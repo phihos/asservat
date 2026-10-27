@@ -36,7 +36,10 @@ type ContextCaseService struct {
 	// ordinary evaluator refuses, keyed by the caller and one artifact, and
 	// before any catalog read of that artifact. Nil disables sharing.
 	Shares permissions.ShareReader
-	Now    func() time.Time
+	// Reviews repeats the caller's recorded decision-time reviews of each
+	// route before its permission read (ADR-245); nil disables them.
+	Reviews permissions.RecordedReviewRefresher
+	Now     func() time.Time
 }
 
 type authorizedContext struct {
@@ -77,6 +80,9 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 	for _, route := range routes.Routes {
 		// Target routing stays internal. Current whole-pod rights precede any
 		// verified evidence, retained audience or effective-policy lookup.
+		if s.Reviews != nil {
+			_ = s.Reviews.ReviewRecorded(ctx, i, route.Target)
+		}
 		p, err := s.Permissions.Permissions(ctx, route.Target)
 		if err != nil {
 			return zero, value.ErrUnavailable

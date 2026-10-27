@@ -62,6 +62,11 @@ type RegionalInstallPlan struct {
 	// Alertmanager is the optional in-cluster Alertmanager base URL that
 	// alert policies read (ADR-231); only an executor uses it.
 	Alertmanager string
+	// IdentityMappings are the cluster's identity mapping records for
+	// decision-time PermissionSources (ADR-245); only an executor uses them,
+	// and only with them does the connector account get SubjectAccessReview
+	// create.
+	IdentityMappings []contracts.RegionalIdentityMapping
 }
 
 // RegionalInstallation records the created objects by UID.
@@ -83,7 +88,7 @@ func (p RegionalInstallPlan) valid() bool {
 // executor offer, and a digest-pinned image for the executor's pins.
 func (p RegionalInstallPlan) executorValid() bool {
 	executor, err := p.Offer.RegionalExecutorOffered()
-	if err != nil || executor != (len(p.Evidence) > 0) || p.Alertmanager != "" && (!executor || !AlertmanagerURL(p.Alertmanager)) {
+	if err != nil || executor != (len(p.Evidence) > 0) || p.Alertmanager != "" && (!executor || !AlertmanagerURL(p.Alertmanager)) || len(p.IdentityMappings) > 0 && (!executor || !IdentityMappingsValid(p.IdentityMappings)) {
 		return false
 	}
 	if !executor {
@@ -196,6 +201,9 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 	if executor {
 		cluster, connector, capacityRole := regionalExecutorRBAC(p.Namespace)
 		clusterRole.Rules = append(clusterRole.Rules, cluster...)
+		if len(p.IdentityMappings) > 0 {
+			clusterRole.Rules = append(clusterRole.Rules, regionalReviewRBAC())
+		}
 		role.Rules = append(role.Rules, connector...)
 		if capacity != nil {
 			clusterRole.Rules = append(clusterRole.Rules, regionalCapacityRBAC(p.Namespace)...)
@@ -335,7 +343,7 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 		apiContext = &contracts.RegionalAPIContext{Settings: RegionalSettings, SettingsGuard: x.settingsGuard,
 			Starts:    contracts.OwnerDeploymentAPIContextStarts{CapacityAccount: ref(x.capacity.ObjectMeta), ExecutionAccount: out.Account, CapacityAudience: x.audience},
 			WorkTrust: x.trust, WorkTrustGuard: x.trustGuard, TrustSettings: x.trustSettings,
-			EvidenceStore: *p.Offer.EvidenceStore, KeyService: *p.Offer.KeyService, Owners: *p.Offer.Owners, Concurrency: RegionalExecutorConcurrency, Alertmanager: p.Alertmanager}
+			EvidenceStore: *p.Offer.EvidenceStore, KeyService: *p.Offer.KeyService, Owners: *p.Offer.Owners, Concurrency: RegionalExecutorConcurrency, Alertmanager: p.Alertmanager, IdentityMappings: p.IdentityMappings}
 	}
 	inputs, err := json.Marshal(contracts.RegionalDeployment{Format: contracts.RegionalDeploymentFormat, InstallationID: b.InstallationID, ClusterID: b.ClusterID, PermissionRootID: p.Offer.PermissionRootID, IssuerEpoch: b.IssuerEpoch, PeerID: b.PeerID,
 		Namespace: out.Namespace, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: roots}, Deployment: out.Deployment, WorkloadGuard: out.WorkloadGuard, ConfigurationProbes: probes,
@@ -513,6 +521,14 @@ func RegionalWorkload(o contracts.RegionalOffer, executor bool) *apps.Deployment
 			Resources:       core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("500m"), core.ResourceMemory: resource.MustParse("256Mi")}}}}}
 	return &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: RegionalDeployment}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(0)), Selector: &meta.LabelSelector{MatchLabels: labels},
 		Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType}, Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: spec}}}
+}
+
+// regionalReviewRBAC lets the connector submit the decision-time
+// SubjectAccessReviews of ADR-245. It is cluster-wide by the API's nature
+// (subjectaccessreviews is a cluster-scoped virtual resource); a review reads
+// an authorizer decision and changes nothing.
+func regionalReviewRBAC() rbac.PolicyRule {
+	return rbac.PolicyRule{APIGroups: []string{"authorization.k8s.io"}, Resources: []string{"subjectaccessreviews"}, Verbs: []string{"create"}}
 }
 
 // regionalRBAC grants the connector exactly its reads, its own Secret CAS and

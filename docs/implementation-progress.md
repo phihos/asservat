@@ -1,5 +1,84 @@
 # Sustained implementation progress
 
+## Decision-time permission sources: pod exec and access review (ADR-245, 2026-10-27)
+
+[ADR-245](decisions/245-decision-time-permission-sources.md) implements REQ-PER-004. The hub-worker
+accepts supported `kubernetesExec`/`kubernetesAccessReview` PermissionSources (≤ 4 per cluster,
+`admissionParity.mode: noAdditionalRestrictions` only) as subject-free `ReviewSources` of the
+audited permission batch (migration 00096, schema 96: `permission_review_source`,
+`permission_review_assignment`, `permission_review_decision`; the capacity scope functions are
+rewritten in place). Before a capture preview/request and explain_access, hub-api asks the target
+cluster's connector (`review-access` on the ADR-179 query frames) to review the request's human
+principal for the resolved Pod: identity mapped through the connector-local
+`cluster.identityMappings` record, namespace UID/selector/exclusions and object UID checked, one
+SubjectAccessReview naming the mapped user. Allowed → one persistent assignment per (source,
+principal) plus a per-Pod decision ≤ `maxDecisionAgeSeconds` (≤ 60 s) that the permission
+projection includes as that principal's `Reviewed` allow; refusal or SAR outage ends it at once;
+explicit denies win; only the capturing human joins a capture's audience. Read paths (get_case,
+projection read, download, get_capture) repeat the caller's recorded reviews first. The connector
+account gets `create subjectaccessreviews` only with identity mappings (Helm and installer RBAC).
+Preview reports proposed decision-time sources as `Indeterminate`/`DecisionTimeSource`; deleting
+or editing one shows the removed access of its persistent assignments (`Allow` before with a
+current decision, `Indeterminate`/`DecisionTimeSource` before otherwise). `resolve_capture_request`
+repeats the caller's recorded review of its preview's Pod first. REQ-PER-006: each decision change
+of a (source, principal, Pod) — first allow, revocation with its closed reason, restoration — is one
+`permission-review` event in the authority audit outbox (published and acknowledged by the existing
+publisher); confirming reviews only update the SQL row. hub-api appends these events only through
+the SECURITY DEFINER function `record_permission_review_audit` (current stream epoch/sequence,
+current review assignment of that stream, kind `permission-review`) and holds no INSERT on
+`authority_audit`; an allow whose decision row is not written (decided before the current
+refusal) records no event. Migration 00096 follows S-04 increment 2's 00095.
+
+PR #88 follow-up verification (2026-10-27): `make initial-installation-integration` PASS (136.6 s)
+incl. `public-runtime-roles-matrix` and `public-runtime-roles-lost-completion/hub-runtime-generated-role-effects`
+(hub runtime role again denied `INSERT INTO authority_audit`); custody
+`TestPermissionAuthorityWithRealServices` PASS incl. the new stale-allow case in
+`decision-time-reviews-mint-expire-deny-and-retire` (0.44 s: refusal, allow decided 2 s earlier
+writes no row and no event, current allow restores; events exactly granted/granted/revoked/
+restored/revoked/restored); `make permission-integration` exit 0 (decision-time subtest 4.28 s);
+`make pre-push` exit 0.
+
+Verification (tracked test/results files restored after each run):
+- Unit: domain/configuration (`ReviewSourceFor`, equivalence, per-cluster bound, batch
+  validation, deleting a decision-time source in the preview), domain/audit (decision-change record
+  bounds), application/capture (resolution repeats the review first and a revoked right refuses), domain/authorization (reviewed allow matches only its principal, joins only the
+  capturing human's audience, never a policy's; deny wins; reads need the recorded assignment;
+  expiry), application/authorization (every outcome recorded, SAR outage recorded as refusal,
+  humans only, recorded targets of current sources only, review before permission read),
+  application/configuration (reconciler carries review sources), adapters/kubernetes
+  (`-run 'TestReviewAccess|TestIdentityMappings|TestRegionalReviewRBAC|TestRegionalExecutor'`:
+  16 SAR modes against a fake API server, mapping bounds, RBAC only with mappings), adapters/postgres
+  grant unions: PASS. `go test ./internal/domain/... ./internal/application/...
+  ./internal/adapters/postgres/... ./internal/transport/... ./internal/contracts/...`: PASS except one
+  run of the unrelated timing test `TestDownloadPolicyObservationNewRequestNearExpiry` under
+  concurrent fixture load; it passed `-count=3` alone.
+- Custody (real PostgreSQL + S3, `scripts/test-custody.py --run TestPermissionAuthorityWithRealServices`):
+  PASS, 23 subtests incl. `decision-time-reviews-mint-expire-deny-and-retire` (0.40 s): refusal
+  mints nothing, stable ID across reviews, refusal ends the decision, other principal not in the
+  audience, deny wins, unreadable source list grants nothing and refuses new records, equivalent
+  edit keeps the ID, removal retires both assignments (audit `ReviewRetirements`, no principal in
+  the record), re-add and generation jump mint new IDs; the decision-change events are exactly
+  granted alice, granted bob, revoked alice (`Denied`), restored alice (no event for confirming
+  reviews), carry no namespace/Pod names and are published and acknowledged; the preview of the
+  caller's own preview finds its recorded review and another actor's does not; the impact preview of
+  deleting the source shows Allow → Deny for both reviewed users on all three operations. Sources
+  unchanged, no cleanup failures.
+- Fleet custody (`scripts/test-custody.py --fleet --run TestCapacityProducerWithRealPostgres`):
+  PASS (75.4 s) incl. `reviewed-workload-gains-a-capacity-scope` (0.19 s): the scope reader lists the
+  review-backed workload scope and enrollment reaches the account reservation step.
+- Permission (`make permission-integration`, owned Kind + PostgreSQL + S3): observation and
+  admission exits 0, sources unchanged, no cleanup failures. New
+  `.../live-guard-proof-and-binding-revocation/decision-time-reviews-with-real-subject-access-reviews-SQL-and-audit`
+  PASS (4.31 s) with a connector account holding only review/read rights and a product-decoded
+  exec source: `create pods/exec` on Pod A grants alice there and not on Pod B; a `get`-only exec
+  grant grants nothing; a mapped group grants and a later request without it ends the decision;
+  RoleBinding removal loses read access at the next read; re-grant restores it under the same
+  assignment ID; an explicit deny wins; a connector without review create fails closed and ends the
+  earlier decision; a deleted Pod stays reviewable by name; a same-name replacement Pod is refused.
+  Measured: first review 29 ms, mean 106.6 ms over 20 reviews (2 GETs + 1 SAR + 1 SQL transaction,
+  loaded workstation; PASS in 4.26 s).
+- Gates: `make pre-push` PASS; `make permission-schema-check`, `helm-check`, `spec-check`, `architecture-check` PASS. All fixture runs after the rebase onto main with the final sources (unchanged during each run, no cleanup failures). The timing test `TestDownloadPolicyObservationNewRequestNearExpiry` failed in two parallel whole-tree runs and passed alone (`-count=3`); it does not use the review port. The sharded `go-check` (race) was not run locally. No installed qualification.
+
 ## S-04 increment 2: native artifact types and larger saves (ADR-244, 2026-10-27)
 
 [ADR-244](decisions/244-native-artifact-types.md): artifact-type registry (pod status unchanged;

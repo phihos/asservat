@@ -14,7 +14,7 @@ func fixture() (identity.Identity, Projection, Retained, time.Time) {
 	i := identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.invalid", Subject: "non-lead-developer", ClientID: "console", Kind: identity.Human}, Scopes: []string{"evidence:read", "evidence:capture", "evidence:download"}, Groups: []string{"team-a"}, Policy: revision, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
 	target := Target{"11111111-1111-1111-1111-111111111111", "namespace-uid", "workload-uid", "pod-uid"}
 	a := artifact.AudienceAssignment{Kind: "Group", Issuer: i.Principal.Issuer, SubjectID: "team-a", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding-uid", BasisDigest: artifact.Digest{1}, AssignmentID: "22222222-2222-2222-2222-222222222222"}
-	p := Projection{Target: target, Revision: revision, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), DeniesComplete: true, DeniesObservedAt: now, DeniesFreshUntil: now.Add(5 * time.Second), Allows: []CurrentAssignment{{a, now, now.Add(20 * time.Second)}}}
+	p := Projection{Target: target, Revision: revision, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), DeniesComplete: true, DeniesObservedAt: now, DeniesFreshUntil: now.Add(5 * time.Second), Allows: []CurrentAssignment{{Audience: a, ObservedAt: now, FreshUntil: now.Add(20 * time.Second)}}}
 	e := Retained{ArtifactID: "33333333-3333-3333-3333-333333333333", Target: target, DataClass: "metadata", ExpiresAt: now.Add(time.Hour), Audience: []artifact.AudienceAssignment{a}}
 	return i, p, e, now
 }

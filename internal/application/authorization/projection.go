@@ -55,7 +55,10 @@ type ContextProjectionAuthority struct {
 	// target eligibility refuses, before the protected catalog read. Nil
 	// disables shared inspection.
 	Shares ShareReader
-	Now    func() time.Time
+	// Reviews repeats the caller's recorded decision-time reviews before the
+	// permission read (ADR-245); nil disables them.
+	Reviews RecordedReviewRefresher
+	Now     func() time.Time
 }
 
 func (s ContextProjectionAuthority) CheckProjectionCurrent(ctx context.Context, source identities.CurrentIdentity, scope analysis.ContextProjectionScope) (analysis.ContextProjectionAuthority, error) {
@@ -108,6 +111,9 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	}
 	defer shorten("identity", i.ValidUntil)()
 	target := value.Target{ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID}
+	if s.Reviews != nil {
+		_ = s.Reviews.ReviewRecorded(call, i, target)
+	}
 	p, err := s.Permissions.Permissions(call, target)
 	p = cloneProjectionPermissions(p)
 	preliminary := value.ScopeEligibility(i, p, value.ReadApproved, target, s.Now())

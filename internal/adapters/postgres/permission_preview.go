@@ -9,6 +9,7 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	configapp "asservat.local/asservat/internal/application/configuration"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -39,12 +40,49 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 			return cfg.ErrLimit
 		}
 		namespaces := slices.Clone(r.Namespaces)
+		// ADR-245: a decision-time source has no basis; its persistent
+		// per-principal assignments, with the workloads they were reviewed
+		// for, are what deleting or editing it removes.
+		var reviewRows []custodydb.SelectPreviewReviewAssignmentsRow
+		reviewSource := map[string]string{}
+		reviewSources, err := q.ListPermissionReviewSources(ctx, s.ID)
+		if err != nil {
+			return err
+		}
+		isReview := func(ref cfg.PreviewBasis) bool {
+			return ref.Kind == "PermissionSource" && slices.ContainsFunc(reviewSources, func(x custodydb.PermissionReviewSource) bool { return x.Uid == ref.UID })
+		}
+		for _, ref := range r.Bases {
+			if !isReview(ref) {
+				continue
+			}
+			rows, err := q.SelectPreviewReviewAssignments(ctx, custodydb.SelectPreviewReviewAssignmentsParams{StreamID: s.ID, SourceUid: ref.UID, Epoch: s.Epoch, SeenSequence: s.Sequence})
+			if err != nil {
+				return err
+			}
+			if len(reviewRows)+len(rows) > cfg.MaxPreviewTargets {
+				return cfg.ErrLimit
+			}
+			for _, row := range rows {
+				reviewSource[uid(row.ID)] = ref.UID
+			}
+			reviewRows = append(reviewRows, rows...)
+		}
 		named := map[cfg.PreviewNamespace][]string{}
 		for ns, workloads := range r.Workloads {
 			named[ns] = slices.Clone(workloads)
 		}
+		for _, row := range reviewRows {
+			ns := cfg.PreviewNamespace{ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid}
+			if !slices.Contains(namespaces, ns) {
+				namespaces = append(namespaces, ns)
+			}
+			if !slices.Contains(named[ns], row.WorkloadUid) {
+				named[ns] = append(named[ns], row.WorkloadUid)
+			}
+		}
 		for _, ref := range r.Bases {
-			found := false
+			found := isReview(ref)
 			for _, b := range bases {
 				ns := cfg.PreviewNamespace{ClusterID: uid(b.ClusterID), NamespaceUID: b.NamespaceUid}
 				// A delegated previewer's read matches objects only inside
@@ -70,6 +108,10 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 				return err
 			}
 			for _, src := range r.Sources {
+				if _, why := cfg.ReviewSourceFor(src); why == "" {
+					out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: cfg.DecisionTimeSource})
+					continue
+				}
 				grants, reason := configapp.NamespaceGrants(src, "", observation)
 				switch reason {
 				case cfg.MetadataUnavailable, cfg.MetadataNotObserved:
@@ -117,6 +159,9 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 				switch {
 				case err == nil:
 					cell.Projection = projection
+					if err = previewReviews(ctx, q, &cell, reviewRows, reviewSource); err != nil {
+						return err
+					}
 				case errors.Is(err, cfg.ErrUnavailable):
 					cell.Unavailable = authorization.UnmetPermissionStale
 				case errors.Is(err, cfg.ErrLimit):
@@ -159,4 +204,29 @@ func currentNamespaceObservation(ctx context.Context, q *custodydb.Queries, s cu
 		return nil, cfg.ErrUnavailable
 	}
 	return record.Namespaces, nil
+}
+
+// previewReviews adds a deleted or edited decision-time source's assignments
+// to the cell of the workload they were reviewed for: a current decision as
+// the reviewed allow it is now; an expired or refused one as Unknown, because
+// the current SubjectAccessReview outcome cannot be known without a review.
+func previewReviews(ctx context.Context, q *custodydb.Queries, cell *cfg.PreviewCell, rows []custodydb.SelectPreviewReviewAssignmentsRow, sources map[string]string) error {
+	n, err := q.CurrentTime(ctx)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if uid(row.ClusterID) != cell.Target.ClusterID || row.NamespaceUid != cell.Target.NamespaceUID || row.WorkloadUid != cell.Target.WorkloadUID {
+			continue
+		}
+		a := artifact.AudienceAssignment{Kind: "User", Issuer: row.Issuer, SubjectID: row.SubjectID, Role: row.Role, BasisKind: "PermissionSource", BasisUID: sources[uid(row.ID)], AssignmentID: uid(row.ID)}
+		copy(a.BasisDigest[:], row.BasisDigest)
+		if row.FreshUntil.Valid && n.Time.Before(row.FreshUntil.Time) && row.FreshUntil.Time.After(row.DecidedAt.Time) {
+			until := identity.Earlier(cell.Projection.FreshUntil, row.FreshUntil.Time)
+			cell.Projection.Allows = append(cell.Projection.Allows, authorization.CurrentAssignment{Audience: a, ObservedAt: row.DecidedAt.Time, FreshUntil: until, Reviewed: true})
+			continue
+		}
+		cell.Unknown = append(cell.Unknown, a)
+	}
+	return nil
 }

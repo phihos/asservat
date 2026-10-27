@@ -179,6 +179,7 @@ func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
 		b.Initial = &p
 	}
 	b.UnavailableSources = slices.Clone(b.UnavailableSources)
+	b.ReviewSources = slices.Clone(b.ReviewSources)
 	b.Bases = slices.Clone(b.Bases)
 	for i := range b.Bases {
 		p := &b.Bases[i]
@@ -273,6 +274,7 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 	batch.UnavailableSources = slices.Clone(inherited.UnavailableSources)
 	batch.SourcesUnavailable = inherited.SourcesUnavailable
 	batch.Namespaces = inherited.Namespaces
+	batch.ReviewSources = slices.Clone(inherited.ReviewSources)
 	if err = batch.Validate(now); err != nil {
 		return value.PermissionBatch{}, err
 	}

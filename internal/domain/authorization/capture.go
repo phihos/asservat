@@ -26,7 +26,7 @@ func ContextEligibility(i identity.Identity, p Projection, target Target, now ti
 	if !result.Eligible {
 		return CaptureEligibility{Result: result}
 	}
-	audience, until, reason := defaultAudience(p, now)
+	audience, until, reason := defaultAudience(p, &i, now)
 	if reason != "" {
 		return CaptureEligibility{Result: Result{Reason: reason}}
 	}
@@ -36,12 +36,19 @@ func ContextEligibility(i identity.Identity, p Projection, target Target, now ti
 
 // defaultAudience is the complete default evidence audience of a new capture:
 // every current, non-denied assignment that may read approved evidence. It
-// never adds the requester or a policy executor merely for creating it.
-func defaultAudience(p Projection, now time.Time) ([]artifact.AudienceAssignment, time.Time, string) {
+// never adds the requester or a policy executor merely for creating it. A
+// decision-time (reviewed) allow joins only as the executor's own: the
+// capturing principal is that source's recorded audience, and other
+// principals who happen to hold a fresh review are never enumerated
+// (REQ-PER-008). A nil executor (a policy) admits no reviewed allow.
+func defaultAudience(p Projection, executor *identity.Identity, now time.Time) ([]artifact.AudienceAssignment, time.Time, string) {
 	var audience []artifact.AudienceAssignment
 	var until time.Time
 	for _, a := range p.Allows {
 		if !identity.Fresh(a.ObservedAt, a.FreshUntil, now, 60*time.Second) || !permits(a.Audience.Role, ReadApproved) {
+			continue
+		}
+		if a.Reviewed && (executor == nil || executor.Principal.Kind != identity.Human || !matches(a.Audience, *executor)) {
 			continue
 		}
 		denied := false

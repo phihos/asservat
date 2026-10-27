@@ -97,6 +97,26 @@ type RegionalAPIContext struct {
 	// alert policies (ADR-231): installation-owned, optional, never policy
 	// input. Without it an alert policy on this cluster is refused.
 	Alertmanager string `json:"alertmanager,omitempty"`
+	// IdentityMappings are this cluster's administrator-configured mappings
+	// from the hub's authenticated principal to the Kubernetes identity its
+	// SubjectAccessReviews name (ADR-245): installation-owned, optional,
+	// referenced by a decision-time PermissionSource's identityMappingRef.
+	// Without them every such source of this cluster grants nothing.
+	IdentityMappings []RegionalIdentityMapping `json:"identityMappings,omitempty"`
+}
+
+// RegionalIdentityMapping maps one issuer's principals to this cluster's
+// Kubernetes authentication: user = UsernamePrefix + the stable subject (the
+// OIDC "sub" claim), groups = GroupsPrefix + each current stable group ID
+// (only when GroupsPrefix is set), uid = the subject when UID is set. Display
+// names and e-mail are never used. A cluster whose authenticator maps other
+// claims or extra attributes needs no mapping: its sources stay unsupported.
+type RegionalIdentityMapping struct {
+	Name           string  `json:"name"`
+	Issuer         string  `json:"issuer"`
+	UsernamePrefix string  `json:"usernamePrefix"`
+	GroupsPrefix   *string `json:"groupsPrefix,omitempty"`
+	UID            bool    `json:"uid,omitempty"`
 }
 
 type RegionalEvidenceStore struct {

@@ -267,6 +267,24 @@ def check_cluster(directory):
     assert pod["containers"][0]["command"][-2:] == ["--alertmanager", "http://alertmanager-operated.monitoring.svc:9093"]
     executor["cluster"]["alertmanager"] = "http://user:secret@alertmanager:9093"
     render(executor, ok=False)
+    # ADR-245: identity mappings reach an executor's installer as JSON and
+    # let the installer grant SubjectAccessReview create; elsewhere refused.
+    executor["cluster"]["alertmanager"] = ""
+    mappings = [{"name": "company", "issuer": "https://id.example.invalid", "usernamePrefix": "oidc:", "groupsPrefix": "oidc:"}]
+    executor["cluster"]["identityMappings"] = mappings
+    rendered = render(executor)
+    pod = next(r for r in rendered if r["kind"] == "Job")["spec"]["template"]["spec"]
+    assert pod["containers"][0]["command"][-2] == "--identity-mappings" and json.loads(pod["containers"][0]["command"][-1]) == mappings
+    role = next(r for r in rendered if r["kind"] == "ClusterRole")
+    assert {"apiGroups": ["authorization.k8s.io"], "resources": ["subjectaccessreviews"], "verbs": ["create"]} in role["rules"]
+    executor["cluster"]["identityMappings"] = [{"name": "Company", "issuer": "https://id.example.invalid", "usernamePrefix": ""}]
+    render(executor, ok=False)
+    executor["cluster"]["identityMappings"] = []
+    role = next(r for r in render(executor) if r["kind"] == "ClusterRole")
+    assert not any("subjectaccessreviews" in r["resources"] for r in role["rules"])
+    stray = json.loads(json.dumps(base))
+    stray["cluster"]["identityMappings"] = mappings
+    render(stray, ok=False)
     stray = json.loads(json.dumps(base))
     stray["cluster"]["evidenceSecret"] = "operator-evidence"
     render(stray, ok=False)

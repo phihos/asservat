@@ -1,5 +1,14 @@
 # Decision records
 
+[ADR-245 — Decision-time permission sources](245-decision-time-permission-sources.md) implements
+REQ-PER-004: `kubernetesExec` and `kubernetesAccessReview` PermissionSources are accepted as
+subject-free configuration, and before a capture, explanation or read hub-api asks the target
+cluster's connector (existing regional query channel) to submit one SubjectAccessReview for the
+request's human principal, mapped through a connector-local identity mapping record. An allowed
+review mints one persistent assignment per source and principal (the capturing principal's
+audience) and a per-Pod decision of at most `maxDecisionAgeSeconds`; a refusal or SAR outage ends it
+at once; explicit denies still win; reads repeat the recorded review. Migration 00096.
+
 [ADR-244 — Native artifact types and larger saves](244-native-artifact-types.md) is S-04
 increment 2: an artifact-type registry (pod status, PCAPNG, syscall JSON Lines, HTTP header JSON)
 with media type, format, safe filename and coverage; typed expectations with verified

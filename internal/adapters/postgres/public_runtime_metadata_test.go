@@ -26,6 +26,8 @@ func TestPublicMetadataReadHasExactExistingReadPrivileges(t *testing.T) {
 		"context_storage_binding", "custody_allocation", "custody_pool", "context_control_pool", "context_control_account",
 		"context_capture", "context_catalog", "custody_attempt", "context_verification", "context_execution", "context_case_locator",
 		"processing_root", "context_processing", "processing_rule",
+		// ADR-245: read with the permission projection that joins them.
+		"permission_review_source", "permission_review_assignment", "permission_review_decision",
 	} {
 		want = append(want, publicRuntimeGrant{"table", table, "", "SELECT"})
 	}

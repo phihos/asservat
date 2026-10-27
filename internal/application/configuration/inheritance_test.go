@@ -321,3 +321,30 @@ func TestInheritanceRespectsTheBatchBudget(t *testing.T) {
 		t.Fatal("over-budget source granted or kept", len(out.Bases))
 	}
 }
+
+// ADR-245: decision-time sources of every cluster are accepted configuration
+// with no subject, carried in the batch; an unreadable source list carries
+// none (the store then keeps them without renewal).
+func TestInheritanceCarriesDecisionTimeSources(t *testing.T) {
+	f, _, s, ctx := inheritanceRun(t)
+	exec := value.Source{Resource: value.Resource{Kind: "PermissionSource", UID: "exec", ResourceVersion: "1", Generation: 1, SpecDigest: artifact.Digest{9}}, Enabled: true, Type: value.SourceKubernetesExec,
+		ClusterID: "22222222-2222-4222-8222-222222222222", Role: "workload-maintainer", MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10, IdentityMappingRef: "company",
+		AdmissionParity: value.AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "platform-review"}}
+	disabled := exec
+	disabled.Resource.UID, disabled.Enabled = "off", false
+	s.sources = []value.Source{inheritanceSource(), exec, disabled}
+	out := s.inheritance(s.r.Now())
+	if len(out.ReviewSources) != 1 || out.ReviewSources[0].Resource.UID != "exec" || out.ReviewSources[0].Check != value.ReviewPodExec {
+		t.Fatalf("review sources %+v", out.ReviewSources)
+	}
+	if err := s.accept(ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	if b := f.accepted[len(f.accepted)-1]; len(b.ReviewSources) != 1 || b.Validate(b.ObservedAt) != nil {
+		t.Fatalf("accepted batch %+v", b.ReviewSources)
+	}
+	s.sourcesComplete = false
+	if all := s.inheritance(s.r.Now()); !all.SourcesUnavailable || len(all.ReviewSources) != 0 {
+		t.Fatal("unreadable source list carried review sources")
+	}
+}

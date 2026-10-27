@@ -13,6 +13,7 @@ const unmet: Record<string, string> = {
   PermissionObservationStale: 'permission data is not current',
   ServiceUnavailable: 'permission data could not be read',
   ClusterUnavailable: 'the cluster is not enrolled in this installation',
+  DecisionTimeSource: 'decided per user and Pod by a Kubernetes access review at request time',
 };
 type Delta = Preview['deltas'][number];
 

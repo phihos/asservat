@@ -1861,6 +1861,48 @@ type PermissionBasis struct {
 	AutomationAuditID  pgtype.UUID
 }
 
+type PermissionReviewAssignment struct {
+	ID                pgtype.UUID
+	StreamID          pgtype.UUID
+	SourceUid         string
+	Issuer            string
+	SubjectID         string
+	Role              string
+	BasisDigest       []byte
+	CreatedAt         pgtype.Timestamptz
+	RetiredAt         pgtype.Timestamptz
+	RetirementAuditID pgtype.UUID
+}
+
+type PermissionReviewDecision struct {
+	AssignmentID  pgtype.UUID
+	PodUid        string
+	ClusterID     pgtype.UUID
+	NamespaceName string
+	NamespaceUid  string
+	WorkloadKind  string
+	WorkloadName  string
+	WorkloadUid   string
+	PodName       string
+	DecidedAt     pgtype.Timestamptz
+	FreshUntil    pgtype.Timestamptz
+}
+
+type PermissionReviewSource struct {
+	StreamID        pgtype.UUID
+	Uid             string
+	Epoch           pgtype.UUID
+	SeenSequence    int64
+	Generation      int64
+	ResourceVersion string
+	SpecDigest      []byte
+	AuthorityDigest []byte
+	ClusterID       pgtype.UUID
+	Role            string
+	SourceJson      []byte
+	AcceptedAuditID pgtype.UUID
+}
+
 type PermissionStream struct {
 	ID               pgtype.UUID
 	Epoch            pgtype.UUID

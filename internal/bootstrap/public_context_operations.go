@@ -186,7 +186,7 @@ func composePublicAccess(c PublicContextOperationsConfig, s PublicContextOperati
 	if err != nil || pc == nil || pc.permissions == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := authapp.AccessExplainer{InstallationID: c.InstallationID, Targets: v.submission.Targets, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
+	service := authapp.AccessExplainer{InstallationID: c.InstallationID, Targets: v.submission.Targets, Permissions: pc.permissions, Recovery: v.submission.Recovery, Reviews: pc.reviews, Now: c.Now}
 	return presentation.NewAccessOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }
 

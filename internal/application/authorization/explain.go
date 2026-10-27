@@ -30,7 +30,10 @@ type AccessExplainer struct {
 	Targets        ExplainTargets
 	Permissions    ProjectionReader
 	Recovery       ExplainRecovery
-	Now            func() time.Time
+	// Reviews reviews the resolved Pod for the caller's decision-time sources
+	// before the permission read (ADR-245); nil leaves them out.
+	Reviews ResolvedReviewer
+	Now     func() time.Time
 }
 
 // Explain returns the explanation and the reply's metadata deadline. Errors
@@ -64,6 +67,9 @@ func (s AccessExplainer) Explain(ctx context.Context, current identities.Current
 		return s.final(ctx, current, i, value.Undisclosed(), until)
 	}
 	target := resolved.Target()
+	if s.Reviews != nil {
+		_ = s.Reviews.ReviewResolved(ctx, i, resolved.Request)
+	}
 	p, err := s.Permissions.Permissions(ctx, target)
 	if err != nil {
 		return s.final(ctx, current, i, unavailable, until)

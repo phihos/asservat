@@ -138,6 +138,36 @@ func (f *capacitySQLFixture) qualifyRegionalExtension(t *testing.T, first app.En
 	}) {
 		return
 	}
+	// ADR-245: a regional workload that only a decision-time source covers
+	// gets its maintainer scope from one recorded allowed review of one of
+	// its Pods. The scope reader lists it and the workload lock accepts it,
+	// so the reservation reaches the same account step as a bound workload.
+	if !t.Run("reviewed-workload-gains-a-capacity-scope", func(t *testing.T) {
+		namespace := cfg.NamespaceRef{Name: "reviewed-apps", UID: custodyID()}
+		workload := cfg.WorkloadRef{Kind: "Deployment", Name: "reviewed-app", UID: custodyID()}
+		f.addReviewScope(t, regional, namespace, workload)
+		permissions, err := f.permissionRead.ReadCapacityPermissions(f.ctx, func() artifact.RecoveryProof { _, r := f.fresh(t); return r }())
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, s := range permissions.Scopes {
+			if s.ClusterID == regional && s.NamespaceUID == namespace.UID && slices.Equal(s.WorkloadUIDs, []string{workload.UID}) {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("review-backed scope missing", permissions.Scopes)
+		}
+		o := f.regionalObservation(t, regional, artifact.Digest{21}, namespace, workload)
+		_, err = (&app.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}).Reconcile(f.ctx, o)
+		var step interface{ FixedStep() string }
+		if !errors.As(err, &step) || step.FixedStep() != "reserve" {
+			t.Fatal("review-backed workload did not reach the account reservation", err)
+		}
+	}) {
+		return
+	}
 	// ADR-200: a refresh demand is recorded only for an enrolled, ready
 	// workload, and only the capacity writer reads demands back.
 	if !t.Run("refresh-demand-names-only-ready-workloads", func(t *testing.T) {

@@ -6,12 +6,14 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/url"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -19,12 +21,14 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -814,6 +818,244 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			if d.Subject.ID != "team-p" || d.Before != authorization.Deny || d.After != authorization.Allow || d.Target.NamespaceUID != namespace.UID || d.Target.WorkloadUID != cfg.OtherWorkloads {
 				t.Fatalf("source preview delta %+v", d)
 			}
+		}
+	})
+	// ADR-245: decision-time reviews. The connector is synthetic here (the
+	// permission-integration subtest submits real SubjectAccessReviews); the
+	// SQL store, projection, evaluator and acceptance are the product's.
+	t.Run("decision-time-reviews-mint-expire-deny-and-retire", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+		flush(t, s.p)
+		binding := s.b.Bases[0]
+		issuer := "https://id.example.test"
+		spec := cfg.Source{Resource: cfg.Resource{Kind: "PermissionSource", UID: custodyID(), ResourceVersion: "exec-1", Generation: 1, SpecDigest: artifact.Digest{40}}, Enabled: true, Type: cfg.SourceKubernetesExec,
+			ClusterID: s.target.ClusterID, Role: "workload-maintainer", NamespaceSelector: map[string]string{"managed": "true"}, MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10,
+			IdentityMappingRef: "company", AdmissionParity: cfg.AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "synthetic-attestation"}}
+		source, reason := cfg.ReviewSourceFor(spec)
+		if reason != "" {
+			t.Fatal(reason)
+		}
+		step := func(t *testing.T, bases []cfg.PermissionBasis, reviews []cfg.ReviewSource, unavailable bool) {
+			t.Helper()
+			s.b = fresh(s.b)
+			s.b.Bases, s.b.ReviewSources, s.b.SourcesUnavailable, s.b.UnavailableSources, s.b.Namespaces = bases, reviews, unavailable, nil, nil
+			s.b.InputDigest[2]++
+			accept(t, &s)
+			flush(t, s.p)
+		}
+		step(t, []cfg.PermissionBasis{binding}, []cfg.ReviewSource{source}, false)
+		store, err := postgres.NewAccessReviews(ctx, pool, s.b.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := store.ReviewSources(ctx, s.target.ClusterID); err != nil || len(got) != 1 || !got[0].SameAuthority(source) || got[0].Resource != source.Resource {
+			t.Fatalf("current review sources %v %+v", err, got)
+		}
+		request := targets.Request{ClusterID: s.target.ClusterID, Namespace: binding.Scope.Namespace, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: s.target.WorkloadUID}, PodName: "api-1", PodUID: s.target.PodUID}
+		alice := identity.Identity{Principal: identity.Principal{Issuer: issuer, Subject: "alice", ClientID: "console", Kind: identity.Human}, Scopes: []string{"evidence:read", "evidence:capture"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}}
+		bob := alice
+		bob.Principal.Subject = "bob"
+		record := func(t *testing.T, who identity.Identity, src cfg.ReviewSource, allowed bool) error {
+			t.Helper()
+			outcome := map[bool]string{true: "Allowed", false: "Denied"}[allowed]
+			return store.RecordReview(ctx, authapp.ReviewDecision{Source: src, Principal: who.Principal, Target: request, Allowed: allowed, Outcome: outcome, DecidedAt: time.Now()})
+		}
+		reviewed := func(t *testing.T, who identity.Identity) string {
+			t.Helper()
+			for _, a := range projection(t, s).Allows {
+				if a.Reviewed && a.Audience.SubjectID == who.Principal.Subject {
+					return a.Audience.AssignmentID
+				}
+			}
+			return ""
+		}
+		eligible := func(t *testing.T, who identity.Identity) authorization.CaptureEligibility {
+			t.Helper()
+			now := time.Now()
+			who.VerifiedAt, who.ValidUntil = now, now.Add(30*time.Second)
+			return authorization.ContextEligibility(who, projection(t, s), s.target, now)
+		}
+		if reviewed(t, alice) != "" || eligible(t, alice).Eligible {
+			t.Fatal("decision-time source granted before any review")
+		}
+		// A refusal of a principal with no assignment mints nothing.
+		if err = record(t, alice, source, false); err != nil {
+			t.Fatal(err)
+		}
+		if n := 0; admin.QueryRow(ctx, "SELECT count(*) FROM permission_review_assignment WHERE stream_id=$1", s.b.RootID).Scan(&n) != nil || n != 0 {
+			t.Fatal("refusal minted an assignment", n)
+		}
+		if err = record(t, alice, source, true); err != nil {
+			t.Fatal(err)
+		}
+		first := reviewed(t, alice)
+		c := eligible(t, alice)
+		if first == "" || !c.Eligible || !slices.ContainsFunc(c.DefaultAudience, func(a artifact.AudienceAssignment) bool {
+			return a.AssignmentID == first && a.Kind == "User" && a.BasisUID == source.Resource.UID
+		}) {
+			t.Fatalf("allowed review did not grant its principal: %q %+v", first, c)
+		}
+		if err = record(t, bob, source, true); err != nil {
+			t.Fatal(err)
+		}
+		if a := eligible(t, alice); slices.ContainsFunc(a.DefaultAudience, func(x artifact.AudienceAssignment) bool { return x.SubjectID == "bob" }) {
+			t.Fatal("another principal's review joined the capturing principal's audience")
+		}
+		// A fresh allowed review keeps the identity; recorded names are kept.
+		if err = record(t, alice, source, true); err != nil || reviewed(t, alice) != first {
+			t.Fatal("repeated review re-minted the assignment", err)
+		}
+		if got, err := store.RecordedReviews(ctx, alice.Principal, s.target); err != nil || len(got) != 1 || got[0].Target != request || got[0].SourceUID != source.Resource.UID {
+			t.Fatalf("recorded review %v %+v", err, got)
+		}
+		// A refusal (RBAC removed, SAR unavailable) ends the decision at once.
+		if err = record(t, alice, source, false); err != nil || reviewed(t, alice) != "" || eligible(t, alice).Eligible {
+			t.Fatal("refusal left the decision current", err)
+		}
+		if err = record(t, alice, source, true); err != nil || reviewed(t, alice) != first {
+			t.Fatal("re-allowed review lost the assignment of an unchanged source", err)
+		}
+		// REQ-PER-006: one authority event per decision change, none for a
+		// confirming review; published and acknowledged like every event.
+		changes := func(t *testing.T) []string {
+			t.Helper()
+			rows, err := admin.Query(ctx, "SELECT record FROM authority_audit WHERE stream_id=$1 AND event_kind='permission-review' ORDER BY created_at,id", s.b.RootID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rows.Close()
+			var out []string
+			for rows.Next() {
+				var raw []byte
+				var event audit.AuthorityRecord
+				if rows.Scan(&raw) != nil || json.Unmarshal(raw, &event) != nil || event.Review == nil || !event.Valid() || bytes.Contains(raw, []byte(`"api-1"`)) || bytes.Contains(raw, []byte(`"app"`)) {
+					t.Fatalf("review change record %s", raw)
+				}
+				out = append(out, event.Review.Subject+":"+event.Review.Change+":"+event.Review.Outcome)
+			}
+			return out
+		}
+		if got := changes(t); !slices.Equal(got, []string{"alice:granted:Allowed", "bob:granted:Allowed", "alice:revoked:Denied", "alice:restored:Allowed"}) {
+			t.Fatalf("decision changes %v", got)
+		}
+		// An allow decided before the current refusal does not overwrite it:
+		// no row changes, so no restored event (Gitar finding on PR #88).
+		if err = record(t, alice, source, false); err != nil {
+			t.Fatal(err)
+		}
+		if err = store.RecordReview(ctx, authapp.ReviewDecision{Source: source, Principal: alice.Principal, Target: request, Allowed: true, Outcome: "Allowed", DecidedAt: time.Now().Add(-2 * time.Second)}); err != nil || reviewed(t, alice) != "" {
+			t.Fatal("stale allow overwrote the refusal", err)
+		}
+		if err = record(t, alice, source, true); err != nil || reviewed(t, alice) != first {
+			t.Fatal("current allow did not restore", err)
+		}
+		if got := changes(t); !slices.Equal(got, []string{"alice:granted:Allowed", "bob:granted:Allowed", "alice:revoked:Denied", "alice:restored:Allowed", "alice:revoked:Denied", "alice:restored:Allowed"}) {
+			t.Fatalf("stale allow wrote a decision event: %v", got)
+		}
+		flush(t, s.p)
+		var pending int
+		if admin.QueryRow(ctx, "SELECT count(*) FROM authority_audit WHERE stream_id=$1 AND event_kind='permission-review' AND acknowledged_at IS NULL", s.b.RootID).Scan(&pending) != nil || pending != 0 {
+			t.Fatal("review change events not published", pending)
+		}
+		// Request resolution names only the caller's own preview: its Pod's
+		// recorded review is found through the preview, for its actor only.
+		preview := custodyID()
+		blueprint, _ := json.Marshal(map[string]any{"Target": request})
+		actor, _ := json.Marshal(struct {
+			Format string
+			Actor  identity.Principal
+		}{"context-preview-actor/v1", alice.Principal})
+		actorKey, blueprintSum := sha256.Sum256(actor), sha256.Sum256(blueprint)
+		if _, err = admin.Exec(ctx, "INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline) VALUES($1,$2,$3,$4,$5,$5,$6,$7,clock_timestamp(),clock_timestamp()+interval '1 minute')",
+			preview, s.b.RootID, custodyID(), custodyID(), actorKey[:], blueprint, blueprintSum[:]); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := store.RecordedPreviewReviews(ctx, alice.Principal, preview); err != nil || len(got) != 1 || got[0].Target != request {
+			t.Fatalf("recorded preview review %v %+v", err, got)
+		}
+		if got, err := store.RecordedPreviewReviews(ctx, bob.Principal, preview); err != nil || len(got) != 0 {
+			t.Fatalf("another actor found the preview's review %v %+v", err, got)
+		}
+		// Preview of deleting the source: the persistent assignments it minted
+		// are removed (alice and bob hold current decisions: Allow -> Deny).
+		deleting := []cfg.AccessChange{{Action: "delete", Kind: "PermissionSource", UID: source.Resource.UID}}
+		deleting, read, err := cfg.PreviewChanges(deleting, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		snap, err := s.p.PreviewProjections(ctx, read)
+		if err != nil || len(snap.Unmatched) != 0 {
+			t.Fatalf("decision-time source unmatched in preview: %v %+v", err, snap.Unmatched)
+		}
+		preview2, err := cfg.PreviewAccess(deleting, snap, []string{s.target.ClusterID}, nil, identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		removed := map[string]int{}
+		for _, d := range preview2.Deltas {
+			if d.Target.WorkloadUID == s.target.WorkloadUID && d.Before == authorization.Allow && d.After == authorization.Deny {
+				removed[d.Subject.ID]++
+			}
+		}
+		if removed["alice"] != 3 || removed["bob"] != 3 {
+			t.Fatalf("deleting the source did not show the removed access: %+v", preview2.Deltas)
+		}
+		// An explicit deny of the user wins over the fresh review.
+		deny := binding
+		deny.Resource.UID, deny.Effect = custodyID(), "Deny"
+		deny.Subjects = []cfg.Subject{{Kind: "User", Issuer: issuer, ID: "alice"}}
+		deny.ScopeDigest = configapp.PermissionScopeDigest(deny)
+		step(t, []cfg.PermissionBasis{binding, deny}, []cfg.ReviewSource{source}, false)
+		if r := eligible(t, alice); r.Eligible || r.Reason != "ExplicitDeny" {
+			t.Fatalf("deny did not win: %+v", r)
+		}
+		step(t, []cfg.PermissionBasis{binding}, []cfg.ReviewSource{source}, false)
+		if err = record(t, alice, source, true); err != nil || reviewed(t, alice) != first {
+			t.Fatal("decision after deny removal", err)
+		}
+		// An unreadable source list keeps the assignment but grants nothing.
+		step(t, []cfg.PermissionBasis{binding}, nil, true)
+		if reviewed(t, alice) != "" {
+			t.Fatal("unavailable source list still granted a review")
+		}
+		if err = record(t, alice, source, true); !errors.Is(err, cfg.ErrChanged) {
+			t.Fatal("review recorded against a source that is not current", err)
+		}
+		// One spec transition with the same authority (a selector edit) keeps
+		// the assignment and its original basis digest.
+		spec.Resource.Generation, spec.Resource.SpecDigest, spec.NamespaceSelector = 2, artifact.Digest{41}, map[string]string{"managed": "yes"}
+		edited, _ := cfg.ReviewSourceFor(spec)
+		step(t, []cfg.PermissionBasis{binding}, []cfg.ReviewSource{edited}, false)
+		if err = record(t, alice, edited, true); err != nil || reviewed(t, alice) != first {
+			t.Fatal("equivalent source edit re-minted the assignment", err)
+		}
+		// Removal retires every assignment of the source; a re-added source
+		// mints new identities.
+		step(t, []cfg.PermissionBasis{binding}, nil, false)
+		var retired int
+		if admin.QueryRow(ctx, "SELECT count(*) FROM permission_review_assignment WHERE stream_id=$1 AND retired_at IS NOT NULL", s.b.RootID).Scan(&retired) != nil || retired != 2 {
+			t.Fatal("removed source kept assignments", retired)
+		}
+		var event audit.AuthorityRecord
+		var raw []byte
+		if admin.QueryRow(ctx, "SELECT record FROM authority_audit WHERE id=$1", s.b.RequestID).Scan(&raw) != nil || json.Unmarshal(raw, &event) != nil || len(event.ReviewRetirements) != 1 || event.ReviewRetirements[0].Retired != 2 || bytes.Contains(raw, []byte(`"alice"`)) {
+			t.Fatalf("retirement audit %s", raw)
+		}
+		step(t, []cfg.PermissionBasis{binding}, []cfg.ReviewSource{edited}, false)
+		if err = record(t, alice, edited, true); err != nil {
+			t.Fatal(err)
+		}
+		if again := reviewed(t, alice); again == "" || again == first {
+			t.Fatal("re-added source restored a retired assignment")
+		}
+		// A generation jump also retires.
+		spec.Resource.Generation, spec.Resource.SpecDigest = 4, artifact.Digest{42}
+		jumped, _ := cfg.ReviewSourceFor(spec)
+		before := reviewed(t, alice)
+		step(t, []cfg.PermissionBasis{binding}, []cfg.ReviewSource{jumped}, false)
+		if err = record(t, alice, jumped, true); err != nil || reviewed(t, alice) == before {
+			t.Fatal("generation jump kept the assignment", err)
 		}
 	})
 	t.Run("scope-change-and-delete-retire-without-audit", func(t *testing.T) {

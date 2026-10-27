@@ -29,6 +29,11 @@ const PermissionObservationInterval = 30 * time.Second
 type CurrentAssignment struct {
 	Audience               artifact.AudienceAssignment
 	ObservedAt, FreshUntil time.Time
+	// Reviewed marks a decision-time allow (ADR-245): one human principal's
+	// recorded, still fresh SubjectAccessReview for this exact Pod. It
+	// matches only that principal and never joins another actor's default
+	// audience.
+	Reviewed bool `json:",omitempty"`
 }
 
 // A projection is already narrowed to an exact whole-pod target. DeniesComplete

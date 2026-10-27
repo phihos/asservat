@@ -4475,6 +4475,7 @@ components:
                         - PermissionObservationStale
                         - AudienceOverflow
                         - ServiceUnavailable
+                        - DecisionTimeSource
                       after_unmet:
                         enum:
                         - NoMatchingAllow
@@ -4482,6 +4483,7 @@ components:
                         - PermissionObservationStale
                         - AudienceOverflow
                         - ServiceUnavailable
+                        - DecisionTimeSource
                       before_basis:
                         type: array
                         maxItems: 8
@@ -4597,6 +4599,7 @@ components:
                         enum:
                         - MetadataUnavailable
                         - MetadataNotObserved
+                        - DecisionTimeSource
                     required:
                     - action
                     - kind

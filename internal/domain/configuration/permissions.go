@@ -58,7 +58,20 @@ type Source struct {
 	MaxNamespaces         int
 	Protection            Protection
 	Mapping               Mapping
+	// WorkloadSelector selects the Deployments/StatefulSets a
+	// workloadMetadata source reads (REQ-PER-005).
+	WorkloadSelector map[string]string `json:",omitempty"`
+	// IdentityMappingRef, AdmissionParity and AccessReviewCheck configure the
+	// decision-time kubernetesExec/kubernetesAccessReview sources
+	// (REQ-PER-004, ADR-245).
+	IdentityMappingRef string          `json:",omitempty"`
+	AdmissionParity    AdmissionParity `json:",omitzero"`
+	AccessReviewCheck  string          `json:",omitempty"`
 }
+
+// AdmissionParity is the administrator's attestation that a SAR-based
+// source's authorizer decision is not narrowed by admission (REQ-PER-004).
+type AdmissionParity struct{ Mode, ReviewRef, AdapterRef string }
 
 // Snapshot contains a complete binding list and an independently observed
 // allow-only source list, NOT an atomic snapshot across
@@ -148,6 +161,10 @@ const (
 	SourceTooManyNamespaces = "TooManyNamespaces"
 	MetadataUnavailable     = "MetadataUnavailable"
 	MetadataNotObserved     = "MetadataNotObserved"
+	// DecisionTimeSource is a supported kubernetesExec/kubernetesAccessReview
+	// source (ADR-245): it grants per principal and Pod at request time, so
+	// a configuration preview cannot evaluate it.
+	DecisionTimeSource = "DecisionTimeSource"
 )
 
 // NamespaceGrant is one namespace that a source currently grants to Subjects.

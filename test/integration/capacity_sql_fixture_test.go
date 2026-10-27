@@ -17,6 +17,7 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	app "asservat.local/asservat/internal/application/capacity"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/contracts"
@@ -25,6 +26,7 @@ import (
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
+	"asservat.local/asservat/internal/domain/targets"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -369,6 +371,45 @@ func (f *capacitySQLFixture) addPermissionScope(t *testing.T, cluster string, na
 		if err = (auditapp.AuthorityPublisher{Ledger: f.permission, Objects: f.authority}).PublishAuthority(f.ctx); err != nil {
 			t.Fatal("regional permission audit", err)
 		}
+	}
+	f.refreshBase(t)
+}
+
+// addReviewScope accepts a kubernetesExec source for cluster (ADR-245),
+// publishes its authority audit and records one allowed review of a Pod of
+// workload, as hub-api does after the cluster's connector allowed it.
+func (f *capacitySQLFixture) addReviewScope(t *testing.T, cluster string, namespace cfg.NamespaceRef, workload cfg.WorkloadRef) {
+	t.Helper()
+	source, reason := cfg.ReviewSourceFor(cfg.Source{Resource: cfg.Resource{Kind: "PermissionSource", UID: custodyID(), ResourceVersion: "exec-1", Generation: 1, SpecDigest: artifact.Digest{41}}, Enabled: true, Type: cfg.SourceKubernetesExec,
+		ClusterID: cluster, Role: "workload-maintainer", MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10, IdentityMappingRef: "company", AdmissionParity: cfg.AdmissionParity{Mode: "noAdditionalRestrictions", ReviewRef: "synthetic-attestation"}})
+	if reason != "" {
+		t.Fatal(reason)
+	}
+	next := f.batch
+	next.ReviewSources = []cfg.ReviewSource{source}
+	next.RequestID, next.InputDigest, next.Initial = custodyID(), artifact.Digest{byte(len(next.Bases)), 5}, nil
+	f.refreshFleet(t)
+	next.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+	next.FreshUntil = next.ObservedAt.Add(5 * time.Second)
+	accepted, err := f.permission.AcceptPermissions(f.ctx, next)
+	if err != nil {
+		t.Fatal("review source acceptance", err)
+	}
+	next.ExpectedSequence = accepted.Sequence
+	f.batch = next
+	for i := 0; i < 2; i++ {
+		if err = (auditapp.AuthorityPublisher{Ledger: f.permission, Objects: f.authority}).PublishAuthority(f.ctx); err != nil {
+			t.Fatal("review source audit", err)
+		}
+	}
+	reviews, err := postgres.NewAccessReviews(f.ctx, f.fixturePool("authority_runtime", "synthetic-authority"), f.input.PermissionRootID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := targets.Request{ClusterID: cluster, Namespace: namespace, Workload: workload, PodName: workload.Name + "-1", PodUID: custodyID()}
+	principal := identity.Principal{Issuer: "https://id.example.test", Subject: "exec-user", ClientID: "console", Kind: identity.Human}
+	if err = reviews.RecordReview(f.ctx, authapp.ReviewDecision{Source: source, Principal: principal, Target: target, Allowed: true, DecidedAt: time.Now()}); err != nil {
+		t.Fatal("recorded review", err)
 	}
 	f.refreshBase(t)
 }

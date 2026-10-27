@@ -295,6 +295,9 @@ func TestPermissionAdmissionWithRealKubernetes(t *testing.T) {
 		t.Run("namespace-inheritance-with-real-namespaces-SQL-and-audit", func(t *testing.T) {
 			testInheritedReconciliation(t, c, observer, guard, plan, fixture.Postgres, fixture.S3)
 		})
+		t.Run("decision-time-reviews-with-real-subject-access-reviews-SQL-and-audit", func(t *testing.T) {
+			testDecisionTimeReviews(t, c, fixture.Postgres, fixture.S3)
+		})
 		// A probe that would pass administration is never a valid negative control.
 		badConfig := rest.CopyConfig(c)
 		badConfig.Impersonate = rest.ImpersonationConfig{UserName: "fixture-admin", Groups: []string{"asservat-fixture-writers", "system:authenticated"}}
