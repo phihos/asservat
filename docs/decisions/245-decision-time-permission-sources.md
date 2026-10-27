@@ -8,7 +8,7 @@ configurable inheritance including pod exec rights, Kubernetes-only permission c
 maintainer decision of 2026-10-26: every spec feature ships in the first release, the complexity
 gate governs how. Follows [ADR-242](242-namespace-permission-inheritance.md), which accepted
 namespace-metadata sources and left `kubernetesExec`/`kubernetesAccessReview` granting nothing.
-Migration 00096 (schema 96; until S-04 increment 2 merges its 00095, the branch carries that migration byte-identical so the contiguous bundle check holds).
+Migration 00096 (schema 96), after S-04 increment 2's 00095.
 
 ## Problem
 

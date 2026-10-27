@@ -23,8 +23,7 @@ current decision, `Indeterminate`/`DecisionTimeSource` before otherwise). `resol
 repeats the caller's recorded review of its preview's Pod first. REQ-PER-006: each decision change
 of a (source, principal, Pod) — first allow, revocation with its closed reason, restoration — is one
 `permission-review` event in the authority audit outbox (published and acknowledged by the existing
-publisher); confirming reviews only update the SQL row. The branch
-carries S-04 increment 2's streaming-custody migration as 00095 byte-identical (migrations must be contiguous) until that merges.
+publisher); confirming reviews only update the SQL row. Migration 00096 follows S-04 increment 2's 00095.
 
 Verification (tracked test/results files restored after each run):
 - Unit: domain/configuration (`ReviewSourceFor`, equivalence, per-cluster bound, batch
