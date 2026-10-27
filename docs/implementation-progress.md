@@ -97,6 +97,10 @@ Verification:
   account holding only the four attestation reads. First run 40444140764 failed: an explicit
   `appArmorProfile: RuntimeDefault` made the kubelet refuse the Pod on the AppArmor-less kind
   node; the field was removed.
+- After rebasing onto main (#82, #84, #85): native run 40445994032 PASS (job 5 min 35 s, Go test
+  143 s incl. waits; status interval 15.014 s; restart re-enrollment 1.0 s; the collector's own
+  log shows the probe line, one `connector unavailable` retry before the test's listener started,
+  then enrollment). `make pre-push` PASS.
 
 Open: installer provisioning of the connector's `collector` input; work producers and recorders
 (increment 4); budget-policy node limits at admission (increment 6); the full Gadget operator set.
