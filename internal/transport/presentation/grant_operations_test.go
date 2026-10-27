@@ -15,10 +15,12 @@ import (
 )
 
 type grantUseCase struct {
-	until   time.Time
-	view    authapp.GrantView
-	err     error
-	decided struct {
+	replay                   bool
+	decideCalls, revokeCalls int
+	until                    time.Time
+	view                     authapp.GrantView
+	err                      error
+	decided                  struct {
 		id, reason, key string
 		approve         bool
 	}
@@ -31,6 +33,7 @@ func (g *grantUseCase) List(context.Context, identities.CurrentIdentity, string,
 	return []authapp.GrantView{g.view}, g.until, g.err
 }
 func (g *grantUseCase) Decide(_ context.Context, _ identities.CurrentIdentity, id string, approve bool, reason, key string) (authorization.Grant, bool, error) {
+	g.decideCalls++
 	g.decided.id, g.decided.approve, g.decided.reason, g.decided.key = id, approve, reason, key
 	out := g.view.Grant
 	out.Revision = 2
@@ -39,12 +42,13 @@ func (g *grantUseCase) Decide(_ context.Context, _ identities.CurrentIdentity, i
 	if approve {
 		out.ExpiresAt = now.Add(out.Lifetime)
 	}
-	return out, false, g.err
+	return out, g.replay, g.err
 }
 func (g *grantUseCase) Revoke(context.Context, identities.CurrentIdentity, string, int64, string) (authorization.Grant, bool, error) {
+	g.revokeCalls++
 	out := g.view.Grant
 	out.Revision = 3
-	return out, false, g.err
+	return out, g.replay, g.err
 }
 
 func grantView(now time.Time) authapp.GrantView {

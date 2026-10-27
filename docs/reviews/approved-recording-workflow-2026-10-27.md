@@ -107,8 +107,8 @@ proxy. The operator reserves actual packet ciphertext bytes while retaining the
 existing four-record/16-object root ceiling. The output SHA-256 and length must
 match authenticated native-download metadata and tshark must read nonempty TCP
 port-8080 packets. The report records actual original identities, review expiry,
-submit time, remaining real wait and native bytes; no first-run runtime result
-exists yet.
+submit time, remaining real wait and native bytes; the installed end-to-end flow remains unqualified; failed runs are recorded
+below.
 
 
 Download preparation is an effect, so its initial call receives one attempt.
@@ -153,3 +153,32 @@ inputs and verify exact named GET without list/watch/update. The installed focus
 also checks actual connector-account permission reviews for the exact Secret,
 unrelated names, list/watch/update and another namespace. Those native assertions
 remain unqualified until the next agreed frozen-candidate run.
+
+
+## Audited grant outcome correction
+
+Frozen native run 40531588743 passed regional executor composition and reached
+preview/request, then failed at the first browser decide_review (the self-review
+refusal), before the independent review. The Go suite exited FAIL in 473.797s;
+that subtest took 9.73s. No complete approval/packet/publication/download result
+is qualified by that run.
+
+The public audited wrapper already treats decide_review/revoke_grant as mutations,
+but the audit domain's closed effect-operation list omitted them. Building either
+an acknowledged or uncertain outcome therefore failed and the browser returned
+503. Production GrantOperations plus AuditedOperations with a synthetic use case
+and audit gate reproduces that failure. Separate application-service tests cover
+the self-refusal's pending/no-decision backing ledger state; the presentation fake
+is not SQL or mutation-safety proof.
+
+The correction adds only those two existing mutation names to the closed list.
+A schema-validated returned grant ID classifies an acknowledged decision/revocation,
+including idempotent replay, as accepted. Malformed output is suppressed and stays
+unknown. Immutable self-approval refusal is denied with no mutation effect: that requester
+cannot have an accepted prior decision through any client. A retry whose reviewer
+lost rights can still have an earlier committed same-key attempt, so uncertainty
+is retained. Reads remain effect none; unknown operation/effect pairs still refuse.
+Encrypted intent acknowledgement remains before dispatch and failed outcome audit
+suppresses a response without erasing an acknowledged effect. No migration, API
+request, credential, watch, background task or deadline change is introduced.
+Future browser-operation failures also collect the existing bounded diagnostics.

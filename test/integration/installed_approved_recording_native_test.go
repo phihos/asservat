@@ -265,6 +265,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		reply, status, err := b.operation(ctx, name, input, key)
 		if err != nil || status != http.StatusOK {
+			diagnose()
 			t.Fatal("approval public browser operation", name, status, err)
 		}
 		var errorData struct {

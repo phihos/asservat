@@ -432,7 +432,12 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 		clear(b)
 		return OperationReply{}, value.ErrUnavailable
 	}
-	return OperationReply{Body: b, ValidUntil: until, auditDecision: grantAuditDecision(operationErr)}, nil
+	// Self-approval cannot have an accepted prior attempt: the immutable
+	// requester is forbidden to decide through every client. This definite
+	// refusal differs from an unavailable/withdrawn-rights retry whose earlier
+	// logical mutation may already have committed.
+	noDispatch := name == "decide_review" && errors.Is(operationErr, authorization.ErrSelfApproval)
+	return OperationReply{Body: b, ValidUntil: until, auditDecision: grantAuditDecision(operationErr), auditNoDispatch: noDispatch}, nil
 }
 
 func grantAuditDecision(err error) operationAuditDecision {
