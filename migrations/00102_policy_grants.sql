@@ -5,12 +5,7 @@ LOCK TABLE access_grant IN ACCESS EXCLUSIVE MODE;
 
 ALTER TABLE access_grant ADD COLUMN requester_kind text NOT NULL DEFAULT 'human';
 ALTER TABLE access_grant ADD COLUMN request_operation text NOT NULL DEFAULT 'requestGrant';
-ALTER TABLE access_grant ADD COLUMN requester_key bytea GENERATED ALWAYS AS (
- sha256(int4send(octet_length(requester_issuer)) || textsend(requester_issuer)
-     || int4send(octet_length(requester_subject)) || textsend(requester_subject)
-     || int4send(octet_length(requester_client)) || textsend(requester_client)
-     || int4send(octet_length(requester_kind)) || textsend(requester_kind))
-) STORED;
+ALTER TABLE access_grant ADD COLUMN requester_key bytea;
 ALTER TABLE access_grant ALTER COLUMN preview_id DROP NOT NULL;
 ALTER TABLE access_grant ALTER COLUMN capture_id DROP NOT NULL;
 ALTER TABLE access_grant ALTER COLUMN pod_uid DROP NOT NULL;
@@ -40,13 +35,15 @@ END $$;
 ALTER TABLE access_grant ADD CONSTRAINT access_grant_kind CHECK(kind IN('adHocCapture','policy'));
 ALTER TABLE access_grant ADD CONSTRAINT access_grant_requester_kind CHECK(requester_kind IN('human','workload'));
 ALTER TABLE access_grant ADD CONSTRAINT access_grant_scope_kind CHECK((
- (kind='adHocCapture' AND requester_kind='human' AND request_operation='requestGrant'
+ (kind='adHocCapture' AND requester_kind='human' AND request_operation='requestGrant' AND requester_key IS NULL
   AND preview_id IS NOT NULL AND capture_id IS NOT NULL AND pod_uid IS NOT NULL
   AND policy_uid IS NULL AND policy_acceptance_id IS NULL AND policy_scope IS NULL AND policy_not_after IS NULL
   AND lifetime_seconds BETWEEN 60 AND 28800
   AND policy_executions_spent=0 AND policy_bytes_spent=0 AND policy_observed_bytes_spent=0)
  OR
  (kind='policy' AND request_operation='requestPolicyGrant'
+  AND requester_key IS NOT NULL AND octet_length(requester_key)=32
+  AND requester_key=sha256(int4send(octet_length(convert_to(requester_issuer,'UTF8'))) || convert_to(requester_issuer,'UTF8') || int4send(octet_length(convert_to(requester_subject,'UTF8'))) || convert_to(requester_subject,'UTF8') || int4send(octet_length(convert_to(requester_client,'UTF8'))) || convert_to(requester_client,'UTF8') || int4send(octet_length(convert_to(requester_kind,'UTF8'))) || convert_to(requester_kind,'UTF8'))
   AND preview_id IS NULL AND capture_id IS NULL AND pod_uid IS NULL
   AND policy_uid IS NOT NULL AND octet_length(policy_uid) BETWEEN 1 AND 64
   AND policy_acceptance_id IS NOT NULL AND policy_scope IS NOT NULL
@@ -136,9 +133,7 @@ CREATE TABLE policy_grant_attachment (
  actor_issuer text NOT NULL CHECK(octet_length(actor_issuer) BETWEEN 1 AND 2048),
  actor_subject text NOT NULL CHECK(octet_length(actor_subject) BETWEEN 1 AND 256),
  actor_client text NOT NULL CHECK(octet_length(actor_client) BETWEEN 1 AND 256),
- actor_key bytea GENERATED ALWAYS AS (sha256(int4send(octet_length(actor_issuer)) || textsend(actor_issuer)
-  || int4send(octet_length(actor_subject)) || textsend(actor_subject)
-  || int4send(octet_length(actor_client)) || textsend(actor_client))) STORED,
+ actor_key bytea NOT NULL CHECK(octet_length(actor_key)=32 AND actor_key=sha256(int4send(octet_length(convert_to(actor_issuer,'UTF8'))) || convert_to(actor_issuer,'UTF8') || int4send(octet_length(convert_to(actor_subject,'UTF8'))) || convert_to(actor_subject,'UTF8') || int4send(octet_length(convert_to(actor_client,'UTF8'))) || convert_to(actor_client,'UTF8') || int4send(5) || convert_to('human','UTF8'))),
  idempotency_key text NOT NULL CHECK(octet_length(idempotency_key) BETWEEN 1 AND 128),
  request_digest bytea NOT NULL CHECK(octet_length(request_digest)=32),
  attached_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -241,8 +236,8 @@ DECLARE
 BEGIN
  -- Stored generated values are computed after BEFORE triggers. Compare the
  -- immutable source columns, never NEW's not-yet-computed generated fields.
- before_row := to_jsonb(OLD)-ARRAY['requester_key','policy_max_executions','policy_max_bytes','policy_max_observed_bytes'];
- after_row := to_jsonb(NEW)-ARRAY['requester_key','policy_max_executions','policy_max_bytes','policy_max_observed_bytes'];
+ before_row := to_jsonb(OLD)-ARRAY['policy_max_executions','policy_max_bytes','policy_max_observed_bytes'];
+ after_row := to_jsonb(NEW)-ARRAY['policy_max_executions','policy_max_bytes','policy_max_observed_bytes'];
  IF TG_OP='DELETE' OR (after_row-mutable)<>(before_row-mutable) THEN
   RAISE EXCEPTION 'access grant is immutable' USING ERRCODE='23514';
  END IF;

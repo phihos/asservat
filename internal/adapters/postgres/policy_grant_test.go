@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 	"time"
@@ -34,6 +36,7 @@ func policyGrantTestRow(t *testing.T) custodydb.AccessGrant {
 		PolicyUid: grantText(a.PolicyUID), PolicyAcceptanceID: id(p.CaseID), PolicyScope: b, PolicyNotAfter: ts(p.CreatedAt.Add(7 * 24 * time.Hour)),
 		PolicyMaxExecutions: pgtype.Int8{Int64: a.Limits.MaxExecutions, Valid: true}, PolicyMaxBytes: pgtype.Int8{Int64: a.Limits.MaxBytes, Valid: true}, PolicyMaxObservedBytes: pgtype.Int8{Valid: true}}
 	r.ReviewDigest[0] = 9
+	r.RequesterKey = policyGrantActorKey(p.Actor)
 	return r
 }
 
@@ -44,6 +47,7 @@ func TestPolicyGrantRowSeparatesWorkloadScopeAndRequestPrincipal(t *testing.T) {
 		t.Fatal("policy row lost typed workload or original scope", g, err)
 	}
 	r.RequesterKind = string(identity.Workload)
+	r.RequesterKey = policyGrantActorKey(identity.Principal{Issuer: r.RequesterIssuer, Subject: r.RequesterSubject, ClientID: r.RequesterClient, Kind: identity.Workload})
 	g, err = grantFromRow(r)
 	if err != nil || g.Requester.Kind != identity.Workload {
 		t.Fatal("authenticated service became a human", err)
@@ -91,6 +95,31 @@ func TestPolicyGrantRequestIndexNeverAliasesAnotherFullActorOrInput(t *testing.T
 		change(&x)
 		if policyGrantRequestMatches(x, a, r.PolicyUid.String, d) {
 			t.Fatal("indexed collision aliased another request")
+		}
+	}
+}
+
+func TestPolicyGrantActorKeyUsesCanonicalUTF8ByteLengths(t *testing.T) {
+	a := identity.Principal{Issuer: "https://id.example.test", Subject: "développeur-支付", ClientID: "console-é-支付", Kind: identity.Human}
+	// Independently encoded as four UTF-8 byte strings, each preceded by its
+	// unsigned 32-bit network-order byte length. This is also a real-SQL golden.
+	if got := hex.EncodeToString(policyGrantActorKey(a)); got != "1a710aa21e71148b6be54f670a1b6aca0ff6aadec6b7e1d82d71ddef71a2c4f7" {
+		t.Fatal("canonical multibyte actor key changed", got)
+	}
+	left := identity.Principal{Issuer: "ab", Subject: "c", ClientID: "d", Kind: identity.Human}
+	right := left
+	right.Issuer, right.Subject = "a", "bc"
+	if bytes.Equal(policyGrantActorKey(left), policyGrantActorKey(right)) {
+		t.Fatal("ambiguous field boundary aliased another principal")
+	}
+	for _, change := range []func(*identity.Principal){
+		func(p *identity.Principal) { p.ClientID += "x" },
+		func(p *identity.Principal) { p.Kind = identity.Workload },
+	} {
+		other := a
+		change(&other)
+		if bytes.Equal(policyGrantActorKey(a), policyGrantActorKey(other)) {
+			t.Fatal("client/kind missing from actor key")
 		}
 	}
 }

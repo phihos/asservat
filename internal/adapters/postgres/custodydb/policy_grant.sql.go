@@ -30,11 +30,11 @@ func (q *Queries) ClampPolicyGrantDeadlines(ctx context.Context, arg ClampPolicy
 
 const insertPolicyGrant = `-- name: InsertPolicyGrant :one
 INSERT INTO access_grant(id,root_id,kind,cluster_id,namespace_uid,workload_uid,execution_digest,review_digest,data_class,reasons,review,scope,
- requester_issuer,requester_subject,requester_client,requester_kind,request_operation,lifetime_seconds,
+ requester_issuer,requester_subject,requester_client,requester_kind,requester_key,request_operation,lifetime_seconds,
  idempotency_key,request_digest,requested_at,review_until,policy_uid,policy_acceptance_id,policy_scope,policy_not_after)
 SELECT $1::uuid,$2::uuid,'policy',$3::uuid,$4::text,$5::text,
  $6::bytea,$7::bytea,$8::text,$9::jsonb,$10::bytea,$11::bytea,
- $12::text,$13::text,$14::text,$15::text,'requestPolicyGrant',$16::integer,
+ $12::text,$13::text,$14::text,$15::text,sha256(int4send(octet_length(convert_to($12::text,'UTF8'))) || convert_to($12::text,'UTF8') || int4send(octet_length(convert_to($13::text,'UTF8'))) || convert_to($13::text,'UTF8') || int4send(octet_length(convert_to($14::text,'UTF8'))) || convert_to($14::text,'UTF8') || int4send(octet_length(convert_to($15::text,'UTF8'))) || convert_to($15::text,'UTF8')),'requestPolicyGrant',$16::integer,
  $17::text,$18::bytea,t.n,t.n+interval '1 hour',$19::text,$20::uuid,$21::jsonb,
  LEAST(t.n+make_interval(secs=>$16::integer),$22::timestamptz,t.n+make_interval(secs=>s.max_age_seconds))
 FROM (SELECT clock_timestamp() AS n) t JOIN policy_grant_settings s ON s.root_id=$2::uuid
@@ -169,33 +169,20 @@ func (q *Queries) InsertPolicyGrant(ctx context.Context, arg InsertPolicyGrantPa
 
 const readPolicyGrantByKey = `-- name: ReadPolicyGrantByKey :one
 SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent FROM access_grant WHERE root_id=$1::uuid AND kind='policy'
- AND requester_key=sha256(int4send(octet_length($2::text)) || textsend($2::text)
-  || int4send(octet_length($3::text)) || textsend($3::text)
-  || int4send(octet_length($4::text)) || textsend($4::text)
-  || int4send(octet_length($5::text)) || textsend($5::text))
- AND request_operation='requestPolicyGrant' AND idempotency_key=$6::text
+ AND requester_key=$2::bytea
+ AND request_operation='requestPolicyGrant' AND idempotency_key=$3::text
 `
 
 type ReadPolicyGrantByKeyParams struct {
-	RootID           pgtype.UUID
-	RequesterIssuer  string
-	RequesterSubject string
-	RequesterClient  string
-	RequesterKind    string
-	IdempotencyKey   string
+	RootID         pgtype.UUID
+	RequesterKey   []byte
+	IdempotencyKey string
 }
 
 // A fixed-size digest locates a request; every full principal field and the
 // original input digest is independently compared by the adapter.
 func (q *Queries) ReadPolicyGrantByKey(ctx context.Context, arg ReadPolicyGrantByKeyParams) (AccessGrant, error) {
-	row := q.db.QueryRow(ctx, readPolicyGrantByKey,
-		arg.RootID,
-		arg.RequesterIssuer,
-		arg.RequesterSubject,
-		arg.RequesterClient,
-		arg.RequesterKind,
-		arg.IdempotencyKey,
-	)
+	row := q.db.QueryRow(ctx, readPolicyGrantByKey, arg.RootID, arg.RequesterKey, arg.IdempotencyKey)
 	var i AccessGrant
 	err := row.Scan(
 		&i.ID,

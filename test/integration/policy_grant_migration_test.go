@@ -54,6 +54,23 @@ func TestCustodyPolicyGrantMigrationWithRealPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer scratch.Close()
+	volatility, err := scratch.Query(ctx, `SELECT proname,provolatile::text FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='pg_catalog' AND proname IN('textsend','convert_to','int4send','sha256') ORDER BY proname`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for volatility.Next() {
+		var name, kind string
+		if err := volatility.Scan(&name, &kind); err != nil {
+			volatility.Close()
+			t.Fatal(err)
+		}
+		t.Logf("actual PostgreSQL function volatility: %s=%s", name, kind)
+	}
+	err = volatility.Err()
+	volatility.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 	db := stdlib.OpenDB(*cfg.ConnConfig)
 	defer db.Close()
 	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))

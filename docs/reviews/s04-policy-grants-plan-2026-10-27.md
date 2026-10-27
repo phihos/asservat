@@ -552,3 +552,20 @@ never extended. The compatibility floor is 102; a compatible Down restores 81,
 while policy/session/attachment survivors refuse rollback without deletion/refund.
 The simple set-based clamp retains the earlier measured complexity decision; no
 revision history or new global row ceiling is introduced.
+
+
+Smoke 1 (`07ad950c`) failed before Go tests during migration: PostgreSQL refused
+its generated requester-key expression as non-immutable (42P17). Both owned
+containers were removed; unchanged sources and cleanup were independently checked.
+No test or role qualification resulted. Report SHA-256
+`a8605c8a3575a1ef7a39179ae66f8d2448200f4e3edaf3f6abc6d1259f010fc3`.
+
+The correction uses an ordinary nullable policy-only actor-key column, no legacy
+backfill, extension or IMMUTABLE wrapper. The existing INSERT computes its key
+from four explicit UTF-8 strings with network-order byte-length prefixes; a
+conditional CHECK independently requires that same canonical key. Go computes
+the lookup key with the same byte encoding and rechecks the full actor/input.
+A multibyte golden is exercised in both languages; boundary/client/kind changes
+remain distinct and caller-selected mismatches must refuse. Attachment keys use
+an ordinary insertion-checked column too. Actual CHECK behavior remains pending
+another coordinated owned SQL run; generation/unit passes alone do not prove it.

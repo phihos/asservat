@@ -3,6 +3,8 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -17,8 +19,19 @@ import (
 )
 
 func policyGrantKey(root string, actor identity.Principal, key string) custodydb.ReadPolicyGrantByKeyParams {
-	return custodydb.ReadPolicyGrantByKeyParams{RootID: id(root), RequesterIssuer: actor.Issuer, RequesterSubject: actor.Subject,
-		RequesterClient: actor.ClientID, RequesterKind: string(actor.Kind), IdempotencyKey: key}
+	return custodydb.ReadPolicyGrantByKeyParams{RootID: id(root), RequesterKey: policyGrantActorKey(actor), IdempotencyKey: key}
+}
+
+// The SQL INSERT/CHECK uses the same UTF-8 byte lengths, independent of a
+// connection's text-send encoding. Full fields remain the collision check.
+func policyGrantActorKey(actor identity.Principal) []byte {
+	var canonical []byte
+	for _, value := range []string{actor.Issuer, actor.Subject, actor.ClientID, string(actor.Kind)} {
+		canonical = binary.BigEndian.AppendUint32(canonical, uint32(len(value)))
+		canonical = append(canonical, value...)
+	}
+	h := sha256.Sum256(canonical)
+	return h[:]
 }
 
 // A hash is only an index key. Exact principal, policy, operation and original

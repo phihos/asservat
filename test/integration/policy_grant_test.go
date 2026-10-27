@@ -87,14 +87,15 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 		t.Fatal(err)
 	}
 	for name, patch := range map[string]map[string]any{
-		"fake Pod":               {"pod_uid": "invented"},
-		"fake capture":           {"capture_id": custodyID()},
-		"fake preview":           {"preview_id": custodyID()},
-		"missing policy":         {"policy_uid": nil},
-		"missing expiry":         {"policy_not_after": nil},
-		"unapproved spend":       {"policy_executions_spent": 1},
-		"personal pool":          {"max_bytes": 1},
-		"invalid requester kind": {"requester_kind": "policyExecutor"},
+		"fake Pod":                  {"pod_uid": "invented"},
+		"fake capture":              {"capture_id": custodyID()},
+		"fake preview":              {"preview_id": custodyID()},
+		"missing policy":            {"policy_uid": nil},
+		"missing expiry":            {"policy_not_after": nil},
+		"unapproved spend":          {"policy_executions_spent": 1},
+		"personal pool":             {"max_bytes": 1},
+		"invalid requester kind":    {"requester_kind": "policyExecutor"},
+		"caller-selected actor key": {"requester_key": "\\x0000000000000000000000000000000000000000000000000000000000000000"},
 	} {
 		patch["id"], patch["idempotency_key"] = custodyID(), custodyID()
 		b, err := json.Marshal(patch)
@@ -110,10 +111,22 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 	for _, actor := range []identity.Principal{
 		{Issuer: authority.Creator.Issuer, Subject: authority.Creator.Subject, ClientID: "other-authenticated-client", Kind: identity.Human},
 		{Issuer: authority.Creator.Issuer, Subject: authority.Creator.Subject, ClientID: authority.Creator.ClientID, Kind: identity.Workload},
+		{Issuer: "https://id.example.test", Subject: "développeur-支付", ClientID: "console-é-支付", Kind: identity.Human},
 	} {
 		x, replay, err := store.RequestGrant(ctx, request(actor), recovery)
 		if err != nil || replay || x.ID == g.ID || x.Requester != actor {
 			t.Fatal("different full principal inherited original journal", x, replay, err)
+		}
+		if actor.Subject == "développeur-支付" {
+			var key string
+			if err = admin.QueryRow(ctx, `SELECT encode(requester_key,'hex') FROM access_grant WHERE id=$1`, x.ID).Scan(&key); err != nil || key != "1a710aa21e71148b6be54f670a1b6aca0ff6aadec6b7e1d82d71ddef71a2c4f7" {
+				t.Fatal("server-computed UTF-8 key differs from Go golden", key, err)
+			}
+			in := request(actor)
+			got, found, err := store.LookupPolicyGrantRequest(ctx, app.PolicyGrantRequestLookup{Requester: actor, PolicyUID: authority.PolicyUID, IdempotencyKey: in.IdempotencyKey, InputDigest: in.RequestDigest})
+			if err != nil || !found || got.ID != x.ID {
+				t.Fatal("Go/SQL multibyte key could not recover exact original", err)
+			}
 		}
 	}
 	conflict := original

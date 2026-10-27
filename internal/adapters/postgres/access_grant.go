@@ -95,8 +95,11 @@ func grantFromRow(r custodydb.AccessGrant) (authorization.Grant, error) {
 		g.Target = authorization.Target{}
 		g.Policy, g.PolicyNotAfter = &scope, optionalTime(r.PolicyNotAfter)
 		g.Requester.Kind = identity.Kind(r.RequesterKind)
+		if !bytes.Equal(r.RequesterKey, policyGrantActorKey(g.Requester)) {
+			return authorization.Grant{}, authapp.ErrGrantUnavailable
+		}
 		g.PolicySpend = authorization.PolicyGrantSpend{Executions: r.PolicyExecutionsSpent, CollectedBytes: r.PolicyBytesSpent, ObservedBytes: r.PolicyObservedBytesSpent}
-	} else if r.Kind != authorization.GrantAdHocCapture || r.RequesterKind != string(identity.Human) || r.RequestOperation != "requestGrant" {
+	} else if r.Kind != authorization.GrantAdHocCapture || r.RequesterKind != string(identity.Human) || r.RequestOperation != "requestGrant" || len(r.RequesterKey) != 0 {
 		return authorization.Grant{}, authapp.ErrGrantUnavailable
 	}
 	for _, x := range reasons {
