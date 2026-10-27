@@ -54,9 +54,14 @@ type investigationOfflineLoader struct{}
 
 func (investigationOfflineLoader) Load(string) (any, error) { return nil, ErrInvestigationWire }
 
+// InvestigationToolNames lists every embedded operation contract.
+func InvestigationToolNames() []string {
+	return []string{"list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change"}
+}
+
 func NewInvestigationContracts() (*InvestigationContracts, error) {
 	v := &InvestigationContracts{tools: make(map[string]investigationSchema)}
-	for _, name := range []string{"list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change"} {
+	for _, name := range InvestigationToolNames() {
 		b, err := investigationSchemas.ReadFile("investigation-schemas/" + name + ".json")
 		var d InvestigationTool
 		if err != nil || json.Unmarshal(b, &d) != nil || d.Name != name {
