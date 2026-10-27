@@ -3,6 +3,10 @@ package configuration
 import (
 	"context"
 	"errors"
+	"runtime"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -94,6 +98,47 @@ func TestReconcilerInheritsRemoteClusterJournal(t *testing.T) {
 	b = f.accepted[len(f.accepted)-1]
 	if o, _ := inheritedOwners(b); len(o) != 0 || len(b.UnavailableSources) != 1 || len(b.RemoteNamespaces) != 0 {
 		t.Fatalf("lapsed remote journal still granted: %+v", b)
+	}
+}
+
+// Concurrent readers of different key sets restart the journal without
+// leaking a feed or reporting one key set's journal for another (Gitar
+// finding on PR #90): every snapshot names only requested keys and Close
+// leaves no feed running.
+func TestNamespaceJournalServiceConcurrentRestarts(t *testing.T) {
+	base := runtime.NumGoroutine()
+	ns := &namespaceFixture{list: value.NamespaceList{ClusterID: inheritanceCluster, ResourceVersion: "10", Namespaces: []value.ObservedNamespace{observedNamespace("payments", "payments-uid", "1", "payments")}}, now: time.Now}
+	s := &NamespaceJournalService{Observer: ns, Now: time.Now}
+	sets := []value.NamespaceKeys{{Labels: []string{"managed"}, Annotations: []string{"owner"}}, {Labels: []string{"managed", "zone"}, Annotations: []string{"owner"}}}
+	var wg sync.WaitGroup
+	var bad atomic.Int32
+	for g := range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range 200 {
+				keys := sets[(g+i)%2]
+				snap, err := s.Snapshot(context.Background(), keys)
+				if err != nil {
+					continue
+				}
+				for _, n := range snap.Namespaces {
+					if !n.Valid(keys, true) || !strings.HasPrefix(n.ResourceVersion, snap.Journal+":") {
+						bad.Add(1)
+					}
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	s.Close()
+	if bad.Load() != 0 {
+		t.Fatal("a snapshot reported another key set's journal", bad.Load())
+	}
+	for end := time.Now().Add(3 * time.Second); runtime.NumGoroutine() > base && time.Now().Before(end); time.Sleep(20 * time.Millisecond) {
+	}
+	if n := runtime.NumGoroutine(); n > base {
+		t.Fatal("restarted feeds kept running after Close", n, base)
 	}
 }
 

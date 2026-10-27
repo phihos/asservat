@@ -66,7 +66,8 @@ type WorkloadJournalSnapshot struct {
 // finite watch sessions resumed from the last cursor. A journal's versions
 // "<journal>:<changes>" change only when an observed value changes; a relist
 // or invalid transition starts a new journal ID. Namespace names are
-// resolved to UIDs from a namespace LIST at most every 30 seconds. A journal
+// resolved to UIDs from a namespace LIST every 30 seconds, and at most once a second
+// when a workload not present at the last LIST appears. A journal
 // stops after NamespaceJournalIdle without a reader.
 type WorkloadJournalService struct {
 	Observer WorkloadObserver
@@ -77,6 +78,10 @@ type WorkloadJournalService struct {
 	uids      map[string]string
 	uidsAt    time.Time
 	uidsError error
+	// resolved are the workload UIDs present at the last namespace LIST: a
+	// new workload (such as one in a recreated namespace) rereads the names
+	// at most once a second rather than waiting for the 30-second refresh.
+	resolved map[string]bool
 }
 
 const maxWorkloadJournals = 4
@@ -132,12 +137,20 @@ func (s *WorkloadJournalService) Snapshot(ctx context.Context, sel value.Workloa
 		w.ResourceVersion = f.id + ":" + strconv.FormatInt(f.journal.changes[w.UID], 10)
 		out.Workloads = append(out.Workloads, w)
 	}
-	refresh := s.uids == nil || s.Now().Sub(s.uidsAt) >= 30*time.Second
+	age := s.Now().Sub(s.uidsAt)
+	refresh := s.uids == nil || age >= 30*time.Second
+	if !refresh && age >= time.Second {
+		refresh = slices.ContainsFunc(out.Workloads, func(w value.ObservedWorkload) bool { return !s.resolved[w.UID] })
+	}
 	s.mu.Unlock()
 	if refresh {
 		uids, err := s.Observer.NamespaceUIDs(ctx)
+		resolved := make(map[string]bool, len(out.Workloads))
+		for _, w := range out.Workloads {
+			resolved[w.UID] = true
+		}
 		s.mu.Lock()
-		s.uids, s.uidsAt, s.uidsError = uids, s.Now(), err
+		s.uids, s.uidsAt, s.uidsError, s.resolved = uids, s.Now(), err, resolved
 		s.mu.Unlock()
 	}
 	s.mu.Lock()

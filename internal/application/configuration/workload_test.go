@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"maps"
 	"slices"
 	"sync"
 	"testing"
@@ -134,6 +135,7 @@ type workloadObserverFixture struct {
 	mu     sync.Mutex
 	items  map[string][]value.ObservedWorkload
 	events map[string][]WorkloadEvent
+	uids   map[string]string
 }
 
 func (f *workloadObserverFixture) ListWorkloads(_ context.Context, kind string, _ value.WorkloadSelection) (string, []value.ObservedWorkload, error) {
@@ -145,6 +147,11 @@ func (f *workloadObserverFixture) WatchWorkloads(_ context.Context, kind, _ stri
 	return &workloadWatchFixture{f: f, kind: kind}, nil
 }
 func (f *workloadObserverFixture) NamespaceUIDs(context.Context) (map[string]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.uids != nil {
+		return maps.Clone(f.uids), nil
+	}
 	return map[string]string{"shared": "shared-uid"}, nil
 }
 
@@ -209,5 +216,49 @@ func TestWorkloadJournalServiceVersions(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	if v := read(); v.Journal != first.Journal || v.Workloads[0].ResourceVersion != first.Journal+":3" {
 		t.Fatalf("A -> B -> A kept the version: %+v", v)
+	}
+}
+
+// A workload in a namespace recreated under the same name gets the new
+// namespace UID within about a second, not after the 30-second refresh
+// (Gitar finding on PR #90).
+func TestWorkloadJournalServiceResolvesRecreatedNamespace(t *testing.T) {
+	sel := WorkloadSelectionOf(workloadSource())
+	w := func(name, uid, rv string) *value.ObservedWorkload {
+		x := observedWorkload(name, uid, "shared", rv, "payments")
+		x.Namespace.UID = ""
+		return &x
+	}
+	f := &workloadObserverFixture{items: map[string][]value.ObservedWorkload{"Deployment": {*w("api", "a", "1")}}, events: map[string][]WorkloadEvent{}}
+	s := &WorkloadJournalService{Observer: f, Now: time.Now}
+	defer s.Close()
+	uidOf := func(uid string) string {
+		v, err := s.Snapshot(context.Background(), sel)
+		if err != nil {
+			return ""
+		}
+		for _, x := range v.Workloads {
+			if x.UID == uid {
+				return x.Namespace.UID
+			}
+		}
+		return ""
+	}
+	for end := time.Now().Add(2 * time.Second); uidOf("a") == "" && time.Now().Before(end); time.Sleep(10 * time.Millisecond) {
+	}
+	if uidOf("a") != "shared-uid" {
+		t.Fatal("first namespace UID not resolved")
+	}
+	// The namespace is deleted and recreated; a new workload appears in it.
+	f.mu.Lock()
+	f.uids = map[string]string{"shared": "recreated-uid"}
+	f.events["Deployment"] = []WorkloadEvent{{Type: "DELETED", ResourceVersion: "2", Workload: w("api", "a", "2")}, {Type: "ADDED", ResourceVersion: "3", Workload: w("api", "b", "3")}}
+	f.mu.Unlock()
+	var got string
+	for end := time.Now().Add(3 * time.Second); got != "recreated-uid" && time.Now().Before(end); time.Sleep(50 * time.Millisecond) {
+		got = uidOf("b")
+	}
+	if got != "recreated-uid" {
+		t.Fatal("new workload kept the stale namespace UID", got)
 	}
 }
