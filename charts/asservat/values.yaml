@@ -78,6 +78,11 @@ bootstrap:
       eligibleSubjects: []
       eligibleGroups: []
       groupMaxAgeSeconds: 300
+      # Optional protected manual-collection policy; without stepUp no
+      # independent approval can be decided. ACR values are provider-specific.
+      # approvals:
+      #   stepUp: { acrValues: ["2"], maxAgeSeconds: 300 }
+      #   requireRecordingApproval: true
       # Trusted initial AccessBinding writer envelopes and their browser
       # permission previewers (stable issuer subject/group IDs). These are
       # independent identities; preview access never grants Kubernetes writes.

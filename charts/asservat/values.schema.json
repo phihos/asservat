@@ -739,6 +739,43 @@
                     }
                   },
                   "description": "Trusted initial permission guard envelopes and matching browser previewers; empty grants no delegated authority."
+                },
+                "approvals": {
+                  "description": "Protected installation approval settings (ADR-249). stepUp names the IdP acr values accepted as approval step-up and their maximum authentication age; without it no approval can be decided. requireRecordingApproval makes metadata packet/syscall recordings need the same individual approval as sensitive acquisitions (REQ-SYS-002).",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "stepUp": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "acrValues": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                          },
+                          "minItems": 1,
+                          "maxItems": 8,
+                          "uniqueItems": true
+                        },
+                        "maxAgeSeconds": {
+                          "type": "integer",
+                          "minimum": 30,
+                          "maximum": 3600
+                        }
+                      },
+                      "required": [
+                        "acrValues",
+                        "maxAgeSeconds"
+                      ]
+                    },
+                    "requireRecordingApproval": {
+                      "type": "boolean"
+                    }
+                  }
                 }
               }
             }

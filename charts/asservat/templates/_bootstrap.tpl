@@ -88,6 +88,7 @@ limits:
 {{- $clients := list -}}
 {{- range $p.clients }}{{ $clients = append $clients (dict "id" .id "kind" .kind "classQualified" true) }}{{ end -}}
 {{- $_ := set $v "public" (dict "origin" $p.origin "issuer" $p.issuer "clientID" $p.clientID "maxLifetimeSeconds" (int $p.maxLifetimeSeconds) "maxLogins" (int $p.maxLogins) "maxSessions" (int $p.maxSessions) "maxLogoutEvents" (int $p.maxLogoutEvents) "clients" $clients "eligibleSubjects" $p.eligibleSubjects "eligibleGroups" $p.eligibleGroups "groupMaxAgeSeconds" (int $p.groupMaxAgeSeconds)) -}}
+{{- if hasKey $p "approvals" }}{{ $_ := set (get $v "public") "approvals" $p.approvals }}{{ end -}}
 {{- if $p.permissionDelegations }}{{ $_ := set (get $v "public") "permissionDelegations" $p.permissionDelegations }}{{ end -}}
 {{- end -}}
 {{- toJson $v -}}

@@ -8733,6 +8733,14 @@ components:
                   type: integer
                   const: 300
                   description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                can_resume:
+                  type: boolean
+                  description: Advisory current original requester/client collection eligibility under this
+                    exact approved grant. Submission rechecks all authority.
+                can_resolve:
+                  type: boolean
+                  description: Advisory original requester/client may attempt passive original-request lookup/closure.
+                    It never authorizes a new start.
               required:
               - grant_id
               - phase
@@ -8755,6 +8763,8 @@ components:
               - approval_navigation_uri
               - actions
               - capture_deadline_rule
+              - can_resume
+              - can_resolve
               allOf:
               - if:
                   properties:
@@ -10948,7 +10958,16 @@ components:
                 lifecycle_plan:
                   $ref: https://asservat.io/spec/v1/action-lifecycle.schema.json#/$defs/plan
                 capture_assessment:
-                  $ref: https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/assessment
+                  allOf:
+                  - $ref: https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/assessment
+                  - properties:
+                      actions:
+                        items:
+                          properties:
+                            retention:
+                              properties:
+                                anchorRule:
+                                  const: submissionPreparation
                 result_access:
                   $ref: https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/resolved
                 preset_ref:

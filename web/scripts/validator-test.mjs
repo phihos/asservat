@@ -38,7 +38,10 @@ for (const anchorRule of ['firstAcquisitionOrEarlierSource', 'uploadCompletion',
   assert.equal(capture.validOutput_preview_capture(wrong), false, 'pod-status rejects ' + anchorRule);
 }
 const otherMechanism = JSON.parse(await readFile(new URL('../../examples/mcp-preview-result.json', import.meta.url), 'utf8'));
-assert.equal(capture.validOutput_preview_capture(otherMechanism), true, 'other mechanisms retain their acquisition/source anchor');
+assert.equal(capture.validOutput_preview_capture(otherMechanism), true, 'manual previews retain their submission-preparation anchor');
+const wrongRecorder = structuredClone(otherMechanism);
+wrongRecorder.data.capture_assessment.actions[0].retention.anchorRule = 'firstAcquisitionOrEarlierSource';
+assert.equal(capture.validOutput_preview_capture(wrongRecorder), false, 'manual recorder preview refuses source-snapshot timing');
 assert.equal(capture.validInput_request_capture({ preview_id: id, idempotency_key: id }), true);
 assert.equal(capture.validInput_request_capture({ preview_id: 'invalid', idempotency_key: id }), false);
 assert.equal(capture.validInput_get_capture({ capture_id: id }), true);

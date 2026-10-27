@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, expect, it, vi } from 'vitest';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import { Investigation } from './investigation';
-import { SyntheticOperations, session, target, previewResult, progressResult, id, resolvedClosedResult, resolvedAcceptedResult } from './test-fixtures';
+import { SyntheticOperations, session, target, previewResult, progressResult, id, resolvedClosedResult, resolvedAcceptedResult, recordingPreviewResult, approvalPendingResult } from './test-fixtures';
 import { returnPath } from '../routes';
 import { BrowserSession } from '../auth/session';
 import { SessionGate } from '../auth/SessionGate';
@@ -173,4 +173,18 @@ it('offers explicit acquisition continuation without claiming acceptance means i
   await waitFor(() => expect(client.calls.filter(call => call.name === 'request_capture')).toHaveLength(2));
   expect(client.calls.filter(call => call.name === 'request_capture')[1].input).toEqual({ preview_id: id(173), idempotency_key: id(6), continue_acquisition: true });
   expect(screen.getByRole('link', { name: 'Start a new investigation' }).getAttribute('href')).toBe('/captures/new');
+});
+
+it('renders the reviewed recorder assessment and requests approval without claiming collection', async () => {
+  const { controller, client } = await review();
+  const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
+  client.responder = name => name === 'preview_capture' ? recording : approvalPendingResult();
+  await act(async () => { await controller.previewComposition(recording.data.profile_composition!.authored); });
+  expect(screen.getByText(/Saved evidence is limited to/).textContent).toContain((recording.data.max_bytes / 1024).toLocaleString());
+  expect(screen.queryByText(/Saved status is limited to 4 KiB/)).toBeNull();
+  expect(screen.queryByText(/No application process is started/)).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
+  expect(await screen.findByRole('link', { name: 'View approval' })).toHaveProperty('pathname', '/approvals/' + id(41));
+  expect(screen.getByRole('button', { name: 'Continue after approval' })).toBeTruthy();
+  expect(controller.snapshot().captureID).toBeUndefined();
 });
