@@ -266,11 +266,28 @@ func (g *ConnectorAPIExecutionProtection) current(ctx context.Context) (connecto
 // RefreshProofs runs the ADR-251 background rebuild until ctx ends; the caller
 // joins it on shutdown. It adds no authority: each rebuilt proof is a complete
 // ordinary production, and every reuse still performs its current recheck.
-func (g *ConnectorAPIExecutionProtection) RefreshProofs(ctx context.Context) {
+// report, if set, receives a fixed event and producer-owned timing text for
+// each rebuild (never inputs or dependency error text).
+func (g *ConnectorAPIExecutionProtection) RefreshProofs(ctx context.Context, report func(event, timing string)) {
 	if g == nil || g.attester == nil || g.attester.client == nil || ctx == nil {
 		return
 	}
-	g.reuse.refreshLoop(ctx, g.attester.client.now, connectorAPIProofRefreshBelow, g.produceProof)
+	produce := func(call context.Context) (connectorAPIProof, error) {
+		started := time.Now()
+		p, err := g.produceProof(call)
+		if report != nil {
+			event, timing := "rebuilt", "took "+time.Since(started).Round(10*time.Millisecond).String()+" left "+p.validUntil.Sub(g.attester.client.now()).Round(10*time.Millisecond).String()
+			var step *connectorAPIStepError
+			if errors.As(err, &step) {
+				event, timing = "failed "+step.phase, step.step
+			} else if err != nil {
+				event = "failed"
+			}
+			report(event, timing)
+		}
+		return p, err
+	}
+	g.reuse.refreshLoop(ctx, g.attester.client.now, connectorAPIProofRefreshBelow, produce)
 }
 
 // Reuse only the expensive independent denial/TokenReview proof, under its

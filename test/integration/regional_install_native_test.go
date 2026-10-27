@@ -410,16 +410,25 @@ func regionalLogs(t *testing.T, ctx context.Context, api kubernetes.Interface) {
 		for _, s := range p.Status.ContainerStatuses {
 			t.Logf("connector pod %s ready=%v restarts=%d waiting=%v", p.Name, s.Ready, s.RestartCount, s.State.Waiting != nil)
 		}
-		stream, err := api.CoreV1().Pods("asservat-connector").GetLogs(p.Name, &core.PodLogOptions{LimitBytes: ptr.To(int64(8 << 10))}).Stream(ctx)
+		// The event logs double their intervals, so the whole log stays small;
+		// keep its start and its latest lines (the failing phase).
+		stream, err := api.CoreV1().Pods("asservat-connector").GetLogs(p.Name, &core.PodLogOptions{LimitBytes: ptr.To(int64(1 << 20))}).Stream(ctx)
 		if err != nil {
 			continue
 		}
-		b, _ := io.ReadAll(io.LimitReader(stream, 8<<10))
+		b, _ := io.ReadAll(io.LimitReader(stream, 1<<20))
 		stream.Close()
+		var lines []string
 		for _, line := range strings.Split(string(b), "\n") {
 			if strings.HasPrefix(line, "connector") || strings.HasPrefix(line, "regional") {
-				t.Log("regional:", line)
+				lines = append(lines, line)
 			}
+		}
+		if len(lines) > 300 {
+			lines = append(lines[:100:100], lines[len(lines)-200:]...)
+		}
+		for _, line := range lines {
+			t.Log("regional:", line)
 		}
 	}
 }
