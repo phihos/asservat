@@ -31,7 +31,11 @@ const (
 	MaxRequestBytes  = 32 << 10
 	MaxResponseBytes = 64 << 10
 	maxNesting       = 32
-	requestLifetime  = 5 * time.Second
+	// toolsListBudget bounds the encoded tools of one tools/list page. The
+	// rest of MaxResponseBytes covers the JSON-RPC envelope, cursor and cache
+	// fields; every single descriptor must fit it (tested).
+	toolsListBudget = MaxResponseBytes - 4<<10
+	requestLifetime = 5 * time.Second
 )
 
 var ErrConfiguration = errors.New("invalid MCP configuration")
@@ -222,7 +226,9 @@ func newHandler(c Config, resolver identities.Resolver, operations presentation.
 	server := sdk.NewServer(&sdk.Implementation{Name: "Asservat", Version: c.Version}, &sdk.ServerOptions{
 		Capabilities:              &sdk.ServerCapabilities{},
 		SupportedProtocolVersions: []string{"2026-07-28", "2025-11-25"},
-		PageSize:                  20,
+		// The SDK pages by count; sizePagedToolsList joins single-tool pages
+		// up to toolsListBudget so no reply can exceed MaxResponseBytes.
+		PageSize: 1,
 		SetCacheable: func(_ context.Context, _ sdk.Request, cache *sdk.Cacheable) {
 			cache.TTLMs = 0
 			cache.CacheScope = "private"
@@ -232,6 +238,7 @@ func newHandler(c Config, resolver identities.Resolver, operations presentation.
 	if operations != nil {
 		registerContextTools(server, operations)
 	}
+	server.AddReceivingMiddleware(sizePagedToolsList)
 	if audited != nil {
 		server.AddReceivingMiddleware(auditedReceivingMiddleware(operations))
 	}
@@ -245,6 +252,54 @@ func newHandler(c Config, resolver identities.Resolver, operations presentation.
 		return nil, ErrConfiguration
 	}
 	return &Handler{config: c, identities: resolver, protocol: protocol, slots: make(chan struct{}, c.MaxConcurrent), wire: wire, normalWork: make(chan struct{}, c.MaxConcurrent), stopWork: make(chan struct{}, 4), normalFlight: map[identity.Principal]int{}, stopFlight: map[identity.Principal]int{}, inFlight: make(map[identity.Principal]int), now: time.Now, operations: operations, audited: audited}, nil
+}
+
+// sizePagedToolsList fills one tools/list reply from successive SDK pages of
+// one tool while their encoded size fits toolsListBudget. The returned cursor
+// is the SDK's own cursor after the last included tool, so pages stay disjoint
+// and invalid cursors keep the SDK's Invalid params error.
+func sizePagedToolsList(next sdk.MethodHandler) sdk.MethodHandler {
+	return func(ctx context.Context, method string, request sdk.Request) (sdk.Result, error) {
+		req, ok := request.(*sdk.ListToolsRequest)
+		if method != "tools/list" || !ok {
+			return next(ctx, method, request)
+		}
+		result, err := next(ctx, method, request)
+		page, typed := result.(*sdk.ListToolsResult)
+		if err != nil || !typed {
+			return result, err
+		}
+		size := encodedToolsSize(page.Tools)
+		for page.NextCursor != "" {
+			params := sdk.ListToolsParams{Cursor: page.NextCursor}
+			if req.Params != nil {
+				params.Meta = req.Params.Meta
+			}
+			result, err = next(ctx, method, &sdk.ListToolsRequest{Session: req.Session, Params: &params, Extra: req.Extra})
+			more, typed := result.(*sdk.ListToolsResult)
+			if err != nil || !typed {
+				return nil, errors.New("tools list unavailable")
+			}
+			added := encodedToolsSize(more.Tools)
+			if size+added > toolsListBudget {
+				break
+			}
+			size += added
+			page.Tools = append(page.Tools, more.Tools...)
+			page.NextCursor = more.NextCursor
+		}
+		return page, nil
+	}
+}
+
+// encodedToolsSize counts each descriptor's JSON plus its array separator.
+func encodedToolsSize(tools []*sdk.Tool) int {
+	size := 0
+	for _, tool := range tools {
+		b, _ := json.Marshal(tool)
+		size += len(b) + 1
+	}
+	return size
 }
 
 func registerContextTools(server *sdk.Server, operations presentation.Operations) {
