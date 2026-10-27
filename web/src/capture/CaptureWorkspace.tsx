@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import { Investigation, requestablePreview, type State } from './investigation';
-import type { HistoryEntry, Preview, Progress, Target } from './http';
+import type { Data, HistoryEntry, Input, Preview, Progress, Target } from './http';
 import { captureIDFromPath } from '../routes';
 import { WhyAccess } from '../access/WhyAccess';
 import { RecipientsEditor } from '../sharing/SharePanel';
@@ -77,14 +77,57 @@ const evidenceLabels: Record<HistoryEntry['evidence_state'], string> = {
 function RecentCaptures({ state, controller }: { state: State; controller: Investigation }) {
   return <section className="review-section" aria-labelledby="recent-heading" aria-busy={state.history === undefined && !state.historyMessage}>
     <h2 id="recent-heading">Recent captures</h2>
+    <label>Request origin <select aria-label="Request origin" disabled={state.busy} value={state.historyOrigin ?? 'manual'} onChange={event => void controller.historyOrigin(event.currentTarget.value as NonNullable<State['historyOrigin']>)}><option value="manual">Manual</option><option value="policy">Policy</option><option value="discovery">Discovery</option><option value="all">All origins</option></select></label>
     {state.historyMessage ? <p className="notice">{state.historyMessage}</p>
       : state.history === undefined ? <p role="status">Loading recent captures…</p>
-      : state.history.length === 0 ? <p>No captures of this target in the last 7 days that you can see.</p>
+      : state.history.length === 0 ? <p>No retained captures of this target that you can see.</p>
       : <ul className="recent-captures">{state.history.map(entry => <li key={entry.capture_id}>
         <span><a href={'/captures/' + entry.capture_id}>{new Date(entry.accepted_at).toLocaleString()}</a> · {phases[entry.phase]} · {evidenceLabels[entry.evidence_state]}</span>
+        <span>{entry.origin} · {entry.action_kinds.map(kind => kind === 'kubernetesSnapshot' ? 'Kubernetes snapshot' : kind.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()).join(', ')}{entry.requester && <> · requested by <span title={entry.requester.issuer}>{entry.requester.subject_id}</span></>}</span>
+        {(entry.repeat_state === 'available' || entry.repeat_state === 'requiresSelection') && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.showSettings(entry.capture_id)}>View settings</Button>}
+        {entry.repeat_state === 'parametersExpired' && <span>Saved settings expired</span>}
+        {entry.repeat_state === 'parametersUnavailable' && <span>Saved settings unavailable</span>}
+        {entry.repeat_state === 'targetUnavailable' && <span>The original target is unavailable</span>}
         {entry.repeat_state === 'available' && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.repeat(entry.capture_id)}>Collect again</Button>}
+        {entry.repeat_state === 'requiresSelection' && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.repeat(entry.capture_id, 'currentEligiblePod')}>Review with a current eligible Pod</Button>}
       </li>)}</ul>}
-    <p className="field-help">Shows the last 7 days of your own requests and of requests your team could access when they were made. Collecting again reviews the same settings with your current access and limits; nothing is collected until you confirm.</p>
+    {state.historyCursor && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.moreHistory()}>Older captures</Button>}
+    {state.history && state.history.length >= 100 && <p>Showing the last 100 entries loaded. Refresh history to return to the newest captures.</p>}
+    <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.historyOrigin(state.historyOrigin ?? 'manual')}>Refresh history</Button>
+    {state.settings && <SavedSettings key={state.settings.settings_digest} settings={state.settings} busy={state.busy} controller={controller} />}
+    <p className="field-help">Shows retained requests you can currently access. Collecting again restores the target, recipe and requested settings for a fresh review of access, limits and approval needs. Nothing is collected until you confirm.</p>
+  </section>;
+}
+
+function SavedSettings({ settings, busy, controller }: { settings: Data<'get_capture_settings'>; busy: boolean; controller: Investigation }) {
+  const provenance = 'profile_composition' in settings.settings ? settings.settings.profile_composition : undefined;
+  const [composition, setComposition] = useState(provenance?.authored);
+  const [retention, setRetention] = useState('');
+  const selection = settings.settings.target.selection === 'triggeringPod' ? 'currentEligiblePod' : undefined;
+  const edit = (component: number, override: number, value: string | number) => {
+    if (!composition) return;
+    const changed = structuredClone(composition);
+    const field = changed.components[component].overrides![override];
+    // Preserve the existing discriminator and value type; the canonical
+    // validator and fresh server preview check the finite field's bounds.
+    if (typeof field.value === typeof value) field.value = value as typeof field.value;
+    setComposition(changed);
+  };
+  return <section className="review-section saved-settings" aria-label="Saved capture settings">
+    <h3>Saved settings</h3>
+    <p>Requested retention: {'requested_retention' in settings.settings ? settings.settings.requested_retention : 'Installation default'}. Available until {new Date(settings.expires_at).toLocaleString()}.</p>
+    {selection && <p>The original policy selected a triggering Pod. This review selects a current eligible Pod of the same workload.</p>}
+    {provenance && <><h4>Authored profiles and version pins</h4><pre tabIndex={0} role="region" aria-label="Authored profiles JSON">{JSON.stringify(provenance, null, 2)}</pre></>}
+    <h4>Accepted settings</h4><pre tabIndex={0} role="region" aria-label="Accepted settings JSON">{JSON.stringify(settings.settings, null, 2)}</pre>
+    {composition && <fieldset disabled={busy}><legend>Adjust saved recording settings</legend>
+      <label>New requested retention in seconds (optional)<input type="number" min="1" step="1" value={retention} onChange={event => setRetention(event.currentTarget.value)} /></label>
+      <label>Maximum duration <input value={composition.maxDuration} onChange={event => setComposition({ ...composition, maxDuration: event.currentTarget.value })} /></label>
+      <label>Maximum total bytes <input type="number" min="1" step="1" value={composition.maxTotalBytes} onChange={event => setComposition({ ...composition, maxTotalBytes: Number(event.currentTarget.value) })} /></label>
+      {composition.components.flatMap((component, i) => (component.overrides ?? []).map((override, j) => (typeof override.value === 'string' || typeof override.value === 'number') && <label key={component.id + ':' + override.actionID + ':' + override.field}>{component.id} / {override.actionID} / {override.field}<input type={typeof override.value === 'number' ? 'number' : 'text'} value={override.value} onChange={event => edit(i, j, typeof override.value === 'number' ? Number(event.currentTarget.value) : event.currentTarget.value)} /></label>))}
+      <p className="field-help">Profile versions and structured settings remain as saved. Changes need a fresh review of access, limits and approval.</p>
+    </fieldset>}
+    <Button className="button secondary" onPress={() => controller.closeSettings()}>Close settings</Button>
+    <Button className="button" isDisabled={busy} onPress={() => void (composition ? controller.previewComposition(composition as NonNullable<Input<'preview_capture'>['profile_composition']>, settings.capture_id, selection, retention) : controller.repeat(settings.capture_id, selection))}>Review these settings</Button>
   </section>;
 }
 
@@ -137,7 +180,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
       <RecentCaptures state={state} controller={controller}/>
     </section>}
     {state.stage === 'review' && state.preview && <section aria-label="Collection review" aria-busy={state.busy}>
-      {state.repeatedFrom && <p className="notice">Collecting again with the settings of capture <span className="identifier">{state.repeatedFrom}</span>: the same target and requested retention. The pod, access and limits below are checked now.</p>}
+      {state.repeatedFrom && <p className="notice">Collecting again with the settings of capture <span className="identifier">{state.repeatedFrom}</span>: the original target, recipe and requested settings. The current Pod, access, limits and approval needs are checked below.</p>}
       <Assessment preview={state.preview}/>
       {state.preview.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
       {state.preview.blockers.length > 0 && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
@@ -182,6 +225,9 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         {state.progress.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
         {state.progress.sharing && <p role="status">{sharingLabels[state.progress.sharing.state]}</p>}
         {state.progress.case_id && <p><a className="button" href={"/cases/" + state.progress.case_id}>View evidence</a></p>}
+        {state.progress.history_state === 'available' && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.showSettings(state.progress!.capture_id)}>View settings</Button>}
+        {state.progress.history_state === 'unavailable' && <p>Saved settings are unavailable. Start a new investigation to prepare a request with your current settings.</p>}
+        {state.settings && <><p>Reviewing these settings prepares a new request. The original capture is not cancelled.</p><SavedSettings key={state.settings.settings_digest} settings={state.settings} busy={state.busy} controller={controller} /></>}
       </> : !state.error && <p role="status">Checking collection status…</p>}
       {state.canContinue && <div className="actions"><Button className="button" isDisabled={state.busy} onPress={() => void controller.continueAcquisition()}>{state.continuing ? 'Continuing collection…' : 'Continue collection'}</Button><p>Continues the original capture and checks your current access.</p></div>}
       {state.captureID && <p><a href="/captures/new">Start a new investigation</a>. This does not cancel the original collection.</p>}

@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/history-work.schema.json",
+  "title": "Purpose separated signed history ciphertext effect work v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "history-work/v1"
+    },
+    "channel": {
+      "$ref": "https://asservat.io/spec/v1/api-context-work.schema.json#/properties/channel"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Expectation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "RootID": {
+              "type": "string",
+              "format": "uuid",
+              "minLength": 36,
+              "maxLength": 36
+            },
+            "CaptureID": {
+              "type": "string",
+              "format": "uuid",
+              "minLength": 36,
+              "maxLength": 36
+            },
+            "Registration": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "Location": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "ClusterID": {
+                      "type": "string",
+                      "format": "uuid",
+                      "minLength": 36,
+                      "maxLength": 36
+                    },
+                    "ArtifactID": {
+                      "type": "string",
+                      "format": "uuid",
+                      "minLength": 36,
+                      "maxLength": 36
+                    },
+                    "AttemptID": {
+                      "type": "string",
+                      "format": "uuid",
+                      "minLength": 36,
+                      "maxLength": 36
+                    }
+                  },
+                  "required": [
+                    "ClusterID",
+                    "ArtifactID",
+                    "AttemptID"
+                  ]
+                },
+                "StoreID": {
+                  "type": "string",
+                  "format": "uuid",
+                  "minLength": 36,
+                  "maxLength": 36
+                },
+                "AllocationID": {
+                  "type": "string",
+                  "format": "uuid",
+                  "minLength": 36,
+                  "maxLength": 36
+                },
+                "PoolRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "AllocationRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "NativeLimit": {
+                  "const": 131072
+                },
+                "AnchorAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "WriteUntil": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "ExpiresAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "DeleteBy": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "Location",
+                "StoreID",
+                "AllocationID",
+                "PoolRevision",
+                "AllocationRevision",
+                "NativeLimit",
+                "AnchorAt",
+                "WriteUntil",
+                "ExpiresAt",
+                "DeleteBy"
+              ]
+            },
+            "SelectorKey": {
+              "type": "array",
+              "minItems": 32,
+              "maxItems": 32,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "SettingsKey": {
+              "type": "array",
+              "minItems": 32,
+              "maxItems": 32,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "OriginalExecutionDigest": {
+              "type": "array",
+              "minItems": 32,
+              "maxItems": 32,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            },
+            "MACVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "RootID",
+            "CaptureID",
+            "Registration",
+            "SelectorKey",
+            "SettingsKey",
+            "OriginalExecutionDigest",
+            "MACVersion"
+          ]
+        },
+        "Operation": {
+          "enum": [
+            "write",
+            "read",
+            "purge"
+          ]
+        },
+        "RequestID": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "ExecutorEpoch": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "StartedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "NotAfter": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "BundleDigest": {
+          "type": "array",
+          "minItems": 32,
+          "maxItems": 32,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "CopiesDigest": {
+          "type": "array",
+          "minItems": 32,
+          "maxItems": 32,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "DeletionFence": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "Expectation",
+        "Operation",
+        "RequestID",
+        "ExecutorEpoch",
+        "StartedAt",
+        "NotAfter",
+        "BundleDigest",
+        "CopiesDigest",
+        "DeletionFence"
+      ]
+    }
+  },
+  "required": [
+    "format",
+    "channel",
+    "authority"
+  ]
+}

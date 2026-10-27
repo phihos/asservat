@@ -113,6 +113,13 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		}
 		clear(credential)
 		args = append(args, "--evidence-credential", evidenceFile)
+		historyFile := filepath.Join(dir, contracts.RegionalHistoryCredentialFile)
+		history := installerRegionalHistoryCredential(t, ctx, providers, offer.EvidenceStore.Bucket, offer.PermissionRootID, envelope.Binding.ClusterID)
+		if os.WriteFile(historyFile, history, 0o600) != nil {
+			t.Fatal("history credential file")
+		}
+		clear(history)
+		args = append(args, "--history-credential", historyFile)
 	}
 	if executor && installedJourneyFocus() == "alert" && index == 1 {
 		// ADR-231: the operator's in-cluster Alertmanager, named at install.

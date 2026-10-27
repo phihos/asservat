@@ -1,17 +1,23 @@
 package presentation
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	app "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -29,14 +35,97 @@ type historyFixture struct {
 	accepted  time.Time
 	untilList time.Time
 	sharing   *value.ContextSharing
+	recipe    json.RawMessage
 }
 
 const historyCapture = "00000000-0000-4000-8000-000000000041"
 
+func largeHistoryRecipe() json.RawMessage {
+	args := make([]string, 30)
+	for i := range args {
+		args[i] = strings.Repeat("a", 4096)
+	}
+	b, _ := json.Marshal(map[string]any{"description": strings.Repeat("<é>&", 200), "actions": []any{map[string]any{"id": "command", "kind": "command", "parameters": map[string]any{"argv": args, "workingDirectory": "/", "adapter": "podsExec"}, "required": true, "impact": "intrusive", "limits": map[string]any{"maxBytes": 4096, "timeout": "5s"}, "executionMode": "onTrigger"}}, "maxTotalBytes": 4096, "maxDuration": "5s"})
+	return b
+}
+
+func TestBrowserSettingsBudgetUsesCanonicalBytesAndLeavesMCPBounded(t *testing.T) {
+	s, f, h := historyOperations(t)
+	h.recipe = largeHistoryRecipe()
+	original := bytes.Clone(h.recipe)
+	input := json.RawMessage(`{"capture_id":"` + historyCapture + `"}`)
+	reply, err := s.Call(AuthenticatedBrowserSettingsView(t.Context()), f, "get_capture_settings", input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(original, h.recipe) {
+		t.Fatal("projection mutated immutable source")
+	}
+	writeCtx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	writeCtx = AuthenticatedBrowserSettingsView(writeCtx)
+	until, _ := writeCtx.Deadline()
+	w := &operationWriter{ResponseRecorder: httptest.NewRecorder()}
+	if sent, e := WriteBrowserOperationResponse(writeCtx, w, http.StatusOK, "get_capture_settings", reply, until); e != nil || !sent || !bytes.Equal(w.Body.Bytes(), reply.Body) {
+		t.Fatal("final HTTP write changed or refused canonical settings", e)
+	}
+	if len(reply.Body) < 120<<10 || len(reply.Body) > 160<<10 || !bytes.Contains(reply.Body, []byte("<é>&")) || bytes.Contains(reply.Body, []byte(`\u003c`)) {
+		t.Fatalf("canonical body size/encoding: %d", len(reply.Body))
+	}
+	if s.contracts.ValidateBrowserOutput("get_capture_settings", reply.Body) != nil || s.contracts.ValidateOutput("get_capture_settings", reply.Body) == nil {
+		t.Fatal("browser/MCP budgets not separated")
+	}
+	if reply.preparedOutputLimit("get_capture") != 24<<10 || reply.preparedOutputLimit("get_capture_settings") != 160<<10 {
+		t.Fatal("budget escaped operation binding")
+	}
+	_, _, _, directErr := s.historyCall(t.Context(), f, f.i, "get_capture_settings", ContextOperationInput{CaptureID: historyCapture})
+	if directErr != value.ErrSettingsTooLarge {
+		t.Fatalf("unexpected direct settings result: %v", directErr)
+	}
+	ordinary, err := s.Call(t.Context(), f, "get_capture_settings", input)
+	if err != nil || !bytes.Contains(ordinary.Body, []byte(`"SettingsTooLarge"`)) || len(ordinary.Body) > 24<<10 {
+		t.Fatalf("MCP should return bounded narrowing error: %v %s", err, ordinary.Body)
+	}
+}
+
+func TestLargeBrowserSettingsKeepExistingAuditAndFinalAuthority(t *testing.T) {
+	for _, revoke := range []bool{false, true} {
+		s, f, gate := auditedFixture(t)
+		inner := s.inner.(*InvestigationOperations).captures
+		h := &historyFixture{ops: f, accepted: f.i.VerifiedAt.Add(-time.Hour), untilList: f.metadataUntil, recipe: largeHistoryRecipe()}
+		inner.history = h
+		s.inner, _ = NewInvestigationOperations(inner, nil)
+		if revoke {
+			gate.onFinish = func() { f.i.Scopes = nil }
+		}
+		reply, err := s.Call(AuthenticatedBrowserSettingsView(t.Context()), f, "get_capture_settings", []byte(`{"capture_id":"`+historyCapture+`"}`))
+		if len(gate.intents) != 1 || len(gate.outcomes) != 1 || !gate.outcomes[0].Valid() {
+			t.Fatal("existing audit path not used", err)
+		}
+		out := gate.outcomes[0]
+		if out.OutputBytes < 120<<10 || out.OutputBytes > 160<<10 || out.OutputDigest == ([32]byte{}) {
+			t.Fatalf("wrong minimized output facts: bytes=%d status=%s err=%v body=%s", out.OutputBytes, out.Status, err, reply.Body)
+		}
+		b, _ := json.Marshal(out)
+		if bytes.Contains(b, []byte(strings.Repeat("a", 100))) {
+			t.Fatal("settings entered audit record")
+		}
+		if revoke {
+			if err == nil || len(reply.Body) != 0 {
+				t.Fatal("post-audit revocation disclosed settings")
+			}
+			continue
+		}
+		if err != nil || len(reply.Body) < 120<<10 {
+			t.Fatal("audited large result unavailable", err)
+		}
+	}
+}
+
 func (h *historyFixture) List(_ context.Context, _ identities.CurrentIdentity, ref targets.WorkloadRequest, origins []value.HistoryOrigin, after *value.HistoryCursor, limit int) (value.HistoryPage, error) {
 	h.listed, h.origins, h.after, h.limit = ref, origins, after, limit
 	entry := value.HistoryEntry{CaptureID: historyCapture, Origin: value.HistoryManual, AcceptedAt: h.accepted, ExpiresAt: h.accepted.Add(value.HistoryLifetime), Phase: "Succeeded", EvidenceState: "available"}
-	return value.HistoryPage{Entries: []value.HistoryEntry{entry}, Next: h.next, ValidUntil: h.untilList}, h.err
+	return value.HistoryPage{Target: authorization.WorkloadScope(ref.ClusterID, "ns", "workload"), AuthorizationRevision: h.ops.i.Policy, Entries: []value.HistoryEntry{entry}, Next: h.next, ValidUntil: h.untilList}, h.err
 }
 func (h *historyFixture) settings() value.CaptureSettings {
 	return value.CaptureSettings{CaptureID: historyCapture, Origin: value.HistoryManual, ClusterID: "00000000-0000-4000-8000-000000000001", NamespaceUID: "ns", WorkloadUID: "workload", AcceptedAt: h.accepted, ExpiresAt: h.accepted.Add(value.HistoryLifetime),
@@ -45,7 +134,9 @@ func (h *historyFixture) settings() value.CaptureSettings {
 		Namespace:      "payments", WorkloadKind: "Deployment", WorkloadName: "api", RequestedSeconds: 3600, ValidUntil: h.untilList}
 }
 func (h *historyFixture) Settings(context.Context, identities.CurrentIdentity, string) (value.CaptureSettings, error) {
-	return h.settings(), h.err
+	s := h.settings()
+	s.RecipeJSON = h.recipe
+	return s, h.err
 }
 func (h *historyFixture) PreviewRepeat(ctx context.Context, current identities.CurrentIdentity, id string, sharing *value.ContextSharing) (app.ContextPreviewResult, value.CaptureSettings, error) {
 	h.repeated, h.sharing = id, sharing
@@ -60,6 +151,13 @@ func (h *historyFixture) PreviewRepeat(ctx context.Context, current identities.C
 func historyOperations(t *testing.T) (*ContextOperations, *contextOperationFixture, *historyFixture) {
 	t.Helper()
 	base, f := operationFixture(t, true)
+	mac, err := auditapp.NewOperationMAC("synthetic-input", bytes.Repeat([]byte{1}, 32), "synthetic-account", bytes.Repeat([]byte{2}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(mac.Close)
+	base.config.HistoryRootID = "00000000-0000-4000-8000-000000000001"
+	base.config.HistoryCursorKeys = mac
 	h := &historyFixture{ops: f, accepted: f.i.VerifiedAt.Add(-time.Hour).UTC(), untilList: f.metadataUntil}
 	s, err := NewContextOperationsWithHistory(base.config, f, f, h)
 	if err != nil {
@@ -108,11 +206,15 @@ func TestContextHistoryWireIsCanonical(t *testing.T) {
 	if entry["capture_id"] != historyCapture || entry["repeat_state"] != "available" || entry["navigation_uri"] != "https://console.invalid/captures/"+historyCapture {
 		t.Fatal("entry", entry)
 	}
+	call("list_capture_history", `{`+wireTarget+`,"origin":"discovery"}`)
+	if len(h.origins) != 1 || h.origins[0] != value.HistoryDiscovery {
+		t.Fatal("discovery filter not passed to authorized reader")
+	}
 	// A next page cursor continues only the same selector and origin.
 	h.next = &value.HistoryCursor{AcceptedAt: h.accepted, CaptureID: historyCapture}
 	out = call("list_capture_history", `{`+wireTarget+`,"origin":"all","limit":1}`)
 	cursor, _ := out["next_cursor"].(string)
-	if cursor == "" || len(h.origins) != 2 || h.limit != 1 {
+	if cursor == "" || len(h.origins) != 3 || h.limit != 1 {
 		t.Fatal("cursor", out)
 	}
 	out = call("list_capture_history", `{`+wireTarget+`,"origin":"all","limit":1,"cursor":"`+cursor+`"}`)

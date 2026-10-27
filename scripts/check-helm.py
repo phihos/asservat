@@ -189,6 +189,14 @@ def check_bootstrap(directory):
     assert settings["origin"] == "https://asservat.example" and settings["groupMaxAgeSeconds"] == 300
     assert "permissionDelegations" not in settings, "empty delegations changed existing installer identities"
     assert "approvals" not in settings, "absent approval settings changed existing installer identities"
+    assert "captureHistory" not in settings, "absent history limits changed existing installer identities"
+    bounded = copy.deepcopy(public)
+    bounded["bootstrap"]["continuation"]["public"]["captureHistory"] = {"perSelector": 200, "perInstallation": 10000}
+    bdocs = render(bounded)
+    binput, = [r for r in bdocs if "continuation.json" in r.get("data", {})]
+    assert json.loads(binput["data"]["continuation.json"])["public"]["captureHistory"] == {"perSelector": 200, "perInstallation": 10000}
+    for limits in ({"perSelector": 0,"perInstallation":1000},{"perSelector":1001,"perInstallation":1000},{"perSelector":1,"perInstallation":100001},{"perSelector":1}):
+        bad=copy.deepcopy(public);bad["bootstrap"]["continuation"]["public"]["captureHistory"]=limits;render(bad,ok=False)
     approved = copy.deepcopy(public)
     approvals = {"requireRecordingApproval": True, "stepUp": {"acrValues": ["2"], "maxAgeSeconds": 300}}
     approved["bootstrap"]["continuation"]["public"]["approvals"] = approvals
@@ -308,8 +316,8 @@ def check_cluster(directory):
     render(executor, ok=False)
     executor["cluster"]["evidenceSecret"] = "operator-evidence"
     pod = next(r for r in render(executor) if r["kind"] == "Job")["spec"]["template"]["spec"]
-    assert pod["containers"][0]["command"][-2:] == ["--evidence-credential", "/run/asservat/cluster/evidence-storage.json"]
-    assert pod["volumes"][0]["projected"]["sources"][2]["secret"] == {"name": "operator-evidence", "items": [{"key": "evidence-storage.json", "path": "evidence-storage.json"}]}
+    assert pod["containers"][0]["command"][-2:] == ["--history-credential", "/run/asservat/cluster/history-storage.json"]
+    assert pod["volumes"][0]["projected"]["sources"][2]["secret"] == {"name": "operator-evidence", "items": [{"key": "evidence-storage.json", "path": "evidence-storage.json"}, {"key": "history-storage.json", "path": "history-storage.json"}]}
     # ADR-231: the optional Alertmanager URL is passed to an executor's
     # installer only; without an executor offer it is refused.
     executor["cluster"]["alertmanager"] = "http://alertmanager-operated.monitoring.svc:9093"

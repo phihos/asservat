@@ -106,6 +106,21 @@ jobs:
           fi
           tshark --version | head -1
           capinfos --version | head -1
+      # The history composition drives real React on the installed recording
+      # focus. Reuse console CI's pinned Playwright browser/cache; no new image.
+      - if: matrix.suite == 'continuation-approved-recording'
+        id: playwright
+        run: echo "version=$(node -p "require('./web/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - if: matrix.suite == 'continuation-approved-recording'
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - if: matrix.suite == 'continuation-approved-recording'
+        name: Installed history browser
+        timeout-minutes: 3
+        working-directory: web
+        run: timeout --signal=TERM --kill-after=5s 170s npm exec --offline -- playwright install --only-shell chromium
       - name: Run ${{ matrix.suite }}
         env:
           SUITE: ${{ matrix.suite }}

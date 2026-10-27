@@ -193,7 +193,7 @@ func (b *installedBrowser) approvedRecordingStepUp(t *testing.T, ctx context.Con
 	b.csrf = view.CSRF
 }
 
-func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement) {
+func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string)) {
 	t.Helper()
 	if _, err := os.Stat("/etc/asservat-disposable-host"); err != nil {
 		t.Fatal("approved recording requires disposable runner", err)
@@ -295,13 +295,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	// Another OAuth client of the requester cannot inherit its MCP grant.
 	self := identity.consoleSession(t, ctx, cert, address, origin)
-	browserCall := func(b *installedBrowser, name string, input, out any) string {
+	browserCallCurrent := func(callCtx context.Context, b *installedBrowser, name string, input, out any) string {
 		t.Helper()
 		key := ""
 		if fields, ok := input.(map[string]any); ok {
 			key, _ = fields["idempotency_key"].(string)
 		}
-		reply, status, err := b.operation(ctx, name, input, key)
+		reply, status, err := b.operation(callCtx, name, input, key)
 		if err != nil || status != http.StatusOK {
 			diagnose()
 			t.Fatal("approval public browser operation", name, status, err)
@@ -317,6 +317,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal("approval browser data", name)
 		}
 		return ""
+	}
+	browserCall := func(b *installedBrowser, name string, input, out any) string {
+		return browserCallCurrent(ctx, b, name, input, out)
 	}
 	var own struct {
 		CanResume                    bool `json:"can_resume"`
@@ -665,6 +668,30 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if measurement.PacketsDuringTraffic == 0 {
 			t.Fatal("native PCAPNG has no measured traffic overlap")
 		}
+	}
+	// This history branch qualifies the repeat in the canonical recording focus.
+	// Other focuses (including paced delivery) retain their own scope.
+	// The original requester browser creates a new
+	// repeat; the separate reviewer only authenticates and decides its new grant.
+	if installedJourneyFocus() == "approved-recording" {
+		historyPhase(receipt.CaptureID)
+		qualifyInstalledRecorderHistory(t, ctx, self, address, arguments["target_ref"].(map[string]string), receipt.CaptureID, grantID, invoke, func(captureID string) { historyPhase(captureID); diagnose() }, func(approvalCtx context.Context, repeatGrant string) {
+			browser.approvedRecordingStepUp(t, approvalCtx, reviewer, repeatGrant)
+			if code := browserCallCurrent(approvalCtx, browser, "decide_review", map[string]any{"grant_id": repeatGrant, "decision": "approve", "reason": "independent installed edited history repeat", "idempotency_key": "installed-history-approval-" + repeatGrant}, nil); code != "" {
+				t.Fatal("signed independent history decision", code)
+			}
+			var decision struct {
+				Phase    string `json:"phase"`
+				Decision struct {
+					By struct {
+						Subject string `json:"subject"`
+					} `json:"decided_by"`
+				} `json:"decision"`
+			}
+			if code := browserCallCurrent(approvalCtx, browser, "get_grant", map[string]string{"grant_id": repeatGrant}, &decision); code != "" || decision.Phase != "Approved" || decision.Decision.By.Subject != reviewer.ReviewerSubject {
+				t.Fatal("history decision did not retain independent signed subject", code)
+			}
+		})
 	}
 	// A closed preview is one finished intent even when its key is public.
 	// A different key cannot reopen it or cause another approval/capture.

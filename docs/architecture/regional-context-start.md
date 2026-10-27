@@ -122,3 +122,44 @@ Focused races exercise actual loopback TLS1.3/HTTP2 with process-owned keys: hub
 The native public journey (adr171-journey-2) passes the whole signed exchange with hub-run execution, regional capture/storage, publication and native download on the bare-Pod executor; see ADR-171. Pending qualification: the connector-Deployment executor's local start below, and failure/unknown partitions across those components. No deadline or client QPS limit is enlarged.
 
 Missing production inputs remain dedicated work-signing key/sign-only hub credential, verify-only regional trust, exact connector API profile/input ownership/RBAC, protected installed composition and regional command startup. Existing initial installation does not yet provision those inputs. The first installed context investigation remains unavailable until these producers and the combined runtime path are implemented and qualified.
+
+## Separate history ciphertext effects
+
+Capture-history control metadata uses `asservat-history-work+jws` with the
+existing protected work-signing trust and a separate `history-work/v1` payload.
+It is not an API execution. The dispatcher selects a live connector session
+before SQL issues authority, exposing that session's original deadline and
+actual executor process epoch. Signed authority fixes root, capture, original
+storage registration/allocation, attempt, request, operation, ciphertext or
+receipt digest, process epoch and original deadline. Each regional receive and
+final reply retains current channel checks and cancellation. A preparation
+lookup grants no storage authority; only signed write/read/purge work invokes
+storage effects.
+
+The distinct history frame family (32–35) carries at most **486077 bytes** of
+base64-encoded ciphertext bundle: data 192 KiB, index 4 KiB, manifest 128 KiB,
+commit 32 KiB, plus exact base64 expansion and 13 array bytes. An independently
+bounded 65536-byte envelope covers four version/ETag receipts, signed work and
+completions; total frame ceiling 551613 bytes. The shared codec checks each role
+before decoding allocation. Common query/operation frames remain 32 KiB and the
+existing exchange ceiling remains 2 MiB. Wire contracts are
+[history-work](../../specs/contracts/history-work.schema.json) and
+[history-ciphertexts](../../specs/contracts/history-ciphertexts.schema.json).
+
+Write completion requires all four acknowledged PUTs to return. Read pins exact
+stored versions. Purge inventories/removes versions, markers and incomplete
+multipart uploads and returns an independent typed completion bound to the
+original deletion fence. Zero receipts are accepted only for purge after the
+original WriteUntil and only with the exact zero-receipt digest; the SQL producer
+must independently establish that no writer claim was issued. Neither expiry
+nor object lookup establishes writer completion or releases capacity.
+
+The regional loader uses the fixed `history-storage.json` capability, limited
+to this root/cluster's history prefix. It cannot read/delete evidence or unwrap
+keys. [Installation instructions](../installation/helm.md) distinguish externally
+provisioned capabilities, readonly permission proposals and actual pinned
+Seaweed qualification. The focused storage gate does not qualify installed
+SQL-to-channel composition. Preparation currently inherits the router's finite
+five-second selection/exchange bound; measure the composed workflow before
+choosing any history-specific bound, preserving the original caller and signed
+operation deadlines.

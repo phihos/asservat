@@ -21,7 +21,7 @@ export function catalogResult(): Output<'list_diagnostics'> {
   return value;
 }
 export function result<N extends Operation>(data: unknown): Output<N> {
-  return { schema_version: 'mcp-result/v1', request_id: id(500), data_class: 'metadata', status: 'ok', data, truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [] } as Output<N>;
+  return { schema_version: 'mcp-result/v1', request_id: id(500), data_class: 'metadata', status: 'ok', data, truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [] } as unknown as Output<N>;
 }
 export function progressResult(phase: 'Pending' | 'Finalizing' | 'Succeeded' = 'Pending', revision = 1): Output<'get_capture'> {
   return result<'get_capture'>({ capture_id: id(8), revision, phase, actions: [{ action_id: 'pod-status', phase }], navigation_uri: 'https://asservat.example.invalid/captures/' + id(8), can_cancel: false, blockers: [], retry_after_seconds: 5 });
@@ -49,7 +49,7 @@ export function repeatedPreviewResult(from: string): Output<'preview_capture'> {
 }
 export class SyntheticOperations implements Operations {
   calls: { name: Operation; input: unknown; signal: AbortSignal; csrf: string }[] = [];
-  responder: (name: Operation) => unknown | Promise<unknown> = name => ({ list_diagnostics: catalogResult, preview_capture: previewResult, request_capture: acceptedResult, resolve_capture_request: resolvedClosedResult, get_capture: progressResult, list_capture_history: () => historyResult() })[name]();
+  responder: (name: Operation) => unknown | Promise<unknown> = name => ({ list_diagnostics: catalogResult, preview_capture: previewResult, request_capture: acceptedResult, resolve_capture_request: resolvedClosedResult, get_capture: progressResult, list_capture_history: () => historyResult(), get_capture_settings: () => settingsResult() })[name]();
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), signal, csrf });
     return await this.responder(name) as Output<N>;
@@ -73,4 +73,13 @@ export function recordingPreviewResult(from?: string): Output<'preview_capture'>
 export function approvalPendingResult(): Output<'request_capture'> {
   return { ...result<'request_capture'>({}), status: 'error', data: { code: 'ApprovalRequired', message: 'Independent approval is pending.', retryable: false,
     responsible_role: 'approver', navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41) } } as Output<'request_capture'>;
+}
+
+export function settingsResult(capture = id(41)): Output<'get_capture_settings'> {
+  const value = result<'get_capture_settings'>({ kind: 'captureSettings', capture_id: capture, cluster_id: target.cluster_id, namespace_uid: 'namespace-uid', accepted_at: new Date(Date.now() - 60000).toISOString(), expires_at: new Date(Date.now() + 60000).toISOString(), settings_digest: 'a'.repeat(64), original_execution_digest: 'b'.repeat(64), navigation_uri: 'https://asservat.example.invalid/captures/' + capture, settings: {
+    target: { namespace: target.namespace, workloadRef: { apiVersion: 'apps/v1', kind: target.kind, name: target.name, uid: 'workload-uid' }, maxPods: 1, selection: 'allWithinLimit', adoption: 'pinUID' },
+    recipe_spec: { actions: [{ id: 'pod-status', kind: 'kubernetesSnapshot', parameters: { include: ['pod'] }, dependsOn: [], required: true, impact: 'observe', limits: { maxBytes: 4096, timeout: '5s' }, executionMode: 'onTrigger' }], maxTotalBytes: 4096, maxDuration: '5s' }, dependency_pins: [{ role: 'recipe', digest: 'c'.repeat(64) }], requested_retention: '120s',
+  } });
+  value.data_class = 'extract';
+  return value;
 }

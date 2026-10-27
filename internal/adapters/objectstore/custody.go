@@ -138,7 +138,11 @@ func (s *Store) PurgeAttempt(ctx context.Context, l artifact.Location) error {
 	if l.Validate() != nil {
 		return artifact.ErrInvalid
 	}
-	in, err := s.inventory(ctx, l.Prefix())
+	return s.purgePrefix(ctx, l.Prefix())
+}
+
+func (s *Store) purgePrefix(ctx context.Context, prefix string) error {
+	in, err := s.inventory(ctx, prefix)
 	if err != nil {
 		return err
 	}
@@ -172,7 +176,7 @@ func (s *Store) PurgeAttempt(ctx context.Context, l artifact.Location) error {
 			return ErrStorage
 		}
 	}
-	after, err := s.inventory(ctx, l.Prefix())
+	after, err := s.inventory(ctx, prefix)
 	if err != nil {
 		return err
 	}

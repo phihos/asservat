@@ -38,6 +38,7 @@ type frameStream struct {
 	pumpDone                     chan struct{}
 	awaited                      bool
 	leaseStarted                 bool
+	historyWork                  bool
 	lease                        *framePeerLease
 	leaseBounds                  []framePeerBound
 	stopOwner                    func() bool
@@ -254,7 +255,7 @@ func (s *frameStream) Send(ctx context.Context, f contracts.APIContextFrame) err
 // pre-work query transition. Generic Send never changes completed deadlines.
 func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (time.Time, error) {
 	// ADR-178: the work check needs the region's fresh source first.
-	if s != nil && f.Kind == contracts.APIContextWorkFrame {
+	if s != nil && (f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame) {
 		if e := s.pullSource(ctx); e != nil {
 			return time.Time{}, fleet.ErrUnavailable
 		}
@@ -266,10 +267,13 @@ func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (ti
 		}
 	}
 	mode := peerFrame
-	if f.Kind == contracts.APIContextWorkFrame {
+	if f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame {
+		s.mu.Lock()
+		s.historyWork = f.Kind == contracts.HistoryWorkFrame
+		s.mu.Unlock()
 		mode = peerWork
 	}
-	if f.Kind == contracts.APIContextResultFrame {
+	if f.Kind == contracts.APIContextResultFrame || f.Kind == contracts.HistoryResponseFrame {
 		mode = peerFinal
 	}
 	call, until, end, e := s.beginFrame(ctx, false, mode)
@@ -350,7 +354,7 @@ func (s *frameStream) startReader() (<-chan contracts.APIContextFrame, error) {
 			// Receipt is the protocol's terminal frame. No later body value is accepted
 			// or used. Let its exact semantic check finish before joined Close, avoiding
 			// an EOF race against an already received terminal acknowledgement.
-			if f.Kind == contracts.APIContextReceiptFrame {
+			if f.Kind == contracts.APIContextReceiptFrame || f.Kind == contracts.HistoryReceiptFrame {
 				return
 			}
 		}
@@ -416,7 +420,7 @@ func (s *frameStream) receive(ctx context.Context) (contracts.APIContextFrame, t
 		s.interruptAt(streamReceiveResult, streamErrorReason(e))
 		return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
 	}
-	if f.Kind == contracts.APIContextResultFrame {
+	if f.Kind == contracts.APIContextResultFrame || f.Kind == contracts.HistoryResponseFrame {
 		if e := s.confirmResultPeer(call); e != nil {
 			clear(f.Payload)
 			return contracts.APIContextFrame{}, time.Time{}, e
@@ -501,7 +505,7 @@ func (s *frameStream) AwaitWork(ctx context.Context) (contracts.APIContextFrame,
 		}
 	}
 	reason := streamNoReason
-	if f.Kind != contracts.APIContextWorkFrame {
+	if f.Kind != contracts.APIContextWorkFrame && f.Kind != contracts.HistoryWorkFrame {
 		reason = streamProtocol
 	} else if err := call.Err(); err != nil {
 		reason = streamErrorReason(err)
@@ -513,6 +517,9 @@ func (s *frameStream) AwaitWork(ctx context.Context) (contracts.APIContextFrame,
 		s.interruptAt(streamPassiveFrame, reason)
 		return empty, zero, fleet.ErrDenied
 	}
+	s.mu.Lock()
+	s.historyWork = f.Kind == contracts.HistoryWorkFrame
+	s.mu.Unlock()
 	checkCtx, end := context.WithTimeout(call, 5*time.Second)
 	defer end()
 	receiver, mode, e := s.observePeer(checkCtx, peerWork)

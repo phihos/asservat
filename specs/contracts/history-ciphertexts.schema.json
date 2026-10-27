@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/history-ciphertexts.schema.json",
+  "title": "Bounded encrypted history request and receipt family v1",
+  "$comment": "Bundle max486077 bytes; complete frame max551613 bytes. Runtime checks operation-specific fields, exact hashes, zero receipts only for signed unclaimed purge after WriteUntil, and original deadlines.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "history-ciphertexts/v1"
+    },
+    "operationId": {
+      "type": "string",
+      "format": "uuid",
+      "minLength": 36,
+      "maxLength": 36
+    },
+    "bundle": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "prefixItems": [
+        {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 262144,
+          "contentEncoding": "base64"
+        },
+        {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 5464,
+          "contentEncoding": "base64"
+        },
+        {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 174764,
+          "contentEncoding": "base64"
+        },
+        {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 43692,
+          "contentEncoding": "base64"
+        }
+      ],
+      "items": false
+    },
+    "copies": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "VersionID": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "ETag": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "Bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "SHA256": {
+            "type": "array",
+            "minItems": 32,
+            "maxItems": 32,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        },
+        "required": [
+          "VersionID",
+          "ETag",
+          "Bytes",
+          "SHA256"
+        ]
+      }
+    },
+    "writerCompletion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "RootID": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "CaptureID": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "AttemptID": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "OperationID": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "ProcessEpoch": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "ExpectationDigest": {
+          "type": "array",
+          "minItems": 32,
+          "maxItems": 32,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "CopiesDigest": {
+          "type": "array",
+          "minItems": 32,
+          "maxItems": 32,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "CompletedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "NotAfter": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "RootID",
+        "CaptureID",
+        "AttemptID",
+        "OperationID",
+        "ProcessEpoch",
+        "ExpectationDigest",
+        "CopiesDigest",
+        "CompletedAt",
+        "NotAfter"
+      ]
+    },
+    "deleteCompletion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "RootID": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "CaptureID": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "AttemptID": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "OperationID": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "ProcessEpoch": {
+          "type": "string",
+          "format": "uuid",
+          "minLength": 36,
+          "maxLength": 36
+        },
+        "ExpectationDigest": {
+          "type": "array",
+          "minItems": 32,
+          "maxItems": 32,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "CopiesDigest": {
+          "type": "array",
+          "minItems": 32,
+          "maxItems": 32,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "CompletedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "NotAfter": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "DeletionFence": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "RootID",
+        "CaptureID",
+        "AttemptID",
+        "OperationID",
+        "ProcessEpoch",
+        "ExpectationDigest",
+        "CopiesDigest",
+        "CompletedAt",
+        "NotAfter",
+        "DeletionFence"
+      ]
+    },
+    "failure": {
+      "type": "string",
+      "maxLength": 32
+    }
+  },
+  "required": [
+    "format",
+    "operationId"
+  ]
+}

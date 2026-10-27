@@ -258,6 +258,9 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		}
 	}()
 	var out presentation.OperationReply
+	if name == "get_capture_settings" {
+		ctx = presentation.AuthenticatedBrowserSettingsView(ctx)
+	}
 	out, err = h.operations.Call(ctx, current, name, body)
 	defer func() { _ = out.Close(ctx); clear(out.Body) }()
 	if err != nil {
@@ -300,7 +303,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	writeCtx, finishWrite := out.ResponseContext(ctx)
 	defer finishWrite()
-	if sent, err := presentation.WriteOperationResponse(writeCtx, w, http.StatusOK, out.Body, deadline, out.CheckDisclosure); err != nil && !sent {
+	if sent, err := presentation.WriteBrowserOperationResponse(writeCtx, w, http.StatusOK, name, out, deadline); err != nil && !sent {
 		h.unavailable(w, "response-write")
 	}
 }

@@ -33,6 +33,12 @@ class RegionalContextSelection(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):
                     fixture.main(installer_continuation=True)
 
+    def test_history_driver_and_locked_browser_dependencies_are_source_pinned(self):
+        hashes = fixture.source_hashes()
+        for name in ("web/scripts/installed-history-browser.mjs", "web/package.json", "web/package-lock.json"):
+            self.assertIn(name, hashes)
+            self.assertEqual(len(hashes[name]), 64)
+
     def test_approved_recording_has_finite_go_envelope(self):
         for focus in ("approved-recording", "native-paced"):
             with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}):

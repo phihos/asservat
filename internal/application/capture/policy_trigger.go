@@ -1,7 +1,9 @@
 package capture
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"time"
@@ -208,6 +210,16 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	if len(occurrences) == 0 {
 		return nil
 	}
+	var authored struct {
+		Target json.RawMessage `json:"target"`
+	}
+	if json.Unmarshal(spec, &authored) != nil {
+		return value.ErrInvalid
+	}
+	compiled.HistoryAuthored = &value.HistoryAuthored{Target: targets.WorkloadRequest{ClusterID: compiled.ClusterID, Namespace: compiled.Namespace, Kind: compiled.WorkloadKind, Name: compiled.WorkloadName}, TargetJSON: bytes.Clone(authored.Target), Selector: value.HistorySelector{ClusterID: a.ClusterID, NamespaceUID: a.NamespaceUID, WorkloadKind: compiled.WorkloadKind, WorkloadUID: a.WorkloadUID}, Selection: "triggeringPod", PolicyOrigins: []value.HistoryPolicyOrigin{{UID: source.Revision.UID, Generation: accepted.SourceRevision.Generation, IntentVersion: accepted.IntentVersion, CollectionDigest: source.CollectionDigest}}}
+	if !compiled.HistoryAuthored.Valid() {
+		return value.ErrChanged
+	}
 	if r == nil {
 		t.run(ctx, a, compiled, observation, occurrences)
 	} else {
@@ -250,7 +262,7 @@ func (t PolicyTrigger) capture(ctx context.Context, a authorization.AcceptedPoli
 	call, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	current := newPolicyIdentity(call, t.Accepted, a, t.Now().Add(45*time.Second), t.Now)
-	intent := value.ContextIntent{Diagnostic: value.ContextDiagnosticName, Target: targets.WorkloadRequest{ClusterID: o.ClusterID, Namespace: o.Namespace.Name, Kind: "Pod", Name: pod}, RequestedSeconds: p.RetentionSeconds}
+	intent := value.ContextIntent{HistoryAuthored: p.HistoryAuthored.Clone(), Diagnostic: value.ContextDiagnosticName, Target: targets.WorkloadRequest{ClusterID: o.ClusterID, Namespace: o.Namespace.Name, Kind: "Pod", Name: pod}, RequestedSeconds: p.RetentionSeconds}
 	// A review that admitted nothing (a lost regional exchange, a replaced
 	// standby) is reviewed again, at most three times, two seconds apart, as a
 	// human retries a preview. Every review repeats all checks; the occurrence
