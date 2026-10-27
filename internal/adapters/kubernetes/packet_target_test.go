@@ -13,7 +13,7 @@ import (
 )
 
 func TestPacketTargetReusesFinalExactPodWithoutNodeAuthority(t *testing.T) {
-	for _, mode := range []string{"available", "node-changed", "host-network", "not-running", "unscheduled", "pod-replaced", "pod-deleted", "owner-changed", "namespace-replaced", "original-expiry"} {
+	for _, mode := range []string{"short-parent", "short-parent-generic", "available", "node-changed", "host-network", "not-running", "unscheduled", "pod-replaced", "pod-deleted", "owner-changed", "namespace-replaced", "original-expiry"} {
 		t.Run(mode, func(t *testing.T) {
 			start := time.Now().UTC()
 			clock := &atomic.Int64{}
@@ -69,7 +69,20 @@ func TestPacketTargetReusesFinalExactPodWithoutNodeAuthority(t *testing.T) {
 			})
 			resolver.executionClass = artifact.ContextAPIExecution
 			request := value.Request{ClusterID: permissionCluster, Namespace: cfg.NamespaceRef{Name: "payments", UID: "payments-uid"}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: "root-uid"}, PodName: "app", PodUID: "pod-app"}
-			p, node, err := resolver.ResolvePacketPod(context.Background(), request)
+			ctx := context.Background()
+			var cancel context.CancelFunc
+			if mode == "short-parent" || mode == "short-parent-generic" {
+				ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
+				defer cancel()
+			}
+			var p value.PodResolution
+			var node string
+			var err error
+			if mode == "short-parent-generic" {
+				p, err = resolver.ResolvePod(ctx, request)
+			} else {
+				p, node, err = resolver.ResolvePacketPod(ctx, request)
+			}
 			refused := mode == "pod-replaced" || mode == "pod-deleted" || mode == "owner-changed" || mode == "namespace-replaced" || mode == "original-expiry"
 			if refused {
 				if err == nil || p != (value.PodResolution{}) || node != "" {
@@ -84,11 +97,17 @@ func TestPacketTargetReusesFinalExactPodWithoutNodeAuthority(t *testing.T) {
 			if mode == "node-changed" {
 				want = "new-worker"
 			}
-			if mode == "host-network" || mode == "not-running" || mode == "unscheduled" {
+			if mode == "host-network" || mode == "not-running" || mode == "unscheduled" || mode == "short-parent-generic" {
 				want = ""
 			}
 			if node != want || pods.Load() != 2 || namespaces.Load() != 2 || calls.Load() != 8 {
 				t.Fatal("did not use final existing read", node, want, pods.Load(), namespaces.Load(), calls.Load())
+			}
+			if mode == "short-parent" || mode == "short-parent-generic" {
+				deadline, _ := ctx.Deadline()
+				if !p.FreshUntil.Equal(start.Add(5*time.Second)) || !p.FreshUntil.After(deadline) {
+					t.Fatal("completed API metadata inherited caller I/O deadline", p, deadline)
+				}
 			}
 			if !p.ObservedAt.Equal(start) || p.FreshUntil.After(start.Add(5*time.Second)) {
 				t.Fatal("original target times extended", p)

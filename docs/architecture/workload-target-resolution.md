@@ -56,10 +56,13 @@ implementation. It independently rechecks the exact namespace, pod and owner
 chain. The node class also pins scheduled node UID and node boot ID; the API
 class carries no invented node/runtime provenance. Its result is the existing
 `PodResolution`, without workload labels, annotations, container names,
-configuration or other raw API content. The entire operation retains the
-original at-most-five-second observation interval and earlier caller deadline;
-the later `ResolvePod` call cannot renew the first namespace/workload reads.
-Cancellation, clock rollback and expiry fail after blocking work.
+configuration or other raw API content. The operation retains its original I/O
+deadline and cancellation checks. Under [ADR-260](../decisions/260-api-target-observation-freshness.md),
+a successfully completed API-class observation retains at most five seconds
+from its earliest target read, independently of the completed transport proof's
+expiry. The later `ResolvePod` call cannot renew the first namespace/workload
+reads. Cancellation, clock rollback and expiry fail after blocking work.
+NodeExecution retains its existing caller/observation cutoff behavior.
 
 The coordinator authenticates the current caller and checks current ordinary
 eligibility for the exact resolved target before disclosing preview metadata.
@@ -80,9 +83,10 @@ has no node name, UID or boot identity. Availability is a transient observation,
 not authority or an added NodeView lease. Recording start independently rereads
 the Pod's node and requires a current collector report before enqueueing.
 
-The combined result keeps the earlier original target and regional receiver
-deadline. Unsupported peers refuse; there is no fallback query, target
-replacement or fresh deadline. Preview retains its existing workload selection
+The combined result keeps its original target observation interval; its query
+I/O and completion keep the original receiver deadline. Unsupported peers
+refuse; there is no fallback query, target replacement or restarted interval.
+Preview retains its existing workload selection
 and availability query because it also produces plans for unavailable or
 unsupported recorders. The combined path applies only to an exact approved
 packet target. Local fake-API/transport tests establish the GET counts, final

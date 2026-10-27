@@ -273,3 +273,34 @@ target races, the cancellation races above, and `make pcap-check` (real libpcap
 compiler tests plus the static production-command build; no capture/BPF load).
 A separate read-only source review found no blocking regression. Required hosted
 CI and a fresh installed approved-recording run remain mandatory before merge.
+
+Run 40563988015 on the combined e6a2fbfb candidate still failed before admission
+at `request/facts/current/target` (Go 624.070s; approved subtest 129.68s including
+the deliberate 120-second wait). All 3,193 hashes matched, source stayed
+unchanged and cleanup reported no failures. Report SHA-256
+`1356fd01e52d8ecbc07d908dc9e0b494eb5f3ee8b19750fdc39d61cb46bf6816`.
+CI and review passed, but this is not an installed capture pass. The label does
+not measure the exact remaining request or inherited transport interval.
+
+Independent source review found two transport-to-target lifetime clamps, at the
+regional resolver and hub result reader. A composed noncollector regression
+reproduces the resulting expiry using actual coordinator/eligibility logic,
+Router/Standby, both protocol streams and the API resolver against a TLS fake
+API: a successful query under 250ms transport proofs is followed by a 400ms
+storage read, which the inherited target cutoff cancels. Identity/recovery,
+grant, recorder availability and admission in that fixture are synthetic.
+Earlier fixture-development failures caused by incorrect shutdown ordering are
+retained separately; they are not the reproduction.
+
+[ADR-260](../decisions/260-api-target-observation-freshness.md) explicitly revises
+the agent-authored lifetime coupling for API target metadata. It keeps the
+earliest target read's original five seconds, every I/O/completion deadline and
+all independently current authority checks; it adds no calls, state, timer or
+new lifetime at receipt. NodeExecution and authority-bearing answers remain
+unchanged. This is a documented contract change, not a claim that the former
+guarantee was immutable or that the native run measured the inherited cutoff.
+The composed matrix passes locally in 7.387s, followed by fresh full affected
+races (targets 1.008s, capture 10.498s, context-start 10.831s, bootstrap 52.215s),
+selected Kubernetes target/selection races, full pre-push and the libpcap/static
+build check. Separate source review found no blocking regression. The new
+candidate still needs hosted CI/review and fresh installed qualification.

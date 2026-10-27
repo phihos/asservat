@@ -14,7 +14,7 @@ import (
 )
 
 func TestAPIContextResolvesUnscheduledPodWithoutNodeAuthority(t *testing.T) {
-	for _, mode := range []string{"unscheduled", "scheduled-during-read", "pod-reference", "pod-replaced", "owner-replaced", "list-denied", "no-eligible-pod", "original-expiry", "canceled"} {
+	for _, mode := range []string{"selection-expiry", "selection-aged", "unscheduled", "scheduled-during-read", "pod-reference", "pod-replaced", "owner-replaced", "list-denied", "no-eligible-pod", "original-expiry", "canceled"} {
 		t.Run(mode, func(t *testing.T) {
 			var podReads atomic.Int64
 			clock := &atomic.Int64{}
@@ -24,6 +24,12 @@ func TestAPIContextResolvesUnscheduledPodWithoutNodeAuthority(t *testing.T) {
 				var object map[string]any
 				switch r.URL.Path {
 				case "/api/v1/namespaces/payments":
+					if mode == "selection-aged" {
+						clock.CompareAndSwap(start.UnixNano(), start.Add(2*time.Second).UnixNano())
+					}
+					if mode == "selection-expiry" {
+						clock.CompareAndSwap(start.UnixNano(), start.Add(3*time.Second).UnixNano())
+					}
 					object = permissionNamespace("payments", "payments-uid")
 				case "/apis/apps/v1/namespaces/payments/deployments/app":
 					object = targetMetadata("Deployment", "app", "root-uid")
@@ -57,6 +63,8 @@ func TestAPIContextResolvesUnscheduledPodWithoutNodeAuthority(t *testing.T) {
 							object["metadata"].(map[string]any)["uid"] = "replacement"
 						case "owner-replaced":
 							object["metadata"].(map[string]any)["ownerReferences"] = []any{targetOwner("ReplicaSet", "other", "other")}
+						case "selection-expiry":
+							clock.Store(start.Add(6 * time.Second).UnixNano())
 						case "original-expiry":
 							clock.Store(start.Add(5 * time.Second).UnixNano())
 						}
@@ -82,7 +90,7 @@ func TestAPIContextResolvesUnscheduledPodWithoutNodeAuthority(t *testing.T) {
 				cancel()
 			}
 			out, err := api.ResolveWorkload(ctx, request)
-			if mode == "unscheduled" || mode == "scheduled-during-read" || mode == "pod-reference" {
+			if mode == "selection-aged" || mode == "unscheduled" || mode == "scheduled-during-read" || mode == "pod-reference" {
 				if err != nil || !out.Valid(time.Unix(0, clock.Load())) || out.ExecutionClass != artifact.ContextAPIExecution || out.Pin.NodeName != "" || out.NodeUID != "" || out.NodeBootID != "" || out.Request.PodName != "a-unscheduled" || out.Request.Workload.UID != "root-uid" || !out.ObservedAt.Equal(start) || !out.FreshUntil.Equal(start.Add(5*time.Second)) {
 					t.Fatalf("API target lost exact identity, class or interval: %+v %v", out, err)
 				}
