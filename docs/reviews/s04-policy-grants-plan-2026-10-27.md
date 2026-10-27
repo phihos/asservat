@@ -578,3 +578,15 @@ correction explicitly groups that CASE; other new IF expressions were reviewed.
 No data/check/role proof resulted. Report SHA-256
 `7ab5b1df971dcc4ab113791634a5d33ba5c3cd35af87c9c94c5a3f6b0c268961`,
 unchanged sources, no cleanup failures, and both owned containers absent.
+
+
+Smoke 3 (`1a5ee7ee`) passed the actual schema-101→102 Up/compatible Down/reapply
+case (2.19 seconds). The catalog confirmed `textsend`/`convert_to` are STABLE,
+`int4send`/`sha256` IMMUTABLE. The policy case failed during its existing synthetic
+source setup: `policy_source_runtime`'s fixture-only column list omitted the new
+`authored_grant_ref` (42501). Production compiled policy-source grants already
+include it. The correction adds only that exact fixture INSERT/UPDATE column.
+No request/settings data or Unicode/check proof resulted yet; group exit 1,
+Go test 3.879 seconds (runner phase 59.802 including race compilation), unchanged
+sources, cleanup empty, containers absent. Report SHA-256
+`20f4186fb34e8f9ad310f6b53db891d03023e0f3f5a6e24db09abd8c6ee4efdd`.

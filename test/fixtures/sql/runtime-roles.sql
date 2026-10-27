@@ -140,8 +140,8 @@ GRANT CONNECT ON DATABASE custody_test TO policy_source_runtime,policy_accept_ru
 GRANT USAGE ON SCHEMA public TO policy_source_runtime,policy_accept_runtime,policy_audit_runtime,policy_read_runtime;
 GRANT SELECT ON goose_db_version,permission_stream,policy_source,policy_acceptance TO policy_source_runtime,policy_accept_runtime,policy_audit_runtime,policy_read_runtime;
 GRANT UPDATE(id) ON permission_stream TO policy_source_runtime,policy_accept_runtime,policy_audit_runtime,policy_read_runtime;
-GRANT INSERT(root_id,policy_uid,installation_id,cluster_id,namespace_uid,name,generation,spec_digest,resource_version,observed_at,fresh_until,deleted,suspended,collection_digest) ON policy_source TO policy_source_runtime;
-GRANT UPDATE(generation,spec_digest,resource_version,observed_at,fresh_until,deleted,suspended,collection_digest,intent_version) ON policy_source TO policy_source_runtime;
+GRANT INSERT(root_id,policy_uid,installation_id,cluster_id,namespace_uid,name,generation,spec_digest,resource_version,observed_at,fresh_until,deleted,suspended,collection_digest,authored_grant_ref) ON policy_source TO policy_source_runtime;
+GRANT UPDATE(generation,spec_digest,resource_version,observed_at,fresh_until,deleted,suspended,collection_digest,intent_version,authored_grant_ref) ON policy_source TO policy_source_runtime;
 GRANT UPDATE(creator_json,active_id) ON policy_source TO policy_accept_runtime;
 GRANT UPDATE(policy_uid) ON policy_source TO policy_read_runtime;
 GRANT SELECT ON fleet_trust,permission_basis,permission_assignment,permission_review_source,permission_review_assignment,permission_review_decision,authority_audit TO policy_accept_runtime,policy_read_runtime;
