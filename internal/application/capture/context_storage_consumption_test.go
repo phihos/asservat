@@ -140,9 +140,13 @@ func TestContextStorageConsumptionRetainsEachAuthorityBound(t *testing.T) {
 			var reports []string
 			f.svc.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
 			_, err := f.svc.Request(t.Context(), source, p.ID, "expired-"+bound)
+			label := bound
+			if label == "eligibility-identity" {
+				label = "identity"
+			}
 			if !errors.Is(err, value.ErrChanged) || reads.Load() != 3 || refresh.demands.Load() != 1 ||
 				f.admissions.Load() != 0 || facts.caps != 1 || facts.ret != 1 || facts.eligibility != 1 ||
-				!slices.Equal(reports, []string{"request/facts/current"}) {
+				!slices.Equal(reports, []string{"request/facts/current/" + label}) {
 				t.Fatal("new storage revived an earlier authority", bound, err, reads.Load(), refresh.demands.Load(), reports)
 			}
 		})

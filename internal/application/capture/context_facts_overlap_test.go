@@ -169,7 +169,7 @@ func TestContextFactsOverlapRetainsOriginalTargetExpiry(t *testing.T) {
 	releaseStorage()
 	err := <-done
 	var failure interface{ FixedStep() string }
-	if !errors.Is(err, value.ErrChanged) || !errors.As(err, &failure) || failure.FixedStep() != "facts/current" || len(f.previews) != 0 || f.admissions.Load() != 0 || f.targetReads.Load() != 1 {
+	if !errors.Is(err, value.ErrChanged) || !errors.As(err, &failure) || failure.FixedStep() != "facts/current/target" || len(f.previews) != 0 || f.admissions.Load() != 0 || f.targetReads.Load() != 1 {
 		t.Fatal("overlap refreshed an expired target or performed an effect", err)
 	}
 }

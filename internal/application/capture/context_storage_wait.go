@@ -6,7 +6,6 @@ import (
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	value "asservat.local/asservat/internal/domain/capture"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
@@ -26,12 +25,13 @@ type contextStorageWait struct {
 	cancel    context.CancelFunc
 	until     time.Time
 	selection value.ContextStorageSelection
+	bound     string               // closed private label for the original enclosing cutoff
 	demand    contextStorageDemand // read only after done is closed
 }
 
 func (s ContextInvestigation) beginStorageWait(ctx context.Context, target targets.PodResolution, until time.Time, selection value.ContextStorageSelection) *contextStorageWait {
 	call, cancel := context.WithDeadline(ctx, until)
-	w := &contextStorageWait{done: make(chan struct{}), cancel: cancel, until: until, selection: selection}
+	w := &contextStorageWait{done: make(chan struct{}), cancel: cancel, until: until, selection: selection, bound: "request"}
 	started := time.Now()
 	if s.Refresh == nil || s.Storage == nil {
 		auditapp.MarkStep(ctx, "p-await-storage", started)
@@ -99,15 +99,23 @@ func storageCallCurrent(ctx context.Context, until, now time.Time) bool {
 
 func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts, intent value.ContextIntent, w *contextStorageWait) (ContextStorageObservation, error) {
 	var zero ContextStorageObservation
-	until := w.until
-	for _, bound := range []time.Time{
-		f.target.FreshUntil, f.eligibility.ValidUntil, f.eligibility.VerifiedIdentity.ValidUntil,
-		f.capability.FreshUntil, f.retention.ValidUntil, f.retention.Proof.ValidUntil, f.retention.ExpiresAt,
-	} {
-		until = identity.Earlier(until, bound)
+	until, boundName := w.until, w.bound
+	if boundName == "" {
+		boundName = "request"
 	}
-	if intent.Reason != nil {
-		until = identity.Earlier(until, intent.Reason.ExpiresAt)
+	for _, bound := range []struct {
+		at   time.Time
+		name string
+	}{
+		{f.target.FreshUntil, "target"}, {f.eligibility.ValidUntil, "eligibility"}, {f.eligibility.VerifiedIdentity.ValidUntil, "identity"},
+		{f.capability.FreshUntil, "capability"}, {f.retention.Proof.ValidUntil, "retention-proof"}, {f.retention.ValidUntil, "retention"}, {f.retention.ExpiresAt, "retention-expiry"},
+	} {
+		if bound.at.Before(until) {
+			until, boundName = bound.at, bound.name
+		}
+	}
+	if intent.Reason != nil && intent.Reason.ExpiresAt.Before(until) {
+		until, boundName = intent.Reason.ExpiresAt, "reason"
 	}
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
@@ -116,10 +124,21 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 		return storageCallCurrent(call, until, now) && s.nonStorageFactsCurrent(f, now)
 	}
 	expired := func() error {
-		if err := call.Err(); err != nil {
-			return previewFailure("facts/current", err)
+		reason := boundName
+		if s.Now().Before(until) {
+			if why := s.nonStorageFactsFailure(f, s.Now()); why != "" {
+				reason = why
+			}
 		}
-		return previewFailure("facts/current", value.ErrChanged)
+		// Context timers use the real clock independently from injected
+		// authority clocks; never substitute one clock's time into the other.
+		if deadline, ok := ctx.Deadline(); ctx.Err() != nil || ok && !time.Now().Before(deadline) {
+			reason = "operation"
+		}
+		if err := call.Err(); err != nil {
+			return previewFailure("facts/current/"+reason, err)
+		}
+		return previewFailure("facts/current/"+reason, value.ErrChanged)
 	}
 	if !current() {
 		w.close()
@@ -140,8 +159,11 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 		if err != nil {
 			return zero, previewFailure("facts/storage", err)
 		}
-		if !current() || !s.storageCurrent(v, f.target.Target(), s.Now()) {
+		if !current() {
 			return zero, expired()
+		}
+		if !s.storageCurrent(v, f.target.Target(), s.Now()) {
+			return zero, previewFailure("facts/current/storage", value.ErrChanged)
 		}
 		if w.selection == (value.ContextStorageSelection{}) {
 			w.selection = v.Selection

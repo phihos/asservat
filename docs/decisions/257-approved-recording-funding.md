@@ -63,3 +63,18 @@ background tasks, configuration knobs or external dependencies. The only added
 failure is an explicit atomic upgrade/rollback refusal for an inconsistent or
 still-charged graph. Work is one bounded migration over existing retained
 accounts; ordinary admission keeps its current queries and charges.
+
+The subsequent installed run 40546623947 on 79694a43 again completed independent
+approval and the real preview wait, then refused current facts before admission.
+The explicit resolution operation safely closed that unstarted intent; it did
+not report accepted work. The original public refusal code was discarded by the
+fixture and the private facts/current label conflated several original bounds.
+The fixture now retains only the public code and resolution state, while private
+closed labels identify the existing failed bound or structural predicate. No
+identifier, provider text, fresh retry, new tracing service or longer deadline
+is added. Pure retained-recorder tests prove refusal then closure for expired
+identity, recovery, target, capability and retention, with zero admissions and
+an unchanged approved blueprint. These model the failure semantics; they do not
+identify which bound expired in that installed run. The aggregate dependency
+path must be assessed once the concrete bound is visible; no speculative
+per-step refresh or limit increase is applied.

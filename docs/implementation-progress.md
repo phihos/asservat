@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Approved packet request: local target composition correction (2026-10-27)
+
+Native run 40557482326 on 23bf0042 failed before admission with
+`request/facts/current/target` (Go 563.658s, approval subtest 129.46s). The
+initial response was OutcomeUnknown; explicit resolution closed the unstarted
+intent. All 3,188 reported sources matched, source stayed unchanged and cleanup
+reported no failures; report SHA-256
+`8a64b558a81cd2c3fda3be8a7d1ebbae73e4fea9af4632281ceba70dbca1afb3`.
+No installed approved packet result passed. The preceding diagnostic run
+40551543601 was cancelled after slow package setup and has no terminal test or
+cleanup result; the bounded setup in 23bf0042 completed in 14s.
+
+The local correction combines exact target resolution and current recorder
+availability, removing one regional query and two Namespace/Pod GETs from the
+serial path for the installed Deployment target. Eight exact target-chain GETs
+remain. Original target/receiver
+deadlines, ordinary checks, API-only pin semantics and the queue-time node check
+remain unchanged. Preview retains its workload-selection/plan-only path; an
+unsupported peer refuses without a fallback. A deterministic serial-cost
+regression and fake-API/transport tests pass; they do not establish installed
+latency. See [the review](reviews/approved-recording-workflow-2026-10-27.md).
+
+CI also exposed a real cancellation-ordering race in admitted enrollment:
+the original HTTP owner could be cancelled before a derived context observed
+it, allowing another effect. Both enrollment paths now retain and directly
+check that owner at existing gates. Deterministic reproduction, full evidence
+race tests and 100 cancellation repetitions pass locally. No deadlines,
+interfaces, API requests, timers, goroutines or durable state were added.
+The combined candidate still needs final gates, review and native qualification.
+
 ## Slow regional native response renewal (ADR-258, 2026-10-27)
 
 The same prepaid regional window can now retain its source cursor and key
@@ -135,6 +165,18 @@ Two earlier local fixture attempts failed (ambiguous migration SQL alias, then
 an invalid test setup changing an enrolled policy) and were cleaned before this
 corrected run. No complete installed approved packet publication/download has
 passed yet; the corrected candidate still needs guarded remote qualification.
+
+The subsequent installed run 40546623947 on 79694a43 failed before admission
+with the private facts/current refusal. Explicit resolution safely closed the
+unstarted request, so the helper returned closed=true; it did not accept or run
+a capture. That run neither proves nor disproves the corrected physical charge.
+The fixture now retains its initial public code and resolver state without
+identifiers, and closed private bound labels distinguish the existing fact,
+storage and whole-operation checks. Pure retained-recorder tests reproduce
+refusal followed by explicit closure for identity, recovery, target, capability
+and retention expiry, with zero admissions and the original blueprint unchanged.
+No current deadline, authority check or retry policy changes. The installed
+expired bound and any justified dependency-path correction remain pending.
 
 ## Approved recording request and continuation (2026-10-27)
 

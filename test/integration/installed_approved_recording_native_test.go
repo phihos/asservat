@@ -434,9 +434,12 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 	}
 	continuation := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"], "continue_acquisition": true}
-	closed, err := installedJourneyRecoverCapture(ctx, requestCapture(original), func() (installedJourneyDisposition, error) {
+	initialCode := requestCapture(original)
+	t.Logf("approved submission initial public code=%q", initialCode)
+	closed, err := installedJourneyRecoverCapture(ctx, initialCode, func() (installedJourneyDisposition, error) {
 		var disposition installedJourneyDisposition
 		read("resolve_capture_request", original, &disposition)
+		t.Logf("approved submission resolution state=%q", disposition.State)
 		if disposition.State == "accepted" {
 			receipt.CaptureID = disposition.CaptureID
 		}
@@ -456,7 +459,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	})
 	if err != nil || closed || receipt.CaptureID == "" {
 		diagnose()
-		t.Fatal("approved expired-preview submission", closed, err)
+		t.Fatal("approved expired-preview submission", "initial code", initialCode, "closed", closed, "error", err)
 	}
 	originalID := receipt.CaptureID
 	confirmReplay := func() {

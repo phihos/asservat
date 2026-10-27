@@ -115,11 +115,11 @@ func TestContextStorageMarginDoesNotRenewEarlierAuthority(t *testing.T) {
 			}
 			_, err := f.svc.Request(t.Context(), source, p.ID, "original")
 			var stage interface{ FixedStep() string }
-			if !errors.Is(err, value.ErrChanged) || !errors.As(err, &stage) || stage.FixedStep() != "facts/current" ||
+			if !errors.Is(err, value.ErrChanged) || !errors.As(err, &stage) || stage.FixedStep() != "facts/current/"+earlier ||
 				f.admissions.Load() != 0 || len(f.accepted) != 0 || storage.reads.Load() != 2 || refresh.demands.Load() != 0 {
 				t.Fatal("storage margin revived earlier authority or repeated readiness", err, f.admissions.Load(), storage.reads.Load(), refresh.demands.Load())
 			}
-			if !slices.Equal(reports, []string{"request/facts/current"}) {
+			if !slices.Equal(reports, []string{"request/facts/current/" + earlier}) {
 				t.Fatal("request omitted its distinct expired-facts diagnostic", reports)
 			}
 		})
