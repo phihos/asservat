@@ -763,3 +763,22 @@ historical uncertainty/pristine migration case, the existing request/settings/
 attachment case and actual policy-executor capture admission with a four-capture
 attached grant, replay/restart and refused fifth occurrence. These new accounting
 cases are pending; no executed RED/GREEN claim is made for them yet.
+
+
+Accounting smoke 1 (`da522a48`) failed overall (Go 10.063s; runner phase
+40.678s; exit 1). Request/settings/attachment passed (3.25s), and the actual
+schema-101→102 conservative historical/pristine migration test passed (2.93s),
+including the production output-spend query refusal and unsafe Down refusal.
+The policy-share/accounting case failed during new synthetic fixture setup:
+WritePolicyGrantSettings returned PostgreSQL 42501 under hub-runtime, which
+correctly cannot accept its own protected ceilings. Fix the fixture to use the
+existing permission-accept purpose for that projection, as the earlier qualified
+request/settings fixture already does; no production privilege is broadened.
+No accounting admission was exercised. All 3,249 source hashes matched,
+unchanged sources, cleanup empty and both exact owned containers absent.
+Report SHA-256
+`1daaba87f88519326eef98ac935fecba2f093c61b09738a99b29b66deaf5617c`,
+archived with actual Go/provider logs under
+`approved-workflow/policy102-accounting-smoke-1-artifacts/` in the local build
+cache. Preserve the passing unchanged migration/attachment evidence; retry only
+the concrete failed policy-share component after fixture correction and gates.

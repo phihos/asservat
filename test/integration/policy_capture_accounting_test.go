@@ -41,8 +41,23 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	settings := identity.PolicyGrantSettingsObservation{Issuer: a.Creator.Issuer, Revision: identity.Revision{UID: "accounting-policy-period", Generation: 1, Digest: artifact.Digest{77}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Values: identity.PolicyGrantApproval{DefaultAge: time.Hour, MaxAge: time.Hour, RenewalNotice: time.Minute}}
-	if err = policies.AcceptPolicyGrantSettings(ctx, settings); err != nil {
-		t.Fatal(err)
+	// Protected settings retain the independently provisioned existing duty;
+	// the ordinary hub must not gain permission to accept its own maxima.
+	settingsRole := narrowRole(t, ctx, admin, "policy_accounting_settings_", "synthetic-accounting-settings", func(role string) []string {
+		grants, ok := postgres.PublicRuntimeRoleGrantSQL("permission-accept", role)
+		if !ok {
+			t.Fatal("missing protected settings duty")
+		}
+		return grants
+	})
+	settingsPool := poolFor(settingsRole, "synthetic-accounting-settings")
+	defer settingsPool.Close()
+	settingsWriter, err := postgres.NewPolicies(ctx, settingsPool, s.a.RootID, a.InstallationID)
+	if err != nil {
+		t.Fatal("settings facet", err)
+	}
+	if err = settingsWriter.AcceptPolicyGrantSettings(ctx, settings); err != nil {
+		t.Fatal("protected settings acceptance", err)
 	}
 	limits := authorization.AutomationLimits{MaxExecutions: 4, MaxBytes: 4 * artifact.MaxContextBytes}
 	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantPolicy, Requester: a.Creator, ExecutionDigest: a.ScopeDigest, DataClass: "extract", Reasons: []authorization.SensitiveReason{{ActionID: "pod-status", Code: "synthetic-component-review"}}, Scope: []byte(`{"fixture":"accepted-context-policy"}`), Review: []byte(`{}`), Lifetime: time.Hour, Revision: 1, Policy: &authorization.PolicyGrantScope{Authority: a, RecipeDigest: planning.RecipeDigest(), Limits: limits, ApprovalPolicyRef: settings.Revision, ApprovalMaxAge: time.Hour}}
@@ -53,15 +68,15 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: "accounting-review", RequestDigest: artifact.Digest{78}}, recovery)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("policy grant request", err)
 	}
 	g, _, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: g.ID, Approver: identity.Principal{Issuer: a.Creator.Issuer, Subject: "independent-component-reviewer", ClientID: "review-console", Kind: identity.Human}, Approve: true, Reason: "synthetic SQL review", ACR: "fixture-step-up", AuthTime: now, IdempotencyKey: "accounting-approval"}, recovery)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("independent component decision", err)
 	}
 	actor := identity.Identity{Principal: a.Creator, Scopes: []string{"evidence:read", "evidence:capture"}, Groups: []string{"maintainers"}, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
 	if _, _, err = policies.AttachPolicyGrant(ctx, app.PolicyGrantAttachmentInput{ID: custodyID(), PolicyUID: a.PolicyUID, GrantID: g.ID, IdempotencyKey: "accounting-attachment", Actor: actor, Recovery: recovery}); err != nil {
-		t.Fatal(err)
+		t.Fatal("current manager attachment", err)
 	}
 	return g.ID
 }
