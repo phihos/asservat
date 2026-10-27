@@ -109,3 +109,41 @@ Recorder scope projects collection fields only. Sharing and grantRef controls do
 not change collection authority, original issue/expiry or spend. Activation replay
 keeps the accepted sharing instruction until a separate authorized sharing control
 applies; it does not silently apply newly authored recipients or limits.
+
+
+## SQL accounting composition and upgrade
+
+Migration 00102 extends the existing grant/request journal with conditional real
+policy/workload scope, original request-anchored deadlines and cumulative pools.
+Explicit attachment uses an immutable control receipt and never reattaches on a
+historical reply. Accepted authored-grantRef changes clear the source pointer;
+new collection acceptance clears an old scope's attachment. Neither changes old
+expiry/spend or supplies encrypted audit authority.
+
+Reuse the existing policy_occurrence for each capture's immutable original
+capture/grant/output tuple. Tick has already spent the accepted execution;
+admission does not spend it twice. The capture, accepted output and optional
+grant execution/output are committed atomically. New acquisition checks retain
+the original charged grant after replacement. Stored completion and publication
+use their separate retained-authority/custody contracts; current source controls
+are not a new finalization fence. All-before-filter sensitive observation pools
+remain distinct from this native-output reservation.
+
+Legacy schema-101 executions/occurrences cannot establish exact past output or
+uncertain starts. On Up, conservatively fill original accepted output/observation
+pools to their ORIGINAL authored maxima whenever any execution was spent or any
+occurrence exists, including pending/refused/unlinked replies. This is uncertain
+spend, not measured bytes. Pristine acceptances with neither signal remain zero.
+One set-based migration UPDATE avoids a historical parser/journal or runtime
+provider lookup. Previously spent legacy scopes intentionally cannot start more
+collection; same-intent reauthorization/renewal is an unfinished lifecycle and
+cosmetic edits must not become a budget reset. Down refuses preserved nonzero
+pools or charged tuples rather than discard uncertainty.
+
+Separate-role PostgreSQL/S3 component tests now pass original request/settings,
+attachment ABA/replay, conservative legacy markers/pristine Up and unsafe Down,
+and actual capture admission with four reservations, lost-reply/restart and a
+refused fifth trigger. Exact source-bound reports and failed fixture runs are in
+the implementation plan. The identity/review/control inputs remain synthetic;
+public audit/request/review/UI/runtime composition, original-grant revocation
+races and installed recorder/session qualification are still pending.

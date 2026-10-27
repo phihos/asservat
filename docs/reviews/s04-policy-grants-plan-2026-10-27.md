@@ -823,3 +823,29 @@ unaccepted control-only edit that stops sharing without changing collection
 acceptance B. Both new collection acceptances now have distinct source intent;
 stop/revoke/replay control transitions retain the same accepted counter pools.
 These fixture corrections add no product behavior or relaxed constraints.
+
+
+Accounting smoke 4 (`2319c48d`) passed the entire selected real PostgreSQL/S3
+policy-share scenario: selected child 31.61s, Go 33.070s, runner phase 52.108s;
+runner/qualification exit 0. The actual log records grant executions 4/output
+16,384 bytes, accepted executions 5/output 16,384 bytes and no fifth reservation.
+The fifth trigger occurrence remains spent but its refused capture contributes
+no output/grant charge. Replays/new adapters do not add charge; later collection
+scopes have distinct accepted intent and monotonic Pod restart ordinals. Existing
+sharing publication after expiry/control changes, stop and revoke-all expectations
+also pass. All 3,249 hashes matched; unchanged sources, cleanup empty and exact
+owned PostgreSQL/S3 containers absent. Report SHA-256
+`e19b5a75f8bf331ebca9e535df5a3d17cc35f101eb93065c1e10414c49f3d41e`,
+archived with Go log under
+`approved-workflow/policy102-accounting-smoke-4-artifacts/`.
+
+This is role-bounded SQL/S3 component evidence with synthetic current identity,
+protected authority and review inputs. It is not installed public policy-grant or
+recorder qualification. The unchanged revised migration/attachment positives
+remain bound to `da522a48`; failures 1–3 remain archived. Acquisition-gate testing
+after attachment replacement/revocation, public activation encrypted audit,
+request/review/UI wiring, finite same-intent renewal and genuine ongoing sensitive
+observation/session credit are still pending. Static call-site review confirms the
+new current-policy/grant gate runs on API work/start checks, never on stored
+completion or publication; no later-source control blocks already gathered
+artifact finalization through this gate.
