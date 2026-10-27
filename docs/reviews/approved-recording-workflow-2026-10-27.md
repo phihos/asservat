@@ -194,3 +194,12 @@ quota. ADR-257 records the bounded formula, atomic legacy backfill, exact
 pre/post graph checks, unchanged IDs/spend/deadlines and rollback refusal.
 Migration 00100 belongs to this correction; history moves to 00101 and policy
 grants to 00102. No installed packet result has passed yet.
+
+Run 40546623947 on 79694a43 refused facts/current before admission; explicit
+resolution then closed the unstarted intent. Preserve the original failure,
+record the initial public code and closed resolution state, and distinguish
+existing fact/bound predicates with private fixed labels. A pure retained-plan
+regression covers identity/recovery/target/capability/retention refusal followed
+by explicit closure. No replacement preview, grant retry, longer operation or
+per-step authority refresh is introduced. Assess the aggregate current reads
+against the actual expired bound before proposing an efficiency change.

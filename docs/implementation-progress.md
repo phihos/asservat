@@ -27,6 +27,18 @@ an invalid test setup changing an enrolled policy) and were cleaned before this
 corrected run. No complete installed approved packet publication/download has
 passed yet; the corrected candidate still needs guarded remote qualification.
 
+The subsequent installed run 40546623947 on 79694a43 failed before admission
+with the private facts/current refusal. Explicit resolution safely closed the
+unstarted request, so the helper returned closed=true; it did not accept or run
+a capture. That run neither proves nor disproves the corrected physical charge.
+The fixture now retains its initial public code and resolver state without
+identifiers, and closed private bound labels distinguish the existing fact,
+storage and whole-operation checks. Pure retained-recorder tests reproduce
+refusal followed by explicit closure for identity, recovery, target, capability
+and retention expiry, with zero admissions and the original blueprint unchanged.
+No current deadline, authority check or retry policy changes. The installed
+expired bound and any justified dependency-path correction remain pending.
+
 ## Approved recording request and continuation (2026-10-27)
 
 The browser can request independent approval for an already-reviewed recorder
