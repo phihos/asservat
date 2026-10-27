@@ -239,6 +239,80 @@ The combined candidate still needs final gates, review and native qualification.
 
 ## Encrypted capture history (ADR-255, implementation checkpoint)
 
+The current history composition merges canonical main
+`eed8594020645fe6d10f8c6565e69a6235c7507d` into the isolated history branch
+(merge `e0e700d1`). PR100's exact reviewed candidate passed installed run
+40586980099: Go 620.173s, approved subtest 155.60s, actual original-expiry wait
+115.4091899s, one independently approved accepted capture, 2,360 native PCAPNG
+bytes and 21 tshark packets. The initial uncertain reply resolved to the same
+capture. Its source stayed unchanged and cleanup was empty; report SHA-256
+`d86eef8c74434bdb9240530927c3dd0edbbe6d1defb333ce432ff245843063da`.
+That run excludes history and is not installed qualification for this branch.
+
+The semantic merge base was the prior shared PR100 source `21806d0d`, because
+main contains its squash. The sole remaining content overlap combined history's
+original-target replacement check with main's tri-state recorder availability;
+operational failures still refuse before blueprint storage. All 21 non-overlap
+files changed since that base remain byte-identical to canonical main. The
+seven overlapping files retain history changes beside final main behavior,
+including original request/observation bounds, storage response scheduling,
+closed endpoint diagnostics and audit failure timing. Funding is still schema
+100 and history 101. No other worktree was changed.
+
+Fresh local pre-push passes, including 227 console tests, pinned SQL generation
+(61 files), spec-check (13,279 assertions), architecture-check (1,326 positive
+checks) and Go architecture (66 packages, 390 edges). Full affected race packages
+pass: capture 11.275s, presentation 86.895s, context-start 11.363s, mTLS 39.154s,
+object-store 5.405s, domain capture 1.011s and bootstrap 52.561s. Four positively
+selected Kubernetes endpoint/history checks pass in 11.704s; no unsplit broad
+Kubernetes run was repeated. The built React/Go TLS gate passes 23 synthetic
+journeys and 20 accessibility scans plus native restart (Go 21.789s). These use
+synthetic identity/evidence ports, not an installed history capture. Logs are
+`history-canonical-main-*.log` and `history-canonical-browser.log` in the local
+build cache; generated browser results were archived before restoring only
+those generated tracked outputs. The six positively selected noncollector
+harness/tunnel/approval guard tests pass under race (1.338s); the installed
+browser script passes syntax checking.
+
+The earlier `history101-parameters-native-1` SQL/S3 evidence remains attached to
+`11806a29`. Nine relevant migration/query/history custody/codec/service/domain
+and fixture files were independently compared to that environment report's
+hashes and remain identical. The report still records actual exit 0, unchanged
+source and empty cleanup. Other source has changed; that result is reused only
+for the unchanged history custody behavior, never as a new full-source or
+installed qualification.
+
+Practical fixed-budget estimate before the next hosted run: use the conservative
+964s approved baseline against the unchanged 1,200s job cap (236s remaining),
+and 620.173s Go against 1,080s (459.827s remaining). Baseline setup already
+installs the same locked console modules. The exact additional Playwright 1.64.0
+headless install command takes 0.761s with the local warm cache; one fresh
+owned-cache measurement takes 13.249s, downloads the reported 120 MiB headless
+shell and 2.2 MiB FFmpeg archives, and extracts 290,381,670 file bytes. Only that
+owned duplicate cache was then removed and its absence verified. This host uses
+the Ubuntu 24.04 fallback build; runner/network timing can differ. The initial
+measurement wrapper lacked `/usr/bin/time`; the preserved successful measurements
+use a monotonic Python clock. No package/root changes or collectors ran.
+
+The first approved path's active 40.191s excludes its measured 115.409s expiry
+wait. The repeat needs no second expiry wait and keeps the existing traffic
+loop; its edited recording is three seconds. Allowing 60–120s for React,
+encrypted settings, a new independent review and native transfer is an
+engineering estimate, not measured installed history runtime. With the measured
+cold setup it projects roughly 1,037–1,097s total, leaving 103–163s. The actual
+21.789s synthetic built-browser suite informs browser/setup feasibility only.
+Browser setup retains its 170s command cap; if it consumes that bound instead,
+the same projection can exceed 20 minutes. The existing five-minute browser
+and three-minute native helper caps are local ceilings, not reserved runtime or
+an overall extension. The unchanged job/Go bounds govern; slow, timed-out or
+incomplete runs fail. All history assertions remain mandatory, and no quota,
+source expiry or timeout is raised to fit. One guarded installed history run,
+its actual terminal result, source hashes and cleanup remain required before
+claiming that workflow qualified.
+
+Earlier composition records follow; their pending PR100 statements describe
+those historical candidates, not the merged mainline above.
+
 The next isolated composition merges exact PR100 candidate `21806d0d` and
 ADR-260 without conflicts. The four changed production target/transport files
 remain byte-identical to that candidate. API metadata retains its earliest-read
