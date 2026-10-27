@@ -1,6 +1,76 @@
 # Remaining native response qualification
 
-Date: 2026-10-27. Status: first installed attempt failed before traffic; corrected request preflight passed. Installed paced transfer and combined costs remain pending.
+Date: 2026-10-28. Status: installed attempts failed before traffic. Request preflight and SQL measurement regression checks pass; installed paced transfer and combined costs remain pending.
+
+## Incomplete SQL measurement and owned PostgreSQL proof (2026-10-28)
+
+Paced Native 40595384061 on `76bae03c` exited 1 after an uncertain submission
+resolved to the same accepted capture, before traffic or pacing. The setup
+snapshot comparison failed at the transition to observed Running. Actual Go
+was 596.503s (installer 394.97s; approved-recording 137.89s). Environment report
+SHA-256: `9a02e42ff2fd8fd79664ada933a9cab15b98bca876c9a505d51c7db36db30032`;
+3,223 source hashes matched the frozen source, unchanged with cleanup `[]`.
+The report writer returned before saving its numeric edges. Consequently the
+specific failed comparison is unknown; inherited statistics saturation is a
+hypothesis, not an established cause. No paced transfer or aggregate cost passed.
+
+The test-only writer now persists incomplete numeric Before/After edges with a
+closed failure reason before returning its error. Missing/reset/evicted coverage
+still refuses qualification; it produces no invented zero SQL delta. A focused
+regression failed before the correction because its report file was absent
+(0.014s), then passed with races (1.063s). No query text, parameters, credentials
+or product telemetry are added. After completed bootstrap, the owned installed
+fixture resets its private statistics once before the first measurement edge.
+That adds one fixture-administrator SQL call; no measurement phase is reset or
+retried after loss of coverage.
+
+The existing custody runner has a narrowly selected `--native-statistics` mode
+for `^TestNativePacingSQLWithRealPostgres$`, using its existing PG/S3 containers
+without collectors. The immutable PostgreSQL image
+`postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c`
+reports 18.6-1.pgdg12+2. Its default 5,000-entry capacity and the test's 20s
+context are unchanged. PostgreSQL 18 normalizes utility statements; SET literal
+values are unsuitable for producing distinct entries. See the
+[PostgreSQL 18 statistics contract](https://www.postgresql.org/docs/18/pgstatstatements.html)
+and its [query jumble implementation](https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/nodes/queryjumblefuncs.c).
+Distinct role identifiers remain significant: `CreateRoleStmt.role` is a string
+without a jumble-ignore annotation, and the
+[node generator](https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/nodes/gen_node_support.pl)
+emits string jumbling for that field. The real numeric preflight independently
+checks this behavior before stressing the library.
+
+Three separately frozen owned runs are retained under
+`~/.cache/asservat-build/native-pacing-statistics-baseline-{1,2,3}-artifacts/`:
+
+| Run/source | Actual result | Environment SHA-256 |
+|---|---|---|
+| 1 / `dabd1945` | Exit 1, test 0.05s / Go 0.109s: SHOW text could not scan into an integer; no stress proof. | `5e283e32cb90684c92e7db2f003b5960ab1f12b494a84b2830730925efac302d` |
+| 2 / `4973b863` | Exit 1, test 0.07s / Go 0.137s: 5,001 SET utilities left deallocations 0→0; saturation assumption refused. | `70325ddf80c2d9fe1d6aa7e846dd19e65faf3283a75811d7fac699900d313c09` |
+| 3 / `0b83e8a5` | Exit 0, test 0.30s / Go 1.360s: rollback-only distinct NOLOGIN role DDL qualified the mechanism. | `d4ff988aa046c16ce075d2ad3847b7cda7de448e16befd2c7e25101d0e0d2b41` |
+
+Each report has 3,187 independently matched source hashes, unchanged source and
+cleanup `[]`; exact owned PG/S3 containers are independently absent. In run 3,
+the two-identifier preflight increased both entry and distinct-ID counts from
+1,852 to 1,854. Two bounded batches of 5,001 CREATE ROLE commands ran in rolled
+back transactions; no bootstrap roles survived. Deallocations rose first to 8,
+then 28, and the measured interval refused eviction. One reset strictly before
+the first positive baseline reduced deallocations to 0. The existing positive
+case still required exactly two narrow-role calls, one normalized statement,
+correct row counts, administrator exclusion and cross-database isolation. An
+explicit later reset also refused comparison. This is induced mechanism proof,
+not an installed runtime result or recovery of the earlier missing edges.
+
+Final local canonical `make pre-push` exited 0, including 218 console checks;
+focused report/SQL/provider race checks exited 0 in 1.064s. Specification
+validation passed 13,277 assertions and the architecture gate passed 1,326
+positive checks. These are local checks, not another installed result.
+
+The bounded-response change targets fresh installations with matched component
+versions. Mixed peers can refuse longer operations; it claims no installed
+rolling upgrade. Regional connector and download-worker upgrades remain the
+existing [ADR-227 backlog](../decisions/227-upgrade-and-rollback.md), without
+adding drain machinery to this fix. A fresh installed pacing run with retained
+measurement edges remains required before qualifying its payload and costs.
 
 ## First installed pacing attempt and request preflight (2026-10-27)
 
@@ -87,7 +157,7 @@ No hosted dispatch is authorized by this plan.
 
 The existing PR-100 helper's small `/log` requests and nonempty-PCAPNG check
 remain its original qualification. For this separate near-full experiment,
-review `actionMaxBytes=8 MiB`, `packetAfter=10s`, `actionTimeout=20s` and finite
+review the builtin recorder's existing 8 MiB cap, `packetAfter=10s`, `actionTimeout=20s` and finite
 composition limits before approval. No duration changes after acceptance are
 allowed. Keep the product's current 8 MiB native cap.
 After the exact accepted capture reports Running, run sixteen batches of 4,096 flushed 64-byte writes
