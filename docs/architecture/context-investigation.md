@@ -184,6 +184,15 @@ grant use with revocation in SQL. Accepted retries recover their original deadli
 Legacy absolute-deadline plans cannot gain this interpretation; they require a
 new preview/review. See [ADR-252](../decisions/252-approved-capture-acceptance.md).
 
+Packet submission resolves its exact approved Pod and current recorder
+availability in one regional exchange. This removes duplicate network/API work
+from the original target's five-second observation interval; it does not restart
+that interval or relax any current eligibility, retention, storage, identity or
+recovery check. Unsupported composition types still refuse before that query.
+The connector rechecks the Pod's node and collector before enqueueing. Preview
+selection and its plan-only behavior remain unchanged. See the
+[target composition](workload-target-resolution.md#independent-pins-and-deadlines).
+
 The existing protected approval-settings reader is consulted once per recorder
 submission. A changed administrator approval requirement invalidates the review
 in either direction. Approval presentation separates passive preview expiry from

@@ -16,7 +16,7 @@ func historyRecordingFixture(t *testing.T) (*investigationFixture, ContextHistor
 	f := newInvestigationFixture()
 	f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
 	f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	f.svc.Recorders = availableRecording{}
+	f.svc.Recorders = availableRecording{f}
 	f.svc.Filters = &stubFilters{}
 	s, r := historyService(f)
 	s.Previews = f.svc

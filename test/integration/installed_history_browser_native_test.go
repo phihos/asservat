@@ -100,7 +100,7 @@ func installedHistoryBrowserTunnel(t *testing.T, parent context.Context, origin,
 // Called from the already collector-qualified approved recording focus after
 // its first real PCAPNG. The approval callback is the existing independently
 // authenticated reviewer, never a fixture INSERT or a copied original grant.
-func qualifyInstalledRecorderHistory(t *testing.T, ctx context.Context, browser *installedBrowser, address string, target map[string]string, sourceCapture, sourceGrant string, invoke func(string, any) (installedJourneyEnvelope, string), approve func(string)) {
+func qualifyInstalledRecorderHistory(t *testing.T, ctx context.Context, browser *installedBrowser, address string, target map[string]string, sourceCapture, sourceGrant string, invoke func(string, any) (installedJourneyEnvelope, string), approve func(context.Context, string)) {
 	t.Helper()
 	type settings struct {
 		CaptureID       string    `json:"capture_id"`
@@ -140,12 +140,12 @@ func qualifyInstalledRecorderHistory(t *testing.T, ctx context.Context, browser 
 		t.Fatal("original encrypted recording settings unavailable")
 	}
 	var requestedGrant string
-	result := installedRecorderHistoryBrowser(t, ctx, browser, address, target, sourceCapture, func(grant string) {
+	result := installedRecorderHistoryBrowser(t, ctx, browser, address, target, sourceCapture, func(approvalCtx context.Context, grant string) {
 		if grant == sourceGrant || requestedGrant != "" {
 			t.Fatal("repeat reused original approval or created multiple new reviews")
 		}
 		requestedGrant = grant
-		approve(grant)
+		approve(approvalCtx, grant)
 	})
 	if requestedGrant != result.GrantID || result.SettingsDigest != source.Digest || !result.SourceExpiresAt.Equal(source.ExpiresAt) || result.Digest == source.ExecutionDigest {
 		t.Fatal("browser/MCP source or new review binding differs")
@@ -224,6 +224,9 @@ func qualifyInstalledRecorderHistory(t *testing.T, ctx context.Context, browser 
 
 func installedHistoryBrowserNative(t *testing.T, ctx context.Context, browser *installedBrowser, artifactID string, expires time.Time) []byte {
 	t.Helper()
+	// One original bound covers the initial preparation and every later read.
+	ctx, stop := context.WithDeadline(ctx, installedJourneyEarlier(expires, time.Now().Add(3*time.Minute)))
+	defer stop()
 	prepare := map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-history-repeat-download-" + artifactID}
 	prepareOnce := func() installedJourneyDownload {
 		t.Helper()
@@ -329,7 +332,7 @@ type installedHistoryBrowserResult struct {
 // The only injected browser credential is the real HttpOnly Asservat session
 // already issued by the installed Keycloak login. It crosses a private stdin
 // pipe, never a command argument, report, page script or fixture authority row.
-func installedRecorderHistoryBrowser(t *testing.T, ctx context.Context, browser *installedBrowser, address string, target map[string]string, source string, approve func(string)) installedHistoryBrowserResult {
+func installedRecorderHistoryBrowser(t *testing.T, ctx context.Context, browser *installedBrowser, address string, target map[string]string, source string, approve func(context.Context, string)) installedHistoryBrowserResult {
 	t.Helper()
 	origin, err := url.Parse(browser.base)
 	if err != nil || browser.client.Jar == nil {
@@ -408,7 +411,7 @@ func installedRecorderHistoryBrowser(t *testing.T, ctx context.Context, browser 
 			if len(event.GrantID) != 36 || len(event.PreviewID) != 36 || len(event.Digest) != 64 {
 				t.Fatal("browser review identity missing")
 			}
-			approve(event.GrantID)
+			approve(call, event.GrantID)
 			if _, err = io.WriteString(in, "approved\n"); err != nil {
 				t.Fatal("browser continuation pipe", err)
 			}

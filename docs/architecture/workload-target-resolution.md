@@ -69,6 +69,25 @@ compares the approved scope. A replaced pod/root/node or changed boot identity
 cannot become an implicit alternative or extend a prior approval. No value
 returned here is a permission or recovery proof.
 
+For an approved packet request, `resolve-packet-recorder` combines exact Pod
+resolution and point-in-time recorder availability under one regional query.
+It retains the same eight Namespace/Pod/ReplicaSet/Deployment GETs for a
+Deployment target and reuses the final Pod's scheduling/status fields locally,
+removing the separate availability exchange and its two Namespace/Pod GETs.
+Source/owner authentication and ordinary entitlement checks remain separate;
+these counts do not include those unchanged reads. The API execution pin still
+has no node name, UID or boot identity. Availability is a transient observation,
+not authority or an added NodeView lease. Recording start independently rereads
+the Pod's node and requires a current collector report before enqueueing.
+
+The combined result keeps the earlier original target and regional receiver
+deadline. Unsupported peers refuse; there is no fallback query, target
+replacement or fresh deadline. Preview retains its existing workload selection
+and availability query because it also produces plans for unavailable or
+unsupported recorders. The combined path applies only to an exact approved
+packet target. Local fake-API/transport tests establish the GET counts, final
+Pod reuse and refusals; installed latency qualification is recorded separately.
+
 ## Qualification and composition
 
 The focused real-TLS fake-API race suite passes in

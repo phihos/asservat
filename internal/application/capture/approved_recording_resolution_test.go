@@ -23,7 +23,7 @@ func TestApprovedRetainedRecordingFactsRefusalThenExplicitResolutionCloses(t *te
 			f := &retainedRecording{investigationFixture: base}
 			base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 			base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-			base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{}
+			base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{base}
 			policy := identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}
 			base.svc.Approvals = fixedApprovalSettings{policy: policy}
 			grants := &fakeGrants{}

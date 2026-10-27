@@ -22,21 +22,29 @@ import (
 // and the connector checks the node again before queueing work.
 type ContextRecorders interface {
 	PacketRecorder(context.Context, targets.PodResolution) error
+	ResolvePacketRecorder(context.Context, targets.Request) (targets.PodResolution, error)
 }
 
 // packetRecorderAvailable reports whether this composition could be recorded
 // on the target's node now. Any failure is "not available".
 func (s ContextInvestigation) packetRecorderAvailable(ctx context.Context, intent value.ContextIntent, target targets.PodResolution) bool {
-	if s.Recorders == nil || intent.Composition == nil || target.ExecutionClass != artifact.ContextAPIExecution {
-		return false
-	}
-	if evidence, err := compiler.RecorderEvidenceType(*intent.Composition); err != nil || evidence != "packetCapture" {
+	if s.Recorders == nil || !packetRecorderInput(intent, target.ExecutionClass) {
 		return false
 	}
 	mark := time.Now()
 	err := s.Recorders.PacketRecorder(ctx, target)
 	auditapp.MarkStep(ctx, "p-recorder", mark)
 	return err == nil
+}
+
+// packetRecorderInput preserves the supported acquisition boundary before any
+// combined RPC; profile lookup is pure and unsupported plans stay plan-only.
+func packetRecorderInput(intent value.ContextIntent, class artifact.ContextExecutionClass) bool {
+	if intent.Composition == nil || class != artifact.ContextAPIExecution {
+		return false
+	}
+	evidence, err := compiler.RecorderEvidenceType(*intent.Composition)
+	return err == nil && evidence == "packetCapture"
 }
 
 // recordingPlan compiles the accepted context plan of an acceptable

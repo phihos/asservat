@@ -1,12 +1,89 @@
 # Sustained implementation progress
 
+## Approved packet request: local target composition correction (2026-10-27)
+
+Native run 40557482326 on 23bf0042 failed before admission with
+`request/facts/current/target` (Go 563.658s, approval subtest 129.46s). The
+initial response was OutcomeUnknown; explicit resolution closed the unstarted
+intent. All 3,188 reported sources matched, source stayed unchanged and cleanup
+reported no failures; report SHA-256
+`8a64b558a81cd2c3fda3be8a7d1ebbae73e4fea9af4632281ceba70dbca1afb3`.
+No installed approved packet result passed. The preceding diagnostic run
+40551543601 was cancelled after slow package setup and has no terminal test or
+cleanup result; the bounded setup in 23bf0042 completed in 14s.
+
+The local correction combines exact target resolution and current recorder
+availability, removing one regional query and two Namespace/Pod GETs from the
+serial path for the installed Deployment target. Eight exact target-chain GETs
+remain. Original target/receiver
+deadlines, ordinary checks, API-only pin semantics and the queue-time node check
+remain unchanged. Preview retains its workload-selection/plan-only path; an
+unsupported peer refuses without a fallback. A deterministic serial-cost
+regression and fake-API/transport tests pass; they do not establish installed
+latency. See [the review](reviews/approved-recording-workflow-2026-10-27.md).
+
+CI also exposed a real cancellation-ordering race in admitted enrollment:
+the original HTTP owner could be cancelled before a derived context observed
+it, allowing another effect. Both enrollment paths now retain and directly
+check that owner at existing gates. Deterministic reproduction, full evidence
+race tests and 100 cancellation repetitions pass locally. No deadlines,
+interfaces, API requests, timers, goroutines or durable state were added.
+The combined candidate still needs final gates, review and native qualification.
+
 ## Encrypted capture history (ADR-255, implementation checkpoint)
+
+The current isolated composition also merges exact approved-recording candidate
+`e6a2fbfb`, including combined packet target/recorder observation and its original
+bounds. Its installed run and CI were pending at composition; no passing PR100
+or installed history result is inferred. History-only test fakes now implement
+the new combined recorder resolver through their original target fixture.
+
+The existing `continuation-approved-recording` focus now calls the actual React
+history driver after its first genuine PCAPNG on this history branch. It uses
+the original human requester's browser, a fresh preview and a new independent
+reviewer decision with fresh real step-up, then verifies the second native
+PCAPNG. Other focuses, including paced delivery, do not invoke that helper.
+There is no hidden fixture flag, synthetic grant row or additional traffic loop.
+The native workflow reuses console CI's pinned Playwright headless-shell setup
+and cache under a three-minute setup bound. The driver and locked browser
+package inputs are included in the existing source-hash report.
+
+This adds one capture and one native-download session (two total of each), within
+the existing four-record/four-session ceilings. The current helper bounds are
+five minutes for React collection plus three minutes for its native preparation
+and transfer. Against prior approximately 9m24s–9m45s Go runs, those worst-case
+bounds leave only 15–36 seconds inside the unchanged 18-minute Go envelope;
+additional settings/metadata reads consume that headroom, and setup also
+consumes the unchanged 20-minute job budget. The five-minute browser context
+caps its approval callback; the original three-minute native context includes
+the first preparation call. Typical additional time
+and whole-job fit remain unqualified and must be measured once PR100 passes.
+No quota, source expiry, retention, timeout or refund is raised to make it fit.
+
+
+Local canonical pre-push passed after this composition. The corrected full
+capture race package and full bootstrap/contextstart race packages passed, as
+did all five focused packet/API target regressions with positive test selection.
+A broader unsplit Kubernetes package run reached its unchanged ten-minute test
+timeout; the repository's canonical inventory splits this expensive package
+into 40-test groups, so that unsplit attempt is retained as a failure, not a
+full-package pass. The initial run also caught two history-only fakes lacking
+the new delegated target reader; those were corrected before the capture rerun.
+No production target or deadline behavior was changed for these fakes.
+
+The actual built React/Go TLS boundary passed 23 synthetic browser journeys and
+20 accessibility scans plus native restart checks (Go 21.880 s). The installed
+history driver passed syntax checking, its exact-destination/cancellation
+loopback tunnel passed under race, workflow YAML parsed, and ten pure harness
+selection/source-pinning tests passed. These tests do not run the installed
+history journey or qualify its provider/collector path. Earlier real SQL/S3
+results below remain tied to `11806a29`; the unchanged history custody path was
+not rerun solely for this target/fixture composition.
 
 The isolated schema-101 composition at `11806a29` combines clean history
 checkpoint `c36d6452` with committed approved-recording candidate `f3a1fb60`.
 Funding remains migration 00100; encrypted history follows as 00101 and the
-compiled schema guard is 101. The later capture-target work in PR100 is not
-included and must be merged before publication. Both sets of approval/history
+compiled schema guard is 101. That checkpoint did not include the later PR100 capture-target work. Both sets of approval/history
 contracts and prior qualification records are retained.
 
 Local full pre-push, pinned SQL generation, all 12 affected Go race packages and

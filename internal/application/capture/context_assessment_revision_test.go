@@ -68,7 +68,7 @@ func TestRecorderOldRetentionAnchorReviewNeedsRefresh(t *testing.T) {
 	f := newInvestigationFixture()
 	f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
 	f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	f.svc.Recorders = availableRecording{}
+	f.svc.Recorders = availableRecording{f}
 	f.svc.Filters = &stubFilters{}
 	ctx := context.Background()
 	r, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition()))

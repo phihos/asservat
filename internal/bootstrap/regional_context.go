@@ -327,6 +327,27 @@ func (t reportedTargets) PacketRecorder(ctx context.Context, r targets.RecorderR
 	return t.recordings.PacketRecorder(ctx, r)
 }
 
+// ResolvePacketRecorder observes the exact Pod and availability under one
+// original receiver proof, without a second query or namespace/Pod read.
+func (t reportedTargets) ResolvePacketRecorder(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {
+	p, node, err := t.PodTargets.ResolvePacketPod(ctx, r)
+	if err != nil {
+		return targets.RecorderResolution{}, err
+	}
+	return t.packetTargetAvailability(p, node), nil
+}
+func (t reportedTargets) packetTargetAvailability(p targets.PodResolution, node string) targets.RecorderResolution {
+	answer := targets.RecorderAnswer{Outcome: targets.RecorderUnavailable}
+	if node == "" {
+		answer.Outcome = targets.RecorderNoNode
+	} else if t.recordings != nil {
+		if v, ok := t.recordings.nodes.NodeByName(node); ok && v.PacketRecorderAvailable() {
+			return targets.RecorderResolution{Target: p, Recorder: targets.RecorderAnswer{Outcome: targets.RecorderAvailable}}
+		}
+	}
+	return targets.RecorderResolution{Target: p, Recorder: answer}
+}
+
 func (t reportedTargets) ReportAnswer(steps string) { t.report("answer", steps) }
 
 // reportedWorkVerifier logs a refused work verification's fixed step.

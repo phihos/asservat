@@ -232,5 +232,7 @@ PostgreSQL/S3 `history101-parameters-native-1` passed the existing
 All 3,200 captured source hashes matched and cleanup was empty, with owned
 containers independently absent. Physical ciphertext was 4,208 bytes against the
 unchanged 1,671,168-byte reservation. Authority/process inputs remain synthetic;
-installed console/history and later PR100 capture-target composition remain
-pending. Prior native results above retain their original source provenance.
+installed console/history remains unqualified. The later PR100 target
+composition and executable browser fixture wiring are recorded separately in
+the progress record; prior native results above retain their original source
+provenance.

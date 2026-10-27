@@ -15,8 +15,11 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 )
 
-type availableRecording struct{}
+type availableRecording struct{ fixture *investigationFixture }
 
+func (a availableRecording) ResolvePacketRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
+	return a.fixture.svc.Targets.ResolvePod(ctx, r)
+}
 func (availableRecording) PacketRecorder(context.Context, targets.PodResolution) error { return nil }
 
 // SQL separately qualifies retained immutable reads and current-grant locking.
@@ -46,7 +49,7 @@ func TestApprovedRecordingStartsAfterPreviewExpiryWithOriginalPlan(t *testing.T)
 	f := &retainedRecording{investigationFixture: base}
 	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{}
+	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{base}
 	policy := identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}
 	base.svc.ReportPreviewFailure = func(stage string) { t.Log("stage", stage) }
 	base.svc.Approvals = fixedApprovalSettings{policy: policy}
@@ -109,7 +112,7 @@ func TestApprovedHistoryRepeatCannotRenewItsSourceDeadline(t *testing.T) {
 	f := &retainedRecording{investigationFixture: base}
 	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{}
+	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{base}
 	base.svc.Lifetime = 2 * time.Minute
 	policy := identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}
 	base.svc.Approvals = fixedApprovalSettings{policy: policy}

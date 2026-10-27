@@ -517,7 +517,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 				p.Deadline = identity.Earlier(p.Deadline, p.Intent.RepeatedFrom.ExpiresAt)
 			}
 		}
-		if p.Storage == (value.ContextStorageSelection{}) {
+		if p.Storage == (value.ContextStorageSelection{}) || !packetRecorderInput(p.Intent, p.ExecutionClass) {
 			return zero, value.ErrRecorderUnavailable
 		}
 	}
@@ -548,18 +548,26 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	storageWait.bound = storageBound
 	defer storageWait.close()
 	resolveStarted := time.Now()
-	target, err := s.Targets.ResolvePod(ctx, p.Target)
+	var target targets.PodResolution
+	if recording && s.Recorders != nil {
+		target, err = s.Recorders.ResolvePacketRecorder(ctx, p.Target)
+	} else {
+		target, err = s.Targets.ResolvePod(ctx, p.Target)
+	}
 	auditapp.MarkStep(ctx, "q-resolve", resolveStarted)
 	if err != nil {
+		if recording && errors.Is(err, targets.ErrUnsupported) {
+			return zero, value.ErrRecorderUnavailable
+		}
 		// Reported with its closed class; the error still unwraps unchanged.
 		return zero, previewFailure("target/"+targetFailureClass(err), err)
 	}
 	if target.Request != p.Target || target.Pin != p.Pin || target.ExecutionClass != p.ExecutionClass {
 		return zero, s.requestChanged("target")
 	}
-	// The node must still offer the recorder; the connector checks it again
-	// before it queues the work.
-	if recording && !s.packetRecorderAvailable(ctx, p.Intent, target) {
+	// Recording resolution checks current availability in the same regional
+	// exchange. The connector still checks the node before queueing work.
+	if recording && s.Recorders == nil {
 		return zero, value.ErrRecorderUnavailable
 	}
 	s.reviewTarget(ctx, source, i.Principal, target)

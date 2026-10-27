@@ -178,6 +178,32 @@ func (t Targets) PacketRecorder(ctx context.Context, p targets.PodResolution) er
 	return nil
 }
 
+// ResolvePacketRecorder shares target and packet readiness under one original
+// receiver check. No second query or refreshed deadline is introduced.
+func (t Targets) ResolvePacketRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
+	if !r.Valid() || t.Router == nil || t.Now == nil || ctx == nil || ctx.Err() != nil {
+		return targets.PodResolution{}, targets.ErrInvalid
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	call, diagnostics := NewStreamDiagnosticContext(call)
+	var out targets.RecorderResolution
+	until, err := t.Router.Query(call, r.ClusterID, queryResolvePacketRecorder, r, &out)
+	if err != nil {
+		t.report("recorder-target/"+queryStep(err, diagnostics), "")
+		return targets.PodResolution{}, err
+	}
+	out.Target.FreshUntil = identity.Earlier(out.Target.FreshUntil, until)
+	if !out.Valid(t.Now()) || out.Target.Request != r {
+		t.report("recorder-target/result", "")
+		return targets.PodResolution{}, targets.ErrUnavailable
+	}
+	if out.Recorder.Outcome != targets.RecorderAvailable {
+		return targets.PodResolution{}, targets.ErrUnsupported
+	}
+	return out.Target, nil
+}
+
 func (t Targets) report(step, timing string) {
 	if t.Report != nil {
 		t.Report(step, timing)
