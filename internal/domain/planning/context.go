@@ -37,7 +37,41 @@ type ContextInput struct {
 	Target            targets.PodResolution
 	Retention         privacy.Resolution
 	Capability        ContextCapability
+	// Recorder selects an accepted node recorder plan (ADR-248) instead of
+	// pod status: the authored composition with its filters frozen at
+	// preview, so the plan never depends on a compiler being present later.
+	Recorder *RecorderContext `json:",omitempty"`
 }
+
+// RecorderContext is the authored composition of a recorder capture and the
+// hub-compiled programs of its filters, keyed by normalized expression.
+type RecorderContext struct {
+	Composition ProfileComposition
+	Filters     []CompiledExpression `json:",omitempty"`
+	// RequireApproval is the installation's ADR-249 switch as frozen in
+	// the reviewed plan.
+	RequireApproval bool `json:",omitempty"`
+}
+
+// CompiledExpression is one frozen filter compilation.
+type CompiledExpression struct {
+	Expression string
+	Filter     CompiledFilter
+}
+
+// Clone returns an independent copy.
+func (r *RecorderContext) Clone() *RecorderContext {
+	if r == nil {
+		return nil
+	}
+	out := RecorderContext{Composition: *r.Composition.Clone()}
+	for _, f := range r.Filters {
+		f.Filter.Program = append([]BPFInstruction(nil), f.Filter.Program...)
+		out.Filters = append(out.Filters, f)
+	}
+	return &out
+}
+
 type ContextPlan struct {
 	Input                     ContextInput
 	CanonicalScope            []byte

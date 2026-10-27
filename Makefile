@@ -74,19 +74,30 @@ LIBPCAP_VERSION := 1.11.0
 LIBPCAP_SHA256 := 9237f5bae9dcf3a91823d9963ec43b7c0e2e3374ef2ad57d92c8cd39530f4723
 LIBPCAP_PREFIX ?= $(HOME)/.cache/asservat-build/libpcap-$(LIBPCAP_VERSION)
 PCAP_ENV = CGO_ENABLED=1 CGO_CFLAGS="-I$(LIBPCAP_PREFIX)/include" CGO_LDFLAGS="-L$(LIBPCAP_PREFIX)/lib" TMPDIR="$(ASSERVAT_BUILD_TMP)"
-.PHONY: libpcap pcap-check
+# The fully static hub build a FROM-scratch image needs (netgo/osusergo; the
+# linker's NSS warnings concern libpcap name lookups the planner never reaches).
+HUB_BUILD = $(PCAP_ENV) go build -tags libpcap,netgo,osusergo -trimpath -buildvcs=false -ldflags '-extldflags "-static"'
+HUB_BINARY ?= $(ASSERVAT_BUILD_TMP)/asservat-hub
+.PHONY: libpcap pcap-check hub-binary
 libpcap:
 	mkdir -p "$(ASSERVAT_BUILD_TMP)"
 	LIBPCAP_VERSION=$(LIBPCAP_VERSION) LIBPCAP_SHA256=$(LIBPCAP_SHA256) LIBPCAP_PREFIX="$(LIBPCAP_PREFIX)" TMPDIR="$(ASSERVAT_BUILD_TMP)" scripts/build-libpcap.sh
 
-# Real libpcap compilation tests plus the fully static hub build a FROM-scratch
-# image needs (netgo/osusergo; the linker's NSS warnings concern libpcap name
-# lookups the planner never reaches). User space only: no capture or BPF load.
+# Real libpcap compilation tests plus the static hub build. User space only:
+# no capture or BPF load.
 pcap-check: libpcap
 	$(PCAP_ENV) go test -tags libpcap -count=1 ./internal/adapters/pcap/
-	$(PCAP_ENV) go build -tags libpcap,netgo,osusergo -trimpath -buildvcs=false -ldflags '-extldflags "-static"' -o "$(ASSERVAT_BUILD_TMP)/asservat-hub" ./cmd/asservat 2>/dev/null
+	$(HUB_BUILD) -o "$(ASSERVAT_BUILD_TMP)/asservat-hub" ./cmd/asservat 2>/dev/null
 	file "$(ASSERVAT_BUILD_TMP)/asservat-hub" | grep -q 'statically linked'
 	rm -f "$(ASSERVAT_BUILD_TMP)/asservat-hub"
+
+# ADR-243 decision 4: the installed product image's binary (hub-api,
+# hub-worker, connector, installers) with the filter compiler linked, written
+# to HUB_BINARY. The native harness builds its FROM-scratch image from it; the
+# collector image keeps its own gadget-tagged build.
+hub-binary: libpcap
+	$(HUB_BUILD) -o "$(HUB_BINARY)" ./cmd/asservat
+	file "$(HUB_BINARY)" | grep -q 'statically linked'
 
 # ADR-246 (S1): only the collector image links Inspektor Gadget (build tag
 # gadget); every other build carries a stub. Vet and build the static

@@ -72,16 +72,23 @@ func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, sourc
 	if p.Intent.Composition == nil {
 		return zero, value.ErrInvalid
 	}
-	return zero, s.recorderRequest(ctx, source, p, key, access)
+	if err := s.recorderRequest(ctx, source, p, key, access); err != nil {
+		return zero, err
+	}
+	// ADR-248: the node recorder does not deliver results under a result-access
+	// instruction yet.
+	return zero, value.ErrRecorderUnavailable
 }
 
-// recorderRequest decides a reviewed packet/syscall submission (ADR-249).
-// A plan without an approval requirement is refused with RecorderUnavailable
-// (ADR-243). A plan that needs approval opens exactly one review request for
-// its capture identity while the preview is current, and is refused with
+// recorderRequest decides the approval gate of a reviewed packet/syscall
+// submission (ADR-249). A plan without an approval requirement passes (nil).
+// A plan that needs approval opens exactly one review request for its capture
+// identity while the preview is current, and is refused with
 // ApprovalRequired until an approved, current grant covers this exact plan
-// for the requesting human; only then does it reach RecorderUnavailable.
-// Nothing is armed, reserved or charged on any path.
+// for the requesting human; only then does it pass to the recorder check
+// (ADR-248). A plan with REQ-AUT-006 observation limits (a raw byte
+// predicate) stays RecorderUnavailable: the node recorder does not charge
+// observation spend. Nothing is armed, reserved or charged here.
 func (s ContextInvestigation) recorderRequest(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, access *authorization.ResultAccess) error {
 	actions, approval, err := compiler.RecorderScopeSummary(p.CanonicalScope)
 	if err != nil {
@@ -91,7 +98,7 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		if access != nil {
 			return value.ErrInvalid
 		}
-		return value.ErrRecorderUnavailable
+		return nil
 	}
 	if s.Grants == nil {
 		return authorization.ErrApprovalRequired
@@ -112,7 +119,10 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		if err != nil {
 			return authorization.ApprovalPendingError{GrantID: g.ID}
 		}
-		return value.ErrRecorderUnavailable
+		if approval.ObservationLimits != nil {
+			return value.ErrRecorderUnavailable
+		}
+		return nil
 	case errors.Is(err, authorization.ErrApprovalRequired):
 		// No request exists yet: only a current preview can open one.
 	default:

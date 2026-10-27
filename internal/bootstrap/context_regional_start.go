@@ -158,7 +158,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 			s.Report(step + " (" + regionalOutcome(err) + ") left" + fleetapp.RemainingBucket(ctx, s.Now()) + " start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
 		}
 		switch {
-		case err == nil && (result.State == "StoredPendingVerification" || result.State == "AlreadyStarted"):
+		case err == nil && (result.State == "StoredPendingVerification" || result.State == "AlreadyStarted" || result.State == "Recording"):
 			return result.State, nil
 		case errors.Is(err, execution.ErrPreparationUncertain):
 			return "PreparationUncertain", err
@@ -177,7 +177,9 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		return execution.ErrUnavailable
 	}
 	switch state {
-	case "StoredPendingVerification", "AlreadyStarted":
+	case "StoredPendingVerification", "AlreadyStarted", "Recording":
+		// ADR-248: a recording continues on the node; RegionalRecordingCollect
+		// records its outcome after a later collect exchange.
 		return nil
 	case "PreparationUncertain":
 		return capturevalue.ErrPreparationUncertain

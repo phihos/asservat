@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
@@ -70,6 +71,10 @@ func (h *Handler) peer(r *http.Request) (delivery.NodePeer, error) {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost && r.TLS != nil && r.URL.RawQuery == "" && r.URL.Path == contracts.NodeCapturePath && r.Header.Get("Content-Type") == contracts.NodeCaptureContentType {
+		h.capture(w, r)
+		return
+	}
 	if r.Method != http.MethodPost || r.TLS == nil || r.URL.RawQuery != "" || r.Header.Get("Content-Type") != "application/json" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -143,6 +148,47 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}
 	_, _ = io.Copy(io.Discard, io.LimitReader(body, 1))
+}
+
+// capture receives one finished packet capture (ADR-248): a 4-byte
+// big-endian header length, the JSON header, then exactly CapturedBytes of
+// PCAPNG. The peer must be the node process the capture was queued for.
+func (h *Handler) capture(w http.ResponseWriter, r *http.Request) {
+	p, err := h.peer(r)
+	if err != nil {
+		w.WriteHeader(status(err))
+		return
+	}
+	if r.ContentLength < 4 || r.ContentLength > 4+contracts.NodeCaptureMaxHeader+collector.MaxPacketCaptureBytes {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	body := http.MaxBytesReader(w, r.Body, r.ContentLength)
+	var size [4]byte
+	if _, err := io.ReadFull(body, size[:]); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	n := binary.BigEndian.Uint32(size[:])
+	if n == 0 || n > contracts.NodeCaptureMaxHeader {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	head, err := contracts.DecodeNodePacketResult(io.LimitReader(body, int64(n)))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	result, ok := DomainPacketResult(head)
+	if !ok || r.ContentLength != 4+int64(n)+result.CapturedBytes {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := h.channel.DeliverPacket(r.Context(), p, head.Epoch, result, body); err != nil {
+		w.WriteHeader(status(err))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // encode marshals a request body; shared by the client.

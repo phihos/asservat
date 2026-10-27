@@ -22,7 +22,8 @@ import (
 // NodeChannelServer is the connector's node listener (ADR-246, I-02): TLS
 // 1.3 with the installation-provided server certificate, node client
 // certificates from a per-process in-memory issuer, and the in-memory node
-// registry. Each node holds at most one long poll and one status request.
+// registry. Each node holds at most one long poll, one status request and one
+// capture upload (ADR-248).
 type NodeChannelServer struct {
 	Channel *delivery.NodeChannel
 	issuer  *mtls.NodeIssuer
@@ -30,8 +31,8 @@ type NodeChannelServer struct {
 	server  tls.Certificate
 }
 
-// nodeChannelConnections bounds open connections: two per node plus slack.
-const nodeChannelConnections = 2*delivery.MaxNodes + 16
+// nodeChannelConnections bounds open connections: three per node plus slack.
+const nodeChannelConnections = 3*delivery.MaxNodes + 16
 
 func NewNodeChannelServer(clusterID string, attester delivery.NodeAttester, server tls.Certificate, out io.Writer, now func() time.Time) (*NodeChannelServer, error) {
 	if attester == nil || len(server.Certificate) == 0 || out == nil || now == nil {

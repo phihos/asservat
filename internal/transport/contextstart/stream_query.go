@@ -25,7 +25,17 @@ const (
 	// ADR-245: one decision-time SubjectAccessReview of one principal for one
 	// exact Pod by the target cluster's connector.
 	queryReviewAccess = "review-access"
+	// ADR-248: whether the target Pod's node collector offers the packet
+	// recorder now.
+	queryPacketRecorder = "packet-recorder"
 )
+
+// RecorderTargets is the region's optional packet recorder availability
+// (ADR-248). A region without it answers the query as unsupported, which
+// keeps every composition plan-only.
+type RecorderTargets interface {
+	PacketRecorder(context.Context, targets.RecorderRequest) (targets.RecorderAnswer, error)
+}
 
 // ReviewTargets is the region's optional decision-time access review
 // (ADR-245). A region without it answers the query as unsupported, which
@@ -302,6 +312,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if reviewer, ok := s.targets.(ReviewTargets); ok {
 			out, e = reviewer.ReviewAccess(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryPacketRecorder:
+		var r targets.RecorderRequest
+		if decodeOperationBody(q.Body, &r) != nil {
+			return contracts.ErrAPIContextProtocol
+		}
+		if recorders, ok := s.targets.(RecorderTargets); ok && r.Valid() {
+			out, e = recorders.PacketRecorder(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}

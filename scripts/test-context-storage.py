@@ -383,7 +383,11 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 installed_budget = json.loads(subprocess.check_output(
                     ["go", "run", "./test/fixtures/installed-sql-budget/main.go"], cwd=ROOT, env=build_env, text=True))
                 report["postgresqlConnectionBudget"] = installed_budget
-            subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"asservat"), "./cmd/asservat"], cwd=ROOT, env=build_env, check=True)
+            # ADR-243 decision 4: the product binary links the pinned static
+            # libpcap filter compiler (cgo, tags libpcap,netgo,osusergo, fully
+            # static for the FROM-scratch image), built as make pcap-check
+            # builds it. The fixture helpers stay cgo-free.
+            subprocess.run(["make", "--no-print-directory", "hub-binary", "HUB_BINARY="+str(image_dir/"asservat"), "ASSERVAT_BUILD_TMP="+build_env["TMPDIR"]], cwd=ROOT, env=build_env, check=True)
             subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"provider-proxy"), "./test/fixtures/provider-proxy/main.go"], cwd=ROOT, env=build_env, check=True)
             helper_copy = ""
             if direct_observation:
@@ -405,7 +409,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             worker_tag = "asservat-context-worker:"+run_id
             run(["docker", "build", "--network=none", "--label", "asservat.test="+run_id, "-t", worker_tag, str(image_dir)])
             worker_info = json.loads(run(["docker", "image", "inspect", worker_tag]))[0]
-            report["workerBuild"] = {"binarySHA256": hashlib.sha256((image_dir/"asservat").read_bytes()).hexdigest(), "dockerImageID": worker_info["Id"], "tag": worker_tag}
+            report["workerBuild"] = {"binarySHA256": hashlib.sha256((image_dir/"asservat").read_bytes()).hexdigest(), "tags": "libpcap,netgo,osusergo (static)", "dockerImageID": worker_info["Id"], "tag": worker_tag}
             if upgrade:
                 upgrade_tag = "asservat-context-worker:"+run_id+"-upgrade"
                 run(["docker", "build", "--network=none", "--label", "asservat.test="+run_id, "--label", "asservat.release=upgrade", "-t", upgrade_tag, str(image_dir)])

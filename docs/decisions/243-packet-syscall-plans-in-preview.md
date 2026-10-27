@@ -119,9 +119,11 @@ Benefit established, cost small: proceed.
 - **No recorder:** every packet/syscall plan is blocked. Increment 4 lifts `RecorderUnavailable`
   for manual `networkHeaders` on nodes whose capability probe passes; increment 6 lifts the policy
   refusal; syscall metadata follows in increment 10.
-- **Installed hub image:** the native/installed image recipe still builds the cgo-free binary, so
-  an installed hub refuses filter edits with `FilterCompilerUnavailable` until that recipe switches
-  to the static `libpcap` build (needed before increment 4).
+- **Installed hub image:** the native harness's product image (`scripts/test-context-storage.py`)
+  now takes its binary from `make hub-binary`, the same static `libpcap,netgo,osusergo` build as
+  `make pcap-check`, still `FROM scratch` (2026-10-27; the image build was checked locally, no
+  installed run has used it yet). The collector image keeps its own gadget-tagged build. No release
+  image recipe exists yet; one must use the same target.
 - **Syscall names** are checked for shape only; the ABI table check is increment 10.
 - **Peers** (`packetPeers`) and the other registered fields are not accepted by the runtime schema
   (increment 9 for peers).

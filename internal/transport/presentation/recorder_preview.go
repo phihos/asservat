@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"asservat.local/asservat/internal/domain/artifact"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -90,8 +91,8 @@ func (in *CompositionInput) composition() (*planning.ProfileComposition, error) 
 }
 
 // RecorderPreviewData is preview_capture's composition reply (ADR-243). The
-// plan is complete and reviewable; capture_enabled is always false because
-// no recorder can run it.
+// plan is complete and reviewable; capture_enabled is true only for a manual
+// network-header plan whose node recorder is available (ADR-248).
 type RecorderPreviewData struct {
 	PreviewID        string             `json:"preview_id"`
 	ExpiresAt        time.Time          `json:"expires_at"`
@@ -211,9 +212,17 @@ func (s *ContextOperations) recorderPreview(ctx context.Context, current identit
 	for _, a := range result.Plan.Actions {
 		limit += a.MaxBytes
 	}
-	blockers := []OperationBlocker{RecorderUnavailableBlocker}
+	blockers := []OperationBlocker{}
 	warnings := recorderWarnings(result.Plan)
 	approval := result.Plan.Approval != nil
+	// ADR-248: a node recorder runs the plan, except one with REQ-AUT-006
+	// observation limits, whose spend it does not charge.
+	if !result.Recordable || approval && result.Plan.Approval.ObservationLimits != nil {
+		blockers = append(blockers, RecorderUnavailableBlocker)
+	} else {
+		// ADR-248: the interim per-capture output cap.
+		limit = min(limit, artifact.RecordingNativeLimit)
+	}
 	if approval {
 		// ADR-249: an individual approval precedes any observation.
 		view := &recorderApprovalView{}
@@ -228,7 +237,7 @@ func (s *ContextOperations) recorderPreview(ctx context.Context, current identit
 	if !s.config.CollectionEnabled {
 		blockers = append(blockers, collectionBlockers(false)...)
 	}
-	return RecorderPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: false, ApprovalRequired: approval, Blockers: blockers,
+	return RecorderPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: len(blockers) == 0, ApprovalRequired: approval, Blockers: blockers,
 		Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: in.Target,
 		SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}}, result.ValidUntil, nil
 }

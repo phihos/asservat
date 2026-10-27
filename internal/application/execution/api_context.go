@@ -130,11 +130,26 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		}
 	}
 	e := w.Accepted.Expectation
-	retention, err := s.Retention.Resolve(ctx, privacy.Input{Target: t.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt})
+	// ADR-248: a recording recompiles its accepted recorder plan from the
+	// frozen composition and program in the expectation, with the retention
+	// of its own evidence type.
+	evidenceType := "context"
+	var recorder *planning.RecorderContext
+	if e.Recording != nil {
+		if recorder, err = compiler.RecorderContextFor(e.Recording); err != nil {
+			return out, apiCheckStep{"Recording", value.ErrInvalid}
+		}
+		evidenceType = e.Type().EvidenceType
+	}
+	retention, err := s.Retention.Resolve(ctx, privacy.Input{Target: t.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: evidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt})
 	if err != nil {
 		return out, apiCheckStep{"Retention", err}
 	}
-	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: e.CaseID, Executor: w.Actor, Deadline: w.Accepted.Deadline, Target: t, Capability: cap, Retention: retention}, s.Now())
+	caseID := e.CaseID
+	if recorder != nil {
+		caseID = "" // a recorder scope carries no case (ADR-243)
+	}
+	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: caseID, Executor: w.Actor, Deadline: w.Accepted.Deadline, Target: t, Capability: cap, Retention: retention, Recorder: recorder}, s.Now())
 	if err != nil {
 		return out, apiCheckStep{"Compile", err}
 	}
@@ -327,6 +342,25 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 		return ContextResult{State: "Indeterminate"}, value.ErrExpired
 	}
 	result := r
+	if w.Accepted.Expectation.Recording != nil {
+		// ADR-248: the node records for the accepted duration; the SQL
+		// execution stays started until a later collect exchange records
+		// the stored completion (CollectRecording). Only a start the region
+		// refused is recorded as failed now.
+		recorder, ok := prepared.(evidence.ContextRecorder)
+		if !ok {
+			return zero, executeStep{"StartRecording", value.ErrUnavailable}
+		}
+		queued, err := recorder.StartRecording(ctx, w.Accepted.Pin, r.StartedAt, d.ValidUntil)
+		if err == nil && !queued.IsZero() && queued.Before(d.ValidUntil) && !queued.Before(r.StartedAt) {
+			return ContextResult{State: "Recording"}, nil
+		}
+		result.CompletedAt, result.Phase = s.Now().UTC().Truncate(time.Microsecond), "captureFailed"
+		if err == nil {
+			err = value.ErrUnavailable
+		}
+		return s.finishAcquisition(ctx, w, prepared, closer, completionRecorder, result, err)
+	}
 	if acquirer, ok := prepared.(evidence.ContextAcquirer); ok {
 		// ADR-171: capture and store happen where the plaintext is. Only the
 		// acquisition instant and the copy receipts return here.

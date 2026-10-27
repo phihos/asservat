@@ -120,7 +120,7 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 		return out, downloadRefused("catalog", err)
 	}
 	r := record.Retained
-	if !r.Valid() || r.RootID != s.RootID || r.Registration.Location.ArtifactID != scope.ArtifactID || r.Input.Target != target || r.Input.EvidenceType != "context" || r.Input.PrivacyClass != "potentialPersonalData" || !identity.Text(record.PurposeRef, 128) || record.CaptureID != scope.CaptureID || record.Version != scope.Version || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
+	if !r.Valid() || r.RootID != s.RootID || r.Registration.Location.ArtifactID != scope.ArtifactID || r.Input.Target != target || !artifact.DownloadEvidenceType(r.Input.EvidenceType) || r.Input.PrivacyClass != "potentialPersonalData" || !identity.Text(record.PurposeRef, 128) || record.CaptureID != scope.CaptureID || record.Version != scope.Version || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
 		return out, downloadRefused("catalog-record", nil)
 	}
 	r.OriginPolicies = slices.Clone(r.OriginPolicies)

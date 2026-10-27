@@ -45,7 +45,11 @@ func (b Binding) Valid() bool {
 		}
 	}
 	if b.ExecutionClass == artifact.ContextAPIExecution {
-		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || b.ActionID != "pod-status" || b.NativeBytes != artifact.MaxContextBytes || b.NotAfter.After(b.NotBefore.Add(5*time.Second)) {
+		// Pod status, or (ADR-248) a manual networkHeaders recording: its
+		// generated action ID and the 8 MiB per-capture cap.
+		podStatus := b.ActionID == "pod-status" && b.NativeBytes == artifact.MaxContextBytes
+		recording := recorderAction(b.ActionID) && b.NativeBytes == artifact.RecordingNativeLimit
+		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || !podStatus && !recording || b.NotAfter.After(b.NotBefore.Add(5*time.Second)) {
 			return false
 		}
 	} else if b.ExecutionClass != artifact.ContextNodeExecution || !authorization.UUID(b.NodeUID) || !authorization.UUID(b.NodeBootID) || b.ExecutorPodUID != "" || b.ExecutorAccountUID != "" {
@@ -53,6 +57,20 @@ func (b Binding) Valid() bool {
 	}
 	return identity.Text(b.ActionID, 63) && b.ScopeDigest != (artifact.Digest{}) && b.AuthorityDigest != (artifact.Digest{}) && b.BudgetDigest != (artifact.Digest{}) && b.AuditDigest != (artifact.Digest{}) && b.NativeBytes > 0 && b.NativeBytes <= 1<<40 && canonicalTime(b.NotBefore) && canonicalTime(b.NotAfter) && b.NotAfter.After(b.NotBefore) && !b.NotAfter.After(b.NotBefore.Add(time.Minute))
 }
+
+// recorderAction is the generated action ID of a composed recorder action.
+func recorderAction(s string) bool {
+	if len(s) != 25 || s[0] != 'a' {
+		return false
+	}
+	for i := 1; i < len(s); i++ {
+		if c := s[i]; (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 func canonicalTime(t time.Time) bool {
 	return t.Year() >= 2020 && t.Year() <= 9999 && t.Equal(t.Truncate(time.Microsecond)) && t.Location() == time.UTC
 }

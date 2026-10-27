@@ -102,6 +102,20 @@ rules:
     resources: [subjectaccessreviews]
     verbs: [create]
   {{- end }}
+  {{- if .Values.collector.enabled }}
+  # ADR-246 decision 9: the connector's node listener Service and the
+  # collector attestation reads it grants (get nodes; get daemonsets in the
+  # collector namespace; get pods is held above).
+  - apiGroups: [""]
+    resources: [services]
+    verbs: [get, create]
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [daemonsets]
+    verbs: [get]
+  {{- end }}
   # ADR-196 decision 4: the executor's and capacity account's reservations.
   - apiGroups: [asservat.io]
     resources: [capacityreservations]
@@ -166,7 +180,7 @@ spec:
         - name: installer
           image: {{ $c.image }}
           imagePullPolicy: IfNotPresent
-          command: [/asservat, installer-cluster, --in-cluster, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json, --namespace, {{ $c.namespace }}{{ if $executor }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json{{ end }}{{ if $c.alertmanager }}, --alertmanager, {{ $c.alertmanager | quote }}{{ end }}{{ if $c.identityMappings }}, --identity-mappings, {{ $c.identityMappings | toJson | quote }}{{ end }}]
+          command: [/asservat, installer-cluster, --in-cluster, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json, --namespace, {{ $c.namespace }}{{ if $executor }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json{{ end }}{{ if $c.alertmanager }}, --alertmanager, {{ $c.alertmanager | quote }}{{ end }}{{ if $c.identityMappings }}, --identity-mappings, {{ $c.identityMappings | toJson | quote }}{{ end }}{{ if .Values.collector.enabled }}, --collector-namespace, {{ .Values.collector.namespace }}, --collector-name, {{ printf "%s-node" .Release.Name }}{{ end }}]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

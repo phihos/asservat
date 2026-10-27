@@ -178,7 +178,7 @@
                     "message": "A prepaid start binding is immutable."
                   },
                   {
-                    "rule": "self.profile == \"apiContextStart/v1\" ? (has(self.executorPodUID) && has(self.executorAccountUID) && !has(self.nodeUID) && !has(self.nodeBootID) && self.actionID == \"pod-status\" && self.nativeBytes == 4096 && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration(\"5s\")) : (has(self.nodeUID) && has(self.nodeBootID) && !has(self.executorPodUID) && !has(self.executorAccountUID))",
+                    "rule": "self.profile == \"apiContextStart/v1\" ? (has(self.executorPodUID) && has(self.executorAccountUID) && !has(self.nodeUID) && !has(self.nodeBootID) && (self.actionID == \"pod-status\" && self.nativeBytes == 4096 || self.actionID.matches(\"^a[0-9a-f]{24}$\") && self.nativeBytes == 8388608) && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration(\"5s\")) : (has(self.nodeUID) && has(self.nodeBootID) && !has(self.executorPodUID) && !has(self.executorAccountUID))",
                     "message": "Execution profile requires exactly its own identity and limits."
                   },
                   {

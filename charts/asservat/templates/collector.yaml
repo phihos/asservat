@@ -4,9 +4,22 @@
 {{- if or (hasPrefix "kube-" $c.namespace) (eq $c.namespace "default") (eq $c.namespace .Release.Namespace) (eq $c.namespace .Values.cluster.namespace) }}{{ fail "collector.namespace must be a dedicated collector namespace distinct from the release and connector namespaces" }}{{ end }}
 {{- if not (regexMatch "^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$" $c.image) }}{{ fail "collector.image requires the exact verified product repository@sha256 digest" }}{{ end }}
 {{- range $id := list $c.installationID $c.clusterID }}{{ if not (regexMatch "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" $id) }}{{ fail "collector.installationID and collector.clusterID must be the installation's UUIDs" }}{{ end }}{{ end }}
-{{- if or (not (hasPrefix "https://" $c.connector.endpoint)) (eq $c.connector.serverName "") (not (contains "-----BEGIN CERTIFICATE-----" $c.connector.rootsPEM)) }}{{ fail "collector.connector requires the connector's https endpoint, certificate server name and issuing roots" }}{{ end }}
+{{- /* ADR-246 decision 9: with cluster.enabled and collector.connector left
+  empty, the values come from the connector-nodes ConfigMap that this
+  release's cluster installer hook publishes. The hook runs after the first
+  render, so the first install creates only the namespace and account (the
+  installer needs the namespace); the next helm upgrade renders the
+  DaemonSet. helm template never sees the ConfigMap. */}}
+{{- $conn := $c.connector }}
+{{- $published := and .Values.cluster.enabled (eq $conn.endpoint "") (eq $conn.serverName "") (eq $conn.rootsPEM "") }}
+{{- if $published }}
+{{- $cm := lookup "v1" "ConfigMap" .Values.cluster.namespace "connector-nodes" }}
+{{- $conn = dict "endpoint" (dig "data" "endpoint" "" $cm) "serverName" (dig "data" "serverName" "" $cm) "rootsPEM" (dig "data" "rootsPEM" "" $cm) }}
+{{- end }}
+{{- $ready := and (hasPrefix "https://" $conn.endpoint) (ne $conn.serverName "") (contains "-----BEGIN CERTIFICATE-----" $conn.rootsPEM) }}
+{{- if and (not $ready) (not $published) }}{{ fail "collector.connector requires the connector's https endpoint, certificate server name and issuing roots (or leave all three empty with cluster.enabled)" }}{{ end }}
 {{- $name := printf "%s-node" .Release.Name }}
-{{- $input := dict "format" "asservat-node-deployment/v1" "installationID" $c.installationID "clusterID" $c.clusterID "connector" (dict "endpoint" $c.connector.endpoint "serverName" $c.connector.serverName "rootsPEM" $c.connector.rootsPEM) "ceilings" (dict "ringBytes" (int64 $c.ceilings.ringBytes) "frozenBytes" (int64 $c.ceilings.frozenBytes) "uploadBytesPerSecond" (int64 $c.ceilings.uploadBytesPerSecond) "uploadBurstBytes" (int64 $c.ceilings.uploadBurstBytes)) }}
+{{- $input := dict "format" "asservat-node-deployment/v1" "installationID" $c.installationID "clusterID" $c.clusterID "connector" (dict "endpoint" $conn.endpoint "serverName" $conn.serverName "rootsPEM" $conn.rootsPEM) "ceilings" (dict "ringBytes" (int64 $c.ceilings.ringBytes) "frozenBytes" (int64 $c.ceilings.frozenBytes) "uploadBytesPerSecond" (int64 $c.ceilings.uploadBytesPerSecond) "uploadBurstBytes" (int64 $c.ceilings.uploadBurstBytes)) }}
 {{- $json := toJson $input }}
 {{- $digest := sha256sum $json }}
 # ADR-246: the collector namespace is the only namespace with the privileged
@@ -29,6 +42,7 @@ metadata:
   name: {{ $name }}
   namespace: {{ $c.namespace }}
 automountServiceAccountToken: false
+{{- if $ready }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -91,11 +105,16 @@ spec:
             - name: ASSERVAT_NODE_NAME
               valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
           securityContext:
-            # Root with exactly the capabilities the probe needs, not a
-            # privileged container, under the runtime's default seccomp
-            # profile: BPF loads programs, NET_ADMIN is required for
-            # sched_cls programs and TCX links, SYS_RESOURCE lifts the memlock
-            # limit on kernels before 5.11. Recorders add what attaching needs.
+            # Root with exactly the capabilities the probe and the packet
+            # recorder need, not a privileged container, under the runtime's
+            # default seccomp profile: BPF loads programs, NET_ADMIN is
+            # required for sched_cls programs, tc filters and TCX links,
+            # SYS_RESOURCE lifts the memlock limit on kernels before 5.11.
+            # ADR-248 (packet recorder, Inspektor Gadget's tcpdump gadget):
+            # PERFMON reads the gadget's perf event buffer, SYS_ADMIN lets it
+            # enter the target Pod's and the host's network namespace (setns)
+            # instead of giving the Pod the host network, SYS_PTRACE opens
+            # another user's /proc/<pid>/ns/net.
             privileged: false
             runAsUser: 0
             runAsNonRoot: false
@@ -103,7 +122,7 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
-              add: ["BPF", "NET_ADMIN", "SYS_RESOURCE"]
+              add: ["BPF", "NET_ADMIN", "SYS_RESOURCE", "PERFMON", "SYS_ADMIN", "SYS_PTRACE"]
             # The runtime's default AppArmor profile applies where the node
             # enables AppArmor; requesting it explicitly would refuse the Pod
             # on nodes without AppArmor.
@@ -147,4 +166,5 @@ spec:
           hostPath: { path: /sys/kernel/tracing, type: "" }
         - name: bpffs
           hostPath: { path: /sys/fs/bpf, type: "" }
+{{- end }}
 {{- end }}

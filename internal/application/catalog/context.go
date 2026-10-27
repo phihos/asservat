@@ -102,7 +102,7 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 			return zero, value.ErrUnavailable
 		}
 		r := record.Retained
-		if !r.Valid() || r.RootID != s.RootID || r.Registration.Location.ArtifactID != route.ArtifactID || r.Input.Target != route.Target || r.Input.EvidenceType != "context" || r.Input.PrivacyClass != "potentialPersonalData" || !identity.Text(record.PurposeRef, 128) || record.CaptureID != route.CaptureID || record.Version == (artifact.Digest{}) || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
+		if !r.Valid() || r.RootID != s.RootID || r.Registration.Location.ArtifactID != route.ArtifactID || r.Input.Target != route.Target || !artifact.DownloadEvidenceType(r.Input.EvidenceType) || r.Input.PrivacyClass != "potentialPersonalData" || !identity.Text(record.PurposeRef, 128) || record.CaptureID != route.CaptureID || record.Version == (artifact.Digest{}) || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
 			return zero, value.ErrUnavailable
 		}
 		retained := authorization.Retained{ArtifactID: route.ArtifactID, Target: route.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
@@ -134,7 +134,7 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 			until = identity.Earlier(until, at)
 		}
 		retained.ExpiresAt = resolved.ExpiresAt
-		records = append(records, authorizedContext{artifact: value.ContextCaseArtifact{ArtifactID: route.ArtifactID, CaptureID: route.CaptureID, Target: route.Target, Version: record.Version, ExpiresAt: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Shared: share != nil}, retained: retained, permission: p.Revision, record: record, processing: processing, share: share})
+		records = append(records, authorizedContext{artifact: value.ContextCaseArtifact{ArtifactID: route.ArtifactID, CaptureID: route.CaptureID, Target: route.Target, Version: record.Version, ExpiresAt: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Shared: share != nil, Recording: r.Input.EvidenceType == "packetCapture"}, retained: retained, permission: p.Revision, record: record, processing: processing, share: share})
 	}
 	if len(records) == 0 {
 		return zero, value.ErrUnavailable

@@ -49,7 +49,7 @@ func retainedContext(root string, c custodydb.ContextCapture, a custodydb.Custod
 	}
 	// The only supported retained producer is the qualified context projection.
 	// Its classification is fixed, not inferred from uploaded labels or content.
-	out = value.RetainedArtifact{RootID: root, Registration: r, OriginPolicies: slices.Clone(e.RetentionRules), Input: value.Input{Target: authorization.Target{ClusterID: r.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: r.AnchorAt}, Effective: value.Deadlines{AnchorAt: r.AnchorAt, ExpiresAt: a.EffectiveExpiresAt.Time, DeleteBy: a.EffectiveDeleteBy.Time}, Sequence: a.RetentionSequence}
+	out = value.RetainedArtifact{RootID: root, Registration: r, OriginPolicies: slices.Clone(e.RetentionRules), Input: value.Input{Target: authorization.Target{ClusterID: r.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}, PrivacyClass: "potentialPersonalData", EvidenceType: e.Type().EvidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: r.AnchorAt}, Effective: value.Deadlines{AnchorAt: r.AnchorAt, ExpiresAt: a.EffectiveExpiresAt.Time, DeleteBy: a.EffectiveDeleteBy.Time}, Sequence: a.RetentionSequence}
 	if !out.Valid() {
 		return value.RetainedArtifact{}, app.ErrUnavailable
 	}

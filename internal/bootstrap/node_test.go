@@ -255,6 +255,9 @@ func (f *fakeNodeChannel) Status(ctx context.Context, _ string, r collector.Repo
 	return nil
 }
 func (f *fakeNodeChannel) CloseIdle() {}
+func (f *fakeNodeChannel) UploadCapture(context.Context, string, collector.PacketResult, []byte) error {
+	return node.ErrUnavailable
+}
 
 type fakeNodeKey struct{ clock *fakeClock }
 

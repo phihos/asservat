@@ -33,18 +33,16 @@ func passing() Facts {
 		DebugFS: Supported, TraceFS: Supported, BPFFS: Supported, HostProcesses: Supported, Runtime: RuntimeContainerd, Engine: Engine{Linked: true, Initialized: true, Version: "v0.57.0"}}
 }
 
-func TestAssessPassingProbeStillReportsAdapterUnavailable(t *testing.T) {
+func TestAssessPassingProbeOffersOnlyThePacketRecorder(t *testing.T) {
 	out := Assess(passing())
 	if len(out) != 2 || out[0].Mechanism != MechanismPacket || out[1].Mechanism != MechanismSyscall {
 		t.Fatalf("mechanisms %+v", out)
 	}
-	for _, a := range out {
-		if !a.Prerequisites || a.Adapter != AdapterUnavailable || !slices.Equal(a.Reasons, []Reason{ReasonRecorderNotImplemented}) {
-			t.Fatalf("increment 3 has no recorder: %+v", a)
-		}
+	if a := out[0]; !a.Prerequisites || a.Adapter != AdapterAvailable || len(a.Reasons) != 0 || a.Hook != HookTC {
+		t.Fatalf("packet recorder (ADR-248, tc hook of the gadget): %+v", a)
 	}
-	if out[0].Hook != HookTCX {
-		t.Fatalf("TCX preferred, got %q", out[0].Hook)
+	if a := out[1]; !a.Prerequisites || a.Adapter != AdapterUnavailable || !slices.Equal(a.Reasons, []Reason{ReasonRecorderNotImplemented}) {
+		t.Fatalf("increment 4 has no syscall recorder: %+v", a)
 	}
 }
 
@@ -52,7 +50,7 @@ func TestAssessReportsEveryMissingFact(t *testing.T) {
 	f := passing()
 	f.TCX = Unsupported
 	if a := Assess(f)[0]; a.Hook != HookTC || !a.Prerequisites {
-		t.Fatalf("tc fallback: %+v", a)
+		t.Fatalf("the gadget needs tc, not TCX: %+v", a)
 	}
 	cases := []struct {
 		edit   func(*Facts)
@@ -77,7 +75,7 @@ func TestAssessReportsEveryMissingFact(t *testing.T) {
 		out := Assess(f)
 		for i, want := range []bool{c.packet, c.sys} {
 			has := slices.Contains(out[i].Reasons, c.reason)
-			if has != want || (want && out[i].Prerequisites) || out[i].Adapter != AdapterUnavailable {
+			if has != want || (want && (out[i].Prerequisites || out[i].Adapter != AdapterUnavailable)) {
 				t.Fatalf("%s mechanism %d: %+v", c.reason, i, out[i])
 			}
 		}

@@ -16,14 +16,14 @@ def render():
     spec = copy.deepcopy(schema['properties']['spec'])
     status = copy.deepcopy(schema['properties']['status'])
     class_rules = spec.pop('allOf')
-    assert class_rules == [{'if': {'properties': {'profile': {'const': 'apiContextStart/v1'}}}, 'then': {'required': ['executorPodUID', 'executorAccountUID'], 'properties': {'actionID': {'const': 'pod-status'}, 'nativeBytes': {'const': 4096}}, 'not': {'anyOf': [{'required': ['nodeUID']}, {'required': ['nodeBootID']}]}}, 'else': {'required': ['nodeUID', 'nodeBootID'], 'not': {'anyOf': [{'required': ['executorPodUID']}, {'required': ['executorAccountUID']}]}}}]
+    assert class_rules == [{'if': {'properties': {'profile': {'const': 'apiContextStart/v1'}}}, 'then': {'required': ['executorPodUID', 'executorAccountUID'], 'oneOf': [{'properties': {'actionID': {'const': 'pod-status'}, 'nativeBytes': {'const': 4096}}}, {'properties': {'actionID': {'pattern': '^a[0-9a-f]{24}$'}, 'nativeBytes': {'const': 8388608}}}], 'not': {'anyOf': [{'required': ['nodeUID']}, {'required': ['nodeBootID']}]}}, 'else': {'required': ['nodeUID', 'nodeBootID'], 'not': {'anyOf': [{'required': ['executorPodUID']}, {'required': ['executorAccountUID']}]}}}]
     assert spec['properties']['profile']['enum'] == ['onTriggerStart/v1', 'apiContextStart/v1']
     assert status.pop('allOf') == [{'if': {'properties': {'phase': {'const': 'StartCommitted'}}}, 'then': {'required': ['committedAt']}, 'else': {'not': {'required': ['committedAt']}}}]
     assert spec.pop('additionalProperties') is False
     assert status.pop('additionalProperties') is False
     spec['x-kubernetes-validations'] = [
         {'rule':'self == oldSelf','message':'A prepaid start binding is immutable.'},
-        {'rule':'self.profile == "apiContextStart/v1" ? (has(self.executorPodUID) && has(self.executorAccountUID) && !has(self.nodeUID) && !has(self.nodeBootID) && self.actionID == "pod-status" && self.nativeBytes == 4096 && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration("5s")) : (has(self.nodeUID) && has(self.nodeBootID) && !has(self.executorPodUID) && !has(self.executorAccountUID))','message':'Execution profile requires exactly its own identity and limits.'},
+        {'rule':'self.profile == "apiContextStart/v1" ? (has(self.executorPodUID) && has(self.executorAccountUID) && !has(self.nodeUID) && !has(self.nodeBootID) && (self.actionID == "pod-status" && self.nativeBytes == 4096 || self.actionID.matches("^a[0-9a-f]{24}$") && self.nativeBytes == 8388608) && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration("5s")) : (has(self.nodeUID) && has(self.nodeBootID) && !has(self.executorPodUID) && !has(self.executorAccountUID))','message':'Execution profile requires exactly its own identity and limits.'},
         {'rule':'timestamp(self.notAfter) > timestamp(self.notBefore) && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration("60s")','message':'Start permit lifetime must be positive and at most 60 seconds.'}]
     status['x-kubernetes-validations'] = [{'rule':'self.phase == "StartCommitted" ? has(self.committedAt) : !has(self.committedAt)','message':'Only a consumed start has committedAt.'}]
     return {'apiVersion':'apiextensions.k8s.io/v1','kind':'CustomResourceDefinition','metadata':{'name':'capacityreservations.asservat.io'},'spec':{

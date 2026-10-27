@@ -34,6 +34,7 @@ type ContextExpectation struct {
 	ExecutionClass                                                    ContextExecutionClass `json:",omitempty"`
 	NativeType                                                        string                `json:",omitempty"`
 	Lifecycle                                                         *OngoingLifecycle     `json:",omitempty"`
+	Recording                                                         *Recording            `json:",omitempty"`
 	Registration                                                      Registration
 	CaseID, OccurrenceID                                              string
 	NodeUID, NodeBootID, PodUID, Namespace, NamespaceUID, WorkloadUID string
@@ -66,7 +67,11 @@ func (e ContextExpectation) Validate() error {
 	if !t.AllowsClass(e.DataClass) {
 		return ErrInvalid
 	}
-	if e.ExecutionClass == ContextAPIExecution && (e.NativeType != PodStatusArtifact || e.ActionID != "pod-status" || e.DataClass != "metadata" || r.NativeLimit != MaxContextBytes) {
+	// The API class runs pod status, or (ADR-248) a manual networkHeaders
+	// recording on the target's node collector, delivered through the connector.
+	podStatus := e.NativeType == PodStatusArtifact && e.ActionID == "pod-status" && e.DataClass == "metadata" && r.NativeLimit == MaxContextBytes && e.Recording == nil
+	recording := e.NativeType == PCAPNGArtifact && recorderActionID(e.ActionID) && e.DataClass == "metadata" && r.NativeLimit == RecordingNativeLimit && e.Recording.Valid() && e.Lifecycle == nil
+	if e.ExecutionClass == ContextAPIExecution && !podStatus && !recording || e.Recording != nil && !recording {
 		return ErrInvalid
 	}
 	// Pod status is an onTrigger snapshot; only recorder types save from an

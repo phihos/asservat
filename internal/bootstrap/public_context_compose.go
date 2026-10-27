@@ -69,14 +69,16 @@ type publicContext struct {
 	investigation captureapp.ContextInvestigation
 	intents       auditapp.CaptureOperationPublication
 	regional      RegionalAPIContextStart
-	progress      captureapp.ContextProgressService
-	cases         catalogapp.ContextCaseService
-	starts        *OwnerContextStartRuntimeConfig
-	retention     privacyapp.RetentionResolver
-	permissions   *postgres.Permissions
-	catalog       *postgres.ContextPublications
-	recovery      *postgres.RecoveryReader
-	mac           *auditapp.OperationMAC
+	// collect is the ADR-248 collect loop for started manual recordings.
+	collect     RegionalRecordingCollect
+	progress    captureapp.ContextProgressService
+	cases       catalogapp.ContextCaseService
+	starts      *OwnerContextStartRuntimeConfig
+	retention   privacyapp.RetentionResolver
+	permissions *postgres.Permissions
+	catalog     *postgres.ContextPublications
+	recovery    *postgres.RecoveryReader
+	mac         *auditapp.OperationMAC
 	// clusters is the guarded cluster catalog read at start and its digest
 	// (ADR-196 decision 3): a later change restarts the process.
 	clusters       *kube.ClusterCatalogSource
@@ -377,6 +379,9 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// One governed pool/credential, retaining the three typed runner ports.
 	runner := executionapp.APIContextRunner{Read: executionSQL, Prepare: executionSQL, Record: executionSQL, Eligibility: eligibility, Retention: out.retention}
 	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
+	out.collect = RegionalRecordingCollect{Runner: executionapp.APIContextRunner{Record: executionSQL, Capabilities: capabilities, Recovery: out.recovery, Now: time.Now}, Recordings: executionSQL, Signer: signers, Router: router, Now: time.Now, Report: eventLog(os.Stderr, "recording collect refused")}
+	// ADR-248: node recorder availability is a regional pre-work query.
+	out.investigation.Recorders = queries
 
 	progress, err := postgres.NewContextProgressReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {

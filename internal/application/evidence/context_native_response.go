@@ -22,9 +22,15 @@ type ContextNativeResponse struct {
 	session                 artifact.DownloadSession
 	key                     contextNativeMetadataKey
 	release                 func()
-	remote                  *RemoteContextSource
-	remoteEnd               context.CancelFunc
-	lease                   artifact.DownloadDeliveryLease
+	// One remote source serves one delivery lease window chunk by chunk
+	// (ADR-248): next is the next native offset, pending a chunk returned but
+	// not yet acknowledged, effect the window's request context.
+	remote    *RemoteContextSource
+	remoteEnd context.CancelFunc
+	effect    context.Context
+	lease     artifact.DownloadDeliveryLease
+	next      int64
+	pending   bool
 }
 
 var _ CurrentNativeResponseSource = (*ContextNativeResponse)(nil)
@@ -112,24 +118,68 @@ func (s *ContextNativeResponse) describeCurrent(ctx context.Context, current ide
 	}
 	s.session, s.key, s.release, s.described = session, key, release, true
 	s.mu.Unlock()
-	return facts.Native, ContextDownloadReadWork, nil
+	t, _ := artifact.NativeTypeForFormat(facts.Native.Format)
+	return facts.Native, NativeWindowReadWork(t), nil
 }
 func (s *ContextNativeResponse) ReadChunkCurrent(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
 	return s.readChunkCurrent(ctx, current, lease, offset, length, false)
 }
 func (s *ContextNativeResponse) readChunkCurrent(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease, offset, length int64, checked bool) (NativeResponseChunk, error) {
 	var zero NativeResponseChunk
-	if s == nil || ctx == nil || !lease.Valid(s.runtime.config.Now()) || !s.enter() {
+	if s == nil || ctx == nil || !lease.Valid(s.runtime.config.Now()) || length < 1 || length > artifact.DeliveryBytes || !lease.Allows(offset, length, s.runtime.config.Now()) || !s.enter() {
 		return zero, artifact.ErrDownloadUnavailable
 	}
 	defer s.leave()
 	s.mu.Lock()
-	session, key, described, active := s.session, s.key, s.described, s.remote
+	session, described, active, effect := s.session, s.described, s.remote, s.effect
+	continuing := active != nil && !s.pending && lease == s.lease && offset == s.next
 	s.mu.Unlock()
-	if !described || active != nil || lease.Authority.Scope != session.Scope || offset != lease.Offset || length != lease.Length || length < 1 || length > artifact.MaxContextBytes {
+	if !described || lease.Authority.Scope != session.Scope || active != nil && !continuing || active == nil && offset != lease.Offset {
 		return zero, artifact.ErrDownloadUnavailable
 	}
-	call, ownerEnd := s.owned(ctx)
+	if active == nil {
+		var e error
+		if active, effect, e = s.openWindow(ctx, current, lease, checked); e != nil {
+			return zero, e
+		}
+	}
+	call, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(effect, cancel)
+	chunk, e := active.ReadChunkCurrent(call, current, lease, offset, length)
+	stop()
+	cancel()
+	s.mu.Lock()
+	if e == nil && (s.closed || effect.Err() != nil) {
+		e = artifact.ErrDownloadExpired
+	}
+	if e != nil {
+		end := s.remoteEnd
+		s.remote, s.remoteEnd, s.pending = nil, nil, false
+		s.mu.Unlock()
+		clear(chunk.Bytes)
+		active.Close()
+		if end != nil {
+			end()
+		}
+		return zero, e
+	}
+	s.pending, s.next = true, offset+length
+	s.mu.Unlock()
+	return chunk, nil
+}
+
+// openWindow checks the current attachment and opens the remote source for
+// one delivery lease window. The original piece, request and current batch
+// own the window until its last chunk's final-sink acknowledgement and joined
+// native cleanup; they end at the lease deadline, not with the first chunk's
+// call, whose cancellation still stops the opening itself.
+func (s *ContextNativeResponse) openWindow(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease, checked bool) (*RemoteContextSource, context.Context, error) {
+	s.mu.Lock()
+	session, key := s.session, s.key
+	s.mu.Unlock()
+	base, cancelBase := context.WithDeadline(context.WithoutCancel(ctx), lease.Until)
+	stopCall := context.AfterFunc(ctx, cancelBase)
+	call, ownerEnd := s.owned(base)
 	var bound *ContextNativeRuntime
 	var work context.Context
 	var requestEnd context.CancelFunc
@@ -141,64 +191,71 @@ func (s *ContextNativeResponse) readChunkCurrent(ctx context.Context, current id
 		bound, work, requestEnd, initial, e = s.runtime.beginRequest(call, current, session)
 	}
 	if e != nil {
+		stopCall()
 		ownerEnd()
-		return zero, e
+		cancelBase()
+		return nil, nil, e
 	}
-	end := func() { requestEnd(); ownerEnd() }
+	effect, stopEffect := context.WithDeadline(work, bound.bound.Deadline())
+	end := func() { stopEffect(); requestEnd(); ownerEnd(); cancelBase() }
+	fail := func(e error) (*RemoteContextSource, context.Context, error) {
+		stopCall()
+		end()
+		return nil, nil, e
+	}
 	observed, a, e := bound.attachmentWithAuthority(work, session, initial)
 	if e != nil {
-		end()
-		return zero, e
+		return fail(e)
 	}
 	currentKey, e := contextMetadataKey(session, observed, a)
 	if e != nil || currentKey != key || observed.NativeBusy || observed.NativeUncertain || !observed.ResponseBusy {
-		end()
-		return zero, artifact.ErrDownloadUnavailable
+		return fail(artifact.ErrDownloadUnavailable)
 	}
 	remote, e := bound.remote(work, session, observed, a)
 	if e != nil {
-		end()
-		return zero, e
+		return fail(e)
 	}
-	// The original piece, request and current batch all own the pending chunk.
-	// Keep them until the final sink acknowledgement and joined native cleanup.
-	effect, stop := context.WithDeadline(work, bound.bound.Deadline())
-	finalEnd := func() { stop(); end() }
-	chunk, e := remote.ReadChunkCurrent(effect, current, lease, offset, length)
-	if e != nil {
+	if !stopCall() {
 		remote.Close()
-		finalEnd()
-		clear(chunk.Bytes)
-		return zero, e
+		return fail(artifact.ErrDownloadUnavailable)
 	}
 	s.mu.Lock()
 	if s.closed || effect.Err() != nil {
 		s.mu.Unlock()
-		clear(chunk.Bytes)
 		remote.Close()
-		finalEnd()
-		return zero, artifact.ErrDownloadExpired
+		end()
+		return nil, nil, artifact.ErrDownloadExpired
 	}
-	s.remote, s.remoteEnd, s.lease = remote, finalEnd, lease
+	s.remote, s.remoteEnd, s.effect, s.lease, s.next, s.pending = remote, end, effect, lease, lease.Offset, false
 	s.mu.Unlock()
-	return chunk, nil
+	return remote, effect, nil
 }
+
+// AcknowledgeNativeChunk forwards the final sink's acknowledgement of the
+// pending chunk. The window's last chunk, or a failed acknowledgement, closes
+// the remote source and ends the window's request.
 func (s *ContextNativeResponse) AcknowledgeNativeChunk(ctx context.Context, lease artifact.DownloadDeliveryLease, offset, length int64) error {
 	if s == nil || ctx == nil || !s.enter() {
 		return artifact.ErrDownloadUnavailable
 	}
 	defer s.leave()
 	s.mu.Lock()
-	remote, end, actual := s.remote, s.remoteEnd, s.lease
+	remote, end, actual, pending, next := s.remote, s.remoteEnd, s.lease, s.pending, s.next
 	s.mu.Unlock()
-	if remote == nil || lease != actual {
+	if remote == nil || lease != actual || !pending || offset+length != next {
 		return artifact.ErrDownloadUnavailable
 	}
 	e := remote.AcknowledgeNativeChunk(ctx, lease, offset, length)
-	remote.Close()
-	end()
+	last := next == lease.Offset+lease.Length
+	if e != nil || last {
+		remote.Close()
+		end()
+	}
 	s.mu.Lock()
-	s.remote, s.remoteEnd = nil, nil
+	s.pending = false
+	if e != nil || last {
+		s.remote, s.remoteEnd = nil, nil
+	}
 	s.mu.Unlock()
 	return e
 }

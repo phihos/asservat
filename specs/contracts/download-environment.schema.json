@@ -232,11 +232,12 @@
           "type": "array",
           "items": {
             "enum": [
-              "context"
+              "context",
+              "packetCapture"
             ]
           },
           "minItems": 0,
-          "maxItems": 1,
+          "maxItems": 2,
           "uniqueItems": true
         },
         "purposes": {

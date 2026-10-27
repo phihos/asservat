@@ -82,7 +82,10 @@ func commandValues(c contracts.NativeCommand, h contracts.NativeHello, target va
 			return o, source, until, contracts.ErrNativeProtocol
 		}
 	case value.NativeResponse:
-		if !value.UUID(c.WindowID) || c.LeaseSequence < 1 || c.Offset < 0 || c.Length < 1 || c.Offset > artifact.MaxContextBytes || c.Length > artifact.MaxContextBytes-c.Offset || nativeDecodeBounded(c.Source, &source, contracts.NativeCommandBytes) != nil || !source.Valid(o.SourceVersion) {
+		if !value.UUID(c.WindowID) || c.LeaseSequence < 1 || c.Offset < 0 || c.Length < 1 || nativeDecodeBounded(c.Source, &source, contracts.NativeCommandBytes) != nil || !source.Valid(o.SourceVersion) {
+			return o, source, until, contracts.ErrNativeProtocol
+		}
+		if limit := source.Expectation.Type().DownloadLimit(); c.Offset > limit || c.Length > limit-c.Offset {
 			return o, source, until, contracts.ErrNativeProtocol
 		}
 	}
@@ -164,13 +167,16 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 	received := make(chan reply, 1)
 	// Reading the next frame concurrently makes actual owner EOF/revocation cancel
 	// a blocked S3/key read immediately. One bounded control frame may be pending.
-	go func() {
-		f, e := s.Receive(work)
-		if e != nil {
-			cancel()
-		}
-		received <- reply{f, e}
-	}()
+	receive := func() {
+		go func() {
+			f, e := s.Receive(work)
+			if e != nil {
+				cancel()
+			}
+			received <- reply{f, e}
+		}()
+	}
+	receive()
 	joined := false
 	defer func() {
 		cancel()
@@ -272,19 +278,32 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		}
 		return take(contracts.NativeDoneFrame, "closed", 0)
 	case value.NativeResponse:
-		body, e := result.Read(work, o, source, c.WindowID, c.Offset, c.Length)
-		defer clear(body)
+		// One data frame per chunk, each acknowledged by the hub's final sink
+		// before the next is read (ADR-248); a single chunk is the historical
+		// frame sequence. The receiver restarts after each non-final ack.
+		end := c.Offset + c.Length
+		at := c.Offset
+		e := result.ReadWindow(work, o, source, c.WindowID, c.Offset, c.Length, func(call context.Context, chunk []byte) error {
+			stage = "result"
+			if e := s.Send(call, contracts.NativeFrame{Kind: contracts.NativeDataFrame, Payload: chunk}); e != nil {
+				return e
+			}
+			if e := take(contracts.NativeAcknowledgeFrame, "delivered", int64(len(chunk))); e != nil {
+				return e
+			}
+			if at += int64(len(chunk)); at < end {
+				joined = false
+				receive()
+			}
+			stage = "read"
+			return nil
+		})
+		if e == nil && at != end {
+			e = contracts.ErrNativeProtocol
+		}
 		if e != nil {
 			return e
 		}
-		stage = "result"
-		if e = s.Send(work, contracts.NativeFrame{Kind: contracts.NativeDataFrame, Payload: body}); e != nil {
-			return e
-		}
-		if e = take(contracts.NativeAcknowledgeFrame, "delivered", int64(len(body))); e != nil {
-			return e
-		}
-		clear(body)
 		stage = "close"
 		if e = sendControl(work, s, contracts.NativeDoneFrame, ack(c, "closed", 0)); e != nil {
 			return e

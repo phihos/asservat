@@ -37,7 +37,7 @@ var _ DownloadEnvironmentReader = CurrentDownloadEnvironment{}
 
 func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r ContextDownloadEvidence, actor identity.Principal) (artifact.DownloadEnvironment, error) {
 	var zero artifact.DownloadEnvironment
-	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Recovery == nil || s.Processing == nil || s.Now == nil || !actor.Valid() || !r.Retained.Valid() || r.Retained.RootID != s.RootID || !identity.Text(r.PurposeRef, 128) || r.Retained.Input.EvidenceType != "context" || r.Retained.Input.PrivacyClass != "potentialPersonalData" {
+	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Recovery == nil || s.Processing == nil || s.Now == nil || !actor.Valid() || !r.Retained.Valid() || r.Retained.RootID != s.RootID || !identity.Text(r.PurposeRef, 128) || !artifact.DownloadEvidenceType(r.Retained.Input.EvidenceType) || r.Retained.Input.PrivacyClass != "potentialPersonalData" {
 		return zero, downloadRefused("configuration", nil)
 	}
 	start := s.Now()

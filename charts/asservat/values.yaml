@@ -138,7 +138,10 @@ collector:
   installationID: ""
   clusterID: ""
   # The connector's node listener (port 8444), the name its server
-  # certificate carries and the PEM roots that issued it.
+  # certificate carries and the PEM roots that issued it. With cluster.enabled
+  # leave all three empty: this release's cluster installer provisions the
+  # listener and publishes them in the connector-nodes ConfigMap, read on the
+  # next helm upgrade (the first install creates only namespace and account).
   connector:
     endpoint: ""
     serverName: ""

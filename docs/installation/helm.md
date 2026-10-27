@@ -319,7 +319,17 @@ They are off by default and are for the disposable S-04 test environment only:
   bpffs. The collector account has no RBAC binding; its projected token has the audience
   `asservat-node:<installationID>`.
 - `collector.connector` names the connector's node listener (port 8444), its certificate server
-  name and PEM roots. The installer does not yet provision that listener (open in ADR-246).
+  name and PEM roots. With `mode=cluster` and `cluster.enabled` in the same release, leave all
+  three empty: the cluster installer hook then provisions the listener (Secret, Service and the
+  attestation reads) and publishes the values in the ConfigMap `connector-nodes` of
+  `cluster.namespace`, which the chart reads through `lookup`. The hook runs after the first
+  render, so `helm install` creates only the collector namespace and account; run the same
+  `helm upgrade` once afterwards to start the DaemonSet. Enable the collector together with the
+  connector: adding it later changes the connector's fixed inputs and needs a connector
+  reinstall. With the operator CLI (`installer-cluster --collector-namespace <ns>
+  --collector-name <release>-node`, collector namespace created first) or `mode=combined`, copy
+  `.Nodes` from the installer output (or the ConfigMap's `endpoint`, `serverName`, `rootsPEM`)
+  into these values.
 - `collector.ceilings` are the per-node ring, frozen, upload-rate and burst ceilings; the
   container memory limit is ring + frozen + 128 MiB.
 

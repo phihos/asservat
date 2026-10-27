@@ -98,6 +98,40 @@ func (q *Queries) InsertAPIExecution(ctx context.Context, arg InsertAPIExecution
 	return i, err
 }
 
+const listStartedRecordings = `-- name: ListStartedRecordings :many
+SELECT e.capture_id FROM context_execution e JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id
+WHERE e.root_id=$1 AND e.phase='started' AND e.started_at<=$2 AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType'='pcapng'
+ORDER BY e.started_at LIMIT $3
+`
+
+type ListStartedRecordingsParams struct {
+	RootID    pgtype.UUID
+	StartedAt pgtype.Timestamptz
+	Limit     int32
+}
+
+// ADR-248: started manual recordings (pcapng expectations) whose start is at
+// or before the given instant, oldest first, for the hub's collect loop.
+func (q *Queries) ListStartedRecordings(ctx context.Context, arg ListStartedRecordingsParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listStartedRecordings, arg.RootID, arg.StartedAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var capture_id pgtype.UUID
+		if err := rows.Scan(&capture_id); err != nil {
+			return nil, err
+		}
+		items = append(items, capture_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockAPIExecution = `-- name: LockAPIExecution :one
 SELECT capture_id, root_id, attempt_id, binding_json, process_json, expectation_digest, created_at, not_before, not_after, object_uid, phase, started_at, acquired_at, completed_at, copies_json, copies_digest, writer_protocol FROM context_execution WHERE root_id=$1 AND capture_id=$2 FOR UPDATE
 `

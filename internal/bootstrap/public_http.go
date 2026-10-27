@@ -100,6 +100,8 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		return nil, &fixedStepError{"policies", mounts.ErrUnavailable}
 	}
 	d.policyTrigger = trigger
+	collect := pc.collect
+	d.recordingCollect = &collect
 	// ADR-232: create_share, list_shares and revoke_share on the same routes.
 	shares, err := composePublicShares(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
 		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)

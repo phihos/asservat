@@ -66,7 +66,9 @@ type OwnerDeployment struct {
 	publicHandler   http.Handler
 	// policyTrigger is the ADR-228 restart trigger; RunPublic supervises it.
 	policyTrigger *captureapp.PolicyTrigger
-	shared        publicShared
+	// recordingCollect is the ADR-248 collect loop; RunPublic supervises it.
+	recordingCollect *RegionalRecordingCollect
+	shared           publicShared
 	// ADR-182: backend and public input roots (the owner root in the legacy
 	// layout) and, in the installed layout, the provider effects.
 	backend, publicFiles *providerInputs
@@ -499,6 +501,13 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 		go func() {
 			defer d.owners.Done()
 			_ = d.policyTrigger.Run(d.root)
+		}()
+	}
+	if d.recordingCollect != nil {
+		d.owners.Add(1)
+		go func() {
+			defer d.owners.Done()
+			_ = d.recordingCollect.Run(d.root)
 		}()
 	}
 	err := server.ServeTLS(listener, "", "")

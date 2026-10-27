@@ -97,8 +97,20 @@ experiment (AGENTS.md).
 9. **Connector composition.** `NodeChannelServer` (bootstrap) is the listener RunRegional starts
    when its deployment input carries the optional `collector` section (collector namespace,
    DaemonSet, account; server certificate files `node-server.pem`/`node-server-key.pem`; port
-   8444). The attestation reads use the observer account. The installer does not yet provision
-   that section; until it does, no installed connector serves nodes.
+   8444). The attestation reads use the observer account. The regional installer provisions it
+   (2026-10-27) when given the collector namespace and name (`installer-cluster
+   --collector-namespace <ns> --collector-name <release>-node`; the chart passes both with
+   `collector.enabled`): a Role/RoleBinding `<connector ns>-connector-nodes` in the collector
+   namespace (get pods, get the named DaemonSet), `get nodes` in the connector ClusterRole, and in
+   the connector namespace the immutable Secret `connector-nodes` (P-256 leaf for
+   `connector-nodes.<connector ns>.svc` plus its CA root, ten years, the root's key discarded; a
+   rerun reopens it, rotation is a reinstall), the ClusterIP Service `connector-nodes` (8444) and
+   the immutable public ConfigMap `connector-nodes` (`endpoint`, `serverName`, `rootsPEM`). The
+   Deployment projects the Secret's two files. With `cluster.enabled` and an empty
+   `collector.connector`, the chart reads that ConfigMap through `lookup`: the first install
+   creates only the collector namespace and account (the installer hook needs the namespace), the
+   next `helm upgrade` renders the DaemonSet. Enabling the collector for an already installed
+   connector changes its fixed inputs and needs a connector reinstall.
 
 ## Privileges added (the key cost)
 
@@ -132,8 +144,8 @@ proceed.
 
 - **No recorder or work producer**: every mechanism is `AdapterUnavailable`; increment 4 adds the
   packet gadget, the attach path and the privileges it needs.
-- **Installer provisioning** of the connector's `collector` input (server Secret and Service, the
-  four attestation reads, the chart's endpoint and roots) is not implemented; the native suite
+- **Installer provisioning** of the connector's `collector` input is implemented (decision 9) and
+  unit/render-tested only; no native run installs a connector with it yet. The native suite still
   hosts the connector's real listener component in the test process.
 - **Budget policy node limits** are accepted and intersectable but not yet read at admission
   (increment 6 reserves rings).

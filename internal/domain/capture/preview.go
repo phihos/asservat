@@ -167,10 +167,12 @@ func (p ContextPreview) Valid() bool {
 	return true
 }
 
-// A composition preview (ADR-243) reserves no storage, so it carries none.
+// A composition preview (ADR-243) that no node recorder can run reserves no
+// storage, so it carries none; an acceptable one (ADR-248) carries the same
+// storage selection as a pod-status preview.
 func (p ContextPreview) storageValid() bool {
-	if p.Intent.Composition != nil {
-		return p.Storage == ContextStorageSelection{}
+	if p.Intent.Composition != nil && p.Storage == (ContextStorageSelection{}) {
+		return true
 	}
 	return p.Storage.Valid()
 }

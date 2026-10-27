@@ -739,6 +739,7 @@ components:
   - internal/adapters/cri
   - internal/adapters/linux
   - internal/adapters/gadget
+  - internal/adapters/packets
   - internal/adapters/pcap
   - internal/adapters/diagnostics
   - internal/adapters/tools

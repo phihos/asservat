@@ -98,6 +98,9 @@ type ContextInvestigation struct {
 	Processing             ContextProcessingCoverageReader
 	Recovery               fleetapp.RecoveryReader
 	Reasons                ContextReasonReader
+	// Recorders answers node packet recorder availability (ADR-248). It is
+	// optional: without it every composition stays plan-only.
+	Recorders ContextRecorders
 	// Filters is the hub's libpcap compiler for composition previews (ADR-243).
 	// It is optional: without it a packet filter edit is refused with
 	// FilterCompilerUnavailable; it never affects pod-status previews.
@@ -207,7 +210,14 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 		return f, previewFailure("facts/capability", err)
 	}
 	mark = time.Now()
-	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: intent.RequestedSeconds, AnchorAt: anchor})
+	evidence := "context"
+	if intent.Composition != nil {
+		// ADR-248: a recording's retention follows its own evidence type.
+		if evidence, err = compiler.RecorderEvidenceType(*intent.Composition); err != nil {
+			return f, previewFailure("facts/composition", err)
+		}
+	}
+	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: evidence, RequestedSeconds: intent.RequestedSeconds, AnchorAt: anchor})
 	auditapp.MarkStep(ctx, "p-retention", mark)
 	if err != nil {
 		return f, previewFailure("facts/retention/"+retentionFailure(err), err)
@@ -442,17 +452,29 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if !ValidContextPreview(p) || p.ID != previewID || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.Actor != i.Principal {
 		return zero, value.ErrDenied
 	}
-	// ADR-243: a reviewed packet/syscall plan has no recorder to run it. It is
-	// refused before any target, storage or admission work; nothing is charged.
-	// ADR-249: a plan that needs approval is first refused with
-	// ApprovalRequired until an approved grant covers it.
-	if p.Intent.Composition != nil {
-		return zero, s.recorderRequest(ctx, source, p, key, nil)
+	// ADR-243/249: a reviewed packet/syscall plan first passes the approval
+	// gate (ApprovalRequired until an approved grant covers it). ADR-248: a
+	// plan that no node recorder can run (it carries no storage selection) is
+	// then refused before any target, storage or admission work; nothing is
+	// charged. An acceptable manual networkHeaders plan continues like pod
+	// status.
+	recording := p.Intent.Composition != nil
+	if recording {
+		if err := s.recorderRequest(ctx, source, p, key, nil); err != nil {
+			return zero, err
+		}
+		if p.Storage == (value.ContextStorageSelection{}) {
+			return zero, value.ErrRecorderUnavailable
+		}
 	}
 	if !p.Current(s.Now()) {
 		return zero, value.ErrPreviewExpired
 	}
-	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != compiler.ContextAssessmentRulesDigestForClass(p.ExecutionClass) {
+	rules := compiler.ContextAssessmentRulesDigestForClass(p.ExecutionClass)
+	if recording {
+		rules = compiler.RecorderAssessmentRulesDigest()
+	}
+	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != rules {
 		return zero, s.requestChanged("epoch")
 	}
 	// The storage wait needs only the preview's pinned target, so it runs
@@ -470,6 +492,11 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	}
 	if target.Request != p.Target || target.Pin != p.Pin || target.ExecutionClass != p.ExecutionClass {
 		return zero, s.requestChanged("target")
+	}
+	// The node must still offer the recorder; the connector checks it again
+	// before it queues the work.
+	if recording && !s.packetRecorderAvailable(ctx, p.Intent, target) {
+		return zero, value.ErrRecorderUnavailable
 	}
 	s.reviewTarget(ctx, source, i.Principal, target)
 	anchor := s.Now().UTC().Truncate(time.Microsecond)
@@ -490,6 +517,9 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	ctx, coverageEnd := context.WithDeadline(ctx, coverage.FreshUntil)
 	defer coverageEnd()
 	plan, err := s.plan(p, f)
+	if recording {
+		plan, err = s.recordingPlan(p, f)
+	}
 	if err != nil {
 		return zero, err
 	}
@@ -505,16 +535,30 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if !slices.Equal(f.eligibility.DefaultAudience, p.Audience) {
 		return zero, s.requestChanged("audience")
 	}
-	assessment, err := compiler.AssessContext(plan, p.AssessmentID, s.Now())
-	if err != nil || assessment.RulesDigest != p.AssessmentRulesDigest {
+	if recording {
+		if err = s.recordingAssessment(p, plan); err != nil {
+			return zero, s.requestChanged("assessment")
+		}
+	} else if assessment, err := compiler.AssessContext(plan, p.AssessmentID, s.Now()); err != nil || assessment.RulesDigest != p.AssessmentRulesDigest {
 		return zero, s.requestChanged("assessment")
 	}
 	// The evidence interval starts at actual request preparation, not preview.
 	// A concurrent request can win with another anchor; SQL replay returns its
 	// original immutable registration and never creates a second reservation.
-	r := artifact.Registration{Location: artifact.Location{ClusterID: p.Target.ClusterID, ArtifactID: p.ArtifactID, AttemptID: p.AttemptID}, StoreID: p.Storage.StoreID, AllocationID: p.Storage.AllocationID, PoolRevision: p.Storage.PoolRevision, AllocationRevision: p.Storage.AllocationRevision, NativeLimit: artifact.MaxContextBytes, AnchorAt: f.retention.AnchorAt, WriteUntil: identity.Earlier(p.Deadline, f.retention.ExpiresAt), ExpiresAt: f.retention.ExpiresAt, DeleteBy: f.retention.DeleteBy}
+	r := artifact.Registration{Location: artifact.Location{ClusterID: p.Target.ClusterID, ArtifactID: p.ArtifactID, AttemptID: p.AttemptID}, StoreID: p.Storage.StoreID, AllocationID: p.Storage.AllocationID, PoolRevision: p.Storage.PoolRevision, AllocationRevision: p.Storage.AllocationRevision, NativeLimit: nativeLimit(recording), AnchorAt: f.retention.AnchorAt, WriteUntil: identity.Earlier(p.Deadline, f.retention.ExpiresAt), ExpiresAt: f.retention.ExpiresAt, DeleteBy: f.retention.DeleteBy}
 	if r.Validate() != nil {
 		return zero, value.ErrInvalid
+	}
+	if recording {
+		// ADR-248: the node records for the accepted duration, then uploads;
+		// the stored result must land within the write window.
+		rec, _, err := compiler.RecordingForContext(plan)
+		if err != nil {
+			return zero, s.requestChanged("recording")
+		}
+		if !s.Now().Add(time.Duration(rec.DurationMillis)*time.Millisecond + recordingCompletionMargin).Before(r.WriteUntil) {
+			return zero, value.ErrAcquisitionClosed
+		}
 	}
 	final := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
 	final.ValidUntil = identity.Earlier(final.ValidUntil, f.eligibility.ValidUntil)

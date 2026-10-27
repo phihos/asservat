@@ -27,15 +27,25 @@ const (
 	// carries this file. Only disposable CI runners and VM images create it.
 	NodeDisposableHostGuard = "/etc/asservat-disposable-host"
 
-	NodeEnrollFormat   = "asservat-node-enroll/v1"
-	NodePollFormat     = "asservat-node-poll/v1"
-	NodeStatusFormat   = "asservat-node-status/v1"
-	NodeEnrollPath     = "/internal/v1/node/enroll"
-	NodePollPath       = "/internal/v1/node/poll"
-	NodeStatusPath     = "/internal/v1/node/status"
-	NodeMaxRequest     = 64 << 10
-	NodeMaxResponse    = 64 << 10
+	NodeEnrollFormat = "asservat-node-enroll/v1"
+	NodePollFormat   = "asservat-node-poll/v1"
+	NodeStatusFormat = "asservat-node-status/v1"
+	NodeEnrollPath   = "/internal/v1/node/enroll"
+	NodePollPath     = "/internal/v1/node/poll"
+	NodeStatusPath   = "/internal/v1/node/status"
+	NodeMaxRequest   = 64 << 10
+	// NodeMaxResponse bounds one poll answer: 16 items, each packet capture
+	// with at most 256 filter instructions (ADR-248).
+	NodeMaxResponse    = 256 << 10
 	NodeMaxCertificate = 8 << 10
+
+	// ADR-248: a finished packet capture travels node → connector as one
+	// request: a 4-byte big-endian header length, the JSON NodePacketResult
+	// header, then exactly CapturedBytes of PCAPNG.
+	NodeCaptureFormat      = "asservat-node-capture/v1"
+	NodeCapturePath        = "/internal/v1/node/capture"
+	NodeCaptureContentType = "application/vnd.asservat.node-capture"
+	NodeCaptureMaxHeader   = 4 << 10
 )
 
 var ErrNodeChannel = errors.New("node channel message rejected")
@@ -100,14 +110,60 @@ type NodePollResponse struct {
 	Work   []NodeWork `json:"work"`
 }
 
-// NodeWork is one closed work item: armSource, stopSource, snapshot or
-// peerGeneration. Typed payloads arrive with the increments that implement
-// the recorders; an item of this version carries only its identity.
+// NodeWork is one closed work item: armSource, stopSource, snapshot,
+// peerGeneration or packetCapture. Only packetCapture (ADR-248) carries a
+// typed payload in this version; the others carry only their identity.
 type NodeWork struct {
-	ID       string    `json:"id"`
-	Sequence uint64    `json:"sequence"`
-	Kind     string    `json:"kind"`
-	NotAfter time.Time `json:"notAfter"`
+	ID            string             `json:"id"`
+	Sequence      uint64             `json:"sequence"`
+	Kind          string             `json:"kind"`
+	NotAfter      time.Time          `json:"notAfter"`
+	PacketCapture *NodePacketCapture `json:"packetCapture,omitempty"`
+}
+
+// NodePacketCapture is one manual networkHeaders capture of one Pod. Program
+// is the hub-compiled classic BPF program (empty: all traffic) and
+// ProgramDigest its SHA-256 over little-endian struct sock_filter bytes in
+// lowercase hex (empty with an empty program).
+type NodePacketCapture struct {
+	CaptureID      string               `json:"captureID"`
+	PodUID         string               `json:"podUID"`
+	Program        []NodeBPFInstruction `json:"program"`
+	ProgramDigest  string               `json:"programDigest"`
+	DurationMillis int64                `json:"durationMillis"`
+	MaxBytes       int64                `json:"maxBytes"`
+}
+
+type NodeBPFInstruction struct {
+	Code uint16 `json:"code"`
+	Jt   uint8  `json:"jt"`
+	Jf   uint8  `json:"jf"`
+	K    uint32 `json:"k"`
+}
+
+// NodePacketResult heads one finished capture upload.
+type NodePacketResult struct {
+	Format        string    `json:"format"`
+	Epoch         string    `json:"epoch"`
+	WorkID        string    `json:"workID"`
+	CaptureID     string    `json:"captureID"`
+	StartedAt     time.Time `json:"startedAt"`
+	EndedAt       time.Time `json:"endedAt"`
+	Seen          uint64    `json:"seen"`
+	Retained      uint64    `json:"retained"`
+	Filtered      uint64    `json:"filtered"`
+	Unsupported   uint64    `json:"unsupported"`
+	Fragment      uint64    `json:"fragment"`
+	Extension     uint64    `json:"extension"`
+	Malformed     uint64    `json:"malformed"`
+	OutputFull    uint64    `json:"outputFull"`
+	LostSamples   uint64    `json:"lostSamples"`
+	WireBytes     uint64    `json:"wireBytes"`
+	CapturedBytes int64     `json:"capturedBytes"`
+	Snaplen       int       `json:"snaplen"`
+	EngineVersion string    `json:"engineVersion"`
+	ProgramDigest string    `json:"programDigest"`
+	Failure       string    `json:"failure"`
 }
 
 // NodeStatus is one batched report: probed facts, mechanism assessment, node
@@ -193,4 +249,7 @@ func DecodeNodePollResponse(r io.Reader) (NodePollResponse, error) {
 }
 func DecodeNodeStatus(r io.Reader) (NodeStatus, error) {
 	return nodeDecode[NodeStatus](r, NodeMaxRequest)
+}
+func DecodeNodePacketResult(r io.Reader) (NodePacketResult, error) {
+	return nodeDecode[NodePacketResult](r, NodeCaptureMaxHeader)
 }
