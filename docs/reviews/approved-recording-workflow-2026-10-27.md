@@ -109,3 +109,22 @@ match authenticated native-download metadata and tshark must read nonempty TCP
 port-8080 packets. The report records actual original identities, review expiry,
 submit time, remaining real wait and native bytes; no first-run runtime result
 exists yet.
+
+
+Download preparation is an effect, so its initial call receives one attempt.
+An uncertain reply or acknowledged failure ends this qualification; only a
+returned `continue_preparation` acknowledgement permits another exact same-key
+prepare. Passive download status reads can retry. This matches the original
+installed journey's uncertainty contract.
+
+
+Review correction: approval-detail resolution is offered only after an approved
+decision, with the close-if-unstarted effect named on its button. Pending and
+denied review show no such control. A server-computed original-client guidance
+hint is restricted to the same original human on another client while the marked
+plan is Approved; it costs no additional read or persisted state. Passive outcome
+recovery needs current read scope, independently of permission to start a capture.
+The public deterministic key is tested against actor/client/preview changes and
+closed-preview resubmission; a new intent always requires a new preview. The
+native focus also exercises wrong-client/wrong-human submission before and after
+acceptance and a closed preview under a new key, without another capture or wait.

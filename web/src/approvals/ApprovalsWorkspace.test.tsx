@@ -15,7 +15,7 @@ const row = {
   reasons: [{ action_id: 'a1', code: 'rawBytePredicate' }], requested_by: principal('synthetic-developer'), requested_at: iso(-60_000), review_until: iso(3_540_000), preview_deadline: iso(-240_000), capture_deadline_rule: 'acceptanceWithinGrant', capture_window_seconds: 300,
   lifetime_seconds: 3600, can_decide: true, can_revoke: true, approval_navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41),
 };
-const grant = { ...row, can_resume: false, can_resolve: false, observation_limits: { max_session_seconds: 15, max_observed_bytes: 1 << 30, max_bytes_per_second: 16 << 20, max_concurrent_sessions: 1 },
+const grant = { ...row, can_resume: false, can_resolve: false, resume_requires_original_client: false, observation_limits: { max_session_seconds: 15, max_observed_bytes: 1 << 30, max_bytes_per_second: 16 << 20, max_concurrent_sessions: 1 },
   actions: [{ action_id: 'a1', kind: 'packetCapture', execution_mode: 'ongoing', before: '30s', after: '10s', filter: 'tcp[13] & 2 != 0', filter_digest: 'ef'.repeat(32), filter_instructions: 4, max_bytes: 16 << 20, ring_max_bytes: 16 << 20, ring_max_age: '50s', sensitive: ['rawBytePredicate'] }] };
 
 class SyntheticApprovals implements Operations {
@@ -95,19 +95,19 @@ it('resumes one exact original preview with the same key after a lost reply and 
 });
 
 it('keeps another original OAuth client from resuming and explains the requesting client', async () => {
-  const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', requested_by: principal('synthetic-developer') };
+  const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', resume_requires_original_client: true, requested_by: principal('synthetic-developer') };
   client.detail.requested_by.client_id = 'mcp';
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
   expect(await screen.findByText(/original requesting client \(mcp\)/)).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Continue approved capture' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Resolve original request' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Find capture; otherwise close request' })).toBeNull();
 });
 
 it('resolves an expired grant original outcome without attempting acquisition', async () => {
   const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Expired', can_resolve: true };
   const capture = new SyntheticOperations(); capture.responder = () => resolvedAcceptedResult(); const opened = vi.fn();
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} captureClient={capture} grantID={id(41)} onAccepted={opened}/>);
-  fireEvent.click(await screen.findByRole('button', { name: 'Resolve original request' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Find capture; otherwise close request' }));
   await waitFor(() => expect(opened).toHaveBeenCalledWith(id(8)));
   expect(capture.calls.map(c => c.name)).toEqual(['resolve_capture_request']);
 });
@@ -125,4 +125,18 @@ it('cancels resume on unmount and ignores a late accepted reply', async () => {
   complete(acceptedResult());
   await Promise.resolve();
   expect(opened).not.toHaveBeenCalled();
+});
+
+it.each(['Pending', 'Denied'] as const)('never offers destructive outcome lookup or client guidance for %s review', async phase => {
+ const client = new SyntheticApprovals(); client.detail = { ...grant, phase, can_resolve: true, resume_requires_original_client: true };
+ render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+ await screen.findByText('tcp[13] & 2 != 0');
+ expect(screen.queryByRole('button', { name: 'Find capture; otherwise close request' })).toBeNull();
+ expect(screen.queryByText(/original requesting client/)).toBeNull();
+});
+it('does not tell an independent approved-plan reviewer to continue the requester capture', async () => {
+ const client = new SyntheticApprovals(); client.detail = { ...grant, phase: 'Approved', requested_by: principal('another-developer') };
+ render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+ await screen.findByText('tcp[13] & 2 != 0');
+ expect(screen.queryByText(/original requesting client/)).toBeNull();
 });

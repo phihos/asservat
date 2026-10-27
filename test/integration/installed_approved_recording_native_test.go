@@ -11,6 +11,7 @@ import (
 	"errors"
 	"html"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -231,7 +232,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if preview.ID == "" || !preview.Approval || preview.Enabled || len(preview.Pods) != 1 || preview.Pods[0].UID == "" || !time.Now().Before(preview.Expires) {
 		t.Fatal("approved recording preview lacks original production review window", preview)
 	}
-	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "installed-approved-" + preview.ID}
+	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "approved-preview-" + preview.ID}
 	pending, code := invoke("request_capture", original)
 	var refused struct {
 		URI string `json:"navigation_uri"`
@@ -272,11 +273,15 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		return ""
 	}
 	var own struct {
-		CanResume  bool `json:"can_resume"`
-		CanResolve bool `json:"can_resolve"`
+		CanResume                    bool `json:"can_resume"`
+		CanResolve                   bool `json:"can_resolve"`
+		ResumeRequiresOriginalClient bool `json:"resume_requires_original_client"`
 	}
-	if code := browserCall(self, "get_grant", map[string]string{"grant_id": grantID}, &own); code != "" || own.CanResume || own.CanResolve {
+	if code := browserCall(self, "get_grant", map[string]string{"grant_id": grantID}, &own); code != "" || own.CanResume || own.CanResolve || own.ResumeRequiresOriginalClient {
 		t.Fatal("MCP grant transferred to browser client", code)
+	}
+	if code := browserCall(self, "request_capture", original, nil); code != "NotAvailable" && code != "ReviewChanged" {
+		t.Fatal("public predictable key transferred MCP intent to browser", code)
 	}
 	if code := browserCall(self, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "self approval must fail", "idempotency_key": "installed-self-refusal"}, nil); code != "SelfApprovalRefused" {
 		t.Fatal("self approval not refused", code)
@@ -305,6 +310,12 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	read("get_grant", map[string]string{"grant_id": grantID}, &grant)
 	if grant.Phase != "Approved" || grant.Digest != preview.Digest || grant.Decision.By.Subject != reviewer.ReviewerSubject {
 		t.Fatal("independent decision or exact plan changed", grant)
+	}
+	if code := browserCall(self, "get_grant", map[string]string{"grant_id": grantID}, &own); code != "" || own.CanResume || own.CanResolve || !own.ResumeRequiresOriginalClient {
+		t.Fatal("approved original human lacks precise original-client guidance", code)
+	}
+	if code := browserCall(browser, "request_capture", original, nil); code != "NotAvailable" && code != "ReviewChanged" {
+		t.Fatal("public predictable key transferred requester intent to reviewer", code)
 	}
 	waitStarted := time.Now()
 	if err := installedJourneyPause(ctx, time.Until(preview.Expires.Add(20*time.Millisecond))); err != nil {
@@ -387,6 +398,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if code := requestCapture(original); code != "" || receipt.CaptureID != originalID {
 		t.Fatal("approved replay changed original capture", code)
 	}
+	for _, otherClient := range []*installedBrowser{self, browser} {
+		if code := browserCall(otherClient, "request_capture", original, nil); code != "NotAvailable" && code != "ReviewChanged" {
+			t.Fatal("known key leaked another actor/client accepted replay", code)
+		}
+	}
 	until := time.Now().Add(3 * time.Minute)
 	var progress installedJourneyCaptureProgress
 	for time.Now().Before(until) {
@@ -419,14 +435,28 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	var download installedJourneyDownload
 	prepare := map[string]string{"artifact_id": evidence.Artifacts[0].ID, "idempotency_key": "installed-approved-download"}
-	read("prepare_artifact_download", prepare, &download)
+	// Preparation is an effect: no automatic retry after an uncertain reply
+	// or acknowledged failure. Only the server's continuation flag below
+	// permits another exact same-key prepare, as in the original journey.
+	prepareDownload := func() {
+		t.Helper()
+		reply, code := invoke("prepare_artifact_download", prepare)
+		if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &download) != nil {
+			diagnose()
+			t.Fatal("initial or acknowledged download preparation failed", code)
+		}
+	}
+	prepareDownload()
 	downloadID, deadline := download.DownloadID, download.ExpiresAt
+	if downloadID == "" || deadline.IsZero() || !time.Now().Before(deadline) || deadline.After(evidence.Artifacts[0].Expires) {
+		t.Fatal("native download exceeds original evidence deadline")
+	}
 	for download.State == "Preparing" && time.Now().Before(until) {
 		if err := installedJourneyPause(ctx, 2*time.Second); err != nil {
 			t.Fatal(err)
 		}
 		if download.ContinuePreparation {
-			read("prepare_artifact_download", prepare, &download)
+			prepareDownload()
 		} else {
 			read("get_artifact_download", map[string]string{"download_id": downloadID}, &download)
 		}
@@ -439,6 +469,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Fatal("approved recording native download not ready", download.State)
 	}
 	response := installedJourneyContent(t, ctx, &http.Client{Transport: transport, Timeout: time.Minute}, strings.TrimSuffix(origin, "/")+download.ContentPath, identity.downloadToken(), nil)
+	_, disposition, dispositionErr := mime.ParseMediaType(response.Header.Get("Content-Disposition"))
+	if dispositionErr != nil || disposition["filename"] != "artifact-"+evidence.Artifacts[0].ID+".pcapng" {
+		response.Body.Close()
+		t.Fatal("native download lacks its PCAPNG filename", dispositionErr)
+	}
 	native, err := io.ReadAll(io.LimitReader(response.Body, artifact.RecordingNativeLimit+1))
 	response.Body.Close()
 	digest := sha256.Sum256(native)
@@ -461,6 +496,21 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if !strings.Contains(line, "8080") {
 			t.Fatalf("native packet outside reviewed port: %q", line)
 		}
+	}
+	// A closed preview is one finished intent even when its key is public.
+	// A different key cannot reopen it or cause another approval/capture.
+	var closedPreview struct {
+		ID string `json:"preview_id"`
+	}
+	read("preview_capture", arguments, &closedPreview)
+	closeRequest := map[string]string{"preview_id": closedPreview.ID, "idempotency_key": "approved-preview-" + closedPreview.ID}
+	var closedIntent installedJourneyDisposition
+	read("resolve_capture_request", closeRequest, &closedIntent)
+	if closedIntent.State != "closed" {
+		t.Fatal("fresh original intent did not close")
+	}
+	if _, code := invoke("request_capture", map[string]string{"preview_id": closedPreview.ID, "idempotency_key": "another-key-cannot-revive-closed-preview"}); code != "ReviewChanged" && code != "NotAvailable" {
+		t.Fatal("closed public intent became a fresh start", code)
 	}
 	report := map[string]any{"captureID": receipt.CaptureID, "grantID": grantID, "previewID": preview.ID, "executionDigest": preview.Digest, "independentReviewerSubject": reviewer.ReviewerSubject, "previewExpiresAt": preview.Expires, "submittedAt": submitted, "remainingRealWaitSeconds": realWait.Seconds(), "nativeSHA256": hex.EncodeToString(digest[:]), "nativeBytes": len(native), "tsharkPackets": len(lines), "assurance": "real signed Keycloak fresh password LoA1, not MFA", "authorization": "public product request/decision/admission; no fixture grant rows"}
 	raw, _ := json.MarshalIndent(report, "", "  ")

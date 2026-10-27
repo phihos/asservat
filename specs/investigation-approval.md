@@ -70,7 +70,11 @@ or strengthening it.
 The detailed grant view exposes advisory `can_resume` only for the current
 original requester and OAuth client with current capture scope, ordinary rights
 and a usable approved plan. `can_resolve` offers passive original-request
-recovery to that same requester/client; expiry never authorizes a new start.
+recovery to that same requester/client after a previous approved decision; it
+is absent for pending or denied reviews. Its control explicitly states that
+finding no acceptance closes the original intent. Expiry never authorizes a new
+start. `resume_requires_original_client` is guidance for the same original human
+on another client only while the marked plan is Approved, never for a reviewer.
 Browser submission and approval-page continuation retain one preview-bound
 intent key through pending review, remounts and lost replies. Another client
 must continue through the original client. Every request still passes current

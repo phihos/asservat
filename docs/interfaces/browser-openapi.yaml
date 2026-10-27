@@ -955,7 +955,7 @@ paths:
   /api/v1/operations/resolve_capture_request:
     post:
       operationId: resolve_capture_request
-      summary: Resolve an uncertain own pod-status request before editing. Returns the already accepted capture or durably closes the unaccepted reviewed request so it cannot later start. Never starts or cancels collection. Use the original preview_id and idempotency_key; retry any unknown reply with that same pair. Requires evidence:read and the same actor/client. Accepted capture metadata additionally requires current original-target read eligibility; closing an own unaccepted request does not disclose or require target metadata. Available while new collection is disabled. A closed result contains no target or effect metadata.
+      summary: Resolve an uncertain own reviewed capture request before editing. Returns the already accepted capture or durably closes the unaccepted reviewed request so it cannot later start. Never starts or cancels collection. Use the original preview_id and idempotency_key; retry any unknown reply with that same pair. Requires evidence:read and the same actor/client. Accepted capture metadata additionally requires current original-target read eligibility; closing an own unaccepted request does not disclose or require target metadata. Available while new collection is disabled. A closed result contains no target or effect metadata.
       tags:
       - Shared browser and MCP
       x-domain-contract: resolve_capture_request
@@ -8739,8 +8739,12 @@ components:
                     exact approved grant. Submission rechecks all authority.
                 can_resolve:
                   type: boolean
-                  description: Advisory original requester/client may attempt passive original-request lookup/closure.
-                    It never authorizes a new start.
+                  description: Advisory original requester/client may recover a possibly accepted request after an approved decision.
+                    Never offered for pending or denied review; a missing acceptance closes the original intent.
+                resume_requires_original_client:
+                  type: boolean
+                  description: Guidance only for the same requesting human on another OAuth client while this marked plan is Approved.
+                    It confers no authority or grant transfer.
               required:
               - grant_id
               - phase
@@ -8765,6 +8769,7 @@ components:
               - capture_deadline_rule
               - can_resume
               - can_resolve
+              - resume_requires_original_client
               allOf:
               - if:
                   properties:

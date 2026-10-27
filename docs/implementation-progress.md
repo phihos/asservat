@@ -6,7 +6,10 @@
 The browser can request independent approval for an already-reviewed recorder
 composition, retain its original submission through pending review and resume it
 from the approval detail. The server computes advisory resume/resolve hints for
-the full original requester/client; current admission remains authoritative.
+the full original requester/client; resolution is offered only after an approved
+decision and names its close-if-unstarted effect. Original-client guidance is
+restricted to that same requesting human on another client while the plan is
+Approved. Current admission remains authoritative.
 One preview-bound intent key survives retries and page remounts. A grant made by
 another OAuth client is accompanied by original-client guidance, without transfer.
 This supplies continuation of existing reviews; a new packet profile editor is
@@ -19,7 +22,7 @@ state retention from submission preparation, with old unsubmitted rule digests
 requiring fresh review. The page renders the supplied recorder assessment and
 output limit instead of pod-status-specific text; overhead remains unmeasured.
 
-Local console check passes 215 tests. The built browser checks pass 20 journeys,
+Local console check passes 218 tests. The built browser checks pass 20 journeys,
 17 accessibility scans and the native restart checks. Affected capture,
 authorization, planning, presentation, installer and contract unit packages pass;
 the original-recorder-anchor regression and canonical manual-anchor validators
@@ -38,6 +41,8 @@ uses actual fresh password LoA1, not MFA. The operator's existing reserve is siz
 for packet ciphertext while retaining four records/16 objects. Offline harness
 checks and integration compilation pass; this installed flow and its runtime
 remain **unqualified until the first disposable-runner test completes**.
+Run 40507673537 was cancelled during setup (84 seconds) for fixture review;
+no qualification test ran in that attempt.
 
 See [the scoped plan and complexity gate](reviews/approved-recording-workflow-2026-10-27.md).
 

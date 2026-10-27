@@ -62,8 +62,8 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
         <Button className="button secondary" isDisabled={busy || reason.trim() === ''} onPress={() => onDecide(false, reason.trim())}>Deny</Button>
       </>}
       {grant.can_resume && <div className="actions"><Button className="button" isDisabled={busy} onPress={onResume}>Continue approved capture</Button><p>Uses the exact reviewed preview and original requester client. It can continue the original accepted acquisition; it cannot create another capture.</p></div>}
-      {grant.can_resolve && <div className="actions"><Button className="button secondary" isDisabled={busy} onPress={onResolve}>Resolve original request</Button><p>Opens the original capture if it was accepted. Otherwise it closes this reviewed request so it cannot start a capture.</p></div>}
-      {!grant.can_resolve && <p>Collection must continue through the original requesting client ({grant.requested_by.client_id}) with its current permissions. This page does not transfer its approval to another client.</p>}
+      {grant.can_resolve && grant.phase !== 'Pending' && grant.phase !== 'Denied' && <div className="actions"><Button className="button secondary" isDisabled={busy} onPress={onResolve}>Find capture; otherwise close request</Button><p>Opens the original capture if it was accepted. Otherwise it closes this reviewed request so it cannot start a capture.</p></div>}
+      {grant.resume_requires_original_client && grant.phase === 'Approved' && <p>Collection must continue through the original requesting client ({grant.requested_by.client_id}) with its current permissions. This page does not transfer its approval to another client.</p>}
       {grant.can_revoke && <Button className="button secondary" isDisabled={busy} onPress={onRevoke}>{grant.phase === 'Pending' ? 'Withdraw request' : 'Revoke approval'}</Button>}
     </section>
   </>;

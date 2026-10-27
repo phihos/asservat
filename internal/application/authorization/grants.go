@@ -153,6 +153,9 @@ type GrantView struct {
 	CanResume bool
 	// CanResolve permits offering passive lookup/closure, never a new start.
 	CanResolve bool
+	// ResumeRequiresOriginalClient is guidance for this same human on a
+	// different client, only while the marked approval remains Approved.
+	ResumeRequiresOriginalClient bool
 }
 
 func (s GrantService) ready() bool {
@@ -488,7 +491,7 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 		return GrantView{}, time.Time{}, ErrGrantUnavailable
 	}
 	until := i.ValidUntil
-	v := GrantView{Grant: g, Phase: g.Phase(s.Now()), CanResolve: i.Principal == g.Requester && slices.Contains(i.Scopes, "evidence:capture")}
+	v := GrantView{Grant: g, Phase: g.Phase(s.Now()), CanResolve: i.Principal == g.Requester && g.Decision != nil && g.Decision.Approved}
 	if !sameHuman(g.Requester, i.Principal) {
 		r, err := s.collector(ctx, i, g.Target, value.ApproveAction)
 		if err != nil || !r.Eligible {
@@ -502,8 +505,9 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 	var timing struct {
 		Timing string `json:"timing"`
 	}
-	if i.Principal == g.Requester && slices.Contains(i.Scopes, "evidence:capture") &&
-		json.Unmarshal(g.Scope, &timing) == nil && timing.Timing == "approvedAcceptance/v1" &&
+	marked := json.Unmarshal(g.Scope, &timing) == nil && timing.Timing == "approvedAcceptance/v1"
+	v.ResumeRequiresOriginalClient = marked && v.Phase == value.GrantApproved && sameHuman(g.Requester, i.Principal) && i.Principal != g.Requester && slices.Contains(i.Scopes, "evidence:capture")
+	if i.Principal == g.Requester && slices.Contains(i.Scopes, "evidence:capture") && marked &&
 		ReviewDigest(g, g.Review) == g.ReviewDigest &&
 		value.CheckCaptureUse(g, i, g.CaptureID, g.ExecutionDigest, g.ReviewDigest, s.Now()) == nil {
 		eligible, e := s.collector(ctx, i, g.Target, value.CollectContext)

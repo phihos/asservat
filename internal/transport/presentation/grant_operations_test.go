@@ -81,7 +81,7 @@ func TestGrantOperationsWire(t *testing.T) {
 	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || out.Data.Phase != "Pending" || !out.Data.CanDecide || out.Data.Actions[0].Filter != "tcp[13] & 2 != 0" || out.Data.ResultAccess.MaxBytes != 100 || *out.Data.RemainingBytes != 100 || out.Data.NavigationURI != "https://console.invalid/approvals/00000000-0000-4000-8000-0000000009a1" {
 		t.Fatalf("get_grant: %v %s", err, reply.Body)
 	}
-	if out.Data.CanResume == nil || *out.Data.CanResume || out.Data.CanResolve == nil || *out.Data.CanResolve {
+	if out.Data.CanResume == nil || *out.Data.CanResume || out.Data.CanResolve == nil || *out.Data.CanResolve || out.Data.ResumeRequiresOriginalClient == nil || *out.Data.ResumeRequiresOriginalClient {
 		t.Fatal("detail must carry explicit advisory flags")
 	}
 	if out.Data.CaptureDeadlineRule != "previewDeadline" || !out.Data.PreviewDeadline.Equal(uc.view.Review.Deadline) || out.Data.CaptureWindowSeconds != 0 {
@@ -96,7 +96,7 @@ func TestGrantOperationsWire(t *testing.T) {
 	if len(reply.Body) > 24<<10 {
 		t.Fatal("get_grant exceeds the result budget")
 	}
-	if reply, err = s.Call(t.Context(), f, "list_reviews", []byte(`{"view":"pending"}`)); err != nil || !strings.Contains(string(reply.Body), `"approvals":[{`) || strings.Contains(string(reply.Body), `"actions"`) {
+	if reply, err = s.Call(t.Context(), f, "list_reviews", []byte(`{"view":"pending"}`)); err != nil || !strings.Contains(string(reply.Body), `"approvals":[{`) || strings.Contains(string(reply.Body), `"actions"`) || strings.Contains(string(reply.Body), `"can_resolve"`) || strings.Contains(string(reply.Body), `"resume_requires_original_client"`) {
 		t.Fatalf("list_reviews: %v %s", err, reply.Body)
 	}
 	if reply, err = s.Call(t.Context(), f, "decide_review", []byte(`{"grant_id":"00000000-0000-4000-8000-0000000009a1","decision":"approve","reason":"incident 42","idempotency_key":"d1"}`)); err != nil || !uc.decided.approve || uc.decided.reason != "incident 42" || !strings.Contains(string(reply.Body), `"revision":2`) {
