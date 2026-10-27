@@ -73,7 +73,7 @@ func TestTargetQueryReportsFinalValidationInsteadOfTransportSuccess(t *testing.T
 			defer cancel()
 			observed := time.Now()
 			receiver := fleet.APIContextReceiver{Channel: work.Work.Channel, ObservedAt: observed, ValidUntil: observed.Add(5 * time.Second)}
-			standby, err := router.RegisterStandby(ctx, receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+			standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -301,7 +301,10 @@ func TestRegionalStartReusesPreludeBeforeFirstPreparation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	standby, err := router.RegisterStandby(ctx, f.receiver, func(ctx context.Context) (fleet.APIContextReceiver, error) { return f.receiver, ctx.Err() })
+	// The standby's passive residency outlives the start's own deadline.
+	resident, endResident := context.WithCancel(t.Context())
+	defer endResident()
+	standby, err := router.RegisterStandby(resident, f.receiver, func(ctx context.Context) (fleet.APIContextReceiver, error) { return f.receiver, ctx.Err() })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,6 +316,7 @@ func TestRegionalStartReusesPreludeBeforeFirstPreparation(t *testing.T) {
 	err = start.StartContext(ctx, current, f.work.Accepted.CaptureID)
 	elapsed := time.Since(began)
 	cancel()
+	endResident()
 	<-done
 	t.Logf("setup progress work=%d observer=%d probe=%d signed=%t", f.workReads, observer.Load(), probe.Load(), f.signed.CaptureID != "")
 	if err == nil || f.preparations != 1 {

@@ -18,6 +18,9 @@ func TestContextRouterReservedClusterCapacityAndClosing(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
+	// A standby keeps its own residency beyond the attachment's deadline.
+	resident, stop := context.WithCancel(context.Background())
+	defer stop()
 	register := func(cluster, exchange string) *Standby {
 		t.Helper()
 		channel := work.Work.Channel
@@ -25,7 +28,7 @@ func TestContextRouterReservedClusterCapacityAndClosing(t *testing.T) {
 		channel.ExchangeID = exchange
 		now := time.Now()
 		receiver := fleet.APIContextReceiver{Channel: channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
-		s, e := router.RegisterStandby(ctx, receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+		s, e := router.RegisterStandby(resident, receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -36,7 +39,7 @@ func TestContextRouterReservedClusterCapacityAndClosing(t *testing.T) {
 	same.ExchangeID = "00000000-0000-4000-8000-000000000098"
 	n := time.Now()
 	obs := fleet.APIContextReceiver{Channel: same, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
-	if _, e = router.RegisterStandby(ctx, obs, func(context.Context) (fleet.APIContextReceiver, error) { return obs, nil }); e == nil {
+	if _, e = router.RegisterStandby(resident, obs, func(context.Context) (fleet.APIContextReceiver, error) { return obs, nil }); e == nil {
 		t.Fatal("one cluster stole another's standby reservation")
 	}
 	second := register(b, same.ExchangeID)

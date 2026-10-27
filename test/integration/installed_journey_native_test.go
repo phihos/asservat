@@ -240,9 +240,6 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 				}
 			}
 			t.Logf("installed request_capture %s request %s", map[bool]string{true: "ok", false: code}[code == ""], reply.RequestID)
-			if code != "" { // TEMPORARY investigation: capture hub refusal lines
-				diagnose()
-			}
 			return code
 		}
 		var request map[string]any

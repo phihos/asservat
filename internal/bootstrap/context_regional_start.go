@@ -4,7 +4,7 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"context"
 	"errors"
-	"sync/atomic"
+	"sync"
 
 	"time"
 
@@ -43,12 +43,15 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(id) || s.Runner.Read == nil || s.Runner.Capabilities == nil || s.Runner.Recovery == nil || s.Signer == nil || s.Router == nil || s.Now == nil {
 		return execution.ErrInvalid
 	}
-	// Every refusal before the run, and a run refused before any start
-	// effect, leaves the admitted capture unstarted: an explicit continuation
-	// may start it (ADR-134/212). Any other run failure stays unavailable.
+	// Every refusal before the run, and a failed run that never entered the
+	// one-use SQL preparation (or whose preparation rolled back before its
+	// insert, ADR-212), leaves the admitted capture unstarted: only reads
+	// happened, so an explicit continuation may start it (ADR-134). Any other
+	// run failure stays unavailable.
 	notStarted := errors.Join(execution.ErrUnavailable, capturevalue.ErrAcquisitionNotStarted)
-	// Atomic: dispatch may return before an abandoned run finishes.
-	var refusedBefore atomic.Bool
+	// Dispatch can return early, without joining the run, when its exchange
+	// or attachment ends; the gate then refuses any later preparation.
+	gate := &preparationGate{}
 	started := s.Now().UTC().Truncate(time.Microsecond)
 	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer cancel()
@@ -142,8 +145,8 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		r := s.Runner
 		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
+		r.Prepare = gatedPreparer{r.Prepare, gate}
 		result, err := r.ExecuteObserved(ctx, current, caller, accepted, capability, recovery)
-		refusedBefore.Store(err != nil && errors.Is(err, execution.ErrNotStarted))
 		if err != nil && s.Report != nil {
 			step := "execute"
 			var fixed interface{ FixedStep() string }
@@ -161,11 +164,12 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		return "Unavailable", err
 	})
 	auditapp.MarkStep(ctx, "st-run", mark)
+	prepared := gate.close()
 	if e != nil && state == "" {
 		if s.Report != nil {
 			s.Report("dispatch (" + regionalOutcome(e) + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
 		}
-		if refusedBefore.Load() {
+		if !prepared {
 			return notStarted
 		}
 		return execution.ErrUnavailable
@@ -176,10 +180,59 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	case "PreparationUncertain":
 		return capturevalue.ErrPreparationUncertain
 	}
-	if refusedBefore.Load() {
+	if !prepared {
 		return notStarted
 	}
 	return execution.ErrUnavailable
+}
+
+// preparationGate records whether a run entered the one-use SQL preparation.
+// A preparation refused before its insert (ADR-212 headroom) does not count.
+// After close no preparation begins, so close's answer cannot change.
+type preparationGate struct {
+	mu             sync.Mutex
+	closed, active bool
+}
+
+func (g *preparationGate) enter() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.closed {
+		return false
+	}
+	g.active = true
+	return true
+}
+
+func (g *preparationGate) rolledBack() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if !g.closed {
+		g.active = false
+	}
+}
+
+func (g *preparationGate) close() (entered bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.closed = true
+	return g.active
+}
+
+type gatedPreparer struct {
+	executionapp.APIExecutionPreparer
+	gate *preparationGate
+}
+
+func (p gatedPreparer) PrepareAPIExecution(ctx context.Context, c executionapp.APIExecutionCheck) (execution.APIExecution, bool, error) {
+	if !p.gate.enter() {
+		return execution.APIExecution{}, false, errors.Join(execution.ErrUnavailable, execution.ErrNotStarted)
+	}
+	r, first, err := p.APIExecutionPreparer.PrepareAPIExecution(ctx, c)
+	if err != nil && errors.Is(err, execution.ErrNotStarted) {
+		p.gate.rolledBack()
+	}
+	return r, first, err
 }
 
 // Diagnostic only: a retained caller deadline is not a fresh start interval.

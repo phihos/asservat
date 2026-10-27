@@ -63,7 +63,9 @@ func TestNativeSharedPortActualH2StandbyAndIndependentPurpose(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 16*time.Second)
+	// Longer than the ten-second check plus the router's idle retirement
+	// margin (an idle standby ends when it can no longer cover any work).
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	done := make(chan error, 1)
 	go func() {
 		done <- native.ServeWithContextStart(ctx, listener, roots, syntheticServingCertificate{certificate}, handler, starts, 1, 1)
