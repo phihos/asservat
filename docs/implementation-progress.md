@@ -249,6 +249,43 @@ capture. Its source stayed unchanged and cleanup was empty; report SHA-256
 `d86eef8c74434bdb9240530927c3dd0edbbe6d1defb333ce432ff245843063da`.
 That run excludes history and is not installed qualification for this branch.
 
+PR102 review identified unchecked mutation counts in history eviction: hiding the
+old row and decrementing the two quota rows previously checked errors but ignored
+zero affected rows. This is a test-induced inconsistent-counter case, not an
+observed production corruption or cap bypass: the checked positive increments
+still enforce their ceilings. The correction checks all three already returned
+counts and uses the existing custody fence error, matching summary expiry. It
+adds no SQL/API calls, privileges, state, background work or configuration.
+
+The real PostgreSQL/S3 regression first sets an existing visible row's selector
+quota to zero and forces eviction through the installation limit of one. On
+unchanged production (`942a8cfb`) it fails as expected: reservation returns nil,
+hides the old row and creates a new history/attempt, charging 1,671,168 bytes
+and four objects. RED Go exit 1 (2.785s; selected case 2.34s), report SHA-256
+`77c092c2d22b46231be59c9bf1fc7fb954c34f29c26c35fe9b3a5017649f371c`.
+With the correction (`7918a152`), the same operation returns the fence error;
+old visibility, original installation count and injected selector value remain,
+and allocation/pool counters, attempt count and absence of a new reservation
+prove rollback of the earlier custody insert. The fixture restores its selector
+counter before continuing the existing positive eviction, encrypted read/write
+and real prefix inventory/retirement checks. GREEN Go exit 0 (8.705s; selected
+case 7.25s), report SHA-256
+`306bc747c14ce0b779e4d1270d27283b2bc42af9d1f7b1c1db56df507bcd5229`.
+Both runs independently match all 3,213 frozen source hashes, report unchanged
+source and empty cleanup failures, and their exact owned PostgreSQL/S3 containers
+were independently absent. Cache archives are
+`history-eviction-fence-red-2-artifacts` and
+`history-eviction-fence-green-1-artifacts`. No collector or installed browser
+ran. The first setup attempt used nonexistent pool charge columns; its actual
+exit 1 and cleanup report are retained separately as unqualified fixture failure
+(`history-eviction-fence-red-1-artifacts`), then the query was corrected to the
+existing pool allocation columns before RED. No adversarial trigger framework
+or speculative new security mechanism was added.
+Fresh canonical pre-push passes, including 227 console tests and pinned SQL
+generation; the full PostgreSQL adapter race package passes (2.661s). Final
+documentation spec-check also passes (13,279 assertions). This SQL correction
+still does not establish installed React/history qualification.
+
 The semantic merge base was the prior shared PR100 source `21806d0d`, because
 main contains its squash. The sole remaining content overlap combined history's
 original-target replacement check with main's tri-state recorder availability;
