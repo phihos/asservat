@@ -123,6 +123,7 @@ func (s *frameStream) acceptPeer(ctx context.Context, observed fleet.APIContextR
 			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 		}
 		s.lease = &framePeerLease{receiver: observed, regional: s.awaited, history: s.historyWork}
+		recordWorkPeerDeadline(ctx, observed.ValidUntil)
 	case peerFinal:
 		if s.lease == nil || !s.lease.final || len(s.leaseBounds) != 1 || !s.lease.receiver.Valid(time.Now()) {
 			return fleet.APIContextReceiver{}, fleet.ErrUnavailable

@@ -18,6 +18,7 @@ import (
 
 type historyTLSObjects struct {
 	calls  atomic.Int64
+	delay  atomic.Int64
 	bundle capture.HistoryCiphertexts
 	copies artifact.Copies
 }
@@ -26,6 +27,15 @@ func (h *historyTLSObjects) ExecuteHistory(ctx context.Context, a capture.Histor
 	h.calls.Add(1)
 	if ctx.Err() != nil {
 		return app.HistoryReply{}, ctx.Err()
+	}
+	if delay := time.Duration(h.delay.Load()); delay > 0 {
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return app.HistoryReply{}, ctx.Err()
+		case <-timer.C:
+		}
 	}
 	if a.Operation == "read" {
 		return app.HistoryReply{Copies: c, Bundle: capture.HistoryCiphertexts{bytes.Clone(h.bundle[0]), bytes.Clone(h.bundle[1]), bytes.Clone(h.bundle[2]), bytes.Clone(h.bundle[3])}}, nil
@@ -71,6 +81,7 @@ type HistoryTLSHarness struct {
 	Copies           artifact.Copies
 	Sources, Effects func() int64
 	ChangeSource     func()
+	DelayEffects     func(time.Duration)
 }
 
 func NewHistoryTLSHarness(t *testing.T, delay time.Duration) HistoryTLSHarness {
@@ -108,5 +119,5 @@ func NewHistoryTLSHarness(t *testing.T, delay time.Duration) HistoryTLSHarness {
 		joined <- contextstart.ServeRegionalOperations(owner, stream, receiver, signer, local, time.Now)
 	}()
 	t.Cleanup(func() { cancel(); stream.Close(); exchange.Close(); <-joined })
-	return HistoryTLSHarness{f.rootID, receiver, f.router, signer, objects.bundle, objects.copies, source.calls.Load, objects.calls.Load, func() { source.changed.Store(true) }}
+	return HistoryTLSHarness{f.rootID, receiver, f.router, signer, objects.bundle, objects.copies, source.calls.Load, objects.calls.Load, func() { source.changed.Store(true) }, func(delay time.Duration) { objects.delay.Store(int64(delay)) }}
 }

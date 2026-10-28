@@ -87,9 +87,10 @@ func (s *regionalHistorySession) ExecuteHistory(ctx context.Context, a capture.H
 		return out, fleet.ErrUnavailable
 	}
 	w := fleetapp.HistoryWork{Channel: s.receiver.Channel, Authority: a}
+	effectUntil := identity.Earlier(s.until, a.NotAfter)
 	began := time.Now()
 	signed, e := s.signer.SignHistoryWork(ctx, w)
-	reportHistoryDispatch(s.report, ctx, "sign", began, s.until, e)
+	reportHistoryDispatch(s.report, ctx, "sign", began, effectUntil, e)
 	if e != nil {
 		return out, e
 	}
@@ -100,8 +101,11 @@ func (s *regionalHistorySession) ExecuteHistory(ctx context.Context, a capture.H
 	began = time.Now()
 	observed, diagnostics := contextstart.NewStreamDiagnosticContext(ctx)
 	out, e = s.attachment.RunHistory(observed, w, signed, b, c)
-	reportHistoryDispatch(s.report, ctx, "exchange", began, s.until, e)
+	reportHistoryDispatch(s.report, ctx, "exchange", began, effectUntil, e)
 	if e != nil && s.report != nil {
+		if peerUntil, ok := diagnostics.WorkPeerDeadline(); ok {
+			reportHistoryDispatch(s.report, ctx, "exchange-peer", began, peerUntil, e)
+		}
 		if first := diagnostics.Interruption(); first.Present() {
 			s.report("exchange-stream/"+first.Stage()+"/"+first.Reason(), "")
 		}
@@ -122,5 +126,9 @@ func reportHistoryDispatch(report func(string, string), ctx context.Context, sta
 		until = identity.Earlier(until, bound)
 	}
 	remaining := time.Until(until)
-	report(stage+"/"+state, "elapsed"+auditapp.DurationBucket(time.Since(began))+" remaining"+auditapp.DurationBucket(remaining))
+	expired := ""
+	if remaining <= 0 {
+		expired = " expired"
+	}
+	report(stage+"/"+state, "elapsed"+auditapp.DurationBucket(time.Since(began))+" remaining"+auditapp.DurationBucket(remaining)+expired)
 }
