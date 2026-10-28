@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"asservat.local/asservat/internal/adapters/gadget"
@@ -71,8 +72,17 @@ func runPacketEngine(ctx context.Context, engine packetEngine, pod string, rec *
 	if meter.Context().Err() != nil {
 		meter.Stop(meter.Context().Err())
 	}
-	if err == nil {
-		err = meter.Snapshot().Stopped
+	outcome := meter.Snapshot()
+	// Unknown input is never natural completion, even when the deadline was
+	// recorded first. A provider's cancellation/deadline cannot mask a prior
+	// debit refusal; a real provider failure remains useful when only the normal
+	// action deadline stopped the meter.
+	if outcome.UnknownInput {
+		err = ErrObservationClosed
+	} else if err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		if outcome.Stopped != nil {
+			err = outcome.Stopped
+		}
 	}
 	return stats, err
 }
