@@ -2,6 +2,82 @@
 
 Date: 2026-10-28. Status: installed attempts failed before traffic. Request preflight and SQL measurement regression checks pass; installed paced transfer and combined costs remain pending.
 
+## Serialized traffic route failure and direct fixture client (2026-10-28)
+
+Native 40600135398 on `4d2e1033` exited 1 after setup SQL snapshots succeeded.
+Actual Go was 603.040s; approved recording was 146.39s. The traffic phase ended
+at 8.500202059s with seven acknowledged batches, 28,672 complete records and
+1,863,232 received bytes: seven full 262,144-byte batches plus 28,224 bytes of
+an incomplete eighth. Its acknowledgement refusal remains a failed experiment.
+No near-full artifact, paced native body or renewal was qualified. The retained
+measurement report SHA-256 is
+`e02d16de7f7dfd5ae9544c05144921e3dab24a896a13d0c29937c7eec045c8be`;
+environment SHA-256 is
+`b96062832090d54cb25673b513981447e8d930d4eb93d9820ebdcf25c14a1da8`.
+All 3,230 source hashes independently match `4d2e1033`, source stayed unchanged
+and the environment report records cleanup `[]`. Exact artifacts remain under
+`~/.cache/asservat-build/codex-bf86-resume/native-paced-40600135398-artifacts/native-continuation-native-paced-1/`.
+
+The fixture serialized sixteen API Pod-proxy responses, each containing 4,096
+individually flushed 64-byte writes. That installed route could not deliver the
+fixed workload within its phase. The report did not retain individual batch
+latencies, so this does not establish a particular Kubernetes buffering defect.
+The correction uses the existing statically built provider-proxy fixture binary
+as one finite traffic client on the selected Pod's exact owned Kind node. It
+connects directly to that live, UID-checked Pod IP on port 8080; there is no
+Pod port-forward, loopback route, DNS, environment proxy, redirect, replacement
+workload, filler or retry. Ordinary approved-recording traffic remains unchanged.
+
+The existing CGO-disabled build produces a static Linux executable, avoiding a
+runner-versus-Kind libc dependency. The measured local artifact is 11,293,151
+bytes. Setup copies the same binary to the two already owned regional nodes
+and verifies its SHA-256 and each Kind ownership label before collection. The
+fixture descriptor/environment retains that digest and exact node allowlist.
+At Running, one live Pod GET verifies the selected UID and provides its node/IP.
+One Docker exec runs the client; a closed 2 KiB numeric receipt is required,
+including last status/body bytes/acknowledgement and a fixed failure code. Missing
+or invalid receipts are explicit, never zero-cost success. Parent wall time and
+client time are separate. The absolute earlier caller/8.5s cutoff includes
+process launch; stdin EOF cancels the child and the parent waits for process exit.
+A failed join or deadline fails the experiment. No new image, Pod, service,
+listener, product credential, privilege or background service is added. Setup
+adds two binary copies (about 21.5 MiB total), two ownership inspections and two
+hash reads; traffic replaces sixteen API-proxy exchanges with one Pod GET and
+sixteen direct HTTP requests in one process. Actual installed setup/runtime cost
+remains unmeasured.
+
+A local RED modeled a 1.1s per-request proxy delay and reproduced seven complete
+batches at the fixed deadline (exit 1, 8.504s). This deliberately injected delay
+is not a measurement of Kubernetes internals. The final GREEN keeps that route
+failed and sends the identical fixed workload directly to the actual fixture
+traffic handler: delayed route seven batches / 1,835,008 bytes / 8.500915135s;
+direct route sixteen batches / 65,536 records / 4,194,304 bytes / 7.537577943s.
+The explicit-file fixture race suite exited 0 in 17.709s, retaining no-retry and
+finite-handler checks. The former duplicate integration traffic loop was removed
+so these checks exercise the binary's actual client. Parent receipt/foreign-node/
+loopback/EOF-cancellation-and-join and measured-size checks passed with races in
+1.127s. No collector or external Kubernetes fixture ran locally. The owned-node
+network route and actual retained capture size still require installed proof;
+all sixteen batches alone cannot qualify packet count or near-full PCAPNG size.
+
+Canonical local `make pre-push` exited 0 (218 console checks; specification
+13,280 assertions; architecture 1,326 positive checks). The final receipt suite
+also refuses partial/missing acknowledgements, extra JSON, unknown fields and
+more than 2 KiB of helper output. Static binary inspection and these local tests
+do not establish the installed node route.
+
+Review follow-up: the child receipt now decodes into a dedicated eight-field
+value before validated fields are copied to the report. Child JSON cannot set
+parent-owned ReceiptValid or ClientElapsed, including before a later decode
+failure. The injected-field regressions reproduced both acceptance and tainted
+error artifacts (RED exit 1, Go 0.035s; affected parent race GREEN exit 0,
+1.134s). Final canonical pre-push including vet and all 218 console checks
+exited 0. Valid partial receipts still preserve
+their acknowledged counts, received bytes and closed failure. This is one fixed
+receipt value per phase, with zero additional API/process calls, timers or
+privileges. The actual traffic client and its measured synthetic proof are
+unchanged; no external or installed run accompanied this correction.
+
 ## Incomplete SQL measurement and owned PostgreSQL proof (2026-10-28)
 
 Paced Native 40595384061 on `76bae03c` exited 1 after an uncertain submission
@@ -120,7 +196,8 @@ clones the installed transport and preserves its TLS/routing; HTTP/1, incorrect
 status/range/length/ETag/hash, truncation, excess bytes and an unbounded caller
 are refused. Original-deadline cancellation closes and joins a blocked read.
 [`native_pacing_traffic_test.go`](../../test/integration/native_pacing_traffic_test.go)
-provides the finite traffic runner and measured-size gate. The real loopback
+provides the bounded owned-node client boundary and measured-size gate; the
+actual traffic loop lives in the existing provider-proxy fixture binary. The real loopback
 traffic-protocol test acknowledges 16 batches, 65,536 writes and 4,194,304 application bytes
 in 7.530 s. It does not infer packets or native artifact size from write counts.
 

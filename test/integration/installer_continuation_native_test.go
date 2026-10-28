@@ -539,7 +539,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					if _, err := admin.Exec(ctx, nativePacingStatisticsReset); err != nil {
 						t.Fatal("pre-baseline private SQL statistics reset", err)
 					}
-					measurement = &nativePacingMeasurement{admin: admin, root: p.RootID, providers: providers}
+					measurement = &nativePacingMeasurement{admin: admin, root: p.RootID, providers: providers, traffic: f.NativeTrafficHelper}
 				}
 				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) })
 			})

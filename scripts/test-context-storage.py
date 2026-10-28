@@ -619,6 +619,19 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                         run(["docker", "network", "connect", network, worker_node])
                         for owned in [node_name, worker_node]:
                             registry.configure_owned_node(owned)
+                            if native_paced and index == 1:
+                                # Reuse the already-built static fixture binary;
+                                # direct node-to-Pod traffic never traverses an API proxy.
+                                helper_digest = hashlib.sha256((image_dir/"provider-proxy").read_bytes()).hexdigest()
+                                if run(["docker", "inspect", "--format", '{{ index .Config.Labels "io.x-k8s.kind.cluster" }}', owned]) != name:
+                                    raise RuntimeError("traffic helper node ownership differs")
+                                run(["docker", "cp", str(image_dir/"provider-proxy"), owned+":/asservat-fixture-traffic"])
+                                observed = run(["docker", "exec", owned, "sha256sum", "/asservat-fixture-traffic"]).split()[0]
+                                if observed != helper_digest:
+                                    raise RuntimeError("traffic helper bytes differ")
+                                helper = fixture.setdefault("nativeTrafficHelper", {"cluster": name, "sha256": helper_digest, "nodes": []})
+                                helper["nodes"].append(owned)
+                                report["nativeTrafficHelper"] = helper
                             info = json.loads(run(["docker", "inspect", owned]))[0]
                             registry_nodes.append(info["NetworkSettings"]["Networks"][network]["IPAddress"])
                         fixture["workerImage"] = registry.image

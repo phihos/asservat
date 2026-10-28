@@ -1,5 +1,38 @@
 # Sustained implementation progress
 
+## Paced traffic route correction after retained failure (2026-10-28)
+
+Native 40600135398 on `4d2e1033` retained valid setup SQL statistics but failed
+the fixed traffic phase: seven acknowledged batches / 28,672 complete records /
+1,863,232 bytes in 8.500202059s, including an incomplete eighth batch. Actual Go
+was 603.040s, approved recording 146.39s. All 3,230 source hashes matched,
+unchanged with cleanup `[]`. No near-full/download/renewal result passed.
+
+The fixture now reuses its existing static provider binary for direct traffic
+from the exact owned node to the live UID-checked selected Pod IP. It avoids the
+serialized API Pod proxy without port-forwarding or substituting a workload.
+All sixteen 4,096-write batches, 64-byte records, 500ms schedule, 8.5s phase,
+10s capture and 8 MiB native cap remain unchanged. Binary copying/hash/ownership
+checks happen during setup; the finite process uses the original absolute
+cutoff, EOF cancellation, joined exit and a bounded closed numeric receipt.
+No product code, privileges, image, Pod or service is added.
+
+The actual fixture client's local synthetic delayed-proxy RED failed in 8.504s;
+GREEN preserves that failure and completes identical direct traffic in 7.538s.
+Fixture races pass in 17.709s and parent target/cancellation/receipt/size races in
+1.127s. These checks are synthetic; actual node-to-Pod traffic, near-full native
+size and aggregate costs remain pending installed qualification. Full retained
+reports, hashes, costs and limitations are in the
+[qualification record](research/native-response-qualification.md#serialized-traffic-route-failure-and-direct-fixture-client-2026-10-28).
+
+The review follow-up separates the child's exact eight-field receipt from
+parent-owned report validity/timing. Injected parent fields now refuse without
+tainting error artifacts; valid partial receipt diagnostics remain available.
+The local regression reproduced the defect (Go 0.035s, exit 1); affected parent
+races pass in 1.134s and canonical pre-push including vet/218 console checks
+exits 0. The traffic
+client, authority/capture limits, process lifecycle and network path are unchanged.
+
 ## Paced measurement failure retained and PostgreSQL mechanism checked (2026-10-28)
 
 Native 40595384061 on `76bae03c` failed after accepted-capture resolution,
