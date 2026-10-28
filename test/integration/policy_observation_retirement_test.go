@@ -66,7 +66,7 @@ func samplePolicyObservationGraph(t *testing.T, ctx context.Context, admin *pgxp
 		{"custody_copy", "EXISTS(SELECT 1 FROM custody_attempt a WHERE a.id=r.attempt_id AND a.allocation_id=$2::uuid)"},
 		{"custody_event", "EXISTS(SELECT 1 FROM custody_attempt a WHERE a.id=r.attempt_id AND a.allocation_id=$2::uuid)"},
 	}
-	for _, name := range []string{"policy_grant_settings", "policy_source", "policy_acceptance", "access_grant", "policy_grant_attachment", "policy_occurrence", "policy_pod_watermark", "policy_workload_window", "policy_suppression", "context_storage_binding", "context_capture", "context_execution", "context_writer_completion", "policy_observation_session", "context_control_pool", "context_control_account", "context_control_charge", "context_verification", "context_catalog", "context_case_locator", "capture_history_quota", "capture_history_parameter", "retention_decision", "context_deletion_checkpoint"} {
+	for _, name := range []string{"policy_grant_settings", "policy_source", "policy_acceptance", "access_grant", "policy_grant_attachment", "policy_occurrence", "policy_pod_watermark", "policy_workload_window", "policy_suppression", "context_storage_binding", "context_preview", "context_capture", "context_execution", "context_writer_completion", "policy_observation_session", "context_control_pool", "context_control_account", "context_control_charge", "context_verification", "context_catalog", "context_case_locator", "capture_history_quota", "capture_history_parameter", "retention_decision", "context_deletion_checkpoint"} {
 		tables = append(tables, scopedTable{name, "r.root_id=$1::uuid"})
 	}
 	// One closed UNION keeps all logical counts under one MVCC snapshot and
