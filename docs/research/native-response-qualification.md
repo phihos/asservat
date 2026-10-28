@@ -621,3 +621,39 @@ probe SHA-256 `ce770b779668c222252e78aa2738c8d4b083c2410ca5240982afc833b3d85632`
 After terminal archival, independent checks found no run-labelled containers,
 networks, volumes or images, no owned Kind node/cluster, and neither exact owned
 network remained. Generated repository results were restored only after archival.
+
+### Stable decimal SQL execution aggregation
+
+Native 40616046225 on `168ca47b` acknowledged all sixteen traffic batches / 4 MiB:
+parent 8.134821413s, client 8.074851714s, schedule wait 0.000113690s and HTTP/ACK
+work 8.074500615s. That last number is wall time, not CPU, and remains close to
+the unchanged 8.5s bound. Recording-phase measurement then refused unchanged
+statement counters whose floating SUM moved backwards: role 21841 execution
+3.3764820000000006 to 3.376482ms, and role 21846 24.505142000000003 to
+24.505142ms. Reset/deallocation and calls/rows/statement counts stayed unchanged.
+This run reached no PCAP, download or owner qualification; neither the earlier
+tail model nor successful traffic establishes the recording/download result.
+
+The fixture now casts each `total_exec_time` input to numeric before SUM and
+converts the aggregate once to double precision. Casting after the float SUM
+would retain order-sensitive arithmetic. The real-PostgreSQL witness uses the
+same observer expression with three fixed nonnegative values in opposite input
+orders: the legacy aggregate must decrease and be refused, while decimal-first
+aggregation must produce the same expected value and zero delta. This is an SQL
+arithmetic witness, not reconstruction of installed statement activity. A pure
+single-ULP genuine decrease still must fail; no epsilon or tolerance is added.
+
+Complexity gate: (1) one observed installed false refusal, qualification-blocking;
+(2) no accepted risk reopened; (3) all fixture SQL measurement edges benefit;
+(4) ordinary exact decimal aggregation, no novel runtime mechanism; (5) zero new
+privileges/credentials/exposure; (6) zero new product/fallback states; (7) zero
+configuration; (8) existing PostgreSQL numeric semantics only; (9) same snapshot
+query/row count, decimal conversion per existing statement row (CPU unmeasured),
+four extra tiny admin-only aggregate SELECTs plus one header read in the focused
+arithmetic witness, zero
+per-packet/API work; (10) fixture-only one-expression rollback, existing reset,
+eviction and real-decrease tests retained; (11) smaller cast-after-SUM or tolerance
+does not preserve the intended exact monotonic check. Existing max5000 statement
+capacity, roles, single pre-baseline reset and all deadlines remain unchanged.
+Local PostgreSQL witness execution awaits a frozen reviewed candidate and the
+parent's single-run coordination; no collector or hosted run is authorized here.
