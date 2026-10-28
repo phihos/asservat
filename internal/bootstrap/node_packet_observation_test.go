@@ -14,7 +14,7 @@ import (
 func packetObservation(t testing.TB, ctx context.Context, credit, rate int64, lease time.Duration) *LocalObservationGate {
 	t.Helper()
 	now := time.Now()
-	b := ObservationBinding{Scope: [32]byte{1}, AccountingRule: ObservationAccountingRule(), SessionID: "00000000-0000-4000-8000-000000000001", Fence: "00000000-0000-4000-8000-000000000002", CaptureID: "capture", ActionID: "packet", PodUID: "pod", NodeUID: "node", BootID: "boot", CollectorPodUID: "collector", CollectorEpoch: "epoch"}
+	b := ObservationBinding{Scope: [32]byte{1}, ProgramDigest: [32]byte{2}, ExpectationDigest: [32]byte{3}, AccountingRule: ObservationAccountingRule(), SessionID: "00000000-0000-4000-8000-000000000001", Fence: "00000000-0000-4000-8000-000000000002", CaptureID: "capture", ActionID: "packet", PodUID: "pod", NodeUID: "node", BootID: "boot", CollectorPodUID: "collector", CollectorEpoch: "epoch"}
 	p := ObservationPermit{Binding: b, StartedAt: now, SessionUntil: now.Add(time.Minute), LeaseUntil: now.Add(lease), Sequence: 1, Credit: credit, BytesPerSecond: rate}
 	m, err := NewLocalObservationGate(ctx, b, p, time.Now)
 	if err != nil {

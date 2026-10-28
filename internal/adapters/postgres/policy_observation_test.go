@@ -9,10 +9,14 @@ import (
 	app "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
+	value "asservat.local/asservat/internal/domain/execution"
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 	"bytes"
+	"context"
+	"errors"
 )
 
 func policyObservationRowFixture() custodydb.PolicyObservationSession {
@@ -188,5 +192,32 @@ func TestPolicyObservationProgramMatchesActualNodeDigest(t *testing.T) {
 	program[0].Jf++
 	if bytes.Equal(policyObservationProgramDigest(program), expected[:]) {
 		t.Fatal("changed instruction retained program identity")
+	}
+}
+
+func TestRawPolicyCannotUseOrdinaryPreparationOrOmitItsGrant(t *testing.T) {
+	r := &artifact.Recording{Filter: &artifact.RecordingFilter{Expression: "tcp[13] & 2 != 0"}}
+	if r.RequireApproval || !policyRecordingNeedsGrant(r) {
+		t.Fatal("raw grant need was confused with protected require-all setting")
+	}
+	var c app.APIExecutionCheck
+	c.Work.Actor = authorization.PolicyPrincipal("11111111-1111-4111-8111-111111111111", "accepted-policy")
+	c.Work.Accepted.Expectation.Recording = r
+	// No adapter dependencies: the ordinary entry point must refuse before any
+	// SQL/provider operation rather than return a preparation without a meter.
+	execution, first, err := (&APIContextExecutions{}).PrepareAPIExecution(context.Background(), c)
+	if !errors.Is(err, value.ErrDenied) || first || execution.RootID != "" || execution.Binding.CaptureID != "" {
+		t.Fatal("raw policy bypassed companion", first, err)
+	}
+	if r.RequireApproval {
+		t.Fatal("raw check rewrote original installation setting")
+	}
+	r.Filter.Expression = "tcp dst port 80"
+	if policyRecordingNeedsGrant(r) {
+		t.Fatal("ordinary headers gained sensitive grant requirement")
+	}
+	r.RequireApproval = true
+	if !policyRecordingNeedsGrant(r) {
+		t.Fatal("original installation approval setting was dropped")
 	}
 }

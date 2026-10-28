@@ -17,13 +17,14 @@ func ObservationAccountingRule() [32]byte {
 // from constructing a second meter. The unwired issuer/channel must do that.
 type ObservationBinding struct {
 	Scope                                            [32]byte
+	ProgramDigest, ExpectationDigest                 [32]byte
 	AccountingRule                                   [32]byte
 	SessionID, Fence, CaptureID, ActionID, PodUID    string
 	NodeUID, BootID, CollectorPodUID, CollectorEpoch string
 }
 
 func (b ObservationBinding) Valid() bool {
-	if b.Scope == ([32]byte{}) || b.AccountingRule != ObservationAccountingRule() {
+	if b.Scope == ([32]byte{}) || b.ProgramDigest == ([32]byte{}) || b.ExpectationDigest == ([32]byte{}) || b.AccountingRule != ObservationAccountingRule() {
 		return false
 	}
 	for _, s := range []string{b.SessionID, b.Fence, b.CaptureID, b.ActionID, b.PodUID, b.NodeUID, b.BootID, b.CollectorPodUID, b.CollectorEpoch} {
@@ -48,4 +49,16 @@ type ObservationPermit struct {
 
 func (p ObservationPermit) Lease() ObservationLease {
 	return ObservationLease{SessionID: p.Binding.SessionID, Fence: p.Binding.Fence, Sequence: p.Sequence, StartedAt: p.StartedAt, SessionUntil: p.SessionUntil, LeaseUntil: p.LeaseUntil, Credit: p.Credit, MaxBytesPerSecond: p.BytesPerSecond}
+}
+
+// ValidFinite checks the original issued-work fit for ADR-261's first policy
+// mode. It is structural validation, never proof of committed authority. New
+// dispatch/start uses its current time; passive receipt decoding may validate
+// at StartedAt without reviving the old StartBy or permitting another start.
+func (p ObservationPermit) ValidFinite(now time.Time) bool {
+	return p.Binding.Valid() && p.Sequence == 1 && p.Lease().Valid(now) &&
+		p.LeaseUntil.Equal(p.SessionUntil) && p.SessionUntil.Sub(p.StartedAt) <= 20*time.Second &&
+		p.Duration >= time.Second && p.Duration <= 15*time.Second &&
+		p.StartBy.After(p.StartedAt) && !p.StartBy.After(p.StartedAt.Add(PacketCaptureStartWithin)) &&
+		!p.StartBy.Add(p.Duration).After(p.SessionUntil) && now.Before(p.StartBy)
 }

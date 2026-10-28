@@ -59,13 +59,14 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 		return nil, value.ErrDenied
 	}
 	output := int64(artifact.MaxContextBytes)
-	required := false
+	required, raw := false, false
 	if a.Plan.Input.Recorder != nil {
 		recording, _, err := planning.RecordingForContext(a.Plan)
 		if err != nil {
 			return nil, value.ErrInvalid
 		}
-		output, required = recording.MaxBytes, recording.RequireApproval
+		output, required = recording.MaxBytes, policyRecordingNeedsGrant(&recording)
+		raw = recording.Filter != nil && planning.RawBytePredicate(recording.Filter.Expression)
 	}
 	r := &policyCaptureReservation{occurrence: occurrence, bytes: output, until: snapshot.FreshUntil}
 	if source.GrantAttachmentID.Valid {
@@ -93,6 +94,9 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 			if errors.Is(err, authorization.ErrPolicyGrantBudgetExhausted) {
 				return nil, value.ErrCapacity
 			}
+			return nil, value.ErrDenied
+		}
+		if raw && (grant.Policy.Observation == nil || grant.Policy.Limits.MaxObservedBytes < 1) {
 			return nil, value.ErrDenied
 		}
 		if grant.Policy.RecipeDigest != a.Plan.RecipeDigest || a.Plan.Input.Deadline.After(grant.PolicyNotAfter) {
@@ -171,7 +175,7 @@ func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, ro
 		return nil, value.ErrDenied
 	}
 	if !reservation.GrantID.Valid {
-		if accepted.Expectation.Recording != nil && accepted.Expectation.Recording.RequireApproval {
+		if policyRecordingNeedsGrant(accepted.Expectation.Recording) {
 			return nil, value.ErrDenied
 		}
 		return nil, ctx.Err()
@@ -195,4 +199,10 @@ func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, ro
 		return nil, value.ErrDenied
 	}
 	return &policyCaptureGrantState{reservation: reservation, grant: grant}, ctx.Err()
+}
+
+// Raw sensitivity is separate from Recording.RequireApproval's immutable
+// protected require-all setting. Do not rewrite that setting on replay.
+func policyRecordingNeedsGrant(r *artifact.Recording) bool {
+	return r != nil && (r.RequireApproval || r.Filter != nil && planning.RawBytePredicate(r.Filter.Expression))
 }

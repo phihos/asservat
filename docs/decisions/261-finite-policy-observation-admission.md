@@ -97,10 +97,21 @@ an eventual SQL permit was already present in those signature bytes. The typed
 permit must travel on that authenticated operation and match its exact accepted
 work, SQL session and resolved node. No remote DTO selects a policy/grant budget.
 
-The shared value owner is C-24 `domain/collector`: byte-compatible local binding
-and permit, with the accounting rule represented by its fixed canonical digest
-(test-verified against the documented version string). Do not broaden the pure
-domain crypto allowlist solely for this move.
+The shared value owner is C-24 `domain/collector`: one canonical binding/permit
+requiring the existing program and expectation digests as well as scope, original
+identities and the fixed accounting-rule digest (test-verified against its version
+string). This unpublished, unwired contract has no weaker prototype compatibility
+branch. Do not broaden the pure domain crypto allowlist. The two digests add 64
+bytes of facts; actual JSON/hex transport overhead is measured separately.
+
+SQL derives the program digest from the exact frozen cBPF instructions and the
+expectation digest from the accepted expectation. C-09 compares the expectation
+to its independently verified signed work, and program to the frozen expectation
+already matched to that work; source facts come from its own remembered resolver
+result. The node independently hashes the actual program before engine start and
+checks current process/node facts. It cannot independently reconstruct the full
+expectation; that digest is provenance already verified at C-09, not a second
+check against a duplicate caller field. No independent initial JWS is added.
 
 Use one primitive C-24 `targets.PacketSourceObservation` containing PodUID, NodeUID,
 BootID, CollectorPodUID, CollectorEpoch, ObservedAt and FreshUntil, optionally in
@@ -142,6 +153,19 @@ passes the request context to the executor. Go's [HTTP profile handler](https://
 starts profiling, waits for a finite interval/cancellation, then stops. These are
 execution-lifecycle precedents only; neither supplies Asservat's grant/quota
 semantics or proves that twenty seconds is the right privacy tradeoff.
+
+## Inert compilation and consumer gates
+
+A private policy-context compiler may derive the exact inert finite on-trigger
+expectation for component qualification. A policy-shaped value is not accepted
+team authority. Shared/manual recorder acceptance keeps its raw refusal, and
+production trigger/C03 raw gates remain until the complete path qualifies.
+Raw predicate grant need is derived from the frozen filter separately from the
+immutable protected require-all setting; changing that setting would alter replay
+scope. Original grant plus positive reviewed observation limits precede output
+reservation. The ordinary API preparer refuses raw policy bypass, and the legacy
+regional recording start refuses raw before prepared ownership/queue changes.
+Only the typed source/committed-permit start may later acquire through the meter.
 
 ## Qualification and remaining work
 

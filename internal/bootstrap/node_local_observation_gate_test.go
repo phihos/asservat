@@ -12,7 +12,7 @@ import (
 func localObservationFixture(t testing.TB, credit, rate int64) (*LocalObservationGate, ObservationPermit, *time.Time) {
 	t.Helper()
 	now := time.Now()
-	binding := ObservationBinding{Scope: [32]byte{1}, AccountingRule: ObservationAccountingRule(), SessionID: "00000000-0000-4000-8000-000000000001", Fence: "00000000-0000-4000-8000-000000000002", CaptureID: "capture", ActionID: "packet", PodUID: "pod", NodeUID: "node", BootID: "boot", CollectorPodUID: "collector", CollectorEpoch: "epoch"}
+	binding := ObservationBinding{Scope: [32]byte{1}, ProgramDigest: [32]byte{2}, ExpectationDigest: [32]byte{3}, AccountingRule: ObservationAccountingRule(), SessionID: "00000000-0000-4000-8000-000000000001", Fence: "00000000-0000-4000-8000-000000000002", CaptureID: "capture", ActionID: "packet", PodUID: "pod", NodeUID: "node", BootID: "boot", CollectorPodUID: "collector", CollectorEpoch: "epoch"}
 	p := ObservationPermit{Binding: binding, StartedAt: now, SessionUntil: now.Add(time.Minute), LeaseUntil: now.Add(30 * time.Second), Sequence: 1, Credit: credit, BytesPerSecond: rate}
 	m, err := NewLocalObservationGate(context.Background(), binding, p, func() time.Time { return now })
 	if err != nil {
@@ -61,7 +61,7 @@ func TestObservationCreditOriginalWireAndDuplicateNoRefill(t *testing.T) {
 }
 
 func TestObservationRenewalKeepsOriginalBindingAndSpend(t *testing.T) {
-	for _, mode := range []string{"lower-sequence", "skip-sequence", "same-sequence-change", "lower-credit", "new-epoch", "new-boot", "new-action", "new-grant-scope", "new-rate", "new-session-end", "shorter-lease"} {
+	for _, mode := range []string{"lower-sequence", "skip-sequence", "same-sequence-change", "lower-credit", "new-epoch", "new-boot", "new-action", "new-grant-scope", "new-program", "new-expectation", "new-rate", "new-session-end", "shorter-lease"} {
 		t.Run(mode, func(t *testing.T) {
 			m, p, _ := localObservationFixture(t, 100, 100)
 			if err := m.Consume(60, 10); err != nil {
@@ -85,6 +85,10 @@ func TestObservationRenewalKeepsOriginalBindingAndSpend(t *testing.T) {
 				p.Binding.BootID = "replacement"
 			case "new-action":
 				p.Binding.ActionID = "replacement"
+			case "new-program":
+				p.Binding.ProgramDigest[0]++
+			case "new-expectation":
+				p.Binding.ExpectationDigest[0]++
 			case "new-grant-scope":
 				p.Binding.Scope[0]++
 			case "new-rate":

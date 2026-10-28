@@ -1890,3 +1890,44 @@ metadata are archived. The host slot was explicitly released to root. Next:
 genuine companion held-wait and positive child retirement, authenticated exact
 source/permit channel, complete graph backing, packet prefix/native qualification.
 Raw remains closed; no first SQL component result substitutes for those gates.
+
+Next companion qualification slice: the shared manual AcceptableRecorder raw
+refusal currently prevents even an inert policy frozen expectation/API check.
+Use a private policy-only structural acceptance path in existing context/recording
+derivation, selected by the installation-local policy executor. It supports one
+onTrigger packet action, before 0, actual duration <=15 s and original reviewed
+observation limits; it grants no authority or permit. The ordinary/manual shared
+AcceptableRecorder remains unchanged, as do runtime trigger and C03 raw refusals
+until authenticated SQL/node/prefix/backing/native composition qualifies. This
+adds no API/SQL reads, watch, task, config, credential or compiler pass: it consumes
+the same already compiled plan in O(1) for this single-action profile. It addresses
+the concrete inability to qualify the actual companion without synthetic checks.
+
+Recording.RequireApproval is the frozen protected require-all setting, not a
+sensitivity override. Reusing it for raw need would add a different approval
+reason on replay and alter scope. Policy SQL admission/original-grant effects
+instead derive grant necessity from the actual frozen raw predicate as well as
+that existing setting, and require a positive reviewed observation pool before
+output reservation. This is a pure check of the already-read grant/plan, with no
+new round trip or identity/approval field. ObservationPermit.ValidFinite shares
+the original start/full-duration structural checks for SQL receipt decoding and
+future transport/start; standalone construction supplies no authority.
+
+Inert compiler/consumer checkpoint: actual unit RED (0.002 s) could not derive the
+policy frozen expectation; new policy-only structural path passes exact scope/
+setting/program roundtrip while manual raw still refuses. Legacy regional raw
+start RED actually queued one work item (0.013 s); the new refusal passes before
+prepared ownership/queue changes, leaving caller Close available. The single
+canonical binding now requires ProgramDigest and ExpectationDigest (no weaker
+prototype branch); SQL copies the already-stored canonical facts, and mutation
+of either invalidates the local bound session. These remain non-authority values.
+
+Independent storage read-only review found no concrete blocker in these source
+changes. Final pre-push actual exit 0 incl 231 console tests; complete affected
+races actual exit 0: planning 1.220 s, capture 11.237 s, execution 1.304 s,
+postgres 2.648 s, collector 1.007 s, bootstrap 54.595 s. Logs:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-inert-policy-compiler-pre-push.log`
+and `policy102-inert-policy-compiler-all-races.log` in the same directory.
+No new external run, runtime raw gate, C09/node wire or native qualification.
+Actual companion held-wait and positive-child retirement remain next, followed
+by authenticated transport, complete graph backing and packet prefix/native.

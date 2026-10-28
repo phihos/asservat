@@ -150,8 +150,10 @@ func policyObservationPermit(row custodydb.PolicyObservationSession) (collector.
 	}
 	b := collector.ObservationBinding{SessionID: uid(row.ID), Fence: uid(row.Fence), CaptureID: uid(row.CaptureID), ActionID: row.ActionID, PodUID: row.PodUid, NodeUID: row.NodeUid, BootID: row.BootID, CollectorPodUID: row.CollectorPodUid, CollectorEpoch: row.CollectorEpoch, AccountingRule: collector.ObservationAccountingRule()}
 	copy(b.Scope[:], row.BindingScope)
+	copy(b.ProgramDigest[:], row.ProgramDigest)
+	copy(b.ExpectationDigest[:], row.ExpectationDigest)
 	permit := collector.ObservationPermit{Binding: b, StartedAt: row.StartedAt.Time, SessionUntil: row.SessionUntil.Time, LeaseUntil: row.LeaseUntil.Time, Sequence: 1, Credit: row.Credit, BytesPerSecond: row.MaxBytesPerSecond, StartBy: row.StartBy.Time, Duration: time.Duration(row.DurationMillis) * time.Millisecond}
-	if !b.Valid() || !permit.Lease().Valid(permit.StartedAt) || !permit.LeaseUntil.Equal(permit.SessionUntil) || permit.LeaseUntil.Sub(permit.StartedAt) > 20*time.Second || permit.Duration < time.Second || permit.Duration > 15*time.Second || !permit.StartBy.After(permit.StartedAt) || permit.StartBy.After(permit.StartedAt.Add(collector.PacketCaptureStartWithin)) || permit.StartBy.Add(permit.Duration).After(permit.LeaseUntil) {
+	if !permit.ValidFinite(permit.StartedAt) {
 		return zero, value.ErrDenied
 	}
 	return permit, nil

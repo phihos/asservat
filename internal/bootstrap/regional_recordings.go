@@ -252,6 +252,12 @@ func (p *preparedRecording) Close() {
 }
 
 func (p *preparedRecording) StartRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time) (time.Time, error) {
+	// The legacy operation carries no committed input permit. Refuse before
+	// transferring prepared ownership; only the future typed policy start may
+	// carry a current exact source and the original SQL observation reservation.
+	if r := p.expectation.Recording; r != nil && r.Filter != nil && compiler.RawBytePredicate(r.Filter.Expression) {
+		return time.Time{}, value.ErrUnavailable
+	}
 	p.mu.Lock()
 	prepared := p.prepared
 	p.prepared = nil

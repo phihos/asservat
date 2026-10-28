@@ -31,6 +31,19 @@ func (a RecorderAcceptance) Acceptable() bool { return a.Code == "" }
 // of 1 s to 5 min. The interim output cap is 8 MiB per capture: the recording
 // stops retaining at the cap; an authored output edit above it is refused.
 func AcceptableRecorder(plan value.RecorderPlan) RecorderAcceptance {
+	return recorderAcceptance(plan, false)
+}
+
+// contextRecorderAcceptance permits an inert finite policy expectation to be
+// checked by the actual SQL companion. A policy-shaped principal is not current
+// authority: admission, the committed observation permit and node enforcement
+// remain mandatory. Manual/public AcceptableRecorder keeps its raw refusal.
+func contextRecorderAcceptance(plan value.RecorderPlan) RecorderAcceptance {
+	_, _, policy := authorization.PolicyExecutor(plan.Input.Executor)
+	return recorderAcceptance(plan, policy)
+}
+
+func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance {
 	if len(plan.Actions) != 1 {
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only a single packet capture action can be recorded in this release"}
 	}
@@ -38,7 +51,7 @@ func AcceptableRecorder(plan value.RecorderPlan) RecorderAcceptance {
 	if a.Kind != "packetCapture" || a.PacketProfile != "networkHeaders" {
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only network-header packet captures can be recorded in this release"}
 	}
-	if plan.Approval != nil && plan.Approval.ObservationLimits != nil {
+	if plan.Approval != nil && plan.Approval.ObservationLimits != nil && !policy {
 		// ADR-249 REQ-AUT-006: the node recorder does not charge observation
 		// spend, so a raw byte predicate cannot be recorded yet.
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a raw byte comparison needs observation limits that this release's recorder does not enforce"}
@@ -46,6 +59,13 @@ func AcceptableRecorder(plan value.RecorderPlan) RecorderAcceptance {
 	after, ok := durationValue(a.After, true)
 	if !ok || after < time.Second || after > 5*time.Minute {
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.after", "a manual capture records between 1 second and 5 minutes after it starts"}
+	}
+	if policy && plan.Approval != nil && plan.Approval.ObservationLimits != nil {
+		limits := plan.Approval.ObservationLimits
+		observed := authorization.ObservationLimits{MaxSessionSeconds: limits.MaxSessionSeconds, MaxObservedBytes: limits.MaxObservedBytes, MaxBytesPerSecond: limits.MaxBytesPerSecond, MaxConcurrentSessions: limits.MaxConcurrentSessions}
+		if a.ExecutionMode != "onTrigger" || a.Before != "0s" || after > 15*time.Second || !observed.Valid() {
+			return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a policy raw predicate needs one finite on-trigger action with original observation limits"}
+		}
 	}
 	for _, c := range plan.Input.Composition.Components {
 		for i, e := range c.Edits {
@@ -61,7 +81,7 @@ func AcceptableRecorder(plan value.RecorderPlan) RecorderAcceptance {
 // filter program from the plan's canonical scope, the recording duration
 // (after) and the output cap (the action limit, at most 8 MiB).
 func RecordingFor(plan value.RecorderPlan) (artifact.Recording, string, error) {
-	if !AcceptableRecorder(plan).Acceptable() {
+	if !contextRecorderAcceptance(plan).Acceptable() {
 		return artifact.Recording{}, "", value.ErrInvalid
 	}
 	a := plan.Actions[0]
@@ -144,7 +164,7 @@ func compileRecorderContext(in value.ContextInput, now time.Time) (value.Context
 		return bad()
 	}
 	plan, err := CompileRecorder(value.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: in.Recorder.Composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: in.Recorder.RequireApproval}, frozenFilters(in.Recorder.Filters), now)
-	if err != nil || !AcceptableRecorder(plan).Acceptable() {
+	if err != nil || !contextRecorderAcceptance(plan).Acceptable() {
 		return bad()
 	}
 	in.Recorder = in.Recorder.Clone()
