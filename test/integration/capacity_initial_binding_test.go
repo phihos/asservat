@@ -107,5 +107,6 @@ func qualifyInitialBindingProjection(t *testing.T, f *capacitySQLFixture, o app.
 		if !after.observed.Equal(before.observed) || !after.until.Equal(before.until) || after.spent != before.spent {
 			t.Fatal("expired original observation changed binding or configuration debit")
 		}
+		t.Log("expired_original_adapter_and_sql_denied=true configuration_debit=0")
 	}
 }

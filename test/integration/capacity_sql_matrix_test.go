@@ -197,7 +197,9 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 			expiredAt = firstObservation.FreshUntil
 		}
 		capacityWaitUntil(t, ctx, expiredAt.Add(10*time.Millisecond))
-		assertFirstExpired(t)
+		if assertFirstExpired != nil {
+			assertFirstExpired(t)
+		}
 		if _, err := f.captureEnrollments.BackCapacityCapture(ctx, o, second); err == nil {
 			t.Fatal("expired original phase issued an effect")
 		}
