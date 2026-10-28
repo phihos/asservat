@@ -115,6 +115,20 @@ func (h *InvestigationHandler) unavailable(w http.ResponseWriter, stage string) 
 	sessionProblem(w, 503)
 }
 
+// Only the audited call's finite outer stages survive. Nested adapter steps
+// and arbitrary error text are neither retained nor rendered here.
+func noOutcomeStage(err error) string {
+	var fixed interface{ FixedStep() string }
+	if errors.As(err, &fixed) {
+		step, _, _ := strings.Cut(fixed.FixedStep(), "/")
+		switch step {
+		case "identity", "busy", "audit-begin", "audit-result", "audit-finish", "result-acknowledgement", "request-expired", "final-identity", "reply-expired", "final-disclosure":
+			return step
+		}
+	}
+	return "other"
+}
+
 // failure is sessionFailure, reporting the stage when it answers 503.
 func (h *InvestigationHandler) failure(w http.ResponseWriter, stage string, err error) {
 	if h.Report != nil && !errors.Is(err, identity.ErrSessionBusy) && !errors.Is(err, identity.ErrDenied) && !errors.Is(err, identity.ErrInvalid) && !errors.Is(err, identity.ErrSessionCapacity) {
@@ -267,7 +281,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		if h.audited != nil {
 			if out.ValidUntil.IsZero() {
 				h.security.Add(presentation.IngressAuditUnavailable)
-				h.unavailable(w, "call-no-outcome")
+				h.unavailable(w, "call-no-outcome/"+noOutcomeStage(err))
 				return
 			}
 			final, e := current.ResolveIdentity(ctx)

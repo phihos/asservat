@@ -747,3 +747,51 @@ bootstrap 61.756s. Canonical pre-push exits 0, including console checks and vet;
 specification, design architecture and Go architecture checks pass. No external
 SQL/Kubernetes fixture, collector, hosted run or publication was performed for
 this diagnostic correction. Installed cancellation attribution remains pending.
+
+
+## Closed browser no-outcome diagnostic (2026-10-29)
+
+Native 40786150168 on frozen `c253525f` accepted the original request after
+`AcquisitionNotStarted`, stored four acknowledged history copies and downloaded
+the initial native PCAPNG. React received `list_diagnostics` HTTP 200/ok, then
+`list_capture_history` HTTP 503 with no operation envelope. It did not reach
+settings, editing or a repeat. Actual Go/test exited 1 (600.004s; approved child
+150.09s); all 3,397 source hashes matched, sources were unchanged and cleanup
+failures were empty. The total reported run was 949s, with zero billable
+milliseconds. The retained initial PCAPNG is 2,060 bytes; it is not repeat proof.
+
+The matching hub label was `browser operation unavailable: call-no-outcome`.
+That branch answers 503 when the audited call errors without a delivery
+`ValidUntil`; it previously discarded the existing typed `FixedStep` stage.
+This can represent initial identity, busy admission, audit Begin/result/Finish,
+result acknowledgement, request expiry, final identity, reply expiry or final
+disclosure. The retained request timings and PostgreSQL events do not establish
+which occurred or prove a five-second timeout. Listing uses current workload
+resolution and SQL, without a regional history-ciphertext dispatch, so absent
+signed/peer exchange diagnostics are expected for this route.
+
+The branch now reports only one of those ten exact outer stage words, with
+`other` for unknown or absent typed steps. Existing nested adapter suffixes are
+discarded; neither error text, provider data, identities nor request IDs enters
+the diagnostic. It uses the existing trusted `FixedStep` protocol and Report
+callback, with no new I/O, state, context, timer, watch, configuration or service.
+Per-call cost is one error-chain lookup and finite string classification on this
+failure branch only. Public response bytes/status, operation/session authority,
+original cancellation/deadlines and audit execution are unchanged.
+
+The real TLS browser handler/session/CSRF/audited Begin-failure regression
+reproduces the missing stage with unchanged runtime (RED exit 1, package 2.305s).
+Its synthetic pre-acknowledged audit journal records one Begin and no Finish or
+service dispatch; the unchanged response remains HTTP 503. Handler-boundary
+fault cases cover all ten outer stages plus unknown/nested synthetic secrets,
+without invoking `Error()` or disclosing stages in the public body. These tests
+supply failure causes; they do not establish the installed 503's cause. No
+external fixture, collector, hosted retry or authority-window change is included.
+
+
+Local GREEN passes the focused handler races (13.591s), then all browser races
+with the added absent-step negative (31.809s) and presentation races (86.848s).
+Affected vet, integration compilation, specification and design/import
+architecture gates pass. The injected non-Begin cases qualify closed diagnostic
+mapping at the strict handler boundary, not production SQL/provider outcomes.
+No unchanged external matrix or hosted run was repeated.
