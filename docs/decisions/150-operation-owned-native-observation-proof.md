@@ -253,4 +253,36 @@ concurrent admission and joined shutdown. Full affected races pass: bootstrap
 98.965s. Integration compilation, affected vet, specification and architecture
 gates pass. Fixture authority/native facts remain synthetic; these checks do not
 establish an installed locator cause, real-provider throughput, collection or
-an end-to-end history result. No external run was performed for this revision.
+an end-to-end history result. The subsequent owned run is recorded below.
+
+
+### Owned direct-observation result
+
+The one reviewed existing `TestDirectHolderObservationWithRealKubernetes` run on
+clean `c9d45572` passed: command/Go/test exits 0, parent 48.93s and Go 50.005s.
+All five purposes passed, along with the changed-original-regional-template
+refusal. The actual observation wall times were 2.379096s (namespace candidates),
+2.347821s (workload candidates), 2.485707s (workload), 2.741297s (namespace guard)
+and 2.935617s (guarded workload). Each retained at least 2.064384s of its original
+five-second interval. These are component measurements, not a comparison with
+old runtime or an installed cold-refresh service guarantee.
+
+The existing helper exercised real Kubernetes objects/admission checks, scoped
+SQL, S3, HTTPS and regional framed streams in two owned clusters with synthetic
+installer/issuer setup. Helper SHA-256 was
+`6fd417a2977e2b341b96b75ab965d4e1d63d99ed4bf8d391d5c95132f47d12e6`;
+all 3,397 retained source hashes matched the frozen candidate, and all 35,989
+tracked files were unchanged apart from three generated reports archived before
+restoration. Sources were unchanged during the run, cleanup failures were empty,
+and build scratch was removed. Healthy Docker readback confirmed the six exact
+owned containers, two networks and helper image absent; both Kind clusters and
+owned-label inventories were absent. No collector ran and no retry occurred.
+
+The outer bound was the existing 1,100 seconds plus 10-second kill grace; the
+test's eight-minute context and generic runner's Go limit were unchanged. The
+terminal reports/raw current artifacts are retained in the existing build cache
+under `codex-bf86-resume/owner-observation-active-accounting/owned-1`. Historical
+tracked outputs copied during initial archival are separately identified and
+excluded from current-run evidence. This does not qualify a complete installed
+workflow, native evidence collection, demand/discovery contention under load,
+or the cause of Native 40776231613's unavailable locator.

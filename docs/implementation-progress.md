@@ -17,9 +17,15 @@ restriction, not original authority, grants, input budgets or replay semantics.
 Maximum installed region scale remains nine active operations and eighteen
 retained entries; extra contexts/timers are bounded, not zero. Exact value sizes,
 residual saturation and terminal local checks are in [ADR-150](decisions/150-operation-owned-native-observation-proof.md#joined-active-capacity-and-bounded-replay-markers-2026-10-28).
-No external fixture, collector or new hosted run has qualified this correction;
-source-frozen review and a scoped existing real-Kubernetes operation test remain
-next, followed separately by the installed workflow.
+The one reviewed existing real-Kubernetes direct-observation selection on clean
+`c9d45572` passed (command/Go/test 0, parent 48.93s/Go 50.005s), including all five
+purposes and changed-template refusal. Actual observations took 2.347821–2.935617s
+within the original five seconds. All 3,397 source/35,989 tracked hashes matched,
+with generated reports archived before restoration, empty cleanup failures and
+independently verified exact owned-resource absence. No collector or retry ran.
+Synthetic initial authority and component scope remain explicit; installed cold
+refresh/history and Native causation remain unqualified. See ADR-150 for the
+archive, helper hash, bounds and proof limits.
 
 
 ## Installed policy grant budget fixture corrected (2026-10-28)
