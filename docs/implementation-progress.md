@@ -544,6 +544,31 @@ Local capture/bootstrap/presentation races pass (11.019s/52.790s/74.493s), the
 browser proxy helper race passes (1.072s), and canonical pre-push passes. No
 external fixture or collector ran for this sequencing correction.
 
+The following exact `c267cde7` installed run 40601041862 failed with decisive
+coarse state: history required, write_claimed/visible, generic custody reserved,
+no writer completion and zero acknowledged copies. Closed diagnostics reported
+write/execute/deadline, then read/storage/live. That does not establish which
+Execute subphase failed or whether physical objects were written. Go was
+618.860s, selected subtest 159.45s; all 3,251 recorded sources were unchanged and
+cleanup was empty. Report SHA-256
+`63886dbb9427659877c0bbe41a11e140412defc117346e1ff5a734ae04929593`.
+
+The least-cost local real mTLS/H2/JWS/private-history composition reproduces a
+redundant receiver/source round trip exhausting a 500ms original parent under
+controlled 200ms source latency, before an object effect. Execute now reuses
+Prepare's original checked receiver only within its original proof and unchanged
+minimum deadline; live attachment and actual current work-source/peer checks
+remain. Source reads drop three→two, and the same controlled case succeeds in
+406ms (434ms under parent race). Current-source change, closed attachment,
+cancellation and original expiry still deny all effects. Closed finite timing
+buckets and existing stream diagnostics now distinguish preparation, signing
+and exchange without extra I/O. This corrects the reproduced composed cost
+problem; the old installed inner cause and full installed workflow remain
+unqualified. No external fixture, collector, timeout increase or retry ran. Affected mTLS/
+context-start/bootstrap/capture races pass (38.143s/10.800s/56.057s/11.082s),
+as does canonical pre-push including 227 console tests. Independent read-only
+review found no blocker.
+
 PR102 review identified unchecked mutation counts in history eviction: hiding the
 old row and decrementing the two quota rows previously checked errors but ignored
 zero affected rows. This is a test-induced inconsistent-counter case, not an
