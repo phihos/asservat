@@ -1,5 +1,15 @@
 # Sustained implementation progress
 
+## Go gate reporting correction (2026-10-28)
+
+The earlier af9 “zero explicit Kubernetes skips” summary was incorrect. Its
+retained actual log has 663 discovered top-level entries: 662 pass and
+TestInitialRuntimeObjectRoundTripWithRealKubernetes skips because its separate
+owned native harness is not selected by ordinary make go-check. The log and
+original report remain retained, with a separate correction in the session
+cache. The current broad local gate records the same default skip. No skip
+condition, selection, test or native qualification requirement was changed.
+
 ## Integrated installed candidate remains unqualified (2026-10-28)
 
 PR 103 at frozen af9 passed local broad Go/pre-push/gadget compilation, hosted CI and
