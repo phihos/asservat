@@ -1,5 +1,30 @@
 # Sustained implementation progress
 
+## Recording readiness follow-up assembled locally (2026-10-28)
+
+The failed 3f candidate's policy review input/parent return and traffic-helper
+header-deadline defects have focused RED/GREEN coverage. The helper still returns
+nonnil incomplete traffic; actual artifact size, contents and download completion
+remain independent gates. Its actual HTTP/parent race selections passed in
+21.114s and 9.586s.
+
+The real SQL storage reader now has core Request/preview/admission/replay
+composition coverage: all four cases passed on f5b6e3bc (Go 3.291s), after two
+retained fixture setup failures were corrected. Identity, target, processing and
+source publication in that witness remain synthetic. It does not establish the
+installed history failure's exact cause or qualify worker refresh.
+
+A separately reviewed scheduling change moves the existing single recording
+readiness hint before grant I/O, preserving original request/identity/recovery
+bounds and post-grant authority. Its final full capture race passed in 12.457s.
+It can add one coalesced refresh demand for denied or pending preview owners;
+this is an engineering tradeoff under the maintainer's proportionality guidance,
+not an explicit maintainer requirement. Exact passive-preview read bounds and
+shared configuration-credit costs are recorded in
+[ADR-213](decisions/213-storage-readiness-at-consumption.md). Installed availability
+and aggregate load remain unqualified. Final assembled checks, publication and
+installed runs have not yet completed.
+
 ## Installed recording candidate 3f: terminal results (2026-10-28)
 
 All three guarded runs of `3f434f00966bf50a45331bd56539982a4878aac1`
