@@ -596,3 +596,28 @@ Go1.27.2 linux/amd64; local binary SHA-256
 No Kind probe or hosted rerun occurred. Root must review/freeze and coordinate
 one owned-route probe after the shared external slot is free; installed native
 capture/download qualification remains pending.
+
+### Owned traffic-route probe on the candidate
+
+The single authorized probe on frozen `5fdcad4f` passed with exact selection
+`^TestNativePacingTrafficWithRealKubernetes$`: test 5.22s, Go 6.279s, actual runner
+exit 0 in 69.714s including setup/teardown. All 3,231 source hashes independently
+matched, sourceUnchangedDuringTest=true and cleanupFailures=[]. Exact owned Kind
+node, Pod UID/IP, original node UID/boot and serialized helper SHA were checked.
+The node used the expected `b61b5cc5...e077e7e` cgo-free helper, not a replacement.
+
+The actual owned-node command acknowledged sixteen batches / 65,536 records /
+4,194,304 bytes in 3.811040756s parent wall and 3.772793883s child wall. The child
+measured 3.440206167s schedule wait and 0.332554706s HTTP/ACK work (not CPU).
+Common ownership/copy/hash setup took 0.138701815s and copied 11,293,387 bytes
+onto the one owned node. No collector, BPF, Gadget, native artifact or download
+participated; this proves the finite traffic route only. Installed near-full
+recording, owner and >5s paced native download still need their guarded run.
+
+The cache archive `native-traffic-tail-owned-kind-1/results` preserves all generated
+results before restoration. Environment SHA-256
+`99489e5ce1fc884af85407b104b0fc45ecbce663c4c4c07b56f187c10f2f09b0`;
+probe SHA-256 `ce770b779668c222252e78aa2738c8d4b083c2410ca5240982afc833b3d85632`.
+After terminal archival, independent checks found no run-labelled containers,
+networks, volumes or images, no owned Kind node/cluster, and neither exact owned
+network remained. Generated repository results were restored only after archival.
