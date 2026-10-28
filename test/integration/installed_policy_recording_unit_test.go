@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"asservat.local/asservat/internal/adapters/packets"
 	captureapp "asservat.local/asservat/internal/application/capture"
@@ -81,5 +82,29 @@ func TestInstalledPolicyRecordingAuthoredInputs(t *testing.T) {
 	}
 	if err = packets.CheckPrefixProgram(plan.Recorder.Filter.Program); err != nil {
 		t.Fatal("native reviewed program exceeds actual prefix", err)
+	}
+	// The public policy grant review derives its session ceiling from this
+	// exact authored action timeout. A schema-valid larger request would still
+	// be refused by RequestPolicy; catch it before an installed runner starts.
+	timeout, err := time.ParseDuration(plan.Recorder.Action.Timeout)
+	observation := input["observation_limits"].(map[string]any)
+	if err != nil || int64(observation["max_session_seconds"].(int))*int64(time.Second) > int64(timeout) {
+		t.Fatal("native grant exceeds original action review", observation, plan.Recorder.Action.Timeout, err)
+	}
+}
+
+func TestInstalledPolicyRecordingNativeFieldProof(t *testing.T) {
+	for _, item := range []struct {
+		input  string
+		count  int
+		refuse bool
+	}{
+		{"1\t1\t\n", 1, false}, {"1\t1\t\n2\t1\t\n", 2, false}, {"", 0, false},
+		{"1\t1\t616263\n", 0, true}, {"1\t0\t\n", 0, true}, {"1\t1\n", 0, true},
+	} {
+		got, err := policyRecordingPacketFields([]byte(item.input))
+		if (err != nil) != item.refuse || got != item.count {
+			t.Fatalf("native fields count=%d err=%v want=%d/refuse%v", got, err, item.count, item.refuse)
+		}
 	}
 }
