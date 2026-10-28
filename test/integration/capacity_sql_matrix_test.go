@@ -129,6 +129,8 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 		return
 	}
 	var first, second app.Enrollment
+	var firstObservation app.EnrollmentObservation
+	var assertFirstExpired func(*testing.T)
 	if !t.Run("first-workload-unknown-capture-completion", func(t *testing.T) {
 		o := f.workloadObservation(t, 0)
 		start := time.Now()
@@ -158,6 +160,8 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 		if first.ID != original.ID || first.AttemptID != original.AttemptID || first.AllocationID != original.AllocationID || !first.InitialUntil.Equal(original.InitialUntil) || lost.calls != 1 {
 			t.Fatal("unknown reply repeated spend or original identity")
 		}
+		firstObservation = o
+		assertFirstExpired = qualifyInitialBindingProjection(t, f, o, first)
 		f.assertAdmission(t, 0, first, true)
 		t.Logf("workload_three_phases_with_lookup_ms=%d original_remaining_ms=%d", time.Since(start).Milliseconds(), time.Until(o.FreshUntil).Milliseconds())
 	}) {
@@ -187,8 +191,13 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 		}
 		second = a.v
 		f.assertAdmission(t, 1, second, false)
-		// Real elapsed original interval; no UPDATE/backdating of persisted facts.
-		capacityWaitUntil(t, ctx, second.InitialUntil.Add(10*time.Millisecond))
+		// Real elapsed original intervals; no UPDATE/backdating of persisted facts.
+		expiredAt := second.InitialUntil
+		if firstObservation.FreshUntil.After(expiredAt) {
+			expiredAt = firstObservation.FreshUntil
+		}
+		capacityWaitUntil(t, ctx, expiredAt.Add(10*time.Millisecond))
+		assertFirstExpired(t)
 		if _, err := f.captureEnrollments.BackCapacityCapture(ctx, o, second); err == nil {
 			t.Fatal("expired original phase issued an effect")
 		}
@@ -270,7 +279,15 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 		return
 	}
 	var session capacityManagedSession
-	if !t.Run("actual-managed-context-publication-and-original-session", func(t *testing.T) { session = f.managedDownloadSession(t, root, first) }) {
+	var sessionPrepared bool
+	if !t.Run("actual-managed-context-publication-and-original-session", func(t *testing.T) {
+		session = f.managedDownloadSession(t, root, first)
+		sessionPrepared = true
+	}) {
+		return
+	}
+	// A filtered child did not prepare a session for the dependent renewal.
+	if !sessionPrepared {
 		return
 	}
 	if !t.Run("fill-provisional-account-envelope-with-retained-spend", func(t *testing.T) {

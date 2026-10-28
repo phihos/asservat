@@ -73,3 +73,9 @@ retained encrypted settings, keyed lookup, bounded history quotas and typed
 writer/retirement receipts. Settings ciphertext has its own history-prefix
 capability; it is not catalog evidence or regional unwrap authority. See
 [ADR-255](../docs/decisions/255-encrypted-capture-history.md).
+
+`00103_initial_binding_projection.sql` applies the existing original-observation
+30-second projection to the first same-observation Ready refresh. Exact projected
+duplicates retain their row and configuration spend; original proof/receipt
+cutoffs, schema floor 102 and privileges stay unchanged. Down restores the old
+no-op rule without narrowing stored projections. See [ADR-200](../docs/decisions/200-on-demand-capacity-refresh.md).

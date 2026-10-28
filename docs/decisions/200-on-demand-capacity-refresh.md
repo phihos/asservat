@@ -251,3 +251,49 @@ workload's immutable enrollment identity without checking the binding.
 Operation audit outside the `capture` lane is no longer gated by
 `capacity_managed_root_until`. Capture preview and admission keep the demand
 lane and the binding/root freshness described above.
+
+
+## First Ready projection correction (2026-10-28)
+
+Migration 00103 (schema 103) corrects the same-observation first refresh.
+The initial Ready phase publishes the binding with its original short phase
+cutoff. The worker immediately refreshes using that same observation; the old
+`observed_at >= observed` no-op retained the short projection. A strictly newer
+observation received the accepted 30-second projection, so initial readiness
+and subsequent readiness had different lifetimes.
+
+Refresh now projects an equal short observation to **its original observation
+plus 30 seconds**, once, under the existing current proof, exact backing and
+post-lock deadline checks. An equal already projected observation is a no-op;
+a newer persisted observation is retained. The receipt keeps its original short
+interval. No observation is restamped to now, expired proof revived, account
+identity changed or caller deadline extended. Down restores the previous no-op
+rule without shortening already accepted projections. Schema floor 102 remains:
+no table, parameter, privilege or returned wire shape changes.
+
+This source defect is independently actionable under the accepted ADR-200
+projection. It is **not an established cause** of Native 40767389365, whose
+approved failure occurred after roughly 120 seconds. That run retained neither
+binding row times nor target-correlated demand completion times. The real SQL
+regression is prepared in the existing capacity producer fixture; external
+RED/GREEN qualification is pending.
+
+Complexity gate (engineering correction, not a new maintainer requirement):
+
+1. Concrete initial-Ready inconsistency; frequency/installed impact unmeasured.
+2. The 30-second projection is already accepted; no new tolerated window.
+3. Applies to every newly enrolled workload's first same-observation refresh.
+4. Reuses the existing projection and transactional idempotency, no new pattern.
+5. Added credentials/privileges/network endpoints: 0.
+6. Added runtime states: 0; one existing short-projection case reaches the
+   existing update branch.
+7. Added configuration: 0.
+8. Uses the existing PostgreSQL transaction/locks, no added dependency.
+9. Same existing SQL call. At most three existing UPDATEs and one configuration
+   credit on the first short projection; duplicate debit 0. Added API calls,
+   watches, timers, goroutines and durable rows: 0. CPU/WAL bytes unmeasured.
+10. One additive function-only migration; Down retains stored rows and restores
+    the old branch. Actual upgrade/Down qualification remains pending.
+11. Adjusting the existing refresh branch is smaller than replacing the shared
+    enrollment phase finisher; documenting unequal initial lifetime would not
+    meet the already accepted projection.

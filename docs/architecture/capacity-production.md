@@ -45,7 +45,7 @@ it changes no cursor, retry policy, API rate, request deadline, guard or SQL
 authority check. The call reduction is an operation count, not a measured
 installed latency improvement.
 
-Admission needs a binding refreshed within the last five seconds, and a
+Admission needs the stored binding within its accepted 30-second projection, and a
 discovery pass revisits a workload only once per pass, which takes minutes on a
 regional cluster. Under [ADR-200](../decisions/200-on-demand-capacity-refresh.md)
 the capture preview and request path records a short refresh demand
@@ -53,7 +53,11 @@ the capture preview and request path records a short refresh demand
 waits within its original deadline. The worker's demand lane
 (`read_capacity_refresh_demands`, capacity writer) reconciles demanded workloads
 back to back through the same guarded path as discovery. A demand names a
-workload and confers no authority.
+workload and confers no authority. Migration 00103 also projects the first
+same-observation Ready refresh to its original observation plus 30 seconds;
+its current proof and returned receipt keep their original short bounds.
+An already projected duplicate spends no configuration credit and a newer
+persisted observation is retained.
 
 [ADR-213](../decisions/213-storage-readiness-at-consumption.md) carries the
 same owned readiness operation from its early hint into final storage

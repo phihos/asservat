@@ -165,3 +165,10 @@ The [live-watch contract](live-watch.md) adds a bounded `live_watch` runtime tab
 AccessGrant retains optional accepted resultAccess (selected actions, operations, same-human registered clients, digest, finite output/count/operation pool, original expiry). Child rawQuery grants store resultOrigin and a parent foreign key. Add a bounded `grant_result_registration` relation keyed by parent, capture, artifact and client, referencing verified immutable artifact/digest and action provenance; distinct-artifact membership is unique at parent/artifact independently of client. This is an internal relation, not a new public aggregate or CRD. Parent resultAccessCounters and ordinary acquisition counters are separate.
 
 Within the canonical transaction order, C-03 locks the parent decision/scope, validates trusted commit and current eligibility, registers/reuses the output, publishes exact child scope and records audit/outbox. Downloads/queries reserve parent disclosure and child operation limits in the same authorization/capacity transaction. Never allocate an independent full parent allowance per child. Revocation/read checks consult the parent synchronously; cleanup delivery may lag. Restore does not recreate expired authority. Runtime concurrency, duplicate publication, interrupted delivery and parent revocation tests remain required under REQ-INV-002.
+
+Capacity binding freshness is a projection from the original checked workload
+observation, never a new observation timestamp. The first same-observation
+Ready refresh and later independent refreshes use the same accepted 30-second
+projection; proof/receipt and caller intervals remain unchanged. Exact already
+projected duplicates do not recharge and older callers retain a newer binding
+([ADR-200](../docs/decisions/200-on-demand-capacity-refresh.md)).
