@@ -12,9 +12,14 @@ The pure setup-path RED reproduces that gate (0.019s). Common owned-node setup
 now copies/hash-checks the exact binary for both topologies, and Python plus the
 actual Go bootstrap entry fail early if the serialized descriptor is missing.
 Seventeen setup tests pass (0.032s), affected parent races pass (1.197s). A new
-single-Kind probe reuses that setup and actual Docker traffic command without
-bootstrap/Keycloak/collectors; its real result is pending. Limits, ownership
-checks and the no-fallback contract remain unchanged. See the
+single-Kind probe on frozen `092cbe4f` passed (test 7.94s / Go 9.011s,
+terminal exit 0): exact helper hash/Pod UID/IP/node boot, sixteen batches / 4 MiB
+in 7.556s including launch/join. Common one-node helper setup took 0.121s for
+11,293,151 copied bytes. All 3,231 source hashes match, unchanged with cleanup
+`[]`; exact owned containers, networks, image and cluster are independently
+absent. No bootstrap/Keycloak/collector ran. This is synthetic route/setup proof;
+installed capture size/native delivery/combined costs remain pending. Limits,
+ownership checks and the no-fallback contract remain unchanged. See the
 [retained failure and preflight](research/native-response-qualification.md#missing-helper-setup-branch-and-early-preflight-2026-10-28).
 
 ## Paced traffic route correction after retained failure (2026-10-28)

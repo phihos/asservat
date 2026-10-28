@@ -31,10 +31,34 @@ a child invocation of the actual bootstrap entry with unusable provider inputs
 that must fail at the earlier helper guard. The new exact selection
 `^TestNativePacingTrafficWithRealKubernetes$` uses the existing context runner
 with one synthetic Kind, its existing PG/S3/OpenBao/TLS bridge fixtures and one
-Restricted traffic Pod. It will exercise this same common installer, serialized
+Restricted traffic Pod. It exercises this same common installer, serialized
 descriptor, actual hash check and Docker command to the exact Pod UID/IP/node.
-No bootstrap, Keycloak, collector or BPF participates. Its actual result remains
-pending; pure/mock preflight alone does not qualify the owned-node route.
+No bootstrap, Keycloak, collector or BPF participates.
+
+The one authorized owned probe on frozen `092cbe4f` passed: test 7.94s, Go
+9.011s and terminal runner exit 0. All 3,231 source hashes independently match,
+source stayed unchanged and cleanup is `[]`. The serialized descriptor and
+node-side binary both use SHA-256
+`1a93443af11b51b656cc8d5231a2f694984daf8334636a29a3c5217fa2dabee6`.
+The live Pod UID, IP, original node UID and boot ID were checked without target
+replacement. The actual Docker command delivered sixteen batches / 65,536
+records / 4,194,304 bytes with valid final acknowledgement in 7.556100912s
+including launch/join; child time was 7.52062203s. Common setup's one ownership,
+copy and hash pass took 0.120864s and copied 11,293,151 bytes. This is measured
+fixture setup/traffic cost, not product acquisition or whole installed-job cost.
+
+Artifacts are under `~/.cache/asservat-build/native-pacing-kind-probe-1-artifacts/`:
+environment SHA-256
+`b719880e91cee33f8d23107f56348caa4dcc7631d4b1b745e90bded4827cba46`;
+exact probe report SHA-256
+`831a56f4492df2d59e7fb907783f58c60db6bbfd094d51914201d52e83ed9ec3`.
+Independent read-back confirms the named Kind node, four provider containers,
+both owned networks, worker image tag/digest and Kind cluster are absent;
+`owned-resource-absence.json` retains those actual checks. Generated reports were
+archived before restoring only this run's tracked outputs. This qualifies the
+synthetic owned-node/Pod route and common setup path. No capture, collector,
+near-full artifact, native download/renewal or combined product cost was tested.
+A fresh installed run remains necessary.
 
 ## Serialized traffic route failure and direct fixture client (2026-10-28)
 
