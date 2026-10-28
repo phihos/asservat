@@ -1,5 +1,24 @@
 # Sustained implementation progress
 
+## Combined recording correction candidate (2026-10-29)
+
+Clean `bc48249c` composes the observation accounting correction, authored grant
+budget correction and native PCAP evidence ordering described below. Independent
+review of all ten changed files found no blocker. Combined `make pre-push`
+passed (30.369s, including 231 console tests), as did `make pcap-check` (5.873s,
+real user-space compiler/replay and static hub build). Full bootstrap races
+passed (63.431s package), authored-grant input races passed (1.615s package), and
+integration compilation passed. Every command returned 0; all 35,989 tracked
+file hashes stayed unchanged and the tree was clean after checks. No collector
+ran on this workstation. Evidence is retained under
+`codex-bf86-resume/post-faac-final-candidate-1` in the existing build cache.
+
+The owned native observation component result below remains separate from
+installed workflow qualification. The three failed `faac9dc4` runs remain the
+latest installed evidence. Fresh CI/review and bounded installed qualification
+of this composition are pending; history recovery and packet completeness
+remain unqualified. No limit, deadline, permission or guard was relaxed.
+
 ## Observation active capacity and bounded replay retention (2026-10-28)
 
 Native 40776231613 failed before capture/history with an exact full-30-second
