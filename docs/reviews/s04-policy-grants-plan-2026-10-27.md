@@ -1402,3 +1402,106 @@ Exact generated grant request/scope/digest, finite settings original anchor,
 role names, source/permission freshness and independent cleanup are reviewed
 before any coordinated external run. This is not a collector/start/publication
 or native-recorder execution qualification.
+
+## Local callback meter component (2026-10-28)
+
+This isolated component starts from `867ed8d7`. It does not issue authority,
+change public wires, migrate SQL, or enable the raw recorder. Finite onTrigger
+with exactly one packet action per real capture is the first composition target;
+default ongoing source arming remains separate required work.
+
+Binding requirements before later enablement: (1) retain UNIQUE capture and one
+packet action, so actions cannot each receive the aggregate credit; (2) existing
+capture/expectation joins prove Pod/action/program but the regional API execution
+row does not prove actual node identity; (3) persist actual node UID, boot ID,
+collector Pod UID/epoch and accounting-rule digest from authenticated node
+resolution, with an under-channel-lock exact tuple comparison at enqueue; (4)
+issue only after SQL commit/current checks, renew the original tuple/fence/grant
+with monotonic sequence, never a replacement process; (5) terminal rows need
+existing custody/backing cleanup after original cutoffs and settled references,
+without refund or credit recreation. This local meter implements none of those
+issuer/channel/persistence responsibilities.
+
+The gate checks the original engine wire length before Recorder.Add (therefore
+before maintained BPF matching), including discarded/malformed/output-full input.
+It distinguishes observed input from the existing retained WireBytes. Missing or
+invalid length stops without a fabricated debit; engine loss is unknown input,
+never zero input or refundable credit. One local mutex serializes debits and
+permit updates. The engine receives the meter cancellation context; returning a
+callback error alone is insufficient. Lease/session timers also stop an idle
+engine, and its synchronous return joins acquisition before capture resources
+are released. No buffered packet copy or per-packet network/SQL call is added.
+
+Accounting rule `wire-token-bucket-v1` uses existing integer ObservationMeter at R bytes/s,
+with initial/max burst R bytes (one second), an average/token-bucket rate rather than
+a strict rolling-one-second cap. Both cumulative prepaid credit and
+rate must admit a whole original frame. A frame larger than R is refused;
+credit does not wait/refill. The finite rate upper bound includes the burst:
+ceil(R * remaining duration) + R, intersected with reviewed cap/remaining pools.
+This is a conservative reservation bound, not measured input. Exact duplicate
+permit updates do not recreate rate tokens or credit. General ongoing prepayment
+quantum and trusted renewer remain undecided by this component.
+
+Complexity gate (estimates before code):
+1. Missing pre-predicate debit is established in Recorder.Add, so enabling raw
+   predicates now would fail the accepted all-input accounting contract; frequency
+   under enabled sensitive capture is every delivered frame (currently refused).
+2. No: maintainer has not accepted unbounded sensitive observation.
+3. Required finite sensitive recorder path; existing sanitized path unchanged.
+4. Published Gadget supplies packet_size; established local token bucket reuses
+   the existing byte-nanosecond ObservationMeter. No custom gadget, BPF or packet parser.
+5. Zero privileges, credentials, endpoints or dependencies added.
+6. Two states, running/terminal, with closed terminal reasons; no fallback.
+7. Zero new knobs. Fixed burst is part of the accounting version.
+8. Existing pinned Gadget callback/source length and BPF evaluator only.
+9. O(1) state/session, one callback-owner mutex plus one gate mutex per callback, one lease
+   timer/session and one engine-cancellation callback; zero per-packet SQL/API/network,
+   zero periodic renewer/watch. CPU/allocations must be benchmarked, not guessed.
+10. No wire/schema change; deleting this unused component restores base behavior.
+11. Keeping raw refusal is sufficient today; this component is the smallest
+    testable next step toward accepted finite enforcement, not rollout proof.
+
+Local component evidence (synthetic inputs, no Gadget execution): removing the
+pre-Add Consume call makes zero-match regression fail in 1.00s with actual exit 1
+because the engine is never canceled; restored gate passes. The tests exercise
+real packetInput -> Recorder.Add -> maintained BPF/decoder/output limit, with
+fake engine delivery and no authority/store. Credit/rate/length refusal, cancelled
+parent, idle original/renewed lease, original session expiry, conflicting/lower
+sequence, cumulative-credit preservation, changed boot/action/scope/epoch and
+unknown engine loss are covered. Synchronous engine return is asserted after
+cancellation, including a queued post-cancel callback; no collector was run.
+
+Final affected `go test -race` passed: collector 1.006s, packets 1.027s,
+bootstrap 54.302s. Canonical `make pre-push` exited 0 (230 console tests,
+13288 specification assertions, 1326 architecture checks); Go architecture
+passed with 67 packages/393 internal edges. The existing pure domain meter and
+its tests are unchanged. The lifecycle wrapper belongs to node bootstrap;
+no domain context dependency or architecture exemption was added.
+
+AMD Ryzen 7 5700X3D, GOMAXPROCS=2, three runs of 100000 callbacks each:
+median baseline -> metered zero-match 13.63 -> 74.84 ns/frame; malformed
+32.93 -> 96.48 ns/frame; output-full 64.69 -> 129.10 ns/frame. Incremental
+cost is 61.21–64.41 ns/frame. Zero-match/output-full stay 0 B/op, 0 allocs/op;
+malformed remains the decoder's 16 B/op, 1 alloc/op on both paths. These are
+shared-host synthetic microbenchmarks using fixed 64-byte wire lengths, not
+native Gadget throughput or end-to-end overhead percentages. Per-source setup
+allocation/CPU and combined installed cost remain unmeasured. The new gate and
+callback helper total 278 implementation lines, with 512 test/benchmark lines
+before this evidence note; no packet bytes are copied by the gate.
+
+The local timer/control cost is exactly one lease timer, one derived cancellation
+context and one engine-cancellation AfterFunc per metered source, plus the runner's
+joined engine call; there is no periodic goroutine or renewal loop. Existing
+ObservationLease's <=60s current-lease limit and <=1h original-session limit remain.
+REQ-AUT-006 and action-lifecycle require rate ceilings but do not define a strict
+rolling-second algorithm; this component pins the existing one-second-burst
+integer implementation explicitly. Eventual review/SQL permit must bind that
+accounting identity before enabling sensitive predicates. Prefix access soundness,
+authenticated actual-node resolution/enqueue binding, issuer/session SQL, terminal
+row cleanup and default ongoing source arming are still required. Upstream events
+that never reach the node frame callback are not measured here; loss remains
+unknown and reserved spend is never refunded.
+
+Duplicate permit comparison uses timestamp instant equality, so private-wire UTC
+normalization/loss of Go monotonic metadata cannot turn an exact replay into a
+conflict. The replay regression also proves that rate tokens remain spent.

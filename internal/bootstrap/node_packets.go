@@ -88,22 +88,15 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 const packetDeliveryGrace = 10 * time.Second
 
 func (n *nodePackets) run(ctx context.Context, epoch, workID string, p collector.PacketCapture, rec *packets.Recorder, started time.Time) {
-	var mu sync.Mutex
 	capture, cancel := context.WithTimeout(ctx, p.Duration)
-	stats, err := n.engine(capture, p.PodUID, packets.Snaplen, func(f gadget.Frame) {
-		mu.Lock()
-		rec.Add(f.Data, f.Wire, f.At)
-		mu.Unlock()
-	})
+	stats, err := runPacketEngine(capture, n.engine, p.PodUID, rec, nil)
 	// The capture completed when its own deadline ended it; a later node
 	// stop does not discard that result. A capture the node stopped early is
 	// reported as failed, never as a shorter recording.
 	completed := errors.Is(capture.Err(), context.DeadlineExceeded)
 	cancel()
 	ended := n.now().UTC()
-	mu.Lock()
 	out, counters, closeErr := rec.Close(ended, stats.LostSamples)
-	mu.Unlock()
 	result := collector.PacketResult{WorkID: workID, CaptureID: p.CaptureID, StartedAt: started, EndedAt: ended, Seen: counters.Seen, Retained: counters.Retained,
 		Filtered: counters.Filtered, Unsupported: counters.Unsupported, Fragment: counters.Fragment, Extension: counters.Extension, Malformed: counters.Malformed,
 		OutputFull: counters.OutputFull, LostSamples: stats.LostSamples, WireBytes: counters.WireBytes, CapturedBytes: int64(len(out)), Snaplen: packets.Snaplen,
