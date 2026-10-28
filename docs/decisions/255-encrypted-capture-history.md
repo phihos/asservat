@@ -386,3 +386,28 @@ pre-push exited 0 (227 console tests); no external fixture or collector was run.
 The local route adds five audited browser operations per case (two precision
 cases), zero admissions, and approximately 1.1s unraced synthetic test runtime;
 its mocked compiler does not qualify native libpcap/Gadget behavior.
+
+### Native40613137981: discovery response visibility
+
+Exact `ad131f4b` failed earlier: after Find diagnostics, the driver's default
+five-second row locator saw zero rows (Go 616.048s / subcase 161.29s). Encrypted
+history still reported available/visible/writer complete/four acknowledged copies.
+Neither diagnostics nor history-list response was retained, and the edited preview
+was not reached; its actual cause remains unknown. The earlier sub-microsecond
+port defect remains distinct and is not an explanation of either installed failure.
+
+The actual React discover controller awaits list_diagnostics and then
+list_capture_history. The fixture now arms both response waiters before the click,
+checks HTTP status plus each body's finite envelope status/code, then starts the unchanged DOM
+row assertion. Network/operation bounds, locator timeout, authorization, quotas
+and retry count are unchanged. Failed/missing/invalid responses fail with a closed
+operation label; early failure still closes the browser and safely settles the
+other waiter. Existing settings/preview checks reuse that same bounded diagnostic.
+This is a small reversible driver sequencing correction, not a new authority or
+wait framework, and cannot qualify the installed history workflow by itself.
+
+Syntax and canonical pre-push passed (227 console unit tests); existing built
+React/HTTPS browser checks passed 23 journeys/20 accessibility scans, plus four
+native-restart boundaries/two scans (Go 21.785s). These existing synthetic checks
+do not run the installed continuation or establish its missing response outcomes.
+No new test framework, timeout, product change or external fixture was added.
