@@ -655,5 +655,24 @@ per-packet/API work; (10) fixture-only one-expression rollback, existing reset,
 eviction and real-decrease tests retained; (11) smaller cast-after-SUM or tolerance
 does not preserve the intended exact monotonic check. Existing max5000 statement
 capacity, roles, single pre-baseline reset and all deadlines remain unchanged.
-Local PostgreSQL witness execution awaits a frozen reviewed candidate and the
-parent's single-run coordination; no collector or hosted run is authorized here.
+The single authorized owned PostgreSQL run on frozen `9c4aede4` passed exact
+`^TestNativePacingSQLWithRealPostgres$`: test 0.30s, Go package 1.360s, actual
+runner exit 0. Real PostgreSQL produced legacy 1.0000000000000002 to 1 (refused),
+and decimal-before-SUM 1.0000000000000002 in both physical orders with delta 0
+and unchanged three calls/rows/statements. Existing runtime-role isolation,
+database isolation and real eviction checks also passed in that selected test.
+This qualifies the arithmetic/counter fixture, not installed recording, native
+download, owner behavior or CPU/performance. No collector or hosted run occurred.
+
+All 3,193 source hashes independently matched the frozen source;
+sourceUnchangedDuringTest=true and cleanupFailures=[]. Exact owned
+`asservat-custody-7uall8qs-postgres` / `-s3` containers and network were absent,
+as were all run-labelled containers, networks, volumes and images. Generated
+results were archived before restoration and the shared fixture slot released.
+Cache archive `native-sql-numeric-owned-1` environment SHA-256
+`311784b38e04244e52e07a7ca1137ec506910ae7efcafef882ab8ebec474b284`;
+report SHA-256
+`39ce5efe7ac4d16e2bbbeea5e06e31f67fe2fdb4bf9731ee59bc696a66d60785`.
+The pure single-ULP decrease race passed in 1.070s; canonical pre-push exited 0
+with 218 console tests. This measured record changes documentation only after
+the source freeze; installed qualification still needs its reviewed guarded run.
