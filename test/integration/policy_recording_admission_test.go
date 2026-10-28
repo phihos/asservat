@@ -207,9 +207,13 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if err != nil {
 				t.Fatal(err)
 			}
+			// The source helper observes a new protected snapshot during this
+			// blocking read. Validate after it returns; retain every original
+			// identity, plan, storage, grant and policy deadline above.
+			now = clock()
 			in.Retention, err = privacy.Resolve(retained, privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", AnchorAt: a.Registration.AnchorAt}, now)
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal("recording retention after current source read", err)
 			}
 			reviewed, err := planning.CompileRecorder(planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: compiled.Recorder.Composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: true}, publicPolicyFilters{}, now)
 			if err != nil {

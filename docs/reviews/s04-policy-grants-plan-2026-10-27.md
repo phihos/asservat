@@ -1529,3 +1529,27 @@ this composition. The next reviewed SQL selection is only the new recorder
 team/action case plus existing policy-share/accounting original-grant positives;
 reuse public focused-3 and unchanged inventory/migration evidence. Complete
 SQL/node binding/channel/pre-filter/native and ongoing qualification remain open.
+
+Composed SQL batch at frozen f94be53c terminated exit 1 (Go 44.905 s, harness
+67.628 s). Existing policy-share/accounting passed 36.81 s, including the original
+grant acquisition/replacement/revocation/status assertions with unchanged pools.
+Both new recorder cases reached actual Tick but stopped before admission at
+retention resolution (4.03 s / 3.60 s). The baseline covers packet evidence;
+the fixture captured its validation time before the existing blocking retention
+helper observed a newer protected snapshot. Freshness correctly refused that
+older time. Validate retention after the read returns, retaining the original
+identity, capability/target/storage, grant/policy and plan deadline. No production
+guard, policy, permission or interval changes. The other captured times were
+reviewed: permission/source observations precede their consumers; original
+acceptance/submission anchors remain fixed; admission obtains fresh recovery
+after retention/compilation and the current accepted read; none renew an original
+execution bound. The focused fixture compiles locally after this correction.
+
+All 3,271 hashes independently matched, sourceUnchanged=true, cleanup [], exact
+`asservat-custody-v4hl9ge_-postgres`, `-s3` and their network absent. Archive before
+source edits:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-producer-meter-smoke-1-artifacts/`;
+report SHA-256 8bc01759ee8ea9284d3f1861bc22e78c527262c503480b820d847258004144d9.
+Reuse the existing positive; next qualification requires reviewed focused new
+recorder child only. Real recorder admission/replay/action-pool assertions remain
+pending; Tick and local source passes are not their substitute.
