@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/adapters/pcap"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/capture"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -61,11 +62,7 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 			if !t.Run(shape.name, func(t *testing.T) {
 				s := seed
 				s.batch = policyRecorderCloneBatch(f.batch)
-				s.a.Plan.Input.CaptureID = custodyID()
-				s.a.CaseID = custodyID()
-				s.a.OccurrenceID = custodyID()
-				s.a.Registration.Location.ArtifactID = custodyID()
-				s.a.Registration.Location.AttemptID = custodyID()
+				s.a = policyMetadataRecorderAdmission(s.a)
 
 				subjects := []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}
 				for i := 1; i < shape.audience; i++ {
@@ -167,4 +164,16 @@ func policyMetadataProfile(q *app.CapacityQualification, snapshot *app.CapacityS
 	budget.Context.Bytes = bytes
 	budget.NamespaceMaximum.Bytes = bytes * budget.NamespaceAccounts
 	(*snapshot).Pools[0].Budget.Slots[0].Protected.Bytes = bytes
+}
+
+// Convert one NEW pod-status seed into a NEW packet case before compilation.
+// The enrolled allocation and original anchor/retention remain unchanged.
+func policyMetadataRecorderAdmission(a capture.Admission) capture.Admission {
+	a.Registration.NativeLimit = artifact.RecordingNativeLimit
+	a.Plan.Input.CaptureID = custodyID()
+	a.CaseID = custodyID()
+	a.OccurrenceID = custodyID()
+	a.Registration.Location.ArtifactID = custodyID()
+	a.Registration.Location.AttemptID = custodyID()
+	return a
 }

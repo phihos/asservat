@@ -100,6 +100,10 @@ func TestPolicyMetadataBoundaryShapesOffline(t *testing.T) {
 		t.Run(shape.name, func(t *testing.T) {
 			now := time.Now().UTC().Truncate(time.Microsecond)
 			a := policyRecorderOfflineAdmission(t, now)
+			// Match the actual managed pod-status seed, then use the exact per-case
+			// preparation consumed by the owned SQL test before recorder preflight.
+			a.Registration.NativeLimit = artifact.MaxContextBytes
+			a = policyMetadataRecorderAdmission(a)
 			for _, p := range policyMetadataRetention(t, a.Storage.ClusterID, shape.retention-1) {
 				a.Plan.Input.Retention.Policies = append(a.Plan.Input.Retention.Policies, artifact.RetentionRule{UID: p.Policy.Revision.UID, Generation: p.Policy.Revision.Generation, Digest: p.Policy.Revision.Digest})
 			}
