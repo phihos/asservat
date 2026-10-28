@@ -127,3 +127,45 @@ Only a new successful, current, margin-sufficient same-selection read can author
 admission. Known source/pool revisions refuse before or after waiting. No TTL,
 demand lifetime, permission, audit, admission retry or authority interval is extended;
 the persisted binding already lasts 30 seconds under ADR-200/migration 00072.
+
+
+## SQL transaction classification correction (2026-10-28)
+
+Native 40648568602 on af9bb589 stopped before capture at
+`request/facts/storage/read/observation/source-expired`, despite the typed natural
+expiry change above. Its demand worker completed refreshes in about 2.3–4 seconds;
+the first 3.98-second refresh reported only 880 ms left on its original guarded
+namespace/workload observation, sampled before its 70 ms reconciliation. That is
+less than the existing one-second storage margin; other original source/recovery
+bounds can shorten the effective binding further. This diagnostic is not a row
+freshness timestamp. Later refreshes can
+supply usable windows, but must be independently read inside the request's
+unchanged authority/readiness cutoffs. These measurements neither justify
+extending five-second source freshness nor identify every request's exact timing.
+
+A concrete adapter defect prevented this existing readiness path: the real
+Ledger.transaction error list included generic capture unavailability but omitted
+its more specific ErrStorageBindingExpired child. Its callback correctly marked
+source expiry, then transaction normalization erased that classification. The
+reader consequently discarded expired Binding/Selection metadata, and the
+consumer immediately returned generic unavailability. The earlier pure adapter
+wrapper and synthetic Request-port tests bypassed that actual SQL transaction
+boundary; their passing results did not prove preservation through it.
+
+The new focused existing PG/S3 fixture calls the real SELECT-only storage reader
+and real Ledger.transaction. A valid original 30-second binding is made naturally
+expired by the fixture administrator; the unchanged implementation returns the
+wrong generic class and zero selection (RED exit 1, child 0.57 s, Go package
+1.103 s). The same case checks changed expired selection, malformed/future source,
+canceled SQL read and an independent restored-original successful read, with no
+capture admission. Protected source setup remains synthetic; this is SQL adapter
+qualification, not a new installed run or runtime refresh authority.
+
+The correction adds the specific expiry marker before generic unavailability in
+the existing closed error list. It retains the original metadata and nonnil
+availability error so only the existing sole readiness owner can demand/poll;
+only a later current same-selection read can authorize admission. No query,
+transaction, timer, watcher, provider call, credential, retry, schema or authority
+interval is added. The worker's cumulative refresh cost is unchanged. The
+installed path and combined runtime budget still need their own later result;
+this fix is not a promise that every refresh fits an already-short caller.
