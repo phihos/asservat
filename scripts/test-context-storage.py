@@ -369,7 +369,9 @@ def qualification_cluster_count(default_count, installer_continuation=False):
     return default_count
 
 
-def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False):
+def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False, native_traffic_probe=False):
+    if native_traffic_probe:
+        return "2m"
     if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "native-paced"):
         return "18m"
     if installer_continuation:
@@ -394,6 +396,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     helm_bootstrap = helm_bootstrap or helm_cluster
     test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation)
     cluster_count = qualification_cluster_count(cluster_count, installer_continuation)
+    if native_traffic_probe:
+        (ROOT/"test/results/native-traffic-probe.json").unlink(missing_ok=True)
     if native_paced:
         for filename in ("native-paced-report.json", "native-paced-kubernetes-audit.json"):
             (ROOT/"test/results"/filename).unlink(missing_ok=True)
@@ -429,7 +433,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         build_scratch = None
         audit_started = False
         audit_nodes = []
-        report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation), "bootstrapFixtureSeconds": (2700 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
+        report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation, native_traffic_probe), "bootstrapFixtureSeconds": (2700 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
         exit_code = 1
         try:
             if runtime_provider_pair or direct_observation:
@@ -763,7 +767,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             command = ["go", "test", "-count=1", "-v"] if installer_continuation else ["go", "test", "-race", "-count=1", "-v"]
             if test_pattern:
                 command += ["-run", test_pattern]
-            aggregate_timeout = qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation)
+            aggregate_timeout = qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation, native_traffic_probe)
             if os.environ.get("ASSERVAT_JOURNEY_HOLD") and installer_continuation:
                 aggregate_timeout = "150m"  # local debugging hold only
             if aggregate_timeout:

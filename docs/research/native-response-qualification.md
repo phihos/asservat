@@ -727,3 +727,34 @@ regression retained the predicate and original refusal. Full affected races
 passed: PostgreSQL adapter 2.578s and capture application 10.969s. Canonical
 pre-push exited 0, including 218 console tests. These are local diagnostic
 checks; the actual installed predicate remains unknown until reviewed evidence.
+
+
+### Traffic CPU-limit probe preparation
+
+Native run 40626149448 on exact e362198b passed approved submission (original
+OutcomeUnknown resolved accepted), then completed seven batches/28,672 records
+and 2,079,488 bytes including the partial final response before its original
+8.5-second cutoff. Parent elapsed 8.506379923s; client 8.449882540s, scheduled
+wait 31,349ns and HTTP work 8.449840711s. Receipt valid; no PCAP/download phase
+was reached. Go exited 1 in 605.117s; the subcase took 147.13s. All 3,231 source hashes matched,
+sources remained unchanged and cleanup completed; environment SHA256
+059e4b35064e6e6c5eb649cc2a05a5652f68cdc129a10af3cca03662a1d07069,
+paced report SHA-256 48b895935c7d533dbcd32405c8d72b893d287357bac4e4e6f35f9a989798abc7.
+
+The former successful local traffic probe used restrictedPod with no resource
+limits. The installed regional target instead requests 5m CPU / 16Mi and is limited
+to 100m CPU / 64Mi. That mismatch means its 3.811s measurement did not qualify the
+installed traffic workload. The probe now uses those exact resources, retaining
+sixteen 4096-write batches, 64-byte flushes, 4 MiB total payload, one in-flight request,
+no retry and the original 8.5s phase. Its Go harness has an explicit 2m aggregate
+bound; installed 20m job / 18m Go limits remain unchanged.
+
+Test-only before/after reads pin the target Pod UID/container ID and owned node,
+obtain that container's current PID from CRI, and read only its cgroup cpu.max and
+six CPU counters through the owned node. Output is bounded; quota must equal 100m
+and deltas reject changed identity, missing data or backward counters. The wall
+interval includes node-side command overhead; CPU counters cover the target
+cgroup, including its background work, and do not attribute collector CPU. No
+workstation collector/BPF/Gadget runs, resource increase, extra traffic, new
+service, production permission or runtime machinery is introduced. This is a
+probe preparation, not a result or established cause of the installed failure.

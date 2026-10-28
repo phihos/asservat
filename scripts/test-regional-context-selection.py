@@ -18,6 +18,9 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_cpu_limited_traffic_probe_has_one_short_recorded_go_bound(self):
+        self.assertEqual(fixture.qualification_go_timeout(native_traffic_probe=True), "2m")
+
     def test_native_traffic_helper_setup_is_not_gated_by_helm_registry(self):
         main = ast.parse(inspect.getsource(fixture.main))
         guards = []
