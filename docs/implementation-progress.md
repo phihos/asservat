@@ -1,5 +1,16 @@
 # Sustained implementation progress
 
+## Policy focus input and parent return correction (2026-10-28)
+
+Native40744737424 on frozen3f failed decide_review HTTP400 because its authored
+body supplied the revocation-only expected_revision field. The later index2/len2
+panic was a separate missing parent return for the two-cluster policy focus.
+An isolated fixture-only correction keeps canonical decision/revocation contracts
+unchanged and reuses the existing recording-focus predicate. Both meaningful
+REDs, corrected pure tests and the complete authored-input audit are retained
+in the [S04 plan](reviews/s04-policy-grants-plan-2026-10-27.md). No approval, packet
+execution or installed pass follows from this failed run or these local checks.
+
 ## Go gate reporting correction (2026-10-28)
 
 The earlier af9 “zero explicit Kubernetes skips” summary was incorrect. Its

@@ -36,3 +36,11 @@ func installedPolicyRecordingGrantArguments(policyUID, key string) map[string]an
 		"observation_limits": map[string]any{"max_session_seconds": 10, "max_observed_bytes": 64 << 20, "max_bytes_per_second": 16 << 20, "max_concurrent_sessions": 1},
 	}
 }
+
+func installedPolicyRecordingDecisionArguments(grantID string) map[string]any {
+	return map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent finite policy input review", "idempotency_key": "native-decision-" + grantID}
+}
+
+func installedPolicyRecordingRevocationArguments(grantID string, revision int64) map[string]any {
+	return map[string]any{"grant_id": grantID, "expected_revision": revision, "idempotency_key": "native-revoke-original-grant"}
+}

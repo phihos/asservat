@@ -18,6 +18,19 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_parent_recording_focus_returns_before_third_cluster(self):
+        # Bind the actual parent control flow, not merely its inner journey's
+        # return or the already-tested two-cluster fixture declaration.
+        source = (Path(__file__).resolve().parents[1]/"test/integration/installer_continuation_native_test.go").read_text()
+        first = source.index("\tqualifyRegionalInstall(t, ctx, f, 1,")
+        third = source.index("\tqualifyRegionalInstall(t, ctx, f, 2,", first)
+        between = source[first:third]
+        guard = between[between.index("\tif focus := installedJourneyFocus();"):].split("\n\t}", 1)[0]
+        self.assertIn("installedRecordingFocus()", guard)
+        self.assertIn("\n\t\treturn\n", guard + "\n")
+        self.assertNotIn("installedFastFixture()", guard,
+                         "the fast clusters focus still owns and needs three clusters")
+
     def test_policy_recording_guard_precedes_all_external_setup(self):
         with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "policy-recording"}), patch.object(fixture.Path, "is_file", return_value=False), patch.object(fixture, "run", side_effect=AssertionError("external setup before guard")) as external:
             with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):

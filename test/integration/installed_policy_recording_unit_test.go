@@ -23,6 +23,34 @@ import (
 // libpcap-tagged test compares every instruction against a fresh compilation.
 type installedPolicyRecordingFilters struct{}
 
+func TestInstalledPolicyRecordingReviewInputs(t *testing.T) {
+	wire, err := contracts.NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const id = "11111111-1111-4111-8111-111111111111"
+	decision := installedPolicyRecordingDecisionArguments(id)
+	raw, _ := json.Marshal(decision)
+	if err = wire.ValidateInput("decide_review", raw); err != nil {
+		t.Fatal("actual native policy decision disagrees with closed production input", err)
+	}
+	revoke := installedPolicyRecordingRevocationArguments(id, 2)
+	raw, _ = json.Marshal(revoke)
+	if err = wire.ValidateInput("revoke_grant", raw); err != nil {
+		t.Fatal("actual native policy revocation disagrees with production CAS input", err)
+	}
+	decision["expected_revision"] = 1
+	raw, _ = json.Marshal(decision)
+	if wire.ValidateInput("decide_review", raw) == nil {
+		t.Fatal("decision contract silently accepted a revocation-only field")
+	}
+	delete(revoke, "expected_revision")
+	raw, _ = json.Marshal(revoke)
+	if wire.ValidateInput("revoke_grant", raw) == nil {
+		t.Fatal("revocation lost its required original revision")
+	}
+}
+
 // Validate the actual installed request against the shipped structural CRD,
 // rather than only the richer offline JSON contract. This opens no API/collector.
 func TestInstalledPolicyRecordingProductionCRD(t *testing.T) {

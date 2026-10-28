@@ -48,6 +48,10 @@ func TestInstalledApprovedRecordingFixtureShape(t *testing.T) {
 			if got := installedFastFixture(); got != tc.fast {
 				t.Fatalf("fast feature fixture=%v; want %v", got, tc.fast)
 			}
+			wantRecording := tc.focus == "approved-recording" || tc.focus == "native-paced" || tc.focus == "policy-recording"
+			if got := installedRecordingFocus(); got != wantRecording {
+				t.Fatalf("recording focus parent-return guard=%v; want %v", got, wantRecording)
+			}
 			if (tc.focus == "approved-recording" || tc.focus == "native-paced") && (installedRegionalInstallerChecks(1) || !installedRegionalInstallerChecks(2)) {
 				t.Fatal("approved focus changed regional feature/chain coverage")
 			}

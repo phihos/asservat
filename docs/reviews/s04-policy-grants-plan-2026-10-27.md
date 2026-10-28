@@ -2444,3 +2444,46 @@ and restoring generated results. This documentation follow-up changes no tested
 runtime/test source. Publication/native delivery, all64 native-profile records,
 provider overhead/CPU, physical page growth/bloat/churn, backups/restore and
 universal accepted-input backing remain unqualified by these two witnesses.
+
+### Policy focus wire/parent-control correction after 3f native failure
+
+Frozen3f Native40744737424 reached the corrected production CRD/activation, then
+failed browser decide_review HTTP400. Its authored input incorrectly included
+expected_revision, which the existing closed decide_review contract does not
+permit. That field belongs to revoke_grant and remains required there. This is
+a fixture input defect, not a failed reviewer/step-up/SQL effect qualification;
+no production contract is widened. The original run remains failed: actual
+Go444.452s, child6.73s, environment sourceUnchanged=true and cleanup[]. Its later
+panic index2/len2 was a separate parent fixture fallthrough masking that error:
+the post-region1 early-return list omitted policy-recording although its topology
+is2. The inner journey closure return could not return its parent.
+
+In a new isolated tree off3f, the actual native decision/revocation bodies are
+shared with the offline canonical-contract test. Decision omits revision;
+revocation preserves CAS, with negative tests enforcing both distinctions.
+Browser fixture dispatch now validates the embedded input before HTTP as its
+MCP dispatch already does. The parent return reuses existing
+installedRecordingFocus() for all three recording focuses, rather than keeping
+another incomplete string list. Other focuses stay unchanged; clusters is fast
+but owns3 and still continues. No new selection framework, state, retry,
+permission, deadline, capacity or authority behavior is introduced.
+
+Actual decision-builder RED exit1/.063s and parent-controlflow selector RED
+exit1/24tests are retained. Corrected affected Go races pass1.736s; selectors
+24tests/.172s; integration vet0. The selector checks the actual parent segment
+between region1 and region2 calls, not just the inner return; existing Go topology
+table now binds recording-predicate membership including policy2 and clusters3.
+All10 authored public operation names/12 body variants were separately audited
+against exact embedded contracts: initial/attached activation, normal/1B policy
+grant request, grant read, decision, CAS revoke, capture, case, policy status and
+prepare/read download. Actual review builders are additionally covered directly
+by Go tests; other MCP bodies already validate before dispatch. Audit is input
+shape/format evidence, never authentication, effects or installed success.
+
+Absolute cache logs: approved-workflow/policy102-focus-decision-input-red.log,
+policy102-focus-parent-return-red.log, policy102-focus-wire-green.log,
+policy102-focus-parent-return-green.log and policy102-focus-wire-vet.log.
+Audit policy102-focus-all-authored-operations-audit.json SHA256
+c22b655cb140ef22010c99089078a25d2b0ba31e21999892089a7f7c3f0d51ab.
+No new hosted/owned fixture, collector or push was performed. Published3f and
+main remain untouched; root reviews the frozen correction before any rerun.

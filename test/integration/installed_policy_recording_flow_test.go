@@ -124,6 +124,13 @@ func qualifyInstalledPolicyRecording(t *testing.T, ctx context.Context, admin *p
 	}
 	browserCall := func(name string, args, out any) {
 		t.Helper()
+		raw, err := json.Marshal(args)
+		if err == nil {
+			err = wire.ValidateInput(name, raw)
+		}
+		if err != nil {
+			t.Fatal("native authored browser input disagrees with production contract", name, err)
+		}
 		fields, _ := args.(map[string]any)
 		key, _ := fields["idempotency_key"].(string)
 		reply, status, err := browser.operation(ctx, name, args, key)
@@ -204,7 +211,7 @@ func qualifyInstalledPolicyRecording(t *testing.T, ctx context.Context, admin *p
 			t.Fatal("policy request lost original finite workload scope", g)
 		}
 		browser.approvedRecordingStepUp(t, ctx, reviewer, g.ID)
-		browserCall("decide_review", map[string]any{"grant_id": g.ID, "decision": "approve", "reason": "independent finite policy input review", "expected_revision": g.Revision, "idempotency_key": "native-decision-" + g.ID}, nil)
+		browserCall("decide_review", installedPolicyRecordingDecisionArguments(g.ID), nil)
 		var approved policyGrant
 		must(requester, "get_grant", map[string]any{"grant_id": g.ID}, &approved)
 		if approved.Phase != "Approved" || approved.Decision == nil || approved.Decision.By.Subject != identity.ReviewerSubject || approved.NotAfter == nil || !approved.NotAfter.Equal(*g.NotAfter) {
@@ -372,7 +379,7 @@ func qualifyInstalledPolicyRecording(t *testing.T, ctx context.Context, admin *p
 		t.Fatal("remaining sponsor lost policy management or renewed bounds", managerView)
 	}
 	attach(manager, beta)
-	browserCall("revoke_grant", map[string]any{"grant_id": alpha.ID, "expected_revision": alpha.Revision, "idempotency_key": "native-revoke-original-grant"}, nil)
+	browserCall("revoke_grant", installedPolicyRecordingRevocationArguments(alpha.ID, alpha.Revision), nil)
 	// Closing the native engine does not refund or prematurely end its original
 	// session. Wait that declared interval before admitting the next occurrence.
 	if delay := time.Until(firstUntil.Add(100 * time.Millisecond)); delay > 0 {
