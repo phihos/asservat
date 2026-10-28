@@ -79,7 +79,8 @@ func runPacketEngine(ctx context.Context, engine packetEngine, pod string, rec *
 	// action deadline stopped the meter.
 	if outcome.UnknownInput {
 		err = ErrObservationClosed
-	} else if err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+	} else if err == nil || errors.Is(err, context.DeadlineExceeded) ||
+		(errors.Is(err, context.Canceled) && !errors.Is(outcome.Stopped, context.DeadlineExceeded)) {
 		if outcome.Stopped != nil {
 			err = outcome.Stopped
 		}

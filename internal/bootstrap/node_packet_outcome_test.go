@@ -82,16 +82,19 @@ func TestPacketEngineWithoutObservationPreservesProviderOutcome(t *testing.T) {
 	}
 }
 func TestObservedPacketOutcomePreservesUnknownAfterNormalStopAndRealEngineError(t *testing.T) {
-	for _, mode := range []string{"unknown-after-deadline", "real-engine-error"} {
+	for _, mode := range []string{"unknown-after-deadline", "real-engine-error", "provider-canceled"} {
 		t.Run(mode, func(t *testing.T) {
 			meter, _, _ := localObservationFixture(t, 1000, 1000)
 			rec, _ := packets.NewRecorder(nil, 64<<10, time.Now(), "")
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
 			defer cancel()
 			provider := errors.New("synthetic engine failure")
+			if mode == "provider-canceled" {
+				provider = context.Canceled
+			}
 			_, err := runObservedPacketEngine(ctx, func(engineCtx context.Context, _ string, _ int, _ func(gadget.Frame), notice func(gadget.InputNotice)) (gadget.CaptureStats, error) {
 				<-engineCtx.Done()
-				if mode == "real-engine-error" {
+				if mode != "unknown-after-deadline" {
 					return gadget.CaptureStats{}, provider
 				}
 				meter.Stop(context.DeadlineExceeded)
