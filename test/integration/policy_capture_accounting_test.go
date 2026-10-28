@@ -14,12 +14,13 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	planvalue "asservat.local/asservat/internal/domain/planning"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // SQL-only review/attachment fixture: current identity and immutable review
 // representation are synthetic. It does not supply public review authority.
-func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte, key string) string {
+func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte, key string, recorder ...planvalue.PolicyRecorderConfiguration) string {
 	t.Helper()
 	role := narrowRole(t, ctx, admin, "policy_accounting_grant_"+key+"_", "synthetic-accounting", func(role string) []string {
 		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
@@ -64,6 +65,10 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 	limits := authorization.AutomationLimits{MaxExecutions: 4, MaxBytes: 4 * artifact.MaxContextBytes}
 	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantPolicy, Requester: a.Creator, ExecutionDigest: a.ScopeDigest, DataClass: "extract", Reasons: []authorization.SensitiveReason{{ActionID: "pod-status", Code: "synthetic-component-review"}}, Scope: scope, Review: []byte(`{}`), Lifetime: time.Hour, Revision: 1, Policy: &authorization.PolicyGrantScope{Authority: a, RecipeDigest: planning.RecipeDigest(), Limits: limits, ApprovalPolicyRef: settings.Revision, ApprovalMaxAge: time.Hour}}
+	if len(recorder) == 1 {
+		g.Policy.RecipeDigest = recorder[0].RecipeDigest
+		g.Policy.Limits.MaxBytes = 4 * artifact.RecordingNativeLimit
+	}
 	g.ReviewDigest = app.ReviewDigest(g, g.Review)
 	blueprint := g
 	blueprint.RequestedAt = now
@@ -76,7 +81,7 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: key, RequestDigest: app.PolicyGrantRequestDigest(a.Creator, app.PolicyGrantRequestInput{PolicyUID: a.PolicyUID, PolicyName: "restarts", IdempotencyKey: key, Lifetime: g.Lifetime, Limits: limits})}, recovery)
+	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: key, RequestDigest: app.PolicyGrantRequestDigest(a.Creator, app.PolicyGrantRequestInput{PolicyUID: a.PolicyUID, PolicyName: "restarts", IdempotencyKey: key, Lifetime: g.Lifetime, Limits: g.Policy.Limits})}, recovery)
 	if err != nil {
 		t.Fatal("policy grant request", err)
 	}

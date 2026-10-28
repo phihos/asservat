@@ -1,5 +1,34 @@
 # Sustained implementation progress
 
+## Public policy grant and recorder producer continuation (2026-10-28)
+
+The isolated S-04 branch's public request/review/attachment boundary passed its
+focused real PostgreSQL/encrypted S3 fixture at frozen 8caf2ee4: actual Go exit0,
+9.703s, both original reviewer/step-up held-row cases independently left decision
+NULL after their bound. Request and attachment both preserved unknown encrypted
+intent/outcome semantics, exact original journals/expiry and zero execution spend;
+source refresh did not run before acknowledged Begin. Six encrypted acknowledged
+operations and two uncertain outcomes were retained. All3,264 hashes matched and
+owned resources were absent after cleanup. Exact archives and earlier failures
+are in the [existing S-04 plan](reviews/s04-policy-grants-plan-2026-10-27.md).
+The unchanged combined134080 positives also qualify original-grant acquisition
+before/after attachment replacement, revocation refusal without resetting pools,
+shared status, attachment and revised migration Up/Down. This supersedes the
+historical unqualified original-grant/public status below, without rewriting its
+failure evidence. Actual protected Kubernetes/IdP/initial trust remain synthetic
+fixture facts, so this is component qualification, not an installed workflow.
+
+The next source slice composes finite onTrigger/before-zero network-header policy
+triggers through the existing recorder preview/request/occurrence path. Accepted
+settings issuer is immutable provenance, not creator reauthentication; current
+team delegation and final SQL action/grant/counter checks remain mandatory.
+Local unit/race and pure actual-libpcap measurements are being recorded; its new
+real Tick/recorder admission fixture is compiled but has not run yet. Sensitive
+raw predicates remain unavailable before occurrence spend, and genuine live
+observation adapter/channel/binding/native qualification plus ongoing arming are
+still required. No chart/public collection or installed recorder claim follows.
+
+
 
 ## Team-policy grant SQL checkpoint (ADR-259, 2026-10-27)
 

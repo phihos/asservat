@@ -80,7 +80,7 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
 	}
 	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.RecorderAssessmentRulesDigest()
-	required, err := s.requireRecordingApproval(ctx, i.Principal.Issuer)
+	required, err := s.requireRecordingApproval(ctx, source, i.Principal)
 	if err != nil {
 		return zero, previewFailure("approvals", err)
 	}

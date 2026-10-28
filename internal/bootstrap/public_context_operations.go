@@ -183,7 +183,7 @@ func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOpera
 	if err != nil {
 		return nil, nil, err
 	}
-	trigger := &captureapp.PolicyTrigger{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Ledger: pc.policyTriggers, Documents: pc.hubPolicies, Sources: pc.policies, Accepted: pc.policies, Observer: observer, Capture: v.submission, Audit: pc.policyAudit, Now: c.Now, Report: timedEventLog(os.Stderr, "policy trigger")}
+	trigger := &captureapp.PolicyTrigger{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters), Ledger: pc.policyTriggers, Documents: pc.hubPolicies, Sources: pc.policies, Accepted: pc.policies, Observer: observer, Capture: v.submission, Audit: pc.policyAudit, Now: c.Now, Report: timedEventLog(os.Stderr, "policy trigger")}
 	return operations, trigger, nil
 }
 

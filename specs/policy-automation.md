@@ -128,3 +128,15 @@ approval. It is distinct from sensitive action reasons such as a raw-byte filter
 or the installation's recording-approval setting; ordinary header collection is
 not mislabeled as either. The existing grant detail/list and request result carry
 this reason consistently in the browser and MCP contracts.
+
+Finite onTrigger/before-zero policy network-header recording uses the actual
+triggering Pod and original admitted occurrence key through the existing recorder
+preview/request pipeline. Preview eligibility is not a permit: atomic admission
+must match the actual recorder/snapshot action to accepted authority and preserve
+the original charged grant and budgets. An internal policy principal never opens
+a personal ad hoc review. Protected recording settings use the accepted pinned
+issuer namespace without reauthenticating the creator; missing/changed settings
+refuse new work, while creator departure alone does not revoke team execution.
+Sensitive raw predicates remain unavailable until live observation authority and
+the pre-filter node boundary are composed and qualified; ongoing arming remains
+a separate required mode.

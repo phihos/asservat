@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -47,6 +48,15 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 	target := a.Plan.Input.Target.Target()
 	if occurrence.PolicyUid != policy || occurrence.AcceptanceID != id(record.ID) || occurrence.ClusterID != id(target.ClusterID) || occurrence.WorkloadUid != target.WorkloadUID || occurrence.PodUid != target.PodUID || occurrence.Outcome.Valid || occurrence.ReservedCaptureID.Valid {
 		return nil, value.ErrConflict
+	}
+	// Generic preflight eligibility does not authorize a different action.
+	// Bind the actual immutable plan before reserving either pool.
+	action := authorization.PolicyContextAction
+	if a.Plan.Input.Recorder != nil {
+		action = "packetCapture"
+	}
+	if !slices.Contains(record.Authority.Actions, action) {
+		return nil, value.ErrDenied
 	}
 	output := int64(artifact.MaxContextBytes)
 	required := false

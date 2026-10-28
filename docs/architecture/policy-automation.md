@@ -110,3 +110,27 @@ record (and its encrypted audit) carries the instruction. The policy principal s
 sharing right of its own: each capture only consumes a slot of the reviewed instruction. `sharing`
 stays outside the collection-intent digest, so editing it stops sharing (a new generation) without
 interrupting collection. See [ADR-239](../decisions/239-recurring-policy-sharing.md).
+
+
+## Finite recorder trigger producer (S-04)
+
+The trigger can compile the same accepted finite onTrigger/before-zero network
+header composition as activation and request review. Its exact recorder policy
+scope must match accepted authority before Tick spends an occurrence. It previews
+the actual triggering Pod with PreviewComposition and reuses ContextSubmission,
+the original occurrence key and capture-intent/start pipeline. Generic current
+team capture eligibility covers the supported snapshot/packet actions; atomic
+admission matches the actual plan action before reserving output or grant spend.
+A snapshot-only grant cannot authorize a recorder. Existing recipe/original
+grant/expiry, replay and conservative counters stay binding.
+
+A package-private request-owned policy identity supplies only accepted settings
+issuer provenance from its existing observed acceptance, including delegation
+and sponsor issuer pins. The protected issuer settings reader remains mandatory
+and unavailable/changed settings refuse the preview/request. This neither checks
+the creator's current account/groups nor borrows personal rights. The policy
+principal opens no personal ad hoc review; the actual SQL admission checks its
+separate attached team grant where required. Raw predicates remain refused
+until the live observation/session authority and node boundary qualify. This
+producer source and component tests do not qualify installed policy recording,
+ongoing source arming, all-before-filter accounting or native evidence.

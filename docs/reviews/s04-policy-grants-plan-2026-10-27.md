@@ -1314,3 +1314,91 @@ finite-budget explanation. Reports/screenshots archived before tracked restore:
 `/home/phil/.cache/asservat-build/approved-workflow/policy102-public-browser-6-artifacts/`.
 These browser facts still use synthetic accepted authority/store; SQL public
 completion/held-row proof is pending a reviewed focused run.
+
+Focused public run 3 at frozen 8caf2ee4 passed, actual terminal exit 0 (Go9.703s,
+public child7.32s, held reviewer1.75s/step-up1.77s; harness49.592s). Both request
+and attachment reached audit-begin/object and audit-finish/object uncertainty,
+then recovered exact journals. Source-before-Begin assertions passed. One grant,
+one immutable attachment, original expiry, zero execution/output spend; six
+independently encrypted acknowledged operations and two uncertain outcomes.
+Both actual held-row cases independently read decision NULL after releasing the
+lock beyond the original bound. This is unit RED / actual SQL GREEN; no actual
+SQL RED source variant was run. All3,264 hashes match, sourceUnchanged=true,
+cleanup[], exact5z8fx0u4 PG/S3/network absent. Archive:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-public-focused-3-artifacts/`;
+report SHA-256334c26892d87e786d3c90ed7766e6148f72e05b45d756474eaddb0e21d5e21df.
+Protected source/IdP/initial trust remain synthetic component facts. Reuse the
+combined134080 migration/attachment/accounting positives; this does not qualify
+installed recorder execution or ongoing observation.
+
+Next producer slice (approved existing S-04 plan): accepted packet policies
+currently hit three concrete incompatible branches: trigger compiles only
+pod-status and calls its Preview; generic policy capture eligibility requires
+kubernetesSnapshot; recording settings look up the internal policy issuer and
+approval asks a policy principal to open a human ad hoc review. Reuse the same
+recorder compiler and PreviewComposition for the actual triggering Pod, original
+occurrence key, ContextSubmission and encrypted capture intent/start. Permit only
+the compiled supported packet mode; sensitive raw predicates keep existing
+RecorderUnavailable until real observation authority is composed. Atomic
+admission checks the actual recorder/snapshot action against accepted actions
+before spend, retaining the original grant/recipe/counter/deadline checks.
+
+Complexity/cost: this fixes all otherwise-unusable accepted packet policies,
+not a new speculative recovery mode. Zero new watch, worker, listener, credential,
+network exposure, table or SQL query/round trip is intended. Pure bounded action
+checks occur in existing eligibility/admission. Existing recording settings read
+uses accepted settings issuer provenance from the private request-owned policy
+identity/cache; it does not reauthenticate the creator or consult personal
+membership/account state. No extra acceptance read or second settings fallback.
+Same one profile/filter compilation per packet-policy poll plus the existing
+actual preview compiler; measure the combined path before claiming CPU cost.
+Same 30s source /15s poll and existing finite attempt/deadlines. New absent-private
+settings provenance refuses packet preview, with no fallback or new config knob.
+No instant role-change revocation or separate machinery is introduced. A smaller
+metadata-only change cannot produce an actual recording; installed/native and
+ongoing qualification remain required after this source slice.
+
+
+Producer local defects reproduced before fixes: a valid packet policy failed
+existing shared eligibility with OutsideDelegation (unit RED exit1,0.001s), and
+its real recorder preview could not use protected settings under the internal
+policy issuer (unit RED exit1,0.005s). Current tests preserve the actual team
+reader audience and deny sponsoring-team loss; use only accepted settings
+provenance, refuse ordinary policy-shaped CurrentIdentity without the private
+view, and refuse absent/outage/changed issuer or requirement after preview.
+The private view reads only the existing cached accepted snapshot (asserted no
+additional acceptance read), never creator credentials/groups. Trigger tests
+reach the existing real recorder preview/request with the original occurrence
+key/Pod/executor/recipe, refuse a changed compiled scope before Tick, and retain
+the raw observation refusal before occurrence spend or personal review.
+
+Actual bounded pure poll compilation with the statically linked libpcap1.11.0
+prefix, GOMAXPROCS2 on Ryzen7 5700X3D (three1s samples per case, actual exit0,
+Go7.023s): ordinary `tcp dst port 80` full policy/profile/DTO/filter/canonical
+compilation117.158–117.512us/op,59,995–60,005B/op,267allocs/op; inert raw filter
+119.391–120.877us/op,60,206–60,211B/op,270allocs/op. No capture/device/socket,
+protected source/SQL read or recurring worker ran. At200 policies/15s, arithmetic
+for this ordinary input is about1.57ms CPU/s (0.157% of one core),0.80MB allocated/s;
+at1,000 policies,7.83ms/s (0.783%),4.00MB/s. These are scaled pure local costs,
+not measured end-to-end CPU, GC retention, concurrent compilation or maximum
+filter complexity. The existing compiler mutex remains; no cache/configuration
+was added without demonstrated need. Complete runtime/workflow costs and native
+qualification remain pending.
+The exact linked compiler version was independently printed by a bounded
+single-iteration diagnostic: libpcap1.11.0 (64-bit time_t, TPACKET_V3), actual
+exit0/Go0.020s; its cold first ordinary compile was498.572us,165,344B/1,670allocs.
+Do not substitute that one-shot sample for the repeated steady measurements.
+
+Producer affected races passed (actual exit0): domain authorization1.478s,
+application authorization cached, capture11.262s, PostgreSQL2.579s,
+bootstrap54.013s. Pre-push exit0 includes231console tests and repository contract/
+architecture/SQL generation/vet/format gates. The new focused SQL fixture compiles
+but has not run: actual Tick baseline→higher restart spends one accepted execution;
+packet admission/replay must charge8MiB native output and one grant execution
+once, while snapshot-only authority/attachment must refuse the actual recorder
+with zero output/grant reservation. Each case has one full8MiB storage slot;
+negative denial cannot be attributed to a four-kilobyte or exhausted fixture.
+Exact generated grant request/scope/digest, finite settings original anchor,
+role names, source/permission freshness and independent cleanup are reviewed
+before any coordinated external run. This is not a collector/start/publication
+or native-recorder execution qualification.

@@ -56,7 +56,7 @@ func publicPolicyCompile(raw json.RawMessage) (planvalue.PolicyRecorderConfigura
 	}
 	return planningapp.CompilePolicyRecorder(*composition, publicPolicyFilters{})
 }
-func publicPolicySpec(t *testing.T, a authorization.AcceptedPolicyAuthority) []byte {
+func publicPolicySpec(t testing.TB, a authorization.AcceptedPolicyAuthority) []byte {
 	t.Helper()
 	spec := map[string]any{
 		"target":    map[string]any{"cluster": a.ClusterID, "namespace": "app", "workloadRef": map[string]any{"apiVersion": "apps/v1", "kind": "Deployment", "name": "app"}, "maxPods": 1, "selection": "triggeringPod", "adoption": "pinUID"},
