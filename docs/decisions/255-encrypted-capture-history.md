@@ -429,12 +429,10 @@ conversion into the already-used x/net/http2.StreamError. It retains only fixed
 INTERNAL/deadline/CANCEL/PROTOCOL/REFUSED/other classes, never stream IDs, Cause
 text or payload. INTERNAL means deadline only when Cause is exactly
 os.ErrDeadlineExceeded; an unqualified INTERNAL establishes neither timeout nor
-peer origin. Classification invokes no Error/Is/Unwrap methods, but may invoke
-net.Error.Timeout and a directly implemented structured As bridge. These are
-trusted in-process Go error interfaces, as in ordinary Go error handling; network
-input cannot inject Go method implementations. This is not an arbitrary-method-
-free guarantee. A regression executes the direct bridge exactly once and retains
-panic Error/Is/Unwrap methods, including a refused conversion that stays `other`.
+peer origin. At checkpoint `7007fa50`, classification avoided Is/Unwrap while
+allowing Timeout and a directly implemented structured As bridge. The concrete
+wrapped-read-timeout defect below supersedes that agent-authored restriction
+with standard trusted Go error protocols. Error text remains unrendered.
 This changes diagnostics only: no transport, query, deadline, authority,
 retry, current check or public response changes.
 
@@ -470,3 +468,57 @@ Legacy-classifier diagnostic RED exited 1; the corrected actual-cutoff witness
 passed. Full affected races passed: context-start 10.893s and mTLS 38.527s.
 Canonical pre-push exited 0, including 227 console tests. These local gates
 establish neither the installed interruption's cause nor a successful repeat.
+
+### Native40624139454: the read-timeout wrapper boundary
+
+Exact `7007fa50` again returned diagnostics HTTP 200/ok and history-list HTTP
+200/error/NotAvailable, with hub `restarts/read/other`. Go took 624.492s, subcase
+153.14s; the first PCAP exists, but browser history/repeat failed. The region now
+reported `exchange/read/http2-internal`, which alone identifies neither origin
+nor deadline. No attribution of the installed underlying cause is established.
+
+Pinned Go1.27.2 source reveals a concrete missing diagnostic case: HTTP2
+onReadTimeout closes its request-body pipe with
+`fmt.Errorf("%w", os.ErrDeadlineExceeded)` (net/http/internal/http2/server.go:1851).
+requestBody.Read returns the pipe error directly. That wrapper has Unwrap but
+neither Timeout nor As. In contrast, onWriteTimeout emits StreamError(INTERNAL,
+Cause=deadline). The prior actual write-cutoff witness therefore did not cover
+the different read-timeout path. The frame decoder normalizes I/O failures;
+the existing original-reader delegate already preserves the source error class.
+
+A cache-only actual HTTP2 read-cutoff probe on the same Go1.27.2 returned concrete
+type `*fmt.wrapError`, no Timeout/As interfaces, trusted errors.Is(deadline)=true
+and a still-live original caller. It printed type/booleans only, no error text.
+The actual two-query mTLS fixture now also induces this read cutoff during the
+second route check. Exact prior classifier RED reports read/other; standard
+errors.Is/As identifies the wrapped deadline without changing the refusal or
+caller bound. This reproduces diagnostic loss, not the installed interruption.
+
+The classifier now uses ordinary trusted in-process Is/As/Unwrap/Timeout error
+protocols. It never renders Error text, parses messages, logs concrete type names
+or retains provider payload. Network input cannot inject Go method implementations.
+The prior blanket no-Is/Unwrap rule was an agent-authored test constraint, not a
+maintainer requirement or security boundary; retaining it hid an actual standard
+library timeout. Panic-Error tests remain, while trusted Is/Unwrap and wrapped
+structured-error tests replace the hypothetical hostile-method restriction.
+No reflection, private type-name matching, recovery framework or new dependency
+is added. A write cutoff may legitimately record owner cancellation before its
+body error because Go cancels request context concurrently; its test accepts
+either first deciding class. The read cutoff's body-pipe error remains exact.
+
+Complexity reassessment: one concrete local diagnostic defect plus a repeatedly
+unidentified installed read failure; zero new product/fallback states, authority,
+reads, network calls, watches, tasks, credentials or knobs. Cost is standard
+error-chain traversal only on failures (CPU unmeasured), with trusted compiled Go
+implementations executing protocol methods as elsewhere in the application.
+The smaller alternative is leaving a demonstrated timeout as `other` and paying
+another installed diagnostic campaign without that distinction. No transport
+flow, deadline, retry, authorization or public error changes. No collector,
+external service or hosted run occurred in this local checkpoint.
+
+Final affected races passed: context-start 10.913s and mTLS 44.311s. The broader
+suite also confirmed that net.Pipe's wrapped net.OpError now resolves to its
+known deadline cause before the generic timeout flag; its diagnostic expectation
+was updated accordingly. Canonical pre-push exited 0 with 227 console tests.
+The earlier local write-cutoff ordering failure and legacy read-classifier RED
+remain retained in cache; neither is substituted for a passing installed run.

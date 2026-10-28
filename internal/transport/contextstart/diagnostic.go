@@ -2,6 +2,7 @@ package contextstart
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -139,45 +140,41 @@ func (d *StreamDiagnostics) Interruption() StreamInterruption {
 	return StreamInterruption{}
 }
 
-// No Error, Is or Unwrap method is invoked. Timeout and the direct structured
-// As bridge below may execute trusted in-process Go error implementations;
-// this is not a guarantee that classification invokes no error methods.
+// Classification uses standard trusted in-process Go error protocols (Is, As,
+// Unwrap and Timeout). It never renders Error text or retains provider payloads.
+// Network input cannot inject Go implementations of those methods.
 func streamErrorReason(err error) streamReason {
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return streamNoReason
-	case context.Canceled:
+	case errors.Is(err, context.Canceled):
 		return streamCanceled
-	case context.DeadlineExceeded, os.ErrDeadlineExceeded:
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, os.ErrDeadlineExceeded):
 		return streamExpired
-	case io.EOF:
+	case errors.Is(err, io.EOF):
 		return streamEOF
-	case io.ErrUnexpectedEOF:
+	case errors.Is(err, io.ErrUnexpectedEOF):
 		return streamShortRead
-	case io.ErrClosedPipe, net.ErrClosed:
+	case errors.Is(err, io.ErrClosedPipe), errors.Is(err, net.ErrClosed):
 		return streamClosedIO
-	case fleet.ErrInvalid, identity.ErrInvalid, execution.ErrInvalid:
+	case errors.Is(err, fleet.ErrInvalid), errors.Is(err, identity.ErrInvalid), errors.Is(err, execution.ErrInvalid):
 		return streamInvalid
-	case fleet.ErrDenied, identity.ErrDenied, execution.ErrDenied:
+	case errors.Is(err, fleet.ErrDenied), errors.Is(err, identity.ErrDenied), errors.Is(err, execution.ErrDenied):
 		return streamDenied
-	case fleet.ErrUnavailable, identity.ErrUnavailable, execution.ErrUnavailable:
+	case errors.Is(err, fleet.ErrUnavailable), errors.Is(err, identity.ErrUnavailable), errors.Is(err, execution.ErrUnavailable):
 		return streamUnavailable
-	case contracts.ErrAPIContextProtocol:
+	case errors.Is(err, contracts.ErrAPIContextProtocol):
 		return streamProtocol
 	}
-	if timeout, ok := err.(net.Error); ok && timeout.Timeout() {
+	var timeout net.Error
+	if errors.As(err, &timeout) && timeout.Timeout() {
 		return streamTimeout
 	}
-	// Go's net/http StreamError supports As into x/net/http2.StreamError.
-	// Invoke a direct As method when implemented, without traversing an Unwrap
-	// chain or reading error text. Preserve no stream ID or Cause except the
-	// exact deadline sentinel; INTERNAL alone establishes no timeout or origin.
-	stream, ok := err.(http2.StreamError)
-	if !ok {
-		if convert, supported := err.(interface{ As(any) bool }); supported {
-			ok = convert.As(&stream)
-		}
-	}
+	// Go's net/http supports As into x/net/http2.StreamError, including through
+	// standard wrappers. Retain no ID or Cause text; INTERNAL alone proves no
+	// timeout or origin. Only its exact known deadline Cause gets that label.
+	var stream http2.StreamError
+	ok := errors.As(err, &stream)
 	if ok {
 		switch stream.Code {
 		case http2.ErrCodeInternal:
