@@ -134,3 +134,18 @@ separate attached team grant where required. Raw predicates remain refused
 until the live observation/session authority and node boundary qualify. This
 producer source and component tests do not qualify installed policy recording,
 ongoing source arming, all-before-filter accounting or native evidence.
+
+## Structural policy composition admission
+
+The production DebugPolicy CRD declares exactly one `recipeRef` or
+`profileComposition`, matching the canonical policy contract. Its bounded
+component/profile/override shape and existing UUID `grantRef` are synchronized
+by `scripts/policy-crd.py`; other detector/target CRD fields remain hand-reviewed.
+Only heterogeneous `override.value` retains its original JSON type, because a
+Kubernetes structural property cannot express that string/integer/object/list
+union. The existing 64 KiB source check and full closed canonical schema validate
+that value by field before compilation, journal acceptance or execution. This is
+configuration persistence, not authority or an expansion of supported actions.
+Fresh installation includes the CRD; existing installations require the documented
+administrator CRD apply separately from Helm upgrade. Actual API/installed
+qualification for the corrected projection remains pending.

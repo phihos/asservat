@@ -1,5 +1,17 @@
 # Sustained implementation progress
 
+## Production policy CRD correction after native failure (2026-10-28)
+
+Native policy run40648562303 stopped before grant creation: the shipped CRD
+pruned unknown profileComposition and required recipeRef. An isolated correction
+aligns its bounded composition and UUID grantRef projection with the existing
+canonical schema/compiler, enforcing exactly one recipe or composition. Exact
+installed-input RED and corrected local schema/pruning tests are retained in the
+[S04 plan](reviews/s04-policy-grants-plan-2026-10-27.md). No permissive fixture,
+authority bypass, new runtime dependency or privileged collector is used.
+Actual corrected API/installed qualification and full backing remain pending;
+frozen PR103 af9 and its prior evidence are untouched.
+
 ## Unpublished finite policy-packet candidate (2026-10-28)
 
 The isolated S04 candidate now composes the reviewed node meter/wire/prefix/loss

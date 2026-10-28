@@ -146,8 +146,12 @@ permission-schema-check:
 	$(PYTHON) scripts/manifest-schemas.py --bundle permissions
 
 .PHONY: policy-schema-check
-policy-schema-check:
+policy-schema-check: policy-crd-check
 	$(PYTHON) scripts/manifest-schemas.py --bundle policies
+
+.PHONY: policy-crd-check
+policy-crd-check:
+	$(PYTHON) scripts/policy-crd.py
 
 .PHONY: permission-crd-check
 permission-crd-check:
@@ -182,7 +186,7 @@ identity-integration:
 	$(PYTHON) scripts/test-identity.py
 
 .PHONY: helm-check helm-integration
-helm-check: permission-crd-check start-crd-check retention-crd-check
+helm-check: permission-crd-check policy-crd-check start-crd-check retention-crd-check
 	$(PYTHON) scripts/check-helm.py
 
 helm-integration: helm-check

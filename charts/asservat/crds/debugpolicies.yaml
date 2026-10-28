@@ -45,12 +45,11 @@
               },
               "spec": {
                 "type": "object",
-                "description": "Hub-held restart-trigger policy (ADR-228). The hub compiles and accepts only a single exit detector firing the pod-status context recipe on the triggering Pod; activation reports any other field with its path. Status is never authority. Optional sharing (ADR-239) shares at most futureCaptures.maxCaptures captures until notAfter with up to eight recipients.",
+                "description": "Hub-held policy with exactly one recipeRef or bounded profileComposition. The current compiler admits its supported detector/action subset before independently audited acceptance; persisted configuration and status are not execution authority. Composition override values retain their original JSON types for canonical field-specific validation.",
                 "required": [
                   "target",
                   "detectors",
                   "when",
-                  "recipeRef",
                   "budgets",
                   "retention",
                   "suspended",
@@ -365,8 +364,138 @@
                         "x-kubernetes-preserve-unknown-fields": true
                       }
                     }
+                  },
+                  "profileComposition": {
+                    "type": "object",
+                    "required": [
+                      "components",
+                      "maxTotalBytes",
+                      "maxDuration"
+                    ],
+                    "properties": {
+                      "maxTotalBytes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1099511627776
+                      },
+                      "maxDuration": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+                        "maxLength": 16
+                      },
+                      "components": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,23}$"
+                            },
+                            "profileRef": {
+                              "type": "object",
+                              "properties": {
+                                "catalog": {
+                                  "enum": [
+                                    "builtin",
+                                    "organization",
+                                    "namespace"
+                                  ],
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                                },
+                                "version": {
+                                  "type": "string",
+                                  "pattern": "^v[1-9][0-9]*$",
+                                  "maxLength": 32
+                                }
+                              },
+                              "required": [
+                                "catalog",
+                                "name",
+                                "version"
+                              ]
+                            },
+                            "overrides": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "actionID",
+                                  "field",
+                                  "value"
+                                ],
+                                "properties": {
+                                  "actionID": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 63
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "enum": [
+                                      "packetPeers",
+                                      "packetFilter",
+                                      "packetBefore",
+                                      "packetAfter",
+                                      "packetRing",
+                                      "processSelector",
+                                      "processBatch",
+                                      "profileDuration",
+                                      "syscallFilter",
+                                      "syscallMode",
+                                      "syscallBefore",
+                                      "syscallAfter",
+                                      "syscallRing",
+                                      "syscallArguments",
+                                      "syscallMaxEvents",
+                                      "syscallRate",
+                                      "filePath",
+                                      "commandArgv",
+                                      "actionMaxBytes",
+                                      "actionTimeout",
+                                      "actionExecutionMode"
+                                    ]
+                                  },
+                                  "value": {
+                                    "x-kubernetes-preserve-unknown-fields": true
+                                  }
+                                }
+                              },
+                              "minItems": 0,
+                              "maxItems": 32
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "profileRef"
+                          ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 8
+                      }
+                    }
+                  },
+                  "grantRef": {
+                    "type": "string",
+                    "format": "uuid"
                   }
-                }
+                },
+                "oneOf": [
+                  {
+                    "required": [
+                      "recipeRef"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "profileComposition"
+                    ]
+                  }
+                ]
               }
             }
           }
