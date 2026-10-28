@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	wire "asservat.local/asservat/api/v1alpha1"
+	"asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/pcap"
 	capacityapp "asservat.local/asservat/internal/application/capacity"
@@ -20,6 +22,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/privacy"
 )
 
 // These are two admitted shapes, not a Cartesian maximum or physical storage
@@ -95,13 +98,8 @@ func TestPolicyMetadataBoundaryShapesOffline(t *testing.T) {
 		t.Run(shape.name, func(t *testing.T) {
 			now := time.Now().UTC().Truncate(time.Microsecond)
 			a := policyRecorderOfflineAdmission(t, now)
-			for i := 1; i < shape.retention; i++ {
-				a.Plan.Input.Retention.Policies = append(a.Plan.Input.Retention.Policies, artifact.RetentionRule{UID: fmt.Sprintf("retention-%054d", i), Generation: 2147483647, Digest: sha256.Sum256([]byte(fmt.Sprint(i)))})
-			}
-			// Four fixed dependency digests leave 60 distinct retention definitions;
-			// 64 source identities remain representable when some definitions match.
-			for i := 60; i < len(a.Plan.Input.Retention.Policies); i++ {
-				a.Plan.Input.Retention.Policies[i].Digest = a.Plan.Input.Retention.Policies[0].Digest
+			for _, p := range policyMetadataRetention(t, a.Storage.ClusterID, shape.retention-1) {
+				a.Plan.Input.Retention.Policies = append(a.Plan.Input.Retention.Policies, artifact.RetentionRule{UID: p.Policy.Revision.UID, Generation: p.Policy.Revision.Generation, Digest: p.Policy.Revision.Digest})
 			}
 			owner := a.Eligibility.DefaultAudience[0]
 			for i := 1; i < shape.audience; i++ {
@@ -155,4 +153,34 @@ func policyMetadataText(n int, seed string) string {
 		b.WriteString(hex.EncodeToString(digest[:]))
 	}
 	return b.String()[:n]
+}
+
+// The published decoder validates the real spec and computes its canonical
+// definition digest. Unique source IDs are distinct from shared definitions.
+func policyMetadataRetention(t testing.TB, cluster string, count int) []privacy.ScopedPolicy {
+	t.Helper()
+	decoder, err := kubernetes.NewRetentionPolicySpecDecoder()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := make([]privacy.ScopedPolicy, 0, count)
+	for i := 1; i <= count; i++ {
+		spec := wire.RetentionPolicySpec{Scope: wire.RetentionScope{ClusterIDs: []string{cluster}}, PurposeRef: "diagnostics", Defaults: wire.RetentionDurations{EvidenceSeconds: 3600, CaseMetadataSeconds: 3600, AuditMetadataSeconds: 3600}, Maxima: wire.RetentionDurations{EvidenceSeconds: 86400 - int64(min(i, 59)), CaseMetadataSeconds: 86400, AuditMetadataSeconds: 86400}, Rules: []wire.RetentionRule{}, DeletionBudgetSeconds: 1, LegalExceptions: "disabled"}
+		raw, err := json.Marshal(spec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, err := decoder.DecodeRetentionPolicySpec(raw, true)
+		if err != nil {
+			t.Fatal("legal retention boundary spec", err)
+		}
+		p.Name = policyMetadataText(63, fmt.Sprint(i))
+		p.Policy.Revision.UID = policyMetadataText(64, fmt.Sprint(i))
+		p.Policy.Revision.Generation = 2147483647
+		if !p.Policy.Valid() || !p.Scope.Valid() || p.Policy.Baseline {
+			t.Fatal("invalid scoped retention definition")
+		}
+		out = append(out, p)
+	}
+	return out
 }

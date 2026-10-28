@@ -16,7 +16,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
-	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -56,15 +55,7 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 		if metadata != f.qualification.RootBacking.Metadata || metadata.RecordRowBytes != profile.Metadata.RecordRowBytes || metadata.RecordWALBytes != profile.Metadata.RecordWALBytes || metadata.BackupCopies != profile.Backup.BackupCopies || metadata.WALCopies != profile.Backup.WALCopies {
 			t.Fatal("actual protected metadata profile differs")
 		}
-		additional := []privacy.ScopedPolicy{}
-		for i := 1; i < 64; i++ {
-			p := capacityNativeRetentionPolicy()
-			p.Name = fmt.Sprintf("retention-%054d", i)
-			p.Policy.Revision.UID = p.Name
-			p.Policy.Baseline = false
-			p.Policy.Revision.Generation = 2147483647
-			additional = append(additional, p)
-		}
+		additional := policyMetadataRetention(t, f.input.ControlClusterID, 63)
 		seed, publisher, _ := f.prepareManagedContext(t, root, enrollment, 3600, additional...)
 		for _, shape := range policyMetadataShapes(t) {
 			t.Run(shape.name, func(t *testing.T) {
@@ -110,14 +101,26 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 						t.Fatal("stored expectation differs from accepted output")
 					}
 					after := samplePolicyObservationGraph(t, ctx, admin, s.a.RootID, e.Registration.AllocationID, s.poolID)
-					var recordBytes, accountBytes, fixedBytes int64
+					var recordBytes, recordDelta, occupied, accountBytes, fixedBytes int64
+					before := map[string]policyObservationGraphTable{}
+					for _, row := range in.Before.Tables {
+						before[row.Table] = row
+					}
 					for _, row := range after.Tables {
 						lane := "separate-purpose/pending"
 						switch row.Table {
-						case "context_preview", "context_capture", "context_execution", "context_writer_completion", "policy_observation_session", "context_control_charge", "context_verification", "context_catalog", "context_case_locator", "capture_history_parameter", "retention_decision", "context_deletion_checkpoint":
+						case "policy_occurrence", "context_preview", "context_capture", "context_execution", "context_writer_completion", "policy_observation_session", "context_control_charge", "context_verification", "context_catalog", "context_case_locator", "capture_history_parameter", "retention_decision", "context_deletion_checkpoint":
 							lane = "ordinary-record"
 							recordBytes += row.TupleBytes
-						case "policy_source", "policy_acceptance", "access_grant", "policy_grant_attachment", "policy_occurrence", "policy_pod_watermark", "policy_workload_window", "policy_suppression", "context_storage_binding", "context_control_account", "capture_history_quota":
+							delta := row.TupleBytes - before[row.Table].TupleBytes
+							if delta < 0 {
+								t.Fatal("ordinary record tuple sample moved backwards", row.Table)
+							}
+							recordDelta += delta
+							if row.Table == "context_capture" {
+								occupied = row.Rows
+							}
+						case "policy_source", "policy_acceptance", "access_grant", "policy_grant_attachment", "policy_pod_watermark", "policy_workload_window", "policy_suppression", "context_storage_binding", "context_control_account", "capture_history_quota":
 							lane = "ordinary-account"
 							accountBytes += row.TupleBytes
 						case "permission_stream", "context_control_pool", "policy_grant_settings":
@@ -130,14 +133,14 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 						}
 						t.Logf("shape=%s paidBy=%s table=%s rows=%d tuple=%d wholeRelationHeap=%d index=%d toast=%d", shape.name, lane, row.Table, row.Rows, row.TupleBytes, row.HeapBytes, row.IndexBytes, row.ToastBytes)
 					}
-					if recordBytes > metadata.RecordRowBytes || accountBytes > metadata.AccountRowBytes || fixedBytes > metadata.FixedRowBytes {
+					if occupied < 1 || recordDelta > metadata.RecordRowBytes || recordBytes > occupied*metadata.RecordRowBytes || accountBytes > metadata.AccountRowBytes || fixedBytes > metadata.FixedRowBytes {
 						t.Fatal("sampled ordinary tuple footprint exceeds accepted profile", recordBytes, accountBytes, fixedBytes)
 					}
 					var wal int64
 					if err := admin.QueryRow(ctx, "SELECT pg_wal_lsn_diff($1::pg_lsn,$2::pg_lsn)::bigint", after.WAL, in.Before.WAL).Scan(&wal); err != nil || wal < 0 {
 						t.Fatal("WAL sample", err)
 					}
-					t.Logf("shape=%s acceptedScope=%d acceptedExpectation=%d authorIdentity=%d programJSON=%d instructions=%d recordTuple=%d/%d accountTuple=%d/%d fixedTuple=%d/%d GLOBAL_FIXTURE_WAL=%d primaryRecordWALAllowance=%d backupCopies=%d WALCopies=%d; no lane subtraction, no publication/native/physical/bloat/backups proof", shape.name, scopeBytes, len(b), len(ident), len(program), len(e.Recording.Filter.Program), recordBytes, metadata.RecordRowBytes, accountBytes, metadata.AccountRowBytes, fixedBytes, metadata.FixedRowBytes, wal, metadata.RecordWALBytes, metadata.BackupCopies, metadata.WALCopies)
+					t.Logf("shape=%s acceptedScope=%d acceptedExpectation=%d authorIdentity=%d programJSON=%d instructions=%d newRecordTuple=%d/%d cumulativeRecordTuple=%d/%d occupiedRecords=%d accountTuple=%d/%d fixedTuple=%d/%d GLOBAL_FIXTURE_WAL=%d primaryRecordWALAllowance=%d backupCopies=%d WALCopies=%d; no lane subtraction, no publication/native/physical/bloat/backups proof", shape.name, scopeBytes, len(b), len(ident), len(program), len(e.Recording.Filter.Program), recordDelta, metadata.RecordRowBytes, recordBytes, occupied*metadata.RecordRowBytes, occupied, accountBytes, metadata.AccountRowBytes, fixedBytes, metadata.FixedRowBytes, wal, metadata.RecordWALBytes, metadata.BackupCopies, metadata.WALCopies)
 				}
 				qualifyPolicyRecorderAdmission(t, ctx, admin, f.fixturePool, f.store, f.keys, func(*testing.T) captureAdmissionScenario { return s }, opt)
 			})
