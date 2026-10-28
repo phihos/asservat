@@ -2514,3 +2514,13 @@ and preserving discarded outcomes are smaller than a new grant path, generic
 expiry patch or longer Native timeout. Cumulative capture/source/accounting
 limits are unchanged; recovered continuation performs only existing authority
 and start work. No installed success or resolved meter behavior is claimed.
+
+
+The first focused f450 PG run returned the original capture from actual Lookup
+(found=true/error=nil) but failed its false-setting assertion: the existing
+shared fixture assembler hardcoded RequireApproval=true. Correct only that
+fixture input for the raw companion and retain true for ordinary require-all
+cases. Both raw flag modes now have offline compiler/preflight coverage; no
+production permission/grant/output limits change. Preserve the failed archive,
+original unchanged source hashes and cleanup evidence; a further focused run
+needs a reviewed clean snapshot and separate host-slot authorization.

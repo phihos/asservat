@@ -120,7 +120,7 @@ func TestPolicyMetadataBoundaryShapesOffline(t *testing.T) {
 			if err != nil || compiled.Recorder == nil {
 				t.Fatal("real compiler shape", err)
 			}
-			a, p := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, now)
+			a, p := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, true, now)
 			requirePolicyRecorderAdmissionFixture(t, a, p, now)
 			e := policyMetadataExpectation(t, a)
 			// Largest common issuer under the ACTUAL 64KiB expectation envelope. This

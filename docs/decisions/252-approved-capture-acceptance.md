@@ -129,3 +129,9 @@ no reserve, deadline, slot, retry or privilege changes. The native one-byte wait
 also retains its last public status/code/error/phase and SQL scan error/phase so
 an absent execution and a refused public view cannot masquerade as meter results.
 The existing exact bound collector's budget-exhaustion log remains required.
+
+
+Only production Attach telemetry uses the fixed closed cause vocabulary. The
+single failed synthetic native-test timeout deliberately retains actual SDK/pgx
+errors as authorized fixture evidence, separately from its last successful phases;
+these are not new production log fields or user-facing errors.

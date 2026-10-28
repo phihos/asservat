@@ -303,7 +303,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if err != nil {
 				t.Fatal(err)
 			}
-			a, preview := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, clock())
+			a, preview := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, !companionSQL, clock())
 			requirePolicyRecorderAdmissionFixture(t, a, preview, clock())
 			previews, err := postgres.NewContextPreviews(ctx, hub, root)
 			if err != nil {
@@ -367,10 +367,10 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 
 // Both the offline preflight and real fixture assemble the same marked plan,
 // passive preview and reviewed request identity. No production validator/export.
-func buildPolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, composition planvalue.ProfileComposition, filters planning.FilterCompiler, now time.Time) (capture.Admission, capture.ContextPreview) {
+func buildPolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, composition planvalue.ProfileComposition, filters planning.FilterCompiler, requireApproval bool, now time.Time) (capture.Admission, capture.ContextPreview) {
 	t.Helper()
 	in := a.Plan.Input
-	reviewed, err := planning.CompileRecorder(planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: true}, filters, now)
+	reviewed, err := planning.CompileRecorder(planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: requireApproval}, filters, now)
 	if err != nil {
 		t.Fatal("reviewed recorder fixture", err)
 	}
@@ -419,7 +419,7 @@ func requirePolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, p 
 		"actual-preview":             captureapp.ValidContextPreview(p) && p.Current(now),
 		"reviewed-request-digest":    a.SubmissionDigest == captureapp.ContextRequestDigest(p.ID),
 		"preview-scope":              p.ScopeDigest == a.Plan.ScopeDigest && bytes.Equal(p.CanonicalScope, a.Plan.CanonicalScope),
-		"marked-reviewed-entrypoint": in.Recorder != nil && in.Recorder.RequireApproval && planning.RecorderApprovedAcceptance(a.Plan.CanonicalScope) && authorization.UUID(p.ID),
+		"marked-reviewed-entrypoint": in.Recorder != nil && planning.RecorderApprovedAcceptance(a.Plan.CanonicalScope) && authorization.UUID(p.ID),
 	}
 	var failed []string
 	for name, ok := range checks {
@@ -434,15 +434,19 @@ func requirePolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, p 
 }
 
 func TestPolicyRecorderAdmissionFixtureOfflineBindings(t *testing.T) {
-	for _, raw := range []bool{false, true} {
-		t.Run(map[bool]string{false: "headers", true: "inert-policy-raw"}[raw], func(t *testing.T) {
+	for _, mode := range []struct {
+		name            string
+		raw, requireAll bool
+	}{
+		{"headers-require-all", false, true}, {"raw-require-all", true, true}, {"raw-independent-approval", true, false},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
 			now := time.Now().UTC().Truncate(time.Microsecond)
 			a := policyRecorderOfflineAdmission(t, now)
-			cluster := a.Storage.ClusterID
-			spec := publicPolicySpec(t, authorization.AcceptedPolicyAuthority{ClusterID: cluster})
+			spec := publicPolicySpec(t, authorization.AcceptedPolicyAuthority{ClusterID: a.Storage.ClusterID})
 			compilePolicy := publicPolicyCompile
 			var filters planning.FilterCompiler = publicPolicyFilters{}
-			if raw {
+			if mode.raw {
 				spec = bytes.ReplaceAll(spec, []byte("tcp dst port 80"), []byte(policyRawExpression))
 				compilePolicy = policyRawCompile
 				filters = policyRawFilters{}
@@ -451,8 +455,16 @@ func TestPolicyRecorderAdmissionFixtureOfflineBindings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			a, p := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, now)
+			a, p := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, mode.requireAll, now)
 			requirePolicyRecorderAdmissionFixture(t, a, p, now)
+			recording, _, err := planning.RecordingForContext(a.Plan)
+			if err != nil || recording.RequireApproval != mode.requireAll || a.Plan.Input.Recorder.RequireApproval != mode.requireAll {
+				t.Fatal("fixture changed protected require-all input", err)
+			}
+			_, approval, err := planning.RecorderScopeSummary(p.CanonicalScope)
+			if err != nil || approval == nil || mode.raw && (approval.ObservationLimits == nil || recording.Filter == nil || !planning.RawBytePredicate(recording.Filter.Expression)) {
+				t.Fatal("fixture lost independent raw approval", err)
+			}
 		})
 	}
 }

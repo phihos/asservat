@@ -1,6 +1,25 @@
 # Sustained implementation progress
 
 
+## Raw replay fixture input correction (2026-10-28)
+
+The one authorized `policy-raw-approved-replay-1` PG/S3 run on f450d839 failed
+(Go4.764s, selected child4.32s, runner21.205s): the actual accepted replay was
+found without error, but the new false-setting assertion met a shared fixture
+assembler hardcoded to true. This is a fixture-input mismatch, not evidence
+against the decoder correction. All3350 harness/3392 reviewed source hashes and
+35984 tracked files matched; cleanup was empty and exact owned PG/S3/network
+absence verified. The complete failed archive and terminal report are retained.
+
+The assembler now takes the existing protected setting as an explicit test input:
+raw companion false, ordinary require-all cases true. Offline preflight checks
+headers/true, raw/true and raw/false, including unchanged independent raw approval
+and frozen plan/preview/authority/storage invariants. The test's reviewed-timing
+preflight uses the canonical marker rather than confusing it with that setting.
+No production, role, grant, funded output or observation limit changes. A fresh
+focused PG run requires separate root review/coordination; no automatic repeat.
+
+
 ## Raw policy replay and initial attachment evidence (2026-10-28)
 
 Native40756795839 on immutable e0d failed at the one-byte refusal wait
