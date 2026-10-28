@@ -48,6 +48,7 @@ func (b StorageBinding) Matches(t authorization.Target) bool {
 // Admission is an internal coordinator input, never an HTTP or CRD shape. The
 // authenticated original authored intent has its own digest, distinct from scope.
 type Admission struct {
+	RepeatedFrom           *HistoryLineage
 	Recovery               artifact.RecoveryProof
 	RootID, IdempotencyKey string
 	SubmissionDigest       artifact.Digest
@@ -61,6 +62,12 @@ type Admission struct {
 // Accepted intentionally contains no "start" method or flag. Intent audit,
 // current execution authority and local effect fencing precede dispatch.
 type Accepted struct {
+	HistoryRecorded bool            `json:"-"`
+	RepeatedFrom    *HistoryLineage `json:"-"`
+	// Optional immutable history draft exists only for this admitted request.
+	HistoryParameters             *HistoryParameters `json:"-"`
+	HistorySource                 *HistoryLineage    `json:"-"`
+	HistoryUnavailable            bool               `json:"-"`
 	CaptureID, State              string
 	ScopeDigest, SubmissionDigest artifact.Digest
 	Expectation                   artifact.ContextExpectation

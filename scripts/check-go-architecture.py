@@ -55,6 +55,12 @@ for package in packages:
                 # net/netip provides pure address values/parsing, unlike net's
                 # sockets and DNS. Network I/O imports remain forbidden here.
                 allowed = {"errors", "fmt", "strings", "strconv", "bytes", "cmp", "slices", "sort", "math", "math/bits", "time", "unicode", "unicode/utf8", "net/netip"}
+                # History custody carries finite opaque ciphertext/value records
+                # across adapter boundaries. Canonical JSON, SHA-256 identities
+                # and io.EOF are deterministic value operations, not key/KMS or
+                # storage I/O. Keep this exception confined to the value owner.
+                if package["ImportPath"] == module+"/internal/domain/capture":
+                    allowed |= {"crypto/sha256", "encoding/json", "encoding/json/jsontext", "io"}
                 if imported not in allowed:
                     raise ValueError(f"Domain import is not a pure value utility: {imported}")
             if source != "bootstrap" and components[source]["layer"] in {"domain", "application"} and "." in imported.split("/")[0]:

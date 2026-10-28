@@ -1,10 +1,29 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { operations, OperationFailure } from './http';
-import { id, previewResult, acceptedResult, progressResult, resolvedAcceptedResult, resolvedClosedResult, target } from './test-fixtures';
+import { id, previewResult, recordingPreviewResult, settingsResult, acceptedResult, progressResult, resolvedAcceptedResult, resolvedClosedResult, target } from './test-fixtures';
 import { validInput_preview_capture, validInput_request_capture, validOutput_preview_capture, validOutput_get_capture, validInput_resolve_capture_request, validOutput_resolve_capture_request } from '../generated/validate-capture';
 
 afterEach(() => vi.unstubAllGlobals());
 const json = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
+it('accepts canonical recording extracts and a fixed bounded browser settings response', async () => {
+  const settings = settingsResult();
+  if (settings.status !== 'ok') throw new Error('fixture');
+  if (!('recipe_spec' in settings.data.settings)) throw new Error('fixture settings');
+  Object.assign(settings.data.settings, { recipe_spec: { description: '<é>&', actions: [{ id: 'command', kind: 'command', parameters: { argv: Array.from({ length: 30 }, () => 'a'.repeat(4096)), workingDirectory: '/', adapter: 'podsExec' }, required: true, impact: 'intrusive', limits: { maxBytes: 4096, timeout: '5s' }, executionMode: 'onTrigger' }], maxTotalBytes: 4096, maxDuration: '5s' } });
+  expect(new TextEncoder().encode(JSON.stringify(settings)).length).toBeGreaterThan(120 * 1024);
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(settings)));
+  expect(await operations.call('get_capture_settings', { capture_id: id(41) }, 'csrf', new AbortController().signal)).toEqual(settings);
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(recordingPreviewResult())));
+  await expect(operations.call('preview_capture', { target_ref: target, preset_ref: { name: 'pod-status', version: 'v1' } }, 'csrf', new AbortController().signal)).resolves.toBeDefined();
+});
+it('refuses larger settings and client-selected response budgets', async () => {
+  const fetcher = vi.fn().mockResolvedValue(new Response(' '.repeat(160 * 1024 + 1), { headers: { 'Content-Type': 'application/json' } }));
+  vi.stubGlobal('fetch', fetcher);
+  await expect(operations.call('get_capture_settings', { capture_id: id(41) }, 'csrf', new AbortController().signal)).rejects.toThrow();
+  fetcher.mockClear();
+  await expect(operations.call('get_capture_settings', { capture_id: id(41), response_budget: 999999 } as never, 'csrf', new AbortController().signal)).rejects.toThrow();
+  expect(fetcher).not.toHaveBeenCalled();
+});
 it('uses canonical finite retention and exact whole-pod preview validation', () => {
   const input = { target_ref: { cluster_id: id(1), namespace: 'payments', kind: 'Pod', name: 'api' }, preset_ref: { name: 'pod-status', version: 'v1' } };
   expect(validInput_preview_capture(input)).toBe(true);

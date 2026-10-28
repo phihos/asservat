@@ -63,6 +63,39 @@ limited issuer credential into the private producer input. Do not overwrite an
 existing key or substitute provider-root credentials. Flags match the chart's
 `bootstrap.providers` and `bootstrap.keyService.auditMount/auditKey` values.
 
+Regional executors also require a separate metadata-only storage capability in
+`history-storage.json`, alongside the evidence writer's `evidence-storage.json`
+in the existing protected regional credential Secret. Supply it to
+`installer-cluster` using `--history-credential`. The regional Helm projection
+requires both entries. Use the same configured evidence bucket and store ID;
+the history capability only operates below
+`history/v1/<permission-root>/<regional-cluster>/`. It has no evidence read or
+delete rights and no key-unwrapping permission.
+
+Render the exact proposed history permissions from the existing public offer
+and protected bootstrap record:
+
+```sh
+asservat installer-provider-recipe --history-offer regional-offer.json --history-bootstrap bootstrap.json > provider-prerequisites.json
+```
+
+This additional output contains `regionalHistory.seaweedIdentityActions` and
+`regionalHistory.s3BucketPolicy` separately. The first is Seaweed's identity
+configuration; the second is the bucket-policy proposal with prefix-conditioned
+inventory and explicit evidence denials. Review and merge it with the bucket's
+existing policy, preserving evidence-writer protections. An external provider
+administrator provisions the identity and supplies its closed `accessKeyID`,
+`secretAccessKey` and `sessionToken` credential input. This command emits no credential, makes no provider
+request, and does not issue an S3 identity. Automatic bundled S3 provisioning is
+not qualified by this output. Other S3 providers require their own qualification
+of prefix-conditioned inventory, version deletion and multipart cleanup.
+
+The focused `make history-storage-integration` gate checks the production policy
+constructor against the pinned Seaweed backend: history write/read, retained
+versions and multipart cleanup succeed; evidence and foreign-prefix read,
+delete and inventory fail. This is storage-capability evidence, distinct from
+installed SQL authorization, encrypted parameter production and history repeat.
+
 Keep nonsecret choices in one values file. Copy the `bootstrap` section of
 `charts/asservat/values.yaml`; set `enabled: true`, a stable `name`, distinct
 `targetNamespace`, the original verified `image: repository@sha256:…`, the three
@@ -76,6 +109,15 @@ projected API token has one audience; set it explicitly for ambiguous profiles.
 
 After the references and public values exist, the fresh operation is one Helm
 invocation (apply/upgrade the CRDs separately as documented):
+
+Public continuation optionally accepts `bootstrap.continuation.public.captureHistory`
+with both `perSelector` (1–1,000) and `perInstallation` (1–100,000). Omission uses
+1,000 and 100,000 respectively. These are retained history-entry ceilings, in
+addition to existing storage capacity; encrypted settings reserve four object
+slots and up to 1,671,168 bytes each. Lower limits evict the oldest eligible
+history from its originating allocation. Physical charges remain until cleanup
+confirms deletion. History exhaustion reports unavailable settings while the
+accepted capture continues. These settings do not change evidence retention.
 
 ```sh
 helm upgrade --install asservat ./asservat-0.1.0-dev.1.tgz \

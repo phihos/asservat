@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -9,6 +10,42 @@ import (
 	"testing"
 	"time"
 )
+
+func TestBrowserSettingsWriterRequiresBothPrivateBindings(t *testing.T) {
+	for _, mode := range []string{"authorized", "no browser", "no prepared reply", "other operation", "over limit", "cancelled"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			until, _ := ctx.Deadline()
+			if mode != "no browser" {
+				ctx = AuthenticatedBrowserSettingsView(ctx)
+			}
+			name := "get_capture_settings"
+			if mode == "other operation" {
+				name = "get_capture"
+			}
+			size := 128 << 10
+			if mode == "over limit" {
+				size = 160<<10 + 1
+			}
+			reply := OperationReply{Body: bytes.Repeat([]byte("x"), size), ValidUntil: until, browserSettings: mode != "no prepared reply"}
+			if mode == "cancelled" {
+				cancel()
+			}
+			w := &operationWriter{ResponseRecorder: httptest.NewRecorder()}
+			sent, err := WriteBrowserOperationResponse(ctx, w, http.StatusOK, name, reply, until)
+			if mode == "authorized" {
+				if err != nil || !sent || !bytes.Equal(reply.Body, w.Body.Bytes()) {
+					t.Fatal("bounded settings write failed", err)
+				}
+				return
+			}
+			if err == nil || sent || w.Body.Len() != 0 {
+				t.Fatal("unbound/late bytes escaped", err)
+			}
+		})
+	}
+}
 
 type operationWriter struct {
 	*httptest.ResponseRecorder

@@ -64,6 +64,10 @@ func TestRegionalInstallShape(t *testing.T) {
 		t.Fatal("executor offer accepted without the evidence credential")
 	}
 	executor.Evidence = []byte(`{"accessKeyID":"synthetic","secretAccessKey":"synthetic-secret","sessionToken":""}`)
+	if executor.valid() {
+		t.Fatal("executor accepted without separate history capability")
+	}
+	executor.History = []byte(`{"accessKeyID":"synthetic-history","secretAccessKey":"synthetic-history-secret","sessionToken":""}`)
 	if !executor.valid() {
 		t.Fatal("complete executor plan refused")
 	}
@@ -95,7 +99,7 @@ func TestRegionalInstallShape(t *testing.T) {
 	mounted := 0
 	for _, s := range RegionalWorkload(executor.Offer, true, false).Spec.Template.Spec.Volumes[0].Projected.Sources {
 		if s.Secret != nil {
-			if s.Secret.Name != RegionalEvidence || len(s.Secret.Items) != 1 || s.Secret.Items[0].Path != "evidence-storage.json" {
+			if s.Secret.Name != RegionalEvidence || len(s.Secret.Items) != 2 || s.Secret.Items[0].Path != "evidence-storage.json" || s.Secret.Items[1].Path != contracts.RegionalHistoryCredentialFile {
 				t.Fatal("executor mounts another Secret", s.Secret.Name)
 			}
 			mounted++

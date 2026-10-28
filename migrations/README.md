@@ -1,6 +1,6 @@
 # Custody migrations and query bindings
 
-`00001_custody.sql` is the initial storage-accounting facet described in [custody transactions](../docs/architecture/custody-transactions.md). It is not the complete hub schema. The current shared runtime adapter requires schema version 58; generated queries consume effective-retention columns and durable source checkpoints; runtime roles must not own schema objects or modify goose history. There is no destructive down migration that silently removes live charges or deletion records.
+`00001_custody.sql` is the initial storage-accounting facet described in [custody transactions](../docs/architecture/custody-transactions.md). It is not the complete hub schema. The current shared runtime adapter requires schema version 101; generated queries consume effective-retention columns and durable source checkpoints; runtime roles must not own schema objects or modify goose history. There is no destructive down migration that silently removes live charges or deletion records.
 
 Use `make sql-tools` for pinned sqlc v1.31.1 and goose v3.28.0, with sufficient build space. `make sql-check` regenerates bindings in a private temporary directory and compares them with `internal/adapters/postgres/custodydb`. Intentional query/schema changes use the pinned `sqlc generate`, then review generated code and run the real PostgreSQL test.
 
@@ -66,3 +66,10 @@ for supported packet recordings. It atomically validates and adjusts retained
 physical child ceilings and pool totals without changing identities, object
 limits, charges or deadlines. Down refuses when retained charges cannot fit the
 historical ceiling. See [ADR-257](../docs/decisions/257-approved-recording-funding.md).
+
+`00101_history_parameters.sql` follows the packet funding correction without
+changing its arithmetic or retained-graph migration. It adds independently
+retained encrypted settings, keyed lookup, bounded history quotas and typed
+writer/retirement receipts. Settings ciphertext has its own history-prefix
+capability; it is not catalog evidence or regional unwrap authority. See
+[ADR-255](../docs/decisions/255-encrypted-capture-history.md).

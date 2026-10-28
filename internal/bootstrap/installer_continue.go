@@ -119,6 +119,11 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 		return nil, mounts.ErrUnavailable
 	}
 	// ADR-194 decision 1: promotion needs the capacity and federation steps.
+	if p := k.input.Public; p != nil {
+		if _, err := captureHistoryBounds(p.CaptureHistory); err != nil {
+			return nil, err
+		}
+	}
 	if p := k.input.Public; p != nil && p.Promotion != nil && (p.Capacity == nil || p.Federation == nil || len(p.ProcessingOperators) == 0) {
 		return nil, mounts.ErrUnavailable
 	}

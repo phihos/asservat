@@ -31,7 +31,7 @@ JSON encoding disables HTML escaping before canonicalization. Actual maximum-str
 
 Work and independently current peer/trust observations may overlap without having identical ends. Verification takes their minimum; it does not reject a valid shorter proof or renew it. Every blocking read/sign/write retains that minimum. The stream owns a single bounded EOF reader, one queued frame and one decoder frame. Socket/pipe callbacks cancel and join before release. Stream termination cancels the hub runner and the regional operation contexts, including a blocked operation. A late positive backend result cannot authorize a reply after cancellation.
 
-Standby and capture reservations count closing owners until joined completion. Each discovered owner has an independent thirty-second conversation with at least one second before a fresh empty standby; after a TLS refusal (a registered owner process the hub no longer serves) the next attempt to that owner waits thirty seconds, so its setup proofs do not contend with the live owner's opening. A hub target query that finds no idle standby waits for the next registration only within its own original deadline, keeping 2.5 seconds for the query and the caller. A retry never carries a capture or signed work from a prior connection. SQL52/ADR134 determine whether an explicit current continuation can proceed; transport failure is not proof of non-admission or no effect.
+Standby and capture reservations count closing owners until joined completion. Each discovered owner has an independent thirty-second conversation with at least one second before a fresh empty standby; after a TLS refusal (a registered owner process the hub no longer serves) the next attempt to that owner waits thirty seconds, so its setup proofs do not contend with the live owner's opening. A hub target query or attachment that finds no idle standby waits for the next registration only within its own original deadline, keeping 2.5 seconds for the operation and the caller. Attachment waits only before reserving a conversation or dispatching work; actual capture capacity, duplicate capture IDs and invalid inputs still refuse immediately. Once waiting begins its fixed cutoff is checked again under the selection mutex, including when registration and expiry are both ready. An immediately available standby retains the original short-deadline behavior. A retry never carries a capture or signed work from a prior connection. SQL52/ADR134 determine whether an explicit current continuation can proceed; transport failure is not proof of non-admission or no effect.
 
 Router selection and attachment checks also observe the stream's own
 cancellation, even before the surrounding HTTP request notices it. A joined
@@ -122,3 +122,44 @@ Focused races exercise actual loopback TLS1.3/HTTP2 with process-owned keys: hub
 The native public journey (adr171-journey-2) passes the whole signed exchange with hub-run execution, regional capture/storage, publication and native download on the bare-Pod executor; see ADR-171. Pending qualification: the connector-Deployment executor's local start below, and failure/unknown partitions across those components. No deadline or client QPS limit is enlarged.
 
 Missing production inputs remain dedicated work-signing key/sign-only hub credential, verify-only regional trust, exact connector API profile/input ownership/RBAC, protected installed composition and regional command startup. Existing initial installation does not yet provision those inputs. The first installed context investigation remains unavailable until these producers and the combined runtime path are implemented and qualified.
+
+## Separate history ciphertext effects
+
+Capture-history control metadata uses `asservat-history-work+jws` with the
+existing protected work-signing trust and a separate `history-work/v1` payload.
+It is not an API execution. The dispatcher selects a live connector session
+before SQL issues authority, exposing that session's original deadline and
+actual executor process epoch. Signed authority fixes root, capture, original
+storage registration/allocation, attempt, request, operation, ciphertext or
+receipt digest, process epoch and original deadline. Each regional receive and
+final reply retains current channel checks and cancellation. A preparation
+lookup grants no storage authority; only signed write/read/purge work invokes
+storage effects.
+
+The distinct history frame family (32–35) carries at most **486077 bytes** of
+base64-encoded ciphertext bundle: data 192 KiB, index 4 KiB, manifest 128 KiB,
+commit 32 KiB, plus exact base64 expansion and 13 array bytes. An independently
+bounded 65536-byte envelope covers four version/ETag receipts, signed work and
+completions; total frame ceiling 551613 bytes. The shared codec checks each role
+before decoding allocation. Common query/operation frames remain 32 KiB and the
+existing exchange ceiling remains 2 MiB. Wire contracts are
+[history-work](../../specs/contracts/history-work.schema.json) and
+[history-ciphertexts](../../specs/contracts/history-ciphertexts.schema.json).
+
+Write completion requires all four acknowledged PUTs to return. Read pins exact
+stored versions. Purge inventories/removes versions, markers and incomplete
+multipart uploads and returns an independent typed completion bound to the
+original deletion fence. Zero receipts are accepted only for purge after the
+original WriteUntil and only with the exact zero-receipt digest; the SQL producer
+must independently establish that no writer claim was issued. Neither expiry
+nor object lookup establishes writer completion or releases capacity.
+
+The regional loader uses the fixed `history-storage.json` capability, limited
+to this root/cluster's history prefix. It cannot read/delete evidence or unwrap
+keys. [Installation instructions](../installation/helm.md) distinguish externally
+provisioned capabilities, readonly permission proposals and actual pinned
+Seaweed qualification. The focused storage gate does not qualify installed
+SQL-to-channel composition. Preparation currently inherits the router's finite
+five-second selection/exchange bound; measure the composed workflow before
+choosing any history-specific bound, preserving the original caller and signed
+operation deadlines.

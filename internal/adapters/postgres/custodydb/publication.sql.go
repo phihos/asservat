@@ -203,7 +203,7 @@ func (q *Queries) ReadContextVerification(ctx context.Context, arg ReadContextVe
 }
 
 const readPublicationCapture = `-- name: ReadPublicationCapture :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin FROM context_capture WHERE id=$1 AND root_id=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at FROM context_capture WHERE id=$1 AND root_id=$2
 `
 
 type ReadPublicationCaptureParams struct {
@@ -248,12 +248,15 @@ func (q *Queries) ReadPublicationCapture(ctx context.Context, arg ReadPublicatio
 		&i.HistoryNamespaceUid,
 		&i.HistoryWorkloadUid,
 		&i.HistoryOrigin,
+		&i.HistoryParametersRequired,
+		&i.RepeatedFromCaptureID,
+		&i.RepeatedFromExpiresAt,
 	)
 	return i, err
 }
 
 const readPublishedContext = `-- name: ReadPublishedContext :one
-SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, v.capture_id, v.root_id, v.expectation_digest, v.copies_digest, v.intent_digest, v.authority_digest, v.permission_epoch, v.permission_sequence, v.verified_at, v.audit_acknowledged_at, v.audit_digest, v.audit_object_key, v.audit_object_version, v.audit_object_etag, v.audit_object_bytes, v.audit_object_sha256, cat.published_at, a.effective_expires_at, a.effective_delete_by
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, v.capture_id, v.root_id, v.expectation_digest, v.copies_digest, v.intent_digest, v.authority_digest, v.permission_epoch, v.permission_sequence, v.verified_at, v.audit_acknowledged_at, v.audit_digest, v.audit_object_key, v.audit_object_version, v.audit_object_etag, v.audit_object_bytes, v.audit_object_sha256, cat.published_at, a.effective_expires_at, a.effective_delete_by
 FROM context_catalog cat JOIN context_capture c ON c.id=cat.capture_id AND c.root_id=cat.root_id
 JOIN context_verification v ON v.capture_id=c.id AND v.root_id=c.root_id
 JOIN custody_attempt a ON a.id=c.attempt_id AND a.artifact_id=cat.artifact_id
@@ -311,6 +314,9 @@ func (q *Queries) ReadPublishedContext(ctx context.Context, arg ReadPublishedCon
 		&i.ContextCapture.HistoryNamespaceUid,
 		&i.ContextCapture.HistoryWorkloadUid,
 		&i.ContextCapture.HistoryOrigin,
+		&i.ContextCapture.HistoryParametersRequired,
+		&i.ContextCapture.RepeatedFromCaptureID,
+		&i.ContextCapture.RepeatedFromExpiresAt,
 		&i.ContextVerification.CaptureID,
 		&i.ContextVerification.RootID,
 		&i.ContextVerification.ExpectationDigest,

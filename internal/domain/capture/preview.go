@@ -49,6 +49,9 @@ func (r ProtectedReasonRef) Valid() bool {
 // its diagnostic handle and protect any free-text reason before constructing
 // this value. It cannot substitute the broader incident-context preset.
 type ContextIntent struct {
+	HistoryAuthored *HistoryAuthored `json:",omitempty"`
+	// RepeatedFrom is independently expiring provenance, never a read grant.
+	RepeatedFrom     *HistoryLineage `json:",omitempty"`
 	Target           targets.WorkloadRequest
 	Diagnostic       string
 	RequestedSeconds int64
@@ -61,7 +64,7 @@ type ContextIntent struct {
 }
 
 func (i ContextIntent) Valid() bool {
-	if !i.Target.Valid() || i.RequestedSeconds < 0 || i.RequestedSeconds > privacy.MaxAgeSeconds || (i.Reason != nil && !i.Reason.Valid()) || (i.Sharing != nil && !i.Sharing.Valid()) {
+	if (i.HistoryAuthored != nil && (!i.HistoryAuthored.Valid() || i.HistoryAuthored.Target.ClusterID != i.Target.ClusterID)) || (i.RepeatedFrom != nil && (!authorization.UUID(i.RepeatedFrom.CaptureID) || i.RepeatedFrom.ExpiresAt.IsZero())) || !i.Target.Valid() || i.RequestedSeconds < 0 || i.RequestedSeconds > privacy.MaxAgeSeconds || (i.Reason != nil && !i.Reason.Valid()) || (i.Sharing != nil && !i.Sharing.Valid()) {
 		return false
 	}
 	if i.Composition != nil {
@@ -131,7 +134,7 @@ func previewTime(t time.Time) bool {
 }
 
 func (p ContextPreview) Valid() bool {
-	if !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.IssuerEpoch) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || p.Deadline.After(p.CreatedAt.Add(5*time.Minute)) || p.Intent.Reason != nil && p.Deadline.After(p.Intent.Reason.ExpiresAt) {
+	if (p.Intent.RepeatedFrom != nil && p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) || !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.IssuerEpoch) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || p.Deadline.After(p.CreatedAt.Add(5*time.Minute)) || p.Intent.Reason != nil && p.Deadline.After(p.Intent.Reason.ExpiresAt) {
 		return false
 	}
 	seen := map[string]bool{}
@@ -191,6 +194,11 @@ func (p ContextPreview) Clone() ContextPreview {
 	}
 	p.Intent.Sharing = p.Intent.Sharing.clone()
 	p.Intent.Composition = p.Intent.Composition.Clone()
+	p.Intent.HistoryAuthored = p.Intent.HistoryAuthored.Clone()
+	if p.Intent.RepeatedFrom != nil {
+		l := *p.Intent.RepeatedFrom
+		p.Intent.RepeatedFrom = &l
+	}
 	return p
 }
 

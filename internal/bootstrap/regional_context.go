@@ -45,6 +45,7 @@ type regionalContext struct {
 	targets   *kube.PodTargets
 	collector *kube.ContextCollector
 	output    regionalArtifactOutput
+	history   objectstore.HistoryObjects
 	verifier  *jose.APIContextWorkSignatures
 	owners    *RegionalLifecycle
 	source    *kube.ConnectorIdentitySource
@@ -201,6 +202,14 @@ func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in 
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
+	// History is a separate purpose-limited capability in the same qualified
+	// backend/bucket. It never receives the raw evidence writer's credential.
+	metadata, err := objectstore.New(a.EvidenceStore.Endpoint, a.EvidenceStore.Region, a.EvidenceStore.Bucket, storageCredentials(in, contracts.RegionalHistoryCredentialFile), storage)
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	closers = append(closers, metadata.Close)
+	out.history = objectstore.HistoryObjects{Store: metadata, StoreID: a.EvidenceStore.StoreID}
 	// ADR-176: keysets are wrapped by the local key service, per attempt, with
 	// this process's own connector client leaf.
 	keyRoots, _, err := mtls.OwnerTrustRoots(a.KeyService.Roots, time.Now())
@@ -253,6 +262,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 		return &fixedStepError{"start-client", err}
 	}
 	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
+	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.TrustSettings.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
 	}

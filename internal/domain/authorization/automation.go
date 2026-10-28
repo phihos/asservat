@@ -67,6 +67,9 @@ type AcceptedPolicyAuthority struct {
 // AcceptedPolicySnapshot carries the original source/recovery read deadline;
 // a delayed preflight must not turn an old source observation into fresh proof.
 type AcceptedPolicySnapshot struct {
+	// Immutable source provenance for private parameter history, never additional authority.
+	IntentVersion          int64
+	SourceRevision         identity.Revision
 	Authority              AcceptedPolicyAuthority
 	ObservedAt, FreshUntil time.Time
 	// SourceUntil is the policy's own bound (source observation and expiry)

@@ -82,7 +82,7 @@ func derivePromotedOwner(in contracts.OwnerDeployment, x promotedOwnerParts, now
 	out := in
 	out.Native = &contracts.OwnerNativeDeployment{ConnectorRoots: x.ConnectorRoots, WorkerAPIs: []contracts.OwnerNativeWorkerAPI{}, RetentionTopologies: []contracts.OwnerNativeTopology{},
 		Connections: in.Connections, Concurrency: in.Concurrency}
-	out.Public = &contracts.OwnerPublicDeployment{Format: contracts.OwnerPublicDeploymentFormat, Origin: x.Settings.Origin,
+	out.Public = &contracts.OwnerPublicDeployment{CaptureHistory: x.Settings.CaptureHistory, Format: contracts.OwnerPublicDeploymentFormat, Origin: x.Settings.Origin,
 		BrowserRootID: x.Sources.BrowserRootID, BrowserSettings: x.Sources.BrowserSettings, IdentitySettings: x.Sources.IdentitySettings,
 		BrowserAudience: p.BrowserAudience, ProviderRoots: roots, SessionTransit: transit,
 		ClusterCatalog: x.Sources.ClusterCatalog, WorkSigning: signing, Standby: 2, Captures: 1, PreviewSeconds: 120,

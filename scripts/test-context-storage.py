@@ -86,6 +86,7 @@ def postgres_fixture_options(regional_context_start=None, lock_waits=False, inst
 
 def source_hashes():
     files = [ROOT/"go.mod", ROOT/"go.sum", Path(__file__), ROOT/"scripts/fetch-gadget.sh", ROOT/"scripts/ci-native.sh", ROOT/".github/workflows/native.yml"]
+    files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs"]
     files += list((ROOT/"cmd").rglob("*.go")) + list((ROOT/"internal").rglob("*.go")) + list((ROOT/"test/integration").rglob("*.go"))
     files += [ROOT/"scripts/helm_registry.py"] + list((ROOT/"charts/asservat").rglob("*"))
     files = [p for p in files if p.is_file()]
@@ -383,6 +384,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 build_scratch = Path(tempfile.mkdtemp(prefix="asservat-"+build_scope+"-build-", dir=tempfile.gettempdir()))
                 report["buildScratch"] = str(build_scratch)
             report["goVersion"] = run(["go", "version"])
+            report["installedHistoryBrowserQualification"] = approved_recording
             report["sourceHashes"] = source_hashes()
             if helm_bootstrap:
                 report["helmVersion"] = run(["helm", "version", "--short"])

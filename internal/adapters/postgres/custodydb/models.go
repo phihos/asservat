@@ -385,6 +385,40 @@ type CaptureAuditRoot struct {
 	ValidUntil      pgtype.Timestamptz
 }
 
+type CaptureHistoryParameter struct {
+	RootID               pgtype.UUID
+	CaptureID            pgtype.UUID
+	AttemptID            pgtype.UUID
+	SelectorKey          []byte
+	SettingsKey          []byte
+	MacVersion           string
+	ExpectationJson      []byte
+	RetentionJson        []byte
+	SummaryExpiresAt     pgtype.Timestamptz
+	Visible              bool
+	State                string
+	WriteID              pgtype.UUID
+	WriteDigest          []byte
+	WriteStartedAt       pgtype.Timestamptz
+	WriteUntil           pgtype.Timestamptz
+	WriteExecutorEpoch   pgtype.UUID
+	PurgeCompletionJson  []byte
+	DeleteID             pgtype.UUID
+	DeleteExecutorEpoch  pgtype.UUID
+	DeleteStartedAt      pgtype.Timestamptz
+	DeleteUntil          pgtype.Timestamptz
+	DeleteFence          pgtype.Int8
+	WriterCompletionJson []byte
+	CopiesDigest         []byte
+	CreatedAt            pgtype.Timestamptz
+}
+
+type CaptureHistoryQuotum struct {
+	RootID      pgtype.UUID
+	SelectorKey []byte
+	Used        int32
+}
+
 type CaptureOperationAccount struct {
 	RootID          pgtype.UUID
 	Lane            string
@@ -429,39 +463,42 @@ type CaptureOperationHistory struct {
 }
 
 type CaptureOperationIntent struct {
-	ID                       pgtype.UUID
-	RootID                   pgtype.UUID
-	RequestKey               []byte
-	SubmissionDigest         []byte
-	ScopeDigest              []byte
-	ScopeJson                []byte
-	ExpectationJson          []byte
-	PodPinJson               []byte
-	AttemptID                pgtype.UUID
-	PermissionEpoch          pgtype.UUID
-	PermissionSequence       int64
-	IdentityPolicyUid        string
-	IdentityPolicyGeneration int64
-	IdentityPolicyDigest     []byte
-	CreatedAt                pgtype.Timestamptz
-	Deadline                 pgtype.Timestamptz
-	State                    string
-	IntentAcknowledgedAt     pgtype.Timestamptz
-	IntentDigest             []byte
-	IntentObjectKey          pgtype.Text
-	IntentObjectVersion      pgtype.Text
-	IntentObjectEtag         pgtype.Text
-	IntentObjectBytes        pgtype.Int8
-	IntentObjectSha256       []byte
-	ProgressRevision         int64
-	DeadlineObservedAt       pgtype.Timestamptz
-	PreviewID                pgtype.UUID
-	IntentOperationID        pgtype.UUID
-	ShareInstruction         []byte
-	HistoryClusterID         pgtype.UUID
-	HistoryNamespaceUid      pgtype.Text
-	HistoryWorkloadUid       pgtype.Text
-	HistoryOrigin            pgtype.Text
+	ID                        pgtype.UUID
+	RootID                    pgtype.UUID
+	RequestKey                []byte
+	SubmissionDigest          []byte
+	ScopeDigest               []byte
+	ScopeJson                 []byte
+	ExpectationJson           []byte
+	PodPinJson                []byte
+	AttemptID                 pgtype.UUID
+	PermissionEpoch           pgtype.UUID
+	PermissionSequence        int64
+	IdentityPolicyUid         string
+	IdentityPolicyGeneration  int64
+	IdentityPolicyDigest      []byte
+	CreatedAt                 pgtype.Timestamptz
+	Deadline                  pgtype.Timestamptz
+	State                     string
+	IntentAcknowledgedAt      pgtype.Timestamptz
+	IntentDigest              []byte
+	IntentObjectKey           pgtype.Text
+	IntentObjectVersion       pgtype.Text
+	IntentObjectEtag          pgtype.Text
+	IntentObjectBytes         pgtype.Int8
+	IntentObjectSha256        []byte
+	ProgressRevision          int64
+	DeadlineObservedAt        pgtype.Timestamptz
+	PreviewID                 pgtype.UUID
+	IntentOperationID         pgtype.UUID
+	ShareInstruction          []byte
+	HistoryClusterID          pgtype.UUID
+	HistoryNamespaceUid       pgtype.Text
+	HistoryWorkloadUid        pgtype.Text
+	HistoryOrigin             pgtype.Text
+	HistoryParametersRequired bool
+	RepeatedFromCaptureID     pgtype.UUID
+	RepeatedFromExpiresAt     pgtype.Timestamptz
 }
 
 type CaptureOperationLifecycle struct {
@@ -812,39 +849,42 @@ type ConnectorRetirementTicket struct {
 }
 
 type ContextCapture struct {
-	ID                       pgtype.UUID
-	RootID                   pgtype.UUID
-	RequestKey               []byte
-	SubmissionDigest         []byte
-	ScopeDigest              []byte
-	ScopeJson                []byte
-	ExpectationJson          []byte
-	PodPinJson               []byte
-	AttemptID                pgtype.UUID
-	PermissionEpoch          pgtype.UUID
-	PermissionSequence       int64
-	IdentityPolicyUid        string
-	IdentityPolicyGeneration int64
-	IdentityPolicyDigest     []byte
-	CreatedAt                pgtype.Timestamptz
-	Deadline                 pgtype.Timestamptz
-	State                    string
-	IntentAcknowledgedAt     pgtype.Timestamptz
-	IntentDigest             []byte
-	IntentObjectKey          pgtype.Text
-	IntentObjectVersion      pgtype.Text
-	IntentObjectEtag         pgtype.Text
-	IntentObjectBytes        pgtype.Int8
-	IntentObjectSha256       []byte
-	ProgressRevision         int64
-	DeadlineObservedAt       pgtype.Timestamptz
-	PreviewID                pgtype.UUID
-	IntentOperationID        pgtype.UUID
-	ShareInstruction         []byte
-	HistoryClusterID         pgtype.UUID
-	HistoryNamespaceUid      pgtype.Text
-	HistoryWorkloadUid       pgtype.Text
-	HistoryOrigin            pgtype.Text
+	ID                        pgtype.UUID
+	RootID                    pgtype.UUID
+	RequestKey                []byte
+	SubmissionDigest          []byte
+	ScopeDigest               []byte
+	ScopeJson                 []byte
+	ExpectationJson           []byte
+	PodPinJson                []byte
+	AttemptID                 pgtype.UUID
+	PermissionEpoch           pgtype.UUID
+	PermissionSequence        int64
+	IdentityPolicyUid         string
+	IdentityPolicyGeneration  int64
+	IdentityPolicyDigest      []byte
+	CreatedAt                 pgtype.Timestamptz
+	Deadline                  pgtype.Timestamptz
+	State                     string
+	IntentAcknowledgedAt      pgtype.Timestamptz
+	IntentDigest              []byte
+	IntentObjectKey           pgtype.Text
+	IntentObjectVersion       pgtype.Text
+	IntentObjectEtag          pgtype.Text
+	IntentObjectBytes         pgtype.Int8
+	IntentObjectSha256        []byte
+	ProgressRevision          int64
+	DeadlineObservedAt        pgtype.Timestamptz
+	PreviewID                 pgtype.UUID
+	IntentOperationID         pgtype.UUID
+	ShareInstruction          []byte
+	HistoryClusterID          pgtype.UUID
+	HistoryNamespaceUid       pgtype.Text
+	HistoryWorkloadUid        pgtype.Text
+	HistoryOrigin             pgtype.Text
+	HistoryParametersRequired bool
+	RepeatedFromCaptureID     pgtype.UUID
+	RepeatedFromExpiresAt     pgtype.Timestamptz
 }
 
 type ContextCaseLocator struct {

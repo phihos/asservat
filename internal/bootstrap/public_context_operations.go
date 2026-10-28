@@ -27,6 +27,7 @@ import (
 // Protected deployment composition must verify original projections and supply
 // current scoped adapters before calling it; no missing service gets a default.
 type PublicContextOperationServices struct {
+	History       *captureapp.HistoryParameterService
 	Investigation captureapp.ContextInvestigation
 	Intents       auditapp.CaptureOperationPublication
 	Regional      RegionalAPIContextStart
@@ -67,9 +68,24 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 	reader, readerOK := v.progress.Reader.(captureapp.ContextHistoryReader)
 	workloads, workloadsOK := v.submission.Targets.(captureapp.RestartObserver)
 	if readerOK && workloadsOK {
+		if s.History != nil {
+			s.History.Now, s.History.NewID, s.History.Legacy = c.Now, c.NewID, reader
+			reader = s.History
+			v.submission.History = s.History
+		}
 		history = captureapp.ContextHistoryService{RootID: c.RootID, InstallationID: c.InstallationID, Reader: reader, Targets: v.submission.Targets, Workloads: workloads, Previews: v.submission, Recovery: v.submission.Recovery, Now: c.Now}
+		if s.History != nil {
+			typed := history.(captureapp.ContextHistoryService)
+			typed.Keys = s.History.Keys
+			history = typed
+		}
 	}
-	captures, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: c.PublicOrigin, CollectionEnabled: c.CollectionEnabled, Now: c.Now, NewID: c.NewID}, v.submission, v.progress, history)
+	cfg := presentation.ContextOperationsConfig{PublicOrigin: c.PublicOrigin, CollectionEnabled: c.CollectionEnabled, Now: c.Now, NewID: c.NewID}
+	if s.History != nil {
+		cfg.HistoryRootID = c.RootID
+		cfg.HistoryCursorKeys = s.History.Keys
+	}
+	captures, err := presentation.NewContextOperationsWithHistory(cfg, v.submission, v.progress, history)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +142,13 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 	}
 	stop := s.Native.Stop
 	stop.Now = c.Now
-	return publicContextUseCases{captureapp.ContextSubmission{ContextInvestigation: i, Intents: a, Start: s.Regional}, p, k, d, stop}, nil
+	if s.History != nil {
+		s.History.Now, s.History.NewID = c.Now, c.NewID
+		if reader, ok := p.Reader.(captureapp.ContextHistoryReader); ok {
+			s.History.Legacy = reader
+		}
+	}
+	return publicContextUseCases{captureapp.ContextSubmission{ContextInvestigation: i, Intents: a, Start: s.Regional, History: s.History}, p, k, d, stop}, nil
 }
 
 // regionalHubRunner accepts only the hub's SQL/authority ports (ADR-171):

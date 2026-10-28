@@ -91,6 +91,11 @@ bootstrap:
       # Changing a completed install's envelope needs a qualified guard revision,
       # not a chart-only replay; see docs/installation/helm.md.
       permissionDelegations: []
+      # Optional lower history view/cache ceilings. Both values are required.
+      # Omission retains 1,000 per selector and 100,000 per installation.
+      # captureHistory:
+      #   perSelector: 200
+      #   perInstallation: 10000
   providers:
     issuerPolicy: asservat-install-issuer
     wrapRole: asservat-install-wrap
@@ -109,9 +114,9 @@ cluster:
   registrySecret: ""
   offer: ""
   bootstrapSecret: ""
-  # ADR-196: an existing operator Secret with evidence-storage.json, the
-  # write-only regional evidence credential. Required exactly when the offer
-  # names the regional executor.
+  # Existing operator Secret: evidence-storage.json is the write-only evidence
+  # capability; history-storage.json is separately restricted to history metadata
+  # read/write/inventory/delete. Both are required for a regional executor.
   evidenceSecret: ""
   # ADR-231: optional in-cluster Alertmanager base URL (http or https, no
   # credentials) that alert DebugPolicies on this cluster read, for example
