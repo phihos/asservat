@@ -327,21 +327,9 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 				t.Fatal("original binding interval diagnostic", facts, err)
 			}
 		}
-		for _, expired := range []bool{false, true} {
-			at := time.Now().UTC().Truncate(time.Microsecond)
-			if expired {
-				at = at.Add(-time.Minute - time.Second)
-			}
-			if _, err := admin.Exec(ctx, `INSERT INTO capacity_refresh_demand(root_id,cluster_id,namespace_uid,namespace_name,workload_kind,workload_name,workload_uid,requested_at,not_after)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$8::timestamptz+interval '60 seconds')
- ON CONFLICT(root_id,cluster_id,namespace_uid,workload_uid) DO UPDATE SET requested_at=EXCLUDED.requested_at,not_after=EXCLUDED.not_after`, p.RootID, p.Target.ClusterID, p.Target.Namespace.UID, p.Target.Namespace.Name, p.Target.Workload.Kind, p.Target.Workload.Name, p.Target.Workload.UID, at); err != nil {
-				t.Fatal("diagnostic demand witness", err)
-			}
-			facts, err = readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
-			if err != nil || !facts.DemandRecorded || facts.DemandCurrent == expired || !facts.DemandRequested.Time.Equal(at) || !facts.DemandNotAfter.Time.Equal(at.Add(time.Minute)) {
-				t.Fatal("original demand diagnostic", facts, err)
-			}
-		}
+		// This raw-preview fixture has no protected capacity_source/enrollment
+		// parent. Positive demand and Ready-publication diagnostics remain
+		// unqualified here; never bypass their foreign keys to seed witnesses.
 		changed := p.Clone()
 		changed.Deadline = changed.Deadline.Add(time.Second)
 		if err := store.CreateContextPreview(ctx, changed); !errors.Is(err, capture.ErrConflict) {
