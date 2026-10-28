@@ -18,6 +18,24 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_history_browser_report_uses_actual_current_guard_expression(self):
+        tree = ast.parse(inspect.getsource(fixture.main))
+        expressions = [node.value for node in ast.walk(tree)
+                       if isinstance(node, ast.Assign) and any(
+                           isinstance(target, ast.Subscript)
+                           and isinstance(target.value, ast.Name) and target.value.id == "report"
+                           and isinstance(target.slice, ast.Constant)
+                           and target.slice.value == "installedHistoryBrowserQualification"
+                           for target in node.targets)]
+        self.assertEqual(len(expressions), 1)
+        expression = compile(ast.Expression(expressions[0]), "actual-main-report", "eval")
+        for focus, collector, expected in (("approved-recording", True, True),
+                                           ("native-paced", True, False),
+                                           ("policy-recording", True, False),
+                                           (None, False, False)):
+            with self.subTest(focus=focus):
+                self.assertEqual(eval(expression, {}, {"focus": focus, "collector_qualification": collector}), expected)
+
     def test_traffic_probe_prelude_reaches_selection_without_external_effects(self):
         # Stop at selection, before cache/build/container work. This catches
         # a probe flag used by artifact cleanup before it is initialized.
