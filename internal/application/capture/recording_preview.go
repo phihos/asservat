@@ -10,6 +10,7 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
@@ -90,7 +91,16 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	if err != nil {
 		return zero, previewFailure("compile", err)
 	}
-	if !compiler.AcceptableRecorder(plan).Acceptable() {
+	recordable := compiler.AcceptableRecorder(plan).Acceptable()
+	if _, _, policy := authorization.PolicyExecutor(i.Principal); policy {
+		// requireRecordingApproval above already checked the package-private
+		// accepted settings provenance. This structural plan is not a permit:
+		// admission must retain the original reviewed policy grant, and start
+		// must obtain its committed observation receipt for the actual source.
+		_, _, acceptanceErr := compiler.RecordingFor(plan)
+		recordable = acceptanceErr == nil
+	}
+	if !recordable {
 		return zero, errRecordingNotAcceptable
 	}
 	p.CanonicalScope, p.ScopeDigest = slices.Clone(plan.CanonicalScope), plan.ScopeDigest

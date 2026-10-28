@@ -107,9 +107,9 @@ func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, sourc
 // identity while the preview is current, and is refused with
 // ApprovalRequired until an approved, current grant covers this exact plan
 // for the requesting human; only then does it pass to the recorder check
-// (ADR-248). A plan with REQ-AUT-006 observation limits (a raw byte
-// predicate) stays RecorderUnavailable: the node recorder does not charge
-// observation spend. Nothing is armed, reserved or charged here.
+// (ADR-248). Manual raw predicates stay unavailable. Finite policy raw actions
+// pass only to their original atomic policy admission and observation companion;
+// this gate itself never arms a source, reserves input or grants acquisition.
 func (s ContextInvestigation) recorderRequest(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, access *authorization.ResultAccess) (authorization.Grant, error) {
 	actions, approval, err := compiler.RecorderScopeSummary(p.CanonicalScope)
 	if err != nil {
@@ -126,9 +126,6 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 	if _, _, policy := authorization.PolicyExecutor(p.Actor); policy {
 		if access != nil {
 			return authorization.Grant{}, value.ErrInvalid
-		}
-		if approval != nil && approval.ObservationLimits != nil {
-			return authorization.Grant{}, value.ErrRecorderUnavailable
 		}
 		// Team grant scope is the accepted policy, not this per-Pod manual preview.
 		// The existing admission transaction locks and spends its actual attachment;

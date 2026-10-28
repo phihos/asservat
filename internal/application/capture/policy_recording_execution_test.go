@@ -148,19 +148,24 @@ func TestTeamRecorderSettingsProvenanceReusesExistingAcceptanceObservation(t *te
 		t.Fatal("provenance added acceptance read or selected another issuer", issuer, err, a.reads, reads)
 	}
 }
-func TestTeamRawPredicateDoesNotReachAdmissionOrPersonalReview(t *testing.T) {
+func TestTeamOngoingRawPredicateDoesNotReachAdmissionOrPersonalReview(t *testing.T) {
 	f, _, _, current := newTeamRecordingFixture(t)
 	f.svc.Filters = &stubFilters{}
 	grants := &fakeGrants{}
 	f.svc.Grants = grants
 	composition := finiteTeamComposition()
+	for i := range composition.Components[0].Edits {
+		if composition.Components[0].Edits[i].Field == "actionExecutionMode" {
+			composition.Components[0].Edits[i].Text = "ongoing"
+		}
+	}
 	composition.Components[0].Edits = append(composition.Components[0].Edits, planvalue.ProfileEdit{ActionID: "sample", Field: "packetFilter", Text: "tcp[13] & 2 != 0"})
 	preview, err := f.svc.PreviewComposition(context.Background(), current, f.compositionIntent(composition))
 	if err != nil || preview.Recordable {
-		t.Fatal("sensitive raw predicate became recordable", err)
+		t.Fatal("ongoing raw predicate became recordable", err)
 	}
 	if _, err = f.svc.Request(context.Background(), current, preview.Preview.ID, fixtureID(901)); !errors.Is(err, value.ErrRecorderUnavailable) || len(grants.requests) != 0 || f.admissions.Load() != 0 {
-		t.Fatal("raw team plan bypassed observation gate or opened personal review", err)
+		t.Fatal("ongoing raw team plan bypassed its unsupported source mode or opened personal review", err)
 	}
 }
 
@@ -259,7 +264,7 @@ func (s triggerAcceptedRecord) AcceptedPolicyAuthority(context.Context, string) 
 	return snap, nil
 }
 func TestPolicyTriggerCompilesOnlyExactAcceptedRecorderBeforeTickSpend(t *testing.T) {
-	for _, mode := range []string{"exact", "changed-interpretation", "raw-observation-unavailable"} {
+	for _, mode := range []string{"exact", "changed-interpretation", "raw-changed-interpretation"} {
 		t.Run(mode, func(t *testing.T) {
 			f, accepted, _ := newPolicyGrantPlanFixture(t)
 			originalEdit := f.edit
@@ -288,11 +293,66 @@ func TestPolicyTriggerCompilesOnlyExactAcceptedRecorderBeforeTickSpend(t *testin
 				if !errors.Is(err, value.ErrChanged) || len(ledger.ticks) != 0 {
 					t.Fatal("reinterpreted accepted recorder spent trigger occurrence", err)
 				}
-			case "raw-observation-unavailable":
-				if !errors.Is(err, value.ErrRecorderUnavailable) || len(ledger.ticks) != 0 {
-					t.Fatal("raw recorder spent occurrence without live observation authority", err)
+			case "raw-changed-interpretation":
+				if !errors.Is(err, value.ErrChanged) || len(ledger.ticks) != 0 {
+					t.Fatal("raw reinterpretation changed the accepted scope before occurrence spend", err)
 				}
 			}
 		})
 	}
+}
+
+func TestFinitePolicyRawProducerReachesOnlyOriginalPolicyAdmission(t *testing.T) {
+	f, _, _, current := newTeamRecordingFixture(t)
+	f.svc.Filters = &stubFilters{}
+	composition := finiteTeamComposition()
+	composition.Components[0].Edits = append(composition.Components[0].Edits, planvalue.ProfileEdit{ActionID: "sample", Field: "packetFilter", Text: "tcp[13] & 2 != 0"})
+	grants := &fakeGrants{}
+	f.svc.Grants = grants
+	preview, err := f.svc.PreviewComposition(t.Context(), current, f.compositionIntent(composition))
+	if err != nil || !preview.Recordable || preview.Plan.Approval == nil || preview.Plan.Approval.ObservationLimits == nil {
+		t.Fatal("finite policy raw preview", preview.Recordable, err)
+	}
+	admission := &retainedRecording{investigationFixture: f}
+	f.svc.Admission = admission
+	_, err = f.svc.Request(t.Context(), current, preview.Preview.ID, fixtureID(920))
+	if !errors.Is(err, reachedRecordingAdmission) || len(admission.seen) != 1 || len(grants.requests) != 0 {
+		t.Fatal("finite policy raw request bypassed admission or opened a human review", err, len(admission.seen), len(grants.requests))
+	}
+	plan := admission.seen[0].Plan
+	if plan.Input.Executor != current.policy.Executor || plan.Input.Recorder == nil || !plan.Input.Recorder.RequireApproval {
+		t.Fatal("finite raw plan lost policy/settings identity")
+	}
+}
+
+func TestFiniteRawPolicyTriggerReachesLedgerOnlyForExactAcceptedScope(t *testing.T) {
+	f, activation := newWorkloadActivationFixture(t)
+	f.envelope.MaxObservedBytes = 1 << 30
+	original := f.edit
+	f.edit = func(spec map[string]any) {
+		original(spec)
+		component := spec["profileComposition"].(map[string]any)["components"].([]any)[0].(map[string]any)
+		component["overrides"] = append(component["overrides"].([]any), map[string]any{"actionID": "sample", "field": "packetFilter", "value": "tcp[13] & 2 != 0"})
+	}
+	if _, err := activation.Activate(t.Context(), f, "restarts", "raw-first", true); err != nil {
+		t.Fatal("actual finite raw scope acceptance", err)
+	}
+	in := f.accepted[0]
+	source, _, err := f.ReadPolicy(t.Context(), "restarts", "policy-uid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := value.PolicyAcceptance{ID: "99999999-9999-4999-8999-999999999999", RootID: activationRoot, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: f.author.Principal, IdentityRevision: f.author.Policy, PermissionRevision: f.projection.Revision, Recovery: in.Recovery, IntentVersion: 1, AcceptedAt: f.now}
+	if !record.Valid() {
+		t.Fatal("invalid real activation receipt")
+	}
+	accepted := &acceptedGrantPlanFixture{record: record, snapshot: authorization.AcceptedPolicySnapshot{Authority: record.Authority, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), SourceUntil: source.FreshUntil}}
+	ledger := &teamTriggerLedger{}
+	inv := newInvestigationFixture()
+	trigger := PolicyTrigger{RootID: activationRoot, InstallationID: activationInstallation, RecipeName: "builtin-pod-status-v1", RecipeDigest: testRecipe, CompileRecorder: testPolicyRecorderCompiler, Ledger: ledger, Documents: f, Sources: f, Accepted: triggerAcceptedRecord{accepted}, Observer: f, Capture: ContextSubmission{ContextInvestigation: inv.svc, Intents: teamNeverStart{t}, Start: teamNeverStart{t}}, Audit: f, Now: func() time.Time { return f.now }}
+	if err := trigger.Tick(t.Context(), value.ActivePolicy{PolicyUID: "policy-uid", Name: "restarts"}); err != nil || len(ledger.ticks) != 1 || ledger.ticks[0].Policy.Recorder == nil {
+		t.Fatal("exact finite raw source did not reach the original occurrence ledger", err, len(ledger.ticks))
+	}
+	// No occurrence is returned here: this synthetic ledger cannot manufacture
+	// admission or input authority. Actual SQL/typed start remain separate tests.
 }

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"slices"
 	"sync"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
-	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
@@ -192,12 +190,8 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	if err != nil {
 		return err
 	}
-	// The actual node/session observation path is not composed yet. Keep the
-	// same raw-predicate boundary closed before spending a trigger occurrence;
-	// ordinary finite network-header actions continue to the real preview.
-	if compiled.Recorder != nil && slices.Contains(compiled.Recorder.Action.Sensitive, planvalue.ReasonRawBytePredicate) {
-		return value.ErrRecorderUnavailable
-	}
+	// A finite recorder proceeds through the real preview/admission and typed
+	// source/observation start. No ordinary/manual raw path is enabled here.
 	accepted, err := t.Accepted.AcceptedPolicyAuthority(tick, p.PolicyUID)
 	if err != nil {
 		return err

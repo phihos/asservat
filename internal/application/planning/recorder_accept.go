@@ -34,8 +34,8 @@ func AcceptableRecorder(plan value.RecorderPlan) RecorderAcceptance {
 	return recorderAcceptance(plan, false)
 }
 
-// contextRecorderAcceptance permits an inert finite policy expectation to be
-// checked by the actual SQL companion. A policy-shaped principal is not current
+// contextRecorderAcceptance structurally checks a finite policy expectation for
+// the actual SQL companion. A policy-shaped principal is not current
 // authority: admission, the committed observation permit and node enforcement
 // remain mandatory. Manual/public AcceptableRecorder keeps its raw refusal.
 func contextRecorderAcceptance(plan value.RecorderPlan) RecorderAcceptance {
@@ -52,9 +52,9 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only network-header packet captures can be recorded in this release"}
 	}
 	if plan.Approval != nil && plan.Approval.ObservationLimits != nil && !policy {
-		// ADR-249 REQ-AUT-006: the node recorder does not charge observation
-		// spend, so a raw byte predicate cannot be recorded yet.
-		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a raw byte comparison needs observation limits that this release's recorder does not enforce"}
+		// Manual raw recording has no observation issuer; the finite policy
+		// companion is a separate authority path (ADR-261, REQ-AUT-006).
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a manual raw byte comparison needs observation authority that is not implemented"}
 	}
 	after, ok := durationValue(a.After, true)
 	if !ok || after < time.Second || after > 5*time.Minute {
