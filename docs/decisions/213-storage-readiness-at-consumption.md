@@ -169,3 +169,14 @@ transaction, timer, watcher, provider call, credential, retry, schema or authori
 interval is added. The worker's cumulative refresh cost is unchanged. The
 installed path and combined runtime budget still need their own later result;
 this fix is not a promise that every refresh fits an already-short caller.
+
+The identical selected SQL case passed after the one-sentinel fix on 606c43e2
+(command/Go exit 0, child 0.52 s, Go package 1.995 s). RED used unchanged production
+on 2f95706f; GREEN's dates, selection and negative checks were unchanged. Both
+owned PG/S3 runs matched all 3,343 source hashes, reported unchanged sources and
+empty cleanup failures, and independently confirmed exact owned container/network
+absence. The role remained SELECT-only and no capture row was created. Offline
+complete PostgreSQL-adapter and capture races also exited 0 (2.577 s and 12.256 s).
+The SQL proofs establish this normalization boundary, not installed capture,
+regional refresh speed or end-to-end response success. No broader external suite
+or hosted run was executed for this fix.
