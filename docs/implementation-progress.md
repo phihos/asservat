@@ -1,5 +1,37 @@
 # Sustained implementation progress
 
+## Installed recording candidate 3f: terminal results (2026-10-28)
+
+All three guarded runs of `3f434f00966bf50a45331bd56539982a4878aac1`
+failed. Their actual Go and fixture exits were 1; each retained environment
+matched all 3,387 historical source hashes, reported unchanged sources and
+an empty cleanup-failure list. None establishes a completed installed workflow.
+
+- Policy run 40744737424 reached the review operation after the CRD correction,
+  then rejected an extra fixture field. Its later parent fallthrough panic was
+  independent; the focused local correction is described below.
+- Paced run 40744850604 failed in traffic generation before native transfer.
+  Seven batches acknowledged 28,672 records and 1,835,008 body bytes; the next
+  request retained no response headers. The helper reported `request` after
+  8.417 seconds within an 8.506-second parent phase. These measurements do not
+  establish the underlying error cause or the resulting capture size. The
+  near-8-MiB artifact, owner renewal, ranges and completion remain unqualified.
+- History run 40744858749 returned `OutcomeUnknown`, then resolved the intent
+  closed after storage readiness refusal. Its `source-expired` diagnostic can
+  represent a correctly recognized expired source followed by an exhausted
+  readiness interval or failed refresh demand. It does not establish another
+  lost error marker. Capture and edited-history repetition were not reached.
+
+The paced run's completed setup phase lasted 139.636 seconds, including the
+deliberate preview-expiry wait and background work. Its retained OID-to-login
+mapping attributes 16,851 SQL calls and 6,976 ms of summed executor time to
+the capacity login, out of 83,297 calls and 10,998 ms overall. The shared
+owner-runtime login accounts for 24,125 calls. These are aggregate statement
+counters, not per-request cost, CPU attribution or a steady-state baseline.
+They motivate reviewing the combined readiness path before another installed
+attempt; increasing freshness intervals or resource limits is not supported
+by these measurements.
+
 ## Policy focus input and parent return correction (2026-10-28)
 
 Native40744737424 on frozen3f failed decide_review HTTP400 because its authored
