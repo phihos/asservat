@@ -82,3 +82,11 @@ UPDATE access_grant SET policy_executions_spent=policy_executions_spent+1,policy
 WHERE root_id=sqlc.arg(root_id)::uuid AND id=sqlc.arg(id)::uuid AND kind='policy'
  AND decision='approved' AND revoked_at IS NULL AND clock_timestamp()<policy_not_after
  AND policy_executions_spent<policy_max_executions AND policy_bytes_spent<=policy_max_bytes-sqlc.arg(bytes)::bigint;
+
+-- name: ReadPolicyStatusSource :one
+-- Exact current pointer only; historical control replay is not attachment state.
+SELECT sqlc.embed(s), a.grant_id AS attached_grant_id, a.authority_digest AS attached_authority_digest
+FROM policy_source s
+LEFT JOIN policy_grant_attachment a ON a.root_id=s.root_id AND a.id=s.grant_attachment_id
+ AND a.policy_uid=s.policy_uid AND a.acceptance_id=s.active_id AND a.authored_grant_ref=s.authored_grant_ref
+WHERE s.root_id=$1 AND s.policy_uid=$2;

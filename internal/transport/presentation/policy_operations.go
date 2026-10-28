@@ -72,6 +72,7 @@ func (s *PolicyOperations) Tool(name string) (contracts.InvestigationTool, bool)
 
 // PolicyOperationInput is the closed input of the policy operations.
 type PolicyOperationInput struct {
+	GrantID        string `json:"grant_id,omitempty"`
 	PolicyName     string `json:"policy_name"`
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 	// SharingReviewed accepts a policy's reviewed recurring sharing (ADR-239).
@@ -181,6 +182,8 @@ type policySuppressionData struct {
 	LastAt  time.Time `json:"last_at"`
 }
 type policyStatusData struct {
+	AttachedGrantID     string                  `json:"attached_grant_id,omitempty"`
+	CollectionKind      string                  `json:"collection_kind"`
 	CollectedBytesSpent int64                   `json:"collected_bytes_spent"`
 	MaxCollectedBytes   int64                   `json:"max_collected_bytes"`
 	ObservedBytesSpent  int64                   `json:"observed_bytes_spent"`
@@ -269,7 +272,17 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 			break
 		}
 		var r app.PolicyActivationResult
-		r, operationErr = s.activation.Activate(ctx, current, in.PolicyName, in.IdempotencyKey, in.SharingReviewed)
+		if in.GrantID != "" {
+			if attached, ok := s.activation.(interface {
+				ActivateWithGrant(context.Context, identities.CurrentIdentity, string, string, bool, string) (app.PolicyActivationResult, error)
+			}); ok {
+				r, operationErr = attached.ActivateWithGrant(ctx, current, in.PolicyName, in.IdempotencyKey, in.SharingReviewed, in.GrantID)
+			} else {
+				operationErr = value.ErrUnavailable
+			}
+		} else {
+			r, operationErr = s.activation.Activate(ctx, current, in.PolicyName, in.IdempotencyKey, in.SharingReviewed)
+		}
 		if operationErr == nil {
 			state := "active"
 			if !r.Audited {
@@ -302,7 +315,11 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 			if acceptance == "" {
 				acceptance = st.DeactivatedID
 			}
-			data := policyStatusData{CollectedBytesSpent: st.CollectedBytesSpent, MaxCollectedBytes: st.MaxCollectedBytes, ObservedBytesSpent: st.ObservedBytesSpent, MaxObservedBytes: st.MaxObservedBytes, PolicyUID: st.PolicyUID, AcceptanceID: acceptance, State: policyState(st, s.now()), Generation: st.Generation, ExpiresAt: st.NotAfter.UTC(), Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, MaxExecutions: st.MaxExecutions, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
+			data := policyStatusData{AttachedGrantID: st.AttachedGrantID, CollectedBytesSpent: st.CollectedBytesSpent, MaxCollectedBytes: st.MaxCollectedBytes, ObservedBytesSpent: st.ObservedBytesSpent, MaxObservedBytes: st.MaxObservedBytes, PolicyUID: st.PolicyUID, AcceptanceID: acceptance, State: policyState(st, s.now()), Generation: st.Generation, ExpiresAt: st.NotAfter.UTC(), Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, MaxExecutions: st.MaxExecutions, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
+			data.CollectionKind = "podStatus"
+			if slices.Contains(st.Authority.Actions, "packetCapture") {
+				data.CollectionKind = "packetCapture"
+			}
 			for _, o := range st.Recent {
 				outcome := o.Outcome
 				if outcome == "" {

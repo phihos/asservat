@@ -24,6 +24,11 @@
       "sharing_reviewed": {
         "type": "boolean",
         "description": "Accept the reviewed recurring sharing of a DebugPolicy with spec.sharing (ADR-239). Without it such a policy is not activated; the reply SharingReviewRequired states that repeated collections will be shared, with whom, how many captures and until when."
+      },
+      "grant_id": {
+        "type": "string",
+        "format": "uuid",
+        "description": "Explicit approved grant to attach as a current team manager after acceptance audit; never reissues authority or refills spend."
       }
     },
     "required": [

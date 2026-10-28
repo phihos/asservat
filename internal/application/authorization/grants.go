@@ -420,25 +420,37 @@ func (s GrantService) Decide(ctx context.Context, current identities.CurrentIden
 	if !eligible.Eligible || eligible.Principal != i.Principal || !s.Now().Before(eligible.ValidUntil) {
 		return zero, false, value.ErrNotApprover
 	}
-	if g.Decision != nil {
-		// Only a retry of exactly this recorded decision (same reviewer and
-		// key) is answered, as a replay; anything else is not pending.
-		return s.Store.DecideGrant(ctx, GrantDecisionInput{GrantID: grantID, Approve: approve, Approver: i.Principal, Reason: reason, IdempotencyKey: key}, recovery)
-	}
-	if err = value.CheckDecision(g, i, eligible, approve, s.Now()); err != nil {
-		return zero, false, err
+	// A historical exact decision replay needs current metadata eligibility,
+	// not a new step-up. Fresh approval retains its original assurance bound.
+	freshDecision := g.Decision == nil
+	if freshDecision {
+		if err = value.CheckDecision(g, i, eligible, approve, s.Now()); err != nil {
+			return zero, false, err
+		}
 	}
 	in := GrantDecisionInput{GrantID: grantID, Approve: approve, Approver: i.Principal, Reason: reason, IdempotencyKey: key}
-	if approve {
+	until := identity.Earlier(i.ValidUntil, eligible.ValidUntil)
+	if freshDecision && approve {
 		in.ACR, in.AuthTime = i.Assurance.ACR, i.Assurance.AuthenticatedAt
+		until = identity.Earlier(until, i.Assurance.StepUpUntil)
 	}
-	out, replay, err := s.Store.DecideGrant(ctx, in, recovery)
+	until = until.UTC().Truncate(time.Microsecond)
+	if !s.Now().Before(until) {
+		return zero, false, ErrGrantUnavailable
+	}
+	effect, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	out, replay, err := s.Store.DecideGrant(effect, in, recovery)
 	if err != nil {
 		return zero, false, err
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	if err = s.finalGrantMetadata(effect, current, i, g.Kind == value.GrantPolicy); err != nil {
 		return zero, false, err
 	}
+	if !s.Now().Before(until) {
+		return zero, false, ErrGrantUnavailable
+	}
+
 	return out, replay, nil
 }
 

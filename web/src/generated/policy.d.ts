@@ -4,6 +4,11 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         McpInput_activate_policy: {
+            /**
+             * Format: uuid
+             * @description Explicit approved grant to attach as a current team manager after acceptance audit; never reissues authority or refills spend.
+             */
+            grant_id?: string;
             policy_name: string;
             idempotency_key: string;
             /** @description Accept the reviewed recurring sharing of a DebugPolicy with spec.sharing (ADR-239). Without it such a policy is not activated; the reply SharingReviewRequired states that repeated collections will be shared, with whom, how many captures and until when. */
@@ -104,6 +109,16 @@ export interface components {
             /** @constant */
             status: "ok";
             data: {
+                /**
+                 * Format: uuid
+                 * @description Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection.
+                 */
+                attached_grant_id?: string;
+                /**
+                 * @description Accepted collection action; controls available approval commands, not acquisition authority.
+                 * @enum {unknown}
+                 */
+                collection_kind: "podStatus" | "packetCapture";
                 policy_uid: string;
                 /** Format: uuid */
                 acceptance_id: string;

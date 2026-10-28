@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"encoding/json"
 	"os"
 	"slices"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
+	planvalue "asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/transport/conversion"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
@@ -173,7 +176,7 @@ func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOpera
 	if !ok {
 		return nil, nil, presentation.ErrOperationsConfiguration
 	}
-	activation := captureapp.PolicyActivation{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Documents: pc.hubPolicies, Sources: pc.policies, Observer: observer, Ledger: pc.policyTriggers, Permissions: pc.permissions, Automation: pc.automation, Acceptor: pc.policies, Audit: pc.policyAudit, Recovery: v.submission.Recovery, Now: c.Now, Report: eventLog(os.Stderr, "policy activation refused")}
+	activation := captureapp.PolicyActivation{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Documents: pc.hubPolicies, Sources: pc.policies, Observer: observer, Ledger: pc.policyTriggers, Permissions: pc.permissions, Automation: pc.automation, Acceptor: pc.policies, Audit: pc.policyAudit, Recovery: v.submission.Recovery, Now: c.Now, Report: eventLog(os.Stderr, "policy activation refused"), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters), WorkloadAutomation: pc.automation, GrantAttachments: pc.policies}
 	status := captureapp.PolicyStatusService{RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
 	deactivation := captureapp.PolicyDeactivation{RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
 	operations, err := presentation.NewPolicyOperations(c.PublicOrigin, c.Now, c.NewID, activation, status, deactivation)
@@ -266,4 +269,19 @@ func previewDelegations(in []contracts.PermissionDelegation) ([]authapp.PreviewD
 		out = append(out, x)
 	}
 	return out, nil
+}
+
+// Same manual composition/filter compiler, without inventing a preview or Pod.
+func publicPolicyRecorderCompiler(filters planningapp.FilterCompiler) captureapp.PolicyRecorderCompiler {
+	return func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+		var wire contracts.CaptureComposition
+		if err := json.Unmarshal(raw, &wire); err != nil {
+			return planvalue.PolicyRecorderConfiguration{}, err
+		}
+		composition, err := conversion.CompositionFromWire(wire)
+		if err != nil || composition == nil {
+			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
+		}
+		return planningapp.CompilePolicyRecorder(*composition, filters)
+	}
 }

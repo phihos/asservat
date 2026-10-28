@@ -470,6 +470,55 @@ func (q *Queries) ReadPolicyGrantSettings(ctx context.Context, rootID pgtype.UUI
 	return i, err
 }
 
+const readPolicyStatusSource = `-- name: ReadPolicyStatusSource :one
+SELECT s.root_id, s.policy_uid, s.installation_id, s.cluster_id, s.namespace_uid, s.name, s.generation, s.spec_digest, s.resource_version, s.observed_at, s.fresh_until, s.deleted, s.suspended, s.collection_digest, s.intent_version, s.active_id, s.creator_json, s.authored_grant_ref, s.grant_attachment_id, a.grant_id AS attached_grant_id, a.authority_digest AS attached_authority_digest
+FROM policy_source s
+LEFT JOIN policy_grant_attachment a ON a.root_id=s.root_id AND a.id=s.grant_attachment_id
+ AND a.policy_uid=s.policy_uid AND a.acceptance_id=s.active_id AND a.authored_grant_ref=s.authored_grant_ref
+WHERE s.root_id=$1 AND s.policy_uid=$2
+`
+
+type ReadPolicyStatusSourceParams struct {
+	RootID    pgtype.UUID
+	PolicyUid string
+}
+
+type ReadPolicyStatusSourceRow struct {
+	PolicySource            PolicySource
+	AttachedGrantID         pgtype.UUID
+	AttachedAuthorityDigest []byte
+}
+
+// Exact current pointer only; historical control replay is not attachment state.
+func (q *Queries) ReadPolicyStatusSource(ctx context.Context, arg ReadPolicyStatusSourceParams) (ReadPolicyStatusSourceRow, error) {
+	row := q.db.QueryRow(ctx, readPolicyStatusSource, arg.RootID, arg.PolicyUid)
+	var i ReadPolicyStatusSourceRow
+	err := row.Scan(
+		&i.PolicySource.RootID,
+		&i.PolicySource.PolicyUid,
+		&i.PolicySource.InstallationID,
+		&i.PolicySource.ClusterID,
+		&i.PolicySource.NamespaceUid,
+		&i.PolicySource.Name,
+		&i.PolicySource.Generation,
+		&i.PolicySource.SpecDigest,
+		&i.PolicySource.ResourceVersion,
+		&i.PolicySource.ObservedAt,
+		&i.PolicySource.FreshUntil,
+		&i.PolicySource.Deleted,
+		&i.PolicySource.Suspended,
+		&i.PolicySource.CollectionDigest,
+		&i.PolicySource.IntentVersion,
+		&i.PolicySource.ActiveID,
+		&i.PolicySource.CreatorJson,
+		&i.PolicySource.AuthoredGrantRef,
+		&i.PolicySource.GrantAttachmentID,
+		&i.AttachedGrantID,
+		&i.AttachedAuthorityDigest,
+	)
+	return i, err
+}
+
 const reservePolicyOccurrenceOutput = `-- name: ReservePolicyOccurrenceOutput :execrows
 UPDATE policy_occurrence SET reserved_capture_id=$3,grant_id=$4,reserved_bytes=$5
 WHERE root_id=$1 AND id=$2 AND reserved_capture_id IS NULL AND outcome IS NULL

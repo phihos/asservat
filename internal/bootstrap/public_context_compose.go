@@ -27,6 +27,7 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	planningapp "asservat.local/asservat/internal/application/planning"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -423,7 +424,9 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.grants = authapp.GrantService{RootID: root, InstallationID: installation, Permissions: out.permissions, WorkloadPermissions: out.permissions, Store: grantStore, Recovery: out.recovery, NewID: ownerRandomID, Now: time.Now}
+	out.grants = authapp.GrantService{RootID: root, InstallationID: installation, Permissions: out.permissions, WorkloadPermissions: out.permissions, Store: grantStore, PolicyRequests: grantStore, ApprovalSettings: grantStore,
+		PolicyPlans: captureapp.PolicyGrantPlans{Accepted: out.policies, Sources: out.policies, Documents: out.hubPolicies, CompileRecorder: publicPolicyRecorderCompiler(out.investigation.Filters), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now},
+		Recovery:    out.recovery, NewID: ownerRandomID, Now: time.Now}
 	out.investigation.Grants = out.grants
 	out.caseRoutes = routes
 	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares, Reviews: out.reviews}

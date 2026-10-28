@@ -30,7 +30,7 @@ UPDATE access_grant g SET decision= @decision::text, approver_issuer= @approver_
  decision_reason= @decision_reason::text, decision_acr=sqlc.narg(decision_acr)::text, decision_auth_time=sqlc.narg(decision_auth_time)::timestamptz, decided_at=t.n, decision_key= @decision_key::text,
  expires_at=CASE WHEN @decision::text='approved' THEN CASE WHEN g.kind='policy' THEN g.policy_not_after ELSE LEAST(t.n+make_interval(secs => g.lifetime_seconds),COALESCE(g.not_after,'infinity'::timestamptz)) END END, revision=g.revision+1
 FROM (SELECT clock_timestamp() AS n) t
-WHERE g.root_id= @root_id::uuid AND g.id= @id::uuid AND g.decision IS NULL AND g.revoked_at IS NULL AND g.review_until>t.n AND g.revision=1
+WHERE t.n< @effect_until::timestamptz AND g.root_id= @root_id::uuid AND g.id= @id::uuid AND g.decision IS NULL AND g.revoked_at IS NULL AND g.review_until>t.n AND g.revision=1
  AND (g.kind<>'policy' OR g.policy_not_after>t.n)
  AND NOT (g.requester_issuer= @approver_issuer::text AND g.requester_subject= @approver_subject::text)
 RETURNING g.*;

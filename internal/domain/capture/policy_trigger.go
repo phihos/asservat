@@ -304,6 +304,7 @@ type PolicyStatus struct {
 	// ActiveID is the current acceptance; DeactivatedID is the latest
 	// acceptance of a deactivated policy (ADR-229). At most one is set.
 	PolicyUID, ActiveID, DeactivatedID string
+	AttachedGrantID                    string
 	Generation, IntentVersion          int64
 	AcceptedIntentVersion              int64
 	// AcceptedGeneration is the DebugPolicy generation the acceptance named.

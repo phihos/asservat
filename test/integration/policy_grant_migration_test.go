@@ -101,6 +101,11 @@ func TestCustodyPolicyGrantMigrationWithRealPostgres(t *testing.T) {
 	if _, err = provider.UpTo(ctx, 102); err != nil {
 		t.Fatal("schema 102 Up", err)
 	}
+	var lane *string
+	var inputValid bool
+	if err = scratch.QueryRow(ctx, `SELECT operation_audit_lane('request_policy_grant'),operation_audit_human_input_valid('request_policy_grant','context-input/v1')`).Scan(&lane, &inputValid); err != nil || lane == nil || *lane != "normal" || !inputValid {
+		t.Fatal("public policy request absent from existing audit envelope", lane, inputValid, err)
+	}
 	var floor string
 	if err = scratch.QueryRow(ctx, `SELECT obj_description('public.goose_db_version'::regclass,'pg_class')`).Scan(&floor); err != nil || floor != "asservat:oldest-binary-schema=102" {
 		t.Fatal("old readers must refuse the changed grant semantics", floor, err)
@@ -114,6 +119,9 @@ func TestCustodyPolicyGrantMigrationWithRealPostgres(t *testing.T) {
 	// hashes and pool values; only this intentional revocation may differ.
 	if _, err = provider.Down(ctx); err != nil {
 		t.Fatal("compatible schema 102 Down", err)
+	}
+	if err = scratch.QueryRow(ctx, `SELECT operation_audit_lane('request_policy_grant'),operation_audit_human_input_valid('request_policy_grant','context-input/v1')`).Scan(&lane, &inputValid); err != nil || lane != nil || inputValid {
+		t.Fatal("compatible Down retained unpublished audit command", lane, inputValid, err)
 	}
 	if err = scratch.QueryRow(ctx, `SELECT to_jsonb(g)-ARRAY['revoked_at','revoker_issuer','revoker_subject','revoker_client','revoke_key','revision'] FROM access_grant g WHERE id=$1`, id).Scan(&after); err != nil {
 		t.Fatal(err)

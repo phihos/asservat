@@ -25,6 +25,7 @@ import (
 	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	configapp "asservat.local/asservat/internal/application/configuration"
+	planningapp "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -128,8 +129,12 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	newSetup := func(t *testing.T) setup {
+	newSetup := func(t *testing.T, outputCeiling ...int64) setup {
 		t.Helper()
+		maxOutput := int64(1000)
+		if len(outputCeiling) == 1 {
+			maxOutput = outputCeiling[0]
+		}
 		root, epoch, installation, cluster, ns, workload, policy := custodyID(), custodyID(), custodyID(), custodyID(), custodyID(), custodyID(), custodyID()
 		now := clock()
 		p, err := postgres.NewPermissions(ctx, configPool, root)
@@ -140,7 +145,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		if _, err = p.BeginPermissions(ctx, root, epoch, trust); err != nil {
 			t.Fatal(err)
 		}
-		basis := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "v1", SpecDigest: artifact.Digest{2}}, Scope: cfg.Scope{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: "app", UID: ns}}, Effect: "Allow", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "team-a"}}, Roles: []string{"workload-maintainer"}, Automation: &authorization.AutomationEnvelope{AllowedActions: []string{"logs", "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: 1000, MaxObservedBytes: 2000}}
+		basis := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "AccessBinding", UID: custodyID(), Generation: 1, ResourceVersion: "v1", SpecDigest: artifact.Digest{2}}, Scope: cfg.Scope{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: "app", UID: ns}}, Effect: "Allow", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "team-a"}}, Roles: []string{"workload-maintainer"}, Automation: &authorization.AutomationEnvelope{AllowedActions: []string{"logs", "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: maxOutput, MaxObservedBytes: 2000}}
 		basis.ScopeDigest = configapp.PermissionScopeDigest(basis)
 		review := cfg.BootstrapReview{Resource: cfg.Resource{ClusterID: cluster, Namespace: "asservat", NamespaceUID: "control", Kind: "ConfigMap", UID: custodyID(), ResourceVersion: "v1", SpecDigest: artifact.Digest{9}}, Reviewer: "synthetic-administrator", BindingsDigest: artifact.Digest{8}, ReviewedAt: now.Add(-time.Minute), ExpiresAt: now.Add(time.Minute), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 		batch := cfg.PermissionBatch{RootID: root, Epoch: epoch, RequestID: custodyID(), TrustDigest: trust, InputDigest: artifact.Digest{3}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Bases: []cfg.PermissionBasis{basis}, Initial: &cfg.PermissionInitialization{ClusterID: cluster, Control: cfg.NamespaceRef{Name: "asservat", UID: "control"}, BindingCount: 1, BindingsDigest: review.BindingsDigest, Review: &review}}
@@ -156,7 +161,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatalf("permission setup: %+v %v", projection, err)
 		}
 		actor := identity.Principal{Issuer: basis.Subjects[0].Issuer, Subject: "developer", ClientID: "console", Kind: identity.Human}
-		authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policy, Creator: actor, Executor: authorization.PolicyPrincipal(installation, policy), ScopeDigest: artifact.Digest{10}, ClusterID: cluster, NamespaceUID: ns, WorkloadUID: workload, Delegation: identity.Revision{UID: basis.Resource.UID, Generation: 1, Digest: basis.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{projection.Allows[0].Audience}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 1000, MaxObservedBytes: 2000}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
+		authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policy, Creator: actor, Executor: authorization.PolicyPrincipal(installation, policy), ScopeDigest: artifact.Digest{10}, ClusterID: cluster, NamespaceUID: ns, WorkloadUID: workload, Delegation: identity.Revision{UID: basis.Resource.UID, Generation: 1, Digest: basis.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{projection.Allows[0].Audience}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: maxOutput, MaxObservedBytes: 2000}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
 		rproof := artifact.RecoveryProof{InstallationID: installation, IssuerEpoch: custodyID(), Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{4}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 		if _, err = admin.Exec(ctx, `INSERT INTO fleet_trust(activated_postmaster_at,activated_database_oid,installation_id,issuer_epoch,source_uid,source_generation,source_digest,suspended,recovery_blocked,observed_at,fresh_until) VALUES(pg_catalog.pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),$1,$2,'recovery',1,$3,false,false,$4,$5)`, installation, rproof.IssuerEpoch, rproof.Revision.Digest[:], now, now.Add(30*time.Second)); err != nil {
 			t.Fatal(err)
@@ -239,6 +244,26 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		r := accept(t, s)
 		flush(t, s)
 		qualifyPolicyGrantPersistence(t, ctx, admin, poolFor, s.source, s.observation, s.input.Author, s.input.RootID, s.input.Authority, r.Record.ID, scope, s.input.Recovery)
+	})
+
+	t.Run("policy-grants-public-request-review-attachment-audit", func(t *testing.T) {
+		s := newSetup(t, 64<<20)
+		spec := publicPolicySpec(t, s.input.Authority)
+		compiled, err := captureapp.CompilePolicyWithRecorders(spec, planningapp.ContextRecipeName, planningapp.RecipeDigest(), publicPolicyCompile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a := s.input.Authority
+		scope := captureapp.RecorderPolicyScope(a.PolicyUID, 1, s.observation.CollectionDigest, compiled, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits)
+		s.input.Authority.ScopeDigest = sha256.Sum256(scope)
+		s.input.Submission.ScopeDigest = s.input.Authority.ScopeDigest
+		target := authorization.WorkloadTarget{ClusterID: s.input.Authority.ClusterID, NamespaceUID: s.input.Authority.NamespaceUID, WorkloadUID: s.input.Authority.WorkloadUID}
+		s.input.Workload = &target
+		s.input.Target = authorization.Target{}
+		s.input.Verification = syntheticSubmissionCheck(s.input, clock())
+		accepted := accept(t, s)
+		flush(t, s)
+		qualifyPolicyGrantPublicOperations(t, ctx, admin, poolFor, store, keys, s.p, s.source, s.observation, s.input.Author, s.input.RootID, s.input.Authority, accepted.Record.ID, spec, s.batch)
 	})
 
 	t.Run("audit-gated-durable-and-no-personal-session-dependency", func(t *testing.T) {

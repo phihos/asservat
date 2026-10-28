@@ -98,3 +98,28 @@ replacement, pause/resume and sharing controls. Conservative legacy/uncertain
 charges are never described as measured gathered user data. The existing current
 viewer/workload metadata authorization and final freshness checks remain required;
 status confers no acquisition, evidence/history or personal continuation rights.
+
+
+`request_policy_grant` uses one canonical browser/MCP input: the hub policy name
+and exact UID, finite limits, optional observation limits/period and original
+caller key. The server resolves protected source, accepted policy and compiled
+review; no requester, authority, scope, Pod, capture or personal resultAccess is
+accepted from this body. The immutable original actor/client/key lookup precedes
+new source/settings reads. The request returns the existing grant detail and
+review link. A different current human action-approver uses the existing review
+and real IdP step-up flow; original reviewer/identity/step-up bounds govern the
+SQL mutation after waits, including its database-clock predicate. Replays need
+current metadata rights without demanding a new step-up for historical success.
+
+`activate_policy` with `grant_id` is an explicit current-manager control of an
+already accepted policy. It never reaccepts collection intent, renews original
+expiry or resets shared/grant spend. Its immutable control receipt and replay do
+not restore a pointer cleared by later authored-reference/control changes. The
+existing encrypted public operation intent is acknowledged before source/control
+mutations; unknown intent cannot dispatch, unknown outcome retains uncertainty.
+`get_policy_status` reports the accepted collection kind and exact current attached
+grant pointer for review, which does not itself assert collection readiness.
+The source-first request observes one actual protected name/UID read before
+current acceptance lookup, so a source observation expired during an outage can
+recover without reauthorization. Healthy source observations last 30s with 15s
+trigger polls; no ordinary five-versus-15 freshness gap is assumed.

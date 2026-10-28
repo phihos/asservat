@@ -63,7 +63,7 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 	request := func(actor identity.Principal) app.StoredGrantRequest {
 		t.Helper()
 		limits := authorization.AutomationLimits{MaxExecutions: 2, MaxBytes: 256}
-		input := app.PolicyGrantRequestInput{PolicyUID: authority.PolicyUID, IdempotencyKey: "one-original-intent", Lifetime: 30 * time.Minute, Limits: limits}
+		input := app.PolicyGrantRequestInput{PolicyUID: authority.PolicyUID, PolicyName: observation.Name, IdempotencyKey: "one-original-intent", Lifetime: 30 * time.Minute, Limits: limits}
 		g := authorization.Grant{ID: custodyID(), RootID: root, Kind: authorization.GrantPolicy, Requester: actor, ExecutionDigest: authority.ScopeDigest,
 			DataClass: "extract", Reasons: []authorization.SensitiveReason{{ActionID: "packets", Code: "rawBytePredicate"}}, Scope: scope, Review: []byte(`{}`),
 			Lifetime: input.Lifetime, Revision: 1, Policy: &authorization.PolicyGrantScope{Authority: authority, RecipeDigest: artifact.Digest{9}, Limits: limits,

@@ -125,7 +125,7 @@ func (s *GrantOperations) PublicOrigin() string {
 }
 
 func (s *GrantOperations) ToolNames() []string {
-	return []string{"get_grant", "list_reviews", "decide_review", "revoke_grant"}
+	return []string{"request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant"}
 }
 
 func (s *GrantOperations) Tool(name string) (contracts.InvestigationTool, bool) {
@@ -136,14 +136,31 @@ func (s *GrantOperations) Tool(name string) (contracts.InvestigationTool, bool) 
 }
 
 // GrantOperationInput is the closed union of the four inputs.
+type policyGrantRequestLimits struct {
+	MaxExecutions     int64 `json:"max_executions"`
+	MaxCollectedBytes int64 `json:"max_collected_bytes"`
+	MaxObservedBytes  int64 `json:"max_observed_bytes"`
+}
+type policyGrantObservationInput struct {
+	MaxSessionSeconds     int64 `json:"max_session_seconds"`
+	MaxObservedBytes      int64 `json:"max_observed_bytes"`
+	MaxBytesPerSecond     int64 `json:"max_bytes_per_second"`
+	MaxConcurrentSessions int64 `json:"max_concurrent_sessions"`
+	MaxObservedEvents     int64 `json:"max_observed_events,omitempty"`
+}
 type GrantOperationInput struct {
-	GrantID          string `json:"grant_id,omitempty"`
-	View             string `json:"view,omitempty"`
-	Limit            int    `json:"limit,omitempty"`
-	Decision         string `json:"decision,omitempty"`
-	Reason           string `json:"reason,omitempty"`
-	ExpectedRevision int64  `json:"expected_revision,omitempty"`
-	IdempotencyKey   string `json:"idempotency_key,omitempty"`
+	PolicyName       string                       `json:"policy_name,omitempty"`
+	PolicyUID        string                       `json:"policy_uid,omitempty"`
+	LifetimeSeconds  int64                        `json:"lifetime_seconds,omitempty"`
+	Limits           *policyGrantRequestLimits    `json:"limits,omitempty"`
+	Observation      *policyGrantObservationInput `json:"observation_limits,omitempty"`
+	GrantID          string                       `json:"grant_id,omitempty"`
+	View             string                       `json:"view,omitempty"`
+	Limit            int                          `json:"limit,omitempty"`
+	Decision         string                       `json:"decision,omitempty"`
+	Reason           string                       `json:"reason,omitempty"`
+	ExpectedRevision int64                        `json:"expected_revision,omitempty"`
+	IdempotencyKey   string                       `json:"idempotency_key,omitempty"`
 }
 
 type grantPrincipal struct {
@@ -353,6 +370,8 @@ type grantDecisionData struct {
 
 func publicGrantFailure(err error) OperationFailure {
 	switch {
+	case errors.Is(err, authorization.ErrGrantInvalid), errors.Is(err, authorization.ErrGrantScope):
+		return OperationFailure{"InvalidApprovalRequest", "The selected approval period or limits do not fit this policy. Check its current limits and try again.", false}
 	case errors.Is(err, authorization.ErrSelfApproval):
 		return OperationFailure{"SelfApprovalRefused", "You requested this plan, so you cannot decide it, from any client. Another approver of this workload must review it.", false}
 	case errors.Is(err, authorization.ErrStepUpRequired):
@@ -404,6 +423,28 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 	until := i.ValidUntil
 	var operationErr error
 	switch name {
+	case "request_policy_grant":
+		requester, ok := s.grants.(interface {
+			RequestPolicy(context.Context, identities.CurrentIdentity, authapp.PolicyGrantRequestInput) (authorization.Grant, bool, error)
+		})
+		if !ok || in.Limits == nil || !slices.Contains(i.Scopes, "evidence:capture") {
+			operationErr = authapp.ErrGrantUnavailable
+			break
+		}
+		request := authapp.PolicyGrantRequestInput{PolicyUID: in.PolicyUID, PolicyName: in.PolicyName, IdempotencyKey: in.IdempotencyKey, Lifetime: time.Duration(in.LifetimeSeconds) * time.Second, Limits: authorization.AutomationLimits{MaxExecutions: in.Limits.MaxExecutions, MaxBytes: in.Limits.MaxCollectedBytes, MaxObservedBytes: in.Limits.MaxObservedBytes}}
+		if in.Observation != nil {
+			o := in.Observation
+			request.Observation = &authorization.ObservationLimits{MaxSessionSeconds: o.MaxSessionSeconds, MaxObservedBytes: o.MaxObservedBytes, MaxBytesPerSecond: o.MaxBytesPerSecond, MaxConcurrentSessions: o.MaxConcurrentSessions, MaxObservedEvents: o.MaxObservedEvents}
+		}
+		var g authorization.Grant
+		if g, _, operationErr = requester.RequestPolicy(ctx, current, request); operationErr == nil {
+			var v authapp.GrantView
+			var valid time.Time
+			if v, valid, operationErr = s.grants.Get(ctx, current, g.ID); operationErr == nil {
+				until = identity.Earlier(until, valid)
+				out.Data = s.view(v, i.Principal, true, s.now())
+			}
+		}
 	case "get_grant":
 		var v authapp.GrantView
 		var valid time.Time

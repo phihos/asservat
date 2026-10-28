@@ -246,11 +246,19 @@ try {
   await expect(page.getByText(/Pod undefined/)).toHaveCount(0);
   await scan('current-policy-manager');
   await page.screenshot({ path: output + '/policy-manager.png', fullPage: true });
+  await page.goto(origin + '/policies');
+  await page.getByLabel('Policy name').fill('team-policy');
+  await page.getByRole('button', { name: 'Show policy' }).click();
+  await page.getByLabel('Approved policy grant ID').fill('00000000-0000-4000-8000-000000000702');
+  await page.getByRole('button', { name: 'Attach approved grant', exact: true }).click();
+  await page.getByRole('link', { name: '00000000-0000-4000-8000-000000000702', exact: true }).waitFor();
+  await scan('current-policy-grant-attachment');
+  await page.goto(origin + '/approvals/00000000-0000-4000-8000-000000000702');
   await page.getByRole('button', { name: 'Revoke approval', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Revoke approval', exact: true })).toHaveCount(0);
   const managerStats = await (await page.request.get(origin + '/test/policy-grant-stats')).json();
   assert.deepEqual(managerStats, { revocations: 1, executions_used: 4, collected_bytes_used: 32 << 20 });
-  checks.push('current team manager views original policy/workload/expiry/reservations through real C03 and built React; revokes once without review, personal capture or budget reset');
+  checks.push('current team manager views policy/workload/expiry/reservations, explicitly attaches an approved grant through real activation control, then revokes once without review, personal capture or budget reset');
 
   await page.goto(origin + '/policies');
   await page.getByLabel('Policy name').fill('team-policy');
@@ -261,8 +269,19 @@ try {
   await page.getByText(/budgets are shared across captures and grants/).waitFor();
   await page.getByRole('button', { name: 'Check status' }).click();
   await page.getByText('5 of 100 used', { exact: true }).waitFor();
+  await page.getByLabel('Maximum executions', { exact: true }).fill('3');
+  await page.getByRole('button', { name: 'Request policy approval', exact: true }).click();
+  await page.getByRole('link', { name: 'View policy approval', exact: true }).click();
+  await expect(page.getByText(/3 executions/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continue approved capture' })).toHaveCount(0);
+  await scan('policy-approval-request');
+  await page.goto(origin + '/policies');
+  await page.getByLabel('Policy name').fill('team-policy');
+  await page.getByRole('button', { name: 'Show policy' }).click();
+  await page.getByText('5 of 100 used', { exact: true }).waitFor();
   await scan('shared-policy-budgets');
-  checks.push('shared policy budgets through current status service and explicit refresh');
+  checks.push('shared policy budgets and explicit refresh; finite policy approval request through real C03/HTTPS, existing review detail and no self-approval/personal continuation');
   await page.screenshot({ path: output + '/policy-budgets.png', fullPage: true });
 
   await page.goto(origin + '/');

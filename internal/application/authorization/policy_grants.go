@@ -16,7 +16,7 @@ import (
 // PolicyGrantPlanReader resolves the currently accepted exact team scope. It is
 // server-owned; public callers submit a policy UID, never authority or a scope.
 type PolicyGrantPlanReader interface {
-	PolicyGrantPlan(context.Context, string) (PolicyGrantPlan, error)
+	PolicyGrantPlan(context.Context, string, string) (PolicyGrantPlan, error)
 }
 
 type PolicyGrantPlan struct {
@@ -57,20 +57,21 @@ func PolicyGrantRequestDigest(actor identity.Principal, in PolicyGrantRequestInp
 		Format      string
 		Actor       identity.Principal
 		PolicyUID   string
+		PolicyName  string
 		Lifetime    time.Duration
 		Limits      value.AutomationLimits
 		Observation *value.ObservationLimits
-	}{"policy-grant-request/v1", actor, in.PolicyUID, in.Lifetime, in.Limits, in.Observation})
+	}{"policy-grant-request/v1", actor, in.PolicyUID, in.PolicyName, in.Lifetime, in.Limits, in.Observation})
 	return sha256.Sum256(b)
 }
 
 // PolicyGrantRequestInput selects finite budgets inside the currently accepted
 // authority. The requester is resolved from the live authenticated request.
 type PolicyGrantRequestInput struct {
-	PolicyUID, IdempotencyKey string
-	Lifetime                  time.Duration
-	Limits                    value.AutomationLimits
-	Observation               *value.ObservationLimits
+	PolicyUID, PolicyName, IdempotencyKey string
+	Lifetime                              time.Duration
+	Limits                                value.AutomationLimits
+	Observation                           *value.ObservationLimits
 }
 
 func (s GrantService) workload(ctx context.Context, i identity.Identity, t value.WorkloadTarget, op value.Operation) (value.Result, error) {
@@ -114,7 +115,7 @@ func (s GrantService) RequestPolicy(ctx context.Context, current identities.Curr
 	if ctx == nil || ctx.Err() != nil || !s.ready() || s.PolicyRequests == nil || current == nil {
 		return zero, false, ErrGrantUnavailable
 	}
-	if !identity.Text(in.PolicyUID, 64) || !identity.Text(in.IdempotencyKey, 128) {
+	if !identity.Text(in.PolicyUID, 64) || !identity.Text(in.PolicyName, 253) || !identity.Text(in.IdempotencyKey, 128) {
 		return zero, false, value.ErrGrantInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -141,7 +142,7 @@ func (s GrantService) RequestPolicy(ctx context.Context, current identities.Curr
 	if s.PolicyPlans == nil {
 		return zero, false, ErrGrantUnavailable
 	}
-	plan, err := s.PolicyPlans.PolicyGrantPlan(ctx, in.PolicyUID)
+	plan, err := s.PolicyPlans.PolicyGrantPlan(ctx, in.PolicyUID, in.PolicyName)
 	if err != nil || plan.RecipeDigest == (artifact.Digest{}) || plan.Authority.PolicyUID != in.PolicyUID || plan.Authority.InstallationID != s.InstallationID || !plan.Authority.Valid(s.Now()) || !s.Now().Before(plan.FreshUntil) || sha256.Sum256(plan.Scope) != plan.Authority.ScopeDigest {
 		return zero, false, ErrGrantUnavailable
 	}
@@ -203,7 +204,7 @@ func (s GrantService) RequestPolicy(ctx context.Context, current identities.Curr
 	if !s.Now().Before(plan.FreshUntil) || !s.Now().Before(settings.FreshUntil) || !s.Now().Before(eligible.ValidUntil) {
 		return zero, false, ErrGrantUnavailable
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	if err = s.finalGrantMetadata(ctx, current, i, true); err != nil {
 		return zero, false, err
 	}
 	if !s.Now().Before(i.ValidUntil) || !s.Now().Before(plan.FreshUntil) || !s.Now().Before(settings.FreshUntil) || !s.Now().Before(eligible.ValidUntil) {
@@ -224,7 +225,7 @@ func (s GrantService) policyRequestReplay(ctx context.Context, current identitie
 	if !eligible.Eligible {
 		return zero, false, identity.ErrDenied
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	if err = s.finalGrantMetadata(ctx, current, i, true); err != nil {
 		return zero, false, err
 	}
 	now := s.Now()

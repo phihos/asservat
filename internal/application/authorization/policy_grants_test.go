@@ -12,10 +12,10 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-type policyPlanFunc func(context.Context, string) (PolicyGrantPlan, error)
+type policyPlanFunc func(context.Context, string, string) (PolicyGrantPlan, error)
 
-func (f policyPlanFunc) PolicyGrantPlan(c context.Context, id string) (PolicyGrantPlan, error) {
-	return f(c, id)
+func (f policyPlanFunc) PolicyGrantPlan(c context.Context, id, name string) (PolicyGrantPlan, error) {
+	return f(c, id, name)
 }
 
 type approvalSettingsFunc func(context.Context) (AcceptedPolicyApprovalSettings, error)
@@ -43,7 +43,7 @@ func newPolicyGrantFixture(t *testing.T) (*grantFixture, PolicyGrantRequestInput
 	owner.Kind = "Group"
 	owner.SubjectID = f.requester.Groups[0]
 	authority := value.AcceptedPolicyAuthority{InstallationID: grantRoot, PolicyUID: "policy-uid", Creator: f.outside.Principal, Executor: value.PolicyPrincipal(grantRoot, "policy-uid"), ScopeDigest: sha256.Sum256(scope), ClusterID: f.target.ClusterID, NamespaceUID: f.target.NamespaceUID, WorkloadUID: f.target.WorkloadUID, Delegation: rev, Owners: []artifact.AudienceAssignment{owner}, Actions: []string{"packetCapture"}, Limits: value.AutomationLimits{MaxExecutions: 10, MaxBytes: 1 << 20, MaxObservedBytes: 1 << 20}, IssuedAt: f.now.Add(-time.Hour), NotAfter: f.now.Add(30 * 24 * time.Hour)}
-	f.svc.PolicyPlans = policyPlanFunc(func(_ context.Context, id string) (PolicyGrantPlan, error) {
+	f.svc.PolicyPlans = policyPlanFunc(func(_ context.Context, id, name string) (PolicyGrantPlan, error) {
 		return PolicyGrantPlan{Authority: authority, RecipeDigest: artifact.Digest{5}, Scope: scope, DataClass: "extract", Reasons: []value.SensitiveReason{{ActionID: "packets", Code: "rawBytePredicate"}}, Review: GrantReview{ObservationLimits: &GrantObservationLimits{MaxSessionSeconds: 10, MaxObservedBytes: 1 << 20, MaxBytesPerSecond: 16 << 20, MaxConcurrentSessions: 1}, Namespace: "payments", WorkloadKind: "Deployment", WorkloadName: "api", Actions: []GrantReviewAction{{ActionID: "packets", Kind: "packetCapture", Filter: "tcp[13] & 2 != 0"}}, Deadline: authority.NotAfter}, FreshUntil: f.now.Add(30 * time.Second)}, nil
 	})
 	f.svc.ApprovalSettings = approvalSettingsFunc(func(context.Context) (AcceptedPolicyApprovalSettings, error) {
@@ -54,7 +54,7 @@ func newPolicyGrantFixture(t *testing.T) (*grantFixture, PolicyGrantRequestInput
 		p.Allows[0].Audience = owner
 		return value.WorkloadProjection{Target: target, Revision: p.Revision, ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil, DeniesComplete: p.DeniesComplete, DeniesObservedAt: p.DeniesObservedAt, DeniesFreshUntil: p.DeniesFreshUntil, Allows: p.Allows, Denies: p.Denies}, nil
 	})
-	return f, PolicyGrantRequestInput{PolicyUID: authority.PolicyUID, IdempotencyKey: "policy-first-review", Limits: value.AutomationLimits{MaxExecutions: 2, MaxBytes: 65536, MaxObservedBytes: 1000}, Observation: &value.ObservationLimits{MaxSessionSeconds: 10, MaxObservedBytes: 1000, MaxBytesPerSecond: 10000, MaxConcurrentSessions: 1}}
+	return f, PolicyGrantRequestInput{PolicyUID: authority.PolicyUID, PolicyName: "restarts", IdempotencyKey: "policy-first-review", Limits: value.AutomationLimits{MaxExecutions: 2, MaxBytes: 65536, MaxObservedBytes: 1000}, Observation: &value.ObservationLimits{MaxSessionSeconds: 10, MaxObservedBytes: 1000, MaxBytesPerSecond: 10000, MaxConcurrentSessions: 1}}
 
 }
 
@@ -108,8 +108,8 @@ func TestPolicyGrantRefusesDepartedRequesterControlAndStaleScope(t *testing.T) {
 		t.Fatal("requester provenance became perpetual control", err)
 	}
 	old := f.svc.PolicyPlans
-	f.svc.PolicyPlans = policyPlanFunc(func(c context.Context, id string) (PolicyGrantPlan, error) {
-		p, e := old.PolicyGrantPlan(c, id)
+	f.svc.PolicyPlans = policyPlanFunc(func(c context.Context, id, name string) (PolicyGrantPlan, error) {
+		p, e := old.PolicyGrantPlan(c, id, name)
 		p.FreshUntil = f.now
 		return p, e
 	})
@@ -184,7 +184,9 @@ func TestPolicyGrantLostRequestReplySurvivesDefaultAndSourceChanges(t *testing.T
 			case "missing-current-plan":
 				f.svc.PolicyPlans = nil
 			case "unavailable-current-plan":
-				f.svc.PolicyPlans = policyPlanFunc(func(context.Context, string) (PolicyGrantPlan, error) { return PolicyGrantPlan{}, ErrGrantUnavailable })
+				f.svc.PolicyPlans = policyPlanFunc(func(context.Context, string, string) (PolicyGrantPlan, error) {
+					return PolicyGrantPlan{}, ErrGrantUnavailable
+				})
 			}
 			again, replay, err := f.svc.RequestPolicy(context.Background(), current, in)
 			if err != nil || !replay || again.ID != first.ID || again.Lifetime != first.Lifetime || again.PolicyNotAfter != first.PolicyNotAfter || again.ReviewDigest != first.ReviewDigest || again.Policy.ApprovalMaxAge != first.Policy.ApprovalMaxAge {
@@ -290,7 +292,9 @@ func TestPolicyGrantRequestReplayKeepsCurrentRightsAndAcceptedLowerDeadline(t *t
 				row.PolicyNotAfter = row.RequestedAt.Add(time.Second)
 				f.store.rows[first.ID] = row
 				f.now = f.now.Add(2 * time.Second)
-				f.svc.PolicyPlans = policyPlanFunc(func(context.Context, string) (PolicyGrantPlan, error) { return PolicyGrantPlan{}, ErrGrantUnavailable })
+				f.svc.PolicyPlans = policyPlanFunc(func(context.Context, string, string) (PolicyGrantPlan, error) {
+					return PolicyGrantPlan{}, ErrGrantUnavailable
+				})
 			}
 			g, replay, err := f.svc.RequestPolicy(context.Background(), current, in)
 			if change == "lower-then-raise" {
@@ -683,5 +687,163 @@ func TestPolicyGrantRevokeReplayRechecksCurrentIdentityAndOriginalDeadline(t *te
 				t.Fatal("refused replay mutated immutable outcome/spend")
 			}
 		})
+	}
+}
+
+// Request receipts disclose the same protected policy metadata as Get/Revoke.
+// Preserve the existing final identity read after both fresh storage and replay.
+type blockedPolicyRequestStore struct {
+	GrantStore
+	entered, release chan struct{}
+}
+
+func (s blockedPolicyRequestStore) RequestGrant(ctx context.Context, in StoredGrantRequest, r artifact.RecoveryProof) (value.Grant, bool, error) {
+	close(s.entered)
+	select {
+	case <-s.release:
+	case <-ctx.Done():
+		return value.Grant{}, false, ctx.Err()
+	}
+	return s.GrantStore.RequestGrant(ctx, in, r)
+}
+func TestPolicyGrantRequestNeverDisclosesAfterBlockedCallerGroupLoss(t *testing.T) {
+	for _, mode := range []string{"fresh", "replay"} {
+		t.Run(mode, func(t *testing.T) {
+			f, in := newPolicyGrantFixture(t)
+			current := &policyReplayIdentity{i: f.requester}
+			if mode == "replay" {
+				if _, _, err := f.svc.RequestPolicy(context.Background(), current, in); err != nil {
+					t.Fatal(err)
+				}
+			}
+			entered, release := make(chan struct{}), make(chan struct{})
+			if mode == "fresh" {
+				f.svc.Store = blockedPolicyRequestStore{GrantStore: f.store, entered: entered, release: release}
+			} else {
+				original := f.svc.WorkloadPermissions
+				f.svc.WorkloadPermissions = workloadProjectionFunc(func(ctx context.Context, target value.WorkloadTarget) (value.WorkloadProjection, error) {
+					p, err := original.WorkloadPermissions(ctx, target)
+					close(entered)
+					select {
+					case <-release:
+					case <-ctx.Done():
+						return value.WorkloadProjection{}, ctx.Err()
+					}
+					return p, err
+				})
+			}
+			type result struct {
+				g   value.Grant
+				err error
+			}
+			done := make(chan result, 1)
+			go func() { g, _, err := f.svc.RequestPolicy(context.Background(), current, in); done <- result{g, err} }()
+			<-entered
+			current.i.Groups = []string{"unrelated"}
+			close(release)
+			out := <-done
+			if out.err == nil || out.g.ID != "" {
+				t.Fatal("policy request disclosed metadata after blocked group loss", out.err, out.g.ID)
+			}
+			f.store.mu.Lock()
+			defer f.store.mu.Unlock()
+			if len(f.store.rows) != 1 {
+				t.Fatal("refused reply lost or duplicated immutable request", len(f.store.rows))
+			}
+			for _, g := range f.store.rows {
+				if g.PolicySpend != (value.PolicyGrantSpend{}) {
+					t.Fatal("refused request charged or refilled execution", g.PolicySpend)
+				}
+			}
+		})
+	}
+}
+
+type blockedPolicyDecisionStore struct {
+	GrantStore
+	entered, release chan struct{}
+}
+
+func (s blockedPolicyDecisionStore) DecideGrant(ctx context.Context, in GrantDecisionInput, r artifact.RecoveryProof) (value.Grant, bool, error) {
+	close(s.entered)
+	select {
+	case <-s.release:
+	case <-ctx.Done():
+		return value.Grant{}, false, ctx.Err()
+	}
+	return s.GrantStore.DecideGrant(ctx, in, r)
+}
+func TestPolicyGrantDecisionRetainsReviewerAfterBlockedFreshAndReplay(t *testing.T) {
+	for _, mode := range []string{"fresh", "replay"} {
+		for _, change := range []string{"groups", "eligibility-expiry"} {
+			t.Run(mode+"/"+change, func(t *testing.T) {
+				f, in := newPolicyGrantFixture(t)
+				original := f.svc.WorkloadPermissions
+				f.svc.WorkloadPermissions = workloadProjectionFunc(func(ctx context.Context, target value.WorkloadTarget) (value.WorkloadProjection, error) {
+					p, err := original.WorkloadPermissions(ctx, target)
+					p.FreshUntil = f.now.Add(5 * time.Second)
+					p.DeniesFreshUntil = p.FreshUntil
+					for n := range p.Allows {
+						p.Allows[n].FreshUntil = p.FreshUntil
+						if p.Allows[n].Audience.Role == "action-approver" {
+							p.Allows[n].Audience.Kind = "Group"
+							p.Allows[n].Audience.SubjectID = "reviewers"
+						}
+					}
+					return p, err
+				})
+				reviewer := &policyReplayIdentity{i: f.approver}
+				reviewer.i.Groups = []string{"reviewers"}
+				g, _, err := f.svc.RequestPolicy(context.Background(), grantIdentity{f.requester, &f.now}, in)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if mode == "replay" {
+					g, _, err = f.svc.Decide(context.Background(), reviewer, g.ID, true, "reviewed", "approve-policy")
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				entered, release := make(chan struct{}), make(chan struct{})
+				f.svc.Store = blockedPolicyDecisionStore{GrantStore: f.store, entered: entered, release: release}
+				type result struct {
+					g   value.Grant
+					err error
+				}
+				done := make(chan result, 1)
+				go func() {
+					out, _, err := f.svc.Decide(context.Background(), reviewer, g.ID, true, "reviewed", "approve-policy")
+					done <- result{out, err}
+				}()
+				<-entered
+				if change == "groups" {
+					reviewer.i.Groups = []string{"unrelated"}
+				} else {
+					f.now = f.now.Add(6 * time.Second)
+				}
+				close(release)
+				out := <-done
+				if out.err == nil || out.g.ID != "" {
+					t.Fatal("blocked decision disclosed protected policy metadata", out.err, out.g.ID)
+				}
+				after, _ := f.store.Grant(context.Background(), g.ID)
+				if after.PolicySpend != g.PolicySpend {
+					t.Fatal("refused decision reply altered spend")
+				}
+			})
+		}
+	}
+}
+
+func TestPolicyGrantRequestJournalBindsExactNamedPolicyBeforeNewSourceReads(t *testing.T) {
+	f, in := newPolicyGrantFixture(t)
+	current := grantIdentity{f.requester, &f.now}
+	if _, _, err := f.svc.RequestPolicy(context.Background(), current, in); err != nil {
+		t.Fatal(err)
+	}
+	f.svc.PolicyPlans = nil
+	in.PolicyName = "other-policy-name"
+	if _, _, err := f.svc.RequestPolicy(context.Background(), current, in); !errors.Is(err, ErrGrantConflict) {
+		t.Fatal("same key changed pinned source name or reinterpreted unavailable source", err)
 	}
 }

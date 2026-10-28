@@ -46,7 +46,7 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 	settings := identity.PolicyGrantSettingsObservation{Issuer: a.Creator.Issuer, Revision: identity.Revision{UID: "accounting-policy-period", Generation: 1, Digest: artifact.Digest{77}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Values: identity.PolicyGrantApproval{DefaultAge: time.Hour, MaxAge: time.Hour, RenewalNotice: time.Minute}}
 	// Protected settings retain the independently provisioned existing duty;
 	// the ordinary hub must not gain permission to accept its own maxima.
-	settingsRole := narrowRole(t, ctx, admin, "policy_accounting_settings_", "synthetic-accounting-settings", func(role string) []string {
+	settingsRole := narrowRole(t, ctx, admin, "policy_accounting_settings_"+key+"_", "synthetic-accounting-settings", func(role string) []string {
 		grants, ok := postgres.PublicRuntimeRoleGrantSQL("permission-accept", role)
 		if !ok {
 			t.Fatal("missing protected settings duty")
@@ -76,7 +76,7 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: key, RequestDigest: app.PolicyGrantRequestDigest(a.Creator, app.PolicyGrantRequestInput{PolicyUID: a.PolicyUID, IdempotencyKey: key, Lifetime: g.Lifetime, Limits: limits})}, recovery)
+	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: key, RequestDigest: app.PolicyGrantRequestDigest(a.Creator, app.PolicyGrantRequestInput{PolicyUID: a.PolicyUID, PolicyName: "restarts", IdempotencyKey: key, Lifetime: g.Lifetime, Limits: limits})}, recovery)
 	if err != nil {
 		t.Fatal("policy grant request", err)
 	}

@@ -27,15 +27,30 @@ type PolicyGrantAcceptanceReader interface {
 type PolicyGrantPlans struct {
 	Accepted        PolicyGrantAcceptanceReader
 	Documents       PolicyDocuments
+	Sources         PolicySourceWriter
 	CompileRecorder PolicyRecorderCompiler
 	RecipeName      string
 	RecipeDigest    artifact.Digest
 	Now             func() time.Time
 }
 
-func (s PolicyGrantPlans) PolicyGrantPlan(ctx context.Context, policy string) (authapp.PolicyGrantPlan, error) {
+func (s PolicyGrantPlans) PolicyGrantPlan(ctx context.Context, policy, name string) (authapp.PolicyGrantPlan, error) {
 	var zero authapp.PolicyGrantPlan
-	if ctx == nil || ctx.Err() != nil || s.Accepted == nil || s.Documents == nil || s.CompileRecorder == nil || s.Now == nil || !identity.Text(policy, 64) {
+	if ctx == nil || ctx.Err() != nil || s.Accepted == nil || s.Documents == nil || s.Sources == nil || s.CompileRecorder == nil || s.Now == nil || !identity.Text(policy, 64) || !identity.Text(name, 253) {
+		return zero, authapp.ErrGrantUnavailable
+	}
+	// A status/trigger observation may have expired. Resolve the exact named
+	// protected source first, retain its original deadline and persist it before
+	// asking for current accepted authority. The immutable request journal was
+	// already resolved by C03; this never refreshes an old request or acceptance.
+	source, spec, err := s.Documents.ReadPolicy(ctx, name, policy)
+	if err != nil || !source.Valid(s.Now()) || source.Revision.UID != policy || source.Name != name {
+		return zero, authapp.ErrGrantUnavailable
+	}
+	bounded, stop := context.WithDeadline(ctx, source.FreshUntil)
+	defer stop()
+	ctx = bounded
+	if err = s.Sources.ObservePolicy(ctx, source); err != nil || source.Suspended || source.Deleted {
 		return zero, authapp.ErrGrantUnavailable
 	}
 	snapshot, record, err := s.Accepted.AcceptedPolicyRecord(ctx, policy)
@@ -43,8 +58,7 @@ func (s PolicyGrantPlans) PolicyGrantPlan(ctx context.Context, policy string) (a
 	if err != nil || !record.Valid() || !reflect.DeepEqual(snapshot.Authority, record.Authority) || snapshot.Authority.PolicyUID != policy || snapshot.Authority.ScopeDigest != record.Authority.ScopeDigest || !snapshot.Authority.Valid(now) || !now.Before(snapshot.FreshUntil) {
 		return zero, authapp.ErrGrantUnavailable
 	}
-	source, spec, err := s.Documents.ReadPolicy(ctx, record.Source.Name, policy)
-	if err != nil || !source.Valid(s.Now()) || source.Revision.UID != policy || source.Name != record.Source.Name || source.InstallationID != record.Source.InstallationID || source.ClusterID != record.Source.ClusterID || source.NamespaceUID != record.Source.NamespaceUID || source.CollectionDigest != record.Source.CollectionDigest || source.Suspended || source.Deleted {
+	if source.Name != record.Source.Name || source.InstallationID != record.Source.InstallationID || source.ClusterID != record.Source.ClusterID || source.NamespaceUID != record.Source.NamespaceUID || source.CollectionDigest != record.Source.CollectionDigest {
 		return zero, authapp.ErrGrantUnavailable
 	}
 	compiled, err := CompilePolicyWithRecorders(spec, s.RecipeName, s.RecipeDigest, s.CompileRecorder)

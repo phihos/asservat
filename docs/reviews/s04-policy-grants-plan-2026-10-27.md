@@ -211,7 +211,7 @@ matches or an unmeasured larger capture buffer.
 | 6 | Existing grant phases plus explicit exhaustion/source stop. No automatic approval renewal, best-effort permission fallback or refund state machine. Waiting credit is bounded by the original lease. |
 | 7 | Only required approval period and reviewed grant budgets. No watch tuning, retry-disable or collector machinery configuration. Rate-times-authority-horizon credit is internal and must pay for its measured cost. |
 | 8 | Existing PostgreSQL/Kubernetes/IdP/Gadget and private TLS channels; upstream before-read support remains a real blocker for syscall arguments, not an assumed capability. |
-| 9 | Per packet: local counter/rate/lease checks, no allocation or network call intended; benchmark actual ns/allocations. One required sensitive-authority renewal carries credit too: a hypothetical five-second lease at 200 sources means 40 new requests/s total, with no additional quota-only stream. Measure the current combined path before choosing the rate-times-horizon credit quantum. No added watches. |
+| 9 | Per packet: local counter/rate/lease checks, no allocation or network call intended; benchmark actual ns/allocations. One required sensitive-authority renewal carries credit too: a hypothetical five-second lease at 200 sources means 40 logical renewals/s, with node→connector and connector→hub RPC legs counted separately and no additional quota-only stream. Measure the current combined path before choosing the rate-times-horizon credit quantum. No added watches. |
 | 10 | Additive conditional grant migration with tested Down and no conversion of old scopes. Disable new sensitive activations without disabling cleanup/current metadata. No spent-counter reset on rollback/restart. |
 | 11 | Explicit onTrigger policy execution avoids prematurely building ongoing arming/rings. Explicit approved-grant attachment avoids a new grant-head controller. Prepaid slices avoid per-packet hub I/O; conservative tail charging avoids a refund protocol. Do not substitute pod-status or foundation-only tests for the real sensitive workflow. |
 
@@ -1103,3 +1103,161 @@ distinct fixed original/replacement request keys. No global helper, production
 role or privilege change, and no replacement/revocation success claimed. This
 failure is retained; the host slot was released to storage qualification and no
 automatic repeat is authorized.
+
+
+### Public request/review/attachment composition (2026-10-28)
+
+Use request_policy_grant as one typed browser/MCP command over the existing C03
+RequestPolicy service; callers select only an exact named policy/UID pin and
+finite limits/period, never authority, scope bytes, requester or a Pod/capture.
+Reuse existing GrantOperations/get_grant detail and independent decide_review
+with real step-up. Keep original actor/client journals and original request
+expiry. Use the current get_grant projection for the command result rather than
+introducing another policy view model: this adds one existing grant read and one
+existing workload metadata projection on a rare approval request; exact SQL
+round trips are recorded with the implementation, not called network-free.
+
+Add optional grant_id to existing activate_policy input. The real activation
+service resolves the policy and current actor, preserves acceptance/audit, and
+calls existing AttachPolicyGrant only when accepted-policy audit is acknowledged.
+The outer AuditedOperations already acknowledges encrypted intent before inner
+service work and records its outcome. Include all new input fields in existing
+normalization/MAC and exact immutable request key; unknown Begin never mutates,
+unknown outcome never refunds or fabricates a new attachment. No new audit
+worker/table/service or public resume hints. SQL102 extends existing closed
+operation_audit_lane/input functions for request_policy_grant; Down restores
+previous names and refuses incompatible retained policy state as before.
+
+Production producers already exist: PolicyGrantPlans recompiles the pinned
+accepted source with the same recorder/profile/filter compiler and verifies its
+exact scope digest; AccessGrants reads current accepted settings and original
+request journals. Wire these and WorkloadPermissions, not fixture authority.
+Reuse the existing manual filter compiler through typed DTO conversion; no new
+compiler dependency or profile approximation. Join the existing settings observer
+under the permission-worker's existing lease, using its protected cached identity
+reader and permission-accept credential. Incremental bound: at most one source
+read/10s (at most three Kubernetes HTTP requests per refresh =0.3 API/s), one SQL
+projection transaction/10s, fewer on exact cached observations; no new watcher,
+credential, worker workload or table. Source validity is the original 30s; cache
+reuse cannot renew it. The existing observer child is joined on lease loss.
+
+Recorder activation/execution currently lacks production composition: the trigger
+still only compiles/submits pod-status and must never substitute that for packet
+recording. Keep sensitive acquisition without concrete observation/session bounds
+unavailable, preserve supported ordinary qualified headers, and compose genuine
+recorder submission next. Public metadata/review/attachment alone does not finish
+ongoing source arming, all-before-filter credit, native evidence or installed
+policy workflow qualification.
+
+
+Public composition cost refinements: settings are one transaction per fresh
+observation, not one SQL query. The normal transaction executes five work SQL
+calls (lock, clock, read, write, final clock), plus existing setup Exec and
+BEGIN/COMMIT = eight database round trips before driver first-use preparation;
+initial/lower maxima add one clamp call = nine. Thus steady accepted observations
+at 10s cost about 0.8 DB round trips/s (0.9 on a clamp), in addition to at most
+0.3 Kubernetes requests/s; exact unchanged cache hits skip SQL. Existing bounded
+transaction retry stays under its original five-second total. One serial joined
+observer child/timer runs inside the existing permission-worker workload/lease,
+with no new worker deployment, watch, credential or table.
+
+For usable controls status also reports accepted collection_kind (from the
+already-read authority actions) and optional attached_grant_id. The latter is
+folded into the existing purpose-specific status source read through a bounded
+LEFT JOIN to the exact current receipt/root/policy/acceptance/authored reference;
+authority digest is checked after accepted-record decode. No additional round
+trip, mutable denormalized grantID or lookup by historical control key. Generic
+source authority readers remain unchanged. The status role already has receipt
+SELECT. Missing/mismatched current pointer fails unavailable; attachment ID never
+claims current approval eligibility or recorder readiness. This addresses stale
+receipt replay without an extra O(attached policies) query in multi-policy views.
+
+
+Public request final-authority regression: while composing the command, fresh
+RequestPolicy and immutable replay reproduced protected-result disclosure after
+same-principal group loss during blocking storage/projection (both RED, actual
+exit 1, 0.011s). Both now use existing finalGrantMetadata at the same final read,
+with no additional workload/SQL read. The stored original request remains once,
+with zero execution spend; refusing the reply cannot erase uncertain history.
+This extends the same demonstrated final policy-identity contract as get/revoke,
+not a new freshness mechanism.
+
+
+The source has a 30-second observation interval with a healthy 15-second trigger
+poll, so there is no inherent normal-operation freshness gap. After a genuinely
+expired source observation (for example a >30s observation outage), the initial
+SQL-first plan could fail before reading the restored protected object. The
+single canonical request
+now binds policy_name plus UID, and its plan reads that protected exact object
+once, persists its original observation through existing SourceWriter, then reads
+current accepted authority and recompiles those same bytes. No extra Kubernetes
+read versus the intended plan, TTL relaxation, watch or SQL locator lookup; one
+existing source-observation transaction per fresh request. Immutable request
+lookup still happens before all new source/settings interpretation on replay.
+
+There are no deployed production schema-102 policy-grant requests: this branch
+has never been published and all recorded requests were disposable owned fixture
+data, with exact source snapshots retained. Update this one unpublished canonical
+v1 input/digest and fixtures together; do not retain compatibility versions or
+fallback ports solely for prototypes. No real receipt is rewritten. The name/UID
+pin is validated again against the accepted record and actual protected source.
+
+
+The source-first ordering regression models an original valid source observation
+expired after 31s, then a new actual named protected read. It retains that read's
+original 30s deadline and the separately bounded five-second recovery/preflight
+result, plus unchanged authority/expiry/pools. Failed observation has no fallback
+to SQL authority. Its mutation of current negative/source watermarks occurs only
+inside the existing acknowledged outer public operation intent. It is never
+acceptance, renewal or permission to collect. The earlier five-versus-15 claim
+was a diagnostic error, corrected before qualification or publication.
+
+
+Review effect-bound cost/qualification: four blocked fresh/replay reviewer cases
+(group loss and original eligibility expiry) reproduced RED (exit 1, 0.012s).
+The same Store context now retains earliest original identity/reviewer and fresh
+approval step-up deadlines, truncated down to microseconds. Its existing UPDATE
+also compares database time with the inherited bound (one scalar parameter, zero
+new queries/permissions/tables). Replay does not demand a new step-up. This is
+original-bound enforcement, not immediate role-change revocation. The compiled
+public SQL fixture holds the actual row beyond both narrowed reviewer and step-up
+bounds and independently reads decision NULL after release. No actual SQL RED or
+GREEN has run yet; do not replace that evidence with a hidden-error assertion.
+
+Public request post-read detail cost: seven work SQL calls in the existing grant
+read/workload projection, two transaction setups and BEGIN/COMMIT pairs = about
+13 steady round trips before first-use preparation, plus two existing current
+identity resolutions. It reuses one existing DTO and actual CanRevoke rather than
+duplicating rights or a view model. Source observation costs six work calls plus
+setup/BEGIN/COMMIT = nine steady round trips per fresh named request; no additional
+protected Kubernetes read. These are per human/service approval request, not
+per packet, policy poll or ongoing authority renewal.
+
+Public fixture preflight now uses actual PolicyGrantPlans, typed composition
+conversion and the same profile compiler, rather than a synthetic plan/scope.
+Its pinned genuine libpcap corpus accepts exactly `tcp dst port 80` and refuses
+other expressions; this is not a host libpcap qualification. The accepted scope
+hashes the compiled configuration, original delegation/owners and original
+64 MiB output ceiling. The public request selects 32 MiB for two executions;
+held-row probes select 16 MiB, matching the builtin action ceiling. Protected
+Kubernetes source, verified IdP/step-up and initial trust remain synthetic facts.
+Source refresh is dispatched only inside the outer acknowledged intent; both
+unknown-intent cases independently compare actual source observed_at, in addition
+to checking no grant/attachment mutation. A separate external source-observer
+simulation performs authored-ref A→B→A. This does not execute a recorder.
+
+Local public composition checks: final canonical source-order races and
+pre-push passed (actual exits 0); the final fixture compiler/compilation check
+passed in 0.014s. Built React → actual Go HTTPS browser run 5 passed (actual exit
+0, Go 23.199s): 25 journeys, 24 accessibility scans, no external requests or CSP/
+runtime errors, plus the native-restart checks. Browser reports/screenshots were
+archived before restoring tracked results at
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-public-browser-5-artifacts/`.
+This uses synthetic server authority/store and does not qualify SQL audit,
+protected Kubernetes producers, installed execution or sensitive observation.
+The new actual SQL public/audit/held-row checks are still pending coordination.
+Final affected race run also passed, actual exit 0: authorization 1.356s,
+capture 11.074s, PostgreSQL 2.596s, bootstrap 54.629s, presentation 87.126s,
+audit 1.031s and browser transport 17.805s. Final pre-push exit 0 includes
+spec/architecture/design/schema/OpenAPI/SQL generation, console 231 tests and
+Go vet/format checks. No external fixture or collector ran for these checks.

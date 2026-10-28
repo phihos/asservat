@@ -464,6 +464,18 @@
                     "minimum": 0,
                     "maximum": 1099511627776,
                     "description": "Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition."
+                  },
+                  "collection_kind": {
+                    "enum": [
+                      "podStatus",
+                      "packetCapture"
+                    ],
+                    "description": "Accepted collection action; controls available approval commands, not acquisition authority."
+                  },
+                  "attached_grant_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection."
                   }
                 },
                 "required": [
@@ -483,7 +495,8 @@
                   "collected_bytes_spent",
                   "max_collected_bytes",
                   "observed_bytes_spent",
-                  "max_observed_bytes"
+                  "max_observed_bytes",
+                  "collection_kind"
                 ]
               }
             },

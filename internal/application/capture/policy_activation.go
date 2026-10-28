@@ -69,6 +69,7 @@ type PolicyActivation struct {
 	// creates a placeholder Pod or draft authority to select an envelope.
 	WorkloadAutomation authapp.WorkloadAutomationAuthorityReader
 	CompileRecorder    PolicyRecorderCompiler
+	GrantAttachments   authapp.PolicyGrantAttachmentStore
 	Acceptor           PolicyAcceptor
 	Audit              PolicyAuditPublisher
 	Recovery           fleetapp.RecoveryReader
@@ -350,4 +351,68 @@ func (s PolicyActivation) sharing(author identity.Identity, in *value.PolicyShar
 		return nil, value.ErrInvalid
 	}
 	return &out, nil
+}
+
+// ActivateWithGrant composes explicit current-manager attachment with the same
+// activation. The public operation's encrypted intent is acknowledged by its
+// existing outer audit envelope before either mutation. An unacknowledged
+// acceptance never becomes attachment authority.
+func (s PolicyActivation) ActivateWithGrant(ctx context.Context, current identities.CurrentIdentity, name, key string, sharingReviewed bool, grantID string) (PolicyActivationResult, error) {
+	if grantID == "" {
+		return s.Activate(ctx, current, name, key, sharingReviewed)
+	}
+	var zero PolicyActivationResult
+	if ctx == nil || current == nil || s.GrantAttachments == nil || s.Documents == nil || s.Sources == nil || s.Ledger == nil || s.Recovery == nil || s.Now == nil || !authorization.UUID(grantID) || !identity.Text(name, 253) || !identity.Text(key, 128) {
+		return zero, value.ErrUnavailable
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	actor, err := current.ResolveIdentity(ctx)
+	if err != nil || !actor.Valid(s.Now()) || !slices.Contains(actor.Scopes, "evidence:capture") {
+		return zero, identity.ErrDenied
+	}
+	source, _, err := s.Documents.ReadPolicy(ctx, name, "")
+	if err != nil || !source.Valid(s.Now()) || source.InstallationID != s.InstallationID {
+		return zero, value.ErrUnavailable
+	}
+	if source.Suspended || source.Deleted {
+		return zero, value.ErrChanged
+	}
+	if err = s.Sources.ObservePolicy(ctx, source); err != nil {
+		return zero, err
+	}
+	status, err := s.Ledger.Status(ctx, source.Revision.UID)
+	if err != nil || status.ActiveID == "" || !s.Now().Before(status.NotAfter) {
+		return zero, value.ErrUnavailable
+	}
+	recovery, err := s.Recovery.RecoveryState(ctx)
+	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
+		return zero, value.ErrUnavailable
+	}
+	receipt, replay, err := s.GrantAttachments.AttachPolicyGrant(ctx, authapp.PolicyGrantAttachmentInput{ID: policyNonce(actor.Principal, status.PolicyUID, key), PolicyUID: status.PolicyUID, GrantID: grantID, IdempotencyKey: key, Actor: actor, Recovery: recovery})
+	if err != nil {
+		return zero, err
+	}
+	if receipt.AcceptanceID != status.ActiveID || receipt.PolicyUID != status.PolicyUID || receipt.GrantID != grantID {
+		return zero, value.ErrConflict
+	}
+	fresh, err := current.ResolveIdentity(ctx)
+	if err != nil || ctx.Err() != nil || !fresh.Valid(s.Now()) || fresh.Principal != actor.Principal || fresh.Policy != actor.Policy || !samePolicyActorSet(fresh.Groups, actor.Groups) || !samePolicyActorSet(fresh.Scopes, actor.Scopes) || !s.Now().Before(actor.ValidUntil) || !s.Now().Before(recovery.FreshUntil) || !s.Now().Before(source.FreshUntil) || !s.Now().Before(status.NotAfter) {
+		return zero, identity.ErrDenied
+	}
+	// Receipt replay is historical control provenance: the store never restores
+	// a pointer cleared by a later source/manager change. No active-grant claim.
+	return PolicyActivationResult{PolicyUID: status.PolicyUID, AcceptanceID: status.ActiveID, NotAfter: status.NotAfter, MaxExecutions: status.MaxExecutions, Replay: replay, Audited: true}, nil
+}
+
+func samePolicyActorSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, v := range a {
+		if !slices.Contains(b, v) {
+			return false
+		}
+	}
+	return true
 }

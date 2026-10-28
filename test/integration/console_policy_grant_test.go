@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -20,18 +21,26 @@ import (
 // route. They confer no installed, IdP, SQL, audit or execution qualification.
 type consoleManagerGrants struct {
 	authapp.GrantStore
-	mu          sync.Mutex
-	g           authorization.Grant
-	revocations int
+	mu             sync.Mutex
+	g              authorization.Grant
+	revocations    int
+	requests       map[string]authorization.Grant
+	requestKeys    map[string]string
+	requestDigests map[string]artifact.Digest
+	attachment     *authorization.PolicyGrantAttachment
+	attachmentKey  string
 }
 
 func (s *consoleManagerGrants) Grant(_ context.Context, id string) (authorization.Grant, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if id != s.g.ID {
-		return authorization.Grant{}, authapp.ErrGrantNotFound
+	if id == s.g.ID {
+		return s.g, nil
 	}
-	return s.g, nil
+	if g, ok := s.requests[id]; ok {
+		return g, nil
+	}
+	return authorization.Grant{}, authapp.ErrGrantNotFound
 }
 func (s *consoleManagerGrants) RevokeGrant(_ context.Context, in authapp.GrantRevocationInput, _ artifact.RecoveryProof) (authorization.Grant, bool, error) {
 	s.mu.Lock()
@@ -104,9 +113,88 @@ func newConsoleManagerGrants(t *testing.T, origin string) (*presentation.GrantOp
 	}
 	store := &consoleManagerGrants{g: g}
 	service := authapp.GrantService{RootID: root, InstallationID: root, Permissions: consoleManagerNoPods{}, WorkloadPermissions: consoleManagerProjection{owner, g.Policy.Workload(), rev}, Store: store, Recovery: consoleManagerRecovery{root, rev}, Now: time.Now, NewID: func() string { return consoleCaptureID(703) }}
+	service.PolicyRequests = store
+	service.PolicyPlans = consolePolicyGrantPlan{store}
+	service.ApprovalSettings = consolePolicyGrantSettings{store}
+	service.NewID = func() string { return consoleCaptureID(706) }
 	wire, err := presentation.NewGrantOperations(origin, time.Now, service.NewID, service)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return wire, store
+}
+
+// Real C03 request workflow with synthetic accepted-plan/settings persistence;
+// the source compiler and protected settings producers have separate tests.
+type consolePolicyGrantPlan struct{ store *consoleManagerGrants }
+
+func (s consolePolicyGrantPlan) PolicyGrantPlan(_ context.Context, uid, name string) (authapp.PolicyGrantPlan, error) {
+	s.store.mu.Lock()
+	defer s.store.mu.Unlock()
+	g := s.store.g
+	if uid != g.Policy.Authority.PolicyUID || name != "team-policy" {
+		return authapp.PolicyGrantPlan{}, authapp.ErrGrantUnavailable
+	}
+	var review authapp.GrantReview
+	if json.Unmarshal(g.Review, &review) != nil {
+		return authapp.PolicyGrantPlan{}, authapp.ErrGrantUnavailable
+	}
+	return authapp.PolicyGrantPlan{Authority: g.Policy.Authority, RecipeDigest: g.Policy.RecipeDigest, Scope: bytes.Clone(g.Scope), Review: review, DataClass: g.DataClass, Reasons: append([]authorization.SensitiveReason(nil), g.Reasons...), FreshUntil: time.Now().Add(5 * time.Second)}, nil
+}
+
+type consolePolicyGrantSettings struct{ store *consoleManagerGrants }
+
+func (s consolePolicyGrantSettings) PolicyApprovalSettings(context.Context) (authapp.AcceptedPolicyApprovalSettings, error) {
+	s.store.mu.Lock()
+	defer s.store.mu.Unlock()
+	now := time.Now()
+	return authapp.AcceptedPolicyApprovalSettings{Values: authorization.PolicyApprovalSettings{DefaultAge: 7 * 24 * time.Hour, MaxAge: 30 * 24 * time.Hour, RenewalNotice: 24 * time.Hour}, Revision: s.store.g.Policy.ApprovalPolicyRef, ObservedAt: now, FreshUntil: now.Add(30 * time.Second)}, nil
+}
+func consolePolicyRequestKey(actor identity.Principal, uid, key string) string {
+	b, _ := json.Marshal(struct {
+		Actor    identity.Principal
+		UID, Key string
+	}{actor, uid, key})
+	return string(b)
+}
+func (s *consoleManagerGrants) LookupPolicyGrantRequest(_ context.Context, in authapp.PolicyGrantRequestLookup) (authorization.Grant, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := consolePolicyRequestKey(in.Requester, in.PolicyUID, in.IdempotencyKey)
+	id, found := s.requestKeys[key]
+	if !found {
+		return authorization.Grant{}, false, nil
+	}
+	if s.requestDigests[key] != in.InputDigest {
+		return authorization.Grant{}, false, authapp.ErrGrantConflict
+	}
+	return s.requests[id], true, nil
+}
+func (s *consoleManagerGrants) RequestGrant(_ context.Context, in authapp.StoredGrantRequest, _ artifact.RecoveryProof) (authorization.Grant, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	g := in.Grant
+	key := consolePolicyRequestKey(g.Requester, g.Policy.Authority.PolicyUID, in.IdempotencyKey)
+	if id, found := s.requestKeys[key]; found {
+		if s.requestDigests[key] != in.RequestDigest {
+			return authorization.Grant{}, false, authapp.ErrGrantConflict
+		}
+		return s.requests[id], true, nil
+	}
+	now := time.Now().UTC()
+	g.RequestedAt = now
+	g.ReviewUntil = now.Add(authorization.GrantReviewWindow)
+	g.PolicyNotAfter = identity.Earlier(now.Add(g.Lifetime), g.Policy.Authority.NotAfter)
+	if !g.Valid() {
+		return authorization.Grant{}, false, authorization.ErrGrantInvalid
+	}
+	if s.requests == nil {
+		s.requests = map[string]authorization.Grant{}
+		s.requestKeys = map[string]string{}
+		s.requestDigests = map[string]artifact.Digest{}
+	}
+	s.requests[g.ID] = g
+	s.requestKeys[key] = g.ID
+	s.requestDigests[key] = in.RequestDigest
+	return g, false, nil
 }

@@ -57,9 +57,11 @@ UI and installed native proof before claiming this increment qualified.
 The [implementation plan](../reviews/s04-policy-grants-plan-2026-10-27.md) records
 all eleven complexity questions. No new watch, listener, collector credential or
 kernel/parser dependency. Metadata recording currently has no per-capture authority renewal. At an assumed
-five-second sensitive-authority interval, 200 active sources add 40 renewals/s; a separate 64 MiB stream at 16 MiB/s would increase the
-combined count to about 90/s and is rejected. Actual intervals and channel/SQL
-costs must be measured. Per-packet local meter cost needs ns/alloc benchmarks.
+five-second sensitive-authority interval, 200 active sources add 40 logical
+renewals/s; each node-to-connector and connector-to-hub RPC leg is counted
+separately. A separate 64 MiB credit stream at 16 MiB/s would increase the
+combined logical count to about 90/s and is rejected. Actual intervals and
+channel/SQL costs must be measured. Per-packet local meter cost needs ns/alloc benchmarks.
 
 Tests must prove requester/executor separation, independent review, original-time
 clamping, no refill on grant replacement/restart, atomic quota/grant admission,
@@ -179,3 +181,40 @@ workload projection. Lost final authority hides the result and refunds no spend
 or completed revocation. The former direct replay return reproduced disclosures
 under blocked-store group loss and identity/eligibility expiry; those regressions
 remain required.
+
+
+The public `request_policy_grant` command uses the existing C03 request service,
+current accepted settings and exact recorder plan producer. One canonical
+policy-name/UID input is bound into its original actor/client/input journal;
+lookup precedes protected source/settings reinterpretation. A protected named
+source is observed with its original deadline before current acceptance lookup,
+using existing C09 source state. This handles genuine expired observations after
+outage and known negative/changed input; it never accepts or renews authority.
+No prototype compatibility path is retained for this unpublished schema-102 API.
+
+The command reuses the existing grant detail/review and independent approver
+step-up. Its final detail uses the same current Get projection (one extra grant
+read plus one workload projection per rare request, seven work SQL calls in two
+existing transactions, about 13 steady database round trips before first-use
+preparation, plus the existing two current-identity resolutions). Protected source
+observation adds six work calls plus setup/BEGIN/COMMIT, about nine round trips
+per fresh named request; no additional Kubernetes read beyond the one required
+source read. The observed settings child costs at most 0.3 Kubernetes requests/s
+and one projection transaction/10s (eight steady database round trips, nine on a
+first/lower-limit clamp), with original 30s source times and no new watch, worker
+workload or credential.
+
+Optional `activate_policy.grant_id` attaches only to an existing current audited
+acceptance under the original outer encrypted operation intent/outcome envelope.
+No-grant activation remains unchanged. Historical attachment replay is not current
+pointer state. Status folds the exact current pointer into its existing source
+SQL with a bounded LEFT JOIN; no extra status round trip or denormalized grantID.
+
+Decision effects use the original identity/reviewer/step-up deadline in the same
+Store context and existing SQL UPDATE database-clock predicate, normalized down
+to microseconds. Historical replay has no new step-up requirement. This fixes the
+concrete held-row wait risk; post-commit metadata refusal alone is insufficient.
+There is no new permission read, watcher or immediate permission-change rule.
+Unit RED covers blocked request/review caller loss and original reviewer expiry;
+real held-row SQL mutation refusal and encrypted public composition remain
+unqualified until their selected owned fixture actually passes.

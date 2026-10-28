@@ -184,7 +184,7 @@ UPDATE access_grant g SET decision= $1::text, approver_issuer= $2::text, approve
  decision_reason= $5::text, decision_acr=$6::text, decision_auth_time=$7::timestamptz, decided_at=t.n, decision_key= $8::text,
  expires_at=CASE WHEN $1::text='approved' THEN CASE WHEN g.kind='policy' THEN g.policy_not_after ELSE LEAST(t.n+make_interval(secs => g.lifetime_seconds),COALESCE(g.not_after,'infinity'::timestamptz)) END END, revision=g.revision+1
 FROM (SELECT clock_timestamp() AS n) t
-WHERE g.root_id= $9::uuid AND g.id= $10::uuid AND g.decision IS NULL AND g.revoked_at IS NULL AND g.review_until>t.n AND g.revision=1
+WHERE t.n< $9::timestamptz AND g.root_id= $10::uuid AND g.id= $11::uuid AND g.decision IS NULL AND g.revoked_at IS NULL AND g.review_until>t.n AND g.revision=1
  AND (g.kind<>'policy' OR g.policy_not_after>t.n)
  AND NOT (g.requester_issuer= $2::text AND g.requester_subject= $3::text)
 RETURNING g.id, g.root_id, g.kind, g.preview_id, g.capture_id, g.cluster_id, g.namespace_uid, g.workload_uid, g.pod_uid, g.execution_digest, g.result_access_digest, g.review_digest, g.data_class, g.reasons, g.review, g.scope, g.requester_issuer, g.requester_subject, g.requester_client, g.lifetime_seconds, g.result_access, g.not_after, g.max_artifacts, g.max_bytes, g.max_operations, g.artifacts_spent, g.bytes_spent, g.operations_spent, g.idempotency_key, g.request_digest, g.requested_at, g.review_until, g.decision, g.approver_issuer, g.approver_subject, g.approver_client, g.decision_reason, g.decision_acr, g.decision_auth_time, g.decided_at, g.decision_key, g.expires_at, g.revoked_at, g.revoker_issuer, g.revoker_subject, g.revoker_client, g.revoke_key, g.revision, g.requester_kind, g.request_operation, g.requester_key, g.policy_uid, g.policy_acceptance_id, g.policy_scope, g.policy_not_after, g.policy_max_executions, g.policy_max_bytes, g.policy_max_observed_bytes, g.policy_executions_spent, g.policy_bytes_spent, g.policy_observed_bytes_spent
@@ -199,6 +199,7 @@ type DecideGrantParams struct {
 	DecisionAcr      pgtype.Text
 	DecisionAuthTime pgtype.Timestamptz
 	DecisionKey      string
+	EffectUntil      pgtype.Timestamptz
 	RootID           pgtype.UUID
 	ID               pgtype.UUID
 }
@@ -215,6 +216,7 @@ func (q *Queries) DecideGrant(ctx context.Context, arg DecideGrantParams) (Acces
 		arg.DecisionAcr,
 		arg.DecisionAuthTime,
 		arg.DecisionKey,
+		arg.EffectUntil,
 		arg.RootID,
 		arg.ID,
 	)

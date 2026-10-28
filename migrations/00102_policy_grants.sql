@@ -1,7 +1,7 @@
 -- +goose Up
 -- ADR-259: distinct team-policy review, request-anchored periods and prepaid
 -- observation. Existing ad hoc rows retain their original contract.
-LOCK TABLE access_grant IN ACCESS EXCLUSIVE MODE;
+LOCK TABLE access_grant,operation_audit IN ACCESS EXCLUSIVE MODE;
 
 ALTER TABLE access_grant ADD COLUMN requester_kind text NOT NULL DEFAULT 'human';
 ALTER TABLE access_grant ADD COLUMN request_operation text NOT NULL DEFAULT 'requestGrant';
@@ -318,12 +318,33 @@ DO $$ BEGIN
 END $$;
 -- +goose StatementEnd
 
+-- Existing encrypted operation-audit envelope, with one new closed command.
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION operation_audit_lane(operation_name text) RETURNS text
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+ SELECT CASE WHEN operation_name IN ('connector_process_enrollment','connector_client_certificate','connector_server_certificate','connector_backing_acceptance','connector_retirement') THEN 'identity'
+ WHEN operation_name='persist_capture_intent' THEN 'capture' WHEN operation_name='release_processing' THEN 'processing'
+ WHEN operation_name='resolve_capture_request' THEN 'resolution'
+ WHEN operation_name IN ('list_diagnostics','preview_capture','request_capture','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','download_artifact_content','initialize_processing','restrict_processing','get_file_excerpt','get_query_result','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing','preview_retention_change','get_grant','list_reviews','decide_review','revoke_grant','request_policy_grant') THEN 'normal' ELSE NULL END
+$$;
+CREATE OR REPLACE FUNCTION operation_audit_human_input_valid(operation_name text,input_format text) RETURNS boolean
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+ SELECT CASE WHEN operation_name IN ('get_file_excerpt','get_query_result') THEN input_format='context-query-input/v1'
+ WHEN operation_name='download_artifact_content' THEN input_format='native-content-input/v1'
+ WHEN operation_name='persist_capture_intent' THEN input_format='capture-intent/v2'
+ WHEN operation_name IN ('initialize_processing','restrict_processing','release_processing') THEN input_format='processing-input/v1'
+ WHEN operation_name IN ('list_diagnostics','preview_capture','request_capture','resolve_capture_request','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing','preview_retention_change','get_grant','list_reviews','decide_review','revoke_grant','request_policy_grant') THEN input_format IN ('context-input/v1','invalid-input/v1') ELSE false END
+$$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION operation_audit_lane(text),operation_audit_human_input_valid(text,text) FROM PUBLIC;
+
 -- +goose Down
 -- Refuse incompatible survivors rather than destroy authority or spent state.
-LOCK TABLE access_grant IN ACCESS EXCLUSIVE MODE;
+LOCK TABLE access_grant,operation_audit IN ACCESS EXCLUSIVE MODE;
 -- +goose StatementBegin
 DO $$ BEGIN
- IF EXISTS(SELECT 1 FROM access_grant WHERE kind<>'adHocCapture')
+ IF EXISTS(SELECT 1 FROM operation_audit WHERE intent->>'Name'='request_policy_grant')
+  OR EXISTS(SELECT 1 FROM access_grant WHERE kind<>'adHocCapture')
   OR EXISTS(SELECT 1 FROM policy_grant_attachment)
   OR EXISTS(SELECT 1 FROM policy_observation_session)
   OR EXISTS(SELECT 1 FROM policy_occurrence WHERE reserved_capture_id IS NOT NULL)
@@ -405,3 +426,23 @@ DO $$ BEGIN
  EXECUTE 'COMMENT ON TABLE public.goose_db_version IS ''asservat:oldest-binary-schema=81''';
 END $$;
 -- +goose StatementEnd
+
+-- Restore the schema-101 closed audit command functions only after survivor refusal.
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION operation_audit_lane(operation_name text) RETURNS text
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+ SELECT CASE WHEN operation_name IN ('connector_process_enrollment','connector_client_certificate','connector_server_certificate','connector_backing_acceptance','connector_retirement') THEN 'identity'
+ WHEN operation_name='persist_capture_intent' THEN 'capture' WHEN operation_name='release_processing' THEN 'processing'
+ WHEN operation_name='resolve_capture_request' THEN 'resolution'
+ WHEN operation_name IN ('list_diagnostics','preview_capture','request_capture','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','download_artifact_content','initialize_processing','restrict_processing','get_file_excerpt','get_query_result','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing','preview_retention_change','get_grant','list_reviews','decide_review','revoke_grant') THEN 'normal' ELSE NULL END
+$$;
+CREATE OR REPLACE FUNCTION operation_audit_human_input_valid(operation_name text,input_format text) RETURNS boolean
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+ SELECT CASE WHEN operation_name IN ('get_file_excerpt','get_query_result') THEN input_format='context-query-input/v1'
+ WHEN operation_name='download_artifact_content' THEN input_format='native-content-input/v1'
+ WHEN operation_name='persist_capture_intent' THEN input_format='capture-intent/v2'
+ WHEN operation_name IN ('initialize_processing','restrict_processing','release_processing') THEN input_format='processing-input/v1'
+ WHEN operation_name IN ('list_diagnostics','preview_capture','request_capture','resolve_capture_request','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing','preview_retention_change','get_grant','list_reviews','decide_review','revoke_grant') THEN input_format IN ('context-input/v1','invalid-input/v1') ELSE false END
+$$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION operation_audit_lane(text),operation_audit_human_input_valid(text,text) FROM PUBLIC;

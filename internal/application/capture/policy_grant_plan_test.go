@@ -11,14 +11,19 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 type acceptedGrantPlanFixture struct {
+	before   func()
 	snapshot authorization.AcceptedPolicySnapshot
 	record   value.PolicyAcceptance
 }
 
 func (f *acceptedGrantPlanFixture) AcceptedPolicyRecord(context.Context, string) (authorization.AcceptedPolicySnapshot, value.PolicyAcceptance, error) {
+	if f.before != nil {
+		f.before()
+	}
 	return f.snapshot, f.record, nil
 }
 
@@ -41,13 +46,13 @@ func newPolicyGrantPlanFixture(t *testing.T) (*workloadActivationFixture, *accep
 		t.Fatal("invalid accepted fixture")
 	}
 	accepted := &acceptedGrantPlanFixture{snapshot: authorization.AcceptedPolicySnapshot{Authority: record.Authority, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), SourceUntil: source.FreshUntil}, record: record}
-	plans := PolicyGrantPlans{Accepted: accepted, Documents: f, CompileRecorder: testPolicyRecorderCompiler, RecipeName: "builtin-pod-status-v1", RecipeDigest: testRecipe, Now: func() time.Time { return f.now }}
+	plans := PolicyGrantPlans{Accepted: accepted, Documents: f, Sources: f, CompileRecorder: testPolicyRecorderCompiler, RecipeName: "builtin-pod-status-v1", RecipeDigest: testRecipe, Now: func() time.Time { return f.now }}
 	return f, accepted, plans
 }
 
 func TestPolicyGrantPlanRebuildsOnlyExactAcceptedWorkloadScope(t *testing.T) {
 	_, accepted, plans := newPolicyGrantPlanFixture(t)
-	p, err := plans.PolicyGrantPlan(context.Background(), "policy-uid")
+	p, err := plans.PolicyGrantPlan(context.Background(), "policy-uid", "restarts")
 	if err != nil || sha256.Sum256(p.Scope) != accepted.record.Authority.ScopeDigest || p.Authority.PolicyUID != "policy-uid" || p.RecipeDigest == (artifact.Digest{}) || p.Review.PodName != "" || p.Review.WorkloadKind != "Deployment" || len(p.Review.Actions) != 1 || p.Review.Actions[0].Kind != "packetCapture" || len(p.Reasons) != 1 || p.Reasons[0].Code != "policyCollection" {
 		t.Fatal("exact policy review", p, err)
 	}
@@ -91,9 +96,48 @@ func TestPolicyGrantPlanRefusesChangedInterpretationAndUnavailableAuthority(t *t
 				cancel()
 				ctx = call
 			}
-			if _, err := plans.PolicyGrantPlan(ctx, policy); !errors.Is(err, authapp.ErrGrantUnavailable) {
+			if _, err := plans.PolicyGrantPlan(ctx, policy, "restarts"); !errors.Is(err, authapp.ErrGrantUnavailable) {
 				t.Fatal("changed/unavailable plan supplied", err)
 			}
 		})
+	}
+}
+
+type grantPlanSourceFunc func(context.Context, value.PolicySource) error
+
+func (f grantPlanSourceFunc) ObservePolicy(ctx context.Context, source value.PolicySource) error {
+	return f(ctx, source)
+}
+func TestPolicyGrantNamedSourceRefreshPrecedesExpiredSQLAcceptanceRead(t *testing.T) {
+	f, accepted, plans := newPolicyGrantPlanFixture(t)
+	original := accepted.record.Authority
+	// The protected source was last seen before a >30s outage; the independent
+	// current recovery reader still supplies its ordinary five-second preflight.
+	f.now = f.now.Add(31 * time.Second)
+	observed := false
+	accepted.before = func() {
+		if !observed {
+			t.Fatal("expired SQL read happened before actual protected source observation")
+		}
+	}
+	plans.Sources = grantPlanSourceFunc(func(ctx context.Context, source value.PolicySource) error {
+		deadline, ok := ctx.Deadline()
+		if !ok || deadline.After(source.FreshUntil) {
+			t.Fatal("source write renewed original read deadline")
+		}
+		observed = true
+		accepted.snapshot.ObservedAt = source.ObservedAt
+		accepted.snapshot.FreshUntil = identity.Earlier(source.FreshUntil, f.now.Add(5*time.Second))
+		accepted.snapshot.SourceUntil = source.FreshUntil
+		return nil
+	})
+	result, err := plans.PolicyGrantPlan(context.Background(), "policy-uid", "restarts")
+	if err != nil || !observed || result.Authority.ScopeDigest != original.ScopeDigest || !result.Authority.NotAfter.Equal(original.NotAfter) || result.Authority.Limits != original.Limits || !result.FreshUntil.Equal(f.now.Add(5*time.Second)) {
+		t.Fatal("named fresh request could not resolve original accepted authority", result, err)
+	}
+	accepted.before = func() { t.Fatal("source write failure fell back to SQL authority") }
+	plans.Sources = grantPlanSourceFunc(func(context.Context, value.PolicySource) error { return value.ErrUnavailable })
+	if _, err := plans.PolicyGrantPlan(context.Background(), "policy-uid", "restarts"); !errors.Is(err, authapp.ErrGrantUnavailable) {
+		t.Fatal("unacknowledged source observation became fresh", err)
 	}
 }
