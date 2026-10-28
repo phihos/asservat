@@ -1261,3 +1261,25 @@ capture 11.074s, PostgreSQL 2.596s, bootstrap 54.629s, presentation 87.126s,
 audit 1.031s and browser transport 17.805s. Final pre-push exit 0 includes
 spec/architecture/design/schema/OpenAPI/SQL generation, console 231 tests and
 Go vet/format checks. No external fixture or collector ran for these checks.
+
+Combined public SQL/S3 batch 1 at clean 134080ef terminated exit 1 (Go 47.590s,
+harness test phase 68.467s). Actual positive children: policy-share accounting
+36.83s, including original-grant acquisition before/after attachment replacement,
+original revocation refusal, unchanged tuple/pools and shared status; original
+request/attachment 3.13s. Migration's full top-level body passed 2.72s, including
+new audit-name Up/Down mapping and legacy conservative spend; the report's
+passedTestNames lists children only. The new public audit child failed 3.00s in
+fixture configuration replay: refresh recomputed audit-pool ValidUntil while
+ExpectedRevision remained zero. The existing immutable configuration replay
+correctly refused this. Provision both finite pools once at their original
+anchor; do not refresh their deadline, revision or spent counters. No product
+permission/constraint change. The public unknown outcome/source and held-row
+SQL assertions did not complete and remain pending.
+
+All 3,264 hashes independently matched the frozen snapshot, sourceUnchanged=true,
+cleanupFailures=[], exact `asservat-custody-ggze1ry6-postgres`, `-s3` and their
+network absent after terminal. Archive before source changes:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-public-composed-smoke-1-artifacts/`;
+report SHA-256 5aff42437209b9273ac028c085086727a92aa6df49474b06a524ad53ce4cffb4.
+Reuse these unchanged positive cases; a next run requires reviewed focused
+public-fixture selection, not an automatic repeat of the combined batch.

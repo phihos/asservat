@@ -251,22 +251,25 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 		}
 		gates[lane] = auditapp.OperationAuditor{Journal: j, Acknowledgements: ack, Objects: objects, Now: clock}
 	}
+	// Provision each finite audit pool once. Replaying configuration cannot
+	// change its original ValidUntil, revision or consumed record/account pools.
+	poolObserved := clock()
+	for _, lane := range []string{"normal", "resolution"} {
+		if e := config.ProvisionOperationAuditPool(ctx, auditapp.OperationAuditPool{RootID: root, Lane: lane, AccountVersion: "accounts-v1", Accounts: 4, RecordsPerAccount: 64, RetainedSeconds: 3600, ObservedAt: poolObserved, FreshUntil: poolObserved.Add(5 * time.Second), ValidUntil: poolObserved.Add(time.Hour)}); e != nil {
+			t.Fatalf("initial %s audit pool: %v", lane, e)
+		}
+	}
 	refresh := func() {
 		t.Helper()
 		now := clock()
 		batch.ObservedAt = now
 		batch.FreshUntil = now.Add(5 * time.Second)
 		if e := permissions.RefreshPermissions(ctx, batch); e != nil {
-			t.Fatal(e)
+			t.Fatal("current permission refresh", e)
 		}
 		periods := identity.PolicyGrantSettingsObservation{Issuer: author.Principal.Issuer, Revision: identity.Revision{UID: "public-policy-periods", Generation: 1, Digest: artifact.Digest{80}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Values: identity.PolicyGrantApproval{DefaultAge: time.Hour, MaxAge: time.Hour, RenewalNotice: time.Minute}}
 		if e := settings.AcceptPolicyGrantSettings(ctx, periods); e != nil {
-			t.Fatal(e)
-		}
-		for _, lane := range []string{"normal", "resolution"} {
-			if e := config.ProvisionOperationAuditPool(ctx, auditapp.OperationAuditPool{RootID: root, Lane: lane, AccountVersion: "accounts-v1", Accounts: 4, RecordsPerAccount: 64, RetainedSeconds: 3600, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: now.Add(time.Hour)}); e != nil {
-				t.Fatal(e)
-			}
+			t.Fatal("current approval settings", e)
 		}
 	}
 	author.Scopes = []string{"evidence:read", "evidence:capture"}
