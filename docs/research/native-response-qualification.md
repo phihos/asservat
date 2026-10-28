@@ -879,3 +879,46 @@ failed demands and original-bound expiry remain refusals. This changes an
 engineering terminal-expiry rule, not a maintainer requirement, TTL or deadline.
 Synthetic ports and the real row mapper establish the component boundary; no
 new SQL schema, fixture privilege, collector or installed qualification is claimed.
+
+## Retained SQL role attribution gap (2026-10-28)
+
+The partial installed run 40648565357 retained comparable completed-edge SQL
+counters keyed by role OID, but no authoritative OID-to-login mapping. PostgreSQL
+connection logs and permanent purpose ordinals cannot reconstruct that missing
+join by guessing role creation order. Shared logins still do not attribute an
+individual statement to one of their several duties. The failed paced phase and
+idle baseline have no completed deltas; they are not measured zero.
+
+The fixture snapshot now includes an optional `RoleNames` map from its existing
+aggregate query using a catalog LEFT JOIN. Unknown/dropped logins have an explicit
+empty name while their numeric counters remain. This adds zero SQL/API requests,
+product permissions, watches, timers or configuration. Bounds remain 512 roles,
+with PostgreSQL catalog names at most 63 bytes each (up to 32,256 name bytes per
+edge, excluding map/JSON overhead). The three existing snapshot queries,
+reset/eviction checks, numeric deltas and original limits are unchanged. This is
+fixture attribution metadata, not production instrumentation or a new authority
+check. The existing owned PostgreSQL test now checks its independently read role
+OID/name and retains the two-statement history after closing both pools and
+dropping that exact fixture login. The pure serialization/delta regression first failed on the old snapshot
+representation (Go 0.013s, exit 1), then passed with the optional map and existing
+counter-refusal cases under race (Go 1.063s, exit 0); integration vet and
+specification/architecture checks also passed.
+
+The one authorized existing PG/S3 selection `TestNativePacingSQLWithRealPostgres`
+on frozen `38bafcdb` passed (child 0.31s, Go 1.368s, command/test/qualification
+exit 0). It checked actual OID-to-login mapping, both pools closed before exact
+role retirement, explicit empty name afterward, and unchanged complete
+counter history. Default capacity stayed 5,000; inherited deallocations 8 then 28,
+initial positive reset to 0, midphase reset/eviction refusals and numeric ordering
+proof remained unchanged. The original 20s test context was retained. All 3,346
+qualification source hashes matched, all 35,979 tracked files remained unchanged,
+cleanup was empty and exact owned PG/S3 containers/network were absent. The
+retained environment SHA256 is
+`68c0cb13224c39120d6151f3d3cefa2d122a17e3c997926df5cd83c98279dfd5`;
+verification SHA256 is
+`820eca921ea815e6690882dd52704d81b50d75ab68e99bbf845df910f68674c5`.
+Artifacts are retained in cache under
+`codex-bf86-resume/native-sql-role-attribution/native-pacing-role-attribution-1-artifacts/`.
+This qualifies the fixture query and dropped-role accounting behavior, not an
+installed paced workflow or actual login-purpose attribution for the preceding
+run, whose missing map cannot be reconstructed.
