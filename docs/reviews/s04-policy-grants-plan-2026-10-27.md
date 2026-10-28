@@ -1,6 +1,6 @@
 # Policy grants and prepaid sensitive observation
 
-Status: architecture decisions accepted by maintainer through the root coordinator; implementation in progress. No runtime qualification yet.
+Status: architecture decisions accepted by maintainer through the root coordinator; implementation in progress. Scoped component qualifications below do not establish installed completion.
 Scope: S-04 increment 12b, REQ-AUT-003/004/006, SC-AUT-003/004/006,
 REQ-EXE-001 and the accepted team-policy authority contract. ADR-259 and migration
 00102 follows packet funding 00100 and history 00101. Local composition
@@ -2291,3 +2291,73 @@ explicit enabled:false field (missing field refuses). One additional fixture
 administrator GET, no product authority/read/observer change. A successful PUT
 alone is no longer reported as verified creator departure; actual installed
 execution remains pending. No whole pre-push repeat for this fixture-only check.
+
+
+## Protected metadata shape witnesses (2026-10-28)
+
+The owned `policy-metadata-backing-5` fixture passed the exact selection
+`^TestPolicyMetadataBackingWithRealPostgres$` on frozen test/runtime source
+`0060ff581c0422f162323c1ab5fb3f1393eb96e9`: actual exit0, Go17.001s,
+selected test15.94s, outer25.090s. It reused the existing custody runner with
+`--fleet`, libpcap only, Go300s/harness360s/outer1100s; no collector/Gadget/device
+ran. Static libpcap1.11.0 compiled on a dead EN10MB handle. Actual initial
+activation, protected capacity setup/enrollment, narrow managed admission and
+original MAC/capture audit roles, policy acceptance/independent grant review,
+Tick, finite SQL permit, typed channel/holder, encrypted synthetic PCAPNG writer
+and stored ACK were composed. Control/node/process/packet inputs remain synthetic.
+
+Both SQL cases used64 accepted retention source identities/60 definition digests;
+their legal varied specs used the actual schema decoder/canonical digest helper.
+The audience case used32 current audience assignments; the program case used1
+and an actual prefix-safe254-instruction program. The separate offline program
+probe used1 retention source, so its smaller arithmetic size is not this SQL
+combined shape. No Cartesian maximum over all allowed inputs is claimed.
+
+| Actual SQL case | Scope / expectation bytes | New ordinary record tuples / allowance | Cumulative record tuples / occupied allowance | Shared account tuples / allowance | Mixed global fixture WAL |
+|---|---:|---:|---:|---:|---:|
+| audience-retention |14684 /62792|71624 /131072|71624 /131072 (1record)|10676 /262144|621744|
+| program +64retention |19210 /26697|52163 /131072|123787 /262144 (2records)|23022 /262144|518696|
+
+Fixed tuples were458B against1MiB. Per-record measurements use nonnegative
+before/after tuple deltas, including `policy_occurrence`; cumulative totals use
+actual occupied capture count. Shared source/grant parents are counted once in
+the account sample. The32-table sample labels ordinary versus separately paid
+lanes; capture/native/Stop/processing graphs outside it are not silently added to
+ordinary128KiB or claimed measured. Entire shared-relation heap/index/TOAST
+figures are labelled, not attributed per capture. Global WAL includes fixture
+activity, not isolated ordinary-record cost; primary RecordWALBytes is8MiB,
+not multiplied by WALCopies3 to make a comparison pass.
+
+Selected protected metadata matches the installed profile's128KiB record row,
+8MiB primary record WAL and backup/WAL copies2/3, with actual accepted SQL JSON
+readback. The fixture retains16accounts×3records=48; the native profile has
+16×4=64. Matching selected values does not qualify that whole native profile.
+Before setup, fixture protected/hard/context evidence bytes were funded for
+three product8MiB PCAPNG registrations, including existing format reserves:
+29786112B rather than the pod-status seed's4632576B. Objects12/records3 and
+all product limits stayed unchanged. Each case stored4592B synthetic PCAPNG;
+accepted/grant input credit33554432B was reserved once each, never described as
+measured observed input or CPU. Original source-expiry rollback, replay and exact
+program/expectation checks remained effective.
+
+Attempts1–4 remain overall failures: a retention version map keyed by display
+name instead of UID; a last-row sponsor outside the author's actual group plus
+stale shared permission state; an unconverted4KiB pod-status registration; and a
+reused root/actor grant key across different policies. Narrow fixture fixes were
+regressed locally. Attempt4's audience child passed, but its program child and
+whole run failed. Attempt5 passed both children. Five attempts total111.132s
+outer/47.682s Go; no deadline/quota increase or automatic retry was used.
+
+The preserved session archive is
+`codex-bf86-resume/policy-metadata-backing-5-artifacts` under the build cache.
+`policy-metadata-backing-5-environment.json` SHA256
+`d3017eefc52c969a10596972d7336e51c4d56c6caf17bc8555829fe0ae911f14`
+and `terminal-verified-report.json` SHA256
+`a590e99c0964fcb65296cbff0fb42ffe01579eaf82736938072ac8304b8e2610`
+bind all3346 historical runner source hashes, actual exit0/unchanged=true,
+cleanup[] and independently absent exact owned PostgreSQL/S3/OpenBao containers
+and network. Archives1–4 remain intact. The source stayed clean after archiving
+and restoring generated results. This documentation follow-up changes no tested
+runtime/test source. Publication/native delivery, all64 native-profile records,
+provider overhead/CPU, physical page growth/bloat/churn, backups/restore and
+universal accepted-input backing remain unqualified by these two witnesses.

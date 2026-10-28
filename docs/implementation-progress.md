@@ -1,5 +1,21 @@
 # Sustained implementation progress
 
+## Scoped protected policy metadata witnesses (2026-10-28)
+
+The two-case owned PostgreSQL/S3/OpenBao metadata fixture passed on frozen
+`0060ff581c0422f162323c1ab5fb3f1393eb96e9`: exit0, Go17.001s,
+outer25.090s, all3346 historical source hashes matched, unchanged=true,
+cleanup[] and exact owned-resource absence independently checked. Actual policy
+admission, finite permit and joined encrypted synthetic PCAPNG stored ACK passed
+for32audience/64retention and254instructions/64retention. Ordinary record tuple
+growth was71624B and52163B against131072B each. Full measurements, report/env
+hashes, prior failure causes and the fixture's3records/root48 versus native's
+4records/root64 distinction are in the [S04 plan](reviews/s04-policy-grants-plan-2026-10-27.md#protected-metadata-shape-witnesses-2026-10-28).
+Input credit was conservatively reserved, not measured input/CPU. This is scoped
+component evidence; publication/native, physical/bloat/backups and universal
+maximum-shape backing are not qualified. Prior attempts remain failed; no new
+runtime gate is enabled by this documentation checkpoint.
+
 ## Unpublished finite policy-packet candidate (2026-10-28)
 
 The isolated S04 candidate now composes the reviewed node meter/wire/prefix/loss
