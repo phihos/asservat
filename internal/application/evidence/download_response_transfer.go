@@ -403,11 +403,11 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		transferErr := func() error {
 			for emitted < intent.Window.Length || intent.Window.Length == 0 && lease.Sequence == 0 {
 				stage = "chunk-current"
-				a, e = current.get(work)
+				a, e = current.fresh(work, localWriteMargin)
 				if e != nil {
 					return e
 				}
-				if !lease.Valid(t.Now()) {
+				if !lease.Valid(t.Now()) || t.Now().Add(localWriteMargin).After(lease.Until) {
 					stage = "lease"
 					lease, e = t.Responses.LeaseDownloadResponse(work, session.ID, r.ID, r.OwnerID, windowID, a)
 					if e != nil {
@@ -462,6 +462,13 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 						return e
 					}
 					piece, stop = context.WithDeadline(work, lease.Until)
+				}
+				// The exact remote chunk may end before the human lease (worker
+				// token/certificate/operation cutoff). Preserve it through the final sink
+				// and its ACK, without replacing or extending the SQL delivery lease.
+				if !chunk.NativeUntil.IsZero() {
+					stop()
+					piece, stop = context.WithDeadline(work, identityvalue.Earlier(lease.Until, chunk.NativeUntil))
 				}
 				if int64(len(chunk.Bytes)) != length || chunk.ReadWork < 0 || chunk.ReadWork > intent.Window.ReadLimit-readWork || !lease.Allows(offset, length, t.Now()) || piece.Err() != nil {
 					clear(chunk.Bytes)

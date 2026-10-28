@@ -103,7 +103,9 @@ def passed_test_elapsed(output, name):
     matches = re.findall(r"^\s*--- PASS: " + re.escape(name) + r" \(([0-9]+(?:\.[0-9]+)?)s\)$", output, re.MULTILINE)
     return float(matches[0]) if len(matches) == 1 else None
 
-def main(fleet=False, test_pattern=None, database_recovery=False, initial_installation=False, connector_retirement=False, scoped_audit=False, owner_audit_inventory=False, result_name=None):
+def main(fleet=False, test_pattern=None, database_recovery=False, initial_installation=False, connector_retirement=False, scoped_audit=False, owner_audit_inventory=False, result_name=None, native_statistics=False):
+    if native_statistics and (test_pattern != "^TestNativePacingSQLWithRealPostgres$" or any((fleet, database_recovery, initial_installation, connector_retirement, scoped_audit, owner_audit_inventory))):
+        raise ValueError("Native statistics owns its exact SQL-only fixture/test selection")
     installed_evidence_delete = installed_evidence_delete_selection(test_pattern)
     if installed_evidence_delete and (fleet or database_recovery or initial_installation or connector_retirement or scoped_audit or owner_audit_inventory):
         raise ValueError("Installed evidence deletion owns its exact fixture/test selection")
@@ -140,7 +142,10 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
                 info = json.loads(run(["docker", "inspect", name]))[0]
                 report["images"][name] = {"requested": image, "imageID": info["Image"], "containerID": info["Id"]}
                 return info["NetworkSettings"]["Networks"][network]["IPAddress"], name
-            pgip, pgname = service("postgres", POSTGRES, ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"], ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"])
+            postgres_options = ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"]
+            if native_statistics:
+                postgres_options += ["-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.save=off", "-c", "pg_stat_statements.track=top"]
+            pgip, pgname = service("postgres", POSTGRES, ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"], postgres_options)
             s3_extra, s3_command = [], []
             if scoped_audit or owner_audit_inventory or installed_evidence_delete:
                 # Exact read-only bind; these public synthetic test credentials
@@ -206,6 +211,10 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
             descriptor = {"postgres": dsn, "s3": "http://"+s3ip+":8333", "kms":bao_endpoint}
             if installed_evidence_delete:
                 descriptor["installedEvidenceDelete"] = True
+            if native_statistics:
+                descriptor["nativeSQLStatistics"] = True
+                env["ASSERVAT_CONTEXT_FIXTURES"] = str(path)
+                report["scope"] = "owned PostgreSQL numeric statistics qualification only; synthetic utility work; no collector or installed runtime"
             path.write_text(json.dumps(descriptor))
             env["ASSERVAT_CUSTODY_FIXTURES"] = str(path)
             if fleet: env["ASSERVAT_FLEET_FIXTURES"] = str(path)
@@ -344,12 +353,13 @@ if __name__ == "__main__":
     parser.add_argument("--connector-retirement",action="store_true",help="Opt in to actual connector retirement timing (at least 31 minutes; 40-minute Go budget)")
     parser.add_argument("--scoped-audit", action="store_true", help="Qualify prefix-scoped immutable audit versions and independent retirement")
     parser.add_argument("--owner-audit-inventory", action="store_true", help="Qualify read-only historical owner audit version/marker/upload inventory")
+    parser.add_argument("--native-statistics", action="store_true", help="Owned PostgreSQL-only numeric statistics case; requires its exact --run selection")
     parser.add_argument("--run", help="Go test name regex for an owned targeted fixture; default runs the complete suite")
     parser.add_argument("--shard", choices=sorted(CUSTODY_SHARDS), help="Run one CI shard of the complete custody suite (CUSTODY_SHARDS)")
     parser.add_argument("--result-name", help="test/results file prefix, so two local runs (for example two shards) do not share a log")
     args=parser.parse_args()
     if args.shard:
-        if args.run or args.fleet or args.database_recovery or args.initial_installation or args.connector_retirement or args.scoped_audit or args.owner_audit_inventory: parser.error("--shard owns its exact test selection")
+        if args.run or args.fleet or args.database_recovery or args.initial_installation or args.connector_retirement or args.scoped_audit or args.owner_audit_inventory or args.native_statistics: parser.error("--shard owns its exact test selection")
         args.run, args.result_name = CUSTODY_SHARDS[args.shard], args.result_name or "custody-" + args.shard
     if args.result_name and not re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.result_name): parser.error("--result-name must be lowercase letters, digits and hyphens")
     if args.database_recovery and (args.fleet or args.run): parser.error("--database-recovery owns its exact phase/test selection")
@@ -357,4 +367,4 @@ if __name__ == "__main__":
     if args.connector_retirement and (args.fleet or args.run or args.database_recovery or args.initial_installation): parser.error("--connector-retirement owns its exact long-fixture selection")
     if args.scoped_audit and (args.fleet or args.run or args.database_recovery or args.initial_installation or args.connector_retirement): parser.error("--scoped-audit owns its exact fixture/test selection")
     if args.owner_audit_inventory and (args.fleet or args.run or args.database_recovery or args.initial_installation or args.connector_retirement or args.scoped_audit): parser.error("--owner-audit-inventory owns its exact fixture/test selection")
-    raise SystemExit(main(args.fleet or args.initial_installation, args.run, args.database_recovery, args.initial_installation, args.connector_retirement, args.scoped_audit, args.owner_audit_inventory, args.result_name))
+    raise SystemExit(main(args.fleet or args.initial_installation, args.run, args.database_recovery, args.initial_installation, args.connector_retirement, args.scoped_audit, args.owner_audit_inventory, args.result_name, args.native_statistics))

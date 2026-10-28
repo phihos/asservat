@@ -84,8 +84,12 @@ func (a *ConnectorAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 			return local, e
 		}
 		other, e := remote.Check(c)
-		if e != nil || !other.Operation.Equal(local.Operation) || other.Certificate != local.Certificate || other.Sequence != local.Sequence {
-			return value.NativeLease{}, artifact.ErrDownloadUnavailable
+		if e != nil {
+			return value.NativeLease{}, e
+		}
+		local, e = evidence.JoinNativeObservations(local, other, a.now())
+		if e != nil {
+			return value.NativeLease{}, e
 		}
 		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, other.Until)))
 		return local, nil
@@ -166,8 +170,12 @@ func (a *HubAdmission) OpenNative(ctx context.Context, state *tls.ConnectionStat
 			return peer, e
 		}
 		local, e := inner.Gate().Check(c)
-		if e != nil || !local.Operation.Equal(peer.Operation) || local.Certificate != peer.Certificate || local.Sequence != peer.Sequence {
-			return value.NativeLease{}, artifact.ErrDownloadUnavailable
+		if e != nil {
+			return value.NativeLease{}, e
+		}
+		local, e = evidence.JoinNativeObservations(local, peer, a.now())
+		if e != nil {
+			return value.NativeLease{}, e
 		}
 		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, peer.Until)))
 		return local, nil
@@ -176,7 +184,7 @@ func (a *HubAdmission) OpenNative(ctx context.Context, state *tls.ConnectionStat
 		inner.Close()
 		return nil, e
 	}
-	return &peerConversation{inner, gate}, nil
+	return &peerConversation{inner: inner, gate: gate}, nil
 }
 
 type peerConversation struct {
@@ -221,7 +229,7 @@ func (c *peerConversation) Close() error {
 // conversation (up to the evidence-read window) is not ended by the stale
 // admission observation. Other kinds keep it.
 func admissionServing(l value.NativeLease, serving time.Time) time.Time {
-	if l.Operation.Kind == value.NativeProjection {
+	if l.Operation.Kind == value.NativeProjection || l.Operation.Kind == value.NativeResponse {
 		return l.Operation.Until
 	}
 	return serving

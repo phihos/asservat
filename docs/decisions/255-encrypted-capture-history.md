@@ -540,3 +540,57 @@ capacity, control or selection. It adds no read, refresh, retry, authority or
 public error change. The actual rejecting predicate remains unknown; this is
 not an availability fix. A later installed run must retain that distinction
 instead of repeating the generic pre-history failure.
+
+
+### Consumed history conversation and the next attachment
+
+Native 40632823232 on 4bfdcf91 reached list_diagnostics,
+list_capture_history and get_capture_settings (HTTP 200/ok), then the edited
+preview returned ParametersUnavailable. Its private diagnostic locates the
+refusal at history attach/failed, read/prepare/live, in less than 100 ms with
+at least three seconds left. No receiver check, signing, SQL history-read
+authorization or ciphertext exchange followed that attachment failure. The
+existing attachment diagnostic does not distinguish unavailable standby from
+capture capacity; the exact installed rejecting branch remains unproven.
+The preceding two successful history exchanges are the original parameter write
+and settings read; summary listing does not dispatch a parameter read.
+
+Source inspection identifies a concrete repeat-read availability gap. Each
+history read consumes its conversation and its joined Close waits for handler
+and socket release. The regional supervisor keeps one conversation per owner;
+its normal one-second reopening delay plus one-second polling cadence leaves
+a gap before a fresh empty conversation registers. Viewing settings and then
+immediately reviewing edited settings requires another independently authorized
+read. Attach previously refused at once during this gap, while target Query
+already waited for registration within its original bound.
+
+The regression executes an actual framed history read with synthetic peer and
+effect authority, joins Close/Finish, then starts a second attachment before
+registering a new conversation 150 ms later. Unchanged production fails at once
+(exit 1, package 0.010 s). The corrected attachment uses the existing registration
+notification and original 2.5-second query reserve. It checks cancellation,
+capacity, duplicate ownership and the fixed wait cutoff under the same mutex
+before selection; a ready registration cannot cross that cutoff. Fresh work
+retains its original caller deadline, with one effect per completed exchange.
+Full capacity, duplicate capture, invalid input and short tail still refuse
+immediately. A missing registration consumes only its original wait allowance;
+cancellation leaves no capture reservation. No dispatched work is replayed.
+
+Complexity: zero new watches, API calls, credentials, network operations,
+background tasks, configuration, persistent state or provider dependencies.
+A request with an immediately available standby adds no wait timer. A request
+that must wait allocates one bounded timer and listens on the existing channel;
+it holds no capture reservation while waiting. At most 2.5 seconds of an
+original five-second request may be spent waiting, with no deadline renewal.
+This covers ordinary attachments as well as history, preserving all later
+current receiver/authority checks. Waiting for a new empty conversation is
+pre-handoff selection, not retrying uncertain work. The regression proves this
+mechanism, not the exact underlying cause of Native 40632823232. No collector,
+external fixture or hosted run was executed for this change.
+
+Final local affected races exited 0: context-start 13.782 s and mTLS 38.545 s.
+Canonical pre-push exited 0, including 227 console tests, SQL generation/vet,
+specification and architecture checks. The original failing regression and
+initial focused race pass (1.269 s) are retained alongside these final logs.
+This is component evidence; installed history/edited-preview qualification
+remains pending.

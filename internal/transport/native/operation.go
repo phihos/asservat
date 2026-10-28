@@ -84,7 +84,7 @@ func newHubOperationChecked(gate *evidence.NativeFrameGate, checked *checkedNati
 	}
 	var o value.NativeOperation
 	until, err := time.Parse(time.RFC3339Nano, c.Until)
-	if err != nil || nativeDecode(c.Operation, &o) != nil || !o.Equal(l.Operation) || c.Reference != nativeReference(o) || c.Kind != string(o.Kind) || c.Format != contracts.NativeExchangeFormat || c.Nonce != "" || c.ParentID != o.ParentID || c.Generation != o.Generation || c.LeaseSequence != l.Sequence || until.After(l.Until) || !time.Now().Before(until) || !expected.Valid(o.SourceVersion) {
+	if err != nil || nativeDecode(c.Operation, &o) != nil || !o.Equal(l.Operation) || c.Reference != nativeReference(o) || c.Kind != string(o.Kind) || c.Format != contracts.NativeExchangeFormat || c.Nonce != "" || c.ParentID != o.ParentID || c.Generation != o.Generation || c.LeaseSequence != l.Sequence || until.After(attachBound(l)) || !time.Now().Before(until) || !expected.Valid(o.SourceVersion) {
 		return nil, artifact.ErrInvalid
 	}
 	if o.Kind == value.NativeResponse {
@@ -123,7 +123,7 @@ func newHubOperationChecked(gate *evidence.NativeFrameGate, checked *checkedNati
 	if json.Unmarshal(encoded, &cloned) != nil {
 		return nil, artifact.ErrInvalid
 	}
-	if l, e = checked.restrict(gate); e != nil || until.After(l.Until) {
+	if l, e = checked.restrict(gate); e != nil || until.After(attachBound(l)) {
 		return nil, artifact.ErrDownloadUnavailable
 	}
 	ctx, cancel := context.WithDeadline(gate.Context(), until)
@@ -264,16 +264,30 @@ func (o *HubOperation) ReadChunk(ctx context.Context, l artifact.DownloadDeliver
 	}
 	select {
 	case b := <-o.body:
-		if _, e := o.gate.Check(ctx); e != nil {
+		native, e := o.gate.Check(ctx)
+		if e != nil || native.Sequence != l.Sequence {
 			clear(b)
-			return evidence.NativeResponseChunk{}, e
+			o.cancel()
+			if e != nil {
+				return evidence.NativeResponseChunk{}, e
+			}
+			return evidence.NativeResponseChunk{}, step("chunk-sequence", artifact.ErrDownloadUnavailable)
 		}
+		o.mu.Lock()
+		if o.closed || o.ctx.Err() != nil || ctx.Err() != nil {
+			o.mu.Unlock()
+			clear(b)
+			o.cancel()
+			return evidence.NativeResponseChunk{}, artifact.ErrDownloadUnavailable
+		}
+		o.delivery = l
+		o.mu.Unlock()
 		// The window's read work is reported once, with its first chunk.
 		var work int64
 		if offset == o.command.Offset {
 			work = evidence.NativeWindowReadWork(o.expected.Expectation.Type())
 		}
-		return evidence.NativeResponseChunk{Bytes: b, ReadWork: work, FinalVerified: true}, nil
+		return evidence.NativeResponseChunk{Bytes: b, ReadWork: work, FinalVerified: true, NativeUntil: native.Until}, nil
 	case <-ctx.Done():
 		o.cancel()
 		return evidence.NativeResponseChunk{}, ctx.Err()
@@ -285,18 +299,20 @@ func (o *HubOperation) ReadChunk(ctx context.Context, l artifact.DownloadDeliver
 // matchChunk binds a chunk to the operation's exact original delivery lease
 // and window; the chunk lies inside the window.
 func (o *HubOperation) matchChunk(l artifact.DownloadDeliveryLease, offset, length int64) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	c := o.command
-	return c.Kind == "read-context-response" && l == o.delivery && l.Valid(time.Now()) && l.ResponseID == c.ParentID && l.WindowID == c.WindowID && l.Generation == c.Generation && l.Sequence == c.LeaseSequence && l.Offset == c.Offset && l.Length == c.Length && length >= 1 && offset >= c.Offset && length <= c.Offset+c.Length-offset && l.Authority.Scope.Version == o.expectedVersion() && l.Allows(offset, length, time.Now())
+	return c.Kind == "read-context-response" && evidence.SameNativeWindow(l, o.delivery) && l.Sequence >= o.delivery.Sequence && l.Valid(time.Now()) && l.ResponseID == c.ParentID && l.WindowID == c.WindowID && l.Generation == c.Generation && l.Sequence >= c.LeaseSequence && l.Offset == c.Offset && l.Length == c.Length && length >= 1 && offset >= c.Offset && length <= c.Offset+c.Length-offset && l.Authority.Scope.Version == o.expectedVersion() && l.Allows(offset, length, time.Now())
 }
 func (o *HubOperation) expectedVersion() artifact.Digest {
 	return evidence.ContextCopiesDigest(o.expected.Copies)
 }
 func (o *HubOperation) AcknowledgeNativeChunk(ctx context.Context, l artifact.DownloadDeliveryLease, offset, length int64) error {
-	if o == nil || !o.matchChunk(l, offset, length) {
+	if o == nil || ctx == nil || ctx.Err() != nil || !o.matchChunk(l, offset, length) {
 		return artifact.ErrDownloadUnavailable
 	}
 	o.mu.Lock()
-	ok := o.pending == length && offset == o.next
+	ok := !o.closed && o.ctx.Err() == nil && ctx.Err() == nil && l.Sequence == o.delivery.Sequence && o.pending == length && offset == o.next
 	if ok {
 		o.pending = 0
 		o.next += length

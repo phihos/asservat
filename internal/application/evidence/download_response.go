@@ -57,6 +57,9 @@ type NativeResponseDeliveryAcknowledger interface {
 type NativeResponseChunk struct {
 	Bytes    []byte
 	ReadWork int64
+	// NativeUntil is the cutoff of this exact checked remote chunk. It may
+	// only shorten the final write/ACK context; it is never wire authority.
+	NativeUntil time.Time
 	// FinalVerified proves the exact selected native range, including the full
 	// native checksum when the selected response contains the whole file.
 	FinalVerified bool

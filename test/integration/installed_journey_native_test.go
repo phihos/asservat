@@ -77,6 +77,7 @@ type installedJourneyDownload struct {
 	State               string    `json:"state"`
 	SizeBytes           *int64    `json:"size_bytes"`
 	SHA256              string    `json:"sha256"`
+	ETag                string    `json:"etag"`
 	ContentPath         string    `json:"content_path"`
 	ContinuePreparation bool      `json:"continue_preparation"`
 	ExpiresAt           time.Time `json:"expires_at"`
@@ -1140,7 +1141,7 @@ func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS")
 // 20-minute limit; docs/implementation-progress.md records the split.
 func installedFastFixture() bool {
 	switch installedJourneyFocus() {
-	case "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording":
+	case "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "native-paced":
 		return true
 	}
 	return false
