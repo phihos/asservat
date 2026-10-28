@@ -1869,3 +1869,24 @@ tests) and integration compile/offline compiler/bindings race 1.081 s. Logs:
 and `policy102-finalizer-fixture-fix-compile-final.log` in that same directory.
 Only the failed compiled-publisher child needs a reviewed focused external rerun;
 no unchanged marker/migration or prior packet/snapshot/share/public suite repeat.
+
+Focused publisher rerun at frozen 1a77e93a passed, actual terminal exit 0 (Go
+6.711 s; compiled-publisher 5.26 s, nested deletion due-pages 0.04 s; harness
+16.793 s). Real API preparation/result verification/publication and audited
+ordinary capture deletion now pass with the new zero-row observation DELETE.
+This proves the ordinary finalizer regression, not positive observation-child
+retirement. No unchanged marker/migration or packet/snapshot/share/public suite
+was repeated. Existing prior component positives remain reusable as scoped.
+
+Archive before edits:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-finalizer-focused-1-artifacts/`.
+Report policy102-finalizer-focused-1-environment.json SHA-256
+f98ed648313fa4766d2ccad77bc2c15085ee1f2e32d29dba21a635262b1745d0;
+raw Go log is the same prefix.log. All 3,280 source hashes independently match
+commit and disk; sourceUnchanged=true, cleanup [], exact
+asservat-custody-yxk0bukn-postgres, asservat-custody-yxk0bukn-s3 and network
+asservat-custody-yxk0bukn absent. Independent hash/absence and actual terminal
+metadata are archived. The host slot was explicitly released to root. Next:
+genuine companion held-wait and positive child retirement, authenticated exact
+source/permit channel, complete graph backing, packet prefix/native qualification.
+Raw remains closed; no first SQL component result substitutes for those gates.
