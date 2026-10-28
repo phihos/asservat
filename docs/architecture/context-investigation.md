@@ -99,8 +99,10 @@ require a new review. Updated observation times do not change reviewed scope or
 extend a prior observation's deadline.
 
 Each call owns at most one non-authoritative capacity readiness wait.
-Request starts it beside exact-Pod resolution using the preview's pinned
-target; Preview and CheckDiagnostic start it after target resolution. The
+For a packet preview with a storage selection, Request starts it after accepted
+replay misses and the actor-matching preview read, before recording grant I/O.
+Other requests retain their existing start beside exact-Pod resolution. Preview
+and CheckDiagnostic start it after target resolution. The
 same wait overlaps eligibility, capability and retention reads in their
 existing order, then joins before the authoritative storage read. Early
 failure cancels and joins it before returning. Under

@@ -495,13 +495,47 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if !ValidContextPreview(p) || p.ID != previewID || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.Actor != i.Principal {
 		return zero, value.ErrDenied
 	}
-	// ADR-243/249: a reviewed packet/syscall plan first passes the approval
-	// gate (ApprovalRequired until an approved grant covers it). ADR-248: a
-	// plan that no node recorder can run (it carries no storage selection) is
-	// then refused before any target, storage or admission work; nothing is
+	var storageWait *contextStorageWait
+	defer func() {
+		if storageWait != nil {
+			storageWait.close()
+		}
+	}()
+	startStorageWait := func(includePreview bool) {
+		storageUntil, storageBound := p.Deadline, "preview"
+		if !includePreview {
+			storageUntil, storageBound = i.ValidUntil, "identity"
+		}
+		for _, bound := range []struct {
+			at   time.Time
+			name string
+		}{{i.ValidUntil, "identity"}, {recovery.FreshUntil, "recovery"}} {
+			if bound.at.Before(storageUntil) {
+				storageUntil, storageBound = bound.at, bound.name
+			}
+		}
+		auditapp.MarkStep(ctx, "q-pre-storage", preStorageStarted)
+		storageWait = s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, storageUntil, p.Storage)
+		storageWait.bound = storageBound
+	}
+	// ADR-243/249: a reviewed packet/syscall plan passes the approval gate
+	// before authority/admission (ApprovalRequired until a grant covers it).
+	// ADR-248: a plan that no node recorder can run (it carries no storage
+	// selection) is then refused before any target, storage or admission work; nothing is
 	// charged. An acceptable manual networkHeaders plan continues like pod
 	// status.
 	recording := p.Intent.Composition != nil
+	rules := compiler.ContextAssessmentRulesDigestForClass(p.ExecutionClass)
+	if recording {
+		rules = compiler.RecorderAssessmentRulesDigest()
+	}
+	if recording && p.IssuerEpoch == recovery.IssuerEpoch && p.AssessmentRulesDigest == rules && p.Storage != (value.ContextStorageSelection{}) && packetRecorderInput(p.Intent, p.ExecutionClass) {
+		// Warm only this existing selection while the grant gate does I/O. The
+		// hint confers no authority; a refused/pending gate cancels and joins it.
+		// An approved retained preview can be expired here, so its post-grant
+		// cutoff is applied below rather than renewing this original owner.
+		startStorageWait(false)
+	}
 	if recording {
 		grant, err := s.recorderRequest(ctx, source, p, key, nil)
 		if err != nil {
@@ -527,30 +561,20 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if !p.Current(s.Now()) {
 		return zero, value.ErrPreviewExpired
 	}
-	rules := compiler.ContextAssessmentRulesDigestForClass(p.ExecutionClass)
-	if recording {
-		rules = compiler.RecorderAssessmentRulesDigest()
-	}
 	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != rules {
 		return zero, s.requestChanged("epoch")
 	}
-	// The storage wait needs only the preview's pinned target, so it runs
-	// beside the target re-resolution instead of after it. It confers nothing:
-	// facts still read and check storage after both, and the wait is joined
-	// before the request returns.
-	storageUntil, storageBound := p.Deadline, "preview"
-	for _, bound := range []struct {
-		at   time.Time
-		name string
-	}{{i.ValidUntil, "identity"}, {recovery.FreshUntil, "recovery"}} {
-		if bound.at.Before(storageUntil) {
-			storageUntil, storageBound = bound.at, bound.name
-		}
+	if storageWait == nil {
+		// Ordinary requests retain their existing post-gate ordering and bound.
+		startStorageWait(true)
+	} else {
+		// The same owner retains its original identity/recovery/request bounds.
+		// All authoritative consumption now also inherits the approved preview
+		// cutoff; no concurrent mutation of the wait's original until is needed.
+		var end context.CancelFunc
+		ctx, end = context.WithDeadline(ctx, p.Deadline)
+		defer end()
 	}
-	auditapp.MarkStep(ctx, "q-pre-storage", preStorageStarted)
-	storageWait := s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, storageUntil, p.Storage)
-	storageWait.bound = storageBound
-	defer storageWait.close()
 	resolveStarted := time.Now()
 	var target targets.PodResolution
 	if recording && s.Recorders != nil {

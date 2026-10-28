@@ -314,3 +314,99 @@ only fixed diagnostic ambiguity and the two retained fixture defects were
 changed. Original authority and readiness behavior remain unchanged; the
 separate earlier-hint proposal and a later installed result have their own
 review and qualification obligations.
+
+
+## Earlier single recording hint (2026-10-28)
+
+Move the existing Request readiness owner before recording approval I/O only for
+an actor-matching packet preview with its existing storage selection. Accepted
+replay, current identity/recovery and exact preview lookup still precede it.
+The non-authoritative owner retains the original request/identity/recovery
+cutoffs; an expired retained approved preview cannot cut it off prematurely.
+After approval, authoritative consumption additionally inherits the resulting
+preview deadline, already capped by the original grant/history bounds. The
+wait's original cutoff is never mutated concurrently. Pending/denied/error
+returns cancel and join it. Ordinary requests keep their existing ordering.
+No current fact, grant or authority deadline is renewed.
+
+The accepted engineering tradeoff is bounded extra wakeup load: an owner of a
+retained preview whose current collection or review rights have since been
+withdrawn can now request a refresh before the gate refuses. This conveys zero
+collection authority but is not zero cost. Preview itself already permits a
+wakeup after current eligibility; this change adds the withdrawn-rights case.
+The preview is readable only before context_preview_read_until: the maximum of
+its original deadline and the exact matching grant's review_until/expires_at.
+Approval/revocation does not shorten that passive read interval. SQL refuses
+reads after it even if cleanup has not deleted the row; the risk is not bounded
+by the two-minute preview alone.
+
+Complexity assessment (maintainer proportionality rule, items 1–11):
+
+1. Observed installed history 40744858749 failed at storage expiry. Twenty
+   successful demand exchanges had median 2.555s, range 2.48–3.11s, before the
+   existing 250ms lane pause. Actual failing Request pre-grant latency was not
+   sampled; the channel RED proves scheduling only, not its installed cause.
+2. This implementation chooses bounded extra denied/pending wakeups under the
+   maintainer's proportionality guidance. This is an engineering tradeoff, not
+   an explicit maintainer requirement. No in-flight authority or permission
+   guarantee is weakened.
+3. This helps cold approved recording after human review. The deliberate 2min
+   preview wait outlasts the original 60s demand and raw 30s storage binding.
+4. Reuse existing asynchronous readiness demand/coalescing; no new mechanism or
+   external precedent is needed for moving this one existing call.
+5. Added privileges/credentials/providers/watches: zero. No extra auth read.
+6. Added fallback/retry states: zero; the same wait and errors remain.
+7. Added configuration/TTL/limits: zero.
+8. Existing regional/API/SQL dependencies unchanged; their measured latency
+   motivates overlap, not a new dependency.
+9. At most one existing demand SQL call per cold pending/denied Request, zero
+   if the hint already finds sufficient freshness. Same target coalesces one
+   SQL row for 60s from the latest demand. One global serial demand lane plus
+   250ms pause projects 60/(2.555+.25)=21.39 attempts per busy minute from the
+   observed median (not steady-state qualification); repeated calls can keep
+   it hot. Each successful refresh spends one shared configuration credit.
+   The actual native profile compiles 4096 ConfigurationTransitions, shared
+   with other configuration effects; aggregate exhaustion is unqualified.
+   At that projected rate 4096 credits last about 191.5min if this is the only
+   spender and demand stays hot: arithmetic, not measured deployment lifetime.
+   Permitted Preview/demand traffic already has this cost; earlier denied
+   wakeups add a trigger path, not a new allowance.
+   There is no per-request worker/goroutine beyond the existing one wait.
+10. No migration or persisted format changes; reverting scheduling restores
+    the previous order. Current request cancellation and joined cleanup remain.
+11. Moving one existing hint is smaller than extra cache, retry, entitlement
+    lookup or source TTL extension. Doing nothing leaves grant I/O consuming
+    the existing four-second readiness ceiling before warming a cold binding.
+
+Cost provenance: the approved pre-hint route previously crossed four identity
+resolution boundaries, one settings read, one recovery read, accepted replay,
+preview, grant lookup and permission projection. These are logical port calls,
+not asserted one-query adapters or measured grant latency. Covering alone adds
+two identity resolutions, grant lookup and permission projection. A successful
+ContextStorage Ledger read uses BEGIN, one Exec with four SET LOCAL statements,
+observation SELECT, current-time SELECT and COMMIT: five application protocol
+exchanges/eight top-level SQL statements absent preparation/retries. Existing
+hint plus final authoritative read therefore remains at least two reads, with
+250ms polling only inside the same original owner. The whole setup report on
+3f counted 83,297 top-level SQL calls over 139.636s including background work and
+intentional review expiry, summed executor time 10,998ms; it does not attribute
+CPU, waits or a failed request cause. No cumulative-load qualification is claimed.
+
+Local coverage uses a blocked grant/channel dependency, pending/denied/error
+cancel-and-join, expired approved review, original cancellation and shortened
+identity/recovery/grant bounds, exact one demand and accepted replay zero hint.
+These are application scheduling tests with synthetic storage/grant inputs;
+installed availability and worker behavior remain separately unqualified.
+
+Known different issuer epochs or current assessment rules skip the early hint;
+the existing post-gate refusal remains in place with unchanged public priority.
+The same-epoch expired approved case still overlaps. The current rule digest is
+computed once; the check adds no I/O.
+
+Local evidence: original-order channel RED exited 1 (3.007s); the final capture
+race suite, including changed epoch/rules zero-hint cases, exited 0 (12.457s).
+The earlier complete suite also passed 12.447s before that narrow guard. The
+canonical pre-push on that prior source exited 2 solely because this isolated
+worktree lacked the console yaml package; make -k still ran the remaining
+checks including Go vet. Final affected checks are recorded separately. No
+external fixture, installed run, push or authority qualification is claimed.
