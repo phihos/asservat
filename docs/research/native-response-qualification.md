@@ -827,3 +827,36 @@ exited1/0.019s; corrected copy/command races passed1.068s, with exact-limit norm
 outputs retained. Canonical pre-push exited0 with218 console tests. These local
 checks do not establish a near-full installed artifact or qualify native transfer;
 no external fixture, collector or hosted rerun occurred in this checkpoint.
+
+## Natural source expiry at authoritative consumption (2026-10-28)
+
+Paced Native 40634973872 on `93074b84` failed before admission or traffic:
+`request/facts/storage/read/observation/source`, with initial `ReviewChanged`.
+Actual Go was 578.546s and the approved subcase 132.58s. All 3,234 historical
+source hashes matched, sourceUnchanged was true and cleanup was `[]`; environment
+SHA256 `eec0ec2ccbe9f349a79633abb27cf04c030f2ab88b64b85827174b075a86026c`,
+paced report SHA256
+`a978928cd7880d303dcc9da86e80ef4960d5737af5f1be53d77134247cb76e87`.
+No traffic, target CPU, PCAP, download or owner-renewal proof was reached.
+
+The closed source label covers original binding validation, including natural
+expiry. Its actual row timestamps were not retained, so expiry is a candidate,
+not an established installed cause. The persisted workload binding already has
+a 30-second lifetime under migration 00072; the worker's reported 1.5–2.5 seconds
+of guarded-read headroom belongs to its separate five-second receipt, not that
+stored lifetime. The approved fixture waits for the two-minute preview to expire;
+the original 60-second refresh demand can end before submission. Exact remaining
+request/row intervals in this failed call are unknown.
+
+A local actual-Request regression reproduces a valid 30-second source with
+1.5 seconds left at the early hint, followed by natural expiry during the next
+authoritative read while original non-storage facts remain current. The former
+consumer returned immediately with two reads, zero demands and zero admissions.
+The correction uses a typed availability result retaining only original expired
+Binding/Selection metadata for exact comparison, then reuses the existing
+single-demand/poll owner. Only an independent successful same-selection read
+permits admission. Invalid/future/mismatched metadata, known source/pool revisions,
+failed demands and original-bound expiry remain refusals. This changes an
+engineering terminal-expiry rule, not a maintainer requirement, TTL or deadline.
+Synthetic ports and the real row mapper establish the component boundary; no
+new SQL schema, fixture privilege, collector or installed qualification is claimed.

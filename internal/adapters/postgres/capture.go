@@ -76,7 +76,7 @@ func captureError(err error) error {
 	if err == nil {
 		return nil
 	}
-	for _, e := range []error{value.ErrInvalid, value.ErrSharingDenied, value.ErrDenied, value.ErrChanged, value.ErrUnavailable, value.ErrCapacity, value.ErrProcessingCoverage, value.ErrConflict} {
+	for _, e := range []error{value.ErrStorageBindingExpired, value.ErrInvalid, value.ErrSharingDenied, value.ErrDenied, value.ErrChanged, value.ErrUnavailable, value.ErrCapacity, value.ErrProcessingCoverage, value.ErrConflict} {
 		if errors.Is(err, e) {
 			return e
 		}

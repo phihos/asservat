@@ -1,5 +1,20 @@
 # Sustained implementation progress
 
+## Expired storage source uses existing readiness owner (2026-10-28)
+
+Paced Native 40634973872 on `93074b84` refused original source validation before
+traffic. Its exact source timestamps are unavailable; natural expiry is not yet
+the established installed cause. A local actual-Request RED separately reproduces
+a legal 30-second binding expiring after an early ready hint: two reads, no demand
+and no admission. Typed expired-only metadata can now enter the existing bounded
+readiness owner after original shape/selection validation, requiring an independent
+fresh successful read. Known revision changes, malformed/future/mismatched metadata,
+failed demands and original authority expiry remain terminal. The persisted
+30-second lifetime, one demand, 250 ms cadence, response reserve and original
+caller/non-storage deadlines remain unchanged. No SQL/migration or external fixture
+is added. See [the failure and qualification limits](research/native-response-qualification.md#natural-source-expiry-at-authoritative-consumption-2026-10-28)
+and [the engineering contract correction](decisions/213-storage-readiness-at-consumption.md#natural-source-expiry-correction-2026-10-28).
+
 ## Paced helper setup omission reproduced before bootstrap (2026-10-28)
 
 Native 40605062812 on `e9e3c64e` failed before any helper invocation because
