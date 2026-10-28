@@ -1,6 +1,37 @@
 # Sustained implementation progress
 
 
+## Exact-preview initial storage diagnostic qualified (2026-10-28)
+
+Fixture-only initial-failure evidence now queries the exact immutable preview's
+stored target/selection before expensive native diagnostics. One administrator
+SELECT, bounded to three seconds, emits eleven booleans and five original/current
+timestamps for binding, enrollment and demand. It prints no identities, target
+names, filters, parameters, credentials, keys or row dumps. The callback runs at
+most once during initial submission failure, including transport/read failure;
+successful recovery clears it. No product authority, freshness, permission,
+demand scheduling, budget, retry or limit changes are included.
+
+The separately reviewed `initial-storage-evidence-2` PG/S3 selection on 55029bc3
+passed (runner/Go0; Go 2.010s, parent 0.95s, exact preview child 0.57s). Actual SQL
+checked missing/exact preview, original selection/dates, allocation mismatch,
+three-second and thirty-second expired raw intervals, absent enrollment/demand,
+and the existing immutable/actor-client/deadline preview invariants. All 3,352
+harness / 3,394 reviewed sources and 35,986 tracked-file hashes remained unchanged;
+cleanup was empty and exact owned PG/S3 names, IDs and network were absent.
+
+Run1 remains archived: its diagnostic SELECT assertions reached the original
+interval cases, then unsupported synthetic demand insertion failed the real
+capacity-source foreign key. The fixture correction removed only that setup
+and its assertions, without fabricating a parent or bypassing the constraint.
+Positive recorded/current demand and exact Ready-publication equality remain
+unqualified by this no-enrollment child. This result does not establish an
+installed invocation, Native storage failure cause, availability improvement,
+collector behavior or completed workflow. No collector, push or hosted run was
+performed. Terminal reports and both raw archives are retained in the existing
+`approved-workflow` cache; changes after the passing frozen source are docs only.
+
+
 ## Corrected raw-policy SQL replay qualified (2026-10-28)
 
 The one reviewed `policy-raw-approved-replay-2` companion-only PG/S3 run on
