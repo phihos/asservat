@@ -120,10 +120,7 @@ func newRetentionEffectFixturesWithPolicy(t *testing.T, ctx context.Context, poo
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		snapshot := privacy.PolicySnapshot{SourceClusterID: ref.ClusterID, ControlNamespaceUID: ref.ControlNamespaceUID, Hub: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Policies: append([]privacy.ScopedPolicy{policy}, additional...)}
 		snapshot.Revision = identity.Revision{UID: ref.ControlNamespaceUID, Generation: 1, Digest: app.RetentionSnapshotDigest(snapshot)}
-		list := app.PolicyList{Snapshot: snapshot, ResourceVersion: "100", Versions: map[string]string{"baseline": "90"}}
-		for _, p := range additional {
-			list.Versions[p.Name] = "90"
-		}
+		list := retentionFixturePolicyList(snapshot)
 		review := cfg.RetentionBootstrapReview{Resource: cfg.Resource{Kind: "ConfigMap", Name: "review", UID: "review", ClusterID: ref.ClusterID, Namespace: "control", NamespaceUID: ref.ControlNamespaceUID, ResourceVersion: "review:1", SpecDigest: artifact.Digest{2}}, Reviewer: "synthetic-installer", PoliciesDigest: snapshot.Revision.Digest, ProtectionDigest: ref.ProtectionDigest, ReviewedAt: now, ExpiresAt: now.Add(time.Hour), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 		cp, err := source.AcceptRetention(ctx, app.RetentionTransition{ID: custodyID(), Fence: start.Fence, List: list, Review: &review})
 		if err != nil {
@@ -145,4 +142,14 @@ func newRetentionEffectFixturesWithPolicy(t *testing.T, ctx context.Context, poo
 		fence.Sequence = cp.Record.Sequence
 		return &retentionEffectFixture{guard: guard, sources: source, reader: reader, checkpoint: cp, fence: fence, topology: topology, target: target}
 	}
+}
+
+// The source cursor is keyed by immutable resource UID, independently of its
+// display name. Shared by owned SQL preparation and the offline preflight.
+func retentionFixturePolicyList(snapshot privacy.PolicySnapshot) app.PolicyList {
+	list := app.PolicyList{Snapshot: snapshot, ResourceVersion: "100", Versions: map[string]string{}}
+	for _, p := range snapshot.Policies {
+		list.Versions[p.Policy.Revision.UID] = "90"
+	}
+	return list
 }

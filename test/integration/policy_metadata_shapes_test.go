@@ -18,10 +18,12 @@ import (
 	"asservat.local/asservat/internal/adapters/pcap"
 	capacityapp "asservat.local/asservat/internal/application/capacity"
 	captureapp "asservat.local/asservat/internal/application/capture"
+	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 )
 
@@ -183,4 +185,17 @@ func policyMetadataRetention(t testing.TB, cluster string, count int) []privacy.
 		out = append(out, p)
 	}
 	return out
+}
+
+func TestPolicyMetadataRetentionListUsesSourceUID(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	cluster := custodyID()
+	snapshot := privacy.PolicySnapshot{SourceClusterID: cluster, ControlNamespaceUID: custodyID(), Hub: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Policies: append([]privacy.ScopedPolicy{retentionEffectDefaultPolicy()}, policyMetadataRetention(t, cluster, 63)...)}
+	snapshot.Revision = identity.Revision{UID: snapshot.ControlNamespaceUID, Generation: 1, Digest: configapp.RetentionSnapshotDigest(snapshot)}
+	if !snapshot.Valid(now) {
+		t.Fatal("retention input invalid before journal")
+	}
+	if _, err := configapp.NewRetentionJournal(retentionFixturePolicyList(snapshot), now); err != nil {
+		t.Fatal("actual fixture list rejected by real journal", err)
+	}
 }
