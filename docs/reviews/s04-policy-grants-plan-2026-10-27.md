@@ -2284,3 +2284,10 @@ one list/twoNode reads, fixture-only. Generic failure, source/provider error,
 wrongcapture and reason suffix fail the pure evidence check. The native attempt
 itself remains unrun; the report records budget exhaustion only after this exact
 proof succeeds. This corrects evidence semantics without changing runtime gates.
+
+Final native creator-departure evidence now reads back the exact Keycloak user
+immediately after enabled:false PUT, requiring the original subject ID and an
+explicit enabled:false field (missing field refuses). One additional fixture
+administrator GET, no product authority/read/observer change. A successful PUT
+alone is no longer reported as verified creator departure; actual installed
+execution remains pending. No whole pre-push repeat for this fixture-only check.
