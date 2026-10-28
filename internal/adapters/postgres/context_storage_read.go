@@ -55,10 +55,19 @@ func contextStorageObservation(row custodydb.ObserveContextStorageRow, root stri
 	var d artifact.Digest
 	copy(d[:], row.SourceDigest)
 	b := value.StorageBinding{RootID: uid(row.RootID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, AllocationID: uid(row.AllocationID), Revision: identity.Revision{UID: row.SourceUid, Generation: row.SourceGeneration, Digest: d}, ObservedAt: row.ObservedAt.Time, FreshUntil: row.FreshUntil.Time}
+	selection := value.ContextStorageSelection{StoreID: uid(row.StoreID), AllocationID: b.AllocationID, PoolRevision: row.PoolRevision, AllocationRevision: row.AllocationRevision, BindingRevision: b.Revision}
 	// Validate the original observation before shortening; clamping must not
 	// make a source with an invalid, overlong freshness interval acceptable.
-	if b.RootID != root || !b.Matches(target) || !b.Valid(now) {
+	if b.RootID != root || !b.Matches(target) || !b.Valid(b.ObservedAt) || b.ObservedAt.After(now) {
 		return refuse("source", value.ErrChanged)
+	}
+	if !now.Before(b.FreshUntil) {
+		if !selection.Valid() {
+			return refuse("selection", value.ErrChanged)
+		}
+		// Expired metadata identifies the original selection only. The nonnil
+		// error supplies no authority; a later protected read must be current.
+		return app.ContextStorageObservation{Binding: b, Selection: selection}, contextStorageObservationFailure{predicate: "source-expired", cause: value.ErrStorageBindingExpired}
 	}
 	if !now.Before(row.CapacityUntil.Time) || row.CapacityUntil.Time.After(row.FreshUntil.Time) {
 		return refuse("capacity", value.ErrChanged)
@@ -70,7 +79,7 @@ func contextStorageObservation(row custodydb.ObserveContextStorageRow, root stri
 		return refuse("control", err)
 	}
 	b.FreshUntil = identity.Earlier(row.CapacityUntil.Time, identity.Earlier(controlUntil, identity.Earlier(b.FreshUntil, identity.Earlier(row.PoolValidUntil.Time, row.AllocationValidUntil.Time))))
-	out = app.ContextStorageObservation{Binding: b, Selection: value.ContextStorageSelection{StoreID: uid(row.StoreID), AllocationID: b.AllocationID, PoolRevision: row.PoolRevision, AllocationRevision: row.AllocationRevision, BindingRevision: b.Revision}}
+	out = app.ContextStorageObservation{Binding: b, Selection: selection}
 	if !out.Selection.Valid() || !out.Binding.Valid(now) {
 		return refuse("selection", value.ErrChanged)
 	}
@@ -131,7 +140,11 @@ func (s *ContextStorageReader) ContextStorage(ctx context.Context, target author
 			// A retry can fail before its callback resets the prior phase.
 			stage = "transaction"
 		}
-		return app.ContextStorageObservation{}, &contextStorageReadFailure{stage: stage, cause: captureError(err)}
+		failure := &contextStorageReadFailure{stage: stage, cause: captureError(err)}
+		if errors.Is(err, value.ErrStorageBindingExpired) {
+			return out, failure
+		}
+		return app.ContextStorageObservation{}, failure
 	}
 	return out, nil
 }

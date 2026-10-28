@@ -33,6 +33,13 @@ Given an approved policy, when its eligible grant handle is renewed or only reci
 For the fixed API pod-status execution, require at least one second remaining
 before its first irreversible execution-preparation insert, as specified in
 [ADR-212](../docs/decisions/212-api-preparation-remaining-interval.md).
+An expired-only protected storage observation is availability metadata, never
+admission authority. Within the original operation and retained non-storage
+bounds, the existing single-demand readiness owner may await an independently
+fresh observation of the exact selection. Invalid/future/mismatched metadata,
+known revision changes and failed demands remain refusals; no stored timestamp
+or original authority deadline is extended.
+
 Use database time after blocking authority/storage locks and the earlier
 original check/caller cutoff. Refusal creates no execution row or key permit;
 the accepted capture and its accounting remain unchanged. This conservative

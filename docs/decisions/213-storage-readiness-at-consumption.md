@@ -26,8 +26,9 @@ enter a consumption phase; it does not start another hint or another
 independent wait.
 
 The authoritative storage read still requires a valid binding and the
-existing one-second selection margin. Only a valid same-selection binding
-with less than that margin permits consumption polling. With refresh configured,
+existing one-second selection margin. A valid same-selection binding
+with less than that margin, or the typed expired-only result described below,
+permits consumption polling. With refresh configured,
 use the call's sole demand attempt if it has not already been spent, then
 read at the existing 250 ms interval. A failed demand prevents further polling.
 Each candidate retains its own original observation and freshness timestamps;
@@ -39,8 +40,8 @@ caller, initial identity/recovery, preview, exact target, eligibility and
 verified identity, capability, retention/proof/expiry and optional reason
 deadline. The first thin binding's freshness is not the consumption wait's
 deadline: that binding is discarded, while every retained non-storage fact
-must remain current. An expired or otherwise invalid binding returned by the
-authoritative reader still refuses the operation.
+must remain current. A malformed expired or otherwise invalid binding returned without the explicit
+expired-only result still refuses the operation.
 
 Request binds the storage selection already reviewed in the passive preview.
 Preview and CheckDiagnostic bind their first valid authoritative selection.
@@ -106,3 +107,23 @@ this correction and reaches installed admission, acquisition and publication.
 Its timing logs do not establish whether a consumption-phase poll was
 required. The complete test failed in subsequent client recovery before
 public retrieval/download and expiry/deletion qualification.
+
+## Natural source expiry correction (2026-10-28)
+
+The prior terminal-expiry rule was an engineering choice in these tests/contracts,
+not a maintainer requirement. A local actual-Request regression reproduces a legal
+30-second original source near expiry: the early hint succeeds, but the later
+authoritative read reports its natural expiry and previously returned immediately
+without using the existing refresh owner. Native 40634973872 refused source
+validation before traffic; its row timestamps were not retained, so this local
+defect does not establish the installed failure's exact cause.
+
+A dedicated availability result may retain expired original Binding/Selection
+metadata with a nonnil error. The consumer validates the original interval, rejects
+future/malformed/mismatched metadata and compares Request's exact preview selection
+before waiting. It reuses the existing sole demand, 250 ms cadence, response reserve
+and original caller/non-storage bounds; an earlier failed demand prevents waiting.
+Only a new successful, current, margin-sufficient same-selection read can authorize
+admission. Known source/pool revisions refuse before or after waiting. No TTL,
+demand lifetime, permission, audit, admission retry or authority interval is extended;
+the persisted binding already lasts 30 seconds under ADR-200/migration 00072.

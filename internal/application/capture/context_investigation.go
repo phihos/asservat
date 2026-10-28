@@ -55,6 +55,8 @@ type ContextStorageObservation struct {
 	Binding   value.StorageBinding
 }
 
+// ErrStorageBindingExpired may retain original Binding/Selection metadata solely
+// for exact comparison. Its nonnil error supplies no admission authority.
 type ContextStorageReader interface {
 	ContextStorage(context.Context, authorization.Target) (ContextStorageObservation, error)
 }
@@ -712,7 +714,7 @@ func (s ContextInvestigation) reportRequestFailure(err error) {
 			if errors.As(failure.cause, &read) {
 				switch detail := read.ContextStorageRead(); detail {
 				case "transaction", "observation",
-					"observation/shape", "observation/pool", "observation/allocation", "observation/source",
+					"observation/shape", "observation/pool", "observation/allocation", "observation/source", "observation/source-expired",
 					"observation/capacity", "observation/control", "observation/selection",
 					"query/no-row", "query/deadline", "query/canceled", "query/unavailable",
 					"clock/no-row", "clock/deadline", "clock/canceled", "clock/unavailable":
