@@ -5,6 +5,7 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"asservat.local/asservat/internal/adapters/pcap"
@@ -45,4 +46,17 @@ func BenchmarkPolicyRecorderPollCompilation(b *testing.B) {
 			}
 		})
 	}
+}
+
+func TestPolicyRecorderPinnedRawFilterMatchesRealCompiler(t *testing.T) {
+	real := pcap.NewCompiler()
+	got, err := real.CompileFilter(policyRawExpression)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pinned, err := (policyRawFilters{}).CompileFilter(policyRawExpression)
+	if err != nil || !reflect.DeepEqual(got, pinned) {
+		t.Fatalf("pinned SQL fixture differs from actual %s: got=%+v want=%+v err=%v", real.Version(), got, pinned, err)
+	}
+	t.Logf("actual %s dead EN10MB snaplen=%d instructions=%d canonical digest=%x; no device/socket/collector", real.Version(), got.Snaplen, len(got.Program), planningapp.FilterProgramDigest(got.Program))
 }

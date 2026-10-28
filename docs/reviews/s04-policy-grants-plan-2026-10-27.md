@@ -1931,3 +1931,38 @@ and `policy102-inert-policy-compiler-all-races.log` in the same directory.
 No new external run, runtime raw gate, C09/node wire or native qualification.
 Actual companion held-wait and positive-child retirement remain next, followed
 by authenticated transport, complete graph backing and packet prefix/native.
+
+Genuine companion fixture source checkpoint: a separate packet-policy-companion-sql
+mode now builds a real accepted policy/occurrence/grant and frozen raw context
+through the shared assembler, with actual companion checks before each effect.
+Node/process/target/bootstrap/reviewer facts remain explicit synthetic component
+inputs; runtime trigger/C03 raw gates stay closed and no packet engine runs.
+Preflight reviewed roles: separate existing capture-admit for admission, existing
+hub-runtime union for API/current team/grant/observed SQL, existing separately
+credentialed capture_audit_runtime for acknowledged encrypted capture intent
+(same component facet as the qualified API fixture). No hub audit privilege gain.
+
+The actual test will hold the ORIGINAL grant row beyond the original shorter
+source cutoff while the original caller/identity check remains live, then
+independently read absent API/session and zero observed spend in both pools.
+A fresh actual companion preparation must create exactly API1/session1 and
+32 MiB conservative credit per pool; stored Binding.NotAfter must remain the
+original API check deadline, not the shorter source cutoff. Exact replay is
+passive with identical binding/permit/dates; a replacement collector epoch under
+still-live original facts must refuse without changing either pool or row.
+This tests actual adapter authority/transaction composition rather than manually
+inserting a marker, but does not qualify authenticated node facts, transport,
+positive child retirement, full graph backing or native/prefix behavior.
+
+The raw fixture is exact tcp[13] & 2 != 0. The local real static libpcap 1.11.0
+compiler independently matched its dead EN10MB/snaplen65535 eleven-instruction
+program, canonical digest c7cde9898f21dcab2b5000d3c62eb24f7b8222fda01149221d900ea9c78c4a2f;
+actual exit 0 / 0.013 s, no device/socket/collector. Both header and inert-raw full
+assembler preflights pass with race (1.094 s), final pre-push actual exit 0 incl
+231 console tests. Logs in absolute directory
+`/home/phil/.cache/asservat-build/approved-workflow/`:
+`policy102-genuine-companion-native-compiler.log`,
+`policy102-genuine-companion-offline.log`, `policy102-genuine-companion-pre-push.log`.
+The new actual SQL test has not yet run; require reviewed frozen exact selection
+and coordinated host slot. Prefix/notice components remain separately qualified
+pure components, not raw execution enablement.
