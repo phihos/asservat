@@ -522,3 +522,21 @@ known deadline cause before the generic timeout flag; its diagnostic expectation
 was updated accordingly. Canonical pre-push exited 0 with 227 console tests.
 The earlier local write-cutoff ordering failure and legacy read-classifier RED
 remain retained in cache; neither is substituted for a passing installed run.
+
+
+### Shared storage refusal before history qualification
+
+Native run 40627584314 on exact a96796aa failed before capture/history lookup:
+approved submission returned closed ReviewChanged, with
+`request/facts/storage/read/observation`. Go exited 1 in 591.339s; the subcase took 134.40s.
+No PCAP was produced and the wrapped-read diagnostic was not exercised by the
+history lookup. All 3,254 source hashes matched, sources stayed unchanged and
+cleanup completed. Environment SHA-256:
+`f869bfa7518b536172464a157b93415c846bb245efdfebedb5cb9852b6f8e6e2`.
+
+The shared storage diagnostic from PR #101 now accompanies this candidate. It
+classifies the existing row/clock refusal into shape, pool, allocation, source,
+capacity, control or selection. It adds no read, refresh, retry, authority or
+public error change. The actual rejecting predicate remains unknown; this is
+not an availability fix. A later installed run must retain that distinction
+instead of repeating the generic pre-history failure.
