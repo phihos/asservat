@@ -66,7 +66,7 @@ func policyRawCompile(raw json.RawMessage) (value.PolicyRecorderConfiguration, e
 // frozen raw scope, typed queue, encrypted producer and audited retirement.
 // Target/process/node trust and packet inputs remain synthetic component facts;
 // neither runtime raw gate is opened and no collector/engine runs.
-func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, current *postgres.AutomationAuthorities, authority authorization.AcceptedPolicyAuthority, admission capture.Admission, accepted capture.Accepted, acceptance, grant string, before *policyObservationGraphSample) {
+func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, current *postgres.AutomationAuthorities, authority authorization.AcceptedPolicyAuthority, admission capture.Admission, accepted capture.Accepted, acceptance, grant string, before *policyObservationGraphSample, protected ...policyRecorderProtectedCase) {
 	t.Helper()
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 	guard := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
@@ -74,16 +74,23 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 	if err != nil {
 		t.Fatal(err)
 	}
-	intentPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
-	defer intentPool.Close()
-	intent, err := postgres.NewCaptureIntentAudits(ctx, intentPool, s.a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = (auditapp.CaptureIntentPublisher{Ledger: intent, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
-		t.Fatal("raw companion acknowledged capture intent", err)
+	if len(protected) > 0 {
+		if err = protected[0].Intent(ctx, accepted.CaptureID); err != nil {
+			t.Fatal("protected intent", err)
+		}
+	} else {
+		intentPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
+		defer intentPool.Close()
+		intent, err := postgres.NewCaptureIntentAudits(ctx, intentPool, s.a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = (auditapp.CaptureIntentPublisher{Ledger: intent, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
+			t.Fatal("raw companion acknowledged capture intent", err)
+		}
 	}
 	e := accepted.Expectation
+	program := admission.Plan.Input.Recorder.Filters[0].Filter.Program
 	process := executionvalue.APIProcessBinding{InstallationID: authority.InstallationID, ClusterID: authority.ClusterID, IssuerEpoch: admission.Recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
 	node, boot, collectorPod, epoch := custodyID(), custodyID(), custodyID(), custodyID()
 	// The actual queue is exercised with explicitly synthetic attestation and
@@ -261,7 +268,7 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 		t.Fatalf("actual finite companion preparation/unchanged identity: first=%v API=%+v permit=%+v err=%v", first, r.Binding, permit, err)
 	}
 	const credit = int64(32 << 20)
-	if permit.Credit != credit || permit.BytesPerSecond != 16<<20 || permit.Duration != time.Second || permit.Binding.CaptureID != accepted.CaptureID || permit.Binding.ActionID != e.ActionID || permit.Binding.ExpectationDigest != [32]byte(evidence.ContextExpectationDigest(e)) || permit.Binding.ProgramDigest != [32]byte(planning.FilterProgramDigest(policyRawProgram)) {
+	if permit.Credit != credit || permit.BytesPerSecond != 16<<20 || permit.Duration != time.Second || permit.Binding.CaptureID != accepted.CaptureID || permit.Binding.ActionID != e.ActionID || permit.Binding.ExpectationDigest != [32]byte(evidence.ContextExpectationDigest(e)) || permit.Binding.ProgramDigest != [32]byte(planning.FilterProgramDigest(program)) {
 		t.Fatal("actual companion bound wrong original values", permit)
 	}
 	read(credit)
@@ -320,7 +327,7 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 	}
 	// Synthetic PCAPNG enters the actual producer path after the finite interval.
 	// This is not a Gadget run, metered input measurement or native qualification.
-	native := syntheticFilteredRecording(t, queued.Add(100*time.Millisecond), policyRawProgram, 2)
+	native := syntheticFilteredRecording(t, queued.Add(100*time.Millisecond), program, 2)
 	resultPacket := collector.PacketResult{WorkID: work[0].ID, CaptureID: accepted.CaptureID, StartedAt: queued.Add(100 * time.Millisecond), EndedAt: queued.Add(1100 * time.Millisecond), Seen: 50, Retained: 50, CapturedBytes: int64(len(native)), Snaplen: artifact.RecordingSnaplen, ProgramDigest: work[0].Packet.ProgramDigest}
 	if !resultPacket.Valid() {
 		t.Fatal("assembled synthetic packet result invalid", resultPacket)
@@ -355,6 +362,10 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 		t.Fatal("actual finite stored completion ACK", err)
 	}
 	t.Logf("ACTUAL companion -> typed holder -> exact channel -> joined encrypted producer -> stored SQL ACK; synthetic node/process/packet inputs, node=%s, synthetic PCAPNG bytes=%d, INPUT RESERVATION=%d unchanged", nodeIdentity.NodeUID, len(native), credit)
+	if len(protected) > 0 {
+		protected[0].Stored(policyObservationRetirementInput{Scenario: s, Accepted: accepted, Execution: r, Completion: collected.Completion, Permit: permit, AcceptanceID: acceptance, GrantID: grant, Before: before})
+		return
+	}
 	qualifyPolicyObservationRetirement(t, ctx, admin, poolFor, store, keys, policyObservationRetirementInput{Scenario: s, Accepted: accepted, Execution: r, Completion: collected.Completion, Permit: permit, AcceptanceID: acceptance, GrantID: grant, Before: before})
 	// A new caller may observe current facts, but cannot turn the terminal
 	// original attempt back into a preparation or create a replacement session.

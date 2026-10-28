@@ -85,7 +85,7 @@ func newRetentionEffectFixtures(t *testing.T, ctx context.Context, poolFor func(
 
 // Only a fixture's original accepted policy is configurable. This path uses
 // the same SQL acceptance, encrypted audit, catch-up and current reads.
-func newRetentionEffectFixturesWithPolicy(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, policy privacy.ScopedPolicy) func(*testing.T, string, authorization.Target) *retentionEffectFixture {
+func newRetentionEffectFixturesWithPolicy(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, policy privacy.ScopedPolicy, additional ...privacy.ScopedPolicy) func(*testing.T, string, authorization.Target) *retentionEffectFixture {
 	sourcePool := poolFor("retention_source_runtime", "synthetic-retention-source")
 	readPool := poolFor("retention_source_read_runtime", "synthetic-retention-source-read")
 	return func(t *testing.T, root string, target authorization.Target) *retentionEffectFixture {
@@ -118,9 +118,12 @@ func newRetentionEffectFixturesWithPolicy(t *testing.T, ctx context.Context, poo
 			t.Fatal(err)
 		}
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		snapshot := privacy.PolicySnapshot{SourceClusterID: ref.ClusterID, ControlNamespaceUID: ref.ControlNamespaceUID, Hub: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Policies: []privacy.ScopedPolicy{policy}}
+		snapshot := privacy.PolicySnapshot{SourceClusterID: ref.ClusterID, ControlNamespaceUID: ref.ControlNamespaceUID, Hub: true, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Policies: append([]privacy.ScopedPolicy{policy}, additional...)}
 		snapshot.Revision = identity.Revision{UID: ref.ControlNamespaceUID, Generation: 1, Digest: app.RetentionSnapshotDigest(snapshot)}
 		list := app.PolicyList{Snapshot: snapshot, ResourceVersion: "100", Versions: map[string]string{"baseline": "90"}}
+		for _, p := range additional {
+			list.Versions[p.Name] = "90"
+		}
 		review := cfg.RetentionBootstrapReview{Resource: cfg.Resource{Kind: "ConfigMap", Name: "review", UID: "review", ClusterID: ref.ClusterID, Namespace: "control", NamespaceUID: ref.ControlNamespaceUID, ResourceVersion: "review:1", SpecDigest: artifact.Digest{2}}, Reviewer: "synthetic-installer", PoliciesDigest: snapshot.Revision.Digest, ProtectionDigest: ref.ProtectionDigest, ReviewedAt: now, ExpiresAt: now.Add(time.Hour), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 		cp, err := source.AcceptRetention(ctx, app.RetentionTransition{ID: custodyID(), Fence: start.Fence, List: list, Review: &review})
 		if err != nil {

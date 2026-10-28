@@ -17,6 +17,7 @@ import (
 	captureapp "asservat.local/asservat/internal/application/capture"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
@@ -25,14 +26,31 @@ import (
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
+	"asservat.local/asservat/internal/transport/conversion"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// Explicit test-only reuse of the existing protected fixture's original roles
+// and intent publisher. Nil preserves the legacy component cases unchanged.
+type policyRecorderProtectedCase struct {
+	Hub        *pgxpool.Pool
+	Admissions *postgres.ContextAdmissions
+	Filters    planning.FilterCompiler
+	Expression string
+	Subjects   []cfg.Subject
+	Intent     func(context.Context, string) error
+	Stored     func(policyObservationRetirementInput)
+}
 
 // Real Tick -> immutable occurrence -> recording admission and shared/grant
 // debit. Protected source/target/identity, initial trust and independent review
 // remain explicit synthetic component facts. No collector or public enablement.
-func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario) {
-	for _, mode := range []string{"packet-policy", "snapshot-policy-refuses-recorder", "packet-policy-observation-sql", "packet-policy-companion-sql"} {
+func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario, protected ...policyRecorderProtectedCase) {
+	modes := []string{"packet-policy", "snapshot-policy-refuses-recorder", "packet-policy-observation-sql", "packet-policy-companion-sql"}
+	if len(protected) > 0 {
+		modes = []string{"packet-policy-companion-sql"}
+	}
+	for _, mode := range modes {
 		t.Run(mode, func(t *testing.T) {
 			s := create(t)
 			var beforeGraph *policyObservationGraphSample
@@ -50,10 +68,17 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				compilePolicy = policyRawCompile
 				filters = policyRawFilters{}
 			}
+			if len(protected) > 0 {
+				filters = protected[0].Filters
+				compilePolicy = policyMetadataCompile(filters)
+			}
 			clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 			root, installation := s.a.RootID, s.recovery.installation
 			target := s.a.Plan.Input.Target.Target()
 			b := &s.batch.Bases[0]
+			if len(protected) > 0 {
+				b.Subjects = protected[0].Subjects
+			}
 			b.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{authorization.PolicyContextAction, "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: 64 << 20}
 			if observed {
 				b.Automation.MaxObservedBytes = 1 << 30
@@ -104,15 +129,20 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			acceptor := factory("policy_accept_runtime", "synthetic-policy-accept")
 			auditor := factory("policy_audit_runtime", "synthetic-policy-audit")
 			reader := factory("policy_read_runtime", "synthetic-policy-read")
-			role := narrowRole(t, ctx, admin, "policy_recorder_"+strings.ReplaceAll(mode, "-", "_")+"_", "synthetic-policy-recorder", func(role string) []string {
-				sql, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
-				if !ok {
-					t.Fatal("hub duty")
-				}
-				return sql
-			})
-			hub := poolFor(role, "synthetic-policy-recorder")
-			defer hub.Close()
+			var hub *pgxpool.Pool
+			if len(protected) > 0 {
+				hub = protected[0].Hub
+			} else {
+				role := narrowRole(t, ctx, admin, "policy_recorder_"+strings.ReplaceAll(mode, "-", "_")+"_", "synthetic-policy-recorder", func(role string) []string {
+					sql, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
+					if !ok {
+						t.Fatal("hub duty")
+					}
+					return sql
+				})
+				hub = poolFor(role, "synthetic-policy-recorder")
+				defer hub.Close()
+			}
 			current, err := postgres.NewAutomationAuthorities(ctx, hub, root, installation)
 			if err != nil {
 				t.Fatal(err)
@@ -123,18 +153,23 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			}
 			// Match production's independently credentialed admission facet;
 			// the ordinary hub union intentionally cannot lock storage bindings.
-			admitRole := narrowRole(t, ctx, admin, "policy_recorder_admit_"+strings.Split(mode, "-")[0]+"_", "synthetic-policy-recorder-admit", func(role string) []string {
-				sql, ok := postgres.PublicRuntimeRoleGrantSQL("capture-admit", role)
-				if !ok {
-					t.Fatal("capture-admit purpose")
+			var admissions *postgres.ContextAdmissions
+			if len(protected) > 0 {
+				admissions = protected[0].Admissions
+			} else {
+				admitRole := narrowRole(t, ctx, admin, "policy_recorder_admit_"+strings.Split(mode, "-")[0]+"_", "synthetic-policy-recorder-admit", func(role string) []string {
+					sql, ok := postgres.PublicRuntimeRoleGrantSQL("capture-admit", role)
+					if !ok {
+						t.Fatal("capture-admit purpose")
+					}
+					return sql
+				})
+				admitPool := poolFor(admitRole, "synthetic-policy-recorder-admit")
+				defer admitPool.Close()
+				admissions, err = postgres.NewContextAdmissions(ctx, admitPool, root, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
+				if err != nil {
+					t.Fatal(err)
 				}
-				return sql
-			})
-			admitPool := poolFor(admitRole, "synthetic-policy-recorder-admit")
-			defer admitPool.Close()
-			admissions, err := postgres.NewContextAdmissions(ctx, admitPool, root, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
-			if err != nil {
-				t.Fatal(err)
 			}
 			now := clock()
 			creator := s.a.Eligibility.VerifiedIdentity.Principal
@@ -157,6 +192,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 					edit := entry.(map[string]any)
 					if edit["field"] == "packetFilter" {
 						edit["value"] = policyRawExpression
+						if len(protected) > 0 {
+							edit["value"] = protected[0].Expression
+						}
 					}
 				}
 			}
@@ -322,7 +360,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				qualifyFinitePolicyObservationSQL(t, ctx, admin, hub, poolFor, root, record.Record.ID, grant, output)
 			}
 			if companionSQL {
-				qualifyPolicyObservationCompanion(t, ctx, admin, hub, poolFor, store, keys, s, current, authority, a, output, record.Record.ID, grant, beforeGraph)
+				qualifyPolicyObservationCompanion(t, ctx, admin, hub, poolFor, store, keys, s, current, authority, a, output, record.Record.ID, grant, beforeGraph, protected...)
 			}
 		})
 	}
@@ -400,22 +438,8 @@ func TestPolicyRecorderAdmissionFixtureOfflineBindings(t *testing.T) {
 	for _, raw := range []bool{false, true} {
 		t.Run(map[bool]string{false: "headers", true: "inert-policy-raw"}[raw], func(t *testing.T) {
 			now := time.Now().UTC().Truncate(time.Microsecond)
-			root, installation, cluster := custodyID(), custodyID(), custodyID()
-			target := capacityNativeTarget(cluster, cfg.NamespaceRef{Name: "app", UID: custodyID()}, cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: custodyID()}, now)
-			target.ExecutionClass = artifact.ContextAPIExecution
-			target.NodeUID, target.NodeBootID, target.Pin.NodeName = "", "", ""
-			set := privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "policy-set", Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Complete: true, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: artifact.Digest{2}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 3600, MaximumSeconds: 86400, DeletionBudgetSeconds: 300}}}
-			retained, err := privacy.Resolve(set, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", AnchorAt: now}, now)
-			if err != nil {
-				t.Fatal(err)
-			}
-			actor := authorization.PolicyPrincipal(installation, "policy-recorder")
-			in := capacityNativeContextInput(target, retained, actor, custodyID(), now)
-			owner := artifact.AudienceAssignment{Kind: "Group", Issuer: "https://id.example.test", SubjectID: "maintainers", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", BasisDigest: artifact.Digest{3}, AssignmentID: custodyID()}
-			verified := identity.Identity{Principal: actor, Policy: identity.Revision{UID: "policy-recorder", Generation: 1, Digest: artifact.Digest{4}}, Scopes: []string{"evidence:capture"}, VerifiedAt: now, ValidUntil: now.Add(5 * time.Second)}
-			eligible := authorization.CaptureEligibility{Result: authorization.Result{Eligible: true, Principal: actor, IdentityRevision: verified.Policy, PermissionRevision: identity.Revision{UID: "permissions", Generation: 1, Digest: artifact.Digest{5}}, ValidUntil: verified.ValidUntil}, Target: target.Target(), VerifiedIdentity: verified, DefaultAudience: []artifact.AudienceAssignment{owner}}
-			allocation := custodyID()
-			a := capture.Admission{RootID: root, IdempotencyKey: custodyID(), Plan: planvalue.ContextPlan{Input: in}, Eligibility: eligible, Recovery: artifact.RecoveryProof{InstallationID: installation, IssuerEpoch: custodyID(), Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{6}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Storage: capture.StorageBinding{RootID: root, ClusterID: cluster, NamespaceUID: target.Target().NamespaceUID, WorkloadUID: target.Target().WorkloadUID, AllocationID: allocation, Revision: identity.Revision{UID: "storage", Generation: 1, Digest: artifact.Digest{7}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second)}, Registration: artifact.Registration{Location: artifact.Location{ClusterID: cluster, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: custodyID(), AllocationID: allocation, PoolRevision: 1, AllocationRevision: 1, NativeLimit: artifact.RecordingNativeLimit, AnchorAt: retained.AnchorAt}, CaseID: custodyID(), OccurrenceID: custodyID()}
+			a := policyRecorderOfflineAdmission(t, now)
+			cluster := a.Storage.ClusterID
 			spec := publicPolicySpec(t, authorization.AcceptedPolicyAuthority{ClusterID: cluster})
 			compilePolicy := publicPolicyCompile
 			var filters planning.FilterCompiler = publicPolicyFilters{}
@@ -431,5 +455,40 @@ func TestPolicyRecorderAdmissionFixtureOfflineBindings(t *testing.T) {
 			a, p := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, now)
 			requirePolicyRecorderAdmissionFixture(t, a, p, now)
 		})
+	}
+}
+
+// Shared compiler-only seed; no persisted observation or authority is invented.
+func policyRecorderOfflineAdmission(t testing.TB, now time.Time) capture.Admission {
+	t.Helper()
+	root, installation, cluster := custodyID(), custodyID(), custodyID()
+	target := capacityNativeTarget(cluster, cfg.NamespaceRef{Name: "app", UID: custodyID()}, cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: custodyID()}, now)
+	target.ExecutionClass = artifact.ContextAPIExecution
+	target.NodeUID, target.NodeBootID, target.Pin.NodeName = "", "", ""
+	set := privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "policy-set", Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Complete: true, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: artifact.Digest{2}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 3600, MaximumSeconds: 86400, DeletionBudgetSeconds: 300}}}
+	retained, err := privacy.Resolve(set, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", AnchorAt: now}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor := authorization.PolicyPrincipal(installation, "policy-recorder")
+	in := capacityNativeContextInput(target, retained, actor, custodyID(), now)
+	owner := artifact.AudienceAssignment{Kind: "Group", Issuer: "https://id.example.test", SubjectID: "maintainers", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", BasisDigest: artifact.Digest{3}, AssignmentID: custodyID()}
+	verified := identity.Identity{Principal: actor, Policy: identity.Revision{UID: "policy-recorder", Generation: 1, Digest: artifact.Digest{4}}, Scopes: []string{"evidence:capture"}, VerifiedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	eligible := authorization.CaptureEligibility{Result: authorization.Result{Eligible: true, Principal: actor, IdentityRevision: verified.Policy, PermissionRevision: identity.Revision{UID: "permissions", Generation: 1, Digest: artifact.Digest{5}}, ValidUntil: verified.ValidUntil}, Target: target.Target(), VerifiedIdentity: verified, DefaultAudience: []artifact.AudienceAssignment{owner}}
+	allocation := custodyID()
+	return capture.Admission{RootID: root, IdempotencyKey: custodyID(), Plan: planvalue.ContextPlan{Input: in}, Eligibility: eligible, Recovery: artifact.RecoveryProof{InstallationID: installation, IssuerEpoch: custodyID(), Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{6}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Storage: capture.StorageBinding{RootID: root, ClusterID: cluster, NamespaceUID: target.Target().NamespaceUID, WorkloadUID: target.Target().WorkloadUID, AllocationID: allocation, Revision: identity.Revision{UID: "storage", Generation: 1, Digest: artifact.Digest{7}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second)}, Registration: artifact.Registration{Location: artifact.Location{ClusterID: cluster, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: custodyID(), AllocationID: allocation, PoolRevision: 1, AllocationRevision: 1, NativeLimit: artifact.RecordingNativeLimit, AnchorAt: retained.AnchorAt}, CaseID: custodyID(), OccurrenceID: custodyID()}
+}
+
+func policyMetadataCompile(filters planning.FilterCompiler) func(json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+	return func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+		var wire contracts.CaptureComposition
+		if err := json.Unmarshal(raw, &wire); err != nil {
+			return planvalue.PolicyRecorderConfiguration{}, err
+		}
+		c, err := conversion.CompositionFromWire(wire)
+		if err != nil || c == nil {
+			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
+		}
+		return planning.CompilePolicyRecorder(*c, filters)
 	}
 }
