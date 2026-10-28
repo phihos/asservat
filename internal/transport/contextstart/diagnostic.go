@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"sync/atomic"
+	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	execution "asservat.local/asservat/internal/domain/execution"
@@ -116,11 +117,13 @@ func (v StreamInterruption) Reason() string {
 func (v StreamInterruption) Present() bool { return v.stage != streamNoStage }
 
 // StreamDiagnostics is one invocation-owned fixed snapshot. It accepts no
-// callback, error, source value or caller-supplied diagnostic. A fixture can
+// callback, error, source body or caller-supplied diagnostic. Its optional
+// transport cutoff is non-authoritative and retains its original instant. A fixture can
 // carry separate instances on its original hub and regional contexts; absence
 // of a recorder changes neither work nor error normalization.
 type StreamDiagnostics struct {
-	first atomic.Pointer[StreamInterruption]
+	first         atomic.Pointer[StreamInterruption]
+	workPeerUntil atomic.Pointer[time.Time]
 }
 type streamDiagnosticKey struct{}
 
@@ -138,6 +141,27 @@ func (d *StreamDiagnostics) Interruption() StreamInterruption {
 		}
 	}
 	return StreamInterruption{}
+}
+
+// WorkPeerDeadline is the first work lease's actual transport cutoff, after
+// intersecting the complete peer observation with its original frame caller.
+// It is diagnostic only, never returned through an authority/process port.
+func (d *StreamDiagnostics) WorkPeerDeadline() (time.Time, bool) {
+	if d != nil {
+		if until := d.workPeerUntil.Load(); until != nil {
+			return *until, true
+		}
+	}
+	return time.Time{}, false
+}
+
+func recordWorkPeerDeadline(ctx context.Context, until time.Time) {
+	if ctx != nil {
+		if d, ok := ctx.Value(streamDiagnosticKey{}).(*StreamDiagnostics); ok && d != nil {
+			original := until
+			d.workPeerUntil.CompareAndSwap(nil, &original)
+		}
+	}
 }
 
 // Classification uses standard trusted in-process Go error protocols (Is, As,

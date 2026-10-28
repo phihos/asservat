@@ -679,3 +679,71 @@ native transport 69.282 s and the complete mTLS package 66.365 s. Canonical
 pre-push exited 0, including 227 console tests, SQL generation/vet and
 specification/architecture checks. These are component gates, not an installed
 history/browser success or a measured steady-state replacement-cost result.
+
+## Signed history budget diagnostic (2026-10-28)
+
+Installed run 40756819144 on `e0d51a5f` progressed through the initial approved
+capture/native result and actual React history/settings reads. The edited
+`preview_capture` then returned ParametersUnavailable: attachment, receiver and
+signing succeeded; exchange failed with `owner/canceled`, while the regional
+half reported `read/http2-internal`. All 3,390 retained sources matched the exact
+commit, source was unchanged and cleanup reported no failures. Those closed
+classes establish interruption, not its cancellation origin or a premature
+deferred Close. The repeated preview/review/capture/native path did not finish.
+
+The reported session time was not the complete work budget. SQL can shorten
+`HistoryOperationAuthority.NotAfter` using original identity, recovery and
+retention bounds. The first current work-peer observation can shorten transport
+again. The old sign/exchange diagnostic considered only session/caller time, so
+its positive remaining bucket did not prove either actual work bound was live.
+
+Only diagnostics change. Sign/exchange remaining now intersects the session
+with the actual signed authority. The existing invocation-owned stream recorder
+retains the first work-peer cutoff after its original caller intersection, once,
+so it survives stream cancellation clearing the lease. A failed exchange reports
+that optional cutoff too. An expired bucket carries an explicit `expired`
+marker; no identity, peer/source value, error text or exact timestamp is emitted.
+The recorder supplies no authority and changes no error, context, deadline,
+stream owner, effect or joined cleanup. A failure before first peer admission
+has no peer snapshot; it is not a zero or a current proof. Last read/write socket
+cutoffs and the exact canceling owner remain unobserved by these fields.
+
+Cost: zero added SQL/API/provider calls, watches, credentials, timers, tasks,
+protocol fields or persistent state. One recorder pointer adds eight bytes and
+one optional immutable time value adds 24 bytes per diagnosed work (value sizes,
+not a measured heap peak), with one atomic first-write. This is per control work,
+not per packet or frame. Failure emits one extra fixed peer-budget event using
+the existing bounded timing recorder; no new configuration or cancellation
+framework is introduced.
+
+The existing real TLS/H2 dispatch fixture reproduces the misleading report with
+a three-second caller/session, a 300ms original signed read authority and a
+synthetic regional effect that starts then remains blocked beyond that authority.
+Old runtime diagnostics incorrectly report seconds left (RED exit 1, Go 0.324s).
+The correction reports both signed and first-peer budgets expired while the
+caller is still live (focused race exit 0, Go 1.405s). The effect counter remains
+one, its attachment remains reserved until joined Close, and another signed
+bound cannot rearm it. The complete local history dispatch matrix passes under
+race (Go 2.308s). Actual TLS/H2/source frames/signatures run; SQL authority and
+object effects are synthetic. This local deciding class is receive-call/deadline,
+not the installed owner/canceled class. It proves the reporting defect and
+original refusal/ownership, not the installed cancellation cause, real storage
+spend or a newly usable installed workflow.
+
+Setup audit: each settings request intentionally rechecks current visibility
+rather than trusting a prior browser copy. Its current path reads storage,
+authorizes before regional I/O and authorizes after opening the bundle. Prepare
+and first work each pull current source; Execute already reuses Prepare's exact
+receiver instead of performing the removed third source round trip. The first
+and final work-peer checks protect intervening blocking I/O. The successful read
+has four version-pinned ciphertext GETs and three unwraps; opening/final checks
+are not reached on the installed failing exchange. No further duplicated setup
+has been shown removable within the current contracts. Measuring which original
+signed/peer bound actually clips the operation is cheaper than extending a TTL,
+removing checks or adding retries based on incomplete timing labels.
+
+Affected final local race checks pass: contextstart 13.801s, mTLS 66.679s and
+bootstrap 61.756s. Canonical pre-push exits 0, including console checks and vet;
+specification, design architecture and Go architecture checks pass. No external
+SQL/Kubernetes fixture, collector, hosted run or publication was performed for
+this diagnostic correction. Installed cancellation attribution remains pending.
