@@ -127,3 +127,106 @@ func TestPolicyGrantCurrentExpiryWinsAtTheOriginalAuthorityEnd(t *testing.T) {
 		t.Fatal("authority end hid grant expiry", err)
 	}
 }
+
+func finitePolicyObservationFixture(t *testing.T) (Grant, AcceptedPolicyAuthority, Target, time.Time) {
+	t.Helper()
+	g, a, target, now := approvedPolicyUseFixture(t)
+	a.Limits.MaxObservedBytes = 1 << 30
+	p := g.Policy.Clone()
+	p.Authority = a
+	p.Limits.MaxObservedBytes = 1 << 30
+	p.Observation = &ObservationLimits{MaxSessionSeconds: 30, MaxObservedBytes: 1 << 30, MaxBytesPerSecond: 16 << 20, MaxConcurrentSessions: 2}
+	g.Policy = &p
+	if !g.Valid() {
+		t.Fatal("invalid finite observation fixture")
+	}
+	return g, a, target, now
+}
+
+func TestFinitePolicyObservationPreservesOriginalBoundsAndConservativeCredit(t *testing.T) {
+	for _, mode := range []string{"fifteen-seconds", "fractional-duration", "reviewed-session", "capture-end", "grant-end", "policy-pool", "grant-pool", "original-start"} {
+		t.Run(mode, func(t *testing.T) {
+			g, a, target, now := finitePolicyObservationFixture(t)
+			duration, remaining := 15*time.Second, int64(1<<30)
+			start, hard := now.Add(10*time.Second), now.Add(time.Minute)
+			wantUntil, wantStart, wantCredit := now.Add(20*time.Second), now.Add(5*time.Second), int64(256<<20)
+			switch mode {
+			case "fractional-duration":
+				duration = 12500 * time.Millisecond
+				wantStart = now.Add(7500 * time.Millisecond)
+				wantCredit = 224 << 20
+			case "reviewed-session":
+				g.Policy.Observation.MaxSessionSeconds = 18
+				wantUntil = now.Add(18 * time.Second)
+				wantStart = now.Add(3 * time.Second)
+			case "capture-end":
+				hard = now.Add(17 * time.Second)
+				wantUntil = hard
+				wantStart = now.Add(2 * time.Second)
+			case "grant-end":
+				g.PolicyNotAfter = now.Add(16 * time.Second)
+				g.ExpiresAt = g.PolicyNotAfter
+				wantUntil = g.PolicyNotAfter
+				wantStart = now.Add(time.Second)
+			case "policy-pool":
+				remaining = 123
+				wantCredit = 123
+			case "grant-pool":
+				g.PolicySpend.ObservedBytes = (1 << 30) - 456
+				wantCredit = 456
+			case "original-start":
+				start = now.Add(2 * time.Second)
+				wantStart = start
+			}
+			p, err := PlanFinitePolicyObservation(g, a, target, duration, remaining, 0, start, hard, now)
+			if err != nil || !p.StartedAt.Equal(now) || !p.Until.Equal(wantUntil) || !p.LatestStart.Equal(wantStart) || p.Credit != wantCredit || p.Duration != duration || p.BytesPerSecond != 16<<20 {
+				t.Fatalf("unexpected reservation: %+v %v", p, err)
+			}
+			if !g.Valid() {
+				t.Fatal("planner mutated grant")
+			}
+		})
+	}
+}
+
+func TestFinitePolicyObservationDeclinesUnusableOrUnauthorizedWindow(t *testing.T) {
+	for _, mode := range []string{"session-cannot-fit", "capture-cannot-fit", "zero-duration", "longer-action", "expired-start", "wrong-pod", "revoked", "concurrency", "grant-empty", "policy-empty", "policy-inflated"} {
+		t.Run(mode, func(t *testing.T) {
+			g, a, target, now := finitePolicyObservationFixture(t)
+			duration, remaining := 15*time.Second, int64(1<<30)
+			start, hard := now.Add(10*time.Second), now.Add(time.Minute)
+			switch mode {
+			case "session-cannot-fit":
+				g.Policy.Observation.MaxSessionSeconds = 15
+			case "capture-cannot-fit":
+				hard = now.Add(duration)
+			case "zero-duration":
+				duration = 0
+			case "longer-action":
+				duration = 16 * time.Second
+			case "expired-start":
+				start = now
+			case "wrong-pod":
+				target.PodUID = ""
+			case "revoked":
+				g.RevokedAt = now
+				g.Revoker = g.Decision.Approver
+			case "concurrency":
+			case "grant-empty":
+				g.PolicySpend.ObservedBytes = 1 << 30
+			case "policy-empty":
+				remaining = 0
+			case "policy-inflated":
+				remaining++
+			}
+			active := int64(0)
+			if mode == "concurrency" {
+				active = 2
+			}
+			p, err := PlanFinitePolicyObservation(g, a, target, duration, remaining, active, start, hard, now)
+			if err == nil || p != (FinitePolicyObservation{}) {
+				t.Fatalf("invalid finite authority admitted: %+v %v", p, err)
+			}
+		})
+	}
+}
