@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -77,6 +78,19 @@ type nativeTrafficHelper struct {
 	Nodes           []string
 }
 
+func (h nativeTrafficHelper) validForNode(node string) bool {
+	digest, err := hex.DecodeString(h.SHA256)
+	if h.Cluster == "" || err != nil || len(digest) != 32 || len(h.Nodes) < 1 || len(h.Nodes) > 2 || !slices.Contains(h.Nodes, node) {
+		return false
+	}
+	for i, current := range h.Nodes {
+		if !strings.HasPrefix(current, h.Cluster+"-") || slices.Contains(h.Nodes[:i], current) {
+			return false
+		}
+	}
+	return true
+}
+
 type nativeTrafficOutput struct{ bytes.Buffer }
 
 func (b *nativeTrafficOutput) Write(p []byte) (int, error) {
@@ -90,7 +104,7 @@ func nativePacingNodeTraffic(ctx context.Context, helper nativeTrafficHelper, no
 	started := time.Now()
 	defer func() { out.Elapsed = time.Since(started) }()
 	ip := net.ParseIP(podIP)
-	if ctx == nil || ctx.Err() != nil || helper.Cluster == "" || len(helper.SHA256) != 64 || !slices.Contains(helper.Nodes, node) || ip == nil || !ip.IsPrivate() || ip.IsLoopback() {
+	if ctx == nil || ctx.Err() != nil || !helper.validForNode(node) || ip == nil || !ip.IsPrivate() || ip.IsLoopback() {
 		return out, errors.New("exact owned traffic target unavailable")
 	}
 	phase, cancel := context.WithTimeout(ctx, nativeTrafficPhase)
@@ -215,5 +229,39 @@ func TestNativePacingNodeTrafficRequiresClosedCompleteReceipt(t *testing.T) {
 				t.Fatal("valid partial diagnostics lost", result)
 			}
 		})
+	}
+}
+
+func TestNativePacingTrafficDescriptorRefusesBeforeBootstrap(t *testing.T) {
+	good := nativeTrafficHelper{Cluster: "owned", SHA256: strings.Repeat("1", 64), Nodes: []string{"owned-control-plane"}}
+	if !good.validForNode("owned-control-plane") {
+		t.Fatal("owned descriptor refused")
+	}
+	for _, bad := range []nativeTrafficHelper{{}, {Cluster: "owned", SHA256: strings.Repeat("z", 64), Nodes: good.Nodes}, {Cluster: "other", SHA256: good.SHA256, Nodes: good.Nodes}, {Cluster: "owned", SHA256: good.SHA256, Nodes: []string{"owned-control-plane", "owned-control-plane"}}} {
+		if bad.validForNode("owned-control-plane") {
+			t.Fatal("missing/foreign/invalid descriptor passed early preflight")
+		}
+	}
+}
+
+func TestNativePacingMissingDescriptorStopsActualBootstrapEntry(t *testing.T) {
+	// The actual entry must refuse this otherwise parseable descriptor before
+	// touching deliberately unusable provider/API inputs. No services are used.
+	path := filepath.Join(t.TempDir(), "fixture.json")
+	raw := `{"WorkerImage":"synthetic","NativeProviders":{"Postgres":"unusable"},"Clusters":[{},{}]}`
+	if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
+		t.Fatal(err)
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, executable, "-test.run=^TestInitialBootstrapChainWithRealServices$", "-test.timeout=5s")
+	command.Env = append(os.Environ(), "ASSERVAT_CONTEXT_FIXTURES="+path, "ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE=1", "ASSERVAT_INSTALLER_CONTINUATION=1", "ASSERVAT_JOURNEY_FOCUS=native-paced")
+	output, err := command.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "native traffic helper descriptor unavailable before bootstrap") {
+		t.Fatal("actual bootstrap entry did not refuse missing helper first", err, string(output))
 	}
 }
