@@ -3,50 +3,17 @@ package bootstrap
 import (
 	"asservat.local/asservat/internal/domain/collector"
 	"context"
-	"crypto/sha256"
 	"errors"
 	"sync"
 	"time"
 )
 
-// ObservationRule pins wire-byte token accounting, including its one-second
-// initial burst. This is local enforcement, never an authority issuer.
-func ObservationAccountingRule() [32]byte {
-	return sha256.Sum256([]byte("wire-token-bucket-v1;burst=rate;whole-frame;no-refund"))
-}
+// These aliases preserve the existing local gate API. The shared values carry
+// committed binding/credit facts; constructing them does not issue authority.
+type ObservationBinding = collector.ObservationBinding
+type ObservationPermit = collector.ObservationPermit
 
-// ObservationBinding must eventually come from committed authority and an exact
-// authenticated node-channel resolution. Scope binds original root, policy,
-// acceptance, grant, source/action plan and program digests, not current aliases.
-// A local value alone cannot establish global ownership or prevent another process
-// from constructing a second meter. The unwired issuer/channel must do that.
-type ObservationBinding struct {
-	Scope                                            [32]byte
-	AccountingRule                                   [32]byte
-	SessionID, Fence, CaptureID, ActionID, PodUID    string
-	NodeUID, BootID, CollectorPodUID, CollectorEpoch string
-}
-
-func (b ObservationBinding) valid() bool {
-	if b.Scope == ([32]byte{}) || b.AccountingRule != ObservationAccountingRule() {
-		return false
-	}
-	for _, s := range []string{b.SessionID, b.Fence, b.CaptureID, b.ActionID, b.PodUID, b.NodeUID, b.BootID, b.CollectorPodUID, b.CollectorEpoch} {
-		if len(s) == 0 || len(s) > 128 {
-			return false
-		}
-	}
-	return true
-}
-
-// ObservationPermit has an immutable original session and rate. Credit is a
-// cumulative reservation ceiling, never remaining balance or measured input.
-type ObservationPermit struct {
-	Binding                             ObservationBinding
-	StartedAt, SessionUntil, LeaseUntil time.Time
-	Sequence                            uint64
-	Credit, BytesPerSecond              int64
-}
+func ObservationAccountingRule() [32]byte { return collector.ObservationAccountingRule() }
 
 var (
 	ErrObservationBinding = errors.New("observation binding invalid")
@@ -82,18 +49,15 @@ type LocalObservationGate struct {
 	snapshot ObservationSnapshot
 }
 
-func (p ObservationPermit) lease() collector.ObservationLease {
-	return collector.ObservationLease{SessionID: p.Binding.SessionID, Fence: p.Binding.Fence, Sequence: p.Sequence, StartedAt: p.StartedAt, SessionUntil: p.SessionUntil, LeaseUntil: p.LeaseUntil, Credit: p.Credit, MaxBytesPerSecond: p.BytesPerSecond}
-}
 func validObservationPermit(p ObservationPermit, now time.Time) bool {
-	return p.Binding.valid() && p.lease().Valid(now)
+	return p.Binding.Valid() && p.Lease().Valid(now)
 }
 
 func NewLocalObservationGate(parent context.Context, expected ObservationBinding, p ObservationPermit, now func() time.Time) (*LocalObservationGate, error) {
 	if parent == nil || parent.Err() != nil || now == nil || expected != p.Binding || !validObservationPermit(p, now()) || p.Sequence != 1 {
 		return nil, ErrObservationBinding
 	}
-	base, err := collector.NewObservationMeter(p.lease(), now())
+	base, err := collector.NewObservationMeter(p.Lease(), now())
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +168,7 @@ func (m *LocalObservationGate) Update(p ObservationPermit) error {
 		old.Sequence == ^uint64(0) || p.Sequence != old.Sequence+1 || p.Credit < old.Credit || p.LeaseUntil.Before(old.LeaseUntil) {
 		return m.stopLocked(ErrObservationUpdate)
 	}
-	if err := m.meter.Renew(p.lease(), now); err != nil {
+	if err := m.meter.Renew(p.Lease(), now); err != nil {
 		return m.stopLocked(err)
 	}
 	m.permit = p

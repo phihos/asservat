@@ -84,3 +84,52 @@ ConfigMap `connector-nodes`, the four attestation reads; ADR decision 9), but no
 installed it yet. Only manual packet captures exist (no rings, policy arming or snapshots);
 budget policy node limits are accepted by the schema but not yet intersected at admission. See the
 ADRs.
+
+## Exact packet source observation foundation
+
+The explicit regional `ResolvePacketSource` operation may return one
+`targets.PacketSourceObservation`: the whole target Pod UID, actual Node UID and
+boot ID, collector Pod UID/process epoch, and original observation interval.
+It reuses the same Pod resolution and authenticated `NodeChannel.NodeView`.
+Existing `ResolvePacketRecorder` metadata answers omit `Source`, preserving old
+strict wire decoders; this slice exposes no new source-query transport.
+Its interval starts at the later original Pod/report observation and ends at the
+earliest original Pod cutoff, report receipt plus the existing 45-second stale
+bound, or caller deadline. A new Pod read cannot renew the node report. The
+ordinary API target pin and metadata availability outcome remain unchanged;
+missing or expired source facts cannot support sensitive dispatch.
+
+`NodeChannel.EnqueuePacketExpected` consumes this single domain target value
+directly. Under the existing queue mutex and clock it checks cancellation,
+original interval, target Pod, Node UID/boot and collector Pod/epoch, current
+recorder availability and the original latest-start bound. Its facts are not a
+grant or permit. Already queued work retains its original latest-start bound
+rather than inheriting the short source-fact deadline. Existing enrollment
+replacement drops the old process queue and pending results; new epochs cannot
+inherit them. Ordinary metadata `EnqueuePacket` keeps its existing behavior.
+
+The shared `collector.ObservationBinding` and `ObservationPermit` own the local
+meter values; bootstrap aliases preserve the existing gate API. The accounting
+rule digest remains identical, represented as a fixed value verified against its
+canonical rule string in tests. This foundation adds no authority issuer,
+SQL/session mutation, sensitive wire permit or raw-predicate enablement.
+
+Cost: zero additional SQL/API/provider calls, watches, timers, goroutines,
+services, configuration, credentials or privileges. Each explicit source
+answer adds one bounded five-string/two-timestamp value (128-byte Go struct on
+amd64, excluding existing referenced strings and JSON encoding). Dispatch copies
+that value and adds fixed comparisons under the existing mutex. These are source
+size/call-count estimates, not installed CPU or end-to-end measurements. SQL
+credit issuance, authenticated permit transport, node enforcement composition and
+installed qualification remain pending in the policy-owned continuation.
+
+Local verification: a controlled regression bypassing expected-source checks
+failed with actual exit 1 (delivery 0.002s), demonstrating forbidden queue effects.
+Restored checks passed the final delivery race (1.049s), target/context-start
+races (1.006s/10.790s) and bootstrap race (56.527s). The unchanged local meter and
+shared accounting-rule test passed the collector race (1.006s). Canonical
+pre-push returned 0, including the actual Go import gate, specification/design
+checks, vet and 231 console tests. Its first new-worktree attempt failed only
+because pinned console dependencies were absent; offline `npm ci` completed
+before the successful run. These are pure/local component checks, not SQL,
+collector, private permit-wire or installed sensitive-observation qualification.
