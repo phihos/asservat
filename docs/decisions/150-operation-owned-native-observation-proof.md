@@ -226,7 +226,10 @@ headroom without an unbounded completed-request ledger. Fast distinct calls can
 still fill that total and must refuse until natural expiry; this is not an
 availability or throughput guarantee. Existing caller/proof five-second ends,
 active HTTP/native ceilings, demand pacing, input grants and budgets are unchanged.
-No public setting, SQL/API request, credential, privilege, watch or service is added.
+No public setting, credential, privilege, watch or service is added. SQL/API
+request counts are unchanged per admitted operation. Additional headroom can
+admit more distinct calls, so aggregate provider work can increase; active
+concurrency, provider limits and input budgets remain unchanged.
 
 Measured amd64 value sizes are entry 832 bytes, key 32 bytes and claim 104 bytes;
 these are not retained-heap or CPU measurements. With one region, active remains
