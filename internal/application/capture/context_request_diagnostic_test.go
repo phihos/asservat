@@ -100,6 +100,8 @@ func (e requestStorageReadMarker) ContextStorageRead() string { return e.stage }
 func TestContextRequestStorageReadDetailsAreClosed(t *testing.T) {
 	for _, detail := range []string{
 		"transaction", "observation",
+		"observation/shape", "observation/pool", "observation/allocation", "observation/source",
+		"observation/capacity", "observation/control", "observation/selection",
 		"query/no-row", "query/deadline", "query/canceled", "query/unavailable",
 		"clock/no-row", "clock/deadline", "clock/canceled", "clock/unavailable",
 		"", "private-provider-token", "query/sql-42501", "query/unavailable/private",
@@ -126,5 +128,22 @@ func TestContextRequestStorageReadDetailsAreClosed(t *testing.T) {
 				t.Fatal("storage diagnostic allowed admission")
 			}
 		})
+	}
+}
+
+func TestContextRequestStoragePredicateRetainsChangedRefusal(t *testing.T) {
+	f := newInvestigationFixture()
+	p := f.preview(t)
+	storage := &requestDiagnosticStorageError{cause: requestStorageReadMarker{error: value.ErrChanged, stage: "observation/capacity"}}
+	f.svc.Storage = storage
+	var reports []string
+	f.svc.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	until, _ := ctx.Deadline()
+	_, err := f.svc.Request(ctx, f.source(t, ctx), p.ID, "original-storage-refusal")
+	if !errors.Is(err, value.ErrChanged) || !slices.Equal(reports, []string{"request/facts/storage/read/observation/capacity"}) ||
+		storage.reads != 1 || storage.until.IsZero() || storage.until.After(until) || f.admissions.Load() != 0 || len(f.accepted) != 0 || len(f.previews) != 1 {
+		t.Fatal("storage predicate changed original refusal, bounds or effects", err, reports, storage.reads)
 	}
 }
