@@ -50,7 +50,11 @@ The exact deletion subcause was not retained. The existing adapter immediately
 checks absence after an acknowledged foreground DELETE, although Kubernetes
 can retain the same terminating Job and Pods while garbage collection proceeds,
 as described in the [official foreground-deletion contract](https://kubernetes.io/docs/concepts/architecture/garbage-collection/#foreground-cascading-deletion).
-A local real-adapter mTLS/client-go HTTP regression reproduced this gap (exit 1, package 0.097s); the other eight original negative/control cases passed.
+A local real-adapter server-authenticated TLS/client-go HTTP regression
+reproduced this gap (exit 1, package 0.097s); the other eight original
+negative/control cases passed. The synthetic API server presents a CA-verified
+certificate; this test supplies no client certificate and does not qualify
+mutual TLS or production API authentication.
 
 Complexity gate 1–11: (1) one installed cap refusal, asynchronous-deletion cause
 still a candidate; (2) uncertain workers remain charged, existing caps unchanged;
@@ -99,3 +103,10 @@ foreground-delete refusal. Qualification should use one adapter call under one
 original five-second retirement context and retain its elapsed time/proof. No
 new collector, fixture, role, quota or deadline increase is needed. External
 execution and installed paced completion remain pending review/authorization.
+
+
+The proposed single owned selection keeps its existing 150-second test context
+and one five-second retirement call. The harness's default Go envelope remains
+30 minutes; an external 1,100-second timeout followed by a ten-second hard-kill
+bounds the complete run below twenty minutes. These three bounds are distinct;
+no external run or real-controller measurement is established by local gates.
