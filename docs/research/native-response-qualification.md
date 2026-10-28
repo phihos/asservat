@@ -676,3 +676,54 @@ report SHA-256
 The pure single-ULP decrease race passed in 1.070s; canonical pre-push exited 0
 with 218 console tests. This measured record changes documentation only after
 the source freeze; installed qualification still needs its reviewed guarded run.
+
+### Native40622454045: approved submission storage observation refusal
+
+Exact `0c3f8582` failed before traffic: the original approved expired-preview
+submission returned closed ReviewChanged. The hub recorded
+`request/facts/storage/read/observation`; target/recorder resolution succeeded.
+Go took 596.874s, approved-recording subcase 132.62s. No traffic, PCAP, download,
+owner or phase measurement proof was reached. Root independently verified all
+3,231 source hashes, source unchanged and cleanupFailures=[]. Retained environment
+SHA-256 `d436ae424d73cb8d8477f2d3b72f2c15c567a469285f3c6111e06c792367a240`;
+paced report SHA-256
+`bc62f84f0a9a52143c0dc9719ce3db3cfc822c18e343b5b55175761605125fae`.
+
+The marker establishes that ObserveContextStorage and the following database
+clock read succeeded, then row validation refused. It cannot distinguish an
+expired managed capacity/source bound, pool/allocation state, control admission
+state or invalid shape/selection. A prior preview's ready hint does not prove
+the later submission's hint was ready or its consumed row remained current.
+The existing READ COMMITTED transaction observes a row in one MVCC statement,
+then checks against the later clock; crossing an original bound can therefore
+refuse without any selection change. This is a source-supported possibility,
+not an established cause of this installed failure.
+
+The existing private read marker now carries one of seven fixed predicates:
+shape, pool, allocation, source, capacity, control or selection. It reuses the
+already-read row and clock, preserving every original guard and error cause.
+Source validation precedes capacity validation only to distinguish a source
+expiry from its necessarily expired derived capacity bound; acceptance and
+refusal are unchanged. The application allows only those closed words. No row
+values, identifiers, provider text or settings enter the logger/public response.
+Pure row cases distinguish those boundaries, including unchanged ErrCapacity
+for exhausted control capacity; the actual Request path preserves ErrChanged,
+one read, original caller deadline and zero admissions. Existing unknown marker
+values remain filtered. No refresh/retry or readiness-loop behavior changes.
+
+Complexity gate: (1) one observed installed pre-traffic refusal with missing
+predicate; (2) no accepted freshness risk reopened; (3) existing storage-read
+diagnostics benefit; (4) fixed private error classification already used here;
+(5) zero privileges/credentials/exposure; (6) seven diagnostic words, zero new
+product/fallback states; (7) zero configuration; (8) existing SQL/Go only;
+(9) zero added API/SQL/network requests, watches, timers or background tasks,
+one small wrapped diagnostic on refusal, CPU unmeasured; (10) no wire/migration
+change, diagnostic-only rollback; (11) retaining the aggregate observation label
+cannot identify the original failed guard. No installed cause is asserted and
+no external/collector/hosted rerun is part of this local checkpoint.
+
+Legacy application marker allowlist RED exited 1; the corrected Request
+regression retained the predicate and original refusal. Full affected races
+passed: PostgreSQL adapter 2.578s and capture application 10.969s. Canonical
+pre-push exited 0, including 218 console tests. These are local diagnostic
+checks; the actual installed predicate remains unknown until reviewed evidence.
