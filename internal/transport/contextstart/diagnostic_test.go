@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -21,11 +22,9 @@ import (
 type streamPrivateError struct{}
 
 func (*streamPrivateError) Error() string { panic("private error rendered") }
-func (*streamPrivateError) Unwrap() error { panic("private error unwrapped") }
-func (*streamPrivateError) Is(error) bool { panic("private error compared") }
 
-// The trusted structured bridge is allowed to execute. Inherited Error/Is/
-// Unwrap methods still panic if classification tries text or chain traversal.
+// Trusted error protocol methods may execute; inherited Error still panics
+// if classification renders private text.
 type streamAsError struct {
 	streamPrivateError
 	calls    int
@@ -33,12 +32,47 @@ type streamAsError struct {
 }
 
 func (e *streamAsError) As(target any) bool {
-	e.calls++
 	stream, ok := target.(*http2.StreamError)
 	if ok {
+		e.calls++
 		*stream = http2.StreamError{Code: http2.ErrCodeInternal, Cause: os.ErrDeadlineExceeded}
 	}
 	return ok && e.accepted
+}
+
+type streamWrappedError struct {
+	streamPrivateError
+	cause   error
+	unwraps int
+}
+
+func (e *streamWrappedError) Unwrap() error { e.unwraps++; return e.cause }
+
+type streamIsError struct{ streamPrivateError }
+
+func (*streamIsError) Is(target error) bool { return target == os.ErrDeadlineExceeded }
+
+func TestContextStreamDiagnosticUsesTrustedWrappedErrorsWithoutText(t *testing.T) {
+	// This is the actual Go1.27 HTTP2 onReadTimeout construction.
+	if streamErrorReason(fmt.Errorf("%w", os.ErrDeadlineExceeded)) != streamExpired {
+		t.Fatal("wrapped HTTP2 read deadline lost")
+	}
+	if streamErrorReason(&streamIsError{}) != streamExpired {
+		t.Fatal("trusted Is protocol ignored")
+	}
+	for _, tc := range []struct {
+		cause error
+		want  streamReason
+	}{
+		{os.ErrDeadlineExceeded, streamExpired},
+		{http2.StreamError{Code: http2.ErrCodeInternal}, streamHTTP2Internal},
+		{&streamPrivateError{}, streamOther},
+	} {
+		err := &streamWrappedError{cause: tc.cause}
+		if got := streamErrorReason(err); got != tc.want || err.unwraps == 0 {
+			t.Fatal("trusted Unwrap protocol", got, tc.want, err.unwraps)
+		}
+	}
 }
 
 type streamReaderFunc func([]byte) (int, error)
@@ -122,7 +156,7 @@ func TestContextStreamHTTP2DiagnosticCodesStayClosed(t *testing.T) {
 	}
 }
 
-func TestContextStreamDiagnosticInvokesDirectAsWithoutUnwrap(t *testing.T) {
+func TestContextStreamDiagnosticUsesTrustedAsWithoutErrorText(t *testing.T) {
 	for _, accepted := range []bool{true, false} {
 		err := &streamAsError{accepted: accepted}
 		want := streamOther
@@ -328,7 +362,9 @@ func TestContextStreamDiagnosticRetainedReadDeadline(t *testing.T) {
 		t.Fatal("retained original socket deadline did not interrupt pump")
 	}
 	s.Close()
-	requireStreamReason(t, s, streamRead, streamTimeout)
+	// net.Pipe's net.OpError wraps os.ErrDeadlineExceeded. The known
+	// deadline cause now precedes its less-specific net.Error timeout flag.
+	requireStreamReason(t, s, streamRead, streamExpired)
 	if checks.Load() != 1 || interrupts.Load() != 1 {
 		t.Fatal("background read refreshed authority or repeated close")
 	}

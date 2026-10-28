@@ -18,7 +18,7 @@ import (
 // The first query completes under its short original caller bound. Its retained
 // socket deadline must not cancel a later caller during a fresh peer check.
 func TestContextStartCompletedQueryDeadlineDoesNotCancelNextQuery(t *testing.T) {
-	for _, phase := range []string{"current-check", "idle-gap", "work", "history-list", "history-stream-cutoff"} {
+	for _, phase := range []string{"current-check", "idle-gap", "work", "history-list", "history-stream-cutoff", "history-read-cutoff"} {
 		t.Run(phase, func(t *testing.T) { contextStartCompletedQueryLifecycle(t, phase) })
 	}
 }
@@ -26,7 +26,7 @@ func TestContextStartCompletedQueryDeadlineDoesNotCancelNextQuery(t *testing.T) 
 func contextStartCompletedQueryLifecycle(t *testing.T, phase string) {
 	f := newContextStartTLSFixture(t)
 	controller := make(chan *http.ResponseController, 1)
-	if phase == "history-stream-cutoff" {
+	if phase == "history-stream-cutoff" || phase == "history-read-cutoff" {
 		f.intercept = func(w http.ResponseWriter, _ *http.Request) bool {
 			controller <- http.NewResponseController(w)
 			return false
@@ -117,7 +117,7 @@ func contextStartCompletedQueryLifecycle(t *testing.T, phase string) {
 	second, stopSecond := context.WithTimeout(context.Background(), 4*time.Second)
 	defer stopSecond()
 	secondUntil, _ := second.Deadline()
-	history := phase == "history-list" || phase == "history-stream-cutoff"
+	history := phase == "history-list" || phase == "history-stream-cutoff" || phase == "history-read-cutoff"
 	hold.Store(phase == "current-check" || history)
 	result := make(chan error, 1)
 	go func() {
@@ -143,16 +143,30 @@ func contextStartCompletedQueryLifecycle(t *testing.T, phase string) {
 		case <-time.After(time.Second):
 			t.Fatal("second query peer check did not start")
 		}
-		if phase == "history-stream-cutoff" {
+		if phase == "history-stream-cutoff" || phase == "history-read-cutoff" {
 			// Induce a real HTTP/2 write cutoff while the second query owns
 			// its current route check. This identifies a diagnostic boundary;
 			// it does not establish why the installed stream was interrupted.
-			if err := (<-controller).SetWriteDeadline(time.Now().Add(20 * time.Millisecond)); err != nil {
+			owner := <-controller
+			deadline := owner.SetWriteDeadline
+			want := "restarts/read/http2-deadline"
+			if phase == "history-read-cutoff" {
+				// Go1.27 wraps the read-timeout sentinel; it has neither
+				// Timeout nor As and requires the standard Is/Unwrap path.
+				deadline = owner.SetReadDeadline
+				want = "restarts/read/deadline"
+			}
+			if err := deadline(time.Now().Add(20 * time.Millisecond)); err != nil {
 				t.Fatal(err)
 			}
 			select {
 			case err := <-result:
-				if !errors.Is(err, value.ErrUnavailable) || lastEvent != "restarts/read/http2-deadline" || second.Err() != nil {
+				// A write timeout closes the HTTP2 stream and cancels its
+				// request context concurrently with delivering the body error.
+				// Either owner cancellation or the read can win first; a read
+				// timeout only closes the body pipe, so its read class is exact.
+				matched := lastEvent == want || phase == "history-stream-cutoff" && lastEvent == "restarts/owner/canceled"
+				if !errors.Is(err, value.ErrUnavailable) || !matched || second.Err() != nil {
 					t.Fatal("history stream cutoff was not a closed target refusal within original caller time", lastEvent, err, second.Err())
 				}
 			case <-second.Done():
