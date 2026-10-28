@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"time"
 )
 
 const (
@@ -131,6 +132,8 @@ func WriteAPIContextFrame(w io.Writer, f APIContextFrame) error {
 type APIContextHello struct {
 	Format  string            `json:"format"`
 	Channel APIContextChannel `json:"channel"`
+	// Original connector conversation end; availability only, never authority.
+	StandbyUntil time.Time `json:"standbyUntil"`
 }
 
 // Result is a bounded disposition, not evidence or a catalog publication.
@@ -190,11 +193,14 @@ func DecodeAPIContextOperationReply(b []byte) (APIContextOperationReply, error) 
 }
 
 func EncodeAPIContextHello(v APIContextHello) ([]byte, error) {
+	if v.StandbyUntil.IsZero() {
+		return nil, ErrAPIContextProtocol
+	}
 	return canonicalAPIContext(v, APIContextWorkBytes)
 }
 func DecodeAPIContextHello(b []byte) (APIContextHello, error) {
 	v, e := decodeClosedRPC[APIContextHello](bytes.NewReader(b), APIContextWorkBytes)
-	if e != nil {
+	if e != nil || v.StandbyUntil.IsZero() {
 		return APIContextHello{}, ErrAPIContextProtocol
 	}
 	return v, nil
