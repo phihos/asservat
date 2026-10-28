@@ -33,13 +33,14 @@ import (
 // Explicit test-only reuse of the existing protected fixture's original roles
 // and intent publisher. Nil preserves the legacy component cases unchanged.
 type policyRecorderProtectedCase struct {
-	Hub        *pgxpool.Pool
-	Admissions *postgres.ContextAdmissions
-	Filters    planning.FilterCompiler
-	Expression string
-	Subjects   []cfg.Subject
-	Intent     func(context.Context, string) error
-	Stored     func(policyObservationRetirementInput)
+	Hub                 *pgxpool.Pool
+	Admissions          *postgres.ContextAdmissions
+	Filters             planning.FilterCompiler
+	Expression          string
+	Subjects            []cfg.Subject
+	Intent              func(context.Context, string) error
+	Stored              func(policyObservationRetirementInput)
+	PermissionsAccepted func(cfg.PermissionBatch)
 }
 
 // Real Tick -> immutable occurrence -> recording admission and shared/grant
@@ -98,6 +99,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			}
 			s.batch.ExpectedSequence = changed.Sequence
 			s.batch.Initial = nil
+			if len(protected) > 0 && protected[0].PermissionsAccepted != nil {
+				protected[0].PermissionsAccepted(policyRecorderCloneBatch(s.batch))
+			}
 			for range 2 {
 				if err = (auditapp.AuthorityPublisher{Ledger: s.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx); err != nil {
 					t.Fatal(err)
@@ -107,12 +111,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if err != nil {
 				t.Fatal(err)
 			}
-			var sponsor artifact.AudienceAssignment
-			for _, row := range projection.Allows {
-				if row.Audience.Role == "workload-maintainer" && row.Audience.BasisUID == b.Resource.UID {
-					sponsor = row.Audience
-				}
-			}
+			sponsor := policyRecorderSponsor(s.a.Eligibility.VerifiedIdentity, projection, b.Resource.UID)
 			if sponsor.AssignmentID == "" {
 				t.Fatal("current sponsor absent")
 			}
@@ -491,4 +490,21 @@ func policyMetadataCompile(filters planning.FilterCompiler) func(json.RawMessage
 		}
 		return planning.CompilePolicyRecorder(*c, filters)
 	}
+}
+
+func policyRecorderSponsor(author identity.Identity, projection authorization.Projection, delegation string) artifact.AudienceAssignment {
+	var sponsor artifact.AudienceAssignment
+	for _, row := range projection.Allows {
+		if row.Audience.Role == "workload-maintainer" && row.Audience.BasisUID == delegation && row.Audience.BasisKind == "AccessBinding" && row.Audience.Kind == "Group" && row.Audience.Issuer == author.Principal.Issuer && slices.Contains(author.Groups, row.Audience.SubjectID) {
+			sponsor = row.Audience
+		}
+	}
+	return sponsor
+}
+
+// Other nested values are replaced, not mutated, by this fixture. Clone only
+// the mutable basis records so each case owns generation/version updates.
+func policyRecorderCloneBatch(b cfg.PermissionBatch) cfg.PermissionBatch {
+	b.Bases = slices.Clone(b.Bases)
+	return b
 }

@@ -58,9 +58,9 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 		additional := policyMetadataRetention(t, f.input.ControlClusterID, 63)
 		seed, publisher, _ := f.prepareManagedContext(t, root, enrollment, 3600, additional...)
 		for _, shape := range policyMetadataShapes(t) {
-			t.Run(shape.name, func(t *testing.T) {
+			if !t.Run(shape.name, func(t *testing.T) {
 				s := seed
-				s.batch = f.batch
+				s.batch = policyRecorderCloneBatch(f.batch)
 				s.a.Plan.Input.CaptureID = custodyID()
 				s.a.CaseID = custodyID()
 				s.a.OccurrenceID = custodyID()
@@ -75,9 +75,9 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 					_, err := publisher.AcknowledgedCaptureIntent(ctx, id)
 					return err
 				}}
+				opt.PermissionsAccepted = func(batch cfg.PermissionBatch) { f.batch = batch }
 				opt.Stored = func(in policyObservationRetirementInput) {
 					e := in.Accepted.Expectation
-					f.batch = in.Scenario.batch
 					if e.Validate() != nil || len(e.Audience) != shape.audience || len(e.RetentionRules) != 64 {
 						t.Fatal("actual SQL shape differs", len(e.Audience), len(e.RetentionRules))
 					}
@@ -143,7 +143,9 @@ func TestPolicyMetadataBackingWithRealPostgres(t *testing.T) {
 					t.Logf("shape=%s acceptedScope=%d acceptedExpectation=%d authorIdentity=%d programJSON=%d instructions=%d newRecordTuple=%d/%d cumulativeRecordTuple=%d/%d occupiedRecords=%d accountTuple=%d/%d fixedTuple=%d/%d GLOBAL_FIXTURE_WAL=%d primaryRecordWALAllowance=%d backupCopies=%d WALCopies=%d; no lane subtraction, no publication/native/physical/bloat/backups proof", shape.name, scopeBytes, len(b), len(ident), len(program), len(e.Recording.Filter.Program), recordDelta, metadata.RecordRowBytes, recordBytes, occupied*metadata.RecordRowBytes, occupied, accountBytes, metadata.AccountRowBytes, fixedBytes, metadata.FixedRowBytes, wal, metadata.RecordWALBytes, metadata.BackupCopies, metadata.WALCopies)
 				}
 				qualifyPolicyRecorderAdmission(t, ctx, admin, f.fixturePool, f.store, f.keys, func(*testing.T) captureAdmissionScenario { return s }, opt)
-			})
+			}) {
+				return
+			}
 		}
 	})
 }
