@@ -103,9 +103,24 @@ func NewLocalObservationGate(parent context.Context, expected ObservationBinding
 	// propagates through ctx directly; no additional parent watcher is needed.
 	// Once stopped, renewal cannot revive this incarnation.
 	m.mu.Lock()
-	m.timer = time.AfterFunc(p.LeaseUntil.Sub(m.last), func() { m.Stop(ErrObservationExpired) })
+	m.timer = time.AfterFunc(p.LeaseUntil.Sub(m.last), m.expire)
 	m.mu.Unlock()
 	return m, nil
+}
+
+// An AfterFunc already dispatched before Update.Reset cannot be retracted.
+// Compare the current lease under its debit/update mutex before stopping, so
+// that obsolete firing cannot cancel a valid renewal which won that mutex.
+func (m *LocalObservationGate) expire() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.snapshot.Stopped != nil {
+		return
+	}
+	now := m.now()
+	if now.Before(m.last) || !now.Before(m.permit.LeaseUntil) {
+		m.stopLocked(ErrObservationExpired)
+	}
 }
 
 func (m *LocalObservationGate) Context() context.Context { return m.ctx }

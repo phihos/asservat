@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -270,5 +271,67 @@ func TestLocalObservationRenewalMovesIdleTimerWithoutRefilling(t *testing.T) {
 	}
 	if err = m.Update(p); err == nil {
 		t.Fatal("expired idle lease revived")
+	}
+}
+
+func TestLocalObservationQueuedOldTimerCannotStopRenewedLease(t *testing.T) {
+	sample, p, _ := localObservationFixture(t, 100, 100)
+	sample.Close()
+	base := time.Now()
+	p.StartedAt = base
+	p.SessionUntil = base.Add(time.Minute)
+	p.LeaseUntil = base.Add(200 * time.Millisecond)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var hold atomic.Bool
+	clock := func() time.Time {
+		if hold.CompareAndSwap(true, false) {
+			close(entered)
+			<-release
+		}
+		return base.Add(time.Millisecond)
+	}
+	m, err := NewLocalObservationGate(context.Background(), p.Binding, p, clock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	dispatched, finished := make(chan struct{}), make(chan struct{})
+	var dispatchedOnce, finishedOnce sync.Once
+	m.mu.Lock()
+	if !m.timer.Stop() {
+		m.mu.Unlock()
+		t.Fatal("initial timer unexpectedly dispatched before setup")
+	}
+	// Wrap the real expiration callback solely to join its already-dispatched
+	// execution; no test-only production hook or race-dependent sleep is needed.
+	m.timer = time.AfterFunc(time.Until(p.LeaseUntil), func() {
+		dispatchedOnce.Do(func() { close(dispatched) })
+		m.expire()
+		finishedOnce.Do(func() { close(finished) })
+	})
+	m.mu.Unlock()
+	hold.Store(true)
+	renewed := make(chan error, 1)
+	p.Sequence++
+	p.LeaseUntil = base.Add(5 * time.Second)
+	go func() { renewed <- m.Update(p) }()
+	<-entered // Update sampled a valid old instant while holding the gate mutex.
+	select {
+	case <-dispatched:
+	case <-time.After(time.Second):
+		close(release)
+		t.Fatal("old callback was not dispatched")
+	}
+	close(release)
+	if err = <-renewed; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-finished:
+	case <-time.After(time.Second):
+		t.Fatal("obsolete callback did not join")
+	}
+	if m.Context().Err() != nil || m.Snapshot().Stopped != nil {
+		t.Fatal("old timer stopped a renewed source", m.Snapshot())
 	}
 }

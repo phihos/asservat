@@ -1505,3 +1505,12 @@ unknown and reserved spend is never refunded.
 Duplicate permit comparison uses timestamp instant equality, so private-wire UTC
 normalization/loss of Go monotonic metadata cannot turn an exact replay into a
 conflict. The replay regression also proves that rate tokens remain spent.
+
+Independent review correction: an already-dispatched old AfterFunc can wait for
+Update's mutex, survive Reset, then wrongly stop the renewed source. The expiry
+callback now compares the current lease while holding that same mutex. A regression
+joins the obsolete callback while renewal wins the mutex; restoring unconditional
+Stop reproduces failure (0.20s, actual exit 1). All observation race tests pass on
+the correction (5.202s, actual exit 0). The full-suite/pre-push/benchmark numbers
+above describe checkpoint `632746cf`; the packet debit/recorder benchmark path is
+unchanged by this timer-only fix. No additional timer, worker, service or authority.
