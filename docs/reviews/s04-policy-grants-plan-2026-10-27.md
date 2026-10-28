@@ -2019,3 +2019,42 @@ The host external slot was explicitly released. No unchanged marker/migration/
 publisher/packet/snapshot/share/public suite repeats. Continue reviewed prefix/
 input-notice components, authenticated typed source/permit holder/node channel,
 real positive child retirement, backing and native qualification with raw closed.
+
+Typed finite source/start composition checkpoint (2026-10-28, component): reuse
+one same-work source operation instead of resolve-pod, and one typed start instead
+of ordinary recording start: zero additional C09 exchanges, SQL queries or new
+remote service/provider connections beyond the already recorded companion's six
+first-preparation queries / one replay read. No new timer, watch, worker, table,
+credential, config or fallback. The existing preparation gate wraps the companion;
+first=false still returns before keys and queue effects. Original API preparation
+identity/deadline is unchanged. The regional holder keeps the original source and
+receipt, proves the frozen program fits134B, and enqueues without another Pod/node
+API lookup. Prefix validation costs the measured 0.55us11-instruction /9.3us256
+full check once per policy compilation/start, not per frame. All raw trigger and
+manual refusals remain closed; no acquisition qualification is claimed.
+
+The typed node foundation38ec3e4 is reviewed and composed as63305502. Ordinary
+nil observation wire is unchanged. A finite raw work item emits a mandatory typed
+permit; invalid decoding cannot downgrade to nil. Queue mutation clones program
+and permit and checks original StartBy and exact authenticated node tuple under
+its existing mutex. Actual measured maximum16-item/256-instruction JSON poll is
+227243B under unchanged262144B. Node execution/meter and actual old/new TLS decoder
+proof remain a separate component. Initial signed work independently binds the
+expectation; the C09 start compares the receipt with that verified digest and the
+locally retained source, not two caller DTO copies. No independent initial JWS.
+
+Typed source/holder local verification: pre-push actual exit0 including231 console
+tests; affected execution race1.303s, contextstart10.822s, bootstrap54.820s pass.
+The initial execution test assertion incorrectly inspected the deliberately opaque
+outer error; it was corrected to inspect the existing typed inner check step.
+No authority behavior was changed to satisfy that assertion. Logs in the absolute
+approved-workflow cache: policy102-typed-source-holder-pre-push.log and
+policy102-typed-source-holder-races{,-final}.log. The direct receiver/holder tests
+use synthetic verified-work/source/permit inputs and do not qualify an end-to-end
+runner, actual node, encrypted output, retirement or backing.
+Final same-source follow-up checks pass: execution race1.300s / C09 race10.795s
+after preserving the retained source against a legacy resolve overwrite and
+labeling its fixed diagnostic correctly; final spec/architecture/Go architecture
+(67 packages/402 internal edges) and vet all actual exit0. Absolute logs
+policy102-typed-source-final-c09-races.log and policy102-typed-source-final-checks.log.
+No external fixture or collector ran for this source batch.

@@ -163,3 +163,33 @@ SQL-to-channel composition. Preparation currently inherits the router's finite
 five-second selection/exchange bound; measure the composed workflow before
 choosing any history-specific bound, preserving the original caller and signed
 operation deadlines.
+
+## Finite policy observation companion (ADR-261, not enabled)
+
+The same verified API work can explicitly replace `resolve-pod` with
+`resolve-packet-source`. Only a policy executor can use it; the regional resolver
+returns the exact Pod graph and original authenticated node-report interval in
+one resolution. Existing metadata queries retain their old shape and omit Source.
+The receiver keeps a value copy of this source for this exchange. Unavailable or
+unsupported source resolution refuses without falling back to a metadata answer.
+
+`start-policy-recording` carries the original finite SQL observation receipt and
+that exact source. Its expectation digest is compared with the independently
+verified signed work; `prepare-output` already matched the frozen expectation to
+that signed digest. The canonical program digest is derived again from those
+frozen instructions, not accepted from another receipt field. Capture, action,
+Pod, duration and source incarnation must agree. Source timestamps compare by
+instant, preserving their original cutoffs. The holder checks the actual prefix
+proof, transfers prepared keys once, and calls the expected-source node queue
+with the original permit StartBy. It performs no second Pod/node resolution.
+The authenticated queue independently checks the current node incarnation and
+original source interval under its existing mutex. No initial permit signature,
+new key, provider, watch or renewal loop is added; the initial work signature
+precedes this later receipt and is not represented as signing it.
+
+The runner uses the existing companion preparation transaction and preparation
+gate. A first=false receipt remains passive before key creation or dispatch.
+The ordinary start still refuses raw predicates before transferring keys. The
+policy trigger's raw guard remains closed pending actual node/meter, old-node
+refusal, positive retirement, complete backing and native qualification; this
+contract does not enable manual raw or ongoing acquisition.

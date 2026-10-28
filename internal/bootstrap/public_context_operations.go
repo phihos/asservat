@@ -7,6 +7,7 @@ import (
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/adapters/packets"
 	analysisapp "asservat.local/asservat/internal/application/analysis"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
@@ -282,6 +283,13 @@ func publicPolicyRecorderCompiler(filters planningapp.FilterCompiler) captureapp
 		if err != nil || composition == nil {
 			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
 		}
-		return planningapp.CompilePolicyRecorder(*composition, filters)
+		cfg, err := planningapp.CompilePolicyRecorder(*composition, filters)
+		if err != nil {
+			return cfg, err
+		}
+		if cfg.Filter != nil && planningapp.RawBytePredicate(cfg.Action.Filter) && packets.CheckPrefixProgram(cfg.Filter.Program) != nil {
+			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
+		}
+		return cfg, nil
 	}
 }
