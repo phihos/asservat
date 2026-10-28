@@ -238,3 +238,50 @@ The candidate twenty-second ceiling still implies about 0.4 MiB/s for a full
 8 MiB window before control overhead. Aggregate installed SQL/S3/KMS/API cost
 and practical slower-link qualification remain pending. No arbitrary slow-client
 support or full installed download completion is claimed.
+
+## Public response composition correction (2026-10-28)
+
+Installed run 40648565357 at af9bb589 captured and transferred 8,388,488 native
+PCAPNG bytes at full speed, then failed its paced response with an HTTP/2
+INTERNAL_ERROR. Its worker stopped during acknowledgement and the public handler
+reported transfer-sent/read. All 3,384 historical source hashes match, source was
+unchanged, actual Go/test exit 1 and cleanup failures were empty. This is partial
+capture/control evidence, not paced/range/owner-completion qualification.
+
+The production ContextNativeResponse wrapper had not adopted the inner
+RemoteContextSource renewal contract: it required equality with the first lease,
+parented the cursor under the first lease/setup observation and retained that
+observation's frozen authorizer. A regression through both real wrappers refuses
+a strictly newer same-window lease. Setup and immutable source reads now retain
+the original short observation; the retained remote cursor instead belongs to
+the existing original response owner, capped by its session/access/twenty-second
+bounds. The inner operation additionally intersects the original worker,
+credential and actual token deadlines. Later chunks use the existing fresh
+identity batches, current authority and SQL owner renewal. No setup observation
+is refreshed, and no metadata source is substituted.
+
+The composed regression uses synthetic SQL/authority/packet bytes, actual wrapper
+opening and renewal, one cursor/registration and the exact original operation.
+It crosses an actual initial 400 ms observation deadline before final acknowledgement;
+wrong ownership/range/scope and stale acknowledgements refuse. It does not run
+TLS, Kubernetes or a collector. Installed paced qualification remains required.
+
+Complexity reassessment: the problem occurred in one of one installed paced
+attempts that reached native transfer; all public multi-chunk downloads use this
+wrapper. Existing ADR258 authorizes bounded renewal. Zero new credentials,
+permissions, calls, watches, configuration, durable phases or fallback states;
+existing setup/source reads are unchanged, one small private source-reader helper
+is shared, and the existing original-owner timer replaces the prematurely short
+parent. Memory remains O(active responses); renewal retains its existing SQL
+update and never reopens keys. Upgrade/rollback has no schema/wire migration.
+Keeping the old wrapper would leave the selected slow-download contract unusable.
+
+The old af9 production files, applied with Go's test overlay against the composed
+regression, failed with “native response retained initial observation deadline”
+(exit 1, package 0.002 s). The separate initial continuation regression had
+already refused the newer lease (exit 1, package 0.002 s). The corrected full
+evidence package passes under race (exit 0, package 5.273 s), including ownership
+changes, stale ACK and final ACK beyond the old wall-clock cutoff. Canonical
+pre-push passes (exit 0, 43.356 s), including 231 console tests and specification,
+architecture, SQL and vet gates. Independent source review found no production
+blocker. These local results do not replace the pending installed retest.

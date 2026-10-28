@@ -1,5 +1,24 @@
 # Sustained implementation progress
 
+## Integrated installed candidate remains unqualified (2026-10-28)
+
+PR 103 at frozen af9 passed local broad Go/pre-push/gadget compilation, hosted CI and
+Gitar review, then all three guarded installed focuses failed. Root verified
+all 3,384 historical source hashes in each unchanged run and their actual exit 1,
+removed scratch and empty cleanup failures. Policy run 40648562303 rejects profile
+composition in the installed structural CRD before acceptance; history run 40648568602
+fails storage source expiry before capture. Their concrete boundary fixes are
+under investigation in isolated trees; these failures remain retained.
+
+Paced run 40648565357 captured and downloaded a real 8,388,488-byte PCAPNG at full speed,
+then failed its paced response. The public native-response wrapper still pinned
+the initial lease and setup authorizer despite the inner source's renewal
+support. The [ADR258 composition correction](decisions/258-slow-native-response-windows.md#public-response-composition-correction-2026-10-28)
+keeps setup short and retains the cursor under its original finite response;
+fresh per-chunk leases/SQL/current identity remain mandatory. Installed paced,
+range and completion, edited history and finite policy outcomes remain open;
+no complete S-04/S-02 or user enablement is claimed.
+
 ## Unpublished finite policy-packet candidate (2026-10-28)
 
 The isolated S04 candidate now composes the reviewed node meter/wire/prefix/loss

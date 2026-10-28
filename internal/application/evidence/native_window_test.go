@@ -324,7 +324,19 @@ func (p *windowNativePorts) RenewNativeOperation(_ context.Context, ref value.Na
 }
 
 func TestRemoteContextSourceRenewalPreservesCursorAndRejectsDowngrade(t *testing.T) {
+	testNativeResponseRenewal(t, false)
+}
+
+func TestContextNativeResponseRenewalPreservesCursorAndRejectsDowngrade(t *testing.T) {
+	testNativeResponseRenewal(t, true)
+}
+
+func testNativeResponseRenewal(t *testing.T, composed bool) {
 	f := newActiveEnrollmentFixture(t)
+	if composed {
+		f.f.a.ValidUntil = f.f.now.Add(400 * time.Millisecond)
+		f.f.identity.ValidUntil = f.f.a.ValidUntil
+	}
 	body := []byte("0123456789abcdefg")
 	ports := &windowNativePorts{exchange: &windowExchange{body: body}}
 	en := *f.lookup.value.Enrollment
@@ -339,16 +351,44 @@ func TestRemoteContextSourceRenewalPreservesCursorAndRejectsDowngrade(t *testing
 		}
 	}
 	f.r.config.Native = NativeAttachmentConfig{HubPodUID: en.Worker.Binding.PodUID, HubProcessEpoch: en.Worker.Intent.ID, KeyScope: value.KeyScope{InstallationID: en.Worker.Binding.InstallationID, Purpose: "artifact", KeyID: "synthetic"}, Owners: ports, Fences: ports, Origins: NativeOrigins{Operations: ports, Now: f.r.config.Now, Recent: NewNativeRecentObservations()}, Registrar: ports, PreparationKeys: ports, WindowKeys: ports}
-	attachment, err := f.r.native(en)
-	if err != nil {
-		t.Fatal(err)
+	var source interface {
+		CurrentNativeResponseSource
+		NativeResponseDeliveryAcknowledger
 	}
-	request := ContextDownloadRequest{SessionID: f.f.s.ID, Scope: f.f.s.Scope, Expectation: f.source.Expectation, Copies: f.source.Copies}
-	source, err := NewRemoteContextSource(t.Context(), attachment, request, artifact.DownloadPreparation{SessionID: f.f.s.ID, BatchID: "30000000-0000-4000-8000-000000000001", Generation: 1})
-	if err != nil {
-		t.Fatal(err)
+	var closeSource func()
+	if composed {
+		f.f.s.State = artifact.DownloadReady
+		f.lookup.value.State = f.f.s.State
+		f.lookup.value.MetadataAttempted = true
+		f.lookup.value.ResponseBusy = true
+		f.lookup.value.Preparation = &artifact.DownloadPreparation{SessionID: f.f.s.ID, BatchID: "30000000-0000-4000-8000-000000000001", Generation: 1}
+		f.r.config.Sources = &downloadControlFixture{source: f.source}
+		outer, err := NewContextNativeResponse(t.Context(), f.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Immutable metadata was verified by preparation. Only its warm cache pin
+		// is synthetic; the window opening, current SQL read, inner source and
+		// renewal are the production composition below.
+		key, err := contextMetadataKey(f.f.s, f.lookup.value, f.f.a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		outer.session, outer.key, outer.described = f.f.s, key, true
+		source, closeSource = outer, outer.Close
+	} else {
+		attachment, err := f.r.native(en)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request := ContextDownloadRequest{SessionID: f.f.s.ID, Scope: f.f.s.Scope, Expectation: f.source.Expectation, Copies: f.source.Copies}
+		inner, err := NewRemoteContextSource(t.Context(), attachment, request, artifact.DownloadPreparation{SessionID: f.f.s.ID, BatchID: "30000000-0000-4000-8000-000000000001", Generation: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		source, closeSource = inner, inner.Close
 	}
-	defer source.Close()
+	defer closeSource()
 	id := f.f.s.ID
 	lease := artifact.DownloadDeliveryLease{ResponseID: id, WindowID: id, OwnerID: id, Generation: 1, Sequence: 1, Length: int64(len(body)), StartedAt: f.f.now, Until: f.f.a.ValidUntil, Authority: f.f.a}
 	first, err := source.ReadChunkCurrent(t.Context(), f.f, lease, 0, 10)
@@ -359,16 +399,57 @@ func TestRemoteContextSourceRenewalPreservesCursorAndRejectsDowngrade(t *testing
 	if err = source.AcknowledgeNativeChunk(t.Context(), lease, 0, 10); err != nil {
 		t.Fatal(err)
 	}
+	// Refused ownership changes cannot reopen or replace the active cursor.
+	for _, change := range []string{"response", "window", "owner", "generation", "range", "scope"} {
+		foreign := lease
+		switch change {
+		case "response":
+			foreign.ResponseID = "30000000-0000-4000-8000-000000000002"
+		case "window":
+			foreign.WindowID = "30000000-0000-4000-8000-000000000002"
+		case "owner":
+			foreign.OwnerID = "30000000-0000-4000-8000-000000000002"
+		case "generation":
+			foreign.Generation++
+		case "range":
+			foreign.Length--
+		case "scope":
+			foreign.Authority.Scope.Principal.Subject = "replacement"
+		}
+		if _, err := source.ReadChunkCurrent(t.Context(), f.f, foreign, 10, 7); err == nil {
+			t.Fatal("changed window continued", change)
+		}
+	}
 	next := lease
 	next.Sequence++
+	if composed {
+		if !ports.registered.Until.After(lease.Until) {
+			t.Fatal("native response retained initial observation deadline")
+		}
+		f.f.refresh(time.Now().UTC().Truncate(time.Microsecond))
+		f.f.a.Environment.Processing.ObservedAt = f.f.now
+		f.f.a.Environment.Processing.ValidUntil = f.f.a.ValidUntil
+		next.StartedAt, next.Until, next.Authority = f.f.now, f.f.a.ValidUntil, f.f.a
+	}
 	ports.nextLease = next
 	last, err := source.ReadChunkCurrent(t.Context(), f.f, next, 10, 7)
 	if err != nil || !bytes.Equal(last.Bytes, body[10:]) {
-		t.Fatal("renewed exact cursor", err)
+		t.Fatal("renewed exact cursor", err, "renewals", ports.renewals)
 	}
 	clear(last.Bytes)
 	if err = source.AcknowledgeNativeChunk(t.Context(), lease, 10, 7); err == nil {
 		t.Fatal("old lease acknowledged renewed chunk")
+	}
+	if composed {
+		// The old setup context and initial delivery lease actually end. Renewed
+		// current authority must keep this exact original cursor alive until ACK.
+		timer := time.NewTimer(time.Until(lease.Until.Add(20 * time.Millisecond)))
+		defer timer.Stop()
+		select {
+		case <-t.Context().Done():
+			t.Fatal(t.Context().Err())
+		case <-timer.C:
+		}
 	}
 	if err = source.AcknowledgeNativeChunk(t.Context(), next, 10, 7); err != nil {
 		t.Fatal(err)

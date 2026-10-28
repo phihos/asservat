@@ -1,6 +1,25 @@
 # Remaining native response qualification
 
-Date: 2026-10-28. Status: installed attempts failed before traffic. Request preflight and SQL measurement regression checks pass; installed paced transfer and combined costs remain pending.
+Date: 2026-10-28. Status: installed capture and full-speed near-8-MiB transfer reached on af9; paced transfer failed. Complete paced/range/owner qualification and combined costs remain pending.
+
+## Integrated af9 installed attempt (2026-10-28)
+
+Native 40648565357 reached genuine collector output of 8,388,488 bytes (83,882 of 100,695
+frames retained, zero reported lost samples, empty failure), followed by exact
+full-speed native bytes in 1.337 s. Its recorded SHA256 is
+6626a0244365497c952b501a0b04ee080d2002fbcf80caa136fd43e6f7855bb7.
+Traffic completed 16 acknowledged batches/65,536 records / 4 MiB payload in 6.743 s.
+The later paced whole response failed HTTP/2 INTERNAL_ERROR; no completed paced
+body, owner renewal/final ACK or ranges were established. Complete=false remains
+binding. Packet timestamp/traffic overlap and independent tshark checks later in
+the journey were not reached; zero/default report fields are missing evidence.
+
+All 3,384 historical source hashes match frozen af9bb589, source remained unchanged,
+actual Go/test exit 1, scratch removed and cleanup failures empty. Environment
+SHA-256 7c3dc55d9f2cac9aa95457d048069a1f22380ddcabfb34e3da424b7ac2699154.
+Archives: `~/.cache/asservat-build/codex-bf86-resume/integrated-40648565357-artifacts/`.
+[ADR-258](../decisions/258-slow-native-response-windows.md#public-response-composition-correction-2026-10-28)
+records the reproduced outer-wrapper renewal gap and pending installed retest.
 
 ## Missing helper setup branch and early preflight (2026-10-28)
 
@@ -569,7 +588,7 @@ and 5,198.45ms summed PostgreSQL execution. This includes background and approve
 setup work, not isolated download, CPU or steady-state cost. Preserve that cost
 edge for combined qualification; it does not identify the traffic deadline cause.
 
-Local model RED at 500ms: actual exit1, 8.503s package, 15 acknowledged batches,
+Local model RED at 500ms: actual exit 1, 8.503s package, 15 acknowledged batches,
 200 final response with 196,608 partial bytes. GREEN at 250ms under race: all
 sixteen acknowledged batches / 65,536 records / 4,194,304 bytes in 4.989702030s;
 measured schedule wait 2.603112970s and HTTP/ACK work 2.386545239s. The receipt

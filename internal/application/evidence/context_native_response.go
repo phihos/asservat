@@ -3,6 +3,8 @@ package evidence
 import (
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"sync"
 )
@@ -132,7 +134,7 @@ func (s *ContextNativeResponse) readChunkCurrent(ctx context.Context, current id
 	defer s.leave()
 	s.mu.Lock()
 	session, described, active, effect := s.session, s.described, s.remote, s.effect
-	continuing := active != nil && !s.pending && lease == s.lease && offset == s.next
+	continuing := active != nil && !s.pending && SameNativeWindow(lease, s.lease) && lease.Sequence >= s.lease.Sequence && offset == s.next
 	s.mu.Unlock()
 	if !described || lease.Authority.Scope != session.Scope || active != nil && !continuing || active == nil && offset != lease.Offset {
 		return zero, artifact.ErrDownloadUnavailable
@@ -163,7 +165,7 @@ func (s *ContextNativeResponse) readChunkCurrent(ctx context.Context, current id
 		}
 		return zero, e
 	}
-	s.pending, s.next = true, offset+length
+	s.lease, s.pending, s.next = lease, true, offset+length
 	s.mu.Unlock()
 	return chunk, nil
 }
@@ -171,13 +173,15 @@ func (s *ContextNativeResponse) readChunkCurrent(ctx context.Context, current id
 // openWindow checks the current attachment and opens the remote source for
 // one delivery lease window. The original piece, request and current batch
 // own the window until its last chunk's final-sink acknowledgement and joined
-// native cleanup; they end at the lease deadline, not with the first chunk's
-// call, whose cancellation still stops the opening itself.
+// native cleanup, within the original response bound. Setup retains its initial
+// short authority; later chunks require fresh leases for the same window.
 func (s *ContextNativeResponse) openWindow(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease, checked bool) (*RemoteContextSource, context.Context, error) {
 	s.mu.Lock()
 	session, key := s.session, s.key
 	s.mu.Unlock()
-	base, cancelBase := context.WithDeadline(context.WithoutCancel(ctx), lease.Until)
+	until := identity.Earlier(s.runtime.config.Now().Add(value.NativeConversationWindow(value.NativeResponse)), session.Deadline)
+	until = identity.Earlier(until, lease.Authority.AccessUntil)
+	base, cancelBase := context.WithDeadline(s.owner, until)
 	stopCall := context.AfterFunc(ctx, cancelBase)
 	call, ownerEnd := s.owned(base)
 	var bound *ContextNativeRuntime
@@ -196,8 +200,11 @@ func (s *ContextNativeResponse) openWindow(ctx context.Context, current identiti
 		cancelBase()
 		return nil, nil, e
 	}
-	effect, stopEffect := context.WithDeadline(work, bound.bound.Deadline())
-	end := func() { stopEffect(); requestEnd(); ownerEnd(); cancelBase() }
+	// The initial observation bounds setup only. The response owns the retained
+	// cursor; each subsequent read and ACK has its independently admitted lease.
+	effect := call
+	end := func() { ownerEnd(); cancelBase() }
+	defer requestEnd()
 	fail := func(e error) (*RemoteContextSource, context.Context, error) {
 		stopCall()
 		end()
@@ -208,10 +215,20 @@ func (s *ContextNativeResponse) openWindow(ctx context.Context, current identiti
 		return fail(e)
 	}
 	currentKey, e := contextMetadataKey(session, observed, a)
-	if e != nil || currentKey != key || observed.NativeBusy || observed.NativeUncertain || !observed.ResponseBusy {
+	if e != nil || currentKey != key || observed.Enrollment == nil || observed.Preparation == nil || observed.NativeBusy || observed.NativeUncertain || !observed.ResponseBusy {
 		return fail(artifact.ErrDownloadUnavailable)
 	}
-	remote, e := bound.remote(work, session, observed, a)
+	source, e := bound.readNativeSource(work, session, a)
+	if e != nil {
+		return fail(e)
+	}
+	// Retain immutable prepared facts, with the original runtime authority
+	// resolver. The initial bound runtime cannot renew its consumed observation.
+	native, e := s.runtime.native(*observed.Enrollment)
+	if e != nil {
+		return fail(e)
+	}
+	remote, e := NewRemoteContextSource(effect, native, ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: source.Expectation, Copies: source.Copies}, *observed.Preparation)
 	if e != nil {
 		return fail(e)
 	}
@@ -242,7 +259,7 @@ func (s *ContextNativeResponse) AcknowledgeNativeChunk(ctx context.Context, leas
 	s.mu.Lock()
 	remote, end, actual, pending, next := s.remote, s.remoteEnd, s.lease, s.pending, s.next
 	s.mu.Unlock()
-	if remote == nil || lease != actual || !pending || offset+length != next {
+	if remote == nil || !SameNativeWindow(lease, actual) || lease.Sequence != actual.Sequence || !pending || offset+length != next {
 		return artifact.ErrDownloadUnavailable
 	}
 	e := remote.AcknowledgeNativeChunk(ctx, lease, offset, length)
