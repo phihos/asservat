@@ -1,12 +1,43 @@
 package postgres
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/capture"
 )
+
+func TestContextStorageObservationNamesClosedRefusalWithoutChangingCause(t *testing.T) {
+	for _, tc := range []struct {
+		name, predicate string
+		change          func(*custodydb.ObserveContextStorageRow, time.Time)
+		cause           error
+	}{
+		{"missing-field", "shape", func(r *custodydb.ObserveContextStorageRow, _ time.Time) { r.SourceDigest = nil }, value.ErrChanged},
+		{"pool-paused", "pool", func(r *custodydb.ObserveContextStorageRow, _ time.Time) { r.PoolPaused = true }, value.ErrChanged},
+		{"allocation-expired", "allocation", func(r *custodydb.ObserveContextStorageRow, now time.Time) { r.AllocationValidUntil = ts(now) }, value.ErrChanged},
+		{"source-expired", "source", func(r *custodydb.ObserveContextStorageRow, now time.Time) {
+			r.FreshUntil, r.CapacityUntil = ts(now), ts(now)
+		}, value.ErrChanged},
+		{"managed-capacity-expired", "capacity", func(r *custodydb.ObserveContextStorageRow, now time.Time) { r.CapacityUntil = ts(now) }, value.ErrChanged},
+		{"control-expired", "control", func(r *custodydb.ObserveContextStorageRow, now time.Time) { r.ControlAccountUntil = ts(now) }, value.ErrChanged},
+		{"control-exhausted", "control", func(r *custodydb.ObserveContextStorageRow, _ time.Time) { r.ChargedFull = r.ControlAccountFull }, value.ErrCapacity},
+		{"invalid-selection", "selection", func(r *custodydb.ObserveContextStorageRow, _ time.Time) { r.PoolRevision = 0 }, value.ErrChanged},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			row, root, target, now := storageObservationFixture()
+			tc.change(&row, now)
+			got, err := contextStorageObservation(row, root, target, now)
+			var failure contextStorageObservationFailure
+			if !errors.Is(err, tc.cause) || !errors.As(err, &failure) || failure.predicate != tc.predicate || got.Binding.RootID != "" {
+				t.Fatal("closed predicate changed cause or returned authority", err, failure.predicate)
+			}
+		})
+	}
+}
 
 func storageObservationFixture() (custodydb.ObserveContextStorageRow, string, authorization.Target, time.Time) {
 	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)

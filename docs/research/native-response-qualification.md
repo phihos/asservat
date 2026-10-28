@@ -596,3 +596,134 @@ Go1.27.2 linux/amd64; local binary SHA-256
 No Kind probe or hosted rerun occurred. Root must review/freeze and coordinate
 one owned-route probe after the shared external slot is free; installed native
 capture/download qualification remains pending.
+
+### Owned traffic-route probe on the candidate
+
+The single authorized probe on frozen `5fdcad4f` passed with exact selection
+`^TestNativePacingTrafficWithRealKubernetes$`: test 5.22s, Go 6.279s, actual runner
+exit 0 in 69.714s including setup/teardown. All 3,231 source hashes independently
+matched, sourceUnchangedDuringTest=true and cleanupFailures=[]. Exact owned Kind
+node, Pod UID/IP, original node UID/boot and serialized helper SHA were checked.
+The node used the expected `b61b5cc5...e077e7e` cgo-free helper, not a replacement.
+
+The actual owned-node command acknowledged sixteen batches / 65,536 records /
+4,194,304 bytes in 3.811040756s parent wall and 3.772793883s child wall. The child
+measured 3.440206167s schedule wait and 0.332554706s HTTP/ACK work (not CPU).
+Common ownership/copy/hash setup took 0.138701815s and copied 11,293,387 bytes
+onto the one owned node. No collector, BPF, Gadget, native artifact or download
+participated; this proves the finite traffic route only. Installed near-full
+recording, owner and >5s paced native download still need their guarded run.
+
+The cache archive `native-traffic-tail-owned-kind-1/results` preserves all generated
+results before restoration. Environment SHA-256
+`99489e5ce1fc884af85407b104b0fc45ecbce663c4c4c07b56f187c10f2f09b0`;
+probe SHA-256 `ce770b779668c222252e78aa2738c8d4b083c2410ca5240982afc833b3d85632`.
+After terminal archival, independent checks found no run-labelled containers,
+networks, volumes or images, no owned Kind node/cluster, and neither exact owned
+network remained. Generated repository results were restored only after archival.
+
+### Stable decimal SQL execution aggregation
+
+Native 40616046225 on `168ca47b` acknowledged all sixteen traffic batches / 4 MiB:
+parent 8.134821413s, client 8.074851714s, schedule wait 0.000113690s and HTTP/ACK
+work 8.074500615s. That last number is wall time, not CPU, and remains close to
+the unchanged 8.5s bound. Recording-phase measurement then refused unchanged
+statement counters whose floating SUM moved backwards: role 21841 execution
+3.3764820000000006 to 3.376482ms, and role 21846 24.505142000000003 to
+24.505142ms. Reset/deallocation and calls/rows/statement counts stayed unchanged.
+This run reached no PCAP, download or owner qualification; neither the earlier
+tail model nor successful traffic establishes the recording/download result.
+
+The fixture now casts each `total_exec_time` input to numeric before SUM and
+converts the aggregate once to double precision. Casting after the float SUM
+would retain order-sensitive arithmetic. The real-PostgreSQL witness uses the
+same observer expression with three fixed nonnegative values in opposite input
+orders: the legacy aggregate must decrease and be refused, while decimal-first
+aggregation must produce the same expected value and zero delta. This is an SQL
+arithmetic witness, not reconstruction of installed statement activity. A pure
+single-ULP genuine decrease still must fail; no epsilon or tolerance is added.
+
+Complexity gate: (1) one observed installed false refusal, qualification-blocking;
+(2) no accepted risk reopened; (3) all fixture SQL measurement edges benefit;
+(4) ordinary exact decimal aggregation, no novel runtime mechanism; (5) zero new
+privileges/credentials/exposure; (6) zero new product/fallback states; (7) zero
+configuration; (8) existing PostgreSQL numeric semantics only; (9) same snapshot
+query/row count, decimal conversion per existing statement row (CPU unmeasured),
+four extra tiny admin-only aggregate SELECTs plus one header read in the focused
+arithmetic witness, zero
+per-packet/API work; (10) fixture-only one-expression rollback, existing reset,
+eviction and real-decrease tests retained; (11) smaller cast-after-SUM or tolerance
+does not preserve the intended exact monotonic check. Existing max5000 statement
+capacity, roles, single pre-baseline reset and all deadlines remain unchanged.
+The single authorized owned PostgreSQL run on frozen `9c4aede4` passed exact
+`^TestNativePacingSQLWithRealPostgres$`: test 0.30s, Go package 1.360s, actual
+runner exit 0. Real PostgreSQL produced legacy 1.0000000000000002 to 1 (refused),
+and decimal-before-SUM 1.0000000000000002 in both physical orders with delta 0
+and unchanged three calls/rows/statements. Existing runtime-role isolation,
+database isolation and real eviction checks also passed in that selected test.
+This qualifies the arithmetic/counter fixture, not installed recording, native
+download, owner behavior or CPU/performance. No collector or hosted run occurred.
+
+All 3,193 source hashes independently matched the frozen source;
+sourceUnchangedDuringTest=true and cleanupFailures=[]. Exact owned
+`asservat-custody-7uall8qs-postgres` / `-s3` containers and network were absent,
+as were all run-labelled containers, networks, volumes and images. Generated
+results were archived before restoration and the shared fixture slot released.
+Cache archive `native-sql-numeric-owned-1` environment SHA-256
+`311784b38e04244e52e07a7ca1137ec506910ae7efcafef882ab8ebec474b284`;
+report SHA-256
+`39ce5efe7ac4d16e2bbbeea5e06e31f67fe2fdb4bf9731ee59bc696a66d60785`.
+The pure single-ULP decrease race passed in 1.070s; canonical pre-push exited 0
+with 218 console tests. This measured record changes documentation only after
+the source freeze; installed qualification still needs its reviewed guarded run.
+
+### Native40622454045: approved submission storage observation refusal
+
+Exact `0c3f8582` failed before traffic: the original approved expired-preview
+submission returned closed ReviewChanged. The hub recorded
+`request/facts/storage/read/observation`; target/recorder resolution succeeded.
+Go took 596.874s, approved-recording subcase 132.62s. No traffic, PCAP, download,
+owner or phase measurement proof was reached. Root independently verified all
+3,231 source hashes, source unchanged and cleanupFailures=[]. Retained environment
+SHA-256 `d436ae424d73cb8d8477f2d3b72f2c15c567a469285f3c6111e06c792367a240`;
+paced report SHA-256
+`bc62f84f0a9a52143c0dc9719ce3db3cfc822c18e343b5b55175761605125fae`.
+
+The marker establishes that ObserveContextStorage and the following database
+clock read succeeded, then row validation refused. It cannot distinguish an
+expired managed capacity/source bound, pool/allocation state, control admission
+state or invalid shape/selection. A prior preview's ready hint does not prove
+the later submission's hint was ready or its consumed row remained current.
+The existing READ COMMITTED transaction observes a row in one MVCC statement,
+then checks against the later clock; crossing an original bound can therefore
+refuse without any selection change. This is a source-supported possibility,
+not an established cause of this installed failure.
+
+The existing private read marker now carries one of seven fixed predicates:
+shape, pool, allocation, source, capacity, control or selection. It reuses the
+already-read row and clock, preserving every original guard and error cause.
+Source validation precedes capacity validation only to distinguish a source
+expiry from its necessarily expired derived capacity bound; acceptance and
+refusal are unchanged. The application allows only those closed words. No row
+values, identifiers, provider text or settings enter the logger/public response.
+Pure row cases distinguish those boundaries, including unchanged ErrCapacity
+for exhausted control capacity; the actual Request path preserves ErrChanged,
+one read, original caller deadline and zero admissions. Existing unknown marker
+values remain filtered. No refresh/retry or readiness-loop behavior changes.
+
+Complexity gate: (1) one observed installed pre-traffic refusal with missing
+predicate; (2) no accepted freshness risk reopened; (3) existing storage-read
+diagnostics benefit; (4) fixed private error classification already used here;
+(5) zero privileges/credentials/exposure; (6) seven diagnostic words, zero new
+product/fallback states; (7) zero configuration; (8) existing SQL/Go only;
+(9) zero added API/SQL/network requests, watches, timers or background tasks,
+one small wrapped diagnostic on refusal, CPU unmeasured; (10) no wire/migration
+change, diagnostic-only rollback; (11) retaining the aggregate observation label
+cannot identify the original failed guard. No installed cause is asserted and
+no external/collector/hosted rerun is part of this local checkpoint.
+
+Legacy application marker allowlist RED exited 1; the corrected Request
+regression retained the predicate and original refusal. Full affected races
+passed: PostgreSQL adapter 2.578s and capture application 10.969s. Canonical
+pre-push exited 0, including 218 console tests. These are local diagnostic
+checks; the actual installed predicate remains unknown until reviewed evidence.

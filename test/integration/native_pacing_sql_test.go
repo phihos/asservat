@@ -44,6 +44,11 @@ COMMIT;`
 // bootstrap, strictly before its first measurement edge. Never rearm a phase.
 const nativePacingStatisticsReset = `SELECT fixture_native_statistics.pg_stat_statements_reset()`
 
+// pg_stat_statements row order is unspecified. Sum canonical decimal inputs
+// before the one final float conversion; summing floats first can move backwards
+// solely because the same entries arrived in another order.
+const nativePacingSQLExecutionSum = `sum(total_exec_time::numeric)::double precision`
+
 func nativePacingSQLSnapshot(ctx context.Context, admin *pgxpool.Pool) (nativeSQLSnapshot, error) {
 	s := nativeSQLSnapshot{StartedAt: time.Now().UTC(), Roles: make(map[uint32]nativeSQLCounters)}
 	if ctx == nil || ctx.Err() != nil || admin == nil {
@@ -59,7 +64,7 @@ func nativePacingSQLSnapshot(ctx context.Context, admin *pgxpool.Pool) (nativeSQ
 	// role, including background services, rather than guessing attribution
 	// from query text. Numeric deltas and an idle baseline remain separate.
 	rows, err := admin.Query(call, `SELECT userid,sum(calls)::bigint,sum(rows)::bigint,
- sum(total_exec_time)::double precision,count(*)::bigint
+ `+nativePacingSQLExecutionSum+`,count(*)::bigint
  FROM fixture_native_statistics.pg_stat_statements WHERE userid<>(current_user::regrole)::oid
  AND dbid=(SELECT oid FROM pg_database WHERE datname=current_database())
  GROUP BY userid ORDER BY userid LIMIT 513`)
@@ -139,7 +144,7 @@ func TestNativePacingSQLDeltaRejectsLostOrResetStatistics(t *testing.T) {
 	if err != nil || d[42].Calls != 2 || d[42].Rows != 3 || d[42].ExecutionMilliseconds != .5 || d[43].Calls != 1 || before.Roles[42].Calls != 3 {
 		t.Fatal("valid numeric deltas changed or mutated their baseline", d, err)
 	}
-	for _, mode := range []string{"reset", "eviction", "missing role", "backwards", "overlap", "nonfinite"} {
+	for _, mode := range []string{"reset", "eviction", "missing role", "backwards", "execution single ULP backwards", "overlap", "nonfinite"} {
 		t.Run(mode, func(t *testing.T) {
 			bad := after
 			bad.Roles = map[uint32]nativeSQLCounters{42: after.Roles[42]}
@@ -152,6 +157,10 @@ func TestNativePacingSQLDeltaRejectsLostOrResetStatistics(t *testing.T) {
 				delete(bad.Roles, 42)
 			case "backwards":
 				bad.Roles[42] = nativeSQLCounters{Calls: 1}
+			case "execution single ULP backwards":
+				c := after.Roles[42]
+				c.ExecutionMilliseconds = math.Nextafter(before.Roles[42].ExecutionMilliseconds, math.Inf(-1))
+				bad.Roles[42] = c
 			case "overlap":
 				bad.StartedAt = before.StartedAt
 			case "nonfinite":
@@ -219,6 +228,7 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 		}
 		admin.Close()
 	}()
+	nativePacingSQLOrderWitness(t, ctx, admin)
 	if _, err := admin.Exec(ctx, `CREATE ROLE fixture_native_pacing_statistics LOGIN PASSWORD 'synthetic-only'`); err != nil {
 		t.Fatal("owned measurement role creation failed")
 	}
@@ -374,4 +384,50 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 		t.Fatal("midphase reset did not refuse coverage", err)
 	}
 	t.Log("actual PostgreSQL numeric role counters isolate two statements; no query text or parameters exported")
+}
+
+// Feed the same fixed nonnegative statement values in two physical input
+// orders to an unordered SUM. This is a PostgreSQL arithmetic witness, not an
+// imitation of pg_stat_statements activity, a reset or an attribution/CPU claim.
+func nativePacingSQLOrderWitness(t *testing.T, ctx context.Context, admin *pgxpool.Pool) {
+	t.Helper()
+	var reset time.Time
+	var dealloc int64
+	if err := admin.QueryRow(ctx, `SELECT stats_reset,dealloc FROM fixture_native_statistics.pg_stat_statements_info`).Scan(&reset, &dealloc); err != nil {
+		t.Fatal("statistics witness header", err)
+	}
+	read := func(expression string, smallFirst bool) nativeSQLSnapshot {
+		t.Helper()
+		s := nativeSQLSnapshot{StartedAt: time.Now().UTC(), ResetAt: reset, Deallocations: dealloc, Roles: map[uint32]nativeSQLCounters{}}
+		// expression is one of the two closed constants below; the observer uses
+		// this same production fixture aggregate, so a stale/wrong cast must fail.
+		q := `SELECT sum(calls)::bigint,sum(rows)::bigint, ` + expression + `,count(*)::bigint FROM (
+ SELECT 1::bigint AS calls,1::bigint AS rows,total_exec_time FROM
+ (VALUES (1,1::double precision),
+ (2,0.00000000000000011102230246251565::double precision),
+ (3,0.00000000000000011102230246251565::double precision)) AS v(ordinal,total_exec_time)
+ ORDER BY CASE WHEN $1::boolean THEN -ordinal ELSE ordinal END
+ ) AS same_statement_values`
+		var c nativeSQLCounters
+		if err := admin.QueryRow(ctx, q, smallFirst).Scan(&c.Calls, &c.Rows, &c.ExecutionMilliseconds, &c.Statements); err != nil {
+			t.Fatal("numeric SQL order witness", err)
+		}
+		s.Roles[42] = c
+		s.FinishedAt = time.Now().UTC()
+		return s
+	}
+	const legacy = `sum(total_exec_time)::double precision`
+	oldBefore, oldAfter := read(legacy, true), read(legacy, false)
+	if !(oldBefore.Roles[42].ExecutionMilliseconds > oldAfter.Roles[42].ExecutionMilliseconds) {
+		t.Fatal("legacy unordered float sum did not reproduce order-sensitive decrease", oldBefore.Roles, oldAfter.Roles)
+	}
+	if _, err := nativePacingSQLDelta(oldBefore, oldAfter); err == nil || err.Error() != "SQL counters moved backwards" {
+		t.Fatal("legacy floating decrease not refused", err)
+	}
+	before, after := read(nativePacingSQLExecutionSum, true), read(nativePacingSQLExecutionSum, false)
+	delta, err := nativePacingSQLDelta(before, after)
+	if err != nil || before.Roles[42] != after.Roles[42] || before.Roles[42].ExecutionMilliseconds != math.Nextafter(1, math.Inf(1)) || delta[42] != (nativeSQLCounters{}) || before.Roles[42].Calls != 3 || before.Roles[42].Rows != 3 || before.Roles[42].Statements != 3 {
+		t.Fatal("same-valued reordered SQL counters changed", before.Roles, after.Roles, delta, err)
+	}
+	t.Logf("real PostgreSQL unordered aggregate: legacy %.17g→%.17g refused; decimal-before-sum %.17g→%.17g delta0, unchanged3 calls/rows/statements; no reset/tolerance", oldBefore.Roles[42].ExecutionMilliseconds, oldAfter.Roles[42].ExecutionMilliseconds, before.Roles[42].ExecutionMilliseconds, after.Roles[42].ExecutionMilliseconds)
 }
