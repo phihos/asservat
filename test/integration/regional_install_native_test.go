@@ -123,7 +123,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		// warm-up (no installer input names it).
 		installMetricsServer(t, ctx, region, f.MetricsServerImage)
 	}
-	if executor && installedJourneyFocus() == "approved-recording" && index == 1 {
+	if executor && installedRecordingFocus() && index == 1 {
 		if _, err := region.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: "asservat-collector"}}, meta.CreateOptions{}); err != nil {
 			t.Fatal("collector namespace prerequisite", err)
 		}
@@ -137,7 +137,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 	if json.Unmarshal(first.Bytes(), &installed) != nil || installed.Secret.UID == "" {
 		t.Fatal("installer-cluster result")
 	}
-	if executor && installedJourneyFocus() == "approved-recording" && index == 1 {
+	if executor && installedRecordingFocus() && index == 1 {
 		installApprovedRecordingCollector(t, ctx, region, f.Clusters[index].Config, f.CollectorImage, installation, envelope.Binding.ClusterID, installed.Namespace.Name)
 	}
 	peer := envelope.Binding.PeerID
@@ -874,7 +874,7 @@ func (b *regionalBudget) addPolicy() {
 	// The operator's regional budget: a policy for the joined cluster and its
 	// slot in the existing pool, with the pool's capacity raised to fit.
 	reserveBytes := int64(4 * 1544192)
-	if installedJourneyFocus() == "approved-recording" {
+	if installedRecordingFocus() {
 		// Four records/16 objects remain the existing root protocol limit;
 		// the operator reserves the actual packet ciphertext size, rather than
 		// the smaller pod-status bytes of the original journey.
@@ -915,7 +915,7 @@ func (b *regionalBudget) addPolicy() {
 func (b *regionalBudget) addBinding(w regionalWorkload) {
 	b.t.Helper()
 	roles := []any{"workload-maintainer"}
-	if installedJourneyFocus() == "approved-recording" {
+	if installedRecordingFocus() {
 		roles = append(roles, "action-approver")
 	}
 	if installedJourneyFocus() == "share" || installedJourneyFocus() == "browser" {
@@ -953,7 +953,7 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	// The regional workload: a labeled namespace (the selector guard admits
 	// the administrator) and a Deployment with no replicas.
 	labels := map[string]string{"team": "regional"}
-	if installedJourneyFocus() == "approved-recording" {
+	if installedRecordingFocus() {
 		labels["pod-security.kubernetes.io/enforce"] = "restricted"
 	}
 	ns, err := region.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: name, Labels: labels}}, meta.CreateOptions{})
@@ -962,7 +962,7 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	}
 	labels = map[string]string{"app": "regional-app"}
 	command := []string{"/provider-proxy", "http://127.0.0.1:1", "http://127.0.0.1:1", "127.0.0.1:1"}
-	if installedJourneyFocus() == "logresource" || installedJourneyFocus() == "approved-recording" {
+	if installedJourneyFocus() == "logresource" || installedRecordingFocus() {
 		// ADR-241: the fixture's synthetic signal workload, which writes a
 		// requested line or keeps its CPU busy on demand.
 		command = []string{"/provider-proxy", "signals"}

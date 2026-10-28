@@ -23,6 +23,7 @@ import (
 type NativeOwners struct{ workers *DownloadWorkers }
 
 var _ evidence.NativeOperations = (*NativeOwners)(nil)
+var _ evidence.NativeOperationRenewer = (*NativeOwners)(nil)
 
 func NewNativeOwners(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, g DownloadTransactionGuards) (*NativeOwners, error) {
 	w, e := NewDownloadWorkers(ctx, pool, root, p, g)
@@ -109,22 +110,26 @@ func (s *NativeOwners) ClaimNativeOperation(ctx context.Context, en value.Worker
 func (s *NativeOwners) claimNativeOperation(ctx context.Context, en value.WorkerEnrollment, a artifact.DownloadAuthority, o value.NativeOperation, firstContext bool) (value.NativeOperation, error) {
 	var out value.NativeOperation
 	if s == nil || ctx == nil || ctx.Err() != nil || !en.Valid() || en.Worker.Intent.Profile != s.workers.profile || !o.CurrentValid(time.Now()) || o.Path != a.Environment.Path || !o.Processing.Equal(a.Environment.Processing) || !a.Valid(time.Now()) || o.Reference.SessionID != en.Worker.Intent.SessionID || o.Reference.WorkerID != en.Worker.Intent.ID || o.WorkerPublicKey != en.PublicKeyDigest || o.SourceVersion != a.Scope.Version || a.Scope != en.Worker.Intent.Authority.Scope || o.StartedAt.After(time.Now()) {
-		return out, artifact.ErrInvalid
+		return out, sqlStep{"native-claim-input", artifact.ErrInvalid}
 	}
 	o.StartedAt = o.StartedAt.UTC().Truncate(time.Microsecond)
 	o.Until = o.Until.UTC().Truncate(time.Microsecond)
 	ctx, cancel := context.WithDeadline(ctx, identity.Earlier(a.ValidUntil, o.Until))
 	defer cancel()
+	stage := "native-claim-session"
 	err := s.workers.withSession(ctx, o.Reference.SessionID, a, func(q *custodydb.Queries, p artifact.DownloadSession, now time.Time) error {
 		// Parent response/window locks precede worker/native locks everywhere.
+		stage = "native-claim-parent"
 		seq, end, e := nativeParent(ctx, q, p, o, now, true)
 		if e != nil {
 			return e
 		}
+		stage = "native-claim-worker"
 		actual, e := nativeWorker(ctx, q, s.workers.downloads.root, o)
 		if e != nil || actual != en {
 			return artifact.ErrDownloadUnavailable
 		}
+		stage = "native-claim-owner"
 		old, lookup := q.LockNativeOwner(ctx, custodydb.LockNativeOwnerParams{WorkerID: id(o.Reference.WorkerID), RootID: id(s.workers.downloads.root)})
 		if lookup != nil && !errors.Is(lookup, pgx.ErrNoRows) {
 			return lookup
@@ -141,15 +146,18 @@ func (s *NativeOwners) claimNativeOperation(ctx context.Context, en value.Worker
 				return artifact.ErrDownloadUnavailable
 			}
 		}
+		stage = "native-claim-clock"
 		clock, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
 		}
 		now = clock.Time.UTC()
 		end = identity.Earlier(end, identity.Earlier(a.ValidUntil, o.Until)).UTC().Truncate(time.Microsecond)
+		stage = "native-claim-deadline"
 		if !a.Valid(now) || !now.Before(end) || o.Until.After(p.Deadline) || o.Until.After(a.AccessUntil) {
 			return artifact.ErrDownloadExpired
 		}
+		stage = "native-claim-predecessor"
 		if lookup == nil {
 			previous, _, e := decodeNativeOwner(old)
 			if e != nil {
@@ -168,6 +176,7 @@ func (s *NativeOwners) claimNativeOperation(ctx context.Context, en value.Worker
 		} else if o.Reference.Fence != 1 {
 			return artifact.ErrDownloadConflict
 		}
+		stage = "native-claim-encoding"
 		encoded, e := json.Marshal(o)
 		if e != nil || len(encoded) > 8192 {
 			return artifact.ErrInvalid
@@ -177,6 +186,7 @@ func (s *NativeOwners) claimNativeOperation(ctx context.Context, en value.Worker
 			return artifact.ErrInvalid
 		}
 		var row custodydb.DownloadNativeOwner
+		stage = "native-claim-write"
 		if lookup == nil {
 			row, e = q.ReplaceNativeOwner(ctx, custodydb.ReplaceNativeOwnerParams{WorkerID: id(o.Reference.WorkerID), RootID: id(s.workers.downloads.root), Fence: old.Fence, OperationID: id(o.Reference.OperationID), OperationJson: encoded, AuthorityJson: authority, LeaseSequence: seq, LeaseStarted: ts(now), LeaseUntil: ts(end)})
 		} else {
@@ -185,11 +195,21 @@ func (s *NativeOwners) claimNativeOperation(ctx context.Context, en value.Worker
 		if e != nil {
 			return e
 		}
+		stage = "native-claim-decode"
 		out, _, e = decodeNativeOwner(row)
-		return e
+		if e != nil {
+			return e
+		}
+		stage = "native-claim-session-final"
+		return nil
 	})
 	if err != nil || ctx.Err() != nil {
-		return value.NativeOperation{}, artifact.ErrDownloadUnavailable
+		// Preserve only the closed stage; dependency errors remain private.
+		var inner interface{ FixedStep() string }
+		if errors.As(err, &inner) {
+			stage += "/" + inner.FixedStep()
+		}
+		return value.NativeOperation{}, sqlStep{stage, artifact.ErrDownloadUnavailable}
 	}
 	return out, nil
 }
@@ -203,7 +223,7 @@ func (s *NativeOwners) ObserveNativeOperation(ctx context.Context, ref value.Nat
 		return out, artifact.ErrDownloadUnavailable
 	}
 	o, a, e := decodeNativeOwner(initial)
-	if e != nil || o.Reference != ref || !o.CurrentValid(time.Now()) || o.Path != a.Environment.Path || !o.Processing.Equal(a.Environment.Processing) {
+	if e != nil || o.Reference != ref || !o.CurrentValid(time.Now()) || o.Path != a.Environment.Path || !sameNativeProcessingState(o.Processing, a.Environment.Processing) {
 		return out, artifact.ErrDownloadUnavailable
 	}
 	ctx, cancel := context.WithDeadline(ctx, identity.Earlier(a.ValidUntil, initial.LeaseUntil.Time))
@@ -243,6 +263,86 @@ func (s *NativeOwners) ObserveNativeOperation(ctx context.Context, ref value.Nat
 		return value.NativeLease{}, artifact.ErrDownloadUnavailable
 	}
 	return out, nil
+}
+
+// RenewNativeOperation consumes a separately admitted newer delivery lease of
+// the same response. The existing operation, worker, source and deadline are
+// immutable. An expired short observation is not reused as authority.
+func (s *NativeOwners) RenewNativeOperation(ctx context.Context, ref value.NativeReference, a artifact.DownloadAuthority, peer value.KeyPeer) (value.NativeLease, error) {
+	var out value.NativeLease
+	now := time.Now()
+	if s == nil || ctx == nil || ctx.Err() != nil || !ref.Valid() || !a.Valid(now) || !peer.Valid(now) || peer.Role != "acquisition" || peer.InstallationID != ref.InstallationID || ref.QueryID != "" {
+		return out, artifact.ErrDownloadUnavailable
+	}
+	initial, err := custodydb.New(s.workers.downloads.ledger.pool).ReadNativeOwner(ctx, custodydb.ReadNativeOwnerParams{WorkerID: id(ref.WorkerID), RootID: id(s.workers.downloads.root)})
+	if err != nil {
+		return out, artifact.ErrDownloadUnavailable
+	}
+	o, previous, err := decodeNativeOwner(initial)
+	if err != nil || o.Reference != ref || o.Kind != value.NativeResponse || !o.CurrentValid(now) || o.WorkerPodUID != peer.PeerID || a.Scope != previous.Scope || o.Path != a.Environment.Path || !sameNativeProcessingState(o.Processing, a.Environment.Processing) {
+		return out, artifact.ErrDownloadUnavailable
+	}
+	call, cancel := context.WithDeadline(ctx, identity.Earlier(a.ValidUntil, o.Until))
+	defer cancel()
+	err = s.workers.withSession(call, ref.SessionID, a, func(q *custodydb.Queries, parent artifact.DownloadSession, _ time.Time) error {
+		clock, err := q.CurrentTime(call)
+		if err != nil {
+			return err
+		}
+		// Parent response/window locks precede worker and owner locks, exactly
+		// as they do during original admission and observation.
+		seq, end, err := nativeParent(call, q, parent, o, clock.Time, true)
+		if err != nil {
+			return err
+		}
+		en, err := nativeWorker(call, q, s.workers.downloads.root, o)
+		if err != nil {
+			return err
+		}
+		row, err := q.LockNativeOwner(call, custodydb.LockNativeOwnerParams{WorkerID: id(ref.WorkerID), RootID: id(s.workers.downloads.root)})
+		if err != nil {
+			return err
+		}
+		if row.Closed || row.RetiredAt.Valid || row.Fence != ref.Fence || !bytes.Equal(row.OperationJson, initial.OperationJson) || seq <= row.LeaseSequence {
+			return artifact.ErrDownloadConflict
+		}
+		if err := activeWorkerCertificate(call, q, en.Worker, peer); err != nil {
+			return err
+		}
+		clock, err = q.CurrentTime(call)
+		if err != nil {
+			return err
+		}
+		now := clock.Time.UTC()
+		end = identity.Earlier(end, identity.Earlier(a.ValidUntil, identity.Earlier(o.Until, peer.NotAfter))).UTC().Truncate(time.Microsecond)
+		if !a.Valid(now) || !o.CurrentValid(now) || !peer.Valid(now) || !now.Before(end) || o.Until.After(parent.Deadline) || o.Until.After(a.AccessUntil) {
+			return artifact.ErrDownloadExpired
+		}
+		encoded, err := json.Marshal(a)
+		if err != nil || len(encoded) > 16384 {
+			return artifact.ErrInvalid
+		}
+		_, err = q.RenewNativeOwner(call, custodydb.RenewNativeOwnerParams{WorkerID: id(ref.WorkerID), RootID: id(s.workers.downloads.root), OperationID: id(ref.OperationID), Fence: ref.Fence, AuthorityJson: encoded, LeaseSequence: seq, LeaseStarted: ts(now), LeaseUntil: ts(end)})
+		if err != nil {
+			return err
+		}
+		out = value.NativeLease{Operation: o, Certificate: peer.Certificate, Sequence: seq, ObservedAt: now, Until: end}
+		if !out.Valid(now) {
+			return artifact.ErrDownloadExpired
+		}
+		return call.Err()
+	})
+	if err != nil || call.Err() != nil || !out.Valid(time.Now()) {
+		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	}
+	return out, nil
+}
+
+// Observation dates can change during a fresh lease; processing identity cannot.
+func sameNativeProcessingState(a, b artifact.DownloadProcessingProof) bool {
+	a.ObservedAt, a.ValidUntil = time.Time{}, time.Time{}
+	b.ObservedAt, b.ValidUntil = time.Time{}, time.Time{}
+	return a == b
 }
 func (s *NativeOwners) ReleaseNativeOperation(ctx context.Context, o value.NativeOperation) error {
 	if s == nil || ctx == nil || !o.Valid() || o.Reference.InstallationID != s.workers.profile.InstallationID {

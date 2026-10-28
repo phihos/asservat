@@ -100,10 +100,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		unavailable(w)
 		return
 	}
-	// An approved projection conversation may span its operation (at most the
-	// evidence-read window); every other request keeps five seconds. The
-	// operation, its leases and each frame's current check bound it further.
-	lifetime := 5 * time.Second
+	// This request may attach a response or projection conversation. Admission
+	// still uses short complete observations; the selected operation and gates
+	// shorten every other purpose to its existing interval. Hello remains5s.
+	lifetime := value.NativeConversationWindow(value.NativeResponse)
 	if hello.Reference.QueryID != "" {
 		lifetime = value.NativeLeaseWindow(value.NativeProjection)
 	}
@@ -149,6 +149,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conversation.Close()
+	clear(hello.WorkerToken)
+	hello.WorkerToken = nil
 	gate := conversation.Gate()
 	if gate == nil {
 		unavailable(w)
@@ -163,8 +165,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		unavailable(w)
 		return
 	}
-	// The first context slice has one <=5s native exchange. A long-lived reader
-	// needs separately admitted subsequent leases, never a renewed ContextIdentity.
+	// Response ownership may span renewed short leases inside the selected
+	// fixed operation; none renews an old identity or failed write.
 	stream := newServerStream(r, w, gate)
 	defer stream.Close()
 	if controller.SetWriteDeadline(lease.Until) != nil || ctx.Err() != nil {
@@ -176,7 +178,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// window) reads under its checked lease; otherwise a slow admission left
 	// the first result read past that deadline (installed native87). Every
 	// frame read still sets its own lease deadline.
-	if lease.Operation.Kind == value.NativeProjection && controller.SetReadDeadline(lease.Until) != nil {
+	if (lease.Operation.Kind == value.NativeProjection || lease.Operation.Kind == value.NativeResponse) && controller.SetReadDeadline(attachBound(lease)) != nil {
 		unavailable(w)
 		return
 	}
@@ -300,7 +302,11 @@ func (s *serverStream) begin(ctx context.Context, read, terminal bool) (context.
 		s.writeFrames++
 	}
 	s.mu.Unlock()
-	call, cancel := context.WithDeadline(ctx, lease.Until)
+	until := lease.Until
+	if read && lease.Operation.Kind == value.NativeResponse {
+		until = lease.Operation.Until
+	}
+	call, cancel := context.WithDeadline(ctx, until)
 	finished := make(chan struct{})
 	stop := context.AfterFunc(call, func() { s.interrupt(); close(finished) })
 	end := func() {
@@ -318,7 +324,7 @@ func (s *serverStream) begin(ctx context.Context, read, terminal bool) (context.
 		s.mu.Unlock()
 	}
 	if read {
-		err = s.controller.SetReadDeadline(lease.Until)
+		err = s.controller.SetReadDeadline(until)
 	} else {
 		err = s.controller.SetWriteDeadline(lease.Until)
 	}

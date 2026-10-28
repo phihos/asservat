@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """Pure qualification selection tests; no services or native fixtures."""
+import ast
+import inspect
 import importlib.util
 from pathlib import Path
 import unittest
 from unittest.mock import patch
 import os
+import copy
+import io
+import json
+import tempfile
 
 spec = importlib.util.spec_from_file_location("context_fixture", Path(__file__).with_name("test-context-storage.py"))
 fixture = importlib.util.module_from_spec(spec)
@@ -12,17 +18,111 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_traffic_probe_prelude_reaches_selection_without_external_effects(self):
+        # Stop at selection, before cache/build/container work. This catches
+        # a probe flag used by artifact cleanup before it is initialized.
+        with patch.object(Path, "unlink"), patch.object(fixture, "qualification_selection", side_effect=RuntimeError("selection boundary")), patch.object(fixture, "run", side_effect=AssertionError("external effect")) as external:
+            with self.assertRaisesRegex(RuntimeError, "selection boundary"):
+                fixture.main(fixture.NATIVE_TRAFFIC_PROBE)
+            external.assert_not_called()
+
+    def test_cpu_limited_traffic_probe_has_one_short_recorded_go_bound(self):
+        self.assertEqual(fixture.qualification_go_timeout(native_traffic_probe=True), "2m")
+
+    def test_native_traffic_helper_setup_is_not_gated_by_helm_registry(self):
+        main = ast.parse(inspect.getsource(fixture.main))
+        guards = []
+
+        def walk(node, conditions):
+            if isinstance(node, ast.If):
+                conditions = conditions + [ast.unparse(node.test)]
+            if isinstance(node, ast.Call):
+                installs = isinstance(node.func, ast.Name) and node.func.id == "install_native_traffic_helper"
+                old_inline = (isinstance(node.func, ast.Attribute) and node.func.attr == "setdefault"
+                              and node.args and isinstance(node.args[0], ast.Constant)
+                              and node.args[0].value == "nativeTrafficHelper")
+                if installs or old_inline:
+                    guards.append(conditions)
+            for child in ast.iter_child_nodes(node):
+                walk(child, conditions)
+
+        walk(main, [])
+        self.assertEqual(len(guards), 1, "one common traffic-helper setup site is required")
+        self.assertTrue(any("native_paced" in condition for condition in guards[0]))
+        self.assertFalse(any("helm_bootstrap" in condition for condition in guards[0]),
+                         "actual native-paced setup has no Helm registry; its helper must still install")
+
+    def test_fast_native_traffic_helper_installs_and_serializes_exact_owned_nodes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory)/"provider-proxy"
+            binary.write_bytes(b"static fixture binary")
+            digest = fixture.hashlib.sha256(binary.read_bytes()).hexdigest()
+            cluster, node = "owned-fast-region", "owned-fast-region-control-plane"
+            calls = []
+            def command(args):
+                calls.append(args)
+                if args[:3] == ["kind", "get", "nodes"]:
+                    return node
+                if args[:2] == ["docker", "inspect"]:
+                    return cluster
+                if args[:2] == ["docker", "cp"]:
+                    return ""
+                if args[:2] == ["docker", "exec"]:
+                    return digest+"  /asservat-fixture-traffic"
+                self.fail("unexpected setup command: "+str(args))
+            values, report = {}, {}
+            with patch.object(fixture, "run", command):
+                fixture.install_native_traffic_helper(binary, cluster, values, report)
+            serialized = json.loads(json.dumps(values))
+            expected = {"cluster": cluster, "nodes": [node], "sha256": digest}
+            self.assertEqual(fixture.require_native_traffic_helper(serialized, cluster), expected)
+            self.assertEqual(report["nativeTrafficHelper"], expected)
+            self.assertEqual(report["nativeTrafficHelperSetup"]["copiedBytes"], binary.stat().st_size)
+            self.assertEqual(len([c for c in calls if c[:2] == ["docker", "cp"]]), 1)
+            self.assertEqual(fixture.qualification_selection(fixture.NATIVE_TRAFFIC_PROBE, False, False), (fixture.NATIVE_TRAFFIC_PROBE, 1))
+
+    def test_traffic_helper_refuses_missing_foreign_or_mismatched_bytes(self):
+        with self.assertRaisesRegex(RuntimeError, "before Go bootstrap"):
+            fixture.require_native_traffic_helper({}, "owned")
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory)/"provider-proxy"
+            binary.write_bytes(b"static fixture binary")
+            for wrong in ("owner", "digest"):
+                def command(args):
+                    if args[0] == "kind": return "owned-control-plane"
+                    if args[1] == "inspect": return "foreign" if wrong == "owner" else "owned"
+                    if args[1] == "cp": return ""
+                    if args[1] == "exec": return "0"*64+"  /asservat-fixture-traffic"
+                    self.fail(str(args))
+                with patch.object(fixture, "run", command), self.assertRaisesRegex(RuntimeError, "ownership differs|bytes differ"):
+                    fixture.install_native_traffic_helper(binary, "owned", {}, {})
+        source = inspect.getsource(fixture.main)
+        self.assertLess(source.index("require_native_traffic_helper(fixture, clusters"), source.index("path.write_text(json.dumps(fixture))"))
+
+    def test_numeric_statistics_are_an_explicit_fixture_option(self):
+        ordinary = fixture.postgres_fixture_options()
+        measured = fixture.postgres_fixture_options(native_statistics=True)
+        self.assertEqual(measured[:len(ordinary)], ordinary)
+        self.assertNotIn("shared_preload_libraries=pg_stat_statements", ordinary)
+        self.assertIn("shared_preload_libraries=pg_stat_statements", measured)
+        self.assertIn("pg_stat_statements.save=off", measured)
+        self.assertIn("fsync=on", measured)
+        self.assertIn("synchronous_commit=on", measured)
+        self.assertEqual(measured.count("max_connections=48"), 1)
+
     def test_approved_recording_refuses_missing_disposable_guard_before_setup(self):
-        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "approved-recording"}), patch.object(fixture.Path, "is_file", return_value=False):
-            with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):
-                fixture.main(installer_continuation=True)
+        for focus in ("approved-recording", "native-paced"):
+            with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}), patch.object(fixture.Path, "is_file", return_value=False):
+                with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):
+                    fixture.main(installer_continuation=True)
 
     def test_approved_recording_has_finite_go_envelope(self):
-        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "approved-recording"}):
-            self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
+        for focus in ("approved-recording", "native-paced"):
+            with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}):
+                self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
 
     def test_installed_focus_topology_and_flags_reach_the_go_consumer(self):
-        for focus, expected in (("approved-recording", 2), ("journey", 2), ("browser", 2),
+        for focus, expected in (("approved-recording", 2), ("native-paced", 2), ("journey", 2), ("browser", 2),
                                 ("policy", 2), ("alert", 2), ("logresource", 2),
                                 ("restart", 2), ("upgrade", 2), ("share", 2),
                                 ("chain", 2), ("clusters", 3), ("", 3), ("unknown", 3)):
@@ -47,6 +147,89 @@ class RegionalContextSelection(unittest.TestCase):
                 fixture.qualification_selection(None, False, False, regional_context_start=mode),
                 ("^TestContextAdmissionWithRealServices$/^native-regional-api-" + mode + "$", 2),
             )
+
+    def test_native_audit_configuration_keeps_original_mounts_and_no_bodies(self):
+        audit = fixture.native_kube_audit
+        original = {"nodes": [{"role": "control-plane", "extraMounts": [{"hostPath": "/owned-volume", "containerPath": "/var/lib/etcd"}]}]}
+        config = copy.deepcopy(original)
+        with tempfile.TemporaryDirectory() as directory:
+            audit.configure(config, Path(directory), 0)
+            self.assertEqual(config["nodes"][0]["extraMounts"][:-1], original["nodes"][0]["extraMounts"])
+            policy = json.loads((Path(directory)/"native-audit-policy-0.json").read_text())
+            self.assertEqual([rule["level"] for rule in policy["rules"]], ["Metadata", "Metadata", "Metadata", "None"])
+            self.assertNotIn("RequestResponse", json.dumps(policy))
+            patch_data = json.loads(config["nodes"][0]["kubeadmConfigPatches"][0])
+            args = {arg["name"]: arg["value"] for arg in patch_data["apiServer"]["extraArgs"]}
+            self.assertEqual((args["audit-log-maxsize"], args["audit-log-maxbackup"]), ("32", "3"))
+            self.assertEqual(args["audit-log-mode"], "blocking-strict")
+            self.assertEqual(patch_data["apiVersion"], "kubeadm.k8s.io/v1beta4")
+
+    def test_native_audit_counts_background_inclusive_phases_without_private_fields(self):
+        audit = fixture.native_kube_audit
+        phases = [{"name": "paced", "startedAt": "2026-10-27T12:00:01Z", "finishedAt": "2026-10-27T12:00:03Z"}]
+        def event(second, resource="serviceaccounts", verb="get", number=1):
+            return {"apiVersion": "audit.k8s.io/v1", "kind": "Event", "level": "Metadata", "stage": "RequestReceived", "auditID": "00000000-0000-4000-8000-"+str(number).zfill(12),
+                    "requestReceivedTimestamp": f"2026-10-27T12:00:0{second}Z", "stageTimestamp": f"2026-10-27T12:00:0{second}.000001Z",
+                    "objectRef": {"resource": resource, "apiGroup": "authentication.k8s.io" if resource == "tokenreviews" else ""}, "verb": verb,
+                    "user": {"username": "PRIVATE-IDENTITY"}, "requestURI": "/PRIVATE-PATH"}
+        def framed(events):
+            data = b"".join(json.dumps(e).encode()+b"\n" for e in events)
+            return io.BytesIO(str(len(data)).encode()+b" audit.log\n"+data+b"\n")
+        events = [event(0, number=1), event(1, number=2), event(2, "tokenreviews", "create", 3), event(4, number=4)]
+        events[0]["requestURI"] = "/readyz"
+        events[-1]["requestURI"] = "/readyz"
+        marker = event(2, number=5)
+        marker["requestURI"] = "/readyz"
+        events.append(marker)
+        result = audit.aggregate(framed(events), phases)
+        self.assertEqual(result["phases"][0]["serviceAccountGet"], 1)
+        self.assertEqual(result["phases"][0]["tokenReviewCreate"], 1)
+        self.assertEqual(result["coverageMarkers"], 3)
+        self.assertNotIn("PRIVATE", json.dumps(result))
+        for mode in ("lost beginning", "lost end", "duplicate", "request body", "truncated", "wrong category"):
+            with self.subTest(mode=mode):
+                bad = copy.deepcopy(events)
+                if mode == "lost beginning": bad = bad[2:]
+                if mode == "lost end": bad = bad[:3]
+                if mode == "duplicate": bad.append(bad[0])
+                if mode == "request body": bad[1]["requestObject"] = {"token": "MUST-NOT-EXPORT"}
+                if mode == "wrong category": bad[1]["objectRef"]["resource"] = "secrets"
+                data = framed(bad)
+                if mode == "truncated": data = io.BytesIO(data.getvalue()[:-2])
+                with self.assertRaises(ValueError): audit.aggregate(data, phases)
+
+    def test_native_audit_phase_names_and_original_intervals_are_closed(self):
+        audit = fixture.native_kube_audit
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/"phases.json"
+            phase = {"name": "paced", "startedAt": "2026-10-27T12:00:01.123456789Z", "finishedAt": "2026-10-27T12:00:03Z"}
+            path.write_text(json.dumps({"phases": [phase]}))
+            self.assertEqual(audit.phases_from_report(path), [phase])
+            for changed in ({**phase, "name": "arbitrary-role-name"}, {**phase, "finishedAt": "2026-10-27T12:00:00Z"}, {**phase, "startedAt": "2026-10-27T12:00:01+03:00"}):
+                path.write_text(json.dumps({"phases": [changed]}))
+                with self.assertRaises(ValueError): audit.phases_from_report(path)
+            for second_start in ("2026-10-27T12:00:02Z", "2026-10-27T12:00:00Z"):
+                second = {"name": "unpaced", "startedAt": second_start, "finishedAt": "2026-10-27T12:00:04Z"}
+                path.write_text(json.dumps({"phases": [phase, second]}))
+                with self.assertRaises(ValueError): audit.phases_from_report(path)
+            second["startedAt"] = phase["finishedAt"]
+            path.write_text(json.dumps({"phases": [phase, second]}))
+            self.assertEqual(len(audit.phases_from_report(path)), 2)
+
+    def test_native_audit_never_substitutes_another_control_plane(self):
+        audit = fixture.native_kube_audit
+        cluster = "asservat-context-owned-0"
+        identity = "a" * 64
+        observed = {"Id": identity, "Name": "/"+cluster+"-control-plane", "Config": {"Labels": {"io.x-k8s.kind.cluster": cluster, "io.x-k8s.kind.role": "control-plane"}}}
+        with patch.object(audit.subprocess, "check_output", return_value=json.dumps([observed])) as invoke:
+            self.assertEqual(audit.owned_node(cluster, identity)["id"], identity)
+            self.assertEqual(invoke.call_args.args[0], ["docker", "inspect", identity])
+            for changed in ({**observed, "Id": "b"*64}, {**observed, "Name": "/unrelated-control-plane"}, {**observed, "Config": {"Labels": {}}}):
+                invoke.return_value = json.dumps([changed])
+                with self.assertRaises(ValueError): audit.owned_node(cluster, identity)
+        with patch.object(audit.subprocess, "check_output") as invoke:
+            with self.assertRaises(ValueError): audit.owned_node(cluster, "--all")
+            invoke.assert_not_called()
 
     def test_conflicting_or_unknown_selection_is_refused(self):
         for arguments in (

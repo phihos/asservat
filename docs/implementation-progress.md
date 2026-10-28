@@ -1,5 +1,139 @@
 # Sustained implementation progress
 
+## Paced helper setup omission reproduced before bootstrap (2026-10-28)
+
+Native 40605062812 on `e9e3c64e` failed before any helper invocation because
+its descriptor was absent. Actual Go was 586.959s, approved recording 137.49s;
+all 3,230 source hashes matched, unchanged with cleanup `[]`. No direct traffic,
+native body or renewal was qualified. Copying was incorrectly gated by the
+Helm/private-registry branch, absent from the actual fast provider-pair path.
+
+The pure setup-path RED reproduces that gate (0.019s). Common owned-node setup
+now copies/hash-checks the exact binary for both topologies, and Python plus the
+actual Go bootstrap entry fail early if the serialized descriptor is missing.
+Seventeen setup tests pass (0.032s), affected parent races pass (1.197s). A new
+single-Kind probe on frozen `092cbe4f` passed (test 7.94s / Go 9.011s,
+terminal exit 0): exact helper hash/Pod UID/IP/node boot, sixteen batches / 4 MiB
+in 7.556s including launch/join. Common one-node helper setup took 0.121s for
+11,293,151 copied bytes. All 3,231 source hashes match, unchanged with cleanup
+`[]`; exact owned containers, networks, image and cluster are independently
+absent. No bootstrap/Keycloak/collector ran. This is synthetic route/setup proof;
+installed capture size/native delivery/combined costs remain pending. Limits,
+ownership checks and the no-fallback contract remain unchanged. See the
+[retained failure and preflight](research/native-response-qualification.md#missing-helper-setup-branch-and-early-preflight-2026-10-28).
+
+## Paced traffic route correction after retained failure (2026-10-28)
+
+Native 40600135398 on `4d2e1033` retained valid setup SQL statistics but failed
+the fixed traffic phase: seven acknowledged batches / 28,672 complete records /
+1,863,232 bytes in 8.500202059s, including an incomplete eighth batch. Actual Go
+was 603.040s, approved recording 146.39s. All 3,230 source hashes matched,
+unchanged with cleanup `[]`. No near-full/download/renewal result passed.
+
+The fixture now reuses its existing static provider binary for direct traffic
+from the exact owned node to the live UID-checked selected Pod IP. It avoids the
+serialized API Pod proxy without port-forwarding or substituting a workload.
+All sixteen 4,096-write batches, 64-byte records, 500ms schedule, 8.5s phase,
+10s capture and 8 MiB native cap remain unchanged. Binary copying/hash/ownership
+checks happen during setup; the finite process uses the original absolute
+cutoff, EOF cancellation, joined exit and a bounded closed numeric receipt.
+No product code, privileges, image, Pod or service is added.
+
+The actual fixture client's local synthetic delayed-proxy RED failed in 8.504s;
+GREEN preserves that failure and completes identical direct traffic in 7.538s.
+Fixture races pass in 17.709s and parent target/cancellation/receipt/size races in
+1.127s. These checks are synthetic; actual node-to-Pod traffic, near-full native
+size and aggregate costs remain pending installed qualification. Full retained
+reports, hashes, costs and limitations are in the
+[qualification record](research/native-response-qualification.md#serialized-traffic-route-failure-and-direct-fixture-client-2026-10-28).
+
+The review follow-up separates the child's exact eight-field receipt from
+parent-owned report validity/timing. Injected parent fields now refuse without
+tainting error artifacts; valid partial receipt diagnostics remain available.
+The local regression reproduced the defect (Go 0.035s, exit 1); affected parent
+races pass in 1.134s and canonical pre-push including vet/218 console checks
+exits 0. The traffic
+client, authority/capture limits, process lifecycle and network path are unchanged.
+
+## Paced measurement failure retained and PostgreSQL mechanism checked (2026-10-28)
+
+Native 40595384061 on `76bae03c` failed after accepted-capture resolution,
+before traffic/pacing, because setup SQL snapshots were not comparable. Actual
+Go was 596.503s; the old report writer saved no numeric edges, so the exact
+comparison failure remains unknown. Its frozen environment report is retained;
+no paced native delivery or aggregate cost is qualified.
+
+Test-only corrections persist incomplete edges plus a closed refusal reason,
+and reset the owned private statistics once after completed bootstrap, strictly
+before the initial measurement baseline. No product calls, roles, permissions,
+limits or retry behavior change. A report-persistence regression passed RED then
+GREEN; the existing PG/S3-only fixture mode also passed on `0b83e8a5` with
+PostgreSQL 18.6/default 5,000 entries and the unchanged 20s context (test 0.30s,
+Go 1.360s). It proved distinct numeric role-DDL entries, rollback, inherited
+saturation, valid post-reset counting, and refusal of midphase eviction/reset.
+Two preceding fixture failures remain unqualified and archived. All three runs
+matched 3,187 source hashes, unchanged with cleanup `[]` and exact container
+absence. See the [full evidence and limits](research/native-response-qualification.md#incomplete-sql-measurement-and-owned-postgresql-proof-2026-10-28).
+
+This remains a fresh matched-install qualification. Mixed peers may refuse the
+longer operation; regional/download-worker upgrade support remains ADR-227's
+existing backlog. No installed rolling-upgrade or new drain mechanism is claimed.
+A fresh installed pacing run with complete numeric edges is still pending.
+
+## Installed pacing request correction (2026-10-27)
+
+The first pacing run 40591118979 failed on `fa69b019` before approval or traffic:
+its fixture requested a non-editable `actionMaxBytes` field. Actual Go exited 1
+in 480.868s; all 3,223 source hashes matched, sources stayed unchanged and cleanup
+completed. The incomplete report has no capture/download/renewal or aggregate
+cost result. The fixture now relies on the builtin's existing 8 MiB recorder cap
+and has an actual-planner RED/GREEN preflight; production validation, profiles,
+quotas and original authority are unchanged. See the
+[qualification record](research/native-response-qualification.md#first-installed-pacing-attempt-and-request-preflight-2026-10-27).
+Fresh installed pacing qualification remains pending.
+
+## Paced native continuation composed with qualified PR100 (2026-10-27)
+
+At the local composition checkpoint before publication, the paced candidate includes canonical main
+`eed8594020645fe6d10f8c6565e69a6235c7507d`, preserving final PR100 storage response
+scheduling, operational-recorder refusal, closed diagnostics and API metadata
+freshness. A content comparison against the prior 21806d0d API checkpoint found
+25 final100-only changed files; all 25 match canonical main byte-for-byte. All 24
+PR101 production files match its reviewed 298110cc source. Only the progress
+record and two approved-recording fixture files overlap the paced additions.
+Squash-history merge conflicts were resolved against their actual shared
+content checkpoint, retaining the final approved-preview blocker guard.
+
+The qualified PR100 baseline Native 40586980099 passed with Go 620.173s,
+approved-recording 155.60s and whole-job 964s. Its frozen 3,201 source hashes
+matched, cleanup was empty, and the environment report SHA-256 is
+`d86eef8c74434bdb9240530927c3dd0edbbe6d1defb333ce432ff245843063da`.
+It verifies actual independent approval, expired-preview submission and a
+2,360-byte PCAPNG with 21 reviewed-port packets, not paced or near-full delivery.
+Historical pending statements below describe their original candidate checkpoints.
+
+The paced focus replaces that approved-recording focus with one independently
+reviewed 10s recording and four existing-budget download sessions. History is
+excluded. The proposed extra 200s phase allowance projects 1,164s total job time,
+leaving 36s below the immutable 1,200s cap; Go would project 820.173s, leaving 259.827s
+below its immutable 1,080s cap. These are planning arithmetic from one observed
+baseline, not a measured fit or a worst-case guarantee: preparation polling,
+in-flight calls, setup and snapshot costs can vary. No timeout or authority
+bound is increased. A timed-out or incomplete experiment cannot qualify this
+candidate. Actual paced payload/backpressure, aggregate costs and two-version
+or installed rolling-upgrade behavior remain unqualified.
+
+Local composed verification exits 0: canonical `make pre-push` with the existing
+spec virtualenv and pinned sqlc (including 218 console checks); full affected
+race packages for evidence (4.868s), native transport (100.206s), mTLS (40.347s),
+objectstore (5.132s) and authorization values (1.486s); selected pacing and
+approved-recording fixture regressions (22.722s); and the ignored provider-proxy
+fixture tested explicitly by file (1.645s). The selected integration tests use
+synthetic facts and actual loopback transport, without opt-in external suites.
+No collector, real-service fixture or hosted paced run was started for this
+composition. Logs are retained under
+`~/.cache/asservat-build/codex-bf86-resume/native-paced-final100-*.log`.
+
 ## Storage readiness response reserve (2026-10-27)
 
 Installed run 40581901798 on 1862f1bf failed during the initial preview, before
@@ -237,6 +371,115 @@ race tests and 100 cancellation repetitions pass locally. No deadlines,
 interfaces, API requests, timers, goroutines or durable state were added.
 The combined candidate still needs final gates, review and native qualification.
 
+## Slow regional native response renewal (ADR-258, 2026-10-27)
+
+The same prepaid regional window can now retain its source cursor and key
+opening across independently current delivery leases. SQL advances the existing
+native owner sequence; original response/source/window/owner/generation,
+processing identity and fixed operation deadline remain unchanged. Responses
+use a candidate 20-second conversation ceiling; actual disclosure observations
+remain at most five seconds. Initial full attestation also supplies its reviewed actual token expiry as a
+private immutable admission bound. No raw token or recurring Kubernetes proof
+read is retained; SQL checks continue and actual expiry caps final write/ACK.
+Kubernetes-only identity changes are independently observed by the next window,
+within the original twenty-second ceiling.
+
+Four complete affected race packages passed (authorization 1.645 s,
+evidence 4.895 s, native transport 97.335 s, mTLS 34.884 s). The paced real two-hop
+TLS/production HTTPS-sink regression delivered 8,126,572 exact bytes in 6.313 s
+(1.228 MiB/s), with 70 current-check callbacks and 2 lease renewals, one cursor
+per window, exact resume and stale-If-Range fallback. Paced revocation and the
+original caller deadline stopped partial transfers. Source/SQL/identity inputs
+in that transport test remain synthetic.
+
+Selected actual PostgreSQL/S3 native-owner renewal passed with one immutable
+20-second operation crossing its old five-second observation: fresh independent
+authority advances the existing owner; expired, same-sequence, wrong-caller,
+worker, changed-processing and closed-owner cases deny. Subtest 10.75 s;
+Go exit 0; source hashes unchanged; cleanup failures empty and owned Docker
+resources gone. Local archived report
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-owner-renewal-1-environment.json`
+has SHA256 `0b8e675ae6c23b111738a3e480e1561520cdd76a5cae70334267e600e717e5c3`.
+The pre-cancellation-guard combined native run also passed both selected cases:
+`download-worker-native-exchange` 9.60 s and
+`download-worker-native-owner-renewal` 10.64 s; top-level 20.63 s, Go exit 0,
+harness phase including compile 46.783 s. Source hashes were unchanged and
+cleanup failures were empty. The existing 4 KiB response traverses the production
+attachment/reader path with actual TLS, PostgreSQL/S3 audit and three one-use key
+slots. Archived report
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-exchange-7-environment.json`
+has SHA256 `b6124d1124b6e25ece89edbad571f299005c88382b0ebfbdc18a71230028dff8`.
+
+Earlier composed failures exposed post-clamp timestamp precision mismatch and
+the reader's shared initial-opening/cursor deadline. Both have failing-before,
+passing-after regressions: normalize operation ends after all clamps, and keep
+initial metadata/three unwraps within five seconds while the cursor retains its
+original response owner. Encrypted-object tests confirm no reopening after the
+short context is canceled and no reads after owner cancellation. After the reader correction,
+objectstore/evidence race suites passed (4.767 s/4.852 s), and integration
+compilation passed. No runtime assertion was weakened.
+
+Strengthening the owner-cancellation check
+then reproduced a separate buffered-read defect: a valid contiguous range could
+return after cancellation without another cursor read. Caller/owner cancellation now
+closes the source and clears plaintext before buffered return and after blocking
+reads. Expiry of a short piece observation during an owned frame load preserves
+the cursor; fresh disclosure authority remains mandatory before delivery. The
+blocked-object regression distinguishes that expiry from explicit cancellation.
+
+Final post-guard qualification passed with these cancellation and short-piece
+contracts present: native exchange 9.36 s, owner renewal 10.21 s, top-level
+19.96 s, Go exit 0, harness phase including compile 43.429 s. Source hashes were
+unchanged and cleanup failures were empty. Archived report
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-exchange-8-environment.json`
+has SHA256 `e4ff44c6e6945dccd6f970cf06d023e581b7fdd4f1a0ff892eddcf767a553a7a`.
+The final objectstore/evidence/native race suites passed
+(5.081 s/4.847 s/98.921 s), as did the full pre-push gate. The native report
+retains the same actual 4 KiB SQL/S3/TLS/key-slot scope and synthetic authority
+boundaries; the earlier native7 report remains labeled as the prior candidate.
+
+The response-proof producer now also passes the existing owned Kubernetes/TLS
+fixture: selected test 7.44 s, Go package 8.559 s, exit 0. Its reviewed expiry
+matches the actual TokenRequest expiration. The proof factory consumes the
+actual token supplied to NativeOrigins; an invalid supplied token is refused by
+one TokenReview before any GET. Initial attestation made two
+TokenReviews and eight GETs; twelve response checks after the original proof's
+actual five-second expiry made zero Kubernetes requests and twelve synthetic SQL
+observations. Missing token/expiry producer, wrong audience/binding, changed spec
+and deleting-object negatives pass. Advancing only the trusted attester clock to
+the actual returned expiration refuses after one real wall-time TokenReview and
+zero GETs; this does not claim real-time token expiration. All 3,180 recorded
+hashes match, cleanup is empty and no owned Docker/Kind resources remain.
+Archived report
+`~/.cache/asservat-build/codex-bf86-resume/native-response-qualification/native-response-proof-kube-2-environment.json`
+has SHA256 `b7d5db04b506d0dc5b51a68a38231daa4e8cfabf220339c61ee718a97984ab7b`.
+
+Subsequent review regressions reproduce and fix accepting a higher sequence
+without retaining it when its observation timestamp is older, and rejecting
+same-instant UTC/offset/JSON lease representations. Accepted sequences stay
+monotonic, lagging cutoffs remain conservative, and renewal/ACK use exact window
+and sequence with current expiry. Both regressions failed before their fixes;
+changed scope, lower sequence and expired ACK still deny. Full affected race
+packages pass (evidence 4.883 s, native 101.577 s, mTLS 41.284 s). The external
+reports above qualify their recorded sources and predate these review corrections.
+
+The next review also reproduced prematurely retaining an unconfirmed caller
+lease and consuming pending bytes with a future ACK sequence. The operation now
+retains only gate-confirmed delivery, clears plaintext/cancels on confirmation
+failure, and checks live ownership plus exact accepted sequence before ACK state
+changes. No retry, refund or new state is added. Mutation-boundary RED/GREEN
+regressions and complete native/evidence/mTLS races pass
+(98.944 s/4.854 s/34.752 s). Existing external custody/SQL/Kubernetes results
+remain evidence for their recorded source versions, before this later fix.
+
+The SQL transfer's Pod-proof/bootstrap/human inputs and the Kubernetes producer
+fixture's SQL/dispatch/certificate-issuance inputs remain synthetic. Installed
+composition of both, paced composed 8 MiB transfer and aggregate installed
+SQL/S3/KMS/API cost,
+installed transfer and practical slower-link qualification remain pending. The
+candidate ceiling implies roughly 0.4 MiB/s
+for a full 8 MiB window before control overhead. This does not complete S-02 or
+claim arbitrary slow-client support; ADR-258 records the proof/API cost floor.
 
 ## Authored packet custody funding correction (2026-10-27)
 

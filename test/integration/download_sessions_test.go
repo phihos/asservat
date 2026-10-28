@@ -197,7 +197,11 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		qualifyInstalledDownloadPreparation(t, f.s.nativeSources.ctx, admin, poolFor, store, keys, f.s, f.p, f.allocation, f.gate)
 	})
 
-	for _, mode := range []string{"native-retention-observation", "native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "enrollment-admitted-detached", "enrollment-admitted-stop-lock", "enrollment-admitted-recovery-lock", "enrollment-admitted-configuration-lock", "enrollment-admitted-activation-stop", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "capacity-held", "expired-claim", "cancelled-parent"} {
+	modes := []string{"native-retention-observation", "native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "native-owner-renewal", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "enrollment-admitted-detached", "enrollment-admitted-stop-lock", "enrollment-admitted-recovery-lock", "enrollment-admitted-configuration-lock", "enrollment-admitted-activation-stop", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "capacity-held", "expired-claim", "cancelled-parent"}
+	if os.Getenv("ASSERVAT_NATIVE_VERSION_HELPERS") != "" {
+		modes = append(modes, "native-owner-mixed")
+	}
+	for _, mode := range modes {
 		t.Run("download-worker-"+mode, func(t *testing.T) {
 			ctx := ctx // This subtest owns any native source-observer cancellation.
 			var nativeScope authorization.KeyScope
@@ -234,7 +238,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				return
 			}
 			profile := syntheticWorkerProfile(f.installation)
-			if strings.HasPrefix(mode, "native-") && mode != "native-exchange" {
+			if strings.HasPrefix(mode, "native-") && mode != "native-exchange" && mode != "native-owner-renewal" && mode != "native-owner-mixed" {
 				// Protected native credential projection pins remain explicit synthetic inputs.
 				profile.StoreCredentialSecret, profile.StoreCredentialSecretUID = "native-store", custodyID()
 			}
@@ -296,7 +300,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				// This is funded before reservation, never a resume-time refill.
 				r.Session.ReadLimit = 12 << 20
 			}
-			if strings.HasPrefix(mode, "native-") && mode != "native-exchange" {
+			if strings.HasPrefix(mode, "native-") && mode != "native-exchange" && mode != "native-owner-renewal" && mode != "native-owner-mixed" {
 				bindContextNativeStopFixture(t, ctx, f.config, f.allocation, f.installation, f.p.Expectation.Registration.StoreID, f.guards, poolFor)
 				r.Session.StopProtocol = artifact.DownloadStopProtocol
 			}
@@ -760,11 +764,11 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			enrollment := newWorkerEnrollmentFixture(t, ctx, poolFor, f.s.a.RootID, w, f.guards, store, keys, f.gate)
 			if strings.HasPrefix(mode, "native-") {
 				var content *nativeContextFixture
-				if mode != "native-exchange" {
+				if mode != "native-exchange" && mode != "native-owner-renewal" && mode != "native-owner-mixed" {
 					service.CurrentAuthority = f.gate
 					content = &nativeContextFixture{mode: mode, dispatcher: service, workers: ledger, configuration: configurationReader, recovery: f.s.recovery.reader}
 				}
-				qualifyNativeExchange(t, ctx, nativeExchangeFixture{content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
+				qualifyNativeExchange(t, ctx, nativeExchangeFixture{renewOnly: mode == "native-owner-renewal", mixedOnly: mode == "native-owner-mixed", topologySource: f.s.retention.topology.source, content: content, worker: w, enrollment: enrollment, published: f.p, runtime: f.runtime, audit: f.audit, config: f.config, allocation: f.allocation, gate: f.gate, guards: f.guards, authority: f.authority, store: store, keys: keys, keyScope: nativeScope, keyBackend: nativeBackend, admin: admin, poolFor: poolFor})
 				return
 			}
 			if mode == "enrollment-audit-versions" {

@@ -85,7 +85,7 @@ func (r *HubRouter) Attach(ctx context.Context, origin evidence.NativeOrigin, h 
 // the admission origin's five-second observations bound only that admission.
 // Other kinds keep the admission origin's lease.
 func attachBound(l value.NativeLease) time.Time {
-	if l.Operation.Kind == value.NativeProjection {
+	if l.Operation.Kind == value.NativeProjection || l.Operation.Kind == value.NativeResponse {
 		return l.Operation.Until
 	}
 	return l.Until
