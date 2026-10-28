@@ -594,3 +594,88 @@ specification and architecture checks. The original failing regression and
 initial focused race pass (1.269 s) are retained alongside these final logs.
 This is component evidence; installed history/edited-preview qualification
 remains pending.
+
+
+### Original connector residency versus hub accept time
+
+Native 40636360797 on 19badbbb failed earlier than the attachment fix: diagnostics
+returned HTTP 200/ok but history summary listing returned NotAvailable, with
+`restarts/read/other` before history SQL. The two parameter dispatches succeeded;
+the later one is a diagnostic read after failure. The exact Native interruption
+cause remains unknown. In particular, a96796aa's standard wrapped-deadline
+classification remains intact; no stale cancellation callback has been proved.
+
+A cache-only actual Go1.27.2 TLS/H2 probe demonstrates that closing the exact
+client TCP socket yields a private plain body-read error while an independent
+caller remains live: no supported Is/As/Unwrap, deadline, EOF, net.Error or
+StreamError identity. Handler Body.Close gives another plain error. A real
+ResponseController read deadline gives the expected wrapped deadline identity.
+Thus `other` need not be diagnostic loss. No raw error text or concrete type
+name was rendered. Expanding taxonomy cannot repair connection lifetime.
+
+A separate actual TLS1.3/H2/Router/Client regression reproduces a concrete
+lifetime mismatch with explicitly synthetic current attesters. The region's
+original 30-second owner starts before setup; the hub's native limit starts at
+actual connection accept. An allowed four-second pre-dial setup leaves the hub
+end four seconds later. Before idle retirement, a five-second query can select
+that conversation even though the region will close before its caller ends.
+The reference TLS harness has no native listener: it applies the native
+accepted-plus-30-second parent bound at the handler using the actual dial
+receipt. This exercises real TLS/H2 and routing with an injected native bound;
+it is not a deployed native-listener qualification.
+The old-protocol witness observed `restarts/read/other` with 496.982 ms remaining.
+Its original regional end was 05:38:14.545947394Z, hub end
+05:38:18.550818676Z and query end 05:38:15.045947394Z on 2026-10-28.
+The desired no-premature-selection assertion then failed on unchanged production
+(exit 1, 30.020 s). A first attempt stopped on the fixture's frozen attester clock
+before reaching this boundary; the corrected synthetic reader issues current
+observations without changing any original setup/conversation/operation dates.
+That failed fixture attempt is retained, not substituted for mechanism proof.
+
+Decision: carry the **original** conversation end in one required private Hello
+field, `standbyUntil`, floored to UTC microseconds. Do not restart the existing
+30-second caller, split setup from residency, increase a margin or repurpose
+an authority/source timestamp. The hub intersects this declared end with its
+independent native/request lifetime before RegisterStandby. Its existing idle
+retirement, selection and stream context all inherit that minimum, including
+passive read/write deadline restoration. Setup narrows only when the declared
+end is even earlier than its original five seconds. Missing/null/malformed,
+expired and over-30s-future inputs fail closed before source/peer reads. No
+receiver, signed work, SQL effect, query or capture authority gains lifetime.
+The corrected witness refuses selection before source/check dispatch, still
+within its original five-second caller and existing 2.5-second wait reserve
+(race exit 0, 29.073 s). Its first green attempt retained a test-only one-second
+wait assertion that was too short for that existing registration wait; this
+fixture failure is retained. Neither failure justifies any product timeout change.
+
+This is a strict private contract change: the old closed decoder rejects the
+unknown field and the new decoder rejects old missing input. There is no legacy
+fallback or compatibility framework. Fresh matched installs are the target;
+actual old/new decoder qualification and installed history remain separately
+reported. The timestamp is a declared availability cutoff authenticated with the
+existing TLS peer, not proof the peer stays connected. It uses the same absolute
+UTC clock assumptions as existing cross-cluster source/peer intervals. No new
+clock service or stronger distributed revocation guarantee is claimed.
+
+Cost: at most 45 additional JSON bytes for the client's microsecond timestamp
+and a 24-byte Go time value on amd64, with unchanged frame/byte ceilings. At most
+one additional bounded residency context timer is needed on the native path
+when this end precedes its local native end; a very short input can also narrow
+the existing setup context/read deadline. There are zero new API/provider calls,
+watches, credentials, background services, configuration, persistent rows or
+connection/capture slots. Earlier correct retirement can increase replacement
+work: with sustained 4 s setup, post-setup idle residence changes from about
+22 s to 18 s. Including setup and the existing 1–2 s reopening cadence gives
+27–28 s versus 23–24 s cycles (about 16.7–17.4% more openings in that slow case;
+16 owners at a one-second cadence: 0.593 versus 0.696 opens/s). Fast setup has
+negligible change. These are arithmetic projections, not measured steady-state
+costs. A new setup-plus-30s lifecycle could instead hold a slot for up to 35 s
+and require different context ownership; one original-end observation is smaller
+and keeps every existing caller bound. No collector, external fixture or hosted
+Native run was executed for this component change.
+
+Final local races exited 0: contracts 3.371 s, context-start 13.872 s,
+native transport 69.282 s and the complete mTLS package 66.365 s. Canonical
+pre-push exited 0, including 227 console tests, SQL generation/vet and
+specification/architecture checks. These are component gates, not an installed
+history/browser success or a measured steady-state replacement-cost result.

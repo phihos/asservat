@@ -16,7 +16,7 @@ The work type is `asservat-api-context-work+jws`, fixed Ed25519. Work binds the 
 
 | Item | Bound |
 | --- | --- |
-| Standby residence | Original 30 seconds; no human authority |
+| Standby residence | Original connector caller end (at most 30 seconds), intersected with the original hub native/request end; no human authority |
 | Setup, peer proof, work and operations | At most original 5 seconds; minimum of all contributing observations |
 | Complete discovered owner set | 16; oversized/incomplete list is unavailable |
 | Whole hub standby budget | At most 64, independently reserved per cluster |
@@ -32,6 +32,20 @@ JSON encoding disables HTML escaping before canonicalization. Actual maximum-str
 Work and independently current peer/trust observations may overlap without having identical ends. Verification takes their minimum; it does not reject a valid shorter proof or renew it. Every blocking read/sign/write retains that minimum. The stream owns a single bounded EOF reader, one queued frame and one decoder frame. Socket/pipe callbacks cancel and join before release. Stream termination cancels the hub runner and the regional operation contexts, including a blocked operation. A late positive backend result cannot authorize a reply after cancellation.
 
 Standby and capture reservations count closing owners until joined completion. Each discovered owner has an independent thirty-second conversation with at least one second before a fresh empty standby; after a TLS refusal (a registered owner process the hub no longer serves) the next attempt to that owner waits thirty seconds, so its setup proofs do not contend with the live owner's opening. A hub target query or attachment that finds no idle standby waits for the next registration only within its own original deadline, keeping 2.5 seconds for the operation and the caller. Attachment waits only before reserving a conversation or dispatching work; actual capture capacity, duplicate capture IDs and invalid inputs still refuse immediately. Once waiting begins its fixed cutoff is checked again under the selection mutex, including when registration and expiry are both ready. An immediately available standby retains the original short-deadline behavior. A retry never carries a capture or signed work from a prior connection. SQL52/ADR134 determine whether an explicit current continuation can proceed; transport failure is not proof of non-admission or no effect.
+
+The private Hello carries required `standbyUntil`, the connector's original
+caller end floored to UTC microseconds. It is an availability observation, never
+peer/work authority. The hub rejects missing, malformed, expired or more-than-30s
+future values, and parents RegisterStandby from the minimum of that original end
+and its independent native/request context. Selection, idle retirement, stream
+ownership and passive socket-deadline restoration therefore use the same earlier
+end. Authentication/setup and every frame retain their independent original
+five-second bounds. The stream joins before that parent is released. Strict old
+closed decoders refuse the new field; new decoders refuse old missing input.
+There is no legacy fallback or rolling-upgrade qualification claim. These absolute
+UTC observations share the existing cross-cluster clock assumptions of the
+five-second peer/source proofs; no clock synchronization or monotonic remote
+lifetime can be established by this field, and a peer can still disconnect early.
 
 Router selection and attachment checks also observe the stream's own
 cancellation, even before the surrounding HTTP request notices it. A joined

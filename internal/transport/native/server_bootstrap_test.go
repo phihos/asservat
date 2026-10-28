@@ -138,7 +138,7 @@ func TestOwnerBootstrapCommonNameCannotEnterExistingNativePurposes(t *testing.T)
 					}
 				} else {
 					path, media = contracts.APIContextStartPath, contracts.APIContextStartMedia
-					hello, e := contracts.EncodeAPIContextHello(contracts.APIContextHello{Format: contracts.APIContextExchangeFormat, Channel: contracts.APIContextChannel{ExchangeID: nativeID}})
+					hello, e := contracts.EncodeAPIContextHello(contracts.APIContextHello{Format: contracts.APIContextExchangeFormat, StandbyUntil: time.Now().UTC().Add(30 * time.Second), Channel: contracts.APIContextChannel{ExchangeID: nativeID}})
 					if e != nil {
 						t.Fatal(e)
 					}

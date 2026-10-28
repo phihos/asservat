@@ -89,11 +89,28 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	hello, e := contracts.DecodeAPIContextHello(frame.Payload)
 	clear(frame.Payload)
-	if e != nil || hello.Format != contracts.APIContextExchangeFormat {
+	if e != nil || hello.Format != contracts.APIContextExchangeFormat || !time.Now().Before(hello.StandbyUntil) || hello.StandbyUntil.After(time.Now().Add(30*time.Second)) {
 		stop()
 		release()
 		h.refuse(w, "hello")
 		return
+	}
+	// The connector started its finite conversation before dialing. Retain its
+	// original declared end as a passive availability bound, intersected with
+	// this request's independently owned native socket/caller lifetime. It is
+	// never a receiver proof or work authority.
+	residence, endResidence := context.WithDeadline(r.Context(), hello.StandbyUntil)
+	defer endResidence()
+	if setupUntil, _ := ctx.Deadline(); hello.StandbyUntil.Before(setupUntil) {
+		shorter, endShorter := context.WithDeadline(ctx, hello.StandbyUntil)
+		defer endShorter()
+		ctx = shorter
+		if controller.SetReadDeadline(hello.StandbyUntil) != nil {
+			stop()
+			release()
+			h.refuse(w, "deadline")
+			return
+		}
 	}
 	sources, e := ReadSourceAfterHello(r.Body, hello.Channel.ExchangeID, time.Now)
 	if e != nil {
@@ -121,7 +138,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return check(c)
 	}
-	standby, e := h.router.RegisterStandby(r.Context(), receiver, attach)
+	standby, e := h.router.RegisterStandby(residence, receiver, attach)
 	stop()
 	release()
 	if e != nil {
