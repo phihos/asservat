@@ -1553,3 +1553,31 @@ report SHA-256 8bc01759ee8ea9284d3f1861bc22e78c527262c503480b820d847258004144d9.
 Reuse the existing positive; next qualification requires reviewed focused new
 recorder child only. Real recorder admission/replay/action-pool assertions remain
 pending; Tick and local source passes are not their substitute.
+
+Recorder focused run 2 at frozen 37dfe108 terminated exit 1 (Go 7.957 s,
+harness 27.405 s). Retention resolution passed; both recorder cases stopped at
+the adapter's pre-transaction structural guard. The fixture called unreviewed
+AdmitContext with an approvedAcceptance-marked RequireApproval plan; that guard
+requires a preview ID. Production ContextSubmission already uses the reviewed
+entrypoint. Correct the fixture by persisting its exact compiled passive preview
+and calling AdmitReviewedContext with ContextRequestDigest of that preview for
+both initial admission and exact replay. Do not set RequireApproval false or
+weaken/export the production validator.
+
+A shared offline/SQL fixture assembler now builds that marked plan, full preview
+and original request digest once. Its local preflight reports all failed
+predicates together: frozen plan; registration/8 MiB bound; storage root, target,
+allocation and freshness; retained anchor/expiry/deletion/write deadline;
+eligible principal/target/identity and permission revisions; original recovery;
+case/occurrence IDs; exact preview canonical scope and reviewed timing marker.
+The offline assembled fixture passes. The actual fixture runs the same checks
+before preview persistence/SQL admission, keeping protected observations and
+original deadlines. These are test-only checks, no production port or validator.
+
+The failed run's 3,271 hashes independently matched; sourceUnchanged=true,
+cleanup [], exact `asservat-custody-m53hggn3-postgres`, `-s3` and network absent.
+Archive before source edits:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-recorder-focused-2-artifacts/`;
+report SHA-256 48cab9576f7c548b763057e0d1158f9c97414231b04f489fbb2c1d40b9476b3f.
+No actual recorder admission or negative action-pool result is claimed. Reuse
+prior policy-share positives and require a reviewed focused rerun only.
