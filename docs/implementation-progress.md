@@ -22,8 +22,9 @@ The next source slice composes finite onTrigger/before-zero network-header polic
 triggers through the existing recorder preview/request/occurrence path. Accepted
 settings issuer is immutable provenance, not creator reauthentication; current
 team delegation and final SQL action/grant/counter checks remain mandatory.
-Local unit/race and pure actual-libpcap measurements are being recorded; its new
-real Tick/recorder admission fixture is compiled but has not run yet. Sensitive
+Local unit/race and pure actual-libpcap measurements pass; the new real
+Tick/recorder admission fixture remains unqualified while its recorded fixture
+failures are corrected and reviewed. Sensitive
 raw predicates remain unavailable before occurrence spend, and genuine live
 observation adapter/channel/binding/native qualification plus ongoing arming are
 still required. No chart/public collection or installed recorder claim follows.

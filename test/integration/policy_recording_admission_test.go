@@ -103,7 +103,18 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if err != nil {
 				t.Fatal(err)
 			}
-			admissions, err := postgres.NewContextAdmissions(ctx, hub, root, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
+			// Match production's independently credentialed admission facet;
+			// the ordinary hub union intentionally cannot lock storage bindings.
+			admitRole := narrowRole(t, ctx, admin, "policy_recorder_admit_"+strings.Split(mode, "-")[0]+"_", "synthetic-policy-recorder-admit", func(role string) []string {
+				sql, ok := postgres.PublicRuntimeRoleGrantSQL("capture-admit", role)
+				if !ok {
+					t.Fatal("capture-admit purpose")
+				}
+				return sql
+			})
+			admitPool := poolFor(admitRole, "synthetic-policy-recorder-admit")
+			defer admitPool.Close()
+			admissions, err := postgres.NewContextAdmissions(ctx, admitPool, root, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -249,8 +260,24 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			} else if !errors.Is(err, capture.ErrDenied) {
 				t.Fatal("snapshot-only policy/grant admitted actual recorder", err)
 			}
-			var execs, bytes, grantExec, grantBytes, reservations int64
-			if err = admin.QueryRow(ctx, `SELECT executions_spent,collected_bytes_spent,(SELECT policy_executions_spent FROM access_grant WHERE id=$2),(SELECT policy_collected_bytes_spent FROM access_grant WHERE id=$2),(SELECT count(*) FROM policy_occurrence WHERE acceptance_id=$1 AND reserved_capture_id IS NOT NULL) FROM policy_acceptance WHERE id=$1`, record.Record.ID, grant).Scan(&execs, &bytes, &grantExec, &grantBytes, &reservations); err != nil {
+			// Reuse the production status/grant models; fixture counter names
+			// cannot drift into an invented column or the personal result pool.
+			status, err := ledger.Status(ctx, authority.PolicyUID)
+			if err != nil {
+				t.Fatal("accepted budget status", err)
+			}
+			grantStore, err := postgres.NewAccessGrants(ctx, hub, root, s.recovery.guard)
+			if err != nil {
+				t.Fatal(err)
+			}
+			charged, err := grantStore.Grant(ctx, grant)
+			if err != nil {
+				t.Fatal("grant reservation counters", err)
+			}
+			execs, bytes := status.ExecutionsSpent, status.CollectedBytesSpent
+			grantExec, grantBytes := charged.PolicySpend.Executions, charged.PolicySpend.CollectedBytes
+			var reservations int64
+			if err = admin.QueryRow(ctx, "SELECT count(*) FROM policy_occurrence WHERE root_id=$1 AND acceptance_id=$2 AND reserved_capture_id IS NOT NULL", root, record.Record.ID).Scan(&reservations); err != nil {
 				t.Fatal(err)
 			}
 			wantBytes, wantExec, wantReservations := int64(0), int64(0), int64(0)

@@ -1581,3 +1581,31 @@ Archive before source edits:
 report SHA-256 48cab9576f7c548b763057e0d1158f9c97414231b04f489fbb2c1d40b9476b3f.
 No actual recorder admission or negative action-pool result is claimed. Reuse
 prior policy-share positives and require a reviewed focused rerun only.
+
+Recorder focused run 3 at frozen f4a46cfe terminated exit 1 (Go 8.133 s,
+harness 10.928 s). Full assembled preflight and persisted reviewed preview passed.
+Positive admission then used the wrong fixture facet: hub-runtime intentionally
+lacks storage-binding row-lock writes; actual production composition uses the
+separate capture-admit purpose. PostgreSQL log lines 68–71 confirm its denied
+ShareContextStorage FOR SHARE. Negative admission reached the intended ErrDenied,
+then a fixture-only raw counter assertion referenced nonexistent
+policy_collected_bytes_spent (actual schema name policy_bytes_spent), so its full
+counter proof remains incomplete. No product authority/guard/privilege change.
+
+The fixture now uses the existing compiled capture-admit role/pool and closes it
+before cleanup, matching production. Grant counters use AccessGrants.Grant and
+PolicySpend; accepted counters use PolicyTriggers.Status. The sole remaining
+counter SQL is the existing bounded occurrence count. Facets compared against
+public_context_compose.go and the closed compiled roles: policy-automation,
+capture-preview and evidence-share/Grant share hub-runtime; capture-admit is
+separate; protected approval settings stay under permission-accept. Existing
+synthetic permission/bootstrap and separate source/accept/audit/read fixture
+facets are unchanged. The current accepted/source read still precedes admission.
+Offline assembled binding/compiler tests pass with race, actual exit 0, 1.079 s.
+
+All 3,271 hashes independently matched, sourceUnchanged=true, cleanup [], exact
+`asservat-custody-mki2bfyh-postgres`, `-s3` and network absent. Archive before edits:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-recorder-focused-3-artifacts/`;
+report SHA-256 0a386c93e17813b52772714983890123417fcdc8dae12ccd1bb2ed6428c1758c.
+No automatic retry and no positive recorder admission/counter qualification yet.
+The root coordinates the next external slot separately from h2's Kind work.
