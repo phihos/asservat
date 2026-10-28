@@ -135,3 +135,12 @@ Only production Attach telemetry uses the fixed closed cause vocabulary. The
 single failed synthetic native-test timeout deliberately retains actual SDK/pgx
 errors as authorized fixture evidence, separately from its last successful phases;
 these are not new production log fields or user-facing errors.
+
+
+The corrected existing raw-companion PG/S3 selection passed on 51a9ee69 (actual
+Go 16.366s / child 14.93s, runner exit 0). Real accepted Lookup retained capture, canonical
+scope and original deadline with RequireApproval=false; the unchanged actual
+companion/holder/retirement path also passed. Its source/node/process/packet
+facts are synthetic component inputs, not a Native meter or initial Attach
+qualification. Both attempts and their complete source/cleanup evidence remain
+archived; no role, grant or limit was relaxed to obtain this result.

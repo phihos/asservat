@@ -1,14 +1,35 @@
 # Sustained implementation progress
 
 
+## Corrected raw-policy SQL replay qualified (2026-10-28)
+
+The one reviewed `policy-raw-approved-replay-2` companion-only PG/S3 run on
+51a9ee69 passed (runner/Go0; Go 16.366s, child 14.93s). Actual admission Lookup
+returned the original capture/scope/deadline with require-all=false. The same
+case independently proved held-grant/source-expiry rollback (API/session NULL,
+both observed spends zero), one immutable preparation/session on replay, and
+original dates/sequence. Typed holder/channel/encrypted producer/stored SQL ACK
+used 4,592 synthetic PCAPNG bytes; 32 MiB prepaid input stayed unchanged. Protected
+purge, separate encrypted audit ACK and narrow finalization deleted the child
+without refunding either observed pool; terminal reprepare still refused.
+
+All 3,350 harness / 3,392 reviewed source hashes and 35,984 tracked files matched the
+frozen source, with empty cleanup and exact owned PG/S3 names/IDs/network absent.
+Run1's fixture mismatch remains archived. This qualifies the SQL/component path
+with synthetic target/node/process/packet provenance; graph/WAL samples remain
+explicitly unqualified. It proves no actual collector, publication, native
+download, installed attachment cause or native meter outcome. No broader suite,
+collector, push or new Native ran. Subsequent changes here are documentation only.
+
+
 ## Raw replay fixture input correction (2026-10-28)
 
 The one authorized `policy-raw-approved-replay-1` PG/S3 run on f450d839 failed
-(Go4.764s, selected child4.32s, runner21.205s): the actual accepted replay was
+(Go 4.764s, selected child 4.32s, runner 21.205s): the actual accepted replay was
 found without error, but the new false-setting assertion met a shared fixture
 assembler hardcoded to true. This is a fixture-input mismatch, not evidence
-against the decoder correction. All3350 harness/3392 reviewed source hashes and
-35984 tracked files matched; cleanup was empty and exact owned PG/S3/network
+against the decoder correction. All 3,350 harness / 3,392 reviewed source hashes and
+35,984 tracked files matched; cleanup was empty and exact owned PG/S3/network
 absence verified. The complete failed archive and terminal report are retained.
 
 The assembler now takes the existing protected setting as an explicit test input:
@@ -22,8 +43,8 @@ focused PG run requires separate root review/coordination; no automatic repeat.
 
 ## Raw policy replay and initial attachment evidence (2026-10-28)
 
-Native40756795839 on immutable e0d failed at the one-byte refusal wait
-(child105.88s, Go566.766s); it did not prove node execution or meter refusal.
+Native run 40756795839 on immutable e0d failed at the one-byte refusal wait
+(child 105.88s, Go 566.766s); it did not prove node execution or meter refusal.
 An admitted occurrence was logged, but initial start stopped at router Attach,
 whose original failure kind/budget was not retained. Accepted continuation had
 a concrete separate defect: explicit approved timing from a raw predicate was
@@ -32,22 +53,22 @@ wrongly gated on the installation require-all-recordings flag, false here.
 Historical decoding now uses the existing validated timing marker and recorder
 expectation independently of that flag. Current grant/permission/recovery and
 original deadlines remain unchanged. Real maintained-libpcap policy compilation
-reproduced RED1/0.011s, then focused race GREEN1.079s including malformed/changed
+reproduced RED exit 1 (0.011s), then focused race GREEN 1.079s including malformed/changed
 historical negatives and exact ordinary absolute deadlines. An initial three
 fixture-preflight failures were retained separately before the meaningful RED.
 The existing user-space pcap-check now includes that one anchored tagged test;
-default Go gates alone do not run it. Actual pcap-check exited0, including the
-new test0.012s, existing compiler tests0.015s and the static hub build check.
+default Go gates alone do not run it. Actual pcap-check exited 0, including the
+new test 0.012s, existing compiler tests 0.015s and the static hub build check.
 
 Initial Attach diagnostics retain fixed capacity/invalid/unavailable plus the
 original remaining/bound; return behavior is unchanged. Real StartContext/Router
-RED1/0.051s became focused race GREEN; same-cluster history attachment must join
-before replacement reaches the existing runner preparation (combined1.359s).
+RED exit 1 (0.051s) became focused race GREEN; same-cluster history attachment must join
+before replacement reaches the existing runner preparation (combined 1.359s).
 Native wait preserves last public status/code/error/phase and SQL scan/phase.
 The exact original collector/capture budget-exhaustion log remains mandatory.
 
-Composed affected libpcap races exited0: PostgreSQL2.617s, bootstrap62.028s,
-planning1.225s, capture12.500s and contextstart13.795s. Specification, architecture,
+Composed affected libpcap races exited 0: PostgreSQL 2.617s, bootstrap 62.028s,
+planning 1.225s, capture 12.500s and contextstart 13.795s. Specification, architecture,
 Go imports, formatting and vet passed; integration compile passed. This is not
 a full broad go-check or installed fix qualification. The existing raw companion
 adds actual admission Lookup replay with the same original IDs/scope/deadline
