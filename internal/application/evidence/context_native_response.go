@@ -147,7 +147,13 @@ func (s *ContextNativeResponse) readChunkCurrent(ctx context.Context, current id
 	}
 	call, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(effect, cancel)
-	chunk, e := active.ReadChunkCurrent(call, current, lease, offset, length)
+	var chunk NativeResponseChunk
+	var e error
+	if checked {
+		chunk, e = active.readChunkChecked(call, current, lease, offset, length)
+	} else {
+		chunk, e = active.ReadChunkCurrent(call, current, lease, offset, length)
+	}
 	stop()
 	cancel()
 	s.mu.Lock()

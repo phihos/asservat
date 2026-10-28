@@ -285,3 +285,41 @@ changes, stale ACK and final ACK beyond the old wall-clock cutoff. Canonical
 pre-push passes (exit 0, 43.356 s), including 231 console tests and specification,
 architecture, SQL and vet gates. Independent source review found no production
 blocker. These local results do not replace the pending installed retest.
+
+### Reuse the coordinator's checked response authority
+
+A source-cost review before publication found that the intermediate unbound
+runtime would repeat one complete plain C03 entitlement check on opening and one
+on each lease renewal, in addition to the response coordinator. That bypassed the
+coordinator's chosen thirty-second ordinary-entitlement reuse. For R renewals,
+the added work was 1+R full checks; each full human check resolves two permission
+projections, a catalog entry, retained policy facts, environment facts and grant
+coverage. Identity callbacks can perform resolver/session I/O; they are not
+assumed to be cached. Underlying adapter cost was not measured and no zero-cost
+claim is made for that intermediate source. It was not published or installed.
+
+The private checked handoff now reaches the inner source on both opening and
+renewal. It reuses the existing newWorkerResponseObservation to bind the exact
+coordinator lease's original CheckedAt/ValidUntil to the current identity batch,
+principal, policy revision and scopes. The common store/location/retention checks
+remain. Public outer and inner ReadChunkCurrent calls still perform full checks.
+No mutable authority cache, new interface, timer, watch or request is introduced.
+Native SQL renewal, peer checks, exact original owner/window/cursor/deadline and
+final-sink ACK remain unchanged. This preserves the selected entitlement interval
+without treating a consumed setup observation as fresh authority.
+
+The composed test counts zero additional full runtime C03 checks for the private
+checked path across opening and one renewal, versus three for the public outer
+path and two for the direct inner path. It still requires current identity and
+SQL/peer gates; zero extra full checks does not mean zero total workflow queries.
+Changed identity, cancelled calls and expired leases return no second chunk or
+renewal. The earlier unbound production overlay fails the cost regression with
+two full checks (actual exit 1, package 0.424 s). A complete checked response still
+crosses the actual initial 400 ms cutoff before its final ACK. These fixtures use
+synthetic authority/transport ports and establish no installed cost or outcome.
+
+Final affected evidence race passes (exit 0, package 5.700 s), and canonical
+pre-push passes (exit 0, 32.733 s, including 231 console tests). Independent
+read-only review found no concrete blocker in checked propagation, original
+bounds, current identity matching or retained SQL/peer fencing. No installed
+transfer or aggregate provider-cost claim follows from these local results.

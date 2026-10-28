@@ -277,10 +277,22 @@ func (s *NativeAttachment) PrepareNativeMetadata(ctx context.Context, r ContextD
 	return metadata, exchange, nil
 }
 func (s *NativeAttachment) current(ctx context.Context, current identities.CurrentIdentity, r ContextDownloadRequest) (NativePreparationCheck, error) {
+	return s.currentAuthority(ctx, current, r, nil)
+}
+
+// A private response handoff consumes the coordinator's already checked lease.
+// Direct callers still construct their complete independent authority.
+func (s *NativeAttachment) currentAuthority(ctx context.Context, current identities.CurrentIdentity, r ContextDownloadRequest, observed *artifact.DownloadAuthority) (NativePreparationCheck, error) {
 	if s == nil {
 		return nil, artifact.ErrInvalid
 	}
-	check, e := newWorkerCurrentCheck(ctx, current, s.config.Authority, r.Scope, s.config.Now)
+	var check *workerCurrentCheck
+	var e error
+	if observed == nil {
+		check, e = newWorkerCurrentCheck(ctx, current, s.config.Authority, r.Scope, s.config.Now)
+	} else {
+		check, _, e = newWorkerResponseObservation(ctx, current, *observed, r.Scope, s.config.Now)
+	}
 	if e != nil {
 		return nil, e
 	}

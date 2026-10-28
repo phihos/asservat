@@ -16,7 +16,10 @@ then failed its paced response. The public native-response wrapper still pinned
 the initial lease and setup authorizer despite the inner source's renewal
 support. The [ADR-258 composition correction](decisions/258-slow-native-response-windows.md#public-response-composition-correction-2026-10-28)
 keeps setup short and retains the cursor under its original finite response;
-fresh per-chunk leases/SQL/current identity remain mandatory. Installed paced,
+fresh per-chunk leases/SQL/current identity remain mandatory. Its private checked
+handoff also reaches the inner source on renewal, preserving the coordinator's
+thirty-second entitlement reuse rather than duplicating full authorization.
+Direct callers retain their independent full checks. Installed paced,
 range and completion, edited history and finite policy outcomes remain open;
 no complete S-04/S-02 or user enablement is claimed.
 

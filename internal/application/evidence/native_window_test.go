@@ -324,14 +324,20 @@ func (p *windowNativePorts) RenewNativeOperation(_ context.Context, ref value.Na
 }
 
 func TestRemoteContextSourceRenewalPreservesCursorAndRejectsDowngrade(t *testing.T) {
-	testNativeResponseRenewal(t, false)
+	testNativeResponseRenewal(t, false, false, "complete")
 }
 
 func TestContextNativeResponseRenewalPreservesCursorAndRejectsDowngrade(t *testing.T) {
-	testNativeResponseRenewal(t, true)
+	testNativeResponseRenewal(t, true, false, "complete")
 }
 
-func testNativeResponseRenewal(t *testing.T, composed bool) {
+func TestContextNativeResponseCheckedRenewalReusesCoordinatorAuthority(t *testing.T) {
+	for _, mode := range []string{"complete", "changed-identity", "cancelled", "expired"} {
+		t.Run(mode, func(t *testing.T) { testNativeResponseRenewal(t, true, true, mode) })
+	}
+}
+
+func testNativeResponseRenewal(t *testing.T, composed, checked bool, mode string) {
 	f := newActiveEnrollmentFixture(t)
 	if composed {
 		f.f.a.ValidUntil = f.f.now.Add(400 * time.Millisecond)
@@ -389,9 +395,13 @@ func testNativeResponseRenewal(t *testing.T, composed bool) {
 		source, closeSource = inner, inner.Close
 	}
 	defer closeSource()
+	read := source.ReadChunkCurrent
+	if checked {
+		read = source.(*ContextNativeResponse).readChunkChecked
+	}
 	id := f.f.s.ID
 	lease := artifact.DownloadDeliveryLease{ResponseID: id, WindowID: id, OwnerID: id, Generation: 1, Sequence: 1, Length: int64(len(body)), StartedAt: f.f.now, Until: f.f.a.ValidUntil, Authority: f.f.a}
-	first, err := source.ReadChunkCurrent(t.Context(), f.f, lease, 0, 10)
+	first, err := read(t.Context(), f.f, lease, 0, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +426,7 @@ func testNativeResponseRenewal(t *testing.T, composed bool) {
 		case "scope":
 			foreign.Authority.Scope.Principal.Subject = "replacement"
 		}
-		if _, err := source.ReadChunkCurrent(t.Context(), f.f, foreign, 10, 7); err == nil {
+		if _, err := read(t.Context(), f.f, foreign, 10, 7); err == nil {
 			t.Fatal("changed window continued", change)
 		}
 	}
@@ -432,7 +442,26 @@ func testNativeResponseRenewal(t *testing.T, composed bool) {
 		next.StartedAt, next.Until, next.Authority = f.f.now, f.f.a.ValidUntil, f.f.a
 	}
 	ports.nextLease = next
-	last, err := source.ReadChunkCurrent(t.Context(), f.f, next, 10, 7)
+	if mode != "complete" {
+		call, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		switch mode {
+		case "changed-identity":
+			f.f.identity.Policy.Generation++
+		case "cancelled":
+			cancel()
+		case "expired":
+			next.Until = time.Now().Add(-time.Second)
+		default:
+			t.Fatal("unknown test mode")
+		}
+		chunk, err := read(call, f.f, next, 10, 7)
+		if err == nil || len(chunk.Bytes) != 0 || len(ports.exchange.reads) != 1 || ports.renewals != 0 || f.f.count("current-authority") != 0 {
+			t.Fatal("invalid checked renewal disclosed or reconstructed full authority", err, ports.renewals)
+		}
+		return
+	}
+	last, err := read(t.Context(), f.f, next, 10, 7)
 	if err != nil || !bytes.Equal(last.Bytes, body[10:]) {
 		t.Fatal("renewed exact cursor", err, "renewals", ports.renewals)
 	}
@@ -453,6 +482,16 @@ func testNativeResponseRenewal(t *testing.T, composed bool) {
 	}
 	if err = source.AcknowledgeNativeChunk(t.Context(), next, 10, 7); err != nil {
 		t.Fatal(err)
+	}
+	wantAuthorityChecks := 2
+	if composed {
+		wantAuthorityChecks++
+	}
+	if checked {
+		wantAuthorityChecks = 0
+	}
+	if got := f.f.count("current-authority"); got != wantAuthorityChecks {
+		t.Fatalf("full C03 checks=%d want=%d: coordinator handoff repeated authority or direct path bypassed it", got, wantAuthorityChecks)
 	}
 	if ports.registrations != 1 || ports.renewals != 1 || ports.releases != 1 {
 		t.Fatal("renewal reopened/refilled conversation", ports.registrations, ports.renewals, ports.releases)
