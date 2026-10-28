@@ -466,6 +466,14 @@ func (c *NodeChannel) enqueue(nodeUID string, kind collector.WorkKind, notAfter 
 		if deadline, ok := ctx.Deadline(); ok && !now.Before(deadline) {
 			return collector.Work{}, ErrNodeUnavailable
 		}
+		if permit := packet.Observation; permit != nil {
+			b := permit.Binding
+			if !permit.ValidFinite(now) || !permit.StartBy.Equal(notAfter) || permit.Duration != packet.Duration ||
+				b.CaptureID != packet.CaptureID || b.PodUID != packet.PodUID || b.ProgramDigest != packet.ProgramDigest ||
+				b.NodeUID != e.id.NodeUID || b.BootID != e.id.BootID || b.CollectorPodUID != e.id.PodUID || b.CollectorEpoch != e.id.Epoch {
+				return collector.Work{}, ErrNodeUnavailable
+			}
+		}
 	}
 	for id, p := range e.captures {
 		if !now.Before(p.until) {

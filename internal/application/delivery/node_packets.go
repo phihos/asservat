@@ -69,7 +69,7 @@ func (v NodeView) PacketRecorderAvailable() bool {
 // bounds when the node may still start it; the result is accepted until
 // startBy plus the duration plus PacketUploadMargin.
 func (c *NodeChannel) EnqueuePacket(nodeUID string, p collector.PacketCapture, startBy time.Time) (collector.Work, error) {
-	if !p.Valid() {
+	if !p.Valid() || p.Observation != nil {
 		return collector.Work{}, ErrNodeInvalid
 	}
 	packet := p
@@ -90,6 +90,10 @@ func (c *NodeChannel) EnqueuePacketExpected(ctx context.Context, expected target
 	}
 	packet := p
 	packet.Program = append(packet.Program[:0:0], p.Program...)
+	if p.Observation != nil {
+		permit := *p.Observation
+		packet.Observation = &permit
+	}
 	return c.enqueue(expected.NodeUID, collector.WorkPacketCapture, startBy, &packet, ctx, &expected)
 }
 
