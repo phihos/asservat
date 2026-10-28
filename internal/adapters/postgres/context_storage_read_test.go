@@ -173,7 +173,9 @@ func TestContextStorageExpiredMetadataRetainsOriginalSelectionWithoutAuthority(t
 	if !errors.Is(err, value.ErrStorageBindingExpired) || !errors.Is(err, value.ErrUnavailable) || errors.Is(err, value.ErrChanged) || got.Binding.Valid(now) || !got.Binding.Valid(got.Binding.ObservedAt) || !got.Binding.ObservedAt.Equal(row.ObservedAt.Time) || !got.Binding.FreshUntil.Equal(row.FreshUntil.Time) || got.Selection.BindingRevision != got.Binding.Revision {
 		t.Fatal("expired metadata became authority or lost original source", got, err)
 	}
-	// The transaction's normalization must preserve the specific readiness type.
+	// The outer capture-error adapter must preserve the specific readiness type.
+	// Actual Ledger.transaction normalization is covered by the SQL integration
+	// regression; this pure wrapper check cannot exercise that boundary.
 	failure := &contextStorageReadFailure{stage: "observation/source-expired", cause: captureError(err)}
 	if !errors.Is(failure, value.ErrStorageBindingExpired) || !errors.Is(failure, value.ErrUnavailable) || failure.ContextStorageRead() != "observation/source-expired" {
 		t.Fatal("expired result lost at adapter boundary")
