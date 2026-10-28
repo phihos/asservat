@@ -17,6 +17,20 @@ type packetInput struct {
 	meter    *LocalObservationGate
 }
 
+// Notices run on the engine's existing callback owner. Only mark/cancel here;
+// runPacketEngine owns the synchronous join before budget release.
+func runObservedPacketEngine(ctx context.Context, engine observedPacketEngine, pod string, rec *packets.Recorder, meter *LocalObservationGate) (gadget.CaptureStats, error) {
+	return runPacketEngine(ctx, func(call context.Context, pod string, snaplen int, deliver func(gadget.Frame)) (gadget.CaptureStats, error) {
+		return engine(call, pod, snaplen, deliver, func(n gadget.InputNotice) {
+			if n.LostSamples > 0 {
+				meter.LostSamples(n.LostSamples)
+			} else {
+				meter.UnknownInput()
+			}
+		})
+	}, pod, rec, meter)
+}
+
 func (p *packetInput) add(f gadget.Frame) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -34,8 +48,8 @@ func (p *packetInput) add(f gadget.Frame) {
 
 // runPacketEngine joins the existing synchronous engine before returning. A
 // debit refusal cancels its context, rather than relying on a datasource callback
-// error (Gadget logs those and continues). No product caller supplies a meter yet:
-// raw-predicate acceptance stays refused until the SQL/channel permit path exists.
+// error (Gadget logs those and continues). Raw runtime producers remain refused
+// until the complete SQL/channel/recording path is qualified.
 func runPacketEngine(ctx context.Context, engine packetEngine, pod string, rec *packets.Recorder, meter *LocalObservationGate) (gadget.CaptureStats, error) {
 	input := packetInput{ctx: ctx, recorder: rec, meter: meter}
 	if meter == nil {

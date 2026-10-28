@@ -193,6 +193,33 @@ func TestNodeChannelOverTLS(t *testing.T) {
 	}
 }
 
+func TestNodeProcessRetainsAuthenticatedEnrollmentSource(t *testing.T) {
+	_, att, endpoint, roots, _ := startNodeServer(t)
+	pod := "11111111-1111-4111-8111-111111111111"
+	att.mu.Lock()
+	att.pod = pod
+	att.mu.Unlock()
+	creds, err := mtls.NewNodeCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := node.NewClient(endpoint, "asservat-connector-nodes", roots, creds.GetClientCertificate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.CloseIdle()
+	p := &nodeProcess{client: client, creds: creds, podUID: pod, bootID: testNodeBoot, epoch: testNodeEpoch, now: time.Now, log: &bytes.Buffer{}, token: func(context.Context) ([]byte, error) { return []byte("synthetic.node.token"), nil }}
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	if _, err := p.enroll(ctx); err != nil {
+		t.Fatal(err)
+	}
+	id := p.packetIdentity()
+	if id.NodeUID != "node-uid" || id.PodUID != pod || id.BootID != testNodeBoot || id.Epoch != testNodeEpoch {
+		t.Fatal("source was not retained from authenticated enrollment/startup", id)
+	}
+}
+
 // fakeNodeChannel records reports against a fake clock.
 type fakeNodeChannel struct {
 	mu       sync.Mutex

@@ -59,11 +59,15 @@ func TestNodeObservationMaximumPollFitsExistingBound(t *testing.T) {
 		p.Program[i] = planning.BPFInstruction{Code: 65535, Jt: 255, Jf: 255, K: ^uint32(0)}
 	}
 	b := &o.Binding
-	b.ActionID = strings.Repeat("a", 128)
-	b.NodeUID = strings.Repeat("n", 128)
-	b.BootID = strings.Repeat("b", 128)
-	b.CollectorPodUID = strings.Repeat("c", 128)
-	b.CollectorEpoch = strings.Repeat("e", 128)
+	b.ActionID = strings.Repeat(`\`, 128)
+	b.NodeUID = strings.Repeat(`\`, 128)
+	b.BootID = strings.Repeat(`\`, 128)
+	b.CollectorPodUID = strings.Repeat(`\`, 128)
+	b.CollectorEpoch = strings.Repeat(`\`, 128)
+	w.Sequence = ^uint64(0)
+	p.Duration, o.Duration = 15*time.Second, 15*time.Second
+	o.SessionUntil, o.LeaseUntil = o.StartedAt.Add(20*time.Second), o.StartedAt.Add(20*time.Second)
+	o.Credit, o.BytesPerSecond = 1<<40, 1<<30
 	poll := contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: make([]contracts.NodeWork, collector.MaxWorkPerPoll)}
 	for i := range poll.Work {
 		poll.Work[i] = WireWork(w)

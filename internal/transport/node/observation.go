@@ -21,6 +21,11 @@ func domainObservation(w *contracts.NodeObservationPermit) (*collector.Observati
 		return nil, false
 	}
 	b := w.Binding
+	for _, s := range []string{b.SessionID, b.Fence, b.CaptureID, b.ActionID, b.PodUID, b.NodeUID, b.BootID, b.CollectorPodUID, b.CollectorEpoch} {
+		if s == "" || !text(s, 128) {
+			return nil, false
+		}
+	}
 	p := &collector.ObservationPermit{Binding: collector.ObservationBinding{SessionID: b.SessionID, Fence: b.Fence, CaptureID: b.CaptureID, ActionID: b.ActionID, PodUID: b.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch}, StartedAt: w.StartedAt.UTC(), SessionUntil: w.SessionUntil.UTC(), LeaseUntil: w.LeaseUntil.UTC(), StartBy: w.StartBy.UTC(), Duration: time.Duration(w.DurationMillis) * time.Millisecond, Sequence: w.Sequence, Credit: w.Credit, BytesPerSecond: w.BytesPerSecond}
 	for _, item := range []struct {
 		wire string

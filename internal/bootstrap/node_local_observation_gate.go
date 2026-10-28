@@ -180,6 +180,11 @@ func (m *LocalObservationGate) LostSamples(n uint64) {
 	if n == 0 {
 		return
 	}
+	m.UnknownInput()
+}
+
+// UnknownInput records an unmeasurable gap without fabricating a lost count.
+func (m *LocalObservationGate) UnknownInput() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.snapshot.UnknownInput = true
