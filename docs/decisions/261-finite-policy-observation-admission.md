@@ -97,15 +97,20 @@ an eventual SQL permit was already present in those signature bytes. The typed
 permit must travel on that authenticated operation and match its exact accepted
 work, SQL session and resolved node. No remote DTO selects a policy/grant budget.
 
-The shared value owner is C-24 `domain/collector`: byte-compatible local binding,
-permit and accounting rule, plus a primitive `PacketSourceBinding` of PodUID,
-NodeUID, BootID, CollectorPodUID and CollectorEpoch plus original ObservedAt and
-FreshUntil. C-09's targets observation keeps the identical seven primitive fields,
-optionally in RecorderAnswer.Source. Bootstrap converts explicitly; C-19 checks
-cancellation and the declared original interval/tuple under its existing injected
-clock and enqueue mutex. No extra deadline timer, freshness interval, configuration
-or targets/collector import cycle. These duplicate primitive facts avoid that real
-owner-layer cycle; neither form is an authority view model.
+The shared value owner is C-24 `domain/collector`: byte-compatible local binding
+and permit, with the accounting rule represented by its fixed canonical digest
+(test-verified against the documented version string). Do not broaden the pure
+domain crypto allowlist solely for this move.
+
+Use one primitive C-24 `targets.PacketSourceObservation` containing PodUID, NodeUID,
+BootID, CollectorPodUID, CollectorEpoch, ObservedAt and FreshUntil, optionally in
+RecorderAnswer.Source. C-19 EnqueuePacketExpected consumes that same value directly
+and checks cancellation and its original interval/tuple under the existing
+injected clock and enqueue mutex. The catalog already permits C-19 → C-24,
+including targets; delivery → targets has no Go import cycle. No duplicate
+collector source type, bootstrap field mapping, catalog expansion, extra deadline
+timer, freshness interval or configuration is needed. Source facts remain
+separate from the committed grant/session permit. C-09 consumes the observation;
 C-11 consumes the committed permit; C-21 implements the existing SQL facet.
 
 ## Cost and alternatives

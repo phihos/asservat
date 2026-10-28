@@ -1651,21 +1651,30 @@ signature happens before later SQL preparation, so do not claim it signs future
 permit bytes. No independent initial JWS operation is intended. No three-second
 renewal machinery, new worker/watch/service/table/credential/config is added.
 
-The node-source contract is agreed before implementation: C-24 collector values
-own byte-compatible ObservationBinding/Permit/rule and PacketSourceBinding with
-five exact strings (PodUID, NodeUID, BootID, CollectorPodUID, CollectorEpoch) plus
-original ObservedAt/FreshUntil. targets.PacketSourceObservation has the same seven
-primitive fields to avoid the real collector→planning→targets dependency cycle.
-RecorderAnswer.Source is optional facts only; bootstrap converts explicitly.
-EnqueuePacketExpected checks cancellation, original interval and exact tuple under
-the existing injected channel clock/mutex, with no extra deadline timer or new
-freshness knob. Work latestStart remains separate from source-fact freshness:
-a new enqueue needs fresh facts; already-issued work retains only its original
-start bound. Storage owns this isolated source/node slice after the clean contract
-checkpoint. This agent owns later policy-only SQL/issuer/C09 composition; manual
+The corrected node-source contract before implementation uses one seven-field
+C-24 targets.PacketSourceObservation: PodUID, NodeUID, BootID, CollectorPodUID,
+CollectorEpoch and original ObservedAt/FreshUntil. RecorderAnswer.Source is optional
+facts only; C-19 EnqueuePacketExpected consumes that exact value directly. The
+catalog already permits C-19 → all C-24 domain types, and delivery → targets is
+acyclic. The proposed duplicate collector.PacketSourceBinding/bootstrap mapping
+was unnecessary and is removed before source edits. Enqueue checks cancellation,
+original interval and exact tuple under its existing injected clock/mutex, with
+no extra deadline timer, catalog change or freshness knob. ObservationBinding and
+Permit move byte-compatibly to domain/collector, with a fixed canonical rule
+digest checked against the version string in tests, without broadening the pure
+domain crypto allowlist. LatestStart stays separate: new enqueue needs fresh
+facts; already-issued work retains only its original start bound. Storage owns
+this isolated source/node slice after the clean reviewed contract checkpoint.
+This agent owns later policy-only SQL/issuer/C09 composition; manual raw and
+longer finite/default ongoing modes remain unfinished.
 raw stays closed and longer finite/default ongoing modes remain unfinished.
 The ADR/spec-only checkpoint passed spec-check, architecture-check and design-check
 with actual exit 0 (176 requirements / existing scenario IDs retained). It makes
 no runtime/schema/permission or raw-availability change. The primary lifecycle
 precedents were inspected at their pinned source versions; they support the
 admission/lifetime separation, not the engineering choice of twenty seconds.
+
+Contract review checked the actual dependency catalog (C-19 → C-24; all
+internal/domain owned by C-24), eliminating the unnecessary duplicate source
+value/conversion before any implementation. The single source observation API
+and fixed rule digest require no catalog/checker/permission expansion.
