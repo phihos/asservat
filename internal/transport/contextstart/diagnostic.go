@@ -139,8 +139,9 @@ func (d *StreamDiagnostics) Interruption() StreamInterruption {
 	return StreamInterruption{}
 }
 
-// Only known sentinel errors and net.Error's non-text timeout classification
-// are observed. No Error, Is or Unwrap method is invoked on a foreign error.
+// No Error, Is or Unwrap method is invoked. Timeout and the direct structured
+// As bridge below may execute trusted in-process Go error implementations;
+// this is not a guarantee that classification invokes no error methods.
 func streamErrorReason(err error) streamReason {
 	switch err {
 	case nil:
@@ -168,9 +169,9 @@ func streamErrorReason(err error) streamReason {
 		return streamTimeout
 	}
 	// Go's net/http StreamError supports As into x/net/http2.StreamError.
-	// Invoke only that direct conversion, never an arbitrary Unwrap chain or
-	// error text. Preserve no stream ID or Cause except the exact deadline
-	// sentinel; INTERNAL by itself does not establish a timeout or peer origin.
+	// Invoke a direct As method when implemented, without traversing an Unwrap
+	// chain or reading error text. Preserve no stream ID or Cause except the
+	// exact deadline sentinel; INTERNAL alone establishes no timeout or origin.
 	stream, ok := err.(http2.StreamError)
 	if !ok {
 		if convert, supported := err.(interface{ As(any) bool }); supported {

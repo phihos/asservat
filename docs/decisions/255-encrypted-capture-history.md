@@ -429,8 +429,13 @@ conversion into the already-used x/net/http2.StreamError. It retains only fixed
 INTERNAL/deadline/CANCEL/PROTOCOL/REFUSED/other classes, never stream IDs, Cause
 text or payload. INTERNAL means deadline only when Cause is exactly
 os.ErrDeadlineExceeded; an unqualified INTERNAL establishes neither timeout nor
-peer origin. Direct As conversion avoids inspecting arbitrary Unwrap/Is/Error
-methods. This changes diagnostics only: no transport, query, deadline, authority,
+peer origin. Classification invokes no Error/Is/Unwrap methods, but may invoke
+net.Error.Timeout and a directly implemented structured As bridge. These are
+trusted in-process Go error interfaces, as in ordinary Go error handling; network
+input cannot inject Go method implementations. This is not an arbitrary-method-
+free guarantee. A regression executes the direct bridge exactly once and retains
+panic Error/Is/Unwrap methods, including a refused conversion that stays `other`.
+This changes diagnostics only: no transport, query, deadline, authority,
 retry, current check or public response changes.
 
 The actual mTLS/HTTP2 fixture now also tests diagnostics ResolveWorkload followed

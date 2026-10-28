@@ -24,6 +24,23 @@ func (*streamPrivateError) Error() string { panic("private error rendered") }
 func (*streamPrivateError) Unwrap() error { panic("private error unwrapped") }
 func (*streamPrivateError) Is(error) bool { panic("private error compared") }
 
+// The trusted structured bridge is allowed to execute. Inherited Error/Is/
+// Unwrap methods still panic if classification tries text or chain traversal.
+type streamAsError struct {
+	streamPrivateError
+	calls    int
+	accepted bool
+}
+
+func (e *streamAsError) As(target any) bool {
+	e.calls++
+	stream, ok := target.(*http2.StreamError)
+	if ok {
+		*stream = http2.StreamError{Code: http2.ErrCodeInternal, Cause: os.ErrDeadlineExceeded}
+	}
+	return ok && e.accepted
+}
+
 type streamReaderFunc func([]byte) (int, error)
 
 func (f streamReaderFunc) Read(p []byte) (int, error) { return f(p) }
@@ -102,6 +119,19 @@ func TestContextStreamHTTP2DiagnosticCodesStayClosed(t *testing.T) {
 	}
 	if streamErrorReason(&streamPrivateError{}) != streamOther {
 		t.Fatal("unrecognized error was inspected")
+	}
+}
+
+func TestContextStreamDiagnosticInvokesDirectAsWithoutUnwrap(t *testing.T) {
+	for _, accepted := range []bool{true, false} {
+		err := &streamAsError{accepted: accepted}
+		want := streamOther
+		if accepted {
+			want = streamHTTP2Deadline
+		}
+		if got := streamErrorReason(err); got != want || err.calls != 1 {
+			t.Fatal("direct structured bridge invocation", got, want, err.calls)
+		}
 	}
 }
 
