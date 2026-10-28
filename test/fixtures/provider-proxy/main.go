@@ -12,6 +12,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -38,7 +39,7 @@ func main() {
 		}
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		defer cancel()
-		go func() { var one [1]byte; _, _ = os.Stdin.Read(one[:]); cancel() }()
+		go cancelTrafficOnInput(os.Stdin, deadline, cancel)
 		receipt := runTrafficClient(ctx, "http://"+net.JoinHostPort(ip.String(), "8080"))
 		_ = json.NewEncoder(os.Stdout).Encode(receipt)
 		if receipt.Failure != "" {
@@ -456,7 +457,10 @@ func runTrafficClient(ctx context.Context, endpoint string) (out trafficClientRe
 		case <-ctx.Done():
 			wait.Stop()
 			out.WaitElapsed += time.Since(waitStarted)
-			out.Failure = "deadline"
+			out.Failure = "request"
+			if trafficDeadlineFailure(ctx, ctx.Err()) {
+				out.Failure = "deadline"
+			}
 			return out
 		case <-wait.C:
 		}
@@ -473,6 +477,9 @@ func runTrafficClient(ctx context.Context, endpoint string) (out trafficClientRe
 		response, err := client.Do(request)
 		if err != nil {
 			out.Failure = "request"
+			if trafficDeadlineFailure(ctx, err) {
+				out.Failure = "deadline"
+			}
 			return out
 		}
 		out.LastStatus = response.StatusCode
@@ -482,7 +489,7 @@ func runTrafficClient(ctx context.Context, endpoint string) (out trafficClientRe
 		out.LastBodyBytes = n
 		if err != nil || response.StatusCode != http.StatusOK || n != 262144 || response.Header.Get("X-Fixture-Traffic-Max-Bytes") != "262144" || response.Trailer.Get("X-Fixture-Traffic-Writes") != "4096" || response.Trailer.Get("X-Fixture-Traffic-Bytes") != "262144" || response.Trailer.Get("X-Fixture-Traffic-Complete") != "true" {
 			out.Failure = "acknowledgement"
-			if ctx.Err() != nil {
+			if trafficDeadlineFailure(ctx, err) {
 				out.Failure = "deadline"
 			}
 			return out
@@ -493,7 +500,27 @@ func runTrafficClient(ctx context.Context, endpoint string) (out trafficClientRe
 		finishWork()
 	}
 	if ctx.Err() != nil {
-		out.Failure = "deadline"
+		out.Failure = "request"
+		if trafficDeadlineFailure(ctx, ctx.Err()) {
+			out.Failure = "deadline"
+		}
 	}
 	return out
+}
+
+// EOF owns early cancellation only. Once the original absolute cutoff has
+// passed, its existing WithDeadline timer owns the cause; EOF must not replace
+// an already-due deadline with context.Canceled. No timer or interval is added.
+func cancelTrafficOnInput(input io.Reader, until time.Time, cancel context.CancelFunc) {
+	var one [1]byte
+	_, _ = input.Read(one[:])
+	if time.Now().Before(until) {
+		cancel()
+	}
+}
+
+// Both the actual HTTP/read error and the original context must report the
+// supported deadline cause. An unrelated failure near the cutoff stays failed.
+func trafficDeadlineFailure(ctx context.Context, err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) && errors.Is(ctx.Err(), context.DeadlineExceeded)
 }

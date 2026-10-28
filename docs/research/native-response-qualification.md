@@ -922,3 +922,60 @@ Artifacts are retained in cache under
 This qualifies the fixture query and dropped-role accounting behavior, not an
 installed paced workflow or actual login-purpose attribution for the preceding
 run, whose missing map cannot be reconstructed.
+
+## Traffic header-wait deadline classification (2026-10-28)
+
+Paced Native 40744850604 on `3f434f00` failed before artifact inspection.
+Its valid receipt retained seven acknowledged batches / 28,672 records /
+1,835,008 bytes, then `request` with no response headers, body or ACK.
+Parent elapsed was 8.506300016s, child 8.416736657s (HTTP work
+8.416691994s); the original phase was 8.5s. All 3,387 historical source
+hashes matched, sourceUnchanged was true and cleanup was empty. Target CPU
+reported 845,853us, 86 periods, 55 throttled periods and 4.799s reported
+throttled time. These values do not establish the HTTP error's cause or CPU cost
+attribution. No native artifact, near-full size or download proof was reached.
+
+The actual helper reproduces a separate local defect: after one acknowledged
+batch, HTTP.Do waiting for the next headers returns a genuine original-context
+deadline, but the former helper labels every Do error `request`. That RED failed
+with exit 1 (Go 1.260s). The parent also rejected an otherwise eligible joined
+no-header deadline receipt (exit 1, Go 0.064s). The installed error itself was
+not retained, so neither reproduction proves that run's underlying cause.
+
+The fixture now labels deadline only when both the actual HTTP/read error and
+original context have the supported deadline cause. Cancellation, connection
+reset and unrelated EOF remain failures, even near an expired cutoff. Invalid
+ACKs without a deadline error remain failures. The existing stdin watcher
+cancels before the original absolute cutoff; afterward it leaves the cause to
+the existing WithDeadline timer instead of replacing a pending deadline with
+context.Canceled. No new timer or interval is introduced.
+
+The parent accepts the additional closed terminal shape only after the original
+phase expires, a normal exit-1 process joins, and the existing valid receipt,
+wall/work timing and live outer-owner checks pass. It requires at least one
+prior acknowledged batch, fewer than sixteen completed batches, exact completed
+record/byte counts, status/body zero and no final ACK. This remains a nonnil
+incomplete-traffic result. The independent actual-artifact near-8-MiB, PCAPNG,
+owner and paced-download checks remain unchanged; this exception supplies no
+artifact bytes and cannot qualify a small or absent artifact.
+
+Complexity gate (1–11): (1) one retained installed failure, two locally reproduced
+fixture defects; installed attribution unknown; (2) no accepted risk reopened;
+(3) installed pacing fixture only; (4) standard Go context/errors.Is semantics;
+(5) zero new privileges, credentials or endpoints; (6) zero fallback/retry states,
+one exact receipt shape added; (7) zero knobs; (8) existing Go HTTP/context only;
+(9) zero new API/SQL calls, watches or per-packet work, same one input goroutine,
+zero added timers, two error-chain checks on terminal paths; CPU unmeasured;
+(10) test-only source rollback, no schema/wire change; (11) classification plus
+exact parent predicate is smaller than changing traffic, quotas or deadlines.
+The sixteen batches, 4 MiB traffic envelope, 250ms schedule, 8.5s phase, 10s
+capture, 20s response and target/native limits are unchanged. Local HTTP and
+synthetic parent checks do not qualify installed capture or transfer.
+
+Local corrected helper races passed (exit 0, Go 21.114s), using the actual
+standalone helper plus both test files explicitly:
+`go test -race -count=1 -v test/fixtures/provider-proxy/main.go test/fixtures/provider-proxy/traffic_test.go test/fixtures/provider-proxy/traffic_deadline_test.go`.
+The parent selection `^TestNativePacing(RecordedDeadline|TrafficOutputCopy|NonzeroCommand)`
+passed under race (exit 0, Go 9.586s), retaining joined nonnil incompleteness,
+actual small-file refusal, output bounds and strict receipt/cancellation controls.
+No external fixture, collector or installed retry ran for this correction.

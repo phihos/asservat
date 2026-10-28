@@ -33,14 +33,31 @@ func TestNativePacingRecordedDeadlineRequiresParentProofAndRealTraffic(t *testin
 	if exitOne == nil || exitTwo == nil || signalExit == nil {
 		t.Fatal("missing real owned process exit evidence")
 	}
-	for _, mode := range []string{"eligible-partial", "eligible-last-ack", "eligible-all-acks-deadline", "parent-cancel", "parent-deadline", "phase-live", "zero-deadline", "short-phase", "late-phase", "not-joined", "signal", "wait-delay", "joined-error", "exit-two", "exit-zero", "no-receipt", "no-acks", "zero-bytes", "status", "request", "acknowledgement", "receipt-error", "records", "bytes", "last-body", "oversized-body", "false-ack", "all-acks-plus-partial", "no-client-wall", "no-work", "negative-wait", "overlapping-time"} {
+	for _, mode := range []string{"eligible-partial", "eligible-header-wait", "headers-extra-body", "headers-false-ack", "headers-extra-bytes", "headers-all-acks", "headers-request", "headers-status", "headers-missing-receipt", "headers-live-phase", "headers-exit-two", "headers-parent-cancel", "eligible-last-ack", "eligible-all-acks-deadline", "parent-cancel", "parent-deadline", "phase-live", "zero-deadline", "short-phase", "late-phase", "not-joined", "signal", "wait-delay", "joined-error", "exit-two", "exit-zero", "no-receipt", "no-acks", "zero-bytes", "status", "request", "acknowledgement", "receipt-error", "records", "bytes", "last-body", "oversized-body", "false-ack", "all-acks-plus-partial", "no-client-wall", "no-work", "negative-wait", "overlapping-time"} {
 		t.Run(mode, func(t *testing.T) {
 			now := time.Now()
 			until := now
 			ctx := context.Background()
 			r := nativePartialTrafficFixture()
 			processErr := exitOne
+			if strings.HasPrefix(mode, "headers-") || mode == "eligible-header-wait" {
+				r.LastStatus = 0
+				r.LastBodyBytes = 0
+				r.LastAcknowledged = false
+				r.Bytes = r.Batches * nativeTrafficRecordsPerBatch * nativeTrafficRecordBytes
+			}
 			switch mode {
+			case "headers-extra-body":
+				r.LastBodyBytes = 1
+				r.Bytes++
+			case "headers-false-ack":
+				r.LastAcknowledged = true
+			case "headers-extra-bytes":
+				r.Bytes++
+			case "headers-all-acks":
+				r.Batches = nativeTrafficBatches
+				r.Records = nativeTrafficRecords
+				r.Bytes = nativeTrafficPayload
 			case "eligible-last-ack":
 				r.LastAcknowledged = true
 				r.LastBodyBytes = nativeTrafficRecordsPerBatch * nativeTrafficRecordBytes
@@ -51,7 +68,7 @@ func TestNativePacingRecordedDeadlineRequiresParentProofAndRealTraffic(t *testin
 				r.Bytes = nativeTrafficPayload
 				r.LastAcknowledged = true
 				r.LastBodyBytes = nativeTrafficRecordsPerBatch * nativeTrafficRecordBytes
-			case "parent-cancel":
+			case "parent-cancel", "headers-parent-cancel":
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
@@ -59,7 +76,7 @@ func TestNativePacingRecordedDeadlineRequiresParentProofAndRealTraffic(t *testin
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithDeadline(ctx, now.Add(-time.Second))
 				defer cancel()
-			case "phase-live":
+			case "phase-live", "headers-live-phase":
 				until = now.Add(time.Nanosecond)
 			case "zero-deadline":
 				until = time.Time{}
@@ -75,11 +92,11 @@ func TestNativePacingRecordedDeadlineRequiresParentProofAndRealTraffic(t *testin
 				processErr = exec.ErrWaitDelay
 			case "joined-error":
 				processErr = errors.Join(exitOne, exec.ErrWaitDelay)
-			case "exit-two":
+			case "exit-two", "headers-exit-two":
 				processErr = exitTwo
 			case "exit-zero":
 				processErr = nil
-			case "no-receipt":
+			case "no-receipt", "headers-missing-receipt":
 				r.ReceiptValid = false
 			case "no-acks":
 				r.Batches = 0
@@ -88,9 +105,9 @@ func TestNativePacingRecordedDeadlineRequiresParentProofAndRealTraffic(t *testin
 			case "zero-bytes":
 				r.Bytes = 0
 				r.LastBodyBytes = 0
-			case "status":
+			case "status", "headers-status":
 				r.LastStatus = 503
-			case "request":
+			case "request", "headers-request":
 				r.Failure = "request"
 			case "acknowledgement":
 				r.Failure = "acknowledgement"
@@ -119,7 +136,7 @@ func TestNativePacingRecordedDeadlineRequiresParentProofAndRealTraffic(t *testin
 			case "overlapping-time":
 				r.ClientWorkElapsed = r.ClientElapsed
 			}
-			want := mode == "eligible-partial" || mode == "eligible-last-ack" || mode == "eligible-all-acks-deadline"
+			want := mode == "eligible-header-wait" || mode == "eligible-partial" || mode == "eligible-last-ack" || mode == "eligible-all-acks-deadline"
 			if got := nativeTrafficRecordedDeadline(ctx, r, processErr, until, now); got != want {
 				t.Fatal("deadline eligibility", mode, got, want)
 			}

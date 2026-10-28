@@ -127,12 +127,20 @@ func nativeTrafficRecordedDeadline(ctx context.Context, r nativeTrafficResult, p
 	if !ok || child.ProcessState == nil || !child.Exited() || child.ExitCode() != 1 {
 		return false
 	}
-	if !r.ReceiptValid || r.Failure != "deadline" || r.Batches < 1 || r.Batches > nativeTrafficBatches || r.Records != r.Batches*nativeTrafficRecordsPerBatch || r.LastStatus != http.StatusOK ||
+	if !r.ReceiptValid || r.Failure != "deadline" || r.Batches < 1 || r.Batches > nativeTrafficBatches || r.Records != r.Batches*nativeTrafficRecordsPerBatch ||
 		r.ClientElapsed <= 0 || r.ClientElapsed > nativeTrafficPhase+250*time.Millisecond || r.ClientWorkElapsed <= 0 || r.ClientWaitElapsed < 0 || r.ClientWaitElapsed > r.ClientElapsed || r.ClientWorkElapsed > r.ClientElapsed-r.ClientWaitElapsed {
 		return false
 	}
 	const batchBytes = nativeTrafficRecordsPerBatch * nativeTrafficRecordBytes
 	completed := r.Batches * batchBytes
+	// A genuine deadline may interrupt HTTP.Do before any response headers.
+	// Only fully acknowledged prior batches count as traffic in this case.
+	if r.LastStatus == 0 {
+		return !r.LastAcknowledged && r.Batches < nativeTrafficBatches && r.LastBodyBytes == 0 && r.Bytes == completed
+	}
+	if r.LastStatus != http.StatusOK {
+		return false
+	}
 	if r.LastAcknowledged {
 		return r.LastBodyBytes == batchBytes && r.Bytes == completed
 	}
