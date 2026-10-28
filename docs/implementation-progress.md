@@ -12,7 +12,9 @@ fresh successful read. Known revision changes, malformed/future/mismatched metad
 failed demands and original authority expiry remain terminal. The persisted
 30-second lifetime, one demand, 250 ms cadence, response reserve and original
 caller/non-storage deadlines remain unchanged. No SQL/migration or external fixture
-is added. See [the failure and qualification limits](research/native-response-qualification.md#natural-source-expiry-at-authoritative-consumption-2026-10-28)
+is added. Affected capture/PostgreSQL/domain races passed (capture 11.917s);
+canonical pre-push, including spec and architecture gates, passed. Full assembled
+Go validation and installed qualification remain separate pending gates. See [the failure and qualification limits](research/native-response-qualification.md#natural-source-expiry-at-authoritative-consumption-2026-10-28)
 and [the engineering contract correction](decisions/213-storage-readiness-at-consumption.md#natural-source-expiry-correction-2026-10-28).
 
 ## Paced helper setup omission reproduced before bootstrap (2026-10-28)

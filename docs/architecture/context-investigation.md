@@ -135,7 +135,8 @@ interval and exact reviewed selection, consumption may use the same bounded
 readiness owner and sole demand attempt as a thin result. No expired value
 authorizes admission: an independently fresh successful read is required.
 Generic read failures and malformed, future or mismatched expired metadata
-remain terminal. Missing refresh or a failed demand prevents polling for a thin
+remain terminal. Expired metadata does not validate capacity/control; the fresh
+successful read must still pass those unchanged checks. Missing refresh or a failed demand prevents polling for a thin
 result; a valid final read with sufficient margin can still succeed.
 The wait uses the earliest original
 caller, initial identity/recovery, preview, target, eligibility/identity,
