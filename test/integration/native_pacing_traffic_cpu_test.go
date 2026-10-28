@@ -6,7 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,15 +31,18 @@ type nativeTrafficCPU struct {
 }
 
 type nativeCPUOutput struct {
-	bytes.Buffer
-	limit int
+	buffer bytes.Buffer
+	limit  int
 }
+
+func (b *nativeCPUOutput) Len() int      { return b.buffer.Len() }
+func (b *nativeCPUOutput) Bytes() []byte { return b.buffer.Bytes() }
 
 func (b *nativeCPUOutput) Write(p []byte) (int, error) {
 	if len(p) > b.limit-b.Len() {
 		return 0, errors.New("CPU command output exceeds bound")
 	}
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
 }
 func nativeCPUCommand(ctx context.Context, limit int, args ...string) ([]byte, error) {
 	c := exec.CommandContext(ctx, "docker", args...)
@@ -169,5 +175,39 @@ func TestNativeTrafficCPUQuotaAndCountersNeverInventAZero(t *testing.T) {
 	second.ContainerID = "replacement"
 	if _, err := nativeTrafficCPUDelta(first, second); err == nil {
 		t.Fatal("replacement cgroup accepted")
+	}
+}
+
+func TestNativeTrafficCPUOutputCopyAndCommandStayBounded(t *testing.T) {
+	b := &nativeCPUOutput{limit: 32}
+	if _, err := io.Copy(b, struct{ io.Reader }{strings.NewReader(strings.Repeat("x", 33))}); err == nil || b.Len() > 32 {
+		t.Error("copy bypassed CPU output bound", b.Len(), err)
+	}
+	work := t.TempDir()
+	path := filepath.Join(work, "response")
+	if err := os.WriteFile(filepath.Join(work, "docker"), []byte("#!/bin/sh\n/bin/cat \"$ASSERVAT_CPU_RESPONSE\"\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", work)
+	t.Setenv("ASSERVAT_CPU_RESPONSE", path)
+	for _, limit := range []int{8192, 128 << 10} {
+		if err := os.WriteFile(path, bytes.Repeat([]byte("x"), limit+1), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if raw, err := nativeCPUCommand(t.Context(), limit, "exec", "owned-node", "synthetic-cpu-read"); err == nil || raw != nil {
+			t.Error("actual command bypassed CPU output bound", limit, len(raw), err)
+		}
+		if err := os.WriteFile(path, bytes.Repeat([]byte("x"), limit), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if raw, err := nativeCPUCommand(t.Context(), limit, "exec", "owned-node", "synthetic-cpu-read"); err != nil || len(raw) != limit {
+			t.Fatal("exact CPU command bound changed", limit, len(raw), err)
+		}
+	}
+	if err := os.WriteFile(path, []byte("10000 100000\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if raw, err := nativeCPUCommand(t.Context(), 32, "exec", "owned-node", "synthetic-cpu-read"); err != nil || string(raw) != "10000 100000\n" {
+		t.Fatal("normal bounded command output changed", string(raw), err)
 	}
 }

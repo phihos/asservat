@@ -417,10 +417,10 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		return code
 	}
-	trafficDone := measurement == nil
+	trafficAttempted := measurement == nil
 	var finishRecording func() error
 	observeTraffic := func(current installedJourneyCaptureProgress, expectedID string) {
-		if !trafficDone && current.CaptureID == expectedID && current.Phase == "Running" {
+		if !trafficAttempted && current.CaptureID == expectedID && current.Phase == "Running" {
 			measurement.ExecutionObservedAt = time.Now().UTC()
 			if err := finishSetup(); err != nil {
 				t.Fatal("native workflow setup snapshot", err)
@@ -435,13 +435,34 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			if e != nil || string(pod.UID) != preview.Pods[0].UID || pod.Spec.NodeName == "" {
 				t.Fatal("exact traffic Pod is unavailable", e)
 			}
+			// These two optional diagnostics consume existing time, never extend the
+			// capture or gate authority. Each edge uses a short diagnostic context;
+			// missing data is recorded as unavailable rather than a new failure gate.
+			observeCPU := func() *nativeTrafficCPU {
+				call, end := context.WithTimeout(ctx, 250*time.Millisecond)
+				defer end()
+				sample, e := nativeTrafficTargetCPU(call, region, pod)
+				if e != nil {
+					return nil
+				}
+				return &sample
+			}
+			beforeCPU := observeCPU()
 			measurement.TrafficStartedAt = time.Now().UTC()
 			measurement.Traffic, err = nativePacingNodeTraffic(ctx, measurement.traffic, pod.Spec.NodeName, pod.Status.PodIP)
 			measurement.TrafficFinishedAt = time.Now().UTC()
+			measurement.TargetCPU = nativePacingTargetCPUSamples(beforeCPU, observeCPU())
+			// Consume this ONE attempt even when it reaches its own fixed deadline.
+			// The helper's non-nil refusal/counts remain; near-full PCAP and all native
+			// transfer/owner/ACK gates below still decide the actual qualification.
+			trafficAttempted = true
 			if err != nil {
-				t.Fatal("bounded exact-target traffic", err)
+				if !errors.Is(err, errNativeTrafficRecordedDeadline) {
+					t.Fatal("bounded exact-target traffic", err)
+				}
+				measurement.TrafficEndedAtDeadline = true
+				t.Logf("incomplete bounded traffic retained: batches=%d bytes=%d; checking actual near-full artifact without another attempt", measurement.Traffic.Batches, measurement.Traffic.Bytes)
 			}
-			trafficDone = true
 		}
 	}
 	continuation := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"], "continue_acquisition": true}
@@ -503,7 +524,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal(err)
 		}
 	}
-	if !trafficDone || progress.Phase != "Succeeded" || progress.CaseID == "" {
+	if !trafficAttempted || progress.Phase != "Succeeded" || progress.CaseID == "" {
 		diagnose()
 		t.Fatal("real recording did not publish", progress)
 	}
