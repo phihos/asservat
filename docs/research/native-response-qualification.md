@@ -518,3 +518,81 @@ separate read-only review confirmed that this focused installed path does not
 rerun initial schema inventory after adding the private fixture schema. A future
 initial-schema replay would reject it; this experiment does not qualify that
 combination. The branch remains unpublished and has not run a collector locally.
+
+## Fixture candidate after Native40609943030
+
+Exact `7f721c08` failed before PCAPNG/download/owner proof: the genuine owned-node
+helper acknowledged 15 batches / 61,440 records, read 4,026,176 bytes including a
+94,016-byte final partial response, and hit the original 8.5s phase cutoff.
+Parent wall time was 8.504619291s; client wall time 8.466837358s. Go failed in
+582.174s / selected subcase 141.20s. Frozen report SHA-256 is
+`23cfc611fec3d56bca9d3e007100bbaea5584344538e130591bf556eb1ea7825`;
+all 3,231 sources matched, unchanged=true and cleanup=[] (root verified).
+No native artifact or download/owner qualification is established by this run.
+
+The helper schedules each batch at started+i*500ms: sixteen batches have a
+7.5s nominal scheduled span and only 1s final tail, further reduced by process
+startup or catch-up after slow batches. This interval is fixture engineering,
+not a maintainer minimum observation duration. The candidate uses 250ms: a 3.75s
+span and 4.75s nominal tail. It preserves sixteen acknowledged batches, 4,096
+64-byte Write+Flush records per batch, 4 MiB total, one in-flight connection,
+no retries, original 8.5s phase, 10s action, 20s response and 8 MiB native limit.
+Near-full measurement and actual paced DOWNLOAD >5s assertions stay binding.
+Nominal offered batch cadence doubles during a shorter period; total writes and
+bytes do not grow. Actual packets, native size and combined CPU cost need the
+installed run; application write counts do not substitute for them.
+
+Before code, complexity gate:
+1. One actual installed fixture deadline failure; final response was partial.
+2. No accepted requirement mandates the fixture's 500ms or 7.5s schedule.
+3. Qualification fixture only, zero production behavior changes.
+4. Reuses its existing absolute batch schedule, direct HTTP client and handler.
+5. Zero new privileges, credentials, listeners or services.
+6. Zero new failure/fallback states; existing partial/deadline results remain.
+7. Zero runtime knobs; one fixed interval adjustment.
+8. Existing Go/net/http, owned-node route and runner scheduling remain dependencies.
+9. Same 65,536 flushed writes / 4 MiB; nominal cadence 2x, active span 1/2;
+   two fixed numeric child wall-time fields, still <=2048B receipt. No CPU claim.
+10. Fixture-only rollback is one constant; parent receipt fields stay protected.
+11. Shorten intentional waiting before changing traffic volume or any limit.
+
+A representative local variable-work model will run the actual helper/direct
+handler: small varying first-batch delays and four 300ms waits during the last
+batch's writes. It tests available tail under the unchanged deadline, not the
+cause or performance of the installed node/collector. Receipt WaitElapsed and
+WorkElapsed will separate measured client wall waiting from HTTP/ACK work; they
+include scheduler/network time and are not CPU measurements. No packet API calls,
+collector execution, external fixture or additional qualification budget is added.
+
+The failed installed setup also measured 132.674s / 79,127 SQL calls (about596.4/s)
+and 5,198.45ms summed PostgreSQL execution. This includes background and approved
+setup work, not isolated download, CPU or steady-state cost. Preserve that cost
+edge for combined qualification; it does not identify the traffic deadline cause.
+
+Local model RED at 500ms: actual exit1, 8.503s package, 15 acknowledged batches,
+200 final response with 196,608 partial bytes. GREEN at 250ms under race: all
+sixteen acknowledged batches / 65,536 records / 4,194,304 bytes in 4.989702030s;
+measured schedule wait 2.603112970s and HTTP/ACK work 2.386545239s. The receipt
+JSON is 194 bytes before its newline, below unchanged 2048B. Full ignored-helper
+race suite passed in 18.920s. The actual full-volume Write+Flush handler took
+576.996951ms wall, and the direct sixteen-batch client 3.786846030s wall. Those
+are synthetic loopback measurements, not native collector or CPU performance.
+
+Parent decoding still rejects extra JSON, unknown fields and injected parent
+receipt/client timing fields. New wait/work durations must be nonnegative,
+nonoverlapping within child elapsed; child elapsed is capped at the unchanged
+8.5s phase plus existing 250ms process-join allowance. A success still needs the
+original phase live and positive measured wait/work, exact bytes/writes and last
+ACK. Valid partial failure diagnostics remain retained. Parent elapsed remains
+measured by the parent, never accepted from child JSON. Focused receipt/cancel/
+target/size races passed in 1.208s.
+
+Final pure selection passed all 15 named top-level pacing tests in 14.952s,
+explicitly excluding real PostgreSQL/Kubernetes cases and removing external
+fixture descriptor variables. Canonical pre-push exited 0 (218 console tests).
+The cgo-free helper built with the runner's `-trimpath -buildvcs=false` flags on
+Go1.27.2 linux/amd64; local binary SHA-256
+`b61b5cc588bd993eea874c5520b9ea85628a9a4a570e6805c63affaa6e077e7e`.
+No Kind probe or hosted rerun occurred. Root must review/freeze and coordinate
+one owned-route probe after the shared external slot is free; installed native
+capture/download qualification remains pending.

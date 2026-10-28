@@ -26,29 +26,31 @@ const nativeTrafficRecordBytes = 64
 const nativeTrafficPayload = nativeTrafficRecords * nativeTrafficRecordBytes
 const nativeTrafficBatches = 16
 const nativeTrafficRecordsPerBatch = nativeTrafficRecords / nativeTrafficBatches
-const nativeTrafficInterval = 500 * time.Millisecond
+const nativeTrafficInterval = 250 * time.Millisecond
 const nativeTrafficPhase = 8500 * time.Millisecond
 
-// The child owns exactly these eight receipt fields. Parent wall time,
+// The child owns exactly these ten receipt fields. Parent wall time,
 // receipt validity and derived client timing are never accepted from JSON.
 type nativeTrafficReceipt struct {
-	Batches, Records, Bytes int64
-	Elapsed                 time.Duration
-	Failure                 string
-	LastStatus              int
-	LastBodyBytes           int64
-	LastAcknowledged        bool
+	Batches, Records, Bytes  int64
+	Elapsed                  time.Duration
+	WaitElapsed, WorkElapsed time.Duration
+	Failure                  string
+	LastStatus               int
+	LastBodyBytes            int64
+	LastAcknowledged         bool
 }
 
 type nativeTrafficResult struct {
-	Batches, Records, Bytes int64
-	Elapsed                 time.Duration
-	Failure                 string
-	LastStatus              int
-	LastBodyBytes           int64
-	LastAcknowledged        bool
-	ClientElapsed           time.Duration
-	ReceiptValid            bool
+	Batches, Records, Bytes              int64
+	Elapsed                              time.Duration
+	Failure                              string
+	LastStatus                           int
+	LastBodyBytes                        int64
+	LastAcknowledged                     bool
+	ClientElapsed                        time.Duration
+	ClientWaitElapsed, ClientWorkElapsed time.Duration
+	ReceiptValid                         bool
 }
 
 // A measured small artifact never qualifies the near-full-window experiment.
@@ -136,7 +138,7 @@ func nativePacingNodeTraffic(ctx context.Context, helper nativeTrafficHelper, no
 		out.Failure = "receipt"
 		return out, errors.New("owned traffic receipt unavailable")
 	}
-	if receipt.Batches < 0 || receipt.Batches > nativeTrafficBatches || receipt.Records != receipt.Batches*nativeTrafficRecordsPerBatch || receipt.Bytes < 0 || receipt.Bytes > nativeTrafficPayload+1 || receipt.LastBodyBytes < 0 || receipt.LastBodyBytes > nativeTrafficRecordsPerBatch*nativeTrafficRecordBytes+1 || receipt.Elapsed < 0 || !slices.Contains([]string{"", "deadline", "request", "acknowledgement"}, receipt.Failure) {
+	if receipt.Batches < 0 || receipt.Batches > nativeTrafficBatches || receipt.Records != receipt.Batches*nativeTrafficRecordsPerBatch || receipt.Bytes < 0 || receipt.Bytes > nativeTrafficPayload+1 || receipt.LastBodyBytes < 0 || receipt.LastBodyBytes > nativeTrafficRecordsPerBatch*nativeTrafficRecordBytes+1 || receipt.Elapsed < 0 || receipt.Elapsed > nativeTrafficPhase+command.WaitDelay || receipt.WaitElapsed < 0 || receipt.WorkElapsed < 0 || receipt.WaitElapsed > receipt.Elapsed || receipt.WorkElapsed > receipt.Elapsed-receipt.WaitElapsed || !slices.Contains([]string{"", "deadline", "request", "acknowledgement"}, receipt.Failure) {
 		out.Failure = "receipt_shape"
 		return out, errors.New("owned traffic receipt exceeds finite shape")
 	}
@@ -147,11 +149,11 @@ func nativePacingNodeTraffic(ctx context.Context, helper nativeTrafficHelper, no
 	}
 	out = nativeTrafficResult{Batches: receipt.Batches, Records: receipt.Records, Bytes: receipt.Bytes,
 		Failure: receipt.Failure, LastStatus: receipt.LastStatus, LastBodyBytes: receipt.LastBodyBytes,
-		LastAcknowledged: receipt.LastAcknowledged, ClientElapsed: receipt.Elapsed, ReceiptValid: true}
+		LastAcknowledged: receipt.LastAcknowledged, ClientElapsed: receipt.Elapsed, ClientWaitElapsed: receipt.WaitElapsed, ClientWorkElapsed: receipt.WorkElapsed, ReceiptValid: true}
 	if processErr != nil && out.Failure == "" {
 		out.Failure = "process"
 	}
-	if processErr != nil || out.Failure != "" || out.Batches != nativeTrafficBatches || out.Records != nativeTrafficRecords || out.Bytes != nativeTrafficPayload || !out.LastAcknowledged || out.LastStatus != http.StatusOK || out.LastBodyBytes != nativeTrafficRecordsPerBatch*nativeTrafficRecordBytes || phase.Err() != nil {
+	if processErr != nil || out.Failure != "" || out.Batches != nativeTrafficBatches || out.Records != nativeTrafficRecords || out.Bytes != nativeTrafficPayload || !out.LastAcknowledged || out.LastStatus != http.StatusOK || out.LastBodyBytes != nativeTrafficRecordsPerBatch*nativeTrafficRecordBytes || out.ClientWaitElapsed <= 0 || out.ClientWorkElapsed <= 0 || phase.Err() != nil {
 		return out, errors.New("owned traffic phase incomplete")
 	}
 	return out, nil
@@ -196,7 +198,7 @@ func TestNativePacingNodeTrafficRequiresClosedCompleteReceipt(t *testing.T) {
 	}
 	t.Setenv("PATH", work)
 	t.Setenv("ASSERVAT_TRAFFIC_RESPONSE", response)
-	complete := `{"Batches":16,"Records":65536,"Bytes":4194304,"Elapsed":7500000000,"LastStatus":200,"LastBodyBytes":262144,"LastAcknowledged":true}`
+	complete := `{"Batches":16,"Records":65536,"Bytes":4194304,"Elapsed":7500000000,"WaitElapsed":3500000000,"WorkElapsed":3500000000,"LastStatus":200,"LastBodyBytes":262144,"LastAcknowledged":true}`
 	for _, tc := range []struct {
 		name, receipt string
 		valid         bool
@@ -208,6 +210,14 @@ func TestNativePacingNodeTrafficRequiresClosedCompleteReceipt(t *testing.T) {
 		{"unknown field", strings.TrimSuffix(complete, "}") + `,"unknown":1}`, false},
 		{"parent receipt validity", strings.TrimSuffix(complete, "}") + `,"ReceiptValid":true}`, false},
 		{"parent client elapsed", strings.TrimSuffix(complete, "}") + `,"ClientElapsed":77}`, false},
+		{"parent client wait", strings.TrimSuffix(complete, "}") + `,"ClientWaitElapsed":77}`, false},
+		{"parent client work", strings.TrimSuffix(complete, "}") + `,"ClientWorkElapsed":77}`, false},
+		{"unbounded client wall", strings.Replace(complete, `"Elapsed":7500000000`, `"Elapsed":8750000001`, 1), false},
+		{"negative work", strings.Replace(complete, `"WorkElapsed":3500000000`, `"WorkElapsed":-1`, 1), false},
+		{"negative wait", strings.Replace(complete, `"WaitElapsed":3500000000`, `"WaitElapsed":-1`, 1), false},
+		{"work exceeds total", strings.Replace(complete, `"WorkElapsed":3500000000`, `"WorkElapsed":7500000001`, 1), false},
+		{"overlapping times", strings.Replace(complete, `"WorkElapsed":3500000000`, `"WorkElapsed":4500000000`, 1), false},
+		{"missing work measurement", strings.Replace(complete, `"WorkElapsed":3500000000,`, "", 1), false},
 		{"decode failure after injected parent fields", strings.TrimSuffix(complete, "}") + `,"ReceiptValid":true,"ClientElapsed":77,"unknown":1}`, false},
 		{"unbounded output", strings.Repeat("x", 2049), false},
 	} {
@@ -222,7 +232,7 @@ func TestNativePacingNodeTrafficRequiresClosedCompleteReceipt(t *testing.T) {
 			if tc.valid && !result.ReceiptValid {
 				t.Fatal("complete synthetic receipt not marked valid")
 			}
-			if strings.Contains(tc.name, "parent") && (result.ReceiptValid || result.ClientElapsed != 0) {
+			if strings.Contains(tc.name, "parent") && (result.ReceiptValid || result.ClientElapsed != 0 || result.ClientWaitElapsed != 0 || result.ClientWorkElapsed != 0) {
 				t.Fatal("invalid child receipt changed parent-owned fields", result)
 			}
 			if tc.name == "partial" && (result.Batches != 7 || result.Records != 28672 || result.Bytes != 1863232 || !result.ReceiptValid || result.Failure != "deadline") {

@@ -210,10 +210,11 @@ func signals() error {
 }
 
 const (
-	trafficMaxRecords  = 65536
-	trafficRecordBytes = 64
-	trafficMaxPayload  = trafficMaxRecords * trafficRecordBytes
-	trafficMaxDuration = 8 * time.Second
+	trafficMaxRecords    = 65536
+	trafficRecordBytes   = 64
+	trafficMaxPayload    = trafficMaxRecords * trafficRecordBytes
+	trafficMaxDuration   = 8 * time.Second
+	trafficBatchInterval = 250 * time.Millisecond
 )
 
 // Handler streams finite small flushed writes through the selected workload's
@@ -426,29 +427,41 @@ func (c *providerCounters) handler(next http.Handler) http.Handler {
 // Fixed owned-node traffic client. It uses the selected Pod IP directly;
 // no proxy environment, redirect, replacement target or retry is available.
 type trafficClientReceipt struct {
-	Batches, Records, Bytes int64
-	Elapsed                 time.Duration
-	Failure                 string
-	LastStatus              int
-	LastBodyBytes           int64
-	LastAcknowledged        bool
+	Batches, Records, Bytes  int64
+	Elapsed                  time.Duration
+	WaitElapsed, WorkElapsed time.Duration
+	Failure                  string
+	LastStatus               int
+	LastBodyBytes            int64
+	LastAcknowledged         bool
 }
 
 func runTrafficClient(ctx context.Context, endpoint string) (out trafficClientReceipt) {
 	started := time.Now()
-	defer func() { out.Elapsed = time.Since(started) }()
+	var workStarted time.Time
+	finishWork := func() {
+		if !workStarted.IsZero() {
+			out.WorkElapsed += time.Since(workStarted)
+			workStarted = time.Time{}
+		}
+	}
+	defer func() { finishWork(); out.Elapsed = time.Since(started) }()
 	transport := &http.Transport{Proxy: nil, MaxConnsPerHost: 1}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	for i := 0; i < 16; i++ {
-		wait := time.NewTimer(max(0, time.Until(started.Add(time.Duration(i)*500*time.Millisecond))))
+		waitStarted := time.Now()
+		wait := time.NewTimer(max(0, time.Until(started.Add(time.Duration(i)*trafficBatchInterval))))
 		select {
 		case <-ctx.Done():
 			wait.Stop()
+			out.WaitElapsed += time.Since(waitStarted)
 			out.Failure = "deadline"
 			return out
 		case <-wait.C:
 		}
+		out.WaitElapsed += time.Since(waitStarted)
+		workStarted = time.Now()
 		out.LastStatus = 0
 		out.LastBodyBytes = 0
 		out.LastAcknowledged = false
@@ -477,6 +490,7 @@ func runTrafficClient(ctx context.Context, endpoint string) (out trafficClientRe
 		out.LastAcknowledged = true
 		out.Batches++
 		out.Records += 4096
+		finishWork()
 	}
 	if ctx.Err() != nil {
 		out.Failure = "deadline"

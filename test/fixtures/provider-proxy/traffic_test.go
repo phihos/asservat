@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -69,6 +70,7 @@ func TestTrafficPreservesOriginalDeadlineAndCancellation(t *testing.T) {
 }
 
 func TestTrafficFullApplicationBudget(t *testing.T) {
+	started := time.Now()
 	server := httptest.NewServer(trafficHandler())
 	defer server.Close()
 	response, err := server.Client().Get(server.URL + "/traffic?records=65536")
@@ -80,7 +82,7 @@ func TestTrafficFullApplicationBudget(t *testing.T) {
 	if err != nil || n != trafficMaxPayload || response.Trailer.Get("X-Fixture-Traffic-Writes") != "65536" || response.Trailer.Get("X-Fixture-Traffic-Complete") != "true" {
 		t.Fatal("actual traffic handler did not complete finite maximum", n, err, response.Trailer)
 	}
-	t.Logf("actual fixture handler: %d application bytes, 65536 completed flushed writes; packet count unmeasured", n)
+	t.Logf("actual fixture handler: %d application bytes, 65536 completed flushed writes; wall=%s, CPU/packet count unmeasured", n, time.Since(started))
 }
 
 // Model only the serialized route's observed per-batch delay. This is not a
@@ -130,4 +132,62 @@ func TestTrafficClientNeverRetriesUnknownBatch(t *testing.T) {
 	if result.Failure != "acknowledgement" || result.Batches != 0 || calls.Load() != 1 {
 		t.Fatal("unknown batch retried", result, calls.Load())
 	}
+}
+
+// The final batch needs 1.2s of modeled work at the actual Write/Flush boundary.
+// This exposes the fixed schedule's available tail; it is not a reconstruction
+// of installed CPU, network, collector timing or packet counts.
+type variableTrafficWriter struct {
+	http.ResponseWriter
+	ctx    context.Context
+	writes int
+	slow   bool
+}
+
+func (w *variableTrafficWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+func (w *variableTrafficWriter) Write(b []byte) (int, error) {
+	if w.slow && w.writes%1024 == 0 {
+		timer := time.NewTimer(300 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-w.ctx.Done():
+			return 0, w.ctx.Err()
+		case <-timer.C:
+		}
+	}
+	w.writes++
+	return w.ResponseWriter.Write(b)
+}
+func TestTrafficClientVariableBatchWorkFitsOriginalPhase(t *testing.T) {
+	var calls atomic.Int64
+	handler := trafficHandler()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		batch := int(calls.Add(1)) - 1
+		if batch < 0 || batch >= 16 {
+			t.Error("traffic batch was replayed")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		delay := time.Duration(batch%5) * 20 * time.Millisecond
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+		select {
+		case <-r.Context().Done():
+			return
+		case <-timer.C:
+		}
+		handler.ServeHTTP(&variableTrafficWriter{ResponseWriter: w, ctx: r.Context(), slow: batch == 15}, r)
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 8500*time.Millisecond)
+	defer cancel()
+	result := runTrafficClient(ctx, server.URL)
+	if result.Failure != "" || result.Batches != 16 || result.Records != 65536 || result.Bytes != 4194304 || !result.LastAcknowledged || calls.Load() != 16 {
+		t.Fatal("unchanged phase did not leave tail for representative variable HTTP work", result, calls.Load())
+	}
+	raw, err := json.Marshal(result)
+	if err != nil || len(raw) > 2048 || result.WaitElapsed <= 0 || result.WorkElapsed <= 0 || result.WaitElapsed > result.Elapsed || result.WorkElapsed > result.Elapsed-result.WaitElapsed {
+		t.Fatal("unbounded or unavailable wall timing", result, len(raw), err)
+	}
+	t.Logf("actual helper+handler with synthetic variable batch work: batches=%d records=%d bytes=%d wall=%s wait=%s HTTPwork=%s receipt=%dB (notCPU)", result.Batches, result.Records, result.Bytes, result.Elapsed, result.WaitElapsed, result.WorkElapsed, len(raw))
 }
