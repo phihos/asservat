@@ -385,14 +385,7 @@ func qualifyInstalledPolicyRecording(t *testing.T, ctx context.Context, admin *p
 	if err = admin.QueryRow(ctx, `SELECT requester_subject FROM access_grant WHERE root_id=$1 AND id=$2`, root, beta.ID).Scan(&requesterSubject); err != nil || requesterSubject == "" {
 		t.Fatal(err)
 	}
-	identity.kc.json("PUT", "/admin/realms/asservat/users/"+requesterSubject, map[string]any{"enabled": false})
-	var disabledCreator struct {
-		ID      string `json:"id"`
-		Enabled *bool  `json:"enabled"`
-	}
-	if err = json.Unmarshal(identity.kc.json("GET", "/admin/realms/asservat/users/"+requesterSubject, nil), &disabledCreator); err != nil || disabledCreator.ID != requesterSubject || disabledCreator.Enabled == nil || *disabledCreator.Enabled {
-		t.Fatal("creator departure lacks exact provider readback", err, disabledCreator)
-	}
+	installedPolicyDisableCreator(t, identity.kc, requesterSubject)
 	var managerView policyGrant
 	must(manager, "get_grant", map[string]any{"grant_id": beta.ID}, &managerView)
 	if !managerView.CanRevoke || managerView.NotAfter == nil || !managerView.NotAfter.Equal(*beta.NotAfter) {
