@@ -274,9 +274,8 @@ no table, parameter, privilege or returned wire shape changes.
 This source defect is independently actionable under the accepted ADR-200
 projection. It is **not an established cause** of Native 40767389365, whose
 approved failure occurred after roughly 120 seconds. That run retained neither
-binding row times nor target-correlated demand completion times. The real SQL
-regression is prepared in the existing capacity producer fixture; external
-RED/GREEN qualification is pending.
+binding row times nor target-correlated demand completion times. The existing capacity producer fixture now has a passing real SQL RED/GREEN
+regression. This qualifies the projection correction, not that installed failure.
 
 Complexity gate (engineering correction, not a new maintainer requirement):
 
@@ -293,7 +292,50 @@ Complexity gate (engineering correction, not a new maintainer requirement):
    credit on the first short projection; duplicate debit 0. Added API calls,
    watches, timers, goroutines and durable rows: 0. CPU/WAL bytes unmeasured.
 10. One additive function-only migration; Down retains stored rows and restores
-    the old branch. Actual upgrade/Down qualification remains pending.
+    the old branch. Actual SQL upgrade/Down/Up passes; installed mixed rollout
+    remains outside this component result.
 11. Adjusting the existing refresh branch is smaller than replacing the shared
     enrollment phase finisher; documenting unequal initial lifetime would not
     meet the already accepted projection.
+
+
+### Measured SQL result (2026-10-28)
+
+The frozen old-production test checkpoint
+`62be37b25666cc60199a4c1c74cb4fcf191138f8` failed the intended first-Ready
+property: the same-observation refresh retained its **4.665197-second** stored
+interval and configuration spend **6 → 6**. The three selected setup children
+passed. The first failing child stopped dependent cases.
+
+The tested correction is
+`4d8d72d8972d65a710852b7d7a6ef0a7761782a1`. Its initial binding interval was
+**4.670076 seconds**; explicit refresh projected it to **original observation
+plus 30 seconds**, with configuration debit **1**. The exact duplicate spent
+**0**, the returned receipt stayed within the original short proof, and an
+older current observation retained the newer binding. After real original
+proof expiry, both adapter and direct SQL refresh refused with **0 effects and
+0 configuration debit**. All six selected producer children passed.
+`TestCustodyUpgradeSchemaWithRealPostgres` also passed: 102 → 103, floor **102**,
+idempotent upgrade, exact prior function restoration on Down, Up again, and
+unknown-history refusal. The fixture activation/recovery row stayed unchanged.
+
+Both runs used the existing owned PostgreSQL/S3/OpenBao fleet fixture, Go **300s**,
+harness **360s**, and an outer **1100s** with a **10s** hard-kill bound; no quota,
+provider deadline or privilege changed. RED outer/Go/test exits were **1/1/1**
+(60.776s outer, 4.643s Go package). GREEN exits were **0/0/0** (51.461s outer,
+13.909s package; producer 10.12s, upgrade 2.73s). Original reports retain all
+**3352/3353** respective runtime/test source hashes, `sourceUnchangedDuringTest`
+true and empty cleanup failures. Each owned three-container set and network was
+independently absent after cleanup, before generated copies were removed.
+
+Immutable local evidence is under
+`/home/phil/.cache/asservat-build/codex-bf86-resume/capacity-initial-binding/`:
+`red-owned-1/verification.json` (SHA-256
+`110666450fb36911c0d73763f4e5ffeb1b24f31b8545d89cfab88747356f7349`)
+and `green-owned-1/verification.json` (SHA-256
+`45f91dc46ed4acbb20d4bc04e798492caa1f84263e181c087d662508d9f7922d`),
+with original logs/environment reports and actual terminal exits alongside.
+The final documentation follow-up leaves tested code byte-identical. Guard,
+source, workload and history inputs remain synthetic; this is actual SQL/role,
+adapter, enrollment and migration evidence, without collector execution,
+installed Native cause attribution, physical backing or measured CPU/WAL claims.

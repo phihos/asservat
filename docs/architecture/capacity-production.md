@@ -253,3 +253,14 @@ the actual installed acquisition/hub/key/provider limits with distinct authority
 and charged query history. Base totals stay exact, each plan binds the exact
 workload and current accepted worker profile, and renewal/expiry/restart never
 replenish the original query budget. Installed qualification is recorded separately.
+
+
+The first-Ready projection correction is qualified by the scoped real SQL
+RED/GREEN case in [ADR-200](../decisions/200-on-demand-capacity-refresh.md#measured-sql-result-2026-10-28):
+a short 4.670076-second publication becomes its original observation plus
+30 seconds only under explicit still-current refresh (one configuration debit,
+exact duplicate zero); original receipt and expiry refusals remain binding.
+Schema 102 → 103 and exact-function Down/Up pass with floor 102 and unchanged
+fixture activation/recovery. Guarded source inputs remain synthetic, and this
+result does not establish the cause of Native 40767389365 or qualify installed
+refresh scheduling, mixed rollout or provider physical backing.
