@@ -3,6 +3,7 @@ package integration
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/transport/conversion"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 // The real installed hub uses libpcap. This exact program is solely the offline
@@ -20,6 +22,123 @@ import (
 // The fixture was emitted by the maintained libpcap dead-handle compiler; the
 // libpcap-tagged test compares every instruction against a fresh compilation.
 type installedPolicyRecordingFilters struct{}
+
+// Validate the actual installed request against the shipped structural CRD,
+// rather than only the richer offline JSON contract. This opens no API/collector.
+func TestInstalledPolicyRecordingProductionCRD(t *testing.T) {
+	raw, err := os.ReadFile("../../charts/asservat/crds/debugpolicies.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var crd map[string]any
+	if err = json.Unmarshal(raw, &crd); err != nil {
+		t.Fatal(err)
+	}
+	version := crd["spec"].(map[string]any)["versions"].([]any)[0].(map[string]any)
+	structural := version["schema"].(map[string]any)["openAPIV3Schema"]
+	c := jsonschema.NewCompiler()
+	c.AssertFormat()
+	if err = c.AddResource("urn:production-debug-policy", structural); err != nil {
+		t.Fatal(err)
+	}
+	schema, err := c.Compile("urn:production-debug-policy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := installedPolicyRecordingSpec("11111111-1111-4111-8111-111111111111", "payments", "api")
+	document := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": installedPolicyRecordingName}, "spec": spec}
+	// Roundtrip normalizes integer representations just as Kubernetes JSON does.
+	raw, _ = json.Marshal(document)
+	if err = json.Unmarshal(raw, &document); err != nil {
+		t.Fatal(err)
+	}
+	if err = schema.Validate(document); err != nil {
+		t.Fatal("shipped structural CRD rejects the actual finite policy request", err)
+	}
+	properties := structural.(map[string]any)["properties"].(map[string]any)["spec"].(map[string]any)["properties"].(map[string]any)
+	if properties["profileComposition"] == nil {
+		t.Fatal("Kubernetes would prune the policy composition as an unknown field")
+	}
+	if properties["grantRef"] == nil {
+		t.Fatal("Kubernetes would prune authored grant-reference changes before source continuity checks")
+	}
+	var ordinary map[string]any
+	_ = json.Unmarshal(raw, &ordinary)
+	ordinarySpec := ordinary["spec"].(map[string]any)
+	delete(ordinarySpec, "profileComposition")
+	ordinarySpec["recipeRef"] = map[string]any{"name": "builtin-pod-status-v1", "digest": strings.Repeat("a", 64)}
+	ordinarySpec["grantRef"] = "11111111-1111-4111-8111-111111111111"
+	if err = schema.Validate(ordinary); err != nil {
+		t.Fatal("structural update broke existing recipe policy shape", err)
+	}
+	for _, item := range []struct {
+		name string
+		edit func(map[string]any)
+	}{
+		{"both recipe and composition", func(s map[string]any) {
+			s["recipeRef"] = map[string]any{"name": "builtin-pod-status-v1", "digest": strings.Repeat("a", 64)}
+		}},
+		{"neither recipe nor composition", func(s map[string]any) { delete(s, "profileComposition") }},
+		{"malformed grant reference", func(s map[string]any) { s["grantRef"] = "not-a-uuid" }},
+		{"component limit", func(s map[string]any) {
+			c := s["profileComposition"].(map[string]any)
+			component := c["components"].([]any)[0]
+			items := make([]any, 9)
+			for i := range items {
+				items[i] = component
+			}
+			c["components"] = items
+		}},
+		{"override discriminator", func(s map[string]any) {
+			c := s["profileComposition"].(map[string]any)["components"].([]any)[0].(map[string]any)
+			c["overrides"].([]any)[0].(map[string]any)["field"] = "unknown"
+		}},
+		{"override limit", func(s map[string]any) {
+			c := s["profileComposition"].(map[string]any)["components"].([]any)[0].(map[string]any)
+			edit := c["overrides"].([]any)[0]
+			items := make([]any, 33)
+			for i := range items {
+				items[i] = edit
+			}
+			c["overrides"] = items
+		}},
+		{"total byte limit", func(s map[string]any) { s["profileComposition"].(map[string]any)["maxTotalBytes"] = float64(1<<40) + 1 }},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			var changed map[string]any
+			_ = json.Unmarshal(raw, &changed)
+			item.edit(changed["spec"].(map[string]any))
+			if schema.Validate(changed) == nil {
+				t.Fatal("production structural schema admitted invalid composition")
+			}
+		})
+	}
+	// Heterogeneous override values must survive CRD pruning unchanged. Their
+	// field-specific closed validation remains in the production source reader's
+	// embedded canonical schema, before compilation or accepted authority.
+	canonical := jsonschema.NewCompiler()
+	canonical.AssertFormat()
+	files, err := filepath.Glob("../../internal/adapters/kubernetes/policy-schemas/*.json")
+	if err != nil || len(files) == 0 {
+		t.Fatal("canonical source schemas", err)
+	}
+	for _, file := range files {
+		body, err := os.ReadFile(file)
+		var doc map[string]any
+		if err != nil || json.Unmarshal(body, &doc) != nil || canonical.AddResource(doc["$id"].(string), doc) != nil {
+			t.Fatal("canonical source schema", file, err)
+		}
+	}
+	closed, err := canonical.Compile("https://asservat.io/spec/v1/policy.schema.json#/properties/spec")
+	if err != nil || closed.Validate(document["spec"]) != nil {
+		t.Fatal("actual request disagrees with canonical source reader", err)
+	}
+	component := document["spec"].(map[string]any)["profileComposition"].(map[string]any)["components"].([]any)[0].(map[string]any)
+	component["overrides"].([]any)[0].(map[string]any)["value"] = map[string]any{"unreviewed": true}
+	if closed.Validate(document["spec"]) == nil {
+		t.Fatal("canonical source reader admitted wrong typed override value")
+	}
+}
 
 func (installedPolicyRecordingFilters) CompileFilter(expression string) (value.CompiledFilter, error) {
 	if expression != installedPolicyRecordingFilter {

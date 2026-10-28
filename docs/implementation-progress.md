@@ -7,17 +7,30 @@ Gitar review, then all three guarded installed focuses failed. Root verified
 all 3,384 historical source hashes in each unchanged run and their actual exit 1,
 removed scratch and empty cleanup failures. Policy run 40648562303 rejects profile
 composition in the installed structural CRD before acceptance; history run 40648568602
-fails storage source expiry before capture. Their concrete boundary fixes are
-under investigation in isolated trees; these failures remain retained.
+fails storage source expiry before capture. The SQL transaction erased the typed expiry result; its one-sentinel correction
+passes the actual SQL reader regression. These failures remain retained, and
+installed outcomes require a new candidate.
 
 Paced run 40648565357 captured and downloaded a real 8,388,488-byte PCAPNG at full speed,
 then failed its paced response. The public native-response wrapper still pinned
 the initial lease and setup authorizer despite the inner source's renewal
-support. The [ADR258 composition correction](decisions/258-slow-native-response-windows.md#public-response-composition-correction-2026-10-28)
+support. The [ADR-258 composition correction](decisions/258-slow-native-response-windows.md#public-response-composition-correction-2026-10-28)
 keeps setup short and retains the cursor under its original finite response;
 fresh per-chunk leases/SQL/current identity remain mandatory. Installed paced,
 range and completion, edited history and finite policy outcomes remain open;
 no complete S-04/S-02 or user enablement is claimed.
+
+## Production policy CRD correction after native failure (2026-10-28)
+
+Native policy run 40648562303 stopped before grant creation: the shipped CRD
+pruned unknown profileComposition and required recipeRef. An isolated correction
+aligns its bounded composition and UUID grantRef projection with the existing
+canonical schema/compiler, enforcing exactly one recipe or composition. Exact
+installed-input RED and corrected local schema/pruning tests are retained in the
+[S04 plan](reviews/s04-policy-grants-plan-2026-10-27.md). No permissive fixture,
+authority bypass, new runtime dependency or privileged collector is used.
+Actual corrected API/installed qualification and full backing remain pending;
+frozen PR 103 at af9 and its prior evidence are untouched.
 
 ## Unpublished finite policy-packet candidate (2026-10-28)
 

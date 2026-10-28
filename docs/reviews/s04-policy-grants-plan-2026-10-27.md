@@ -2291,3 +2291,87 @@ explicit enabled:false field (missing field refuses). One additional fixture
 administrator GET, no product authority/read/observer change. A successful PUT
 alone is no longer reported as verified creator departure; actual installed
 execution remains pending. No whole pre-push repeat for this fixture-only check.
+
+### Production DebugPolicy structural CRD correction after native failure
+
+Native40648562303 at af9 stopped before grant creation: the real API warned
+unknown spec.profileComposition and rejected required spec.recipeRef. This is a
+production chart contract defect, not evidence of packet admission/execution.
+The canonical policy schema already has mutually exclusive recipe/composition
+branches and the finite policy compiler consumes profileComposition. The old
+hand-reviewed ADR228 CRD never gained that field and required recipeRef globally.
+No permissive test-only CRD or alternate authored request is substituted.
+
+The shipped CRD now declares the bounded composition and enforces exactly one
+recipeRef or profileComposition through structural oneOf required branches.
+Existing recipe policy shape remains valid; both/neither,9components,33overrides,
+unknown field tags and excessive total bytes refuse. A small synchronization
+script owns only this projection inside the existing hand-reviewed CRD; it derives
+component/ref/bounds and all21 override tags from canonical contracts. Existing
+other detector/target properties remain unchanged. policy-schema-check and
+helm-check verify this projection before their existing gates; there is no new
+runtime process, admission webhook, provider request or configurable mechanism.
+
+Kubernetes structural schemas cannot express a single property's heterogeneous
+string/integer/object/array type union. Only override.value preserves original
+JSON, like existing typed detector options; whole spec/composition/component
+objects stay declared structural fields. The existing production source reader
+first enforces its64KiB spec limit and the full closed canonical field-specific
+schema, then the compiler/independent acceptance/grant pipeline. A wrong typed
+value is still rejected before authority. No value is converted to a string or
+silently pruned, and no weak compatibility branch is added. Full profile catalogs,
+ongoing execution and unsupported composition variants do not become executable.
+
+Complexity/benefit: one observed installed failure blocks every composed policy;
+no maintainer accepted this contract mismatch. Correcting the existing accepted
+workflow helps typical composed policies; doing nothing or authoring a fake
+recipeRef cannot satisfy the actual compiler contract. Standard structural
+pruning and the existing canonical validator supply the checks. Zero added
+credentials, SQL/API calls, watches, workers, timers or runtime configuration.
+CRD JSON grows13415->18706B (+5291B); native oneOf checks two required alternatives
+per write. Composition remains at most8components/32overrides each, canonical
+reader64KiB unchanged. No new end-to-end CPU/throughput claim; no quota increase.
+Fresh chart installation includes the corrected schema. Existing installations
+use the documented administrator-owned CRD apply before code upgrade; Helm
+does not upgrade CRDs. Chart rollback must not imply CRD rollback; restoring
+the old schema would again reject composed policy writes, without changing
+accepted SQL, spend or evidence. Actual upgrade/rollback API behavior for this
+correction remains unrun. No migration/table/collection gate is altered.
+
+Meaningful local RED uses the exact installed authored builder against the
+actual shipped CRD: test exit1/.015s, missing recipeRef. The corrected structural
+schema plus canonical-reader closure pass local race tests. A cached upstream
+Kubernetes v0.37.1 checker independently uses NewStructural/ValidateStructural
+and actual pruning to verify mixed JSON values survive unchanged; no repository
+dependency, network, API server or collector. This offline proof is distinct
+from the pending actual API/installed rerun. Prior native/source/log evidence
+remains intact; af9 PR103 tree is untouched by this isolated correction.
+
+The same parity review found the only other absent canonical field, grantRef,
+in both recipe/composition branches and the accepted compiler. It is now derived
+as the existing UUID type, so authored A->B->A grant-reference changes survive
+storage for existing continuity checks. A separate missing-property RED exit1/
+.020s is retained; no new grant creation or authorization semantics is added.
+Final CRD size18834B (+5419B versus af9), including that field. The prior5291B
+figure records the composition-only intermediate, not the final artifact.
+
+The initial pre-push exit2 was solely the isolated worktree's missing web
+node_modules/yaml dependency; all other gates including Helm and go-vet ran to
+completion. The exact matching existing package.json/lock dependency tree was
+reused temporarily without installing or accessing a network, then the console
+target passed231tests. Failure and corrected console logs are retained separately;
+this is not an initial complete pre-push0 claim. Final checks bind the final code
+and schema; no hosted/API/collector rerun is authorized or performed here.
+
+Final affected authored/production-CRD tests pass -race1.467s, actual exit0,
+including the grantRef projection. Final complete pre-push exits0, including
+SQL/vet/spec/architecture/Helm projection and231console tests. No broad Go matrix
+or external fixture was repeated. The Go regression alone checks JSON Schema and
+declared properties, not actual Kubernetes pruning. The separate cached-upstream
+scratch checker invokes real NewStructural/ValidateStructural and pruning with
+string/integer/object/list values plus grantRef; its exact source/module/binary,
+old/final CRD inputs, actual terminal exits and outputs are archived in
+approved-workflow/policy-crd-structural-check. Old shipped artifact loses the
+composition under actual pruning (expected failing exit2); final retains every
+input unchanged. No API installation/upgrade, compiler/runtime acquisition or
+installed pass follows from this separate offline structural/pruning proof.
