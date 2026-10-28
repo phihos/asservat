@@ -394,23 +394,54 @@ func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachme
 	if !ok || !time.Now().Before(deadline) || deadline.After(time.Now().Add(5*time.Second)) {
 		return nil, fleet.ErrInvalid
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	c := r.clusters[cluster]
-	if r.closed || c == nil || len(r.captures) >= r.limits.Captures || c.captures >= c.limit.Captures || r.captures[capture] != nil {
-		return nil, fleet.ErrCapacity
+	// A completed history exchange consumes its standby. Its next empty
+	// conversation may still be opening. Wait only before selecting any work,
+	// within this caller's original bound and the existing query reserve.
+	var timer *time.Timer
+	defer func() {
+		if timer != nil {
+			timer.Stop()
+		}
+	}()
+	for {
+		r.mu.Lock()
+		c := r.clusters[cluster]
+		if r.closed || c == nil || len(r.captures) >= r.limits.Captures || c.captures >= c.limit.Captures || r.captures[capture] != nil {
+			r.mu.Unlock()
+			return nil, fleet.ErrCapacity
+		}
+		if ctx.Err() != nil || !time.Now().Before(deadline) || timer != nil && !time.Now().Before(deadline.Add(-queryReserve)) {
+			r.mu.Unlock()
+			return nil, fleet.ErrUnavailable
+		}
+		r.pruneLocked(cluster)
+		selected := r.selectLocked(cluster, deadline, func(*Standby) bool { return true })
+		if selected != nil {
+			selected.attached = true
+			call, cancel := context.WithDeadline(ctx, deadline)
+			a := &Attachment{router: r, standby: selected, capture: capture, ctx: call, cancel: cancel}
+			r.captures[capture] = a
+			c.captures++
+			r.mu.Unlock()
+			return a, nil
+		}
+		registered := r.registered
+		r.mu.Unlock()
+		if timer == nil {
+			wait := time.Until(deadline.Add(-queryReserve))
+			if wait <= 0 {
+				return nil, fleet.ErrUnavailable
+			}
+			timer = time.NewTimer(wait)
+		}
+		select {
+		case <-registered:
+		case <-ctx.Done():
+			return nil, fleet.ErrUnavailable
+		case <-timer.C:
+			return nil, fleet.ErrUnavailable
+		}
 	}
-	r.pruneLocked(cluster)
-	selected := r.selectLocked(cluster, deadline, func(*Standby) bool { return true })
-	if selected == nil {
-		return nil, fleet.ErrUnavailable
-	}
-	selected.attached = true
-	call, cancel := context.WithDeadline(ctx, deadline)
-	a := &Attachment{router: r, standby: selected, capture: capture, ctx: call, cancel: cancel}
-	r.captures[capture] = a
-	c.captures++
-	return a, nil
 }
 func (a *Attachment) Receiver(ctx context.Context) (fleet.APIContextReceiver, error) {
 	if a == nil || ctx == nil || ctx.Err() != nil {
