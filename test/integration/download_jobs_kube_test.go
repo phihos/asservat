@@ -414,17 +414,17 @@ func qualifyDownloadWorkerPod(t *testing.T, nativeMode bool) {
 		t.Fatal("real worker termination", e)
 	}
 	// The production coordinator persists this observation before deleting.
-	var retired value.DownloadWorkerRetirement
-	limit = time.Now().Add(10 * time.Second)
-	for time.Now().Before(limit) {
-		retired, e = jobs.RetireDownloadWorker(ctx, termination)
-		if e == nil {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	if e != nil || !retired.Valid(time.Now()) {
-		t.Fatal("real foreground cleanup", e)
+	// One attempt measures the adapter's bounded observation after its one
+	// acknowledged UID-conditional delete; no outer delete retry masks failure.
+	retirementCall, finishRetirement := context.WithTimeout(ctx, 5*time.Second)
+	retirementUntil, _ := retirementCall.Deadline()
+	retirementStarted := time.Now()
+	retired, retireErr := jobs.RetireDownloadWorker(retirementCall, termination)
+	remaining, expired := time.Until(retirementUntil), retirementCall.Err()
+	finishRetirement()
+	t.Logf("single foreground retirement elapsed=%s original-budget-left=%s", time.Since(retirementStarted), remaining)
+	if retireErr != nil || expired != nil || !retired.Valid(time.Now()) || retired.Termination != termination {
+		t.Fatal("real foreground cleanup", retireErr, expired)
 	}
 	if _, e = source.ReadDownloadPeerProof(ctx, i.SessionID, peer); e == nil {
 		t.Fatal("deleted worker retained proof")
