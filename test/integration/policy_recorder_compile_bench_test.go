@@ -60,3 +60,16 @@ func TestPolicyRecorderPinnedRawFilterMatchesRealCompiler(t *testing.T) {
 	}
 	t.Logf("actual %s dead EN10MB snaplen=%d instructions=%d canonical digest=%x; no device/socket/collector", real.Version(), got.Snaplen, len(got.Program), planningapp.FilterProgramDigest(got.Program))
 }
+
+func TestInstalledPolicyRecordingACKMatchesRealCompiler(t *testing.T) {
+	real := pcap.NewCompiler()
+	got, err := real.CompileFilter(installedPolicyRecordingFilter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture, err := (installedPolicyRecordingFilters{}).CompileFilter(installedPolicyRecordingFilter)
+	if err != nil || !reflect.DeepEqual(got, fixture) {
+		t.Fatalf("actual ACK program differs from emitted fixture: compiler=%s err=%v", real.Version(), err)
+	}
+	t.Logf("actual %s dead EN10MB snaplen=%d instructions=%d canonical digest=%x; no device/socket/collector", real.Version(), got.Snaplen, len(got.Program), planningapp.FilterProgramDigest(got.Program))
+}

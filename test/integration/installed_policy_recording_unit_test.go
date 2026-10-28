@@ -2,6 +2,8 @@ package integration
 
 import (
 	"encoding/json"
+	"os"
+	"strings"
 	"testing"
 
 	"asservat.local/asservat/internal/adapters/packets"
@@ -14,15 +16,29 @@ import (
 
 // The real installed hub uses libpcap. This exact program is solely the offline
 // compiler input for preflighting the authored request; no capture can use it.
+// The fixture was emitted by the maintained libpcap dead-handle compiler; the
+// libpcap-tagged test compares every instruction against a fresh compilation.
 type installedPolicyRecordingFilters struct{}
 
 func (installedPolicyRecordingFilters) CompileFilter(expression string) (value.CompiledFilter, error) {
 	if expression != installedPolicyRecordingFilter {
 		return value.CompiledFilter{}, value.ErrInvalid
 	}
-	program := append([]value.BPFInstruction(nil), policyRawProgram...)
-	program[8].K = 16 // the reviewed tcp[13] ACK-bit test; same88B read bound
-	return value.CompiledFilter{LinkType: value.FilterLinkType, Snaplen: value.FilterSnaplen, Program: program}, nil
+	raw, err := os.ReadFile("../../internal/adapters/pcap/testdata/finite-policy-ack-filter.json")
+	if err != nil {
+		return value.CompiledFilter{}, err
+	}
+	var fixture struct {
+		Expression, Compiler string
+		Filter               value.CompiledFilter
+	}
+	if err = json.Unmarshal(raw, &fixture); err != nil {
+		return value.CompiledFilter{}, err
+	}
+	if fixture.Expression != expression || !strings.HasPrefix(fixture.Compiler, "libpcap version 1.11.0 ") {
+		return value.CompiledFilter{}, value.ErrInvalid
+	}
+	return fixture.Filter, nil
 }
 
 func TestInstalledPolicyRecordingAuthoredInputs(t *testing.T) {
