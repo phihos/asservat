@@ -97,6 +97,7 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	}
 
 	qualifyContextRequestResolution(t, ctx, admin, poolFor, create, newStore, blueprint, query)
+	qualifyContextStorageRequest(t, ctx, admin, poolFor, create)
 
 	t.Run("current-context-placement-is-scoped-read-only-and-preserves-original-freshness", func(t *testing.T) {
 		s := create(t, 1)

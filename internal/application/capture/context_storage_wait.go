@@ -229,7 +229,15 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 		// selection and original deadlines cannot be replaced or extended.
 		if s.Refresh == nil || w.demand == storageDemandFailed || !readinessCurrent() {
 			if expiredSource {
-				return zero, previewFailure("facts/storage", err)
+				// The typed read was recognized. Keep the original error, and
+				// distinguish the bounded readiness decision from a read failure.
+				reason := "readiness-tail"
+				if s.Refresh == nil {
+					reason = "refresh-unavailable"
+				} else if w.demand == storageDemandFailed {
+					reason = "demand-failed"
+				}
+				return zero, previewFailure("facts/storage/expired/"+reason, err)
 			}
 			return zero, previewFailure("facts/storage", contextStorageMarginRefusal{})
 		}

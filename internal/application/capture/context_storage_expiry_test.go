@@ -175,3 +175,44 @@ func TestContextStorageExpiredSourceRetainsReadinessCutoffs(t *testing.T) {
 		})
 	}
 }
+
+// The same typed expired read can end at distinct bounded readiness decisions.
+// Keep those closed diagnostics separate without changing the returned cause.
+func TestContextStorageExpiredReadinessRefusalReason(t *testing.T) {
+	for _, mode := range []string{"readiness-tail", "demand-failed", "refresh-unavailable"} {
+		t.Run(mode, func(t *testing.T) {
+			f, facts, owner := consumptionFixture(t)
+			f.svc.Refresh = consumptionRefreshFunc(func(context.Context, targets.Request) error {
+				t.Error("refusal issued a new demand")
+				return value.ErrUnavailable
+			})
+			ctx := t.Context()
+			if mode == "readiness-tail" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 750*time.Millisecond)
+				defer cancel()
+			}
+			if mode == "demand-failed" {
+				owner.demand = storageDemandFailed
+			}
+			if mode == "refresh-unavailable" {
+				f.svc.Refresh = nil
+			}
+			reads := 0
+			f.svc.Storage = consumptionStorageFunc(func(call context.Context, target authorization.Target) (ContextStorageObservation, error) {
+				reads++
+				out, _ := f.ContextStorage(call, target)
+				out.Binding.ObservedAt = f.now.Add(-31 * time.Second)
+				out.Binding.FreshUntil = f.now.Add(-time.Second)
+				return out, value.ErrStorageBindingExpired
+			})
+			var got string
+			f.svc.ReportPreviewFailure = func(stage string) { got = stage }
+			_, err := f.svc.consumeStorage(ctx, facts, f.intent(), owner)
+			f.svc.reportRequestFailure(err)
+			if !errors.Is(err, value.ErrStorageBindingExpired) || reads != 1 || got != "request/facts/storage/expired/"+mode {
+				t.Fatal("expired read lost its readiness decision or original cause", got, reads, err)
+			}
+		})
+	}
+}

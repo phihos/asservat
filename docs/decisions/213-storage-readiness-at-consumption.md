@@ -135,13 +135,16 @@ Native 40648568602 on af9bb589 stopped before capture at
 `request/facts/storage/read/observation/source-expired`, despite the typed natural
 expiry change above. Its demand worker completed refreshes in about 2.3–4 seconds;
 the first 3.98-second refresh reported only 880 ms left on its original guarded
-namespace/workload observation, sampled before its 70 ms reconciliation. That is
-less than the existing one-second storage margin; other original source/recovery
-bounds can shorten the effective binding further. This diagnostic is not a row
-freshness timestamp. Later refreshes can
-supply usable windows, but must be independently read inside the request's
-unchanged authority/readiness cutoffs. These measurements neither justify
-extending five-second source freshness nor identify every request's exact timing.
+namespace/workload observation, sampled before its 70 ms reconciliation. That
+number is not the persisted raw binding cutoff or the consumer's final effective
+cutoff, and cannot establish a one-second storage-margin refusal. Migration 00072
+keeps the raw source binding's original 30-second interval separate from checked
+work facts/receipts within their original five seconds. The storage reader tests
+raw source expiry before its successful-result managed/control/pool/allocation
+intersection. Later successful observations must still be independently read
+inside the request's unchanged authority/readiness cutoffs. These measurements
+neither justify extending source freshness nor identify every request's exact
+timing.
 
 A concrete adapter defect prevented this existing readiness path: the real
 Ledger.transaction error list included generic capture unavailability but omitted
@@ -180,3 +183,51 @@ complete PostgreSQL-adapter and capture races also exited 0 (2.577 s and 12.256 
 The SQL proofs establish this normalization boundary, not installed capture,
 regional refresh speed or end-to-end response success. No broader external suite
 or hosted run was executed for this fix.
+
+
+## Readiness decision diagnostics and composed boundary (2026-10-28)
+
+Native 40744858749 on `3f434f00` again ended at
+`request/facts/storage/read/observation/source-expired`, before capture (Go
+599.782s, approved-recording case 132.28s). The corrected transaction marker was
+present. A full source trace finds the real storage reader assigned directly to
+`ContextInvestigation.Storage` and carried unchanged into `ContextSubmission`.
+The old final label also described recognized typed expiry when the existing
+readiness cutoff was exhausted or the single wakeup demand had failed. It did
+not prove another lost-marker defect or identify the installed failure branch.
+
+Keep the returned typed cause and all behavior unchanged. Recognized expired
+metadata now distinguishes the fixed private readiness decisions
+`facts/storage/expired/readiness-tail`, `demand-failed` and
+`refresh-unavailable`. An unrecognized/read failure retains its old read-stage
+classification. `q-pre-storage` uses the existing bounded timing recorder to
+measure Request's initial identity/recovery/replay/preview/approval work before
+its first storage hint. Shared timing logs sample powers of two, so a given
+request's timing may still be absent; the first fixed refusal label can identify
+its decision without request identifiers, dependency strings or new machinery.
+
+A failed wakeup is not authority. A fresh, current, margin-sufficient independent
+first/final read is accepted **before** the failed-demand gate. That gate stops
+additional polling only. Whether allowing further bounded polling improves
+availability after failed/uncertain demand is an engineering load choice; the
+retained Native does not identify that branch, so no polling behavior changes.
+
+The composed fixture exercises actual Ledger/ContextStorageReader through
+Preview/Request with actual SQL previews, replay and admission. Source publication,
+identity, target and processing facts remain explicit synthetic inputs; it does
+not qualify the worker or protected source producer. Cases cover one demand and
+fresh source, failed demand followed by an independently fresh source, failed
+wakeup without a fresh source and an original short-parent readiness tail.
+Accepted replay must recover the original capture without storage refresh.
+External execution of this new composition remains pending.
+
+This adds zero SQL/API/provider calls, watches, credentials, timers, retries or
+authority intervals. It adds three fixed diagnostic labels and two clock reads
+for one existing timing step. Request retains its original five seconds and the
+one-second response reserve. With a cold source, a 2.48–3.11s successful producer
+exchange leaves at most 1.52–0.89s of that four-second readiness ceiling for all
+pre-hint work, polling jitter and other overhead; earlier original bounds may
+shorten it further. This is source-bound arithmetic, not a measurement of the
+failed request's prefix or proof of its exact cause. The deliberate two-minute
+preview-expiry wait can outlast both the 60s demand and raw 30s source binding.
+No earlier wakeup, extra demand, new deadline or TTL change is implemented here.

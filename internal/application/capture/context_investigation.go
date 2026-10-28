@@ -461,6 +461,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	started := s.Now()
+	preStorageStarted := time.Now()
 	i, err := source.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) {
 		return zero, value.ErrDenied
@@ -546,6 +547,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 			storageUntil, storageBound = bound.at, bound.name
 		}
 	}
+	auditapp.MarkStep(ctx, "q-pre-storage", preStorageStarted)
 	storageWait := s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, storageUntil, p.Storage)
 	storageWait.bound = storageBound
 	defer storageWait.close()
