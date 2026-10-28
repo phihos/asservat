@@ -2093,3 +2093,48 @@ pre-push actual0 including231console. Absolute logs in approved-workflow cache:
 policy102-typed-holder-retirement-preflight-final.log and
 policy102-typed-holder-retirement-pre-push.log. Await one reviewed frozen owned
 PG/S3 run of the existing exact companion child; no broader repeat or collector.
+
+Actual owned PG/S3 typed-holder/retirement focused1 at frozen b6dfc7f3 PASS:
+terminal runner0, Go16.481s, exact companion child15.03s, harness invocation
+27.258s (reported test command19.264s). Only the reviewed three-level companion
+selection ran; no collector or unrelated suite. Actual original-grant held-source
+rollback, immutable replay and epoch refusal remain positive. Original first=true
+receipt queued through the real expected-source channel, then4592B SYN-program
+synthetic PCAPNG flowed through actual encrypted producer/store and SQL writer
+completion ACK. Node trust/start facts and packet input remain synthetic; this
+is not C09 TLS, native Gadget input or live observation measurement.
+
+Actual legal purge and separate signed/encrypted audit ACK pass. Unacknowledged
+finalization and acknowledged early finalization refuse with unchanged releases;
+after natural original lease expiry a direct wrong-XID DELETE refuses. The narrow
+actual finalizer retires child1->0 exactly once, keeps original stored API metadata
+and both32MiB conservative INPUT RESERVATIONS, and releases only the custody
+charges specified by the existing finalizer. A new fresh synthetic caller preflight
+then reaches the actual companion's terminal refusal, independently leaving zero
+children, one stored receipt and unchanged spend. No second capture or receipt is
+manufactured; native output reservation remains8MiB, distinct from4592B synthetic
+PCAPNG bytes and from unmeasured observed input.
+
+The closed31-table UNQUALIFIED sample records stored29logical rows/23284tupleB,
+purged+audited31rows/26284B, retired31rows/25724B. Fixture-global WAL edges are
+621792B before-policy->stored,9016B purge/audit/refusals,1968B final retirement;
+rollback/FPI/shared fixture writes are included, not attributed application cost.
+Entire shared heap/index/TOAST relations total1744896B then1810432B; these are not
+per-capture bytes, reclaimed disk or accepted backing. Observation row608B and its
+relation/index pages remain physically allocated after logical deletion. No
+protected qualification, maximal256-instruction/identity/composition graph or
+installed performance claim follows. Existing backing quantities/transitions and
+ordinary capture costs stay unchanged; those qualification gaps remain open.
+
+Archive before any edits:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-typed-holder-retirement-focused-1-artifacts/`;
+report policy102-typed-holder-retirement-focused-1-environment.json SHA-256
+791a459aacf01472c4a46660572b64800e525faabaa2d1efa8d642c1cc61e6a8;
+raw log, actual terminal, independent hash and owned-absence JSON retained.
+All3293 source hashes independently match frozen commit/disk,
+sourceUnchangedDuringTest=true, cleanupFailures=[], exact
+asservat-custody-0dajlewo-postgres/-s3 and network absent. Generated results were
+archived before removal, source freeze and external slot explicitly released.
+Next compose reviewed node enforcement/strict old-client proof and qualify actual
+source/C09/node/prefix/loss/lease behavior plus protected backing/native workflow;
+keep raw trigger/manual/ongoing gates closed until their respective paths qualify.
