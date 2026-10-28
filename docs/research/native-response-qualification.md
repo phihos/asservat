@@ -879,3 +879,26 @@ failed demands and original-bound expiry remain refusals. This changes an
 engineering terminal-expiry rule, not a maintainer requirement, TTL or deadline.
 Synthetic ports and the real row mapper establish the component boundary; no
 new SQL schema, fixture privilege, collector or installed qualification is claimed.
+
+## Retained SQL role attribution gap (2026-10-28)
+
+The partial installed run 40648565357 retained comparable completed-edge SQL
+counters keyed by role OID, but no authoritative OID-to-login mapping. PostgreSQL
+connection logs and permanent purpose ordinals cannot reconstruct that missing
+join by guessing role creation order. Shared logins still do not attribute an
+individual statement to one of their several duties. The failed paced phase and
+idle baseline have no completed deltas; they are not measured zero.
+
+The fixture snapshot now includes an optional `RoleNames` map from its existing
+aggregate query using a catalog LEFT JOIN. Unknown/dropped logins have an explicit
+empty name while their numeric counters remain. This adds zero SQL/API requests,
+product permissions, watches, timers or configuration. Bounds remain 512 roles,
+with PostgreSQL catalog names at most 63 bytes each (up to 32,256 name bytes per
+edge, excluding map/JSON overhead). The three existing snapshot queries,
+reset/eviction checks, numeric deltas and original limits are unchanged. This is
+fixture attribution metadata, not production instrumentation or a new authority
+check. The existing owned PostgreSQL test now checks its independently read role
+OID/name and retains the two-statement history after closing both pools and
+dropping that exact fixture login. Actual PostgreSQL validation of this addition
+is pending; the pure serialization/delta regression first failed on the old
+snapshot representation, then passed with the optional map.

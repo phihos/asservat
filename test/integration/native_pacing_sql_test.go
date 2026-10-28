@@ -15,8 +15,9 @@ import (
 )
 
 // Owned-fixture measurements only. Counts are statements, not wire attempts;
-// execution time excludes planning by default. No SQL text, parameters, role
-// names or credentials enter the report. The snapshot reader's role is excluded.
+// execution time excludes planning by default. No SQL text, parameters or
+// credentials enter the report. Optional catalog login names identify OIDs, not
+// individual duties of a shared login. The snapshot reader's role is excluded.
 type nativeSQLCounters struct {
 	Calls, Rows, Statements int64
 	ExecutionMilliseconds   float64
@@ -26,6 +27,7 @@ type nativeSQLSnapshot struct {
 	StartedAt, FinishedAt, ResetAt time.Time
 	Deallocations                  int64
 	Roles                          map[uint32]nativeSQLCounters
+	RoleNames                      map[uint32]string `json:",omitempty"`
 }
 
 // Install only after the real initial schema/role workflow has finished. An
@@ -50,7 +52,7 @@ const nativePacingStatisticsReset = `SELECT fixture_native_statistics.pg_stat_st
 const nativePacingSQLExecutionSum = `sum(total_exec_time::numeric)::double precision`
 
 func nativePacingSQLSnapshot(ctx context.Context, admin *pgxpool.Pool) (nativeSQLSnapshot, error) {
-	s := nativeSQLSnapshot{StartedAt: time.Now().UTC(), Roles: make(map[uint32]nativeSQLCounters)}
+	s := nativeSQLSnapshot{StartedAt: time.Now().UTC(), Roles: make(map[uint32]nativeSQLCounters), RoleNames: make(map[uint32]string)}
 	if ctx == nil || ctx.Err() != nil || admin == nil {
 		return s, errors.New("SQL measurement unavailable")
 	}
@@ -62,23 +64,29 @@ func nativePacingSQLSnapshot(ctx context.Context, admin *pgxpool.Pool) (nativeSQ
 	}
 	// This fixture database belongs to one installation. Include every other
 	// role, including background services, rather than guessing attribution
-	// from query text. Numeric deltas and an idle baseline remain separate.
-	rows, err := admin.Query(call, `SELECT userid,sum(calls)::bigint,sum(rows)::bigint,
+	// from query text. LEFT JOIN preserves counters after a role is dropped; an
+	// empty name explicitly means unavailable at this edge. Numeric deltas and
+	// an idle baseline remain separate.
+	rows, err := admin.Query(call, `SELECT userid,coalesce(r.rolname::text,''),sum(calls)::bigint,sum(rows)::bigint,
  `+nativePacingSQLExecutionSum+`,count(*)::bigint
- FROM fixture_native_statistics.pg_stat_statements WHERE userid<>(current_user::regrole)::oid
+ FROM fixture_native_statistics.pg_stat_statements
+ LEFT JOIN pg_catalog.pg_roles r ON r.oid=userid
+ WHERE userid<>(current_user::regrole)::oid
  AND dbid=(SELECT oid FROM pg_database WHERE datname=current_database())
- GROUP BY userid ORDER BY userid LIMIT 513`)
+ GROUP BY userid,r.rolname ORDER BY userid LIMIT 513`)
 	if err != nil {
 		return s, errors.New("SQL counters unavailable")
 	}
 	for rows.Next() {
 		var id uint32
+		var name string
 		var c nativeSQLCounters
-		if err := rows.Scan(&id, &c.Calls, &c.Rows, &c.ExecutionMilliseconds, &c.Statements); err != nil || !c.valid() || len(s.Roles) == 512 {
+		if err := rows.Scan(&id, &name, &c.Calls, &c.Rows, &c.ExecutionMilliseconds, &c.Statements); err != nil || !c.valid() || len(s.Roles) == 512 {
 			rows.Close()
 			return s, errors.New("SQL counter snapshot exceeds its finite shape")
 		}
 		s.Roles[id] = c
+		s.RoleNames[id] = name
 	}
 	rows.Close()
 	if rows.Err() != nil {
@@ -134,6 +142,33 @@ func nativePacingSQLDelta(before, after nativeSQLSnapshot) (map[uint32]nativeSQL
 		out[id] = d
 	}
 	return out, nil
+}
+
+// Missing/renamed login metadata must not remove otherwise comparable OID
+// counters, including statistics left behind after a role was dropped.
+func TestNativePacingSQLRoleNamesRemainOptionalMetadata(t *testing.T) {
+	now := time.Now().UTC()
+	before := nativeSQLSnapshot{StartedAt: now, FinishedAt: now.Add(time.Millisecond), ResetAt: now.Add(-time.Hour), Roles: map[uint32]nativeSQLCounters{42: {Calls: 3}}}
+	after := nativeSQLSnapshot{StartedAt: now.Add(time.Second), FinishedAt: now.Add(time.Second + time.Millisecond), ResetAt: before.ResetAt, Roles: map[uint32]nativeSQLCounters{42: {Calls: 5}, 43: {Calls: 1}}}
+	if err := json.Unmarshal([]byte(`{"RoleNames":{"42":"fixture_renamed_login","43":""}}`), &after); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reported struct{ RoleNames map[uint32]string }
+	if err := json.Unmarshal(encoded, &reported); err != nil {
+		t.Fatal(err)
+	}
+	name, retained := reported.RoleNames[43]
+	if reported.RoleNames[42] != "fixture_renamed_login" || !retained || name != "" {
+		t.Fatal("report lost actual or explicitly unavailable login metadata")
+	}
+	delta, err := nativePacingSQLDelta(before, after)
+	if err != nil || delta[42].Calls != 2 || delta[43].Calls != 1 {
+		t.Fatal("optional login metadata changed numeric counter history", err)
+	}
 }
 
 func TestNativePacingSQLDeltaRejectsLostOrResetStatistics(t *testing.T) {
@@ -365,6 +400,32 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 	delta, err := nativePacingSQLDelta(before, after)
 	if err != nil || delta[role].Calls != 2 || delta[role].Rows != 2 || delta[role].Statements != 1 {
 		t.Fatal("actual SQL counters did not isolate two role statements", err, delta)
+	}
+	if after.RoleNames[role] != "fixture_native_pacing_statistics" {
+		t.Fatal("actual measurement role OID lost its catalog login name")
+	}
+	// Dropping the owned login must remove its attribution, not its retained
+	// pg_stat_statements history. Both connection pools are closed first.
+	reader.Close()
+	reader = nil
+	if otherDatabase != nil {
+		otherDatabase.Close()
+		otherDatabase = nil
+	}
+	if _, err := admin.Exec(ctx, `DROP ROLE fixture_native_pacing_statistics`); err != nil {
+		t.Fatal("owned measurement role retirement failed", err)
+	}
+	created = false
+	dropped, err := nativePacingSQLSnapshot(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	name, retained := dropped.RoleNames[role]
+	if !retained || name != "" || dropped.Roles[role] != after.Roles[role] {
+		t.Fatal("dropped role lost counter history or retained a fabricated login")
+	}
+	if _, err := nativePacingSQLDelta(after, dropped); err != nil {
+		t.Fatal("dropped login metadata invalidated comparable counters", err)
 	}
 	var administrator uint32
 	if err := admin.QueryRow(ctx, `SELECT (current_user::regrole)::oid`).Scan(&administrator); err != nil {
