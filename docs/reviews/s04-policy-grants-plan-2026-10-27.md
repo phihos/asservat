@@ -2138,3 +2138,12 @@ archived before removal, source freeze and external slot explicitly released.
 Next compose reviewed node enforcement/strict old-client proof and qualify actual
 source/C09/node/prefix/loss/lease behavior plus protected backing/native workflow;
 keep raw trigger/manual/ongoing gates closed until their respective paths qualify.
+
+Post-archive C09 framing component: an actual bounded hub/regional conversation
+now roundtrips the new exact-source and typed-start operations, the frozen
+expectation comparison, committed start, finish echo and receipt. Exact original
+permit succeeds; tampered program refuses before recorder dispatch; no source
+refresh or ordinary fallback occurs. Verification/start/output doubles remain
+synthetic, so this adds no TLS, signature, SQL or installed authority claim.
+Focused race passes1.070s; absolute log approved-workflow/policy102-finite-source-stream.log.
+No production code/query/permission changes and no external run for this test.
