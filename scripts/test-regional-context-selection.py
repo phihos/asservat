@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Pure qualification selection tests; no services or native fixtures."""
+import ast
+import inspect
 import importlib.util
 from pathlib import Path
 import unittest
@@ -16,6 +18,76 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_native_traffic_helper_setup_is_not_gated_by_helm_registry(self):
+        main = ast.parse(inspect.getsource(fixture.main))
+        guards = []
+
+        def walk(node, conditions):
+            if isinstance(node, ast.If):
+                conditions = conditions + [ast.unparse(node.test)]
+            if isinstance(node, ast.Call):
+                installs = isinstance(node.func, ast.Name) and node.func.id == "install_native_traffic_helper"
+                old_inline = (isinstance(node.func, ast.Attribute) and node.func.attr == "setdefault"
+                              and node.args and isinstance(node.args[0], ast.Constant)
+                              and node.args[0].value == "nativeTrafficHelper")
+                if installs or old_inline:
+                    guards.append(conditions)
+            for child in ast.iter_child_nodes(node):
+                walk(child, conditions)
+
+        walk(main, [])
+        self.assertEqual(len(guards), 1, "one common traffic-helper setup site is required")
+        self.assertTrue(any("native_paced" in condition for condition in guards[0]))
+        self.assertFalse(any("helm_bootstrap" in condition for condition in guards[0]),
+                         "actual native-paced setup has no Helm registry; its helper must still install")
+
+    def test_fast_native_traffic_helper_installs_and_serializes_exact_owned_nodes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory)/"provider-proxy"
+            binary.write_bytes(b"static fixture binary")
+            digest = fixture.hashlib.sha256(binary.read_bytes()).hexdigest()
+            cluster, node = "owned-fast-region", "owned-fast-region-control-plane"
+            calls = []
+            def command(args):
+                calls.append(args)
+                if args[:3] == ["kind", "get", "nodes"]:
+                    return node
+                if args[:2] == ["docker", "inspect"]:
+                    return cluster
+                if args[:2] == ["docker", "cp"]:
+                    return ""
+                if args[:2] == ["docker", "exec"]:
+                    return digest+"  /asservat-fixture-traffic"
+                self.fail("unexpected setup command: "+str(args))
+            values, report = {}, {}
+            with patch.object(fixture, "run", command):
+                fixture.install_native_traffic_helper(binary, cluster, values, report)
+            serialized = json.loads(json.dumps(values))
+            expected = {"cluster": cluster, "nodes": [node], "sha256": digest}
+            self.assertEqual(fixture.require_native_traffic_helper(serialized, cluster), expected)
+            self.assertEqual(report["nativeTrafficHelper"], expected)
+            self.assertEqual(report["nativeTrafficHelperSetup"]["copiedBytes"], binary.stat().st_size)
+            self.assertEqual(len([c for c in calls if c[:2] == ["docker", "cp"]]), 1)
+            self.assertEqual(fixture.qualification_selection(fixture.NATIVE_TRAFFIC_PROBE, False, False), (fixture.NATIVE_TRAFFIC_PROBE, 1))
+
+    def test_traffic_helper_refuses_missing_foreign_or_mismatched_bytes(self):
+        with self.assertRaisesRegex(RuntimeError, "before Go bootstrap"):
+            fixture.require_native_traffic_helper({}, "owned")
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory)/"provider-proxy"
+            binary.write_bytes(b"static fixture binary")
+            for wrong in ("owner", "digest"):
+                def command(args):
+                    if args[0] == "kind": return "owned-control-plane"
+                    if args[1] == "inspect": return "foreign" if wrong == "owner" else "owned"
+                    if args[1] == "cp": return ""
+                    if args[1] == "exec": return "0"*64+"  /asservat-fixture-traffic"
+                    self.fail(str(args))
+                with patch.object(fixture, "run", command), self.assertRaisesRegex(RuntimeError, "ownership differs|bytes differ"):
+                    fixture.install_native_traffic_helper(binary, "owned", {}, {})
+        source = inspect.getsource(fixture.main)
+        self.assertLess(source.index("require_native_traffic_helper(fixture, clusters"), source.index("path.write_text(json.dumps(fixture))"))
+
     def test_numeric_statistics_are_an_explicit_fixture_option(self):
         ordinary = fixture.postgres_fixture_options()
         measured = fixture.postgres_fixture_options(native_statistics=True)

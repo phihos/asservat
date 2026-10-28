@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## Paced helper setup omission reproduced before bootstrap (2026-10-28)
+
+Native 40605062812 on `e9e3c64e` failed before any helper invocation because
+its descriptor was absent. Actual Go was 586.959s, approved recording 137.49s;
+all 3,230 source hashes matched, unchanged with cleanup `[]`. No direct traffic,
+native body or renewal was qualified. Copying was incorrectly gated by the
+Helm/private-registry branch, absent from the actual fast provider-pair path.
+
+The pure setup-path RED reproduces that gate (0.019s). Common owned-node setup
+now copies/hash-checks the exact binary for both topologies, and Python plus the
+actual Go bootstrap entry fail early if the serialized descriptor is missing.
+Seventeen setup tests pass (0.032s), affected parent races pass (1.197s). A new
+single-Kind probe reuses that setup and actual Docker traffic command without
+bootstrap/Keycloak/collectors; its real result is pending. Limits, ownership
+checks and the no-fallback contract remain unchanged. See the
+[retained failure and preflight](research/native-response-qualification.md#missing-helper-setup-branch-and-early-preflight-2026-10-28).
+
 ## Paced traffic route correction after retained failure (2026-10-28)
 
 Native 40600135398 on `4d2e1033` retained valid setup SQL statistics but failed

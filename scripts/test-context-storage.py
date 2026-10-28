@@ -101,7 +101,47 @@ def source_hashes():
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}
 
 
+NATIVE_TRAFFIC_PROBE = "^TestNativePacingTrafficWithRealKubernetes$"
+
+
+def require_native_traffic_helper(fixture, cluster):
+    helper = fixture.get("nativeTrafficHelper")
+    if (not isinstance(helper, dict) or set(helper) != {"cluster", "sha256", "nodes"}
+            or helper["cluster"] != cluster or not isinstance(helper["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", helper["sha256"])
+            or not isinstance(helper["nodes"], list) or not 1 <= len(helper["nodes"]) <= 2
+            or any(not isinstance(node, str) or not node.startswith(cluster+"-") for node in helper["nodes"])
+            or len(set(helper["nodes"])) != len(helper["nodes"])):
+        raise RuntimeError("native traffic helper descriptor is absent or differs before Go bootstrap")
+    return helper
+
+
+def install_native_traffic_helper(binary, cluster, fixture, report):
+    began = time.monotonic()
+    nodes = run(["kind", "get", "nodes", "--name", cluster]).splitlines()
+    digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+    helper = {"cluster": cluster, "sha256": digest, "nodes": nodes}
+    require_native_traffic_helper({"nativeTrafficHelper": helper}, cluster)
+    for node in nodes:
+        if run(["docker", "inspect", "--format", '{{ index .Config.Labels "io.x-k8s.kind.cluster" }}', node]) != cluster:
+            raise RuntimeError("traffic helper node ownership differs")
+        run(["docker", "cp", str(binary), node+":/asservat-fixture-traffic"])
+        observed = run(["docker", "exec", node, "sha256sum", "/asservat-fixture-traffic"]).split()[0]
+        if observed != digest:
+            raise RuntimeError("traffic helper bytes differ")
+    fixture["nativeTrafficHelper"] = helper
+    report["nativeTrafficHelper"] = helper
+    report["nativeTrafficHelperSetup"] = {"elapsedSeconds": time.monotonic()-began,
+                                        "binaryBytes": binary.stat().st_size,
+                                        "copiedBytes": binary.stat().st_size*len(nodes)}
+
+
 def qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False):
+    if test_pattern == NATIVE_TRAFFIC_PROBE:
+        if any((initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap,
+                regional_context_start, runtime_object_roundtrip, owner_provider_auth,
+                runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation)):
+            raise ValueError("Traffic probe owns its single synthetic cluster selection")
+        return test_pattern, 1
     if installer_continuation and (not runtime_provider_pair or runtime_provider_worker or runtime_provider_owner):
         raise ValueError("Installer continuation reuses the provider-pair network and replaces the fixture continuation")
     if runtime_provider_owner and not runtime_provider_worker:
@@ -361,6 +401,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     if helm_cluster:
         test_pattern = "^" + helm_test + "$"
     direct_observation = test_pattern == "^TestDirectHolderObservationWithRealKubernetes$"
+    native_traffic_probe = test_pattern == NATIVE_TRAFFIC_PROBE
     # Product federation/connector Pods also run in every owned cluster.
     two_cluster_pods = direct_observation or test_pattern == "^TestFederationRegionalProductWithRealKubernetes$" or installer_continuation
     test_package = "./internal/adapters/kms" if owner_provider_auth else "./internal/adapters/kubernetes" if runtime_object_roundtrip else "./test/integration"
@@ -597,6 +638,9 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 name = network+"-"+str(index)
                 config = work/("kube-"+str(index))
                 config.chmod(0o600)
+                if (native_paced and index == 1) or (native_traffic_probe and index == 0):
+                    # Common to fast provider-pair and private-registry setup.
+                    install_native_traffic_helper(image_dir/"provider-proxy", name, fixture, report)
                 run(["docker", "update", "--memory", "3g", "--memory-swap", "3g", "--cpus", "2", name+"-control-plane"])
                 if index == 0 or two_cluster_pods:
                     node_name = name+"-control-plane"
@@ -617,19 +661,6 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                         run(["docker", "network", "connect", network, worker_node])
                         for owned in [node_name, worker_node]:
                             registry.configure_owned_node(owned)
-                            if native_paced and index == 1:
-                                # Reuse the already-built static fixture binary;
-                                # direct node-to-Pod traffic never traverses an API proxy.
-                                helper_digest = hashlib.sha256((image_dir/"provider-proxy").read_bytes()).hexdigest()
-                                if run(["docker", "inspect", "--format", '{{ index .Config.Labels "io.x-k8s.kind.cluster" }}', owned]) != name:
-                                    raise RuntimeError("traffic helper node ownership differs")
-                                run(["docker", "cp", str(image_dir/"provider-proxy"), owned+":/asservat-fixture-traffic"])
-                                observed = run(["docker", "exec", owned, "sha256sum", "/asservat-fixture-traffic"]).split()[0]
-                                if observed != helper_digest:
-                                    raise RuntimeError("traffic helper bytes differ")
-                                helper = fixture.setdefault("nativeTrafficHelper", {"cluster": name, "sha256": helper_digest, "nodes": []})
-                                helper["nodes"].append(owned)
-                                report["nativeTrafficHelper"] = helper
                             info = json.loads(run(["docker", "inspect", owned]))[0]
                             registry_nodes.append(info["NetworkSettings"]["Networks"][network]["IPAddress"])
                         fixture["workerImage"] = registry.image
@@ -714,6 +745,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 target_token = run(k+["-n", "synthetic", "create", "token", "target-reader", "--duration=1h"])
                 fixture["clusters"].append({"config": str(config), "token": token, "targetToken": target_token, "nodeUID":node["metadata"]["uid"], "nodeBootID":node["status"]["nodeInfo"]["bootID"], "workloadUID":deployment["metadata"]["uid"], "pod": {"Namespace": "synthetic", "NamespaceUID": ns["metadata"]["uid"], "Name": pod["metadata"]["name"], "UID": pod["metadata"]["uid"], "NodeName": pod["spec"]["nodeName"], "ControllerUID": pod["metadata"]["ownerReferences"][0]["uid"]}})
                 report["clusters"].append({"name": name, "nodeImage": NODE, "workloadImage": pause, "podUID": pod["metadata"]["uid"]})
+            if native_paced or native_traffic_probe:
+                require_native_traffic_helper(fixture, clusters[1 if native_paced else 0])
             path = work/"fixtures.json"
             path.touch(mode=0o600)
             path.write_text(json.dumps(fixture))

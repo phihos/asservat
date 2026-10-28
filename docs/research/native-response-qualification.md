@@ -2,6 +2,40 @@
 
 Date: 2026-10-28. Status: installed attempts failed before traffic. Request preflight and SQL measurement regression checks pass; installed paced transfer and combined costs remain pending.
 
+## Missing helper setup branch and early preflight (2026-10-28)
+
+Native 40605062812 on `e9e3c64e` failed before invoking the traffic helper:
+`exact owned traffic target unavailable`, with a 731ns refusal and no valid
+receipt. The environment has no nativeTrafficHelper descriptor. Actual Go was
+586.959s; approved recording was 137.49s. All 3,230 source hashes independently
+match the frozen source, unchanged with cleanup `[]`. Environment SHA-256:
+`3a07e6f84b9789364328aed128248029c48672f3dc4e3fc5390ed9fbc2fc85e5`;
+measurement report SHA-256:
+`dbf9d8899a697dcbd9f14810d35a894742ca5435d76b417aeb2cf5706be2ed7c`.
+This establishes a setup omission, not failure or success of the direct route.
+
+Helper copying was nested inside Helm's private-registry branch, while the
+actual native-paced provider-pair setup uses no Helm registry. A pure setup-path
+regression reproduced that conditional mismatch (exit 1, 0.019s). Installation
+now runs in the common owned-regional-node setup, enumerates its exact Kind
+nodes and retains the same ownership/SHA checks. Descriptor validation precedes
+serialization and Go launch. The actual Go bootstrap entry independently refuses
+a missing descriptor before touching provider/API inputs. No API-proxy fallback,
+collector guard relaxation, timeout/quota change or new product privilege is added.
+The fast topology has one regional node; the Helm topology can have two. Copy
+cost follows the enumerated owned set rather than assuming the Helm topology.
+
+All 17 pure selection/setup tests pass in 0.032s, including ownership/hash
+mismatch and missing descriptor. Affected parent races pass in 1.197s, including
+a child invocation of the actual bootstrap entry with unusable provider inputs
+that must fail at the earlier helper guard. The new exact selection
+`^TestNativePacingTrafficWithRealKubernetes$` uses the existing context runner
+with one synthetic Kind, its existing PG/S3/OpenBao/TLS bridge fixtures and one
+Restricted traffic Pod. It will exercise this same common installer, serialized
+descriptor, actual hash check and Docker command to the exact Pod UID/IP/node.
+No bootstrap, Keycloak, collector or BPF participates. Its actual result remains
+pending; pure/mock preflight alone does not qualify the owned-node route.
+
 ## Serialized traffic route failure and direct fixture client (2026-10-28)
 
 Native 40600135398 on `4d2e1033` exited 1 after setup SQL snapshots succeeded.
@@ -30,7 +64,7 @@ workload, filler or retry. Ordinary approved-recording traffic remains unchanged
 
 The existing CGO-disabled build produces a static Linux executable, avoiding a
 runner-versus-Kind libc dependency. The measured local artifact is 11,293,151
-bytes. Setup copies the same binary to the two already owned regional nodes
+bytes. Setup copies the same binary to the enumerated already owned regional nodes
 and verifies its SHA-256 and each Kind ownership label before collection. The
 fixture descriptor/environment retains that digest and exact node allowlist.
 At Running, one live Pod GET verifies the selected UID and provides its node/IP.
@@ -41,8 +75,8 @@ client time are separate. The absolute earlier caller/8.5s cutoff includes
 process launch; stdin EOF cancels the child and the parent waits for process exit.
 A failed join or deadline fails the experiment. No new image, Pod, service,
 listener, product credential, privilege or background service is added. Setup
-adds two binary copies (about 21.5 MiB total), two ownership inspections and two
-hash reads; traffic replaces sixteen API-proxy exchanges with one Pod GET and
+adds one binary copy (about 10.8 MiB), one ownership inspection and one
+hash read per enumerated owned node; traffic replaces sixteen API-proxy exchanges with one Pod GET and
 sixteen direct HTTP requests in one process. Actual installed setup/runtime cost
 remains unmeasured.
 
