@@ -619,6 +619,10 @@ original 30-second owner starts before setup; the hub's native limit starts at
 actual connection accept. An allowed four-second pre-dial setup leaves the hub
 end four seconds later. Before idle retirement, a five-second query can select
 that conversation even though the region will close before its caller ends.
+The reference TLS harness has no native listener: it applies the native
+accepted-plus-30-second parent bound at the handler using the actual dial
+receipt. This exercises real TLS/H2 and routing with an injected native bound;
+it is not a deployed native-listener qualification.
 The old-protocol witness observed `restarts/read/other` with 496.982 ms remaining.
 Its original regional end was 05:38:14.545947394Z, hub end
 05:38:18.550818676Z and query end 05:38:15.045947394Z on 2026-10-28.
