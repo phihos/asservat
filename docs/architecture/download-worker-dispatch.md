@@ -96,17 +96,52 @@ before prepare-paced; joined-cleanup no longer includes those earlier checks.
 This preserves partial content proof after a late failure without declaring the
 whole experiment complete or inventing missing output/drop measurements.
 
-Smallest proposed owned real-controller selection:
+Owned real-controller selection:
 `^TestDownloadNativeJobsWithRealKubernetes$`, existing 150s test bound. Its old
 outer ten-second retirement loop repeats the adapter call and can mask immediate
-foreground-delete refusal. Qualification should use one adapter call under one
-original five-second retirement context and retain its elapsed time/proof. No
-new collector, fixture, role, quota or deadline increase is needed. External
-execution and installed paced completion remain pending review/authorization.
+foreground-delete refusal. The fixture now uses one adapter call under one original five-second retirement
+context and retains its elapsed time/proof. No
+new collector, fixture, role, quota or deadline increase is needed. The measured component result below does not establish installed paced
+completion.
 
 
-The proposed single owned selection keeps its existing 150-second test context
+This single owned selection kept its existing 150-second test context
 and one five-second retirement call. The harness's default Go envelope remains
 30 minutes; an external 1,100-second timeout followed by a ten-second hard-kill
 bounds the complete run below twenty minutes. These three bounds are distinct;
-no external run or real-controller measurement is established by local gates.
+the local gates alone establish no external or real-controller result.
+
+
+### Owned single-call measurement
+
+One authorized fresh owned selection on immutable
+`6e467f360b9d9646d2bc4e5db3b0716e4cecb448` passed:
+`^TestDownloadNativeJobsWithRealKubernetes$`. The one retirement call completed
+in **115.82032 ms**, with **4.8841782 s** remaining in its original five-second
+context. The exact original observed termination remained bound to the fresh retirement
+proof; the later deleted-worker peer proof was refused. The selected test took
+47.96 s, Go package 49.043 s and complete command 199.314446 s. Actual command,
+Go and qualification exits were all zero; no outer retirement retry occurred.
+
+All 3,391 retained qualification-source hashes matched the frozen commit.
+`sourceUnchangedDuringTest` was true and cleanup failures were empty. The two
+owned clusters, provider containers, networks and worker images were independently
+absent. Outputs were archived before restoration; all 35,983 working files then
+matched their pre-run hashes and the source tree was clean. No collector or BPF
+ran. The fixture uses an actual Restricted product worker, Pod token, TLS/native
+idle exchange and foreground Kubernetes deletion. Dispatch/issuer/registry/audit
+authority remains synthetic; no native evidence transfer or SQL capacity-row
+retirement was qualified by this selection.
+
+The immutable cache archive is
+`codex-bf86-resume/native-worker-retirement-owned-1/`.
+Its `final-report.json` SHA256 is
+`39dc7d1b67dd1dfc0cfae57c4b10d6617f72e0c491817aef1c9d6b08b4235844`;
+`artifacts/context-storage-environment.json` SHA256 is
+`de8e47bafaa8735c7738336bdbdf2afc76f41f5ec6388a99d8e35da490e5a624`.
+The report binds actual commands/exits, all archived source hashes, logs and
+owned-resource readback. Original local RED/GREEN and source manifests remain
+unchanged. This measures the chosen observation bound on this owned controller;
+it neither proves the earlier Native deletion subcause nor completes ranges,
+SQL capacity retirement or the installed paced workflow. No limit, quota,
+authority or deadline was increased to obtain this result.
