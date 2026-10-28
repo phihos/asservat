@@ -280,3 +280,37 @@ acknowledgement. No enrolled-workload seeding, broader roles or source authority
 is added. The existing exact production-purpose role test passes under race
 (Go 1.046s); the fixture processing-bound preflight remains green (Go 1.060s).
 A further composed PostgreSQL execution remains pending separate authorization.
+
+The third authorized composed PG/S3 run on frozen `f5b6e3bc` passed all four
+cases (child 1.85s, Go 3.291s, command/test/qualification exit 0). The actual
+Reader→Request→SQL admission path accepted fresh storage after one successful
+SQL demand call in 101.166ms, and independently fresh storage after a failed
+wakeup in 76.607ms. Both recorded one successful SQL call, one fixture source
+publication and one capture; exact accepted replay after source re-expiry reused
+the original capture with no new demand. Controlled wakeup failure **after** a
+successful SQL call, without publication, refused in 36.779ms with zero captures
+and the fixed `expired/demand-failed` label. The original 750ms parent refused in
+37.786ms with no demand and `expired/readiness-tail`. Demand contexts retained
+3.986–3.989s at submission in these local cases; this is remaining original
+budget, not an installed pre-hint latency measurement.
+
+All 3,347 qualification source hashes and 35,980 tracked files were unchanged;
+cleanup was empty and exact owned PG/S3 names/IDs/network were absent. The
+retained environment SHA256 is
+`c2dfc97ef28272f13b69efde63116c28f2c1fb30a06245ce0dabe930241f746c`;
+verification SHA256 is
+`d31723df5cb15205142e79da54028eb4a5bc4e12f6a19f8e11ce1b2b35b2bed5`.
+All three immutable archives remain under
+`codex-bf86-resume/history-storage-readiness-reasons/history-storage-request-composition-{1,2,3}-artifacts/`.
+
+This qualifies the previously separate actual SQL-reader and core Request
+boundary using builtin pod-status, including original selection, deadline,
+real replay/admission and failed-wakeup ordering. It does not qualify the
+approved recorder's pre-hint grant reads, runtime source producer, enrolled
+refresh acknowledgement, collector or installed history workflow. The identity,
+pinned source facts, processing projection and administrator source publication
+remain synthetic. No fresh-positive defect was claimed on the old runtime:
+only fixed diagnostic ambiguity and the two retained fixture defects were
+changed. Original authority and readiness behavior remain unchanged; the
+separate earlier-hint proposal and a later installed result have their own
+review and qualification obligations.
