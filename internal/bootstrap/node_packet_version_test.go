@@ -35,13 +35,15 @@ type nodeVersionResult struct {
 	Accepted, Unavailable, Observed, PacketValid bool
 	WorkCount                                    int
 }
-type nodeHelperOutput struct{ bytes.Buffer }
+type nodeHelperOutput struct{ buffer bytes.Buffer }
+
+func (b *nodeHelperOutput) String() string { return b.buffer.String() }
 
 func (b *nodeHelperOutput) Write(p []byte) (int, error) {
-	if b.Len()+len(p) > 4096 {
+	if b.buffer.Len()+len(p) > 4096 {
 		return 0, errors.New("bounded node helper output exceeded")
 	}
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
 }
 
 type nodeVersionStatus struct {
