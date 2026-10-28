@@ -1,5 +1,59 @@
 # Sustained implementation progress
 
+## Installed recording correction results (2026-10-29)
+
+Fresh CI [40784874267](https://github.com/phihos/asservat/actions/runs/40784874267)
+passed all fifteen jobs on `c253525f`, and fresh Gitar review approved with no
+findings. Three guarded installed commands on that frozen candidate all failed:
+
+- [Policy 40786145588](https://github.com/phihos/asservat/actions/runs/40786145588)
+  again proved the exact collector's one-byte ObservationBudgetExhausted refusal.
+  The corrected normal 64/64 MiB grant then passed request, review and retrieval.
+  The fixture's next Keycloak administrator PUT to disable the creator returned
+  HTTP 401, before the mandatory disabled-account readback. Creator departure,
+  manager attachment/revocation, positive artifact and native download remain
+  unqualified. Go/test returned 1 (524.703s package, policy child 65.81s). The
+  later parent-test FailNow message is secondary. Test, upload and Complete-job
+  steps finished by 23:30:18 UTC; GitHub's enclosing run/job still reported
+  in_progress at the independent evidence readback. That status discrepancy
+  remains separate from the finalized command failure and artifact evidence.
+- [History 40786150168](https://github.com/phihos/asservat/actions/runs/40786150168)
+  resolved initial AcquisitionNotStarted to accepted and retained the initial
+  authenticated 2,060-byte PCAPNG. The browser loaded diagnostics (HTTP 200),
+  then list_capture_history returned HTTP 503 before settings/edit/repeat.
+  The exact server diagnostic was call-no-outcome: the audited operation failed
+  without a delivery outcome, and this branch discarded its typed failure step.
+  Actual five-second expiry is not established. History listing uses the shared
+  identity/recovery/workload/SQL service, not RegionalHistoryDispatch; successful
+  sampled peer exchanges do not diagnose this failed list. Go/test returned 1
+  (600.004s package, approved child 150.09s), run 949s.
+- [Paced 40786153907](https://github.com/phihos/asservat/actions/runs/40786153907)
+  retained an authenticated unpaced 4,695,860-byte PCAPNG in 1.371s with matching
+  hash and passing native port/statistics/window checks. It then failed the
+  unchanged required 8,323,072–8,388,608-byte interval. The file contains 46,956
+  retained TCP packets on the reviewed port; combined reported drops are zero,
+  which does not establish upstream loss or hook readiness. Traffic reached its
+  genuine deadline after seven acknowledged batches. The unchanged 100m target
+  was throttled in all 85 measured periods and spent most reported CPU in system
+  time; this does not establish a cause. Paced body, ranges, owner/key renewal and
+  completion were not reached. Go/test returned 1 (630.034s package, approved
+  child 166.28s), run 995s.
+
+Independent root readback matched all 3,397 canonical source hashes for each
+command and all 35,989 frozen local tracked hashes. Sources were unchanged,
+cleanup failures empty and build scratch removed. Hosted cleanup is the retained
+runner report, not an independent remote Docker inspection. GitHub reports zero
+Ubuntu billable milliseconds; nonzero runner time remains recorded. Artifacts,
+per-file hashes, provider status and root reports are retained under
+`codex-bf86-resume/integrated-c253-*` in the existing build cache.
+
+All actual commands and artifact uploads are finalized; the execution-source
+freeze is released for isolated corrections. No automatic retry is queued and
+no complete installed workflow is qualified. Investigate the fixture admin
+credential, expose only a closed existing browser failure step with no extra IO,
+and establish a concrete traffic-path cost before changing that helper. Keep all
+production authority, CPU/traffic/window/cap limits and qualification guards.
+
 ## Combined recording correction candidate (2026-10-29)
 
 Clean `bc48249c` composes the observation accounting correction, authored grant
