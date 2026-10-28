@@ -93,13 +93,50 @@ func (h nativeTrafficHelper) validForNode(node string) bool {
 	return true
 }
 
-type nativeTrafficOutput struct{ bytes.Buffer }
+type nativeTrafficOutput struct {
+	buffer   bytes.Buffer
+	exceeded bool
+}
+
+func (b *nativeTrafficOutput) Len() int       { return b.buffer.Len() }
+func (b *nativeTrafficOutput) Bytes() []byte  { return b.buffer.Bytes() }
+func (b *nativeTrafficOutput) String() string { return b.buffer.String() }
 
 func (b *nativeTrafficOutput) Write(p []byte) (int, error) {
 	if b.Len()+len(p) > 2048 {
+		b.exceeded = true
 		return 0, errors.New("traffic receipt exceeds bound")
 	}
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
+}
+
+// A non-nil refusal; only the installed artifact experiment may consume this
+// one attempted traffic phase and proceed to its independent artifact gates.
+var errNativeTrafficRecordedDeadline = errors.New("owned traffic ended incomplete at original deadline")
+
+func nativeTrafficRecordedDeadline(ctx context.Context, r nativeTrafficResult, processErr error, until, now time.Time) bool {
+	if ctx == nil || ctx.Err() != nil || until.IsZero() || now.Before(until) || r.Elapsed < nativeTrafficPhase || r.Elapsed > nativeTrafficPhase+250*time.Millisecond {
+		return false
+	}
+	if deadline, ok := ctx.Deadline(); ok && !now.Before(deadline) {
+		return false
+	}
+	// Wait must report the known helper's normal failure exit, never a signal,
+	// WaitDelay, context/transport failure or an arbitrary wrapped process error.
+	child, ok := processErr.(*exec.ExitError)
+	if !ok || child.ProcessState == nil || !child.Exited() || child.ExitCode() != 1 {
+		return false
+	}
+	if !r.ReceiptValid || r.Failure != "deadline" || r.Batches < 1 || r.Batches > nativeTrafficBatches || r.Records != r.Batches*nativeTrafficRecordsPerBatch || r.LastStatus != http.StatusOK ||
+		r.ClientElapsed <= 0 || r.ClientElapsed > nativeTrafficPhase+250*time.Millisecond || r.ClientWorkElapsed <= 0 || r.ClientWaitElapsed < 0 || r.ClientWaitElapsed > r.ClientElapsed || r.ClientWorkElapsed > r.ClientElapsed-r.ClientWaitElapsed {
+		return false
+	}
+	const batchBytes = nativeTrafficRecordsPerBatch * nativeTrafficRecordBytes
+	completed := r.Batches * batchBytes
+	if r.LastAcknowledged {
+		return r.LastBodyBytes == batchBytes && r.Bytes == completed
+	}
+	return r.Batches < nativeTrafficBatches && r.LastBodyBytes > 0 && r.LastBodyBytes <= batchBytes && r.Bytes == completed+r.LastBodyBytes
 }
 
 func nativePacingNodeTraffic(ctx context.Context, helper nativeTrafficHelper, node, podIP string) (out nativeTrafficResult, err error) {
@@ -131,6 +168,10 @@ func nativePacingNodeTraffic(ctx context.Context, helper nativeTrafficHelper, no
 	stop := context.AfterFunc(phase, func() { _ = input.Close() })
 	processErr := command.Wait()
 	stop()
+	if output.exceeded {
+		out.Failure = "receipt_size"
+		return out, errors.New("owned traffic receipt exceeds bound")
+	}
 	decoder := json.NewDecoder(bytes.NewReader(output.Bytes()))
 	decoder.DisallowUnknownFields()
 	var receipt nativeTrafficReceipt
@@ -147,11 +188,14 @@ func nativePacingNodeTraffic(ctx context.Context, helper nativeTrafficHelper, no
 		out.Failure = "receipt_extra"
 		return out, errors.New("owned traffic receipt has extra output")
 	}
-	out = nativeTrafficResult{Batches: receipt.Batches, Records: receipt.Records, Bytes: receipt.Bytes,
+	out = nativeTrafficResult{Elapsed: time.Since(started), Batches: receipt.Batches, Records: receipt.Records, Bytes: receipt.Bytes,
 		Failure: receipt.Failure, LastStatus: receipt.LastStatus, LastBodyBytes: receipt.LastBodyBytes,
 		LastAcknowledged: receipt.LastAcknowledged, ClientElapsed: receipt.Elapsed, ClientWaitElapsed: receipt.WaitElapsed, ClientWorkElapsed: receipt.WorkElapsed, ReceiptValid: true}
 	if processErr != nil && out.Failure == "" {
 		out.Failure = "process"
+	}
+	if nativeTrafficRecordedDeadline(ctx, out, processErr, deadline, time.Now()) {
+		return out, errNativeTrafficRecordedDeadline
 	}
 	if processErr != nil || out.Failure != "" || out.Batches != nativeTrafficBatches || out.Records != nativeTrafficRecords || out.Bytes != nativeTrafficPayload || !out.LastAcknowledged || out.LastStatus != http.StatusOK || out.LastBodyBytes != nativeTrafficRecordsPerBatch*nativeTrafficRecordBytes || out.ClientWaitElapsed <= 0 || out.ClientWorkElapsed <= 0 || phase.Err() != nil {
 		return out, errors.New("owned traffic phase incomplete")

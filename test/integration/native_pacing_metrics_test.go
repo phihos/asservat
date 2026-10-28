@@ -45,6 +45,27 @@ type nativePacingPhase struct {
 	ProviderDelta map[string]nativeProviderCounters
 }
 
+// Optional target-cgroup diagnostics are independent of authority and artifact
+// qualification. Missing or discontinuous data is explicit, never a zero delta.
+type nativePacingTargetCPU struct {
+	Before, After                                   *nativeTrafficCPU
+	BeforeAvailable, AfterAvailable, DeltaAvailable bool
+	Delta                                           map[string]uint64
+}
+
+func nativePacingTargetCPUSamples(before, after *nativeTrafficCPU) nativePacingTargetCPU {
+	out := nativePacingTargetCPU{Before: before, After: after, BeforeAvailable: before != nil, AfterAvailable: after != nil}
+	if before == nil || after == nil || before.StartedAt.IsZero() || before.FinishedAt.Before(before.StartedAt) || after.StartedAt.Before(before.FinishedAt) || after.FinishedAt.Before(after.StartedAt) {
+		return out
+	}
+	delta, err := nativeTrafficCPUDelta(*before, *after)
+	if err == nil {
+		out.Delta = delta
+		out.DeltaAvailable = true
+	}
+	return out
+}
+
 type nativePacingMeasurement struct {
 	traffic                                                  nativeTrafficHelper
 	admin                                                    *pgxpool.Pool
@@ -52,6 +73,8 @@ type nativePacingMeasurement struct {
 	providers                                                *initialRuntimeNativeProviders
 	Phases                                                   []nativePacingPhase `json:"phases"`
 	Traffic                                                  nativeTrafficResult
+	TargetCPU                                                nativePacingTargetCPU
+	TrafficEndedAtDeadline                                   bool
 	TrafficStartedAt, TrafficFinishedAt, ExecutionObservedAt time.Time
 	Owner                                                    nativePacingOwnerReport
 	Bodies                                                   map[string]nativePacingResult

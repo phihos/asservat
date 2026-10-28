@@ -295,8 +295,8 @@ remain its original qualification. For this separate near-full experiment,
 review the builtin recorder's existing 8 MiB cap, `packetAfter=10s`, `actionTimeout=20s` and finite
 composition limits before approval. No duration changes after acceptance are
 allowed. Keep the product's current 8 MiB native cap.
-After the exact accepted capture reports Running, run sixteen batches of 4,096 flushed 64-byte writes
-at 500 ms start intervals. Maximum application payload is 4 MiB; traffic phase
+After the exact accepted capture reports Running, attempt up to sixteen batches of 4,096 flushed 64-byte writes
+at the existing 250 ms start intervals. Maximum application payload is 4 MiB; traffic phase
 ends after 8.5 s or the earlier original context, with no retry. Record real
 capture/traffic timestamp overlap. Public Running records execution start before gadget attachment; it is not an attach-ready signal. Record the execution observation and traffic interval, then verify actual retained packets and timestamps. An undersized result fails without retry. TCP segmentation, ACKs and PCAPNG overhead are
 not predictable from application writes; measure them.
@@ -727,3 +727,103 @@ regression retained the predicate and original refusal. Full affected races
 passed: PostgreSQL adapter 2.578s and capture application 10.969s. Canonical
 pre-push exited 0, including 218 console tests. These are local diagnostic
 checks; the actual installed predicate remains unknown until reviewed evidence.
+
+
+### Traffic CPU-limit probe preparation
+
+Native run 40626149448 on exact e362198b passed approved submission (original
+OutcomeUnknown resolved accepted), then completed seven batches/28,672 records
+and 2,079,488 bytes including the partial final response before its original
+8.5-second cutoff. Parent elapsed 8.506379923s; client 8.449882540s, scheduled
+wait 31,349ns and HTTP work 8.449840711s. Receipt valid; no PCAP/download phase
+was reached. Go exited 1 in 605.117s; the subcase took 147.13s. All 3,231 source hashes matched,
+sources remained unchanged and cleanup completed; environment SHA256
+059e4b35064e6e6c5eb649cc2a05a5652f68cdc129a10af3cca03662a1d07069,
+paced report SHA-256 48b895935c7d533dbcd32405c8d72b893d287357bac4e4e6f35f9a989798abc7.
+
+The former successful local traffic probe used restrictedPod with no resource
+limits. The installed regional target instead requests 5m CPU / 16Mi and is limited
+to 100m CPU / 64Mi. That mismatch means its 3.811s measurement did not qualify the
+installed traffic workload. The probe now uses those exact resources, retaining
+sixteen 4096-write batches, 64-byte flushes, 4 MiB total payload, one in-flight request,
+no retry and the original 8.5s phase. Its Go harness has an explicit 2m aggregate
+bound; installed 20m job / 18m Go limits remain unchanged.
+
+Test-only before/after reads pin the target Pod UID/container ID and owned node,
+obtain that container's current PID from CRI, and read only its cgroup cpu.max and
+six CPU counters through the owned node. Output is bounded; quota must equal 100m
+and deltas reject changed identity, missing data or backward counters. The wall
+interval includes node-side command overhead; CPU counters cover the target
+cgroup, including its background work, and do not attribute collector CPU. No
+workstation collector/BPF/Gadget runs, resource increase, extra traffic, new
+service, production permission or runtime machinery is introduced. This is a
+probe preparation, not a result or established cause of the installed failure.
+
+
+The first local launch stopped before fixture creation with an uninitialized
+probe flag in the new artifact-cleanup prelude. The ordering is corrected and a
+pure prelude test now reaches the selection boundary with external effects
+forbidden. That failed launch is retained; it measured no traffic or CPU.
+
+### Let the actual artifact decide the installed traffic experiment
+
+The installed fixture's sixteen-ACK prerequisite was an agent-authored traffic
+volume surrogate, not a maintainer requirement or a product guarantee. Native
+40626149448 supplied seven complete real HTTP batches and a partial eighth until
+the unchanged 8.5s cutoff, then stopped before reading its recording. The actual
+near8MiB size is unknown. Sixteen ACKs also do not establish near-full PCAPNG;
+that separate artifact gate already measures the required result.
+
+The installed orchestrator now consumes its one attempted phase and proceeds
+only on normal full completion or a parent-derived non-nil deadline sentinel.
+The latter requires the original phase elapsed, live parent context, normal
+joined helper exit1 (not signal/WaitDelay/unknown), a valid closed receipt,
+>=1 acknowledged batch, real200 positive bytes, exact acknowledged-record and
+completed-plus-partial byte accounting and valid finite timings. The helper
+keeps its error, Failure=deadline, partial counts and absent final ACK. The report
+records TrafficEndedAtDeadline; this is not sixteen completed batches. Request,
+acknowledgement, receipt, shape, extra-output and other process errors still fail.
+No second traffic attempt, filler, changed packet bytes or replacement workload.
+The standalone traffic/CPU route probe still requires all sixteen ACKs and nil
+helper error.
+
+Qualification still requires actual authenticated native size8MiB minus at most
+64KiB, never above8MiB; exact full/range/hash/ETag/HTTP2 checks; real PCAP port and
+capture/traffic timestamp overlap; paced transfers beyond5s; the same original
+owner/window, renewal, three key slots, final outcomeACK and joined cleanup.
+An eligible incomplete traffic phase with a small actual artifact still fails.
+Traffic8.5s, capture10s, response20s, native8MiB, job20m and Go18m limits remain.
+This revises a fixture surrogate only; it establishes no new installed result.
+
+Optional before/after CPU snapshots reuse the existing exact target reader.
+Two short250ms diagnostic contexts consume existing time (command/scheduling
+overhead remains unmeasured), with at most two Pod GETs/four node commands. They
+add no workload resource or product privilege. Availability is explicit for each
+edge/delta; missing or discontinuous counters serialize a null delta, never a
+fabricated zero. Unavailable new CPU diagnostics do not gate authority or the
+artifact result. These counters cover the target cgroup/background work, not
+collector CPU; sample wall intervals include measurement-command overhead.
+
+A separate concrete cap defect surfaced in this work: embedding bytes.Buffer
+promoted its ReadFrom, so os/exec's io.Copy could bypass the custom Write bound.
+The local traffic-copy RED accepted2049 bytes, and actual local CPU-command REDs
+accepted8193/131073 bytes against intended8192/131072 caps. Named buffers remove
+that promoted method, retaining the same limits and normal outputs. Traffic also
+retains a sticky overrun flag because a known nonzero child exit can mask the
+copying error in Cmd.Wait. CPU commands already reject every Run error and need
+no additional state. Prior normal CPU samples remain truthful; this correction
+establishes the intended cap rather than changing those measurements. No extra
+collector, host fixture, runtime parser, configuration or service is added.
+
+Local contract RED exited1 (8.526s package): a closed, normal-exit deadline
+receipt was still refused before artifact inspection. The corrected focused race
+passed9.578s; the final22-test pure pacing/CPU selection passed23.498s under race,
+explicitly excluding all real PostgreSQL/Kubernetes cases and removing external
+fixture descriptors. The selected tests include signal/WaitDelay/unknown exits,
+parent cancellation, early/late clocks, missing traffic, false200/accounting,
+small actual file refusal, nullable CPU diagnostics and copied/command output
+bounds. The traffic-copy RED exited1/0.014s and both CPU-command size REDs
+exited1/0.019s; corrected copy/command races passed1.068s, with exact-limit normal
+outputs retained. Canonical pre-push exited0 with218 console tests. These local
+checks do not establish a near-full installed artifact or qualify native transfer;
+no external fixture, collector or hosted rerun occurred in this checkpoint.

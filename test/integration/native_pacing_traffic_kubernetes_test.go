@@ -10,6 +10,7 @@ import (
 	"time"
 
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -44,6 +45,8 @@ func TestNativePacingTrafficWithRealKubernetes(t *testing.T) {
 	pod.Spec.AutomountServiceAccountToken = ptr.To(false)
 	pod.Spec.Containers[0].Command = []string{"/provider-proxy", "signals"}
 	pod.Spec.Containers[0].Args = nil
+	// Match the installed target, which the former probe left unlimited.
+	pod.Spec.Containers[0].Resources = core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("5m"), core.ResourceMemory: resource.MustParse("16Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}}
 	pod.Spec.Containers[0].ReadinessProbe = &core.Probe{ProbeHandler: core.ProbeHandler{TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(8080)}}, PeriodSeconds: 1, TimeoutSeconds: 1, FailureThreshold: 30}
 	created, err := api.CoreV1().Pods("synthetic").Create(ctx, pod, meta.CreateOptions{})
 	if err != nil {
@@ -93,15 +96,26 @@ func TestNativePacingTrafficWithRealKubernetes(t *testing.T) {
 	if len(fields) != 2 || fields[0] != f.NativeTrafficHelper.SHA256 || fields[1] != "/asservat-fixture-traffic" {
 		t.Fatal("serialized descriptor differs from actual helper bytes")
 	}
+	beforeCPU, err := nativeTrafficTargetCPU(ctx, api, current)
+	if err != nil {
+		t.Fatal("exact target CPU baseline", err)
+	}
 	result, err := nativePacingNodeTraffic(ctx, f.NativeTrafficHelper, current.Spec.NodeName, current.Status.PodIP)
+	afterCPU, cpuErr := nativeTrafficTargetCPU(ctx, api, current)
+	delta, deltaErr := nativeTrafficCPUDelta(beforeCPU, afterCPU)
 	report := struct {
 		Helper                             nativeTrafficHelper
 		PodUID, PodIP, NodeUID, NodeBootID string
 		Result                             nativeTrafficResult
-	}{f.NativeTrafficHelper, string(current.UID), current.Status.PodIP, string(node.UID), node.Status.NodeInfo.BootID, result}
+		BeforeCPU, AfterCPU                nativeTrafficCPU
+		CPUDelta                           map[string]uint64
+	}{f.NativeTrafficHelper, string(current.UID), current.Status.PodIP, string(node.UID), node.Status.NodeInfo.BootID, result, beforeCPU, afterCPU, delta}
 	encoded, _ := json.MarshalIndent(report, "", "  ")
 	if writeErr := os.WriteFile("../results/native-traffic-probe.json", encoded, 0600); writeErr != nil {
 		t.Fatal(writeErr)
+	}
+	if cpuErr != nil || deltaErr != nil {
+		t.Fatal("exact target CPU measurement incomplete", cpuErr, deltaErr)
 	}
 	if err != nil || !result.ReceiptValid || result.Elapsed > nativeTrafficPhase {
 		t.Fatal("actual direct traffic incomplete", result, err)
