@@ -183,3 +183,32 @@ credit identity and current checks, using measured loop latency/fairness bounds.
 The existing collection loop is not implicitly an authority renewal. Do not add
 the held three-second machinery now. Default ongoing arming, manual raw authority
 and full installed S-04 workflows remain required and unfinished.
+
+## Input-gap adapter component (unwired)
+
+The pinned Gadget v0.57.0 tracer continues after perf loss and read/process
+errors. Its datasource lost-data method is a TODO; the adapter previously exposed
+only the final lost-sample count. This is a concrete accounting gap for a future
+raw predicate, rather than evidence of an observed production loss incident.
+
+A separate observed-capture entry point forwards typed lost/unknown notices from
+the existing exact logger format hooks. It never parses provider error text.
+It also rejects missing/inconsistent requested prefixes or undecodable input
+fields before delivering a frame. Notices and frames share the existing delivery
+mutex. The future node consumer must mark spend unknown, cancel its existing
+engine context and join from the outer owner; the callback must not join itself.
+The ordinary entry point supplies no notice callback and retains its behavior.
+No runtime caller uses the new entry point yet, and neither raw gate is opened.
+
+Complexity assessment: loss/read-error frequency is unmeasured and no new loss
+risk is claimed; stopping unknown input implements the existing observation
+contract. The published engine is retained instead of adding a custom collector.
+Added permissions, credentials, network calls, watches, goroutines, timers and
+configuration knobs: zero. Added fallback states: zero; existing unknown/spent
+semantics apply. Cost is one optional callback check per frame plus bounded
+prefix-length comparison for observed capture, and the existing mutex; no packet
+parser or additional predicate is added. Rollback removes the unused entry point.
+Unit tests exercise the pinned logger hooks and prefix bounds without starting a
+collector. Composed cancellation/join, real loss/prefix accounting and native
+qualification remain pending; final lost-sample totals alone do not prove prompt
+runtime stopping.
