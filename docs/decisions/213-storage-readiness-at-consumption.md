@@ -231,3 +231,24 @@ shorten it further. This is source-bound arithmetic, not a measurement of the
 failed request's prefix or proof of its exact cause. The deliberate two-minute
 preview-expiry wait can outlast both the 60s demand and raw 30s source binding.
 No earlier wakeup, extra demand, new deadline or TTL change is implemented here.
+
+The first authorized composed PG/S3 run on `f2f7d2a` failed initial Preview in
+all four cases (child 1.20s, Go 1.644s, exit 1), before the expired-row Request
+checks. All 3,347 source hashes and 35,980 tracked files were unchanged; cleanup
+was empty and exact owned resources were absent. Its environment SHA256 is
+`a64a0b594b1b1de65396d75536d7825c13bb69cd5f89f525efc3906c3a79b333`.
+This failed setup provides no composed expiry or admission qualification.
+
+Source review found a deterministic fixture error: its synthetic processing
+coverage used `now+5s` after the original identity/recovery bounds had already
+begun, while the real consumer rejects a proof beyond those bounds. A pure test
+reproduced this contract violation (exit 1, Go 0.014s) for both caller-first and
+recovery-first cutoffs. The fixture now intersects its five-second ceiling with
+the received caller deadline and original recovery freshness; the unchanged
+consumer still verifies every original bound. The focused race passes (exit 0,
+Go 1.060s). The fixture diagnostic callback now precedes initial Preview, so a
+later setup failure retains its fixed stage. The first failed run did not retain
+that stage; the deterministic defect is not presented as an observed Native
+cause. Independent source preflight of identity/permission, target/pin/class,
+capability, retention, preview and admission found no second concrete mismatch.
+Corrected composed PostgreSQL execution remains pending separate authorization.

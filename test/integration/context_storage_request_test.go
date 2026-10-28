@@ -39,9 +39,16 @@ func (s storageRequestTarget) ResolvePod(c context.Context, r targets.Request) (
 
 type storageRequestProcessing struct{}
 
-func (storageRequestProcessing) ContextProcessingCoverage(c context.Context, r value.ProcessingCoverageRequest, _ artifact.RecoveryProof) (value.ProcessingCoverage, error) {
+func (storageRequestProcessing) ContextProcessingCoverage(c context.Context, r value.ProcessingCoverageRequest, recovery artifact.RecoveryProof) (value.ProcessingCoverage, error) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	return value.ProcessingCoverage{Request: r, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, c.Err()
+	until := now.Add(5 * time.Second)
+	if deadline, ok := c.Deadline(); ok && deadline.Before(until) {
+		until = deadline
+	}
+	if recovery.FreshUntil.Before(until) {
+		until = recovery.FreshUntil
+	}
+	return value.ProcessingCoverage{Request: r, ObservedAt: now, FreshUntil: until}, c.Err()
 }
 
 type storageRequestRefresh struct {
@@ -81,10 +88,12 @@ func qualifyContextStorageRequest(t *testing.T, ctx context.Context, admin *pgxp
 				if err != nil {
 					t.Fatal(err)
 				}
+				var reason string
+				service.ReportPreviewFailure = func(stage string) { reason = stage }
 				target := s.a.Plan.Input.Target.Request
 				preview, err := service.Preview(ctx, source, value.ContextIntent{Target: targets.WorkloadRequest{ClusterID: target.ClusterID, Namespace: target.Namespace.Name, Kind: target.Workload.Kind, Name: target.Workload.Name}, Diagnostic: value.ContextDiagnosticName})
 				if err != nil {
-					t.Fatal("actual Request fixture preview failed", err)
+					t.Fatal("actual Request fixture preview failed", reason, err)
 				}
 				// An expired actual SQL row supplies non-authoritative original selection.
 				// These administrator-authored times are fixture facts, not a runtime
@@ -131,8 +140,7 @@ func qualifyContextStorageRequest(t *testing.T, ctx context.Context, admin *pgxp
 					}
 					return nil
 				}}
-				var reason string
-				service.ReportPreviewFailure = func(stage string) { reason = stage }
+				reason = ""
 				call := ctx
 				end := func() {}
 				if mode == "short-tail" {
@@ -176,3 +184,23 @@ func qualifyContextStorageRequest(t *testing.T, ctx context.Context, admin *pgxp
 }
 
 var _ app.ContextStorageReader = (*postgres.ContextStorageReader)(nil)
+
+func TestStorageRequestProcessingPreservesOriginalBounds(t *testing.T) {
+	for _, contextFirst := range []bool{false, true} {
+		t.Run(map[bool]string{false: "recovery-first", true: "caller-first"}[contextFirst], func(t *testing.T) {
+			now := time.Now().UTC().Truncate(time.Microsecond)
+			caller, recovery := now.Add(time.Second), now.Add(750*time.Millisecond)
+			if contextFirst {
+				caller, recovery = recovery, caller
+			}
+			c, cancel := context.WithDeadline(t.Context(), caller)
+			defer cancel()
+			r := value.ProcessingCoverageRequest{RootID: custodyID(), Location: artifact.Location{ClusterID: custodyID(), ArtifactID: custodyID(), AttemptID: custodyID()}, AnchorAt: now, DeleteBy: now.Add(time.Hour)}
+			r.Target.ClusterID, r.Target.NamespaceUID, r.Target.WorkloadUID, r.Target.PodUID = r.Location.ClusterID, custodyID(), custodyID(), custodyID()
+			got, err := (storageRequestProcessing{}).ContextProcessingCoverage(c, r, artifact.RecoveryProof{FreshUntil: recovery})
+			if err != nil || !got.Current(time.Now()) || got.Request != r || got.FreshUntil.After(caller) || got.FreshUntil.After(recovery) {
+				t.Fatal("synthetic processing exceeded original consumer proof bounds", err)
+			}
+		})
+	}
+}
