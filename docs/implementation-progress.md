@@ -1,6 +1,37 @@
 # Sustained implementation progress
 
 
+## Combined recording follow-ups before installed qualification (2026-10-28)
+
+The isolated diagnostic-only Native run
+[40767389365](https://github.com/phihos/asservat/actions/runs/40767389365)
+on `bda42ccb` failed before capture and history. The initial approved request
+returned `OutcomeUnknown`, then resolved `closed`; its correlated refusal was
+`request/facts/storage/expired/readiness-tail`. Go exited 1 after 604.791s
+(approved child 132.32s). All 3,390 retained source hashes matched the frozen
+commit, sources were unchanged, cleanup failures were empty and build scratch
+was removed. The complete hosted run took 1,051s with zero billable milliseconds.
+No history exchange or edited-preview result was obtained, so its original
+cancellation cause remains unresolved. No automatic replacement run followed.
+
+The combined candidate now contains the independently checked raw-policy replay
+correction, single-call foreground worker retirement, signed/peer history budget
+diagnostics, exact-preview initial-failure diagnostics, and migration 00103's
+initial storage-binding projection correction. Component evidence is recorded
+below, in [ADR-200](decisions/200-on-demand-capacity-refresh.md#measured-sql-result-2026-10-28)
+and [worker dispatch](architecture/download-worker-dispatch.md#owned-single-call-measurement).
+The projection correction is a separately reproduced defect; it is not an
+established cause of this installed failure. No caller/proof deadline, permission,
+quota or retry was relaxed. The owned SQL and Kubernetes fixtures are terminal,
+archived and cleaned up; no collector ran on this workstation.
+
+At this checkpoint the next work is final combined local checks, fresh PR review
+and exact-head CI, then guarded installed policy/history/paced qualification on
+one frozen candidate. Existing successful whole native bodies and component
+passes do not complete the failed installed workflows or S-04/S-02. PR #103
+remains a draft; no release, registry publication or public enablement is included.
+
+
 ## Exact-preview initial storage diagnostic qualified (2026-10-28)
 
 Fixture-only initial-failure evidence now queries the exact immutable preview's
