@@ -619,6 +619,8 @@ GRANT UPDATE(root_id) ON retention_source TO retention_preview_read_runtime;
 
 -- ADR-252: fixed read retention and exact current approval; no grant table access.
 GRANT EXECUTE ON FUNCTION context_preview_read_until(uuid,uuid) TO context_preview_runtime,context_preview_cleanup_runtime,context_request_resolution_runtime;
+-- ADR-200: mirror the compiled capture-preview duty; wakeup only, no table grant.
+GRANT EXECUTE ON FUNCTION demand_capacity_refresh(uuid,uuid,text,text,text,text,text) TO context_preview_runtime;
 GRANT EXECUTE ON FUNCTION lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea) TO capture_runtime,api_execution_read_runtime,api_execution_prepare_runtime,api_execution_runtime;
 
 -- ADR-255: existing metadata/retention facets read typed history obligations.

@@ -252,3 +252,31 @@ that stage; the deterministic defect is not presented as an observed Native
 cause. Independent source preflight of identity/permission, target/pin/class,
 capability, retention, preview and admission found no second concrete mismatch.
 Corrected composed PostgreSQL execution remains pending separate authorization.
+
+The second composed run on `991e3ff8` passed initial Preview but failed both
+fresh-source cases before their fixture publication (child 1.49s, Go 1.925s,
+exit 1). Both reported the recognized-expiry `demand-failed` decision with one
+demand attempt and zero captures. The failed-demand and short-tail cases passed,
+but the former exercised a real SQL permission failure, not its intended
+controlled failure after successful SQL. The short-tail case refused in 39.17ms
+with no demand; the failed-demand case took 37.10ms and had 3.9886s left on its
+original demand context. All 3,347 qualification source hashes and 35,980 tracked
+files were unchanged, cleanup was empty, and owned resources were absent.
+Environment SHA256:
+`6288350d8faf463e621f1552c515a16a5e5a4024c483b4d901c4d269f5ed8337`.
+
+The retained PostgreSQL log records three permission denials for the exact
+`demand_capacity_refresh` function. Production already supplies its exact
+`EXECUTE` right through the compiled capture-preview duty, alongside
+`context_preview_read_until`; the legacy owned fixture's preview role omitted
+that migration-66 right. The fixture now mirrors that existing one-function
+grant, with no production role or direct demand-table grant change. Before any
+case it checks both intended function rights, absence of demand-worker read
+rights and absence of direct demand-table INSERT. Per-case counters require the
+actual SQL method to succeed before the intentionally failed-wakeup path and
+require publication before claiming a fresh-source case. An unenrolled SQL call
+may still be a silent no-op; method success is not worker consumption or refresh
+acknowledgement. No enrolled-workload seeding, broader roles or source authority
+is added. The existing exact production-purpose role test passes under race
+(Go 1.046s); the fixture processing-bound preflight remains green (Go 1.060s).
+A further composed PostgreSQL execution remains pending separate authorization.

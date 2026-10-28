@@ -61,6 +61,16 @@ func (s storageRequestRefresh) DemandCapacityRefresh(c context.Context, r target
 
 func qualifyContextStorageRequest(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, create func(*testing.T, int64) captureAdmissionScenario) {
 	t.Run("storage-expiry-request-composition", func(t *testing.T) {
+		// The fixture role mirrors production capture-preview's two function
+		// rights, without the capacity worker's reader or direct table writes.
+		var previewRead, demandWrite, demandRead, directInsert bool
+		if err := admin.QueryRow(ctx, `SELECT
+ has_function_privilege('context_preview_runtime','context_preview_read_until(uuid,uuid)','EXECUTE'),
+ has_function_privilege('context_preview_runtime','demand_capacity_refresh(uuid,uuid,text,text,text,text,text)','EXECUTE'),
+ has_function_privilege('context_preview_runtime','read_capacity_refresh_demands(uuid)','EXECUTE'),
+ has_table_privilege('context_preview_runtime','capacity_refresh_demand','INSERT')`).Scan(&previewRead, &demandWrite, &demandRead, &directInsert); err != nil || !previewRead || !demandWrite || demandRead || directInsert {
+			t.Fatal("fixture preview/demand function rights differ from production duty", err)
+		}
 		for _, mode := range []string{"fresh-after-demand", "fresh-after-failed-demand", "failed-demand", "short-tail"} {
 			t.Run(mode, func(t *testing.T) {
 				s := create(t, 1)
@@ -118,7 +128,7 @@ func qualifyContextStorageRequest(t *testing.T, ctx context.Context, admin *pgxp
 				if !errors.Is(err, value.ErrStorageBindingExpired) || expired.Selection != preview.Preview.Storage {
 					t.Fatal("actual SQL expired source lost its original preview selection", err)
 				}
-				var submitted atomic.Int32
+				var submitted, sqlSucceeded, publications atomic.Int32
 				var waitLeft atomic.Int64
 				service.Refresh = storageRequestRefresh{run: func(c context.Context, r targets.Request) error {
 					submitted.Add(1)
@@ -128,10 +138,12 @@ func qualifyContextStorageRequest(t *testing.T, ctx context.Context, admin *pgxp
 					if err := demands.DemandCapacityRefresh(c, r); err != nil {
 						return err
 					}
+					sqlSucceeded.Add(1) // Method success may be an unenrolled no-op.
 					if mode == "fresh-after-demand" || mode == "fresh-after-failed-demand" {
 						if err := publish(c, false); err != nil {
 							return err
 						}
+						publications.Add(1)
 					}
 					// An uncertain/failed wakeup is not authority. A later independent
 					// current SELECT must still be accepted before that failure gate.
@@ -155,8 +167,8 @@ func qualifyContextStorageRequest(t *testing.T, ctx context.Context, admin *pgxp
 					t.Fatal(e)
 				}
 				if mode == "fresh-after-demand" || mode == "fresh-after-failed-demand" {
-					if err != nil || accepted.CaptureID != preview.Preview.CaptureID || captures != 1 || submitted.Load() != 1 {
-						t.Fatal("actual reader/request/admission failed independent fresh source", mode, err, captures, submitted.Load(), reason)
+					if err != nil || accepted.CaptureID != preview.Preview.CaptureID || captures != 1 || submitted.Load() != 1 || sqlSucceeded.Load() != 1 || publications.Load() != 1 {
+						t.Fatal("actual reader/request/admission failed independent fresh source", mode, err, captures, submitted.Load(), sqlSucceeded.Load(), publications.Load(), reason)
 					}
 					// Accepted idempotency must precede the now-expired source; no rearm.
 					if err := publish(ctx, true); err != nil {
@@ -173,11 +185,11 @@ func qualifyContextStorageRequest(t *testing.T, ctx context.Context, admin *pgxp
 						want = "request/facts/storage/expired/readiness-tail"
 						count = 0
 					}
-					if !errors.Is(err, value.ErrStorageBindingExpired) || captures != 0 || submitted.Load() != count || reason != want {
-						t.Fatal("actual expired read lost its bounded readiness refusal", err, captures, submitted.Load(), reason)
+					if !errors.Is(err, value.ErrStorageBindingExpired) || captures != 0 || submitted.Load() != count || sqlSucceeded.Load() != count || publications.Load() != 0 || reason != want {
+						t.Fatal("actual expired read lost its bounded readiness refusal", err, captures, submitted.Load(), sqlSucceeded.Load(), publications.Load(), reason)
 					}
 				}
-				t.Logf("actual SQL Reader→Request mode=%s request=%s original wait-left-at-demand=%s demands=%d captures=%d refusal=%q; source/target/processing provenance remains synthetic", mode, elapsed, time.Duration(waitLeft.Load()), submitted.Load(), captures, reason)
+				t.Logf("actual SQL Reader→Request mode=%s request=%s original wait-left-at-demand=%s demands=%d sql-succeeded=%d publications=%d captures=%d refusal=%q; source/target/processing provenance remains synthetic", mode, elapsed, time.Duration(waitLeft.Load()), submitted.Load(), sqlSucceeded.Load(), publications.Load(), captures, reason)
 			})
 		}
 	})
