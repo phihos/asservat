@@ -1997,3 +1997,25 @@ actual exit 0 including 231 console tests. Absolute log directory
 `/home/phil/.cache/asservat-build/approved-workflow/`: `policy102-companion-utc-fix-pre-push.log`
 and `policy102-companion-utc-fix-races-final.log`. Require one reviewed frozen
 companion-only rerun; no automatic repeat or other source composition first.
+
+Genuine companion focused run 2 at frozen d9f6652e passed actual terminal exit 0
+(Go 6.550 s, exact child 5.10 s, harness 23.808 s). Actual held original-grant
+source-cutoff rollback leaves API/session absent and both observed spends zero
+while original caller/check remain live. Fresh actual companion creates API1/
+session1 and 32 MiB INPUT RESERVATION per pool; canonical program/expectation,
+original start/end and original preparation NotAfter match. Exact replay is
+first=false and unchanged; still-live-fact collector epoch replacement refuses.
+No raw acquisition/native bytes, real node/process attestation, positive child
+retirement or complete graph backing is established by this component fixture.
+
+Archive before edits:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-genuine-companion-focused-2-artifacts/`;
+report policy102-genuine-companion-focused-2-environment.json SHA-256
+d93569fbc719f95e10a7272647ae2f83180576dbf5cccaf5ac3d8349b1a31ed9;
+raw same-prefix .log, terminal and independent hash/absence JSON retained. All
+3,282 hashes independently match frozen commit/disk; sourceUnchanged=true,
+cleanup [], exact asservat-custody-75j4f1sz-postgres, -s3 and network absent.
+The host external slot was explicitly released. No unchanged marker/migration/
+publisher/packet/snapshot/share/public suite repeats. Continue reviewed prefix/
+input-notice components, authenticated typed source/permit holder/node channel,
+real positive child retirement, backing and native qualification with raw closed.
