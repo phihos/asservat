@@ -296,6 +296,52 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if err != nil || !reflect.DeepEqual(got, p) {
 			t.Fatal("preview identity or original deadline changed", err)
 		}
+		// Exercise the exact fixture-only failure query against actual SQL and
+		// the immutable stored blueprint, without collection or enrollment.
+		facts, err := readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+		if err != nil || !facts.Preview || !facts.Binding || !facts.SelectedAllocation || facts.Enrolled || facts.Ready || facts.DemandRecorded || facts.DemandCurrent || !facts.ObservedAt.Time.Equal(s.a.Storage.ObservedAt) || !facts.FreshUntil.Time.Equal(s.a.Storage.FreshUntil) {
+			t.Fatal("exact preview storage diagnostic", facts, err)
+		}
+		missing, err := readInstalledInitialStorage(ctx, admin, p.RootID, custodyID())
+		if err != nil || missing.Preview || missing.Binding || missing.Enrolled || missing.DemandRecorded || !missing.Now.Valid {
+			t.Fatal("absent preview diagnostic", missing, err)
+		}
+		mismatch := fork(t, s, p.Actor, p.Deadline)
+		mismatch.Storage.AllocationID = custodyID()
+		if err := store.CreateContextPreview(ctx, mismatch); err != nil {
+			t.Fatal("immutable mismatched-selection witness", err)
+		}
+		facts, err = readInstalledInitialStorage(ctx, admin, p.RootID, mismatch.ID)
+		if err != nil || !facts.Preview || !facts.Binding || facts.SelectedAllocation {
+			t.Fatal("selected allocation mismatch diagnostic", facts, err)
+		}
+		// Administrator-only synthetic observations exercise the diagnostic;
+		// they do not constitute genuine enrollment or refresh qualification.
+		for _, seconds := range []int{3, 30} {
+			until := time.Now().UTC().Truncate(time.Microsecond).Add(-time.Second)
+			if _, err := admin.Exec(ctx, "UPDATE context_storage_binding SET observed_at=$2,fresh_until=$3 WHERE allocation_id=$1", p.Storage.AllocationID, until.Add(-time.Duration(seconds)*time.Second), until); err != nil {
+				t.Fatal("diagnostic original interval witness", err)
+			}
+			facts, err = readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+			if err != nil || facts.ShortInterval != (seconds == 3) || facts.ThirtySecondInterval != (seconds == 30) || !facts.Now.Time.After(facts.FreshUntil.Time) || facts.ReadyPublication {
+				t.Fatal("original binding interval diagnostic", facts, err)
+			}
+		}
+		for _, expired := range []bool{false, true} {
+			at := time.Now().UTC().Truncate(time.Microsecond)
+			if expired {
+				at = at.Add(-time.Minute - time.Second)
+			}
+			if _, err := admin.Exec(ctx, `INSERT INTO capacity_refresh_demand(root_id,cluster_id,namespace_uid,namespace_name,workload_kind,workload_name,workload_uid,requested_at,not_after)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$8::timestamptz+interval '60 seconds')
+ ON CONFLICT(root_id,cluster_id,namespace_uid,workload_uid) DO UPDATE SET requested_at=EXCLUDED.requested_at,not_after=EXCLUDED.not_after`, p.RootID, p.Target.ClusterID, p.Target.Namespace.UID, p.Target.Namespace.Name, p.Target.Workload.Kind, p.Target.Workload.Name, p.Target.Workload.UID, at); err != nil {
+				t.Fatal("diagnostic demand witness", err)
+			}
+			facts, err = readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+			if err != nil || !facts.DemandRecorded || facts.DemandCurrent == expired || !facts.DemandRequested.Time.Equal(at) || !facts.DemandNotAfter.Time.Equal(at.Add(time.Minute)) {
+				t.Fatal("original demand diagnostic", facts, err)
+			}
+		}
 		changed := p.Clone()
 		changed.Deadline = changed.Deadline.Add(time.Second)
 		if err := store.CreateContextPreview(ctx, changed); !errors.Is(err, capture.ErrConflict) {

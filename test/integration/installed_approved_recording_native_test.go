@@ -191,8 +191,19 @@ func (b *installedBrowser) approvedRecordingStepUp(t *testing.T, ctx context.Con
 	b.csrf = view.CSRF
 }
 
-func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string)) {
+func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string)) {
 	t.Helper()
+	// Initial MCP transport/read failures can diagnose and terminate inside
+	// helpers before recovery returns. Sample this one preview first, once.
+	initialStoragePreview := ""
+	fullDiagnose := diagnose
+	diagnose = func() {
+		if initialStoragePreview != "" {
+			initialStorageFailure(initialStoragePreview)
+			initialStoragePreview = ""
+		}
+		fullDiagnose()
+	}
 	if _, err := os.Stat("/etc/asservat-disposable-host"); err != nil {
 		t.Fatal("approved recording requires disposable runner", err)
 	}
@@ -469,6 +480,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 	}
 	continuation := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"], "continue_acquisition": true}
+	initialStoragePreview = preview.ID
 	initialCode := requestCapture(original)
 	t.Logf("approved submission initial public code=%q", initialCode)
 	closed, err := installedJourneyRecoverCapture(ctx, initialCode, func() (installedJourneyDisposition, error) {
@@ -496,6 +508,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		diagnose()
 		t.Fatal("approved expired-preview submission", "initial code", initialCode, "closed", closed, "error", err)
 	}
+	initialStoragePreview = ""
 	originalID := receipt.CaptureID
 	confirmReplay := func() {
 		if code := requestCapture(original); code != "" || receipt.CaptureID != originalID {
