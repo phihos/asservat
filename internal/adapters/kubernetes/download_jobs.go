@@ -579,38 +579,111 @@ func (s *DownloadWorkerJobs) acquisitionTermination(ctx context.Context, w value
 	copy(out.TerminationDigest[:], h.Sum(nil))
 	return out, nil
 }
+
+// A single acknowledged foreground DELETE can leave the original terminating
+// objects briefly visible. Only observation is repeated, within the existing
+// caller/five-second retirement bound: at most 20 GET/LIST rounds, 19 timers.
+const workerRetirementObservations = 20
+const workerRetirementPause = 100 * time.Millisecond
+
+type workerRetirementFailure struct {
+	step  string
+	cause error
+}
+
+func (e workerRetirementFailure) Error() string     { return "worker retirement unavailable" }
+func (e workerRetirementFailure) Unwrap() error     { return e.cause }
+func (e workerRetirementFailure) FixedStep() string { return "retirement/" + e.step }
+
 func (s *DownloadWorkerJobs) RetireAcquisitionWorker(ctx context.Context, t value.AcquisitionWorkerTermination) (value.AcquisitionWorkerRetirement, error) {
 	var out value.AcquisitionWorkerRetirement
 	if ctx == nil || !t.Valid(t.ObservedAt) || s == nil || t.Worker.Intent.Profile != s.profile {
 		return out, artifact.ErrInvalid
 	}
+	// Persisted termination is historical evidence, not renewable authority.
 	i := t.Worker.Intent
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	start := s.client.now()
+	current := func() bool {
+		if s.client.current(ctx, start, 5*time.Second) != nil {
+			return false
+		}
+		deadline, ok := ctx.Deadline()
+		return !ok || time.Now().Before(deadline)
+	}
+	refuse := func(step string, cause error) (value.AcquisitionWorkerRetirement, error) {
+		return out, workerRetirementFailure{step, cause}
+	}
 	j, e := s.historicalAcquisitionJob(ctx, t.Worker)
+	acknowledged := false
 	if e == nil {
 		if !workerJobTerminal(j) {
-			return out, artifact.ErrDownloadUnavailable
+			return refuse("historical", artifact.ErrDownloadUnavailable)
+		}
+		if !current() {
+			return refuse("current", artifact.ErrDownloadUnavailable)
 		}
 		uid := types.UID(t.Worker.Job.UID)
 		foreground := meta.DeletePropagationForeground
 		body, _ := json.Marshal(meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &uid}, PropagationPolicy: &foreground})
 		_, e = s.client.api.Delete().AbsPath("/apis/batch/v1/namespaces/" + i.Profile.Namespace + "/jobs/" + i.JobName()).Body(body).MaxRetries(0).DoRaw(ctx)
 		if e != nil && !apierrors.IsNotFound(e) {
-			return out, artifact.ErrDownloadUnavailable
+			return refuse("delete", artifact.ErrDownloadUnavailable)
 		}
+		acknowledged = e == nil
 	} else if e != errWorkerJobMissing {
-		return out, e
+		return refuse("historical", e)
 	}
-	if _, e = s.historicalAcquisitionJob(ctx, t.Worker); e != errWorkerJobMissing {
-		return out, artifact.ErrDownloadUnavailable
+	for attempt := 0; attempt < workerRetirementObservations; attempt++ {
+		if !current() {
+			return refuse("current", artifact.ErrDownloadUnavailable)
+		}
+		job, err := s.historicalAcquisitionJob(ctx, t.Worker)
+		pending := "job-present"
+		if err == nil {
+			// A replacement, changed spec, live Job or unacknowledged deletion may
+			// never be adopted or repeatedly deleted to turn this into success.
+			if !acknowledged || job.DeletionTimestamp == nil || !workerJobTerminal(job) {
+				return refuse("job-present", artifact.ErrDownloadUnavailable)
+			}
+		} else if err != errWorkerJobMissing {
+			return refuse("job-read", err)
+		} else {
+			if !current() {
+				return refuse("current", artifact.ErrDownloadUnavailable)
+			}
+			items, err := s.acquisitionPods(ctx, i)
+			if err != nil {
+				return refuse("pods-read", artifact.ErrDownloadUnavailable)
+			}
+			if len(items) == 0 {
+				if !current() {
+					return refuse("current", artifact.ErrDownloadUnavailable)
+				}
+				return value.AcquisitionWorkerRetirement{Termination: t, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, nil
+			}
+			if !acknowledged || len(items) != 1 {
+				return refuse("pods-present", artifact.ErrDownloadUnavailable)
+			}
+			pod, err := checkedHistoricalAcquisitionPod(t.Worker, items[0])
+			if err != nil || (pod.Status.Phase != core.PodSucceeded && pod.Status.Phase != core.PodFailed) || len(pod.Status.ContainerStatuses) != 1 || pod.Status.ContainerStatuses[0].State.Terminated == nil {
+				return refuse("pods-changed", artifact.ErrDownloadUnavailable)
+			}
+			pending = "pods-present"
+		}
+		if attempt == workerRetirementObservations-1 {
+			return refuse(pending, artifact.ErrDownloadUnavailable)
+		}
+		timer := time.NewTimer(workerRetirementPause)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return refuse("current", artifact.ErrDownloadUnavailable)
+		case <-timer.C:
+		}
 	}
-	items, e := s.acquisitionPods(ctx, i)
-	if e != nil || len(items) != 0 || s.client.current(ctx, start, 5*time.Second) != nil {
-		return out, artifact.ErrDownloadUnavailable
-	}
-	return value.AcquisitionWorkerRetirement{Termination: t, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, nil
+	return refuse("current", artifact.ErrDownloadUnavailable)
 }
 
 // Called only after the exact immutable Job and complete bounded Pod list have

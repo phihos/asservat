@@ -626,14 +626,6 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if err := finishUnpaced(); err != nil {
 			t.Fatal(err)
 		}
-		qualifyInstalledNativePacing(t, ctx, measurement, transport, identity, origin, evidence.Artifacts[0].ID, download, native, invoke, read, diagnose)
-	}
-	var finishChecks func() error
-	if measurement != nil {
-		finishChecks, err = measurement.begin(ctx, "joined-cleanup")
-		if err != nil {
-			t.Fatal(err)
-		}
 	}
 	path := "../results/approved-recording.pcapng"
 	if err := os.WriteFile(path, native, 0600); err != nil {
@@ -680,6 +672,18 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		if measurement.PacketsDuringTraffic == 0 {
 			t.Fatal("native PCAPNG has no measured traffic overlap")
+		}
+	}
+	// Retain and validate the authenticated control before later comparisons.
+	// A failed range preparation must not erase already downloaded native proof.
+	if measurement != nil {
+		qualifyInstalledNativePacing(t, ctx, measurement, transport, identity, origin, evidence.Artifacts[0].ID, download, native, invoke, read, diagnose)
+	}
+	var finishChecks func() error
+	if measurement != nil {
+		finishChecks, err = measurement.begin(ctx, "joined-cleanup")
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 	// This history branch qualifies the repeat in the canonical recording focus.
