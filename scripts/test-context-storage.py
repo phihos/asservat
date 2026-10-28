@@ -444,7 +444,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 build_scratch = Path(tempfile.mkdtemp(prefix="asservat-"+build_scope+"-build-", dir=tempfile.gettempdir()))
                 report["buildScratch"] = str(build_scratch)
             report["goVersion"] = run(["go", "version"])
-            report["installedHistoryBrowserQualification"] = approved_recording
+            report["installedHistoryBrowserQualification"] = collector_qualification and focus == "approved-recording"
             report["sourceHashes"] = source_hashes()
             if helm_bootstrap:
                 report["helmVersion"] = run(["helm", "version", "--short"])
