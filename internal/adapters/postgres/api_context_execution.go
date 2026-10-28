@@ -180,7 +180,7 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 
 // check locks recovery -> permission -> pool/allocation -> attempt -> capture,
 // re-evaluating the same ordinary evaluator after every blocking SQL wait.
-func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, topology privacyvalue.PolicyTopology, fn func(custodydb.ContextCapture) error) error {
+func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, topology privacyvalue.PolicyTopology, effectUntil *time.Time, fn func(custodydb.ContextCapture, *policyCaptureGrantState) error) error {
 	trust, err := s.guards.Recovery.lock(ctx, q, s.root, c.Recovery)
 	if err != nil {
 		return sqlStep{"recovery-lock", err}
@@ -213,8 +213,14 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 	if !bytes.Equal(attempt.RequestDigest, digest(normalized(e.Registration))) || attempt.State != artifact.Reserved {
 		return sqlStep{"attempt-state", value.ErrDenied}
 	}
+	var policyGrant *policyCaptureGrantState
 	check := func() error {
-		if err := currentRecordingGrant(ctx, q, accepted); err != nil {
+		if _, _, policy := authorization.PolicyExecutor(w.Actor); policy {
+			policyGrant, err = lockCurrentPolicyCaptureGrant(ctx, q, accepted, w.Accepted)
+		} else {
+			err = currentRecordingGrant(ctx, q, accepted)
+		}
+		if err != nil {
 			return sqlStep{"approval", err}
 		}
 		if err := s.guards.Recovery.check(ctx, q, trust, s.root, c.Recovery); err != nil {
@@ -242,7 +248,7 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 		if err != nil {
 			return sqlStep{"time", err}
 		}
-		if !c.Valid(now.Time) || !now.Time.Before(eligible.ValidUntil) {
+		if !c.Valid(now.Time) || !now.Time.Before(eligible.ValidUntil) || effectUntil != nil && !now.Time.Before(*effectUntil) {
 			return sqlStep{"expired", value.ErrExpired}
 		}
 		return ctx.Err()
@@ -250,14 +256,21 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 	if err = check(); err != nil {
 		return sqlStep{"expired", err}
 	}
-	if err = fn(accepted); err != nil {
+	if err = fn(accepted, policyGrant); err != nil {
 		return sqlStep{"effect", err}
 	}
 	return check()
 }
 func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.APIExecutionCheck) (value.APIExecution, bool, error) {
+	return s.prepareAPIExecution(ctx, c, nil)
+}
+
+func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.APIExecutionCheck, observation *policyObservationPreparation) (value.APIExecution, bool, error) {
 	var out value.APIExecution
 	var first bool
+	if sensitivePolicyRecording(c) && observation == nil {
+		return out, false, value.ErrDenied
+	}
 	if !authorization.UUID(c.Work.Accepted.CaptureID) || c.Work.Accepted.Expectation.ExecutionClass != artifact.ContextAPIExecution {
 		return out, false, value.ErrInvalid
 	}
@@ -272,7 +285,14 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 		out = value.APIExecution{}
 		first = false
 		headroomRefused = false
-		err := s.checked(ctx, q, c, topology, func(accepted custodydb.ContextCapture) error {
+		// Runtime source freshness is a separate ephemeral effect bound. It must
+		// not change Binding.NotAfter or the existing persisted preparation digest.
+		var sourceUntil *time.Time
+		if observation != nil {
+			originalSourceUntil := observation.source.FreshUntil
+			sourceUntil = &originalSourceUntil
+		}
+		err := s.checked(ctx, q, c, topology, sourceUntil, func(accepted custodydb.ContextCapture, policyGrant *policyCaptureGrantState) error {
 			row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: accepted.ID})
 			if errors.Is(err, pgx.ErrNoRows) {
 				e := c.Work.Accepted.Expectation
@@ -329,6 +349,16 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 			// and after this result, and every active effect keeps its cutoff.
 			if (first || out.Phase != "prepared") && !now.Time.Before(out.Binding.NotAfter) {
 				return sqlStep{"expired", value.ErrExpired}
+			}
+			if observation != nil {
+				if err := s.preparePolicyObservation(ctx, q, c, accepted, policyGrant, now.Time, first, observation); err != nil {
+					return sqlStep{"observation", err}
+				}
+				// New preparation must still have dispatch slack after all existing
+				// post-effect reads. Exact replay is passive even after its old startBy.
+				if first {
+					*sourceUntil = identity.Earlier(*sourceUntil, observation.permit.StartBy)
+				}
 			}
 			return nil
 		})
@@ -397,7 +427,7 @@ func (s *APIContextExecutions) changeAPIStart(ctx context.Context, c app.APIExec
 		return out, err
 	}
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		return s.checked(ctx, q, c, topology, func(_ custodydb.ContextCapture) error {
+		return s.checked(ctx, q, c, topology, nil, func(_ custodydb.ContextCapture, _ *policyCaptureGrantState) error {
 			row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: id(r.Binding.CaptureID)})
 			if err != nil {
 				return err

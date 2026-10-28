@@ -623,3 +623,7 @@ GRANT EXECUTE ON FUNCTION lock_approved_context_grant(uuid,uuid,uuid,text,text,t
 
 -- ADR-255: existing metadata/retention facets read typed history obligations.
 GRANT SELECT ON capture_history_parameter TO retention_runtime,retention_catchup_runtime,context_progress_read_runtime;
+
+-- ADR-261: existing audited finalization alone retires an expired observation
+-- child; cleaner/audit roles cannot delete or refund either observed pool.
+GRANT SELECT(root_id,capture_id),DELETE ON policy_observation_session TO context_cleanup_finalize_runtime;

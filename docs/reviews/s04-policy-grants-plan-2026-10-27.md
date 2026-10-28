@@ -1667,7 +1667,6 @@ facts; already-issued work retains only its original start bound. Storage owns
 this isolated source/node slice after the clean reviewed contract checkpoint.
 This agent owns later policy-only SQL/issuer/C09 composition; manual raw and
 longer finite/default ongoing modes remain unfinished.
-raw stays closed and longer finite/default ongoing modes remain unfinished.
 The ADR/spec-only checkpoint passed spec-check, architecture-check and design-check
 with actual exit 0 (176 requirements / existing scenario IDs retained). It makes
 no runtime/schema/permission or raw-availability change. The primary lifecycle
@@ -1678,3 +1677,102 @@ Contract review checked the actual dependency catalog (C-19 → C-24; all
 internal/domain owned by C-24), eliminating the unnecessary duplicate source
 value/conversion before any implementation. The single source observation API
 and fixed rule digest require no catalog/checker/permission expansion.
+
+Finite SQL implementation cost checkpoint (after source/node b6d153df): the
+observed requirement is pre-predicate input accounting for a sensitive policy
+packet action; the ordinary metadata path does not need this row. One original
+session per admitted capture adds one bounded heap row and three indexes, one
+INSERT and at most one terminal UPDATE plus DELETE (<=3 transitions, no renewal).
+The once-only grant/accepted counter debits serialize under existing authority
+locks; uncertain replies recover the original row and never rearm/refund. New
+preparation uses the same existing transaction and capture/expectation identity.
+No new table, credential, provider connection, watch, worker, timer or user knob.
+The node foundation's existing metadata response omits Source; only the explicit
+source query returns facts, preserving strict older wire decoders.
+
+The first prospective SQL additions are one session lookup, one active-session
+COUNT, two guarded counter UPDATEs and one INSERT, plus database-clock checks;
+these are SQL round trips, not zero network requests. Current original grant,
+accepted source and locked eligibility checks remain, with exact counts to be
+reported from the final composed implementation. Initial issuance uses no new
+provider signature. Concurrent first attempts serialize on the existing capture
+and grant/permission locks. Replay reads the original immutable tuple and does
+not recompute duration/credit/latestStart. Epoch/source change cannot rebind it.
+
+No global NativeRows 1->2 backing increase is made: ordinary metadata/manual/
+download captures have no observation child, and that change would increase
+aggregate native WAL units 30->44 (~47%) for unused capacity. The finite child
+has <=3 transitions, within the existing ten-transition engineering envelope;
+this does not prove its physical backing. The protected root metadata contract
+already covers the complete ordinary context/control/publication graph per
+capture (RecordRowBytes >=128 KiB, RecordWALBytes >=1 MiB). The next owned SQL
+qualification must measure the complete sensitive graph plus new row/index/WAL,
+including rollback/delete, against that accepted envelope before raw enablement.
+Do not silently assume spare bytes or change historical qualifications. If it
+cannot fit, use a purpose/plan-specific protected quantity, not a global ordinary
+cost increase or renewal-WAL service.
+
+Retirement belongs to the existing audited capture deletion finalizer: after
+positive writer quiescence/backend purge, acknowledged deletion audit and the
+same-transaction finalization claim/tombstone, delete that capture's session only
+after its immutable lease end. Retrying cannot delete a different capture or
+refund either observed pool. Unknown acquisition/completion remains charged and
+retains its backing until that existing protected lifecycle can finish; an
+elapsed lease alone is not writer/backend quiescence. No new sweeper is added.
+Raw admission remains closed pending SQL, exact node transport, prefix and native
+qualification. Manual raw and full ongoing-policy arming are separate unfinished
+requirements, not authorized by this policy-only implementation checkpoint.
+
+The implemented helper adds six round trips on first preparation: one original
+session read, one original acceptance read (counter only), one live session
+count, two observed-pool UPDATEs and one INSERT. Replay adds one session read,
+no updates/session/start. Four initially drafted extra database-clock reads
+were removed before qualification: preparation already reads current time after
+its API row lock, and checked() repeats original authority/storage/clock checks
+after the callback. The companion passes the original source cutoff as an independent ephemeral
+effect deadline to that SAME check, so a wait beyond it rolls back all SQL
+effects. Existing c.ValidUntil also enters persisted Binding.NotAfter, so it
+remains unchanged: source freshness changes no preparation/scope/digest identity.
+For a first insert only, the same temporary effect bound also clips to the
+immutable new startBy before the final checks; post-effect waits cannot commit a
+known unusable dispatch. Passive replay keeps the original expired receipt. INSERT
+also checks source/start cutoffs using database time. The finite window anchors
+the existing pre-helper timestamp (earlier is conservative), never a new time
+on replay. Existing original occurrence/grant locks are reused without another
+read chain. Count is acceptance-scoped under the existing permission lock, so
+two grants cannot evade the shared session ceiling. No provider/API calls,
+connections, signatures or renewable tasks are added.
+
+New privileges are explicit: the existing api-execution duty gains SELECT/INSERT
+on policy_observation_session and UPDATE only policy_acceptance.observed_bytes_spent
+and access_grant.policy_observed_bytes_spent. It already reads the original
+acceptance/grant and holds its id-only grant row-lock privilege. The installed
+hub-runtime union receives these exact new effects; no fresh credential or
+exported renderer for a retired standalone duty is introduced. Existing
+context-cleanup-finalize gains DELETE and SELECT(root_id,capture_id) only on the
+session table; its already-held checkpoint/attempt reads satisfy the deletion
+trigger. This adds one bounded DELETE round trip per actual terminal capture
+finalization, including a zero-row check for ordinary captures. Other cleanup
+facets cannot retire sessions. No end/renewal UPDATE privilege is granted.
+
+ObservationPermit now retains original StartBy and Duration alongside its
+original lease/credit. Reconstructing a fresh latestStart from a replay clock
+would extend dispatch, so those issued-work values must travel with the
+immutable permit. This is an unpublished private contract extension; existing
+local lease/meter semantics are unchanged. The companion preparer is not yet
+called by the runner or transported by C09. The shared raw compiler refusal is
+unchanged for manual and policy recording until complete qualification.
+
+Finite SQL source checkpoint local verification (before external qualification):
+make pre-push actual exit 0, including SQL generation, schema/spec/architecture,
+Go vet and 231 console tests. Full affected race command actual exit 0:
+postgres 2.589 s, bootstrap 54.614 s; execution, authorization, collector,
+targets and delivery cached passes. Logs:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-finite-sql-source-pre-push-final.log`
+and `policy102-finite-sql-source-races-final.log` in the same directory.
+New focused tests cover immutable SQL-row-to-permit replay, changed original
+identity/program/accounting/credit/dates, unusable finite dispatch, original
+source containment and exact role grants. These are local/pure component tests,
+not real SQL, source-authentication, byte-prefix, backing or native evidence.
+Next add actual generated-query rollback/immutable-row SQL markers, then genuine
+companion held-wait and same-work transport tests under the still-closed gate.

@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/collector"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
@@ -62,6 +63,15 @@ type APIExecutionPreparer interface {
 	PrepareAPIExecution(context.Context, APIExecutionCheck) (value.APIExecution, bool, error)
 	BindAPIStart(context.Context, APIExecutionCheck, value.APIExecution, value.PreparedStart) (value.APIExecution, error)
 }
+
+// PolicyRecordingPreparer is the finite policy-only companion. It atomically
+// commits the original API preparation and both observed-input pool debits.
+// The runner must not use the ordinary preparation for a sensitive policy action.
+// Implementing this port alone does not qualify or enable that acquisition mode.
+type PolicyRecordingPreparer interface {
+	PreparePolicyRecording(context.Context, APIExecutionCheck, targets.PacketSourceObservation) (value.APIExecution, bool, collector.ObservationPermit, error)
+}
+
 type APIExecutionRecorder interface {
 	RecordAPIStart(context.Context, APIExecutionCheck, value.APIExecution, value.Disposition) (value.APIExecution, error)
 	RecordAPIOutcome(context.Context, value.APIExecution, value.APIProcessObservation) (value.APIExecution, error)

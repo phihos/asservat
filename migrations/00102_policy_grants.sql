@@ -185,27 +185,46 @@ ALTER TABLE policy_source ADD COLUMN grant_attachment_id uuid;
 ALTER TABLE policy_source ADD CONSTRAINT policy_source_exact_grant_attachment
  FOREIGN KEY(root_id,policy_uid,grant_attachment_id) REFERENCES policy_grant_attachment(root_id,policy_uid,id);
 
--- One original recorder session/fence. Credit is cumulative and already spent
--- in both grant and acceptance pools, including an uncertain start/reply.
--- Authority renewal extends this same row; there is no refund or quota poller.
+-- ADR-261: one finite policy-only recorder session/fence. All input credit is
+-- spent in both original pools, including uncertain replies. No renewal/refund.
 CREATE TABLE policy_observation_session (
  id uuid PRIMARY KEY,
  root_id uuid NOT NULL,
  policy_uid text NOT NULL,
  acceptance_id uuid NOT NULL,
  grant_id uuid NOT NULL,
- capture_id uuid NOT NULL UNIQUE REFERENCES context_capture(id),
+ capture_id uuid NOT NULL UNIQUE,
+ attempt_id uuid NOT NULL REFERENCES custody_attempt(id),
  fence uuid NOT NULL,
+ action_id text NOT NULL CHECK(octet_length(action_id) BETWEEN 1 AND 128),
+ pod_uid text NOT NULL CHECK(octet_length(pod_uid) BETWEEN 1 AND 128),
+ node_uid text NOT NULL CHECK(octet_length(node_uid) BETWEEN 1 AND 128),
+ boot_id text NOT NULL CHECK(octet_length(boot_id) BETWEEN 1 AND 128),
+ collector_pod_uid text NOT NULL CHECK(octet_length(collector_pod_uid) BETWEEN 1 AND 128),
+ collector_epoch text NOT NULL CHECK(octet_length(collector_epoch) BETWEEN 1 AND 128),
+ expectation_digest bytea NOT NULL CHECK(octet_length(expectation_digest)=32),
+ program_digest bytea NOT NULL CHECK(octet_length(program_digest)=32),
+ binding_scope bytea NOT NULL CHECK(octet_length(binding_scope)=32),
+ accounting_rule bytea NOT NULL CHECK(accounting_rule=decode('4d3f2eea2ed280bd7017ea2398a4cde18d94daacbcc4c8741a98d52c56697453','hex')),
+ source_observed_at timestamptz NOT NULL,
+ source_fresh_until timestamptz NOT NULL,
  started_at timestamptz NOT NULL,
  session_until timestamptz NOT NULL,
  lease_until timestamptz NOT NULL,
- sequence bigint NOT NULL CHECK(sequence>0),
+ start_by timestamptz NOT NULL,
+ duration_millis bigint NOT NULL CHECK(duration_millis BETWEEN 1000 AND 15000),
+ sequence bigint NOT NULL CHECK(sequence=1),
  credit bigint NOT NULL CHECK(credit BETWEEN 1 AND 1099511627776),
  max_bytes_per_second bigint NOT NULL CHECK(max_bytes_per_second BETWEEN 1 AND 1073741824),
  ended_at timestamptz,
+ FOREIGN KEY(capture_id,root_id) REFERENCES context_capture(id,root_id),
  FOREIGN KEY(root_id,grant_id,acceptance_id,policy_uid) REFERENCES access_grant(root_id,id,policy_acceptance_id,policy_uid),
- CHECK(session_until>started_at AND session_until<=started_at+interval '1 hour'),
- CHECK(lease_until>started_at AND lease_until<=session_until),
+ CHECK(session_until>started_at AND session_until<=started_at+interval '20 seconds'),
+ CHECK(lease_until=session_until),
+ CHECK(start_by>started_at AND start_by<=started_at+interval '10 seconds'
+  AND start_by+duration_millis*interval '1 millisecond'<=lease_until),
+ CHECK(source_observed_at<=started_at AND source_fresh_until>started_at
+  AND source_fresh_until<=source_observed_at+interval '5 seconds'),
  CHECK(ended_at IS NULL OR ended_at>=started_at)
 );
 CREATE INDEX policy_observation_active ON policy_observation_session(root_id,acceptance_id,lease_until) WHERE ended_at IS NULL;
@@ -214,24 +233,30 @@ CREATE FUNCTION protect_policy_observation_session() RETURNS trigger
 LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
 BEGIN
  IF TG_OP='INSERT' THEN
-  IF NEW.sequence<>1 OR NEW.ended_at IS NOT NULL OR clock_timestamp()>=NEW.lease_until
-   OR NEW.lease_until>clock_timestamp()+interval '1 minute' THEN
+  IF NEW.ended_at IS NOT NULL OR clock_timestamp()>=NEW.start_by
+   OR clock_timestamp()>=NEW.source_fresh_until OR NEW.started_at>clock_timestamp()
+   OR NOT EXISTS(SELECT 1 FROM public.context_capture c WHERE c.id=NEW.capture_id
+     AND c.root_id=NEW.root_id AND c.attempt_id=NEW.attempt_id) THEN
    RAISE EXCEPTION 'invalid original observation session' USING ERRCODE='23514';
   END IF;
   RETURN NEW;
  END IF;
- IF TG_OP='DELETE' OR (to_jsonb(NEW)-ARRAY['sequence','credit','lease_until','ended_at'])<>(to_jsonb(OLD)-ARRAY['sequence','credit','lease_until','ended_at'])
-  OR OLD.ended_at IS NOT NULL THEN
-  RAISE EXCEPTION 'original observation session is immutable' USING ERRCODE='23514';
- END IF;
- IF NEW.ended_at IS NOT NULL THEN
-  IF (to_jsonb(NEW)-'ended_at')<>(to_jsonb(OLD)-'ended_at') THEN
-   RAISE EXCEPTION 'closing observation does not change credit' USING ERRCODE='23514';
+ IF TG_OP='DELETE' THEN
+  -- The same protected finalizer already proved writer/backend quiescence and
+  -- acknowledged encrypted deletion audit. An expired lease alone is not enough.
+  IF clock_timestamp()<OLD.lease_until OR NOT EXISTS(
+   SELECT 1 FROM public.context_deletion_checkpoint d
+   JOIN public.custody_attempt a ON a.id=d.attempt_id
+   WHERE d.root_id=OLD.root_id AND d.attempt_id=OLD.attempt_id AND d.capture_id=OLD.capture_id
+    AND d.audit_acknowledged_at IS NOT NULL AND d.finalization_xid=pg_current_xact_id()
+    AND a.state='deleted') THEN
+   RAISE EXCEPTION 'observation retirement requires finalized capture' USING ERRCODE='23514';
   END IF;
- ELSIF clock_timestamp()>=OLD.lease_until OR clock_timestamp()>=OLD.session_until
-  OR OLD.sequence=9223372036854775807 OR NEW.sequence<>OLD.sequence+1
-  OR NEW.credit<OLD.credit OR NEW.lease_until<OLD.lease_until OR NEW.lease_until>clock_timestamp()+interval '1 minute' THEN
-  RAISE EXCEPTION 'observation renewal cannot revive or refund' USING ERRCODE='23514';
+  RETURN OLD;
+ END IF;
+ IF OLD.ended_at IS NOT NULL OR NEW.ended_at IS NULL
+  OR (to_jsonb(NEW)-'ended_at')<>(to_jsonb(OLD)-'ended_at') THEN
+  RAISE EXCEPTION 'original finite observation session is immutable' USING ERRCODE='23514';
  END IF;
  RETURN NEW;
 END $$;

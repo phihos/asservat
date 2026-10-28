@@ -19,6 +19,11 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "policy_source", "", "SELECT"},
 		{"table", "access_grant", "", "SELECT"},
 		{"table", "access_grant", "id", "UPDATE"},
+		// ADR-261 finite policy-only once-only input reservation, not renewals.
+		{"table", "access_grant", "policy_observed_bytes_spent", "UPDATE"},
+		{"table", "policy_acceptance", "observed_bytes_spent", "UPDATE"},
+		{"table", "policy_observation_session", "", "SELECT"},
+		{"table", "policy_observation_session", "", "INSERT"},
 		{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"},
 		{"schema", "public", "", "USAGE"},
 		{"table", "authority_audit", "", "SELECT"},

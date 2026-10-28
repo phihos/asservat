@@ -144,45 +144,55 @@ func (r *policyCaptureReservation) spend(ctx context.Context, q *custodydb.Queri
 // Later effect checks keep the original charged grant, even after the policy
 // points at a replacement grant. Current policy/delegation eligibility remains
 // the caller's separate check; this cannot issue an execution permit.
+type policyCaptureGrantState struct {
+	reservation custodydb.PolicyOccurrence
+	grant       authorization.Grant
+}
+
 func currentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, row custodydb.ContextCapture, accepted value.Accepted) error {
+	_, err := lockCurrentPolicyCaptureGrant(ctx, q, row, accepted)
+	return err
+}
+
+func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, row custodydb.ContextCapture, accepted value.Accepted) (*policyCaptureGrantState, error) {
 	reservation, err := q.ReadPolicyCaptureReservation(ctx, custodydb.ReadPolicyCaptureReservationParams{RootID: row.RootID, ReservedCaptureID: row.ID})
 	if err != nil {
-		return value.ErrDenied
+		return nil, value.ErrDenied
 	}
 	source, err := q.ReadPolicySourceRow(ctx, custodydb.ReadPolicySourceRowParams{RootID: row.RootID, PolicyUid: reservation.PolicyUid})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	now, err := q.CurrentTime(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if source.ActiveID != reservation.AcceptanceID || source.Deleted || source.Suspended || !policySource(source).Valid(now.Time) {
-		return value.ErrDenied
+		return nil, value.ErrDenied
 	}
 	if !reservation.GrantID.Valid {
 		if accepted.Expectation.Recording != nil && accepted.Expectation.Recording.RequireApproval {
-			return value.ErrDenied
+			return nil, value.ErrDenied
 		}
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 	gr, err := q.ReadGrantForUpdate(ctx, custodydb.ReadGrantForUpdateParams{RootID: row.RootID, ID: reservation.GrantID})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	grant, err := grantFromRow(gr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	now, err = q.CurrentTime(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if grant.Policy == nil || gr.PolicyAcceptanceID != reservation.AcceptanceID ||
 		grant.Policy.RecipeDigest != accepted.Expectation.RecipeDigest ||
 		authorization.CheckPolicyGrantCurrent(grant, grant.Policy.Authority, grant.Policy.Workload(), now.Time) != nil ||
 		accepted.Deadline.After(grant.PolicyNotAfter) {
-		return value.ErrDenied
+		return nil, value.ErrDenied
 	}
-	return ctx.Err()
+	return &policyCaptureGrantState{reservation: reservation, grant: grant}, ctx.Err()
 }

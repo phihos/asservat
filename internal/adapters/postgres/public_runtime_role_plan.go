@@ -457,6 +457,10 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			// admits its FOR UPDATE lock, and the guard trigger refuses changes.
 			add("context_deletion_checkpoint", "UPDATE", "attempt_id", "audit_receipt_json", "audit_acknowledged_at")
 		case "context-cleanup-finalize":
+			// ADR-261: only the exact expired observation child, protected by the
+			// existing audited finalization transaction; no pool counter updates.
+			add("policy_observation_session", "SELECT", "root_id", "capture_id")
+			add("policy_observation_session", "DELETE")
 			// The one-use finalization claim, charge release, receipt clearing,
 			// tombstone and outbox event; triggers require the acknowledged audit.
 			add("context_deletion_checkpoint", "UPDATE", "attempt_id", "finalization_xid")

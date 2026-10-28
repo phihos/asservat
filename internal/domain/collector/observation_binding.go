@@ -39,8 +39,11 @@ func (b ObservationBinding) Valid() bool {
 type ObservationPermit struct {
 	Binding                             ObservationBinding
 	StartedAt, SessionUntil, LeaseUntil time.Time
-	Sequence                            uint64
-	Credit, BytesPerSecond              int64
+	// StartBy and Duration are the original finite issued-work fit, not renewal.
+	StartBy                time.Time
+	Duration               time.Duration
+	Sequence               uint64
+	Credit, BytesPerSecond int64
 }
 
 func (p ObservationPermit) Lease() ObservationLease {

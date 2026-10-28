@@ -2105,10 +2105,25 @@ type PolicyObservationSession struct {
 	AcceptanceID      pgtype.UUID
 	GrantID           pgtype.UUID
 	CaptureID         pgtype.UUID
+	AttemptID         pgtype.UUID
 	Fence             pgtype.UUID
+	ActionID          string
+	PodUid            string
+	NodeUid           string
+	BootID            string
+	CollectorPodUid   string
+	CollectorEpoch    string
+	ExpectationDigest []byte
+	ProgramDigest     []byte
+	BindingScope      []byte
+	AccountingRule    []byte
+	SourceObservedAt  pgtype.Timestamptz
+	SourceFreshUntil  pgtype.Timestamptz
 	StartedAt         pgtype.Timestamptz
 	SessionUntil      pgtype.Timestamptz
 	LeaseUntil        pgtype.Timestamptz
+	StartBy           pgtype.Timestamptz
+	DurationMillis    int64
 	Sequence          int64
 	Credit            int64
 	MaxBytesPerSecond int64
