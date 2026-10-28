@@ -22,6 +22,9 @@ import (
 // representation are synthetic. It does not supply public review authority.
 func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte, key string, recorder ...planvalue.PolicyRecorderConfiguration) string {
 	t.Helper()
+	// Role labels may repeat, but reviewed operations for distinct policies must
+	// use distinct original request keys under the same root and human actor.
+	requestKey := key + ":" + a.PolicyUID
 	role := narrowRole(t, ctx, admin, "policy_accounting_grant_"+key+"_", "synthetic-accounting", func(role string) []string {
 		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
 		if !ok {
@@ -91,16 +94,16 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: key, RequestDigest: app.PolicyGrantRequestDigest(a.Creator, app.PolicyGrantRequestInput{PolicyUID: a.PolicyUID, PolicyName: "restarts", IdempotencyKey: key, Lifetime: g.Lifetime, Limits: g.Policy.Limits})}, recovery)
+	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: requestKey, RequestDigest: app.PolicyGrantRequestDigest(a.Creator, app.PolicyGrantRequestInput{PolicyUID: a.PolicyUID, PolicyName: "restarts", IdempotencyKey: requestKey, Lifetime: g.Lifetime, Limits: g.Policy.Limits})}, recovery)
 	if err != nil {
 		t.Fatal("policy grant request", err)
 	}
-	g, _, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: g.ID, Approver: identity.Principal{Issuer: a.Creator.Issuer, Subject: "independent-component-reviewer", ClientID: "review-console", Kind: identity.Human}, Approve: true, Reason: "synthetic SQL review", ACR: "fixture-step-up", AuthTime: now, IdempotencyKey: key + "-approval"}, recovery)
+	g, _, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: g.ID, Approver: identity.Principal{Issuer: a.Creator.Issuer, Subject: "independent-component-reviewer", ClientID: "review-console", Kind: identity.Human}, Approve: true, Reason: "synthetic SQL review", ACR: "fixture-step-up", AuthTime: now, IdempotencyKey: requestKey + "-approval"}, recovery)
 	if err != nil {
 		t.Fatal("independent component decision", err)
 	}
 	actor := identity.Identity{Principal: a.Creator, Scopes: []string{"evidence:read", "evidence:capture"}, Groups: []string{"maintainers"}, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
-	if _, _, err = policies.AttachPolicyGrant(ctx, app.PolicyGrantAttachmentInput{ID: custodyID(), PolicyUID: a.PolicyUID, GrantID: g.ID, IdempotencyKey: key + "-attachment", Actor: actor, Recovery: recovery}); err != nil {
+	if _, _, err = policies.AttachPolicyGrant(ctx, app.PolicyGrantAttachmentInput{ID: custodyID(), PolicyUID: a.PolicyUID, GrantID: g.ID, IdempotencyKey: requestKey + "-attachment", Actor: actor, Recovery: recovery}); err != nil {
 		t.Fatal("current manager attachment", err)
 	}
 	return g.ID
