@@ -1609,3 +1609,63 @@ All 3,271 hashes independently matched, sourceUnchanged=true, cleanup [], exact
 report SHA-256 0a386c93e17813b52772714983890123417fcdc8dae12ccd1bb2ed6428c1758c.
 No automatic retry and no positive recorder admission/counter qualification yet.
 The root coordinates the next external slot separately from h2's Kind work.
+
+
+Recorder focused run 4 at frozen 6e12afa4 passed, actual terminal exit 0 (Go
+9.272 s, component child 7.82 s; packet 4.15 s / snapshot refusal 3.67 s;
+harness 12.032 s). Actual Tick pre-spent one accepted execution. Initial reviewed
+packet admission and exact replay retained one 8 MiB OUTPUT RESERVATION in each
+accepted/grant byte pool, one grant execution and one original reservation.
+Snapshot-only authority/attachment refused the recorder with zero output/grant
+reservations, retaining only the Tick execution. No packet acquisition, native
+artifact production/publication or collector execution occurred in this fixture.
+Reuse frozen f94be53c's 36.81 s policy-share/original-grant acquisition/revocation/
+status pass; no repeat was run solely to change log wording.
+
+All 3,271 hashes independently matched, sourceUnchanged=true, cleanup [], exact
+`asservat-custody-yh9zl_ac-postgres`, `-s3` and network absent. Archive before edits:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-recorder-focused-4-artifacts/`;
+report SHA-256 ee995b179a26b5d390a34c52c8ab2a1a6fcbe1941b8f8a290e8f5d13e91e2fd8.
+The host slot was released for h2; no further external run is authorized here.
+
+ADR-261 is an engineering revision accepted under the maintainer's proportionality
+instructions, not a maintainer choice of twenty seconds or download-rule reuse.
+New admission/permit issuance/renewal still checks original fresh facts after
+locks; already-issued work may start within its original shortened latestStart
+and continue only to its original <=20 s leaf inside every reviewed/hard bound.
+External source-change visibility retains its own lag; e.g. a qualified 5 s lag
+plus a 20 s leaf can compose to 25 s, rather than a universal twenty seconds from
+an external edit. An authoritative SQL grant revocation/recovery fence blocks
+later issuance under existing locks. No connected packet stop is currently
+implemented. Missing latest-start slack declines rather than extending a session.
+
+The rejected three-second renewal loop would add about four SQL transactions,
+four signatures and twelve RPC pairs per 15 s action (256/256/768 for 64 such
+actions), or 21.3 transactions/signatures and 64 RPC pairs/s for 64 continuing
+sources. A fitting finite action has zero renewal operations. Initial SQL/node
+binding, both pool debits, bounded terminal state and native checks remain; the
+provisional seven observation-specific statements and initial/provider latency
+must be measured. Initial permit data uses the existing authenticated same-work
+operation tied to the already signed capture/expectation; the current first
+signature happens before later SQL preparation, so do not claim it signs future
+permit bytes. No independent initial JWS operation is intended. No three-second
+renewal machinery, new worker/watch/service/table/credential/config is added.
+
+The node-source contract is agreed before implementation: C-24 collector values
+own byte-compatible ObservationBinding/Permit/rule and PacketSourceBinding with
+five exact strings (PodUID, NodeUID, BootID, CollectorPodUID, CollectorEpoch) plus
+original ObservedAt/FreshUntil. targets.PacketSourceObservation has the same seven
+primitive fields to avoid the real collector→planning→targets dependency cycle.
+RecorderAnswer.Source is optional facts only; bootstrap converts explicitly.
+EnqueuePacketExpected checks cancellation, original interval and exact tuple under
+the existing injected channel clock/mutex, with no extra deadline timer or new
+freshness knob. Work latestStart remains separate from source-fact freshness:
+a new enqueue needs fresh facts; already-issued work retains only its original
+start bound. Storage owns this isolated source/node slice after the clean contract
+checkpoint. This agent owns later policy-only SQL/issuer/C09 composition; manual
+raw stays closed and longer finite/default ongoing modes remain unfinished.
+The ADR/spec-only checkpoint passed spec-check, architecture-check and design-check
+with actual exit 0 (176 requirements / existing scenario IDs retained). It makes
+no runtime/schema/permission or raw-availability change. The primary lifecycle
+precedents were inspected at their pinned source versions; they support the
+admission/lifetime separation, not the engineering choice of twenty seconds.

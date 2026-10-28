@@ -1,7 +1,13 @@
 # Decision records
 
+[ADR-261 — Finite policy observation admission](261-finite-policy-observation-admission.md)
+records the engineering finite-window contract, original hard bounds, explicit
+revocation residual and held renewal machinery. Authority/prefix/native
+qualification remains pending; manual raw and ongoing modes are not enabled.
+
 [ADR-259 — Policy grants and observation spend](259-policy-grants-and-observation-spend.md)
-records the accepted team-policy grant and single authority/credit renewal design.
+records accepted team-policy grants and prepaid observation; ADR-261 refines the
+first finite policy lease without a periodic renewal loop.
 Implementation and installed qualification remain in progress.
 
 [ADR-253 — Approval step-up sign-in](253-approval-stepup-login.md) adds an explicit console

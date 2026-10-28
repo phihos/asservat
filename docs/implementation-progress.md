@@ -22,12 +22,26 @@ The next source slice composes finite onTrigger/before-zero network-header polic
 triggers through the existing recorder preview/request/occurrence path. Accepted
 settings issuer is immutable provenance, not creator reauthentication; current
 team delegation and final SQL action/grant/counter checks remain mandatory.
-Local unit/race and pure actual-libpcap measurements pass; the new real
-Tick/recorder admission fixture remains unqualified while its recorded fixture
-failures are corrected and reviewed. Sensitive
-raw predicates remain unavailable before occurrence spend, and genuine live
-observation adapter/channel/binding/native qualification plus ongoing arming are
-still required. No chart/public collection or installed recorder claim follows.
+Local unit/race and actual-libpcap pure compilation checks pass. The real
+Tick/reviewed recorder admission component now passes at frozen 6e12afa4
+(Go 9.272 s): one pre-spent accepted execution; initial admission plus exact
+replay retains one 8 MiB OUTPUT RESERVATION, one grant execution and one original
+occurrence/capture reservation. Snapshot-only authority refuses the recorder
+with zero output/grant reservations. No packets were collected or native artifact
+produced/published by this SQL fixture. All 3,271 source hashes matched; cleanup
+was empty and owned containers/network absent. Reuse f94be53c's separate 36.81 s
+policy-share/original-grant acquisition/revocation/status pass. Exact failures,
+fixes, archives and report hashes remain in the existing S-04 plan.
+
+[ADR-261](decisions/261-finite-policy-observation-admission.md) records the approved
+engineering finite policy-observation lease: fresh issuance facts, a separate
+active window of at most twenty seconds within original hard bounds, latestStart
+that fits the full finite action and no periodic renewal for a fitting short
+action. It is not a maintainer-selected interval or the download timing rule.
+Raw remains unavailable until actual SQL/node binding/transport, prefix/loss,
+retirement/backing and native qualification pass. Manual raw and default ongoing
+arming/renewal remain separate unfinished requirements. No chart/public collection
+or installed recorder claim follows.
 
 
 

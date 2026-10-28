@@ -30,16 +30,21 @@ existing bounded observation semantics, not unobserved raw ConfigMap history.
 Reuse existing projection identity/epoch/audit; no new watch/history service and
 no blanket revocation for benign resourceVersion changes.
 
-Observation input is separate from retained output. Reserve conservative byte
-credit before dispatch and charge original wire bytes before a sensitive predicate,
-including discarded packets. Piggyback cumulative credit extension on the
-current-authority renewal required for sensitive observation over the existing
-private node channel, preserving original session/fence, idempotent sequence
-and one outstanding RPC. Preserve unconsumed existing credit when the parent pool
-has no new credit. Unknown possibly-started credit stays spent. No independent
-quota renewal stream, two-slice machinery, per-packet network or refund protocol.
-Derive credit from reviewed rate times measured bounded authority horizon; compare
-full-session prepayment and tail waste before fixing the quantum.
+Observation input is separate from retained output. [ADR-261](261-finite-policy-observation-admission.md)
+refines the first policy-only, finite onTrigger/before-zero action: reserve once
+under current original facts, retain an active lease of at most twenty seconds
+inside every original hard bound, and use no periodic renewal for an action that
+fits. This is an engineering revision, not a maintainer-selected interval or the
+download timing rule. Already-issued work may start within its original shortened
+latest-start bound and may outlast revocation only to its fixed lease end.
+
+Charge whole original wire bytes before a sensitive predicate, including discarded
+packets. Keep uncertain/unused prepaid credit spent; no refund or timer refill.
+The once-only ceiling is the reviewed rate times finite duration plus the existing
+one-second burst, capped by review and both remaining original pools. Longer or
+ongoing authority renewal is separate unfinished work; if later implemented it
+must carry credit on the same due-only renewal, never a separate quota stream.
+Manual raw remains unavailable until genuine manual observation authority exists.
 
 Use only the pinned published Gadget and maintained compiler/decoder libraries.
 Verify actual published snaplen limits and compiler assumptions before lifting
@@ -56,12 +61,14 @@ UI and installed native proof before claiming this increment qualified.
 
 The [implementation plan](../reviews/s04-policy-grants-plan-2026-10-27.md) records
 all eleven complexity questions. No new watch, listener, collector credential or
-kernel/parser dependency. Metadata recording currently has no per-capture authority renewal. At an assumed
-five-second sensitive-authority interval, 200 active sources add 40 logical
-renewals/s; each node-to-connector and connector-to-hub RPC leg is counted
-separately. A separate 64 MiB credit stream at 16 MiB/s would increase the
-combined logical count to about 90/s and is rejected. Actual intervals and
-channel/SQL costs must be measured. Per-packet local meter cost needs ns/alloc benchmarks.
+kernel/parser dependency. Metadata recording currently has no per-capture authority renewal. The rejected
+provisional three-second loop at 64 active sessions would add about 21.3 renewal
+transactions/signatures and 64 RPC pairs per second; a fifteen-second action would
+need roughly four renewals. ADR-261 avoids those for fitting finite actions,
+retaining initial SQL/node binding and local checks. Its twenty-second active
+lease is distinct from the original current-check observations. Actual initial
+SQL/provider/dispatch and native costs remain unmeasured; local meter/compile
+benchmarks do not establish the complete workflow cost.
 
 Tests must prove requester/executor separation, independent review, original-time
 clamping, no refill on grant replacement/restart, atomic quota/grant admission,
@@ -216,5 +223,6 @@ to microseconds. Historical replay has no new step-up requirement. This fixes th
 concrete held-row wait risk; post-commit metadata refusal alone is insufficient.
 There is no new permission read, watcher or immediate permission-change rule.
 Unit RED covers blocked request/review caller loss and original reviewer expiry;
-real held-row SQL mutation refusal and encrypted public composition remain
-unqualified until their selected owned fixture actually passes.
+real held-row SQL mutation refusal and encrypted public composition now pass
+the selected frozen 8caf2ee4 fixture; exact provenance and remaining installed
+qualification are recorded in the implementation plan.
