@@ -2058,3 +2058,38 @@ labeling its fixed diagnostic correctly; final spec/architecture/Go architecture
 (67 packages/402 internal edges) and vet all actual exit0. Absolute logs
 policy102-typed-source-final-c09-races.log and policy102-typed-source-final-checks.log.
 No external fixture or collector ran for this source batch.
+
+Prepared actual holder/retirement fixture candidate (not externally run): the
+same companion child now samples the closed31-table graph before policy creation,
+uses its original first=true receipt to prepare actual encrypted output, queues
+through the actual expected-source NodeChannel, polls exactly that work and
+routes one synthetic PCAPNG through the actual holder/producer. The maintained
+recorder constructs SYN frames with the exact reviewed11-instruction program;
+this is synthetic input with no collector, Gadget or live observation measurement.
+Node attestation and certificate issuance remain explicit synthetic interfaces;
+this is not actual TLS/Pod attestation or installed C09 qualification. The original
+source and check remain live at start; no refresh/reissue occurs between receipt
+and queue. Completion refreshes only the same process/recovery facts.
+
+Only after actual stored completion and SQL acknowledgement does the reviewed
+retirement helper run: restrictive retention, actual complete backend purge,
+separate signed/encrypted deletion audit acknowledgement, early rollback, natural
+original lease expiry, wrong-transaction refusal, then exact narrow finalization.
+It retains the original API receipt and both conservative input spends. A fresh
+synthetic caller preflight then exercises the actual companion's terminal refusal
+and independently checks zero children, one stored receipt and unchanged spends.
+The existing held-row cutoff/replay/incarnation assertions remain in this one
+capture; no second capture is manufactured for the lifecycle matrix.
+
+Whole-graph tuple counts, relation/index/TOAST sizes and global fixture-inclusive
+WAL edges remain explicitly UNQUALIFIED component samples: this fixture seeds raw
+pools and has no accepted protected RootMetadataQualification. No comparison to
+minima, native-byte overhead estimate or supported backing guarantee is inferred;
+largest accepted identities/program/composition and installed backing remain open.
+This candidate changes test fixtures only after reviewed holder df877458 and
+retirement helper34f8d678 (composed2cf49384); no production role/query/limit change.
+Local final offline raw/header admission and synthetic-program races pass1.092s;
+pre-push actual0 including231console. Absolute logs in approved-workflow cache:
+policy102-typed-holder-retirement-preflight-final.log and
+policy102-typed-holder-retirement-pre-push.log. Await one reviewed frozen owned
+PG/S3 run of the existing exact companion child; no broader repeat or collector.

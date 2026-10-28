@@ -4,17 +4,22 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
+	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
+	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/collector"
 	executionvalue "asservat.local/asservat/internal/domain/execution"
+	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"reflect"
@@ -58,9 +63,10 @@ func policyRawCompile(raw json.RawMessage) (value.PolicyRecorderConfiguration, e
 }
 
 // Actual companion transaction with real accepted policy/occurrence/grant and
-// frozen raw scope. Target/process/node facts remain synthetic control inputs;
-// neither runtime raw gate is opened and no engine/packet/native artifact runs.
-func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, current *postgres.AutomationAuthorities, authority authorization.AcceptedPolicyAuthority, admission capture.Admission, accepted capture.Accepted, acceptance, grant string) {
+// frozen raw scope, typed queue, encrypted producer and audited retirement.
+// Target/process/node trust and packet inputs remain synthetic component facts;
+// neither runtime raw gate is opened and no collector/engine runs.
+func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, current *postgres.AutomationAuthorities, authority authorization.AcceptedPolicyAuthority, admission capture.Admission, accepted capture.Accepted, acceptance, grant string, before *policyObservationGraphSample) {
 	t.Helper()
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 	guard := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
@@ -80,6 +86,24 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 	e := accepted.Expectation
 	process := executionvalue.APIProcessBinding{InstallationID: authority.InstallationID, ClusterID: authority.ClusterID, IssuerEpoch: admission.Recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: e.CollectorImageDigest}
 	node, boot, collectorPod, epoch := custodyID(), custodyID(), custodyID(), custodyID()
+	// The actual queue is exercised with explicitly synthetic attestation and
+	// issuance. No native collector, certificate or Kubernetes proof is claimed.
+	channel, err := delivery.NewNodeChannel(policyObservationNode{collector.Identity{NodeName: "worker", NodeUID: node, PodUID: collectorPod, BootID: boot}}, policyObservationNodeIssuer{}, clock, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, _, nodeIdentity, err := channel.Enroll(ctx, "synthetic-component", []byte("synthetic-token"), []byte("synthetic-csr"), boot, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer, err := channel.Peer(sha256.Sum256(der))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = channel.Report(peer, epoch, collector.Report{Sequence: 1, ObservedAt: clock(), Facts: collector.Facts{Kernel: collector.KernelVersion{Major: 6, Minor: 8}}, Mechanisms: []collector.Availability{{Mechanism: collector.MechanismPacket, Prerequisites: true, Adapter: collector.AdapterAvailable, Hook: collector.HookTC}}}); err != nil {
+		t.Fatal(err)
+	}
+
 	refresh := func() (executionapp.APIExecutionCheck, targets.PacketSourceObservation) {
 		t.Helper()
 		n := clock()
@@ -241,6 +265,7 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 		t.Fatal("actual companion bound wrong original values", permit)
 	}
 	read(credit)
+	originalSource := source
 	again, second, original, err := executions.PreparePolicyRecording(ctx, check, source)
 	if err != nil || second || !reflect.DeepEqual(again, r) || original != permit {
 		t.Fatal("actual exact companion replay rearmed/refilled", second, err)
@@ -254,5 +279,121 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 		t.Fatal("actual companion rebound original session to replacement epoch", first, err)
 	}
 	read(credit)
-	t.Logf("ACTUAL companion initial/replay: one API preparation +one session; accepted/grant input reservation=%d each, sequence1, canonical program+expectation matched, original start/end unchanged; no raw acquisition", credit)
+	t.Logf("ACTUAL companion initial/replay: one API preparation +one session; accepted/grant input reservation=%d each, sequence1, canonical program+expectation matched, original start/end unchanged", credit)
+	// Reuse only the original positively acknowledged receipt. The passive replay
+	// above never creates keys, queues a second work item or issues more input.
+	bound, err := store.ForCustody(e.Registration.StoreID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	producer, err := objectstore.NewArtifactProducer(bound, keys, recordingJournal{}, clock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preparedArtifact, err := producer.Prepare(ctx, e, "")
+	if err != nil {
+		t.Fatal("raw component output preparation", err)
+	}
+	holder := bootstrap.NewConnectorRecordings(channel, nil, clock, func(line string) { t.Log(line) })
+	channel.SetPacketSink(holder)
+	prepared := holder.Prepare(preparedArtifact, e)
+	defer prepared.Close()
+	r, err = executions.BindAPIStart(ctx, check, r, executionvalue.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disposition := executionvalue.Disposition{ObjectUID: r.ObjectUID, ResourceVersion: "2", Phase: executionvalue.StartCommitted, CommittedAt: clock(), MayStart: true, ValidUntil: r.Binding.NotAfter}
+	r, err = executions.RecordAPIStart(ctx, check, r, disposition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !originalSource.Valid(clock()) || !permit.ValidFinite(clock()) {
+		t.Fatal("fixture consumed original source/start before typed holder")
+	}
+	queued, err := prepared.StartPolicyRecording(ctx, accepted.Pin, r.StartedAt, disposition.ValidUntil, originalSource, permit)
+	if err != nil {
+		t.Fatal("actual typed policy holder", err)
+	}
+	work, err := channel.Poll(ctx, peer, epoch, 0, 0)
+	if err != nil || len(work) != 1 || work[0].Packet.Observation == nil || *work[0].Packet.Observation != permit || !work[0].NotAfter.Equal(permit.StartBy) {
+		t.Fatal("actual queue original finite work", work, err)
+	}
+	// Synthetic PCAPNG enters the actual producer path after the finite interval.
+	// This is not a Gadget run, metered input measurement or native qualification.
+	native := syntheticFilteredRecording(t, queued.Add(100*time.Millisecond), policyRawProgram, 2)
+	resultPacket := collector.PacketResult{WorkID: work[0].ID, CaptureID: accepted.CaptureID, StartedAt: queued.Add(100 * time.Millisecond), EndedAt: queued.Add(1100 * time.Millisecond), Seen: 50, Retained: 50, CapturedBytes: int64(len(native)), Snaplen: artifact.RecordingSnaplen, ProgramDigest: work[0].Packet.ProgramDigest}
+	if !resultPacket.Valid() {
+		t.Fatal("assembled synthetic packet result invalid", resultPacket)
+	}
+	if wait := time.Until(resultPacket.EndedAt); wait > 0 {
+		time.Sleep(wait)
+	}
+	if err = channel.DeliverPacket(ctx, peer, epoch, resultPacket, bytes.NewReader(native)); err != nil {
+		t.Fatal("actual channel/holder storage", err)
+	}
+	if err = channel.DeliverPacket(ctx, peer, epoch, resultPacket, bytes.NewReader(native)); err == nil {
+		t.Fatal("duplicate finite delivery accepted")
+	}
+	signed := fleet.APIContextWork{CaptureID: accepted.CaptureID, AttemptID: e.Registration.Location.AttemptID, ExpectationDigest: evidence.ContextExpectationDigest(e)}
+	collected, err := holder.Collect(signed)
+	if err != nil || collected.State != evidence.RecordingStored || !collected.Completion.Valid(e.Registration) {
+		t.Fatal("actual stored/joined completion", collected, err)
+	}
+	// Outcome facts refresh only this same process/recovery observation. They do
+	// not reissue the grant, source, lease, packet action or observation credit.
+	processAt := clock()
+	currentRecovery, err := s.recovery.reader.RecoveryState(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.CompletedAt = collected.Completion.StoredAt
+	r.Phase = "stored"
+	r.Copies = collected.Completion.Copies
+	r.AcquiredAt = collected.Acquired
+	r, err = executions.RecordAPIStoredCompletion(ctx, r, collected.Completion, executionvalue.APIProcessObservation{Binding: process, CheckedAt: processAt, ValidUntil: processAt.Add(5 * time.Second)}, currentRecovery)
+	if err != nil {
+		t.Fatal("actual finite stored completion ACK", err)
+	}
+	t.Logf("ACTUAL companion -> typed holder -> exact channel -> joined encrypted producer -> stored SQL ACK; synthetic node/process/packet inputs, node=%s, synthetic PCAPNG bytes=%d, INPUT RESERVATION=%d unchanged", nodeIdentity.NodeUID, len(native), credit)
+	qualifyPolicyObservationRetirement(t, ctx, admin, poolFor, store, keys, policyObservationRetirementInput{Scenario: s, Accepted: accepted, Execution: r, Completion: collected.Completion, Permit: permit, AcceptanceID: acceptance, GrantID: grant, Before: before})
+	// A new caller may observe current facts, but cannot turn the terminal
+	// original attempt back into a preparation or create a replacement session.
+	check, source = refresh()
+	if !check.Valid(clock()) || !source.Valid(clock()) {
+		t.Fatal("terminal-refusal preflight lost fresh original-identity facts")
+	}
+	if _, first, p, err := executions.PreparePolicyRecording(ctx, check, source); err == nil || first || p != (collector.ObservationPermit{}) {
+		t.Fatal("retired original attempt rearmed with fresh caller facts", first, err)
+	}
+	var children, apiRows, acceptedInput, grantInput int64
+	if err = admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2),
+       (SELECT count(*) FROM context_execution WHERE root_id=$1 AND capture_id=$2 AND phase='stored'),a.observed_bytes_spent,g.policy_observed_bytes_spent
+       FROM policy_acceptance a JOIN access_grant g ON g.root_id=a.root_id AND g.id=$4 WHERE a.root_id=$1 AND a.id=$3`, s.a.RootID, accepted.CaptureID, acceptance, grant).Scan(&children, &apiRows, &acceptedInput, &grantInput); err != nil || children != 0 || apiRows != 1 || acceptedInput != credit || grantInput != credit {
+		t.Fatal("terminal refusal changed retained receipt or spend", children, apiRows, acceptedInput, grantInput, err)
+	}
+	t.Log("ACTUAL companion fresh-input terminal refusal retains original stored API receipt, zero observation children and unchanged conservative INPUT RESERVATIONS")
+}
+
+// Synthetic node trust exists only in this SQL/storage component fixture. The
+// queue, source comparison, result ownership and holder storage are real code.
+type policyObservationNode struct{ identity collector.Identity }
+
+func (n policyObservationNode) PrecheckNode([]byte) error { return nil }
+func (n policyObservationNode) AttestNode(context.Context, []byte, string) (collector.Identity, error) {
+	return n.identity, nil
+}
+
+type policyObservationNodeIssuer struct{}
+
+func (policyObservationNodeIssuer) IssueNode([]byte, collector.Identity, time.Time) ([]byte, [32]byte, error) {
+	b := []byte("synthetic-policy-component-certificate")
+	return b, sha256.Sum256(b), nil
+}
+
+func TestPolicyObservationSyntheticPacketProgram(t *testing.T) {
+	// Construct through the maintained recorder using the exact reviewed program,
+	// with SYN set in every synthetic frame. This opens no device or socket.
+	if out := syntheticFilteredRecording(t, time.Now(), policyRawProgram, 2); len(out) == 0 {
+		t.Fatal("missing synthetic filtered PCAPNG")
+	}
 }

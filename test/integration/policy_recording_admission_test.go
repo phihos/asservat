@@ -35,6 +35,11 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 	for _, mode := range []string{"packet-policy", "snapshot-policy-refuses-recorder", "packet-policy-observation-sql", "packet-policy-companion-sql"} {
 		t.Run(mode, func(t *testing.T) {
 			s := create(t)
+			var beforeGraph *policyObservationGraphSample
+			if mode == "packet-policy-companion-sql" {
+				sample := samplePolicyObservationGraph(t, ctx, admin, s.a.RootID, s.a.Registration.AllocationID, s.poolID)
+				beforeGraph = &sample
+			}
 			packetPolicy := mode != "snapshot-policy-refuses-recorder"
 			observationSQL := mode == "packet-policy-observation-sql"
 			companionSQL := mode == "packet-policy-companion-sql"
@@ -317,7 +322,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				qualifyFinitePolicyObservationSQL(t, ctx, admin, hub, poolFor, root, record.Record.ID, grant, output)
 			}
 			if companionSQL {
-				qualifyPolicyObservationCompanion(t, ctx, admin, hub, poolFor, store, keys, s, current, authority, a, output, record.Record.ID, grant)
+				qualifyPolicyObservationCompanion(t, ctx, admin, hub, poolFor, store, keys, s, current, authority, a, output, record.Record.ID, grant, beforeGraph)
 			}
 		})
 	}
