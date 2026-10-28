@@ -133,13 +133,15 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 			return a, err
 		}
 	}
-	// Run optional persistence after the start path (including a failed start),
-	// within the original invocation. No history outage changes its outcome.
-	defer func() {
-		if a.Replay {
+	// Retain one advisory attempt on early failure, but spend the live original
+	// invocation on it before Start can block through that invocation's end.
+	// Replay never writes history and no history outcome changes admission.
+	historyAttempted := false
+	persistHistory := func() {
+		if a.Replay || historyAttempted {
 			return
 		}
-		result.HistoryUnavailable = a.HistoryUnavailable
+		historyAttempted = true
 		if a.HistoryParameters == nil {
 			return
 		}
@@ -149,13 +151,12 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 			e = s.History.Persist(call, a, i, *a.HistoryParameters, a.HistorySource)
 		}
 		auditapp.MarkStep(call, "s-history", began)
-		if e != nil {
-			result.HistoryUnavailable = true
-		} else {
-			result.HistoryRecorded = true
-		}
-		result.HistoryParameters = nil
-		result.HistorySource = nil
+		a.HistoryUnavailable, a.HistoryRecorded = e != nil, e == nil
+	}
+	defer func() {
+		persistHistory()
+		result.HistoryUnavailable, result.HistoryRecorded = a.HistoryUnavailable, a.HistoryRecorded
+		result.HistoryParameters, result.HistorySource = nil, nil
 	}()
 	if err = check(); err != nil {
 		return a, err
@@ -194,6 +195,12 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		}
 		return a, value.ErrUnavailable
 	}
+	if err = check(); err != nil {
+		return a, err
+	}
+	persistHistory()
+	// History can block, so consume current identity again before dispatch;
+	// neither its completion nor a fresh identity extends the original bound.
 	if err = check(); err != nil {
 		return a, err
 	}

@@ -43,6 +43,7 @@ func (a *Attachment) RunHistory(ctx context.Context, w fleetapp.HistoryWork, sig
 	job.historyRun = func(run context.Context, s Stream) (string, error) {
 		var e error
 		out, e = serveHubHistory(run, s, w, job.signed, b, c, time.Now)
+		recordStreamDiagnostic(run, s, e, streamHubOperations)
 		return "", e
 	}
 	a.standby.job <- job

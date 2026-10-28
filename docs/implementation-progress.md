@@ -404,6 +404,58 @@ capture. Its source stayed unchanged and cleanup was empty; report SHA-256
 `d86eef8c74434bdb9240530927c3dd0edbbe6d1defb333ce432ff245843063da`.
 That run excludes history and is not installed qualification for this branch.
 
+Installed history run 40596917652 on `3673c264` failed after the original
+approved capture and authenticated 2,660-byte native PCAPNG download, at the first
+MCP settings read (`ParametersUnavailable`), before React/repeat. Go was 625.780s,
+selected approved subtest 152.28s; all 3,249 source hashes matched, source stayed
+unchanged and cleanup was empty. Report SHA-256
+`7c1509ce004a716d6dfe3b85d52a9da111af9d76213d5ff57bc943812bd2d1f9`.
+The accepted/PCAPNG portion is partial evidence; the whole case failed and its
+final approved-recording report was not written.
+
+A local deterministic RED reproduces deferred advisory history starvation when
+Start consumes the original five-second invocation. The sequencing correction
+runs that same single synchronous attempt after acknowledged intent and before
+Start, retaining original authority/cancellation and passive replay. Quick
+history failure still permits dispatch; slow history can exhaust the original
+budget and prevent dispatch without rolling back admission. Provider operation
+counts stay unchanged, but their latency moves before Start, followed by one
+additional current identity recheck per dispatch attempt reaching that boundary
+(including explicit continuation). No timeout, background task, retry or storage workaround
+is added. The hosted failure's exact phase is not established by that regression.
+Closed write/read diagnostics and a fixture-only exact state/receipt count lookup
+now separate missing/pending storage from read/relay/codec failure at the next
+installed attempt. See ADR-255 for scope and retained failure provenance. Installed
+combined timing and the complete browser history/repeat workflow remain pending.
+Local capture/bootstrap/presentation races pass (11.019s/52.790s/74.493s), the
+browser proxy helper race passes (1.072s), and canonical pre-push passes. No
+external fixture or collector ran for this sequencing correction.
+
+The following exact `c267cde7` installed run 40601041862 failed with decisive
+coarse state: history required, write_claimed/visible, generic custody reserved,
+no writer completion and zero acknowledged copies. Closed diagnostics reported
+write/execute/deadline, then read/storage/live. That does not establish which
+Execute subphase failed or whether physical objects were written. Go was
+618.860s, selected subtest 159.45s; all 3,251 recorded sources were unchanged and
+cleanup was empty. Report SHA-256
+`63886dbb9427659877c0bbe41a11e140412defc117346e1ff5a734ae04929593`.
+
+The least-cost local real mTLS/H2/JWS/private-history composition reproduces a
+redundant receiver/source round trip exhausting a 500ms original parent under
+controlled 200ms source latency, before an object effect. Execute now reuses
+Prepare's original checked receiver only within its original proof and unchanged
+minimum deadline; live attachment and actual current work-source/peer checks
+remain. Source reads drop three→two, and the same controlled case succeeds in
+406ms (434ms under parent race). Current-source change, closed attachment,
+cancellation and original expiry still deny all effects. Closed finite timing
+buckets and existing stream diagnostics now distinguish preparation, signing
+and exchange without extra I/O. This corrects the reproduced composed cost
+problem; the old installed inner cause and full installed workflow remain
+unqualified. No external fixture, collector, timeout increase or retry ran. Affected mTLS/
+context-start/bootstrap/capture races pass (38.143s/10.800s/56.057s/11.082s),
+as does canonical pre-push including 227 console tests. Independent read-only
+review found no blocker.
+
 PR102 review identified unchecked mutation counts in history eviction: hiding the
 old row and decrementing the two quota rows previously checked errors but ignored
 zero affected rows. This is a test-induced inconsistent-counter case, not an

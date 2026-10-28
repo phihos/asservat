@@ -100,7 +100,7 @@ func installedHistoryBrowserTunnel(t *testing.T, parent context.Context, origin,
 // Called from the already collector-qualified approved recording focus after
 // its first real PCAPNG. The approval callback is the existing independently
 // authenticated reviewer, never a fixture INSERT or a copied original grant.
-func qualifyInstalledRecorderHistory(t *testing.T, ctx context.Context, browser *installedBrowser, address string, target map[string]string, sourceCapture, sourceGrant string, invoke func(string, any) (installedJourneyEnvelope, string), approve func(context.Context, string)) {
+func qualifyInstalledRecorderHistory(t *testing.T, ctx context.Context, browser *installedBrowser, address string, target map[string]string, sourceCapture, sourceGrant string, invoke func(string, any) (installedJourneyEnvelope, string), diagnose func(string), approve func(context.Context, string)) {
 	t.Helper()
 	type settings struct {
 		CaptureID       string    `json:"capture_id"`
@@ -131,6 +131,9 @@ func qualifyInstalledRecorderHistory(t *testing.T, ctx context.Context, browser 
 			return reply.Status, code, nil
 		})
 		if err != nil || status != "ok" || code != "" || json.Unmarshal(reply.Data, out) != nil {
+			if selected, ok := args.(map[string]string); ok {
+				diagnose(selected["capture_id"])
+			}
 			t.Fatal("installed history MCP read", name, status, code, err)
 		}
 	}
@@ -139,6 +142,13 @@ func qualifyInstalledRecorderHistory(t *testing.T, ctx context.Context, browser 
 	if source.CaptureID != sourceCapture || source.Digest == "" || len(source.Settings.Composition.Authored.Components) != 1 || !time.Now().Before(source.ExpiresAt) {
 		t.Fatal("original encrypted recording settings unavailable")
 	}
+	// A child browser assertion exits through Goexit; retain the existing closed
+	// SQL/process diagnostics for that failure as well as MCP read failures.
+	defer func() {
+		if t.Failed() {
+			diagnose(sourceCapture)
+		}
+	}()
 	var requestedGrant string
 	result := installedRecorderHistoryBrowser(t, ctx, browser, address, target, sourceCapture, func(approvalCtx context.Context, grant string) {
 		if grant == sourceGrant || requestedGrant != "" {

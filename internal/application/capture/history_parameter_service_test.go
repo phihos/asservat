@@ -136,7 +136,7 @@ type historyPersistenceOutage struct {
 
 func (h *historyPersistenceOutage) Persist(context.Context, value.Accepted, identity.Identity, value.HistoryParameters, *value.HistoryLineage) error {
 	h.calls++
-	if h.started.starts != 1 {
+	if h.started.starts != 0 {
 		return value.ErrInvalid
 	}
 	return value.ErrHistoryUnavailable
@@ -255,5 +255,107 @@ func TestHistoryCleanupBudgetExhaustionResumesAfterLastAttemptedCandidate(t *tes
 	_, _, _ = svc.sweep(t.Context(), after)
 	if h.attempted[2] != fixtureID(102) || len(h.finished) != 0 {
 		t.Fatal("original obligations lost or partial page did not advance")
+	}
+}
+
+// A deterministic elapsed-start regression: the accepted start can consume
+// the remaining original invocation even when its eventual reply is unknown.
+// This fixture grants no durable SQL/object authority or renewed deadline.
+type submissionHistoryBudget struct {
+	f            *investigationFixture
+	started      *submissionFixture
+	until        time.Time
+	calls, saved int
+	consume      bool
+}
+
+func (h *submissionHistoryBudget) Persist(ctx context.Context, a value.Accepted, _ identity.Identity, p value.HistoryParameters, _ *value.HistoryLineage) error {
+	h.calls++
+	until, ok := ctx.Deadline()
+	if !ok || !until.Equal(h.until) || a.CaptureID == "" || p.OriginalExecutionDigest != a.ScopeDigest {
+		return value.ErrInvalid
+	}
+	if ctx.Err() != nil || !h.f.now.Before(until) {
+		return value.ErrHistoryUnavailable
+	}
+	if h.started.starts != 0 || h.started.intentReads != 1 {
+		return value.ErrInvalid
+	}
+	if h.consume {
+		h.f.now = h.until.Add(time.Microsecond)
+		return value.ErrHistoryUnavailable
+	}
+	h.saved++
+	return nil
+}
+func TestSubmissionHistoryRetainsOriginalBudgetBeforeElapsedStart(t *testing.T) {
+	f, start, svc, p := submissionTest(t)
+	start.current = f.source(t, t.Context())
+	until := f.now.Add(5 * time.Second)
+	ctx, cancel := context.WithDeadline(t.Context(), until)
+	defer cancel()
+	history := &submissionHistoryBudget{f: f, started: start, until: until}
+	svc.History = history
+	start.startHook = func() { f.now = until.Add(time.Microsecond) }
+	start.startErr = context.DeadlineExceeded
+	got, err := svc.Request(ctx, start.current, p.ID, "history-before-elapsed-start")
+	if !errors.Is(err, context.DeadlineExceeded) || got.CaptureID == "" || start.starts != 1 || f.admissions.Load() != 1 || history.calls != 1 || history.saved != 1 || !got.HistoryRecorded || got.HistoryUnavailable || got.HistoryParameters != nil {
+		t.Fatalf("accepted start starved advisory history: err=%v starts=%d attempts=%d saved=%d recorded=%t unavailable=%t", err, start.starts, history.calls, history.saved, got.HistoryRecorded, got.HistoryUnavailable)
+	}
+}
+
+func TestSubmissionSlowHistoryCannotExtendBudgetOrDispatchExpiredStart(t *testing.T) {
+	f, start, svc, p := submissionTest(t)
+	start.current = f.source(t, t.Context())
+	until := f.now.Add(5 * time.Second)
+	ctx, cancel := context.WithDeadline(t.Context(), until)
+	defer cancel()
+	history := &submissionHistoryBudget{f: f, started: start, until: until, consume: true}
+	svc.History = history
+	got, err := svc.Request(ctx, start.current, p.ID, "history-exhausted-budget")
+	if err == nil || got.CaptureID == "" || start.starts != 0 || f.admissions.Load() != 1 || history.calls != 1 || history.saved != 0 || got.HistoryRecorded || !got.HistoryUnavailable || got.HistoryParameters != nil {
+		t.Fatalf("slow history renewed deadline or hid dispatch refusal: err=%v starts=%d calls=%d saved=%d recorded=%t unavailable=%t", err, start.starts, history.calls, history.saved, got.HistoryRecorded, got.HistoryUnavailable)
+	}
+}
+
+func TestHistoryReadReportsClosedStageAndContextState(t *testing.T) {
+	for _, phase := range []string{"storage", "final", "cancelled"} {
+		t.Run(phase, func(t *testing.T) {
+			svc, h, q := newParameterReadFixture(t)
+			var reports []string
+			svc.ReportFailure = func(stage string) { reports = append(reports, stage) }
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			want := "read/" + phase + "/live"
+			switch phase {
+			case "storage":
+				h.failInitial = true
+			case "final":
+				h.failFinal = true
+			case "cancelled":
+				h.failInitial = true
+				cancel()
+				want = "read/storage/canceled"
+			}
+			_, err := svc.ReadCaptureSettings(ctx, q)
+			if err == nil || len(reports) != 1 || reports[0] != want {
+				t.Fatal("history phase diagnostic", err, reports)
+			}
+		})
+	}
+}
+
+func TestHistoryWriteReportsReservationStageWithoutDependencyText(t *testing.T) {
+	svc, h, q := newParameterReadFixture(t)
+	preview := h.f.preview(t)
+	accepted, err := h.f.svc.Request(t.Context(), h.f.source(t, t.Context()), preview.ID, "history-reservation-diagnostic")
+	if err != nil || accepted.HistoryParameters == nil {
+		t.Fatal("history diagnostic admission", err)
+	}
+	var reports []string
+	svc.ReportFailure = func(stage string) { reports = append(reports, stage) }
+	err = svc.Persist(t.Context(), accepted, q.Identity, *accepted.HistoryParameters, nil)
+	if err == nil || len(reports) != 1 || reports[0] != "write/reserve/live" {
+		t.Fatal("history reservation diagnostic", err, reports)
 	}
 }

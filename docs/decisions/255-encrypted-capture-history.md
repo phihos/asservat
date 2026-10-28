@@ -236,3 +236,307 @@ installed console/history remains unqualified. The later PR100 target
 composition and executable browser fixture wiring are recorded separately in
 the progress record; prior native results above retain their original source
 provenance.
+
+## Original submission budget and installed read failure
+
+Installed run 40596917652 on `3673c264` reached one accepted approved capture
+and its authenticated native PCAPNG download, then failed at the first
+`get_capture_settings` with `ParametersUnavailable`, before React editing or a
+repeat. Go took 625.780s and the approved subtest 152.28s. All 3,249 source hashes
+matched, source stayed unchanged and cleanup was empty; environment report
+SHA-256 `7c1509ce004a716d6dfe3b85d52a9da111af9d76213d5ff57bc943812bd2d1f9`.
+The first 2,660-byte PCAPNG has SHA-256
+`8734a0032c1bbc89118a851703f86111a3e5cc70a6a7f27185df49ab30341b2d`.
+The whole approved/history case failed; no final approved-recording report was
+written. That failure alone does not distinguish an absent/incomplete snapshot
+from a retained read, relay or codec failure.
+
+A deterministic application regression reproduces a concrete ordering defect:
+admission and acknowledged intent succeed, then Start consumes the original
+five-second invocation and returns an uncertain deadline error. Deferred history
+runs afterward with zero budget, records nothing and cannot be retried by passive
+replay. The local RED preserves the accepted capture and one start; it is not
+proof that this was the hosted failure's precise phase.
+
+The same synchronous advisory history attempt now runs after acknowledged intent
+and current identity, before blocking Start. An early failure retains the one
+existing best-effort attempt; replay remains passive. All work retains the
+original invocation, identity, source and accepted deadlines. Provider counts
+remain three wraps/four PUTs per successful snapshot, with zero eager GETs; this
+moves their latency earlier on the dispatch critical path. A current identity
+check follows that blocking work before Start (one additional existing-port
+recheck per dispatch attempt reaching this boundary, including explicit
+continuation). No timer, background task, retry, durable phase,
+credential or storage path is added. A quick history error still permits Start
+when time remains. Slow history can consume the original budget and prevent
+Start; admission remains accepted, and no deadline is extended. Installed timing
+must establish the combined cost before this workflow is qualified.
+
+Closed write/read stage and original-invocation context-state words use one
+private constructor callback through the existing bounded event logger. They
+never include provider errors, identities, parameters, credentials or object/key
+locators; the public ParametersUnavailable response is unchanged. The fixture
+also logs one exact capture's closed header/custody states and numeric receipt
+count before history and on failure, using its existing administrator connection.
+This is diagnostic fixture authority only. Subsequent failure invokes existing
+process diagnostics so a write outage and read/relay/codec failure are separable.
+No settings operation grants evidence read, download or cleanup authority, and
+no hub connection to regional S3 is introduced. Fresh installed qualification
+remains required.
+
+Local focused sequencing/diagnostic tests pass (0.019s); full capture/bootstrap/
+presentation race suites pass in 11.019s / 52.790s / 74.493s, and the local browser
+proxy helper race passes in 1.072s. Canonical pre-push passes with the existing
+spec virtualenv and pinned sqlc, including 227 console tests. The initial
+sequencing RED and a subsequent diagnostic-test duplicate-field compile failure
+are retained separately. No external fixture or collector ran for this fix.
+
+## Retained receiver and private exchange cost
+
+The next frozen installed run, 40601041862 on `c267cde7`, again failed at the
+first settings read. Its new diagnostics establish required history with
+`header=write_claimed`, visible=true, custody=reserved, no writer completion and
+zero acknowledged copies, followed by `write/execute/deadline` and
+`read/storage/live`. Those SQL facts do not establish absence of physical
+objects. Execute includes receiver rechecking, signing and the frame/object
+exchange; that run did not distinguish the failing inner phase. Go was 618.860s,
+selected subtest 159.45s; source stayed unchanged and cleanup was empty across
+3,251 recorded sources. Report SHA-256
+`63886dbb9427659877c0bbe41a11e140412defc117346e1ff5a734ae04929593`.
+The complete installed history workflow remains unqualified.
+
+A local composition now invokes the actual RegionalHistoryDispatch through the
+existing actual process-owned mTLS/H2 fixture, handler/router/source frames,
+real history JWS and regional history protocol. Current source/SQL authority and
+object effects remain synthetic; no external service or collector runs. Fast
+write/read calibration took about 6ms with three source reads. A controlled
+200ms regional source latency under one original 500ms parent reproduced a
+failure after 500ms, before any object effect. Preparation and the duplicate
+Execute Receiver call each took about 202ms; local signing was 0.2ms, leaving
+insufficient time for the work frame's own mandatory source read. This is a
+reproduced composed cost defect, not a measurement of native S3 or proof that
+it alone caused the installed failure.
+
+Execute now consumes the checked receiver already retained by Prepare, within
+that receiver's original ValidUntil and unchanged minimum NotAfter. Its exact
+channel/executor cannot change. RunHistory still checks the live attachment,
+original owner context and standby membership; the actual first work frame still
+pulls/validates the current regional source and peer before any effect. Current
+signing trust and final-peer checks remain. This removes one redundant source
+round trip and its existing checks: three source reads become two, not zero.
+The same controlled-delay write succeeds in 406ms normally (434ms under parent
+race) inside the unchanged 500ms parent. Positive reads preserve all four exact
+ciphertexts/receipts; changed source, closed attachment, canceled caller and
+expired original bound all refuse with zero object effects.
+
+Finite elapsed/remaining buckets for attach, initial receiver, sign and exchange
+use the existing bounded logger and step timings. Existing stream diagnostics
+also report the first closed exchange stage/reason after failure, without another
+read, payload, provider error or authority. No timeout, renewal, retry, detached
+context, KMS/object capability, durable state or background task is added.
+Fresh exact-source installed timing is still required to establish the original
+native inner failure and qualify the complete browser/repeat workflow.
+
+Final local affected races pass: mTLS 38.143s, context-start 10.800s, bootstrap
+56.057s and capture application 11.082s. Canonical pre-push passes, including
+227 console tests. Independent read-only review found no blocker in retained
+proof/current-frame separation, joined ownership, finite diagnostics or the
+actual-adapter TLS test. No external qualification is implied by these gates.
+
+### Native40607161911: write/read advances, repeat preview remains unqualified
+
+Exact `b944fd93` passed the initial approved native capture and wrote history:
+`available`, visible, writer completed, four acknowledged ciphertext copies. The
+built browser then successfully read settings, edited the packet filter to
+`tcp dst port 8080` and after-window to `3s`, but its preview returned `error`.
+The assertion at installed-history-browser.mjs:44 discarded the public error code;
+retained output cannot identify its closed failure stage. The whole run failed
+(Go 607.616s, approved-recording subcase 157.51s); it is not a completed repeat,
+browser approval or second native capture. No new installed run is established.
+
+The fixture now reports only finite preview status/code words and invokes its
+existing closed SQL/process diagnostics if the browser workflow fails. No settings,
+identities, provider text or credentials enter that added assertion. This adds
+no production read, watch, endpoint, authority or retry. One later guarded installed
+run is necessary to determine the actual code/stage if it cannot reproduce locally.
+
+A real HTTPS/HTTP2 browser POST -> session/CSRF -> audited presentation -> C09
+regression reuses the existing response-reserve fixtures. Exact `2s` -> `3s` and
+filter edits pass with SQL-precision dates; expired source and unavailable settings
+refuse with zero admissions. It uses synthetic session/facts/history/compiler
+ports. Recipe/filter/profile fields come from the first real C09 canonical preview,
+but the history header is constructed: this does not exercise accepted snapshot
+creation, encryption, real SQL or a collector and cannot establish the Native cause.
+
+That composition found a separate test-induced precision defect. CaptureSettings
+and HistoryLineage accept future time.Time instants without a microsecond condition;
+CompileRecorder requires persisted preview deadlines on microsecond boundaries.
+A source expiry with an additional 777ns made the edited route return NotAvailable
+at compile while the SQL-precision case passed (RED exit 1). Repeat now floors the
+lineage cutoff to UTC microseconds before planning, preserving the earlier original
+bound. Both paths, edited settings and original-expiry refusal pass (focused race
+3.715s, exit 0). Current SQL summary/effective expiry and original-anchor duration
+retention are expected microsecond-aligned; this is not attribution to the installed
+failure. The fix is one time normalization per repeat, zero I/O, extra reads, state,
+configuration or deadline extension; no broader time framework is introduced.
+
+Local affected races passed: capture 11.202s, MCP 58.956s, browser 20.108s;
+final required-approval route case 3.715s, local pinned tunnel 1.071s. Canonical
+pre-push exited 0 (227 console tests); no external fixture or collector was run.
+The local route adds five audited browser operations per case (two precision
+cases), zero admissions, and approximately 1.1s unraced synthetic test runtime;
+its mocked compiler does not qualify native libpcap/Gadget behavior.
+
+### Native40613137981: discovery response visibility
+
+Exact `ad131f4b` failed earlier: after Find diagnostics, the driver's default
+five-second row locator saw zero rows (Go 616.048s / subcase 161.29s). Encrypted
+history still reported available/visible/writer complete/four acknowledged copies.
+Neither diagnostics nor history-list response was retained, and the edited preview
+was not reached; its actual cause remains unknown. The earlier sub-microsecond
+port defect remains distinct and is not an explanation of either installed failure.
+
+The actual React discover controller awaits list_diagnostics and then
+list_capture_history. The fixture now arms both response waiters before the click,
+checks HTTP status plus each body's finite envelope status/code, then starts the unchanged DOM
+row assertion. Network/operation bounds, locator timeout, authorization, quotas
+and retry count are unchanged. Failed/missing/invalid responses fail with a closed
+operation label; early failure still closes the browser and safely settles the
+other waiter. Existing settings/preview checks reuse that same bounded diagnostic.
+This is a small reversible driver sequencing correction, not a new authority or
+wait framework, and cannot qualify the installed history workflow by itself.
+
+Syntax and canonical pre-push passed (227 console unit tests); existing built
+React/HTTPS browser checks passed 23 journeys/20 accessibility scans, plus four
+native-restart boundaries/two scans (Go 21.785s). These existing synthetic checks
+do not run the installed continuation or establish its missing response outcomes.
+No new test framework, timeout, product change or external fixture was added.
+
+### Native40617618424: history target exchange refusal
+
+Exact `d7cdb5d3` failed after the corrected discovery wait: list_diagnostics
+returned HTTP 200/ok; list_capture_history returned HTTP 200/error/NotAvailable
+(Go 589.644s, subcase 153.55s). Encrypted history remained available with four
+acknowledged copies. Neither the DOM wait, lineage precision nor edited preview
+explains this failure. The hub logged `restarts/read/other`: history's regional
+workload resolution failed before ListCaptureHistory's SQL read/eligibility.
+An adjacent canceled route namespace read is not proof of causal ordering;
+stream interruption or later browser cleanup can cancel that read. The underlying
+installed I/O cause is still unknown.
+
+The existing closed stream classifier now recognizes the supported Go net/http
+conversion into the already-used x/net/http2.StreamError. It retains only fixed
+INTERNAL/deadline/CANCEL/PROTOCOL/REFUSED/other classes, never stream IDs, Cause
+text or payload. INTERNAL means deadline only when Cause is exactly
+os.ErrDeadlineExceeded; an unqualified INTERNAL establishes neither timeout nor
+peer origin. At checkpoint `7007fa50`, classification avoided Is/Unwrap while
+allowing Timeout and a directly implemented structured As bridge. The concrete
+wrapped-read-timeout defect below supersedes that agent-authored restriction
+with standard trusted Go error protocols. Error text remains unrendered.
+This changes diagnostics only: no transport, query, deadline, authority,
+retry, current check or public response changes.
+
+The actual mTLS/HTTP2 fixture now also tests diagnostics ResolveWorkload followed
+by history ObserveWorkloadRestarts for a zero-Pod workload. Holding the second
+fresh route check across the first query's 500ms cutoff passes, preserving the
+second original deadline and retained source identity. Callback inspection found
+no demonstrated stale-callback defect: stream-affecting frame/setup callbacks
+join before reuse; the remaining cancel-only callbacks own invocation-local
+contexts. This positive synthetic path does not reproduce the installed failure.
+
+A deliberate real HTTP2 write cutoff during that second current route check
+produces a closed target refusal while the caller still has time. It reports
+`restarts/read/http2-deadline` (race pass 1.136s); the legacy classifier reports
+only `restarts/read/other`. The moved existing idle-write-deadline test exercises
+the actual stdlib As conversion and neutral INTERNAL result; fixed-code tests
+retain private-error noninspection. This is a test-induced diagnostic witness,
+not attribution of the installed interruption or completed browser qualification.
+
+Complexity gate: (1) one observed closed history-list failure whose I/O cause is
+unavailable; (2) no accepted timing risk reopened; (3) shared transport diagnostics
+benefit, no typical-path product behavior change; (4) Go's supported StreamError
+conversion, no protocol/error parser; (5) zero privileges/credentials/exposure;
+(6) six diagnostic classes, zero product/fallback states; (7) zero configuration;
+(8) existing Go HTTP2/x/net dependency; (9) zero added API/SQL/network requests,
+watches or goroutines, one type conversion only on errors, CPU unmeasured;
+(10) no wire change, diagnostic-only rollback; (11) retaining `other` cannot
+distinguish the demonstrated transport cutoff. No collector/external fixture or
+hosted rerun is part of this local checkpoint; actual installed cause and complete
+history/repeat qualification remain pending.
+
+Legacy-classifier diagnostic RED exited 1; the corrected actual-cutoff witness
+passed. Full affected races passed: context-start 10.893s and mTLS 38.527s.
+Canonical pre-push exited 0, including 227 console tests. These local gates
+establish neither the installed interruption's cause nor a successful repeat.
+
+### Native40624139454: the read-timeout wrapper boundary
+
+Exact `7007fa50` again returned diagnostics HTTP 200/ok and history-list HTTP
+200/error/NotAvailable, with hub `restarts/read/other`. Go took 624.492s, subcase
+153.14s; the first PCAP exists, but browser history/repeat failed. The region now
+reported `exchange/read/http2-internal`, which alone identifies neither origin
+nor deadline. No attribution of the installed underlying cause is established.
+
+Pinned Go1.27.2 source reveals a concrete missing diagnostic case: HTTP2
+onReadTimeout closes its request-body pipe with
+`fmt.Errorf("%w", os.ErrDeadlineExceeded)` (net/http/internal/http2/server.go:1851).
+requestBody.Read returns the pipe error directly. That wrapper has Unwrap but
+neither Timeout nor As. In contrast, onWriteTimeout emits StreamError(INTERNAL,
+Cause=deadline). The prior actual write-cutoff witness therefore did not cover
+the different read-timeout path. The frame decoder normalizes I/O failures;
+the existing original-reader delegate already preserves the source error class.
+
+A cache-only actual HTTP2 read-cutoff probe on the same Go1.27.2 returned concrete
+type `*fmt.wrapError`, no Timeout/As interfaces, trusted errors.Is(deadline)=true
+and a still-live original caller. It printed type/booleans only, no error text.
+The actual two-query mTLS fixture now also induces this read cutoff during the
+second route check. Exact prior classifier RED reports read/other; standard
+errors.Is/As identifies the wrapped deadline without changing the refusal or
+caller bound. This reproduces diagnostic loss, not the installed interruption.
+
+The classifier now uses ordinary trusted in-process Is/As/Unwrap/Timeout error
+protocols. It never renders Error text, parses messages, logs concrete type names
+or retains provider payload. Network input cannot inject Go method implementations.
+The prior blanket no-Is/Unwrap rule was an agent-authored test constraint, not a
+maintainer requirement or security boundary; retaining it hid an actual standard
+library timeout. Panic-Error tests remain, while trusted Is/Unwrap and wrapped
+structured-error tests replace the hypothetical hostile-method restriction.
+No reflection, private type-name matching, recovery framework or new dependency
+is added. A write cutoff may legitimately record owner cancellation before its
+body error because Go cancels request context concurrently; its test accepts
+either first deciding class. The read cutoff's body-pipe error remains exact.
+
+Complexity reassessment: one concrete local diagnostic defect plus a repeatedly
+unidentified installed read failure; zero new product/fallback states, authority,
+reads, network calls, watches, tasks, credentials or knobs. Cost is standard
+error-chain traversal only on failures (CPU unmeasured), with trusted compiled Go
+implementations executing protocol methods as elsewhere in the application.
+The smaller alternative is leaving a demonstrated timeout as `other` and paying
+another installed diagnostic campaign without that distinction. No transport
+flow, deadline, retry, authorization or public error changes. No collector,
+external service or hosted run occurred in this local checkpoint.
+
+Final affected races passed: context-start 10.913s and mTLS 44.311s. The broader
+suite also confirmed that net.Pipe's wrapped net.OpError now resolves to its
+known deadline cause before the generic timeout flag; its diagnostic expectation
+was updated accordingly. Canonical pre-push exited 0 with 227 console tests.
+The earlier local write-cutoff ordering failure and legacy read-classifier RED
+remain retained in cache; neither is substituted for a passing installed run.
+
+
+### Shared storage refusal before history qualification
+
+Native run 40627584314 on exact a96796aa failed before capture/history lookup:
+approved submission returned closed ReviewChanged, with
+`request/facts/storage/read/observation`. Go exited 1 in 591.339s; the subcase took 134.40s.
+No PCAP was produced and the wrapped-read diagnostic was not exercised by the
+history lookup. All 3,254 source hashes matched, sources stayed unchanged and
+cleanup completed. Environment SHA-256:
+`f869bfa7518b536172464a157b93415c846bb245efdfebedb5cb9852b6f8e6e2`.
+
+The shared storage diagnostic from PR #101 now accompanies this candidate. It
+classifies the existing row/clock refusal into shape, pool, allocation, source,
+capacity, control or selection. It adds no read, refresh, retry, authority or
+public error change. The actual rejecting predicate remains unknown; this is
+not an availability fix. A later installed run must retain that distinction
+instead of repeating the generic pre-history failure.
