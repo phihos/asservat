@@ -7,8 +7,12 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	app "asservat.local/asservat/internal/application/execution"
+	"asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
+	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
+	"bytes"
 )
 
 func policyObservationRowFixture() custodydb.PolicyObservationSession {
@@ -170,5 +174,19 @@ func TestPolicyObservationSourceKeepsSameResolvedPodAndOriginalInterval(t *testi
 				t.Fatalf("source admission=%v mode=%s", got, mode)
 			}
 		})
+	}
+}
+
+func TestPolicyObservationProgramMatchesActualNodeDigest(t *testing.T) {
+	program := []artifact.FilterInstruction{{Code: 0x28, Jt: 1, Jf: 2, K: 0xabcdef01}, {Code: 6, K: 65535}}
+	node := []planvalue.BPFInstruction{{Code: 0x28, Jt: 1, Jf: 2, K: 0xabcdef01}, {Code: 6, K: 65535}}
+	expected := planning.FilterProgramDigest(node)
+	got := policyObservationProgramDigest(program)
+	if !bytes.Equal(got, expected[:]) {
+		t.Fatalf("observation program digest %x differs from actual node cBPF digest %x", got, expected)
+	}
+	program[0].Jf++
+	if bytes.Equal(policyObservationProgramDigest(program), expected[:]) {
+		t.Fatal("changed instruction retained program identity")
 	}
 }

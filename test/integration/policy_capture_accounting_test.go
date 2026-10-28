@@ -68,6 +68,16 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 	if len(recorder) == 1 {
 		g.Policy.RecipeDigest = recorder[0].RecipeDigest
 		g.Policy.Limits.MaxBytes = 4 * artifact.RecordingNativeLimit
+		// Only the explicit SQL observation component case provisions this
+		// synthetic reviewed pool; ordinary recorder fixtures remain unchanged.
+		if a.Limits.MaxObservedBytes > 0 {
+			timeout, err := time.ParseDuration(recorder[0].Action.Timeout)
+			if err != nil {
+				t.Fatal(err)
+			}
+			g.Policy.Limits.MaxObservedBytes = a.Limits.MaxObservedBytes
+			g.Policy.Observation = &authorization.ObservationLimits{MaxSessionSeconds: int64(timeout / time.Second), MaxObservedBytes: a.Limits.MaxObservedBytes, MaxBytesPerSecond: planvalue.SensitiveMaxBytesPerSecond, MaxConcurrentSessions: 1}
+		}
 	}
 	g.ReviewDigest = app.ReviewDigest(g, g.Review)
 	blueprint := g

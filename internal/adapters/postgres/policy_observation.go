@@ -10,10 +10,12 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	app "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
+	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -89,7 +91,7 @@ func (s *APIContextExecutions) preparePolicyObservation(ctx context.Context, q *
 	row := custodydb.PolicyObservationSession{
 		ID: id(uuid.NewString()), RootID: capture.RootID, PolicyUid: a.PolicyUid, AcceptanceID: a.ID, GrantID: original.reservation.GrantID, CaptureID: capture.ID, AttemptID: capture.AttemptID, Fence: id(uuid.NewString()),
 		ActionID: e.ActionID, PodUid: e.PodUID, NodeUid: p.source.NodeUID, BootID: p.source.BootID, CollectorPodUid: p.source.CollectorPodUID, CollectorEpoch: p.source.CollectorEpoch,
-		ExpectationDigest: ed[:], ProgramDigest: digest(e.Recording.Filter.Program), AccountingRule: observationRuleBytes(),
+		ExpectationDigest: ed[:], ProgramDigest: policyObservationProgramDigest(e.Recording.Filter.Program), AccountingRule: observationRuleBytes(),
 		SourceObservedAt: ts(p.source.ObservedAt.UTC().Truncate(time.Microsecond)), SourceFreshUntil: ts(p.source.FreshUntil.UTC().Truncate(time.Microsecond)), StartedAt: ts(finite.StartedAt), SessionUntil: ts(finite.Until), LeaseUntil: ts(finite.Until), StartBy: ts(finite.LatestStart), DurationMillis: e.Recording.DurationMillis,
 		Sequence: 1, Credit: finite.Credit, MaxBytesPerSecond: finite.BytesPerSecond,
 	}
@@ -156,3 +158,12 @@ func policyObservationPermit(row custodydb.PolicyObservationSession) (collector.
 }
 
 var _ app.PolicyRecordingPreparer = (*APIContextExecutions)(nil)
+
+func policyObservationProgramDigest(program []artifact.FilterInstruction) []byte {
+	native := make([]planvalue.BPFInstruction, len(program))
+	for i, ins := range program {
+		native[i] = planvalue.BPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
+	}
+	sum := planning.FilterProgramDigest(native)
+	return sum[:]
+}

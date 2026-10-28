@@ -1776,3 +1776,43 @@ source containment and exact role grants. These are local/pure component tests,
 not real SQL, source-authentication, byte-prefix, backing or native evidence.
 Next add actual generated-query rollback/immutable-row SQL markers, then genuine
 companion held-wait and same-work transport tests under the still-closed gate.
+
+Read-only review of 23ec0b8c found a concrete program-identity mismatch: SQL used
+JSON SHA-256 while actual node work uses FilterProgramDigest's little-endian
+8-byte classic-BPF instructions. The regression failed with actual exit 1
+(0.010 s), JSON 22c379ad... versus node c80fe4c7.... SQL now reuses that existing
+canonical function on the exact converted instructions; no new digest format or
+compiler/cache is added. At most 256 instructions / 2 KiB are converted per
+first preparation; this is a bound, not a CPU benchmark. Focused observation/
+source/role races passed 1.063 s; final combined focused races passed postgres
+1.074 s, bootstrap 4.082 s and integration compiler/bindings 1.084 s. Final
+pre-push actual exit 0 including 231 console tests. Logs use absolute directory
+`/home/phil/.cache/asservat-build/approved-workflow/` with names
+`policy102-finite-sql-fixture-pre-push.log` and `policy102-finite-sql-fixture-races.log`.
+
+The added packet-policy-observation-sql fixture is deliberately a separate nested
+mode: existing ordinary packet/snapshot cases retain their original zero observed
+pools. It admits a real ordinary header capture and uses generated queries with
+explicit synthetic observation review/node/scope facts, never an application raw
+permit. It checks actual held-table expiry/rollback with independently read zero
+accepted/grant spend and no session; one finite committed tuple and exact SQL
+read; fresh IDs/fence/dates cannot insert another session for that capture;
+immutable credit/epoch, nonpositive/over-budget debits, and live-session expiry
+without refunds. Compiled finalizer early and expired-but-unaudited deletion must
+refuse. The sample row/relation/index and WAL values, when actually run, will be
+reported only as SQL component samples, not a full-graph/worst-case/backing proof.
+No actual external run of this new test has yet occurred. Genuine companion
+held-wait, positive audited retirement, native bytes/prefix and backing remain
+required before enabling the policy-only raw path.
+
+Old-node wire audit (h2, pinned eed85940 / 6e12afa4 / b6d153df): NodePollResponse
+uses nodeDecode -> decodeClosedRPC with DisallowUnknownFields and canonical
+shape equality; an emitted unknown permit field, even null, rejects the whole
+old poll. Client.Poll returns no work on decode error before DomainWork/start.
+A legacy-shaped packetCapture with the field OMITTED remains unmetered, so the
+future sender must emit a nonnil required raw permit and the new receiver/start
+must carry/enforce it, with no omission/downgrade fallback. Image pinning is not
+an app-meter capability check: current attestation checks Pod/DaemonSet/account/
+node/boot, and reported engine version is Gadget. No new version/flag framework
+is needed solely for this strict-decoder boundary. Actual old/new poll regression
+and exact authenticated transport still precede raw availability.

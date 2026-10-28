@@ -32,14 +32,19 @@ import (
 // debit. Protected source/target/identity, initial trust and independent review
 // remain explicit synthetic component facts. No collector or public enablement.
 func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario) {
-	for _, mode := range []string{"packet-policy", "snapshot-policy-refuses-recorder"} {
+	for _, mode := range []string{"packet-policy", "snapshot-policy-refuses-recorder", "packet-policy-observation-sql"} {
 		t.Run(mode, func(t *testing.T) {
 			s := create(t)
+			packetPolicy := mode != "snapshot-policy-refuses-recorder"
+			observationSQL := mode == "packet-policy-observation-sql"
 			clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 			root, installation := s.a.RootID, s.recovery.installation
 			target := s.a.Plan.Input.Target.Target()
 			b := &s.batch.Bases[0]
 			b.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{authorization.PolicyContextAction, "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: 64 << 20}
+			if observationSQL {
+				b.Automation.MaxObservedBytes = 1 << 30
+			}
 			b.Resource.Generation++
 			b.Resource.SpecDigest[0]++
 			b.Resource.ResourceVersion = custodyID()
@@ -121,6 +126,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			now := clock()
 			creator := s.a.Eligibility.VerifiedIdentity.Principal
 			authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: custodyID(), Creator: creator, ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{sponsor}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 64 << 20}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
+			if observationSQL {
+				authority.Limits.MaxObservedBytes = 1 << 30
+			}
 			authority.Executor = authorization.PolicyPrincipal(installation, authority.PolicyUID)
 			spec := publicPolicySpec(t, authority)
 			var authored map[string]any
@@ -140,7 +148,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			}
 			source := capture.PolicySource{InstallationID: installation, ClusterID: target.ClusterID, NamespaceUID: "control", Name: "restarts", Revision: identity.Revision{UID: authority.PolicyUID, Generation: 1, Digest: sha256.Sum256(spec)}, ResourceVersion: "policy-1", CollectionDigest: sha256.Sum256(spec), ObservedAt: now, FreshUntil: now.Add(30 * time.Second)}
 			scope := captureapp.RecorderPolicyScope(authority.PolicyUID, 1, source.CollectionDigest, compiled, target.NamespaceUID, target.WorkloadUID, authority.Delegation, authority.Owners, authority.Actions, authority.Limits)
-			if mode != "packet-policy" {
+			if !packetPolicy {
 				authority.Actions = []string{authorization.PolicyContextAction}
 				scope, err = json.Marshal(struct {
 					Format string
@@ -171,7 +179,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal(err)
 			}
 			var grant string
-			if mode == "packet-policy" {
+			if packetPolicy {
 				grant = attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "recorder-positive", *compiled.Recorder)
 			} else {
 				grant = attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "snapshot-negative")
@@ -249,7 +257,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal(err)
 			}
 			output, err := admissions.AdmitReviewedContext(ctx, preview.ID, a)
-			if mode == "packet-policy" {
+			if packetPolicy {
 				if err != nil || output.Expectation.Recording == nil || output.Expectation.Recording.MaxBytes != artifact.RecordingNativeLimit || output.Expectation.RecipeDigest != compiled.Recorder.RecipeDigest {
 					t.Fatal("real team recorder admission", err)
 				}
@@ -281,13 +289,16 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal(err)
 			}
 			wantBytes, wantExec, wantReservations := int64(0), int64(0), int64(0)
-			if mode == "packet-policy" {
+			if packetPolicy {
 				wantBytes, wantExec, wantReservations = artifact.RecordingNativeLimit, 1, 1
 			}
 			if execs != 1 || bytes != wantBytes || grantExec != wantExec || grantBytes != wantBytes || reservations != wantReservations {
 				t.Fatal("action mismatch/replay changed prospective pools", execs, bytes, grantExec, grantBytes, reservations)
 			}
 			t.Logf("actual Tick accepted executions=%d; native output=%d grant executions=%d output=%d reservations=%d", execs, bytes, grantExec, grantBytes, reservations)
+			if observationSQL {
+				qualifyFinitePolicyObservationSQL(t, ctx, admin, hub, poolFor, root, record.Record.ID, grant, output)
+			}
 		})
 	}
 }
