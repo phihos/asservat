@@ -18,6 +18,25 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_policy_recording_guard_precedes_all_external_setup(self):
+        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "policy-recording"}), patch.object(fixture.Path, "is_file", return_value=False), patch.object(fixture, "run", side_effect=AssertionError("external setup before guard")) as external:
+            with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):
+                fixture.main(installer_continuation=True)
+            external.assert_not_called()
+        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "policy-recording"}):
+            self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
+
+    def test_policy_recording_workflow_installs_guard_and_offline_reader(self):
+        source = (Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
+        self.assertIn("timeout-minutes: 20", source)
+        for name in ("Disposable-host guard", "tshark"):
+            step = source.index("name: " + name)
+            condition = source[source.rfind("      - if:", 0, step):step]
+            self.assertIn("continuation-policy-recording", condition)
+        suites = (Path(__file__).with_name("ci-native.sh")).read_text()
+        self.assertIn("[continuation-policy-recording]", suites)
+        self.assertIn("ASSERVAT_JOURNEY_FOCUS=policy-recording", suites)
+
     def test_history_browser_report_uses_actual_current_guard_expression(self):
         tree = ast.parse(inspect.getsource(fixture.main))
         expressions = [node.value for node in ast.walk(tree)
@@ -129,7 +148,7 @@ class RegionalContextSelection(unittest.TestCase):
         self.assertEqual(measured.count("max_connections=48"), 1)
 
     def test_approved_recording_refuses_missing_disposable_guard_before_setup(self):
-        for focus in ("approved-recording", "native-paced"):
+        for focus in ("approved-recording", "native-paced", "policy-recording"):
             with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}), patch.object(fixture.Path, "is_file", return_value=False):
                 with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):
                     fixture.main(installer_continuation=True)
@@ -141,12 +160,12 @@ class RegionalContextSelection(unittest.TestCase):
             self.assertEqual(len(hashes[name]), 64)
 
     def test_approved_recording_has_finite_go_envelope(self):
-        for focus in ("approved-recording", "native-paced"):
+        for focus in ("approved-recording", "native-paced", "policy-recording"):
             with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}):
                 self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
 
     def test_installed_focus_topology_and_flags_reach_the_go_consumer(self):
-        for focus, expected in (("approved-recording", 2), ("native-paced", 2), ("journey", 2), ("browser", 2),
+        for focus, expected in (("approved-recording", 2), ("policy-recording", 2), ("native-paced", 2), ("journey", 2), ("browser", 2),
                                 ("policy", 2), ("alert", 2), ("logresource", 2),
                                 ("restart", 2), ("upgrade", 2), ("share", 2),
                                 ("chain", 2), ("clusters", 3), ("", 3), ("unknown", 3)):

@@ -154,18 +154,22 @@ starts profiling, waits for a finite interval/cancellation, then stops. These ar
 execution-lifecycle precedents only; neither supplies Asservat's grant/quota
 semantics or proves that twenty seconds is the right privacy tradeoff.
 
-## Inert compilation and consumer gates
+## Policy-only composition and consumer gates
 
 A private policy-context compiler may derive the exact inert finite on-trigger
 expectation for component qualification. A policy-shaped value is not accepted
-team authority. Shared/manual recorder acceptance keeps its raw refusal, and
-production trigger/C03 raw gates remain until the complete path qualifies.
+team authority. Shared/manual recorder acceptance keeps its raw refusal. The
+maintainer authorized removing the policy-only trigger/C03 placeholder in an
+unpublished qualification candidate after SQL, C09 and node composition. This
+does not authorize user exposure, merge, release or rollout before the complete
+native authority/custody/privacy/download qualification passes. No qualification
+bypass or configuration flag is added.
 Raw predicate grant need is derived from the frozen filter separately from the
 immutable protected require-all setting; changing that setting would alter replay
 scope. Original grant plus positive reviewed observation limits precede output
 reservation. The ordinary API preparer refuses raw policy bypass, and the legacy
 regional recording start refuses raw before prepared ownership/queue changes.
-Only the typed source/committed-permit start may later acquire through the meter.
+Only the typed source/committed-permit start may acquire through the meter.
 
 ## Qualification and remaining work
 
@@ -198,7 +202,9 @@ fields before delivering a frame. Notices and frames share the existing delivery
 mutex. The future node consumer must mark spend unknown, cancel its existing
 engine context and join from the outer owner; the callback must not join itself.
 The ordinary entry point supplies no notice callback and retains its behavior.
-No runtime caller uses the new entry point yet, and neither raw gate is opened.
+The composed node uses this entry point only for an actual observation permit;
+ordinary nil-permit capture retains the original entry point. Manual raw stays
+unavailable. Policy exposure still requires the installed qualification above.
 
 Complexity assessment: loss/read-error frequency is unmeasured and no new loss
 risk is claimed; stopping unknown input implements the existing observation

@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Unpublished finite policy-packet candidate (2026-10-28)
+
+The isolated S04 candidate now composes the reviewed node meter/wire/prefix/loss
+components, current history/pacing7254 and storage-expiry e3bf1ea9. Under the
+maintainer's qualification sequencing it removes only the finite private-policy
+raw producer placeholder. Manual raw, ordinary preparation bypass and legacy raw
+start remain refused; no qualification bypass, flag or user rollout is added.
+Original reviewed grant/positive observation limits, both prepaid pools and the
+typed committed same-work permit are still mandatory. The new guarded
+`continuation-policy-recording` focus is prepared for a fresh GitHub runner only;
+its actual collector/privacy/publication/download outcome is unrun. No installed
+pass, full S04 completion or user exposure follows from local component evidence.
+
+The native candidate requests10s within the authored10s review (the earlier
+schema-valid15s request failed real preflight), records2s and conservatively
+prepays48MiB input plus a separate one-byte refusal attempt. Its maintained
+libpcap ACK fixture equality and pure input/focus tests pass. The actual node
+component includes the reproduced same-epoch replay and late loss/unknown error
+precedence corrections; source-bound proof and numeric cache costs are in the
+[S04 plan](reviews/s04-policy-grants-plan-2026-10-27.md). That plan distinguishes
+the component full gate from the pending final assembled broad gate, retains the
+merged Python NameError RED/fix, and records protected-backing/native gaps.
+
 ## Public policy grant and recorder producer continuation (2026-10-28)
 
 The isolated S-04 branch's public request/review/attachment boundary passed its

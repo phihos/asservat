@@ -134,6 +134,12 @@ func qualifyInstalledPolicyRecording(t *testing.T, ctx context.Context, admin *p
 	}
 	// The operator grants this existing team a finite envelope. No grant row,
 	// acceptance, occurrence, capture, observation receipt or writer is seeded.
+	// This LSN includes all later shared fixture writes, not attributable packet
+	// WAL. The baseline has no invented allocation: use the real capture below.
+	var beforeGraph policyObservationGraphSample
+	if err = admin.QueryRow(ctx, "SELECT pg_current_wal_insert_lsn()::text").Scan(&beforeGraph.WAL); err != nil {
+		t.Fatal("native policy graph baseline", err)
+	}
 	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "policy-packet-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "finite installed policy packet qualification", "automation": map[string]any{"allowedActions": []any{"packetCapture"}, "maxLifetimeSeconds": 3600, "maxExecutions": 2, "maxBytes": 16 << 20, "maxObservedBytes": 128 << 20}}}
 	body, _ := json.Marshal(binding)
 	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
@@ -397,6 +403,36 @@ func qualifyInstalledPolicyRecording(t *testing.T, ctx context.Context, admin *p
 	}
 	if packets < 1 {
 		t.Fatal("native policy PCAPNG has no actual ACK packets")
+	}
+	var allocation, pool string
+	var protectedMetadata []byte
+	if err = admin.QueryRow(ctx, `SELECT a.allocation_id::text,ca.pool_id::text,s.qualification->'RootBacking'->'Metadata'
+FROM context_capture c JOIN custody_attempt a ON a.id=c.attempt_id
+JOIN custody_allocation ca ON ca.id=a.allocation_id JOIN capacity_source s ON s.root_id=c.root_id
+WHERE c.root_id=$1 AND c.id=$2`, root, second).Scan(&allocation, &pool, &protectedMetadata); err != nil || !json.Valid(protectedMetadata) || string(protectedMetadata) == "null" {
+		t.Fatal("actual protected native metadata profile", err)
+	}
+	graph := samplePolicyObservationGraph(t, ctx, admin, root, allocation, pool)
+	logPolicyObservationGraph(t, ctx, admin, "installed-native-published-download", &beforeGraph, graph)
+	report := map[string]any{
+		"policyUID": active.PolicyUID, "acceptanceID": active.AcceptanceID, "podUID": podUID,
+		"failedCaptureID": first, "publishedCaptureID": second, "caseID": progress.CaseID,
+		"originalGrantID": alpha.ID, "replacementGrantID": beta.ID, "replacementGrantNotAfter": beta.NotAfter,
+		"originalInputCredit": firstCredit, "originalLeaseUntil": firstUntil, "replacementInputCredit": secondCredit,
+		"executionsSpent": status.Executions, "outputReservations": status.Output, "inputReservations": status.Input,
+		"nativeBytes": len(native), "nativeSHA256": hex.EncodeToString(digest[:]), "tsharkACKHeaderPackets": packets,
+		"creatorDisabled": true, "currentSponsorManaged": true, "originalGrantRevoked": true,
+		"protectedMetadataProfile": json.RawMessage(protectedMetadata), "graphSample": graph,
+		"backingScope":     "31-table component sample and fixture-global WAL since before policy creation; shared physical relations; operation-audit/lifecycle/download/processing graphs and largest accepted shapes not qualified; no complete backing fit claim",
+		"authorization":    "installed public policy request, independent decision, attachment, real restart and production observation permit; no fixture grant or capture rows",
+		"measurementScope": "native retained bytes and decoded packet count; input credits are conservative reservations, not measured input; protected worst-case backing remains separate",
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile("../results/policy-recording-report.json", append(raw, '\n'), 0600); err != nil {
+		t.Fatal(err)
 	}
 	t.Logf("UNPUBLISHED installed finite policy proof: native one-byte input refusal, creator departure, current sponsoring-manager replacement, original grant revocation, actual ACK headers PCAPNG %dB/%dpackets SHA256=%x; conservative input reservations=%d, output reservations=%d, no measured-input claim", len(native), packets, digest, status.Input, status.Output)
 }

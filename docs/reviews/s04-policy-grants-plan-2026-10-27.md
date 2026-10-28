@@ -2147,3 +2147,124 @@ refresh or ordinary fallback occurs. Verification/start/output doubles remain
 synthetic, so this adds no TLS, signature, SQL or installed authority claim.
 Focused race passes1.070s; absolute log approved-workflow/policy102-finite-source-stream.log.
 No production code/query/permission changes and no external run for this test.
+
+### Unpublished assembled finite-policy qualification candidate (2026-10-28)
+
+Maintainer-authorized sequencing removes the policy-only trigger/C03 raw
+placeholder after original-grant SQL, typed same-work C09 and node composition;
+it adds no bypass/flag. Manual/public ad hoc raw remains unavailable, ordinary
+API preparation and legacy raw StartRecording still refuse, ongoing raw remains
+unsupported. The private accepted-settings provenance, exact frozen scope,
+original grant, positive observation review, both prepaid pools and mandatory
+committed permit remain independent gates. A finite private-policy producer RED
+(`policy102-finite-policy-producer-red.log`) reached the former placeholder;
+focused GREEN1.151s and capture races11.219s follow its removal. Existing seven
+composed package results are retained; node44's component full matrix is not
+presented as proof of the current assembled head.
+
+Node replay RED established that same-epoch re-enrollment resets its poll cursor
+and could create another meter for one capture. Corrected9e9f91be composition
+claims captureID atomically with budget/meter under existing budgetMu, at most64
+entries, logically valid only until original StartBy, lazily pruned on the next
+sensitive start; a full cache returns existing CaptureBusy. No timer/watch/API or
+per-frame cache work. Unmeasured amd64 payload estimate:64*(36UUID bytes +16string
+header +24time bytes)=4864B, order16KiB with map/allocator overhead, not a measured
+or hard heap bound. At most64 deadline comparisons plus one lookup per sensitive
+start. Expired physical entries can remain until next pruning/process exit,
+while cardinality remains bounded. Replayed/conflicting fence/full/expiry tests
+pass, and input permit/program values are cloned rather than caller aliases.
+
+Late/final loss or unknown input could also be masked by a provider's normal
+context/deadline result, including unknown after the gate had first recorded its
+normal deadline. Reproduced REDs now retain ErrObservationClosed for unknown and
+non-deadline meter refusals over nil/provider cancellation/deadline. A genuine
+provider failure, including cancellation, remains an error when the only meter
+stop was its natural deadline. Ordinary nil-meter behavior stays covered.
+Final component9e9f's actual old/new Client.Poll TLS proof returned four real
+HTTP200 responses: two legacy positives, old strict decoder refusal with zero
+work for the emitted permit and new valid permit retention. Full44 code gate
+passed66packages/663Kubernetes tests; final9e changes only the bounded proof-output
+helper after a real io.Copy/command cap RED. Root independently verified its
+11888 source hashes and proof logs; report SHA-256
+5a3f0cd11fc7e230a24b326a24007a00793c06ec27fe371d11f076f24d6fe1db.
+
+History/pacing7254 and storage-expiry e3bf1ea9 are merged without runtime
+conflicts; progress-document conflicts preserve both incoming and S04 evidence.
+A real merged Python harness NameError referenced retired approved_recording;
+separate946932d0 fixes the actual main report expression. Four-scope expression
+RED, selector GREEN21tests and original failure logs are retained. This was a
+merge defect, not a product authority change. Storage expiry recovery retains
+original cutoffs; no new SQL role/limit is added by these compositions.
+
+The new guarded continuation-policy-recording focus reuses existing two-cluster
+installer, published digest-pinned Gadget, reviewer and native-download helpers.
+Harness and workflow require the disposable-host guard before setup/collector;
+job20m and Go18m remain unchanged. No local collector run is permitted. The focus
+uses two real onTrigger restarts: one original1B input-credit refusal, then a new
+independently reviewed grant after creator departure/current sponsor attachment
+replacement and original-grant revocation. It waits the first lease naturally,
+never resets pools. The second2s action conservatively prepays48MiB input
+(16MiB/s*(ceil2+1burst)), distinct from128MiB reviewed grant,16MiB cumulative
+output reservations and actual retained delivery bytes. No extra production
+observer/renewal/watch/credential/service or user configuration. Additional
+requests/reviews/traffic/status reads belong solely to this qualification.
+
+The ACK expression tcp[13] & 16 != 0 is emitted by the maintained libpcap1.11.0
+dead-handle compiler, not instruction edits. Actual tagged equality race1.362s
+passes against its complete11-instruction JSON fixture, canonical program digest
+d0679198c133da149f21a13ed2aaf9600ea8e23403797fcef51154ece1bdf93e;
+88B access proof fits134B node prefix. No device/socket/collector was opened.
+Pure preflight caught another genuine defect: requested15s session was schema
+valid but exceeded the authored10s review ceiling. Actual RED is retained in
+policy102-native-session-review-red.log; request is narrowed to10s, with action
+and48MiB allowance unchanged. Native field parser preserves the trailing empty
+payload column and rejects payload/non-ACK/malformed rows. Authored-input/focus
+races pass1.344s; these are preflight, not installed/native evidence.
+
+Planned installed assertions include real public independent review, team
+continuity, both original session credits, native stored publication and exact
+hash/download plus offline tshark ACK-only headers/no user-data payload. A bounded
+policy-recording-report.json is written only after those checks succeed. No
+installed pass is claimed. The existing protected native metadata input declares
+128KiB record rows/8MiB record WAL; prior raw-pool graph samples remain UNQUALIFIED.
+Largest identity/program/composition and accepted whole-graph/backing comparison
+remain separate open qualification work; no global row1->2 or limit increase.
+Manual raw, full ongoing/session renewal and syscall composition remain unfinished.
+
+Native partial measurement uses five additional fixture-only SQL round trips:
+initial global WAL LSN, one real capture/allocation/pool plus protected metadata
+projection, existing sample LSN/31-table UNION, and global WAL difference. The
+baseline precedes policy creation; it has no invented allocation or tuple-row
+baseline. The final sample includes both real attempts and all shared fixture
+activity/background writes. It records actual protected Metadata alongside the
+sample without attributing global WAL to one record or treating entire shared
+relation pages as capture bytes. No new production query or role is added.
+
+Known tables outside that31-table sample include operation_audit_pool,
+operation_audit_account, operation_audit, operation_audit_lifecycle,
+operation_audit_history (separate purpose lanes), capture_audit_root,
+capture_audit_allocation, capture_audit_binding, processing_root, processing_rule,
+processing_decision, context_processing, artifact_download, download_allocation,
+download_batch, download_key_binding, download_response, download_window,
+download_control_allocation, download_native_backing, download_native_owner,
+download_native_key, download_stop_pool, download_stop_backing, download_stop,
+download_stop_lifecycle and download_stop_history. Their independently backed purpose costs must not be
+silently charged twice to ordinary RecordRowBytes or silently omitted from an
+entire-workflow claim. Protected capacity_source/root and capacity_workload
+fixed/account graph is also outside this sample. Current sample is not a complete
+catalog of all installation state. Remaining maximum-shape work includes256BPF
+instructions,32audience assignments (issuer2048B/subject256B/basisUID64B),64retention
+rules and original64B target/provenance identities within existing canonical
+scope/expectation limits. Native's short ACK case does not prove those maxima.
+
+Final composed local affected races after e3 merge: capture2.615s,
+postgres1.265s, integration5.270s, actual exit0. Final native authored/selection/
+parser/fixture-shape races after the report/sample code pass1.623s, actual0.
+First pre-push exit2 found only gofmt on the new report map; retained unchanged
+failure log, formatted and reran the actual complete pre-push: exit0 including
+all gates, go-vet, SQL/spec/architecture and231console tests. Logs:
+policy102-composed-expiry-focus-races.log,
+policy102-native-focus-final-races.log,
+policy102-native-candidate-pre-push.log (failure),
+policy102-native-candidate-pre-push-final.log (actual complete0).
+Final broad Go/installed runs still pending source freeze and root coordination.

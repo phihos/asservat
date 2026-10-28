@@ -111,7 +111,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 	if installedRecordingFocus() {
 		// Real fresh password authentication at the reference provider's LoA1;
 		// this fixture does not configure or claim MFA/LoA2.
-		approvals = &contracts.IdentityApprovals{RequireRecordingApproval: true, StepUp: &contracts.IdentityStepUp{ACRValues: []string{"1"}, MaxAgeSeconds: 300}}
+		approvals = &contracts.IdentityApprovals{RequireRecordingApproval: installedJourneyFocus() != "policy-recording", StepUp: &contracts.IdentityStepUp{ACRValues: []string{"1"}, MaxAgeSeconds: 300}}
 	}
 	document, _ := json.Marshal(contracts.InstallerContinuation{Format: contracts.InstallerContinuationFormat, Namespace: namespace,
 		WorkerProvider:      contracts.InstallerProviderSelection{AuthMount: providers.worker.AuthMount, AuthMountAccessor: providers.worker.AuthMountAccessor},
@@ -523,6 +523,12 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			c, end := context.WithTimeout(ctx, 20*time.Second)
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
+		}
+		if installedJourneyFocus() == "policy-recording" {
+			t.Run("policy-recording", func(t *testing.T) {
+				qualifyInstalledPolicyRecording(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, diagnose)
+			})
+			return
 		}
 		if installedRecordingFocus() {
 			t.Run("approved-recording", func(t *testing.T) {

@@ -18,7 +18,7 @@ import (
 )
 
 func installedRecordingFocus() bool {
-	return installedJourneyFocus() == "approved-recording" || installedJourneyFocus() == "native-paced"
+	return installedJourneyFocus() == "approved-recording" || installedJourneyFocus() == "native-paced" || installedJourneyFocus() == "policy-recording"
 }
 
 // This is a separate reviewed public capture request, before independent
