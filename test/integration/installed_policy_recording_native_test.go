@@ -32,7 +32,7 @@ func installedPolicyRecordingSpec(cluster, namespace, workload string) map[strin
 func installedPolicyRecordingGrantArguments(policyUID, key string) map[string]any {
 	return map[string]any{
 		"policy_name": installedPolicyRecordingName, "policy_uid": policyUID, "idempotency_key": key, "lifetime_seconds": 600,
-		"limits":             map[string]any{"max_executions": 2, "max_collected_bytes": 16 << 20, "max_observed_bytes": 128 << 20},
+		"limits":             map[string]any{"max_executions": 2, "max_collected_bytes": 16 << 20, "max_observed_bytes": 64 << 20},
 		"observation_limits": map[string]any{"max_session_seconds": 10, "max_observed_bytes": 64 << 20, "max_bytes_per_second": 16 << 20, "max_concurrent_sessions": 1},
 	}
 }

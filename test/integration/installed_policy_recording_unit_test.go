@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,9 +10,12 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/packets"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/transport/conversion"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -237,6 +241,46 @@ func TestInstalledPolicyRecordingAuthoredInputs(t *testing.T) {
 	observation := input["observation_limits"].(map[string]any)
 	if err != nil || int64(observation["max_session_seconds"].(int))*int64(time.Second) > int64(timeout) {
 		t.Fatal("native grant exceeds original action review", observation, plan.Recorder.Action.Timeout, err)
+	}
+	// RequestPolicy validates a pending Grant with Grant.Valid before any
+	// store effect. Exercise that same production scope validation, rather
+	// than treating JSON-schema acceptance as a usable grant request.
+	_, fixture := newConsoleManagerGrants(t, "https://console.invalid")
+	for _, name := range []string{"normal", "tiny", "mismatched"} {
+		t.Run(name, func(t *testing.T) {
+			args := installedPolicyRecordingGrantArguments(uid, "native-"+name)
+			limits := args["limits"].(map[string]any)
+			observed := args["observation_limits"].(map[string]any)
+			if name == "tiny" {
+				limits["max_observed_bytes"], observed["max_observed_bytes"] = 1, 1
+			}
+			if name == "mismatched" {
+				limits["max_observed_bytes"] = observed["max_observed_bytes"].(int) + 1
+			}
+			g := fixture.g
+			policy := g.Policy.Clone()
+			g.Policy = &policy
+			// Reuse synthetic accepted identity/owner/settings facts, but bind
+			// the genuine authored recorder scope and original installed envelope.
+			a := &g.Policy.Authority
+			a.PolicyUID, a.ClusterID = uid, uid
+			a.Executor = authorization.PolicyPrincipal(a.InstallationID, uid)
+			a.Limits = authorization.AutomationLimits{MaxExecutions: 2, MaxBytes: 16 << 20, MaxObservedBytes: 128 << 20}
+			g.Scope = captureapp.RecorderPolicyScope(uid, 1, artifact.Digest{1}, plan, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits)
+			a.ScopeDigest = sha256.Sum256(g.Scope)
+			g.ExecutionDigest = a.ScopeDigest
+			g.Policy.RecipeDigest = compiler.RecipeDigest()
+			g.Policy.Limits = authorization.AutomationLimits{MaxExecutions: int64(limits["max_executions"].(int)), MaxBytes: int64(limits["max_collected_bytes"].(int)), MaxObservedBytes: int64(limits["max_observed_bytes"].(int))}
+			g.Policy.Observation = &authorization.ObservationLimits{MaxSessionSeconds: int64(observed["max_session_seconds"].(int)), MaxObservedBytes: int64(observed["max_observed_bytes"].(int)), MaxBytesPerSecond: int64(observed["max_bytes_per_second"].(int)), MaxConcurrentSessions: int64(observed["max_concurrent_sessions"].(int))}
+			g.Lifetime = time.Duration(args["lifetime_seconds"].(int)) * time.Second
+			g.PolicyNotAfter = g.RequestedAt.Add(g.Lifetime)
+			g.Decision, g.ExpiresAt, g.Revision = nil, time.Time{}, 1
+			g.PolicySpend = authorization.PolicyGrantSpend{}
+			g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
+			if len(g.Scope) == 0 || g.Valid() != (name != "mismatched") {
+				t.Fatalf("authored grant pre-store validation: valid=%t total=%d observation=%d", g.Valid(), g.Policy.Limits.MaxObservedBytes, g.Policy.Observation.MaxObservedBytes)
+			}
+		})
 	}
 }
 

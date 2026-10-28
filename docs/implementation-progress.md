@@ -1,6 +1,35 @@
 # Sustained implementation progress
 
 
+## Installed policy grant budget fixture corrected (2026-10-28)
+
+The frozen faac policy Native40776227145 reached the first real one-byte refusal:
+its control flow required public Failed, SQL captureFailed, original session
+credit1 and the exact original collector/Node's ObservationBudgetExhausted log.
+It then failed the second `request_policy_grant` with InvalidApprovalRequest,
+before creator departure, replacement grant, positive packet publication or
+payload/native-download checks. Go/test exited1 (502.631s; policy child49.56s),
+all3396 canonical source hashes matched, and cleanup was empty. This partial
+meter evidence is not a complete installed-policy qualification.
+
+The normal authored grant requested128MiB total observed bytes but64MiB in its
+observation limits. Production PolicyGrantScope validation requires equality;
+the one-byte request had overwritten both fields to1 and masked this fixture
+error. The correction lowers only the authored total to the existing64MiB;
+accepted128MiB policy authority and all production checks/settings stay intact.
+The existing authored-input preflight now passes the genuine compiled recorder
+scope and normal/tiny/mismatched inputs through the same Grant.Valid predicate
+used by RequestPolicy before storage, with synthetic accepted identity/owner/
+settings facts reused from the existing typed fixture. The old normal input
+failed while tiny and mismatch-refusal cases passed; no network, collector,
+authority bypass, new framework or runtime cost was introduced. Local results
+remain distinct from the next installed qualification, which has not run.
+Focused installed-input/proof races passed1.888s, finite producer/trigger and
+ongoing-refusal races1.064s, and the maintained-libpcap approved raw replay with
+require-all=false passed1.078s. Integration vet, spec, policy-schema and
+architecture gates returned0; no external fixture or hosted run was started.
+
+
 ## Combined recording follow-ups before installed qualification (2026-10-28)
 
 The isolated diagnostic-only Native run
