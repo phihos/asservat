@@ -133,3 +133,33 @@ checks, vet and 231 console tests. Its first new-worktree attempt failed only
 because pinned console dependencies were absent; offline `npm ci` completed
 before the successful run. These are pure/local component checks, not SQL,
 collector, private permit-wire or installed sensitive-observation qualification.
+
+## Conservative prefix proof component
+
+`packets.CheckPrefixProgram` is an unwired prerequisite for a future sensitive
+predicate. It reuses the maintained typed cBPF disassembler and existing opcode/VM
+validation, then checks every instruction, including unreachable instructions.
+Absolute/MSH reads must fit the existing 134-byte prefix. X starts at zero and
+can only be loaded from a constant <=60 or MSH (4 * low nibble <=60); TAX and
+scratch-to-X are refused. Indirect reads use that global bound with uint64
+arithmetic. This intentionally rejects some programs whose path-specific reads
+would fit; there is no new parser, VM, branch interpreter or configuration.
+
+`LD len` retains existing `Filter.vmFor` specialization from original Wire. Raw
+x/net VM `ExtLen` returns slice length, so that unspecialized VM alone is not the
+prefix evaluator. Maintained-VM tests compare full frames with their exact
+min(Wire,134) prefix and the same original wire length, including len >134,
+IPv4 IHL20/60 and the pinned 11-instruction `tcp[13]` program (largest read ends
+at byte88). IPv6/VLAN nonmatches for that IPv4 program are not broader support
+claims. Runtime complete-prefix/length validation, prompt unknown/loss handling,
+SQL/permit composition and native qualification remain separate requirements.
+
+The existing opcode-only check demonstrably permits an out-of-prefix read that
+changes a full-frame match into a silent nonmatch. Component RED exited1
+(0.003s); the new checker and full packets race passed (1.027s). Local amd64
+benchmarks of the complete checker, including existing VM validation, measured
+547–579ns/632B/22 allocations for11 instructions and 9.29–9.36us/11,112B/516
+allocations for256. These are synthetic per-plan checks, not installed CPU or
+packet throughput measurements. There is no added per-frame code, SQL/API/provider
+call, watch, timer, goroutine, service, credential, privilege or runtime knob.
+No compiler/node call site is wired by this component; raw gates remain closed.
