@@ -2268,3 +2268,19 @@ policy102-native-focus-final-races.log,
 policy102-native-candidate-pre-push.log (failure),
 policy102-native-candidate-pre-push-final.log (actual complete0).
 Final broad Go/installed runs still pending source freeze and root coordination.
+
+Root review found a qualification false-positive in the first native1B attempt:
+public Failed + SQL captureFailed + credit1 could also arise from unrelated
+source/node/provider failure. The follow-up keeps those assertions and now
+requires the exact existing node log `node collector: capture <originalID>
+stopped: ObservationBudgetExhausted` from the SQL receipt's original collector
+PodUID and NodeUID. Fixture selects only the existing asservat-node label in the
+owned regional cluster (bounded64Pod list, refuses pagination), pins original UID
+and assigned Node before/after the log read, and checks NodeUID again on success.
+No production logger/telemetry/permission/query is added; existing session SELECT
+returns two more immutable identity columns. Read is capped64KiB/256lines and30s
+of existing one-second wait polling: conservatively at most31attempts/93Pod+log reads plus
+one list/twoNode reads, fixture-only. Generic failure, source/provider error,
+wrongcapture and reason suffix fail the pure evidence check. The native attempt
+itself remains unrun; the report records budget exhaustion only after this exact
+proof succeeds. This corrects evidence semantics without changing runtime gates.

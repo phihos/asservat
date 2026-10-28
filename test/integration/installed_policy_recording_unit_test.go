@@ -108,3 +108,27 @@ func TestInstalledPolicyRecordingNativeFieldProof(t *testing.T) {
 		}
 	}
 }
+
+func TestInstalledPolicyRecordingCreditRefusalProof(t *testing.T) {
+	const id = "11111111-1111-4111-8111-111111111111"
+	const reason = "node collector: capture " + id + " stopped: ObservationBudgetExhausted"
+	for _, item := range []struct {
+		name, log string
+		want      bool
+	}{
+		{"exact", reason + "\n", true},
+		{"logger timestamp", "2026/10/28 06:00:00 " + reason + "\n", true},
+		{"generic capture failure", "node collector: capture " + id + " stopped: CaptureFailed\n", false},
+		{"source failure", "node collector: capture " + id + " stopped: ObservationClosed\n", false},
+		{"provider failure", "node collector: capture " + id + " stopped: target not found\n", false},
+		{"different capture", strings.ReplaceAll(reason, id, "22222222-2222-4222-8222-222222222222"), false},
+		{"partial reason", reason + "Extra", false},
+		{"none", "", false},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			if got := policyRecordingCreditRefusal([]byte(item.log), id); got != item.want {
+				t.Fatalf("capture-specific input credit proof=%t want=%t", got, item.want)
+			}
+		})
+	}
+}

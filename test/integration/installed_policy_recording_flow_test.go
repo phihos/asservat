@@ -21,9 +21,12 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/collector"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // This is an installed production-path qualification, never an authority
@@ -301,9 +304,53 @@ func qualifyInstalledPolicyRecording(t *testing.T, ctx context.Context, admin *p
 	})
 	var firstUntil time.Time
 	var firstCredit int64
-	if err = admin.QueryRow(ctx, `SELECT lease_until,credit FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2`, root, first).Scan(&firstUntil, &firstCredit); err != nil || firstCredit != 1 {
+	var firstCollectorUID, firstNodeUID string
+	if err = admin.QueryRow(ctx, `SELECT lease_until,credit,collector_pod_uid,node_uid FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2`, root, first).Scan(&firstUntil, &firstCredit, &firstCollectorUID, &firstNodeUID); err != nil || firstCredit != 1 {
 		t.Fatal("native refusal lost original one-byte spend", firstCredit, err)
 	}
+	// A generic failure can also mean stale source, target or provider failure.
+	// Require the existing node meter's exact reason from the originally bound
+	// collector, rather than misreporting any failed capture as input enforcement.
+	boundCollectors, err := f.region.CoreV1().Pods("").List(ctx, meta.ListOptions{LabelSelector: "app.kubernetes.io/name=asservat-node", Limit: 64})
+	if err != nil || boundCollectors.Continue != "" {
+		t.Fatal("bounded owned collector inventory", err)
+	}
+	var boundCollector *core.Pod
+	for i := range boundCollectors.Items {
+		p := &boundCollectors.Items[i]
+		if string(p.UID) == firstCollectorUID {
+			boundCollector = p
+		}
+	}
+	if boundCollector == nil || boundCollector.DeletionTimestamp != nil || boundCollector.Spec.NodeName == "" {
+		t.Fatal("original observation collector Pod missing")
+	}
+	boundNode, err := f.region.CoreV1().Nodes().Get(ctx, boundCollector.Spec.NodeName, meta.GetOptions{})
+	if err != nil || string(boundNode.UID) != firstNodeUID {
+		t.Fatal("observation collector changed original Node UID", err)
+	}
+	wait("exact native one-byte meter refusal", 30*time.Second, func(call context.Context) bool {
+		before, err := f.region.CoreV1().Pods(boundCollector.Namespace).Get(call, boundCollector.Name, meta.GetOptions{})
+		if err != nil || before.UID != boundCollector.UID || before.Spec.NodeName != boundNode.Name || before.DeletionTimestamp != nil {
+			t.Fatal("original collector identity before log read", err)
+		}
+		logs, err := f.region.CoreV1().Pods(before.Namespace).GetLogs(before.Name, &core.PodLogOptions{Container: "node", LimitBytes: ptr.To(int64(64 << 10)), TailLines: ptr.To(int64(256))}).DoRaw(call)
+		if err != nil {
+			return false
+		}
+		after, err := f.region.CoreV1().Pods(before.Namespace).Get(call, before.Name, meta.GetOptions{})
+		if err != nil || after.UID != before.UID || after.Spec.NodeName != before.Spec.NodeName || after.DeletionTimestamp != nil {
+			t.Fatal("original collector identity after log read", err)
+		}
+		if !policyRecordingCreditRefusal(logs, first) {
+			return false
+		}
+		afterNode, err := f.region.CoreV1().Nodes().Get(call, boundNode.Name, meta.GetOptions{})
+		if err != nil || afterNode.UID != boundNode.UID {
+			t.Fatal("original Node identity after meter proof", err)
+		}
+		return true
+	})
 	beta := requestReview("native-policy-payload-headers", false)
 	// Disable the real creator account after both original requests. Team
 	// execution/settings provenance and current sponsor management must survive.
@@ -419,6 +466,7 @@ WHERE c.root_id=$1 AND c.id=$2`, root, second).Scan(&allocation, &pool, &protect
 		"failedCaptureID": first, "publishedCaptureID": second, "caseID": progress.CaseID,
 		"originalGrantID": alpha.ID, "replacementGrantID": beta.ID, "replacementGrantNotAfter": beta.NotAfter,
 		"originalInputCredit": firstCredit, "originalLeaseUntil": firstUntil, "replacementInputCredit": secondCredit,
+		"originalCollectorPodUID": firstCollectorUID, "originalNodeUID": firstNodeUID, "oneByteFailureReason": collector.ErrObservationBudgetExhausted.Error(),
 		"executionsSpent": status.Executions, "outputReservations": status.Output, "inputReservations": status.Input,
 		"nativeBytes": len(native), "nativeSHA256": hex.EncodeToString(digest[:]), "tsharkACKHeaderPackets": packets,
 		"creatorDisabled": true, "currentSponsorManaged": true, "originalGrantRevoked": true,
@@ -435,6 +483,16 @@ WHERE c.root_id=$1 AND c.id=$2`, root, second).Scan(&allocation, &pool, &protect
 		t.Fatal(err)
 	}
 	t.Logf("UNPUBLISHED installed finite policy proof: native one-byte input refusal, creator departure, current sponsoring-manager replacement, original grant revocation, actual ACK headers PCAPNG %dB/%dpackets SHA256=%x; conservative input reservations=%d, output reservations=%d, no measured-input claim", len(native), packets, digest, status.Input, status.Output)
+}
+
+func policyRecordingCreditRefusal(logs []byte, captureID string) bool {
+	expected := "node collector: capture " + captureID + " stopped: " + collector.ErrObservationBudgetExhausted.Error()
+	for _, line := range strings.Split(string(logs), "\n") {
+		if strings.HasSuffix(strings.TrimSpace(line), expected) {
+			return true
+		}
+	}
+	return false
 }
 
 // Keep the trailing empty payload column; TrimSpace would silently discard a
