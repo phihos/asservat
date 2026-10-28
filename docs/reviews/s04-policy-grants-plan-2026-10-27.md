@@ -1514,3 +1514,18 @@ Stop reproduces failure (0.20s, actual exit 1). All observation race tests pass 
 the correction (5.202s, actual exit 0). The full-suite/pre-push/benchmark numbers
 above describe checkpoint `632746cf`; the packet debit/recorder benchmark path is
 unchanged by this timer-only fix. No additional timer, worker, service or authority.
+
+The clean producer checkpoint is 3dd5f544. Only the independently reviewed local
+meter commits were then composed: 632746cf as 480b22af and ba585360 as f120b6ea.
+The plan's append conflict retained both public/producer and meter sections.
+No stale branch merge, SQL/node authority issuer or raw-path enablement occurred.
+At composed f120b6ea, one affected race run passed (actual exit 0): bootstrap
+54.634s, packets 1.028s; unchanged collector/capture/authorization/PostgreSQL
+packages reused Go's test cache. One composed pre-push also exited 0, including
+231 console tests and the repository contract/architecture/SQL generation/vet/
+format gates. Logs are `policy102-producer-meter-composed-{race,prepush}.log`
+under the existing approved-workflow archive root. No external fixture ran for
+this composition. The next reviewed SQL selection is only the new recorder
+team/action case plus existing policy-share/accounting original-grant positives;
+reuse public focused-3 and unchanged inventory/migration evidence. Complete
+SQL/node binding/channel/pre-filter/native and ongoing qualification remain open.
