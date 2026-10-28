@@ -1816,3 +1816,56 @@ an app-meter capability check: current attestation checks Pod/DaemonSet/account/
 node/boot, and reported engine version is Gadget. No new version/flag framework
 is needed solely for this strict-decoder boundary. Actual old/new poll regression
 and exact authenticated transport still precede raw availability.
+
+Finite observation SQL run 1 at frozen 46e72285 terminated actual exit 1 (Go
+21.463 s, harness 36.721 s). Migration Up/Down PASS 4.35 s (top-level proof in
+raw Go log; the slash-filtered report list omits this top-level name). New
+packet-policy-observation-sql child PASS 14.10 s: generated query held-table
+source expiry CHECK23514 and independently read accepted/grant/session rollback
+all zero; one 32 MiB conservative input reservation per original pool; immutable
+original tuple/unique capture, debit bounds, active-count expiry and compiled
+finalizer early/expired-but-unfinalized refusal. Sample tuple 528 B, whole current
+observation relation/indexes 65,536 B, global WAL delta including debit/insert/
+negative writes 9,480 B. These are partial component samples, not the complete
+sensitive graph/worst-case backing or actual companion/node/raw qualification.
+No packet acquisition, native bytes or positive child retirement occurred.
+
+The selected compiled-publisher case failed earlier at 2.53 s: an old negative
+facet expected shared hub-runtime to lack custody_copy.etag UPDATE. ADR-255's
+existing capture-history duty intentionally adds that column update to the hub
+union. The eight remaining negatives were compared against the complete current
+compiled union: execution DELETE/binding mutation, capture INSERT/expectation
+mutation, recovery clear, catalog INSERT, context-key unwrap INSERT and authority
+audit DELETE remain excluded. The fixture now retains those denials, replaces the stale etag denial with
+custody_copy.attempt_id UPDATE (the real excluded identity column), and separately
+requires the existing history etag update, each WHERE false (no data mutation).
+The narrower execution-duty unit contract still excludes custody-copy writes;
+no retired duty renderer or product privilege change is added. No ordinary
+positive finalization result is claimed from the failed publisher child.
+
+Archive before source edits:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-finite-observation-sql-1-artifacts/`.
+Report policy102-finite-observation-sql-1-environment.json SHA-256
+fe15c8b328f2c4ccc26439a38065a3fc07159e5fb309e47a9e3be5a4a9a93c32;
+raw Go/publisher/migration log is the same prefix.log. All 3,280 source hashes
+independently match frozen commit and disk; sourceUnchanged=true, cleanup [],
+exact asservat-custody-lf54jl01-postgres, asservat-custody-lf54jl01-s3 and
+network asservat-custody-lf54jl01 absent. Independent source/absence
+JSON and actual runner terminal metadata are in that archive. The host slot was
+released to root/h2. Reuse marker/migration positives; no automatic rerun.
+
+The corrective fixture review read ADR-222's accepted ordinary process union,
+ADR-255 and the actual custody_copy DDL/query paths. attempt_id is a real foreign
+key and part of the row primary key. No custody_copy row-immutability trigger
+was found; the history duty legitimately updates its receipt columns. Therefore
+this WHERE-false regression establishes the compiled column privilege boundary,
+not a proof that all evidence/receipt writes are impossible. Existing completed
+result verification, separate publication/key/delete/recovery effects retain their
+own guards; no role/pool or extra product mechanism restores the obsolete test.
+
+Corrective fixture local checks passed with actual exit 0: pre-push (231 console
+tests) and integration compile/offline compiler/bindings race 1.081 s. Logs:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-finalizer-fixture-fix-pre-push-final.log`
+and `policy102-finalizer-fixture-fix-compile-final.log` in that same directory.
+Only the failed compiled-publisher child needs a reviewed focused external rerun;
+no unchanged marker/migration or prior packet/snapshot/share/public suite repeat.

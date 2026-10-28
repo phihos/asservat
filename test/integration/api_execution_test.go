@@ -70,13 +70,20 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					"UPDATE context_capture SET expectation_json=expectation_json WHERE false",
 					"UPDATE fleet_trust SET recovery_blocked=false WHERE false",
 					"INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture WHERE false",
-					"UPDATE custody_copy SET etag=etag WHERE false",
+					"UPDATE custody_copy SET attempt_id=attempt_id WHERE false",
 					"INSERT INTO context_key_unwrap SELECT * FROM context_key_unwrap WHERE false",
 					"DELETE FROM authority_audit WHERE false",
 				} {
 					if _, err = sharedPool.Exec(ctx, query); capacitySQLState(err) != "42501" {
-						t.Fatal("execution credential acquired excluded authority", query, err)
+						t.Fatal("shared hub credential acquired excluded authority", query, err)
 					}
+				}
+				// The installed hub union also runs capture-history; its exact etag
+				// update is intentional (ADR-255), unlike the narrower execution duty.
+				// The attempt_id denial above tests the real excluded identity column;
+				// WHERE false checks privileges only, without mutating any receipt.
+				if _, err = sharedPool.Exec(ctx, "UPDATE custody_copy SET etag=etag WHERE false"); err != nil {
+					t.Fatal("shared hub lost its existing capture-history receipt update", err)
 				}
 				guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
 				newExecution := func(p *pgxpool.Pool) *postgres.APIContextExecutions {
