@@ -1,5 +1,40 @@
 # Sustained implementation progress
 
+
+## Raw policy replay and initial attachment evidence (2026-10-28)
+
+Native40756795839 on immutable e0d failed at the one-byte refusal wait
+(child105.88s, Go566.766s); it did not prove node execution or meter refusal.
+An admitted occurrence was logged, but initial start stopped at router Attach,
+whose original failure kind/budget was not retained. Accepted continuation had
+a concrete separate defect: explicit approved timing from a raw predicate was
+wrongly gated on the installation require-all-recordings flag, false here.
+
+Historical decoding now uses the existing validated timing marker and recorder
+expectation independently of that flag. Current grant/permission/recovery and
+original deadlines remain unchanged. Real maintained-libpcap policy compilation
+reproduced RED1/0.011s, then focused race GREEN1.079s including malformed/changed
+historical negatives and exact ordinary absolute deadlines. An initial three
+fixture-preflight failures were retained separately before the meaningful RED.
+The existing user-space pcap-check now includes that one anchored tagged test;
+default Go gates alone do not run it. Actual pcap-check exited0, including the
+new test0.012s, existing compiler tests0.015s and the static hub build check.
+
+Initial Attach diagnostics retain fixed capacity/invalid/unavailable plus the
+original remaining/bound; return behavior is unchanged. Real StartContext/Router
+RED1/0.051s became focused race GREEN; same-cluster history attachment must join
+before replacement reaches the existing runner preparation (combined1.359s).
+Native wait preserves last public status/code/error/phase and SQL scan/phase.
+The exact original collector/capture budget-exhaustion log remains mandatory.
+
+Composed affected libpcap races exited0: PostgreSQL2.617s, bootstrap62.028s,
+planning1.225s, capture12.500s and contextstart13.795s. Specification, architecture,
+Go imports, formatting and vet passed; integration compile passed. This is not
+a full broad go-check or installed fix qualification. The existing raw companion
+adds actual admission Lookup replay with the same original IDs/scope/deadline
+and false setting under its already compiled capture-admit role; its external
+selection awaits root review. No new fixture/collector/Native/push ran.
+
 ## Recording readiness follow-up assembled locally (2026-10-28)
 
 The failed 3f candidate's policy review input/parent return and traffic-helper

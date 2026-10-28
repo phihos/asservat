@@ -97,3 +97,35 @@ cleanup, reviewed admission after actual expiry, shared-lock/revocation ordering
 and historical replay. Actual commands/results belong in implementation progress;
 no unrun gate is claimed passed here. Installed independent-review/browser
 journeys and participant studies remain separate qualification.
+
+
+## Raw-predicate replay and independent installation setting (2026-10-28)
+
+The explicit canonical `approvedAcceptance/v1` marker can result from a raw byte
+predicate even when protected `RequireRecordingApproval` is false. That setting
+records the separate requirement to approve every recording; it does not exhaust
+the reasons a plan needs approval. Historical routing/replay therefore recognizes
+the validated marker plus an actual recorder expectation independently of that
+boolean. Exact canonical digest, capture, target, execution class and version
+checks remain; ordinary absolute-deadline scopes still require exact equality.
+Current permission/recovery and the original policy/grant checks remain separate
+mandatory authority checks, unchanged by this decoder correction.
+
+Native40756795839 reached an admitted policy occurrence but timed out waiting for
+a one-byte native refusal. `occurrence/captured` reports admission, not node
+execution. Its57 retained timing marks stopped at `st-attach` before receiver,
+signing, runner and meter. The initial attachment cause was discarded; no exact
+cause or meter failure is established. Three accepted continuations could not
+recover: the historical decoder wrongly required the installation flag to be
+true for the explicit approved timing marker. A maintained libpcap dead-handle
+filter plus real policy/recorder compiler reproduces that decoder refusal with
+the flag false. This is a real continuation defect, not proof of the initial
+attachment cause or a qualified installed fix.
+
+Initial attachment failures now use the existing fixed diagnostic sink to retain
+`capacity`, `invalid` or `unavailable`, original remaining bucket and enclosing
+bound. The original router still decides and returns the same not-started result;
+no reserve, deadline, slot, retry or privilege changes. The native one-byte wait
+also retains its last public status/code/error/phase and SQL scan error/phase so
+an absent execution and a refused public view cannot masquerade as meter results.
+The existing exact bound collector's budget-exhaustion log remains required.

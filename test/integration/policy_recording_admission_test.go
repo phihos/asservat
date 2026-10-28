@@ -359,7 +359,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				qualifyFinitePolicyObservationSQL(t, ctx, admin, hub, poolFor, root, record.Record.ID, grant, output)
 			}
 			if companionSQL {
-				qualifyPolicyObservationCompanion(t, ctx, admin, hub, poolFor, store, keys, s, current, authority, a, output, record.Record.ID, grant, beforeGraph, protected...)
+				qualifyPolicyObservationCompanion(t, ctx, admin, hub, poolFor, store, keys, s, admissions, current, authority, a, output, record.Record.ID, grant, beforeGraph, protected...)
 			}
 		})
 	}

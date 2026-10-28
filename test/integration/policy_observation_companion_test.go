@@ -66,7 +66,7 @@ func policyRawCompile(raw json.RawMessage) (value.PolicyRecorderConfiguration, e
 // frozen raw scope, typed queue, encrypted producer and audited retirement.
 // Target/process/node trust and packet inputs remain synthetic component facts;
 // neither runtime raw gate is opened and no collector/engine runs.
-func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, current *postgres.AutomationAuthorities, authority authorization.AcceptedPolicyAuthority, admission capture.Admission, accepted capture.Accepted, acceptance, grant string, before *policyObservationGraphSample, protected ...policyRecorderProtectedCase) {
+func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin, hub *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, s captureAdmissionScenario, admissions *postgres.ContextAdmissions, current *postgres.AutomationAuthorities, authority authorization.AcceptedPolicyAuthority, admission capture.Admission, accepted capture.Accepted, acceptance, grant string, before *policyObservationGraphSample, protected ...policyRecorderProtectedCase) {
 	t.Helper()
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 	guard := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
@@ -111,6 +111,11 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 		t.Fatal(err)
 	}
 
+	var previewID string
+	if err := admin.QueryRow(ctx, `SELECT preview_id::text FROM context_capture WHERE root_id=$1 AND id=$2`, s.a.RootID, accepted.CaptureID).Scan(&previewID); err != nil {
+		t.Fatal("actual raw admission preview", err)
+	}
+	replayChecked := false
 	refresh := func() (executionapp.APIExecutionCheck, targets.PacketSourceObservation) {
 		t.Helper()
 		n := clock()
@@ -130,6 +135,14 @@ func qualifyPolicyObservationCompanion(t *testing.T, ctx context.Context, admin,
 		recovery, err := s.recovery.reader.RecoveryState(ctx)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !replayChecked {
+			replay, found, err := admissions.LookupContextAdmission(ctx, capture.ReplayQuery{RootID: s.a.RootID, PreviewID: previewID, IdempotencyKey: admission.IdempotencyKey, SubmissionDigest: admission.SubmissionDigest, Identity: verified, Recovery: recovery})
+			if err != nil || !found || !replay.Replay || replay.CaptureID != accepted.CaptureID || replay.ScopeDigest != accepted.ScopeDigest || !replay.Deadline.Equal(accepted.Deadline) || replay.Expectation.Recording == nil || replay.Expectation.Recording.RequireApproval {
+				t.Fatal("actual raw policy admission replay with require-all false", found, err)
+			}
+			replayChecked = true
+			t.Log("actual raw policy admission replay retained capture/scope/deadline and require-all=false")
 		}
 		work, err := executions.ReadAPIContextWork(ctx, accepted.CaptureID, verified, recovery)
 		if err != nil {

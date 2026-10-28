@@ -115,6 +115,15 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	attachment, e := s.Router.Attach(call, target.ClusterID, id)
 	auditapp.MarkStep(ctx, "st-attach", mark)
 	if e != nil {
+		if s.Report != nil {
+			reason := "unavailable"
+			if errors.Is(e, fleetvalue.ErrCapacity) {
+				reason = "capacity"
+			} else if errors.Is(e, fleetvalue.ErrInvalid) {
+				reason = "invalid"
+			}
+			s.Report("attach (" + reason + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
+		}
 		return notStarted
 	}
 	defer attachment.Close()

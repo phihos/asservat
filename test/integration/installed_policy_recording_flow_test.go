@@ -303,12 +303,32 @@ func qualifyInstalledPolicyRecording(t *testing.T, ctx context.Context, admin *p
 	})
 	restart()
 	first := captureAfter("")
+	var lastPublicStatus, lastPublicCode, lastPublicPhase, lastSQLPhase string
+	var lastPublicErr, lastSQLErr error
+	oneByteWaitFinished := false
+	defer func() {
+		if !oneByteWaitFinished {
+			t.Logf("native one-byte refusal last facts: public status=%q code=%q last-successful-phase=%q error=%v; SQL last-successful-phase=%q error=%v", lastPublicStatus, lastPublicCode, lastPublicPhase, lastPublicErr, lastSQLPhase, lastSQLErr)
+		}
+	}()
 	wait("native one-byte refusal", time.Minute, func(call context.Context) bool {
+		reply, code, publicErr := invoke(call, requester, "get_capture", map[string]any{"capture_id": first})
+		lastPublicStatus, lastPublicCode, lastPublicErr = reply.Status, code, publicErr
 		var p installedJourneyCaptureProgress
-		_ = read(call, requester, "get_capture", map[string]any{"capture_id": first}, &p)
+		if publicErr == nil && reply.Status == "ok" && code == "" {
+			lastPublicErr = json.Unmarshal(reply.Data, &p)
+		}
+		if lastPublicErr == nil && reply.Status == "ok" && code == "" {
+			lastPublicPhase = p.Phase
+		}
 		var phase string
-		return admin.QueryRow(call, `SELECT phase FROM context_execution WHERE root_id=$1 AND capture_id=$2`, root, first).Scan(&phase) == nil && phase == "captureFailed" && p.Phase == "Failed"
+		lastSQLErr = admin.QueryRow(call, `SELECT phase FROM context_execution WHERE root_id=$1 AND capture_id=$2`, root, first).Scan(&phase)
+		if lastSQLErr == nil {
+			lastSQLPhase = phase
+		}
+		return lastPublicErr == nil && reply.Status == "ok" && code == "" && lastSQLErr == nil && phase == "captureFailed" && p.Phase == "Failed"
 	})
+	oneByteWaitFinished = true
 	var firstUntil time.Time
 	var firstCredit int64
 	var firstCollectorUID, firstNodeUID string

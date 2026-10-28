@@ -87,6 +87,7 @@ libpcap:
 # no capture or BPF load.
 pcap-check: libpcap
 	$(PCAP_ENV) go test -tags libpcap -count=1 ./internal/adapters/pcap/
+	$(PCAP_ENV) go test -tags libpcap -count=1 -run '^TestRawPolicyApprovedTimingReplayIgnoresRequireAllSwitch$$' ./internal/adapters/postgres/
 	$(HUB_BUILD) -o "$(ASSERVAT_BUILD_TMP)/asservat-hub" ./cmd/asservat 2>/dev/null
 	file "$(ASSERVAT_BUILD_TMP)/asservat-hub" | grep -q 'statically linked'
 	rm -f "$(ASSERVAT_BUILD_TMP)/asservat-hub"

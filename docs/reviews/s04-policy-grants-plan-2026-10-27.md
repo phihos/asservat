@@ -2487,3 +2487,30 @@ Audit policy102-focus-all-authored-operations-audit.json SHA256
 c22b655cb140ef22010c99089078a25d2b0ba31e21999892089a7f7c3f0d51ab.
 No new hosted/owned fixture, collector or push was performed. Published3f and
 main remain untouched; root reviews the frozen correction before any rerun.
+
+
+### Raw approved-timing replay correction and initial attachment evidence
+
+On published e0d, Native40756795839 failed the one-byte wait before proof of node
+execution. The genuine decoder defect is distinct: raw-predicate approved timing
+was gated on the independent require-all recording flag, deliberately false in
+the fixture. Recognize only the existing validated timing marker/recorder shape;
+do not flip the flag or weaken current grant/permission/recovery checks. Preserve
+ordinary exact absolute deadlines and mismatched/malformed historical refusal.
+Real admission/replay coverage is added to the existing companion fixture; its
+external execution awaits root review/slot. No new fixture framework or collector.
+
+Proportionality1–11: (1) one actual installed failure plus compiler-backed decoder
+RED; initial Attach cause unknown; (2) no maintainer risk change; (3) valid raw
+policy replay/continuation is ordinary supported behavior; (4) reuse existing
+versioned compiler contract, router and diagnostic sink; (5) zero privileges,
+credentials or network destinations; (6) zero behavioral fallback states, three
+fixed attachment diagnostic causes; (7) zero configuration; (8) existing compiler
+and transport dependencies only; (9) zero new SQL/API/provider/RPC calls, watches,
+workers or timers; one bounded diagnostic string and clock read only on failed
+Attach, sampled by existing logging; (10) no schema/persisted-format migration,
+old scopes retain exact canonical checks; (11) a decoder predicate correction
+and preserving discarded outcomes are smaller than a new grant path, generic
+expiry patch or longer Native timeout. Cumulative capture/source/accounting
+limits are unchanged; recovered continuation performs only existing authority
+and start work. No installed success or resolved meter behavior is claimed.
