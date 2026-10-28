@@ -580,3 +580,14 @@ separately covers actual translated-port TLS/h2, unchanged original SNI/HTTP
 authority, wrong roots/name/candidates, no replay and joined cancellation.
 Synthetic initial setup roots and fixture signing still bound the native scope;
 this does not qualify real provider latency or installed runtime selection.
+
+
+The direct HWORK receiver distinguishes active operations from retained same-ID
+markers under [ADR-150's accounting revision](../decisions/150-operation-owned-native-observation-proof.md#joined-active-capacity-and-bounded-replay-markers-2026-10-28).
+The existing map admits at most `maximum` active entries and `2 * maximum`
+retained entries. Only positively joined native/reservation/GET/claim cleanup
+and token clearing release active capacity; markers retain the original expiry
+and refuse replay. Possible delivery or a phase change alone releases nothing.
+Total saturation remains a bounded refusal, with unchanged authority intervals,
+input budgets and active transport/native limits. The added retained context and
+timer instances are bounded by the same total; no watch or new service is added.

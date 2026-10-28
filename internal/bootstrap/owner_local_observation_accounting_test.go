@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 	"unsafe"
@@ -103,4 +104,117 @@ func TestLocalPendingUnjoinedAndPossiblyDeliveredHoldActiveConcurrency(t *testin
 
 func TestLocalPendingAccountingValueSizes(t *testing.T) {
 	t.Logf("entry_value_bytes=%d key_value_bytes=%d claim_value_bytes=%d max_region_calls=%d token_cap_bytes=%d; excludes maps/contexts/timers/native retained graphs", unsafe.Sizeof(ownerLocalObservationPendingEntry{}), unsafe.Sizeof(ownerLocalObservationPendingKey{}), unsafe.Sizeof(ownerLocalObservationPendingClaim{}), capacityRegionalCalls(16), 16<<10)
+}
+
+// The retained ceiling stays finite even for fast, known pre-output failures.
+// Short synthetic original intervals exercise real expiry without changing any
+// production five-second limit or moving an already issued deadline.
+func TestLocalPendingRetainedSaturationAndNaturalExpiry(t *testing.T) {
+	f := newPendingFixture(t)
+	s, err := newOwnerLocalObservationPending(context.Background(), f.store.pin, f.server.Binding, 2, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Close)
+	end := time.Now().Add(250 * time.Millisecond)
+	var entries []*ownerLocalObservationPendingEntry
+	for range 4 {
+		q := f.request.LocatorQuery()
+		q.RequestID, q.Challenge = ownerRandomID(), ownerRandomID()
+		q.RequestedAt = time.Now()
+		q.NotAfter = end
+		call, cancel := context.WithDeadline(context.Background(), end)
+		t.Cleanup(cancel)
+		e, err := s.reserve(call, q, observationForwardID(701), []byte(localObservationFixtureToken), f.server)
+		if err != nil {
+			t.Fatal("bounded retained headroom", err)
+		}
+		e.finishGET()
+		pendingWait(t, e.closed, "pre-output owner join")
+		entries = append(entries, e)
+		if replay, err := s.reserve(call, q, observationForwardID(701), []byte(localObservationFixtureToken), f.server); err == nil {
+			replay.finishGET()
+			t.Fatal("spent marker replay")
+		}
+	}
+	s.mu.Lock()
+	active, total := s.active, len(s.entries)
+	s.mu.Unlock()
+	if active != 0 || total != 4 {
+		t.Fatal("retained accounting", active, total)
+	}
+	q := f.request.LocatorQuery()
+	q.RequestID, q.Challenge = ownerRandomID(), ownerRandomID()
+	call, cancel := context.WithDeadline(context.Background(), f.request.NotAfter)
+	defer cancel()
+	if extra, err := s.reserve(call, q, observationForwardID(701), []byte(localObservationFixtureToken), f.server); err == nil {
+		extra.finishGET()
+		t.Fatal("total retained ceiling exceeded")
+	}
+	for _, e := range entries {
+		pendingWait(t, e.retired, "natural original expiry")
+	}
+	s.mu.Lock()
+	active, total = s.active, len(s.entries)
+	s.mu.Unlock()
+	if active != 0 || total != 0 {
+		t.Fatal("expiry did not retire exact entries", active, total)
+	}
+	next, err := s.reserve(call, q, observationForwardID(701), []byte(localObservationFixtureToken), f.server)
+	if err != nil {
+		t.Fatal("expired markers retained capacity", err)
+	}
+	next.finishGET()
+}
+
+func TestLocalPendingConcurrentAccountingAndClose(t *testing.T) {
+	f := newPendingFixture(t)
+	s, err := newOwnerLocalObservationPending(context.Background(), f.store.pin, f.server.Binding, 2, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Close)
+	var owners sync.WaitGroup
+	start := make(chan struct{})
+	admitted := make(chan *ownerLocalObservationPendingEntry, 16)
+	for range 16 {
+		owners.Add(1)
+		go func() {
+			defer owners.Done()
+			<-start
+			q := f.request.LocatorQuery()
+			q.RequestID, q.Challenge = ownerRandomID(), ownerRandomID()
+			if e, err := s.reserve(f.get, q, observationForwardID(701), []byte(localObservationFixtureToken), f.server); err == nil {
+				admitted <- e
+			}
+		}()
+	}
+	close(start)
+	owners.Wait()
+	close(admitted)
+	var entries []*ownerLocalObservationPendingEntry
+	for e := range admitted {
+		entries = append(entries, e)
+	}
+	if len(entries) != 2 {
+		t.Fatal("concurrent active ceiling", len(entries))
+	}
+	for _, e := range entries {
+		owners.Add(1)
+		go func(e *ownerLocalObservationPendingEntry) { defer owners.Done(); e.finishGET(); e.closeWork() }(e)
+	}
+	owners.Wait()
+	s.Close()
+	s.mu.Lock()
+	active, total := s.active, len(s.entries)
+	s.mu.Unlock()
+	if active != 0 || total != 0 {
+		t.Fatal("joined shutdown accounting", active, total)
+	}
+	q := f.request.LocatorQuery()
+	q.RequestID = ownerRandomID()
+	if e, err := s.reserve(f.get, q, observationForwardID(701), []byte(localObservationFixtureToken), f.server); err == nil {
+		e.finishGET()
+		t.Fatal("closed store admitted")
+	}
 }

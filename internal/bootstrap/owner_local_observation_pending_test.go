@@ -123,9 +123,11 @@ func TestLocalPendingRetainsTokenAndOriginalGETLifetime(t *testing.T) {
 	}
 	other := f.request.LocatorQuery()
 	other.RequestID = observationForwardID(900)
-	if _, err = s.reserve(call, other, observationForwardID(701), []byte(localObservationFixtureToken), f.server); err == nil {
-		t.Fatal("completed or unknown output refunded original slot")
+	next, err := s.reserve(call, other, observationForwardID(701), []byte(localObservationFixtureToken), f.server)
+	if err != nil {
+		t.Fatal("joined completion retained active capacity", err)
 	}
+	next.finishGET()
 }
 func TestLocalPendingOneConcurrentClaim(t *testing.T) {
 	f, s, e, native, locator := localPendingFixture(t)

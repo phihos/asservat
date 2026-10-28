@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Observation active capacity and bounded replay retention (2026-10-28)
+
+Native 40776231613 failed before capture/history with an exact full-30-second
+binding expired by 106.948562 seconds and a current demand recorded 4.018931
+seconds before the diagnostic. That rules out the first-short-binding defect
+for this request. Its locator failures remain unattributed; the SQL permission
+denial is the intentional installed permission-reader negative probe.
+
+A separate local regression reproduces two fully joined operations consuming
+the production two-call active envelope until original expiry. The correction
+keeps active calls at the same ceiling, releases them only after all cleanup
+joins/token clearing, and retains same-ID markers in the existing map under a
+finite total of twice that ceiling. It changes an agent-authored concurrency
+restriction, not original authority, grants, input budgets or replay semantics.
+Maximum installed region scale remains nine active operations and eighteen
+retained entries; extra contexts/timers are bounded, not zero. Exact value sizes,
+residual saturation and terminal local checks are in [ADR-150](decisions/150-operation-owned-native-observation-proof.md#joined-active-capacity-and-bounded-replay-markers-2026-10-28).
+No external fixture, collector or new hosted run has qualified this correction;
+source-frozen review and a scoped existing real-Kubernetes operation test remain
+next, followed separately by the installed workflow.
+
 
 ## Installed policy grant budget fixture corrected (2026-10-28)
 

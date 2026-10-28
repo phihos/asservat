@@ -107,13 +107,17 @@ end. It is deliberately not a child of the completed GET handler. Setup
 cancellation remains linked and joined until the possible-delivery boundary.
 The original finite context then survives GET completion without renewal.
 POST cancellation joins actual native/SQL/frame/output work. Spent markers stay
-in the same slot until the original end, and delayed cleanup compares the exact
-entry pointer. Process restart, missing state, changed token/leaf/sequence or
+until the original end, and delayed cleanup compares the exact entry pointer.
+The active-call versus retained-marker accounting revision below supersedes
+counting a fully joined marker as active concurrency. Process restart, missing state, changed token/leaf/sequence or
 unknown previous claim cannot create or adopt a replacement operation.
 
-H keeps at most two admitted operations and two active transports shared across
-those operations and all losing candidates. A retains its existing pending and
-active-request ceilings. Every slot includes admitted work and joined cleanup.
+H retains its compiled active-operation and transport ceilings, shared across
+operations and losing candidates. The original single-region ceiling is two;
+current installed composition scales it with regional clusters as recorded in
+the accounting revision below. A retains that active-request ceiling and the
+separate finite total-marker bound. Active slots include admitted work and
+joined cleanup.
 The original listener accept-time two-second prelude and five-/thirty-second
 finite/standby bounds remain separate additional caps, not new time at dispatch.
 
@@ -191,3 +195,59 @@ success, the real native primitive's 28/6 result or the passing SQL49 test canno
 qualify this graph. Installed caller/backend receipts, fresh-format consumer
 selection and the final fixed listener composition remain separate missing
 boundaries until their actual qualification passes.
+
+
+## Joined active capacity and bounded replay markers (2026-10-28)
+
+This revises an agent-authored throughput restriction, not a maintainer security
+requirement. The installed single-region composition supplies two concurrent
+observation slots. Previously, two distinct completed operations retained both
+slots until their original five-second ends, even after all native/claim/GET
+work joined and tokens were cleared. A local regression reproduces the next
+fresh demand's refusal with both original markers still live. It does not prove
+this caused Native 40776231613's locator failure; that run instead establishes
+an expired full-30-second binding and a current demand, with no matching fresh
+publication before the request's unchanged readiness cutoff. The SQL permission
+denial in that run is the intentional fixture privilege probe.
+
+Use the existing pending map with two separate admission conditions:
+`active <= maximum` and `retained entries <= 2 * maximum`. Every admitted entry
+counts as active through preparation, possible delivery, claim, native/reservation
+closure, joined GET/claim owners and token clearing. Only the end of `closeWork`
+releases its active count. Entering the Spent phase, cancellation or an unknown
+reply does not release it. The same root/request marker remains until the exact
+original end; no replay, replacement, refund or authority extension follows.
+The store counter is released outside the entry mutex to preserve store-before-
+entry lock order. Shutdown still joins all retained entries.
+
+A separate spent-marker ceiling of only `maximum` would still reject a fresh
+third request after two joined calls. The chosen total ceiling allows bounded
+headroom without an unbounded completed-request ledger. Fast distinct calls can
+still fill that total and must refuse until natural expiry; this is not an
+availability or throughput guarantee. Existing caller/proof five-second ends,
+active HTTP/native ceilings, demand pacing, input grants and budgets are unchanged.
+No public setting, SQL/API request, credential, privilege, watch or service is added.
+
+Measured amd64 value sizes are entry 832 bytes, key 32 bytes and claim 104 bytes;
+these are not retained-heap or CPU measurements. With one region, active remains
+2 and total entries become at most 4 (3,328 entry-value bytes). With the current
+maximum eight regional clusters, active remains 9 and total at most 18 (14,976
+entry-value bytes; +7,488 over the previous ceiling). Active token capacity stays
+9 * 16 KiB = 144 KiB and joined markers retain no token. Map buckets, original
+contexts, callbacks and referenced graphs are additional. The store also adds one 8-byte active counter. Each admitted entry
+uses the existing retention deadline/context and callbacks, so the larger total
+can retain up to nine additional such timer/context instances; there is no new
+timer kind or background loop. Runtime/SQL/native-provider qualification remains
+separate from these local lifecycle checks.
+
+
+The local lifecycle regression reproduces RED with unchanged runtime (race exit
+1, package 0.082s), then passes after the accounting change (all LocalPending
+race cases, exit 0, 1.388s). Controls include blocked native Close plus possible
+delivery, same-ID denial, total retained saturation, natural original expiry,
+concurrent admission and joined shutdown. Full affected races pass: bootstrap
+62.841s, mTLS 66.762s, cluster-observation transport 3.214s and native transport
+98.965s. Integration compilation, affected vet, specification and architecture
+gates pass. Fixture authority/native facts remain synthetic; these checks do not
+establish an installed locator cause, real-provider throughput, collection or
+an end-to-end history result. No external run was performed for this revision.
