@@ -342,3 +342,47 @@ Final local affected races pass: mTLS 38.143s, context-start 10.800s, bootstrap
 227 console tests. Independent read-only review found no blocker in retained
 proof/current-frame separation, joined ownership, finite diagnostics or the
 actual-adapter TLS test. No external qualification is implied by these gates.
+
+### Native40607161911: write/read advances, repeat preview remains unqualified
+
+Exact `b944fd93` passed the initial approved native capture and wrote history:
+`available`, visible, writer completed, four acknowledged ciphertext copies. The
+built browser then successfully read settings, edited the packet filter to
+`tcp dst port 8080` and after-window to `3s`, but its preview returned `error`.
+The assertion at installed-history-browser.mjs:44 discarded the public error code;
+retained output cannot identify its closed failure stage. The whole run failed
+(Go 607.616s, approved-recording subcase 157.51s); it is not a completed repeat,
+browser approval or second native capture. No new installed run is established.
+
+The fixture now reports only finite preview status/code words and invokes its
+existing closed SQL/process diagnostics if the browser workflow fails. No settings,
+identities, provider text or credentials enter that added assertion. This adds
+no production read, watch, endpoint, authority or retry. One later guarded installed
+run is necessary to determine the actual code/stage if it cannot reproduce locally.
+
+A real HTTPS/HTTP2 browser POST -> session/CSRF -> audited presentation -> C09
+regression reuses the existing response-reserve fixtures. Exact `2s` -> `3s` and
+filter edits pass with SQL-precision dates; expired source and unavailable settings
+refuse with zero admissions. It uses synthetic session/facts/history/compiler
+ports. Recipe/filter/profile fields come from the first real C09 canonical preview,
+but the history header is constructed: this does not exercise accepted snapshot
+creation, encryption, real SQL or a collector and cannot establish the Native cause.
+
+That composition found a separate test-induced precision defect. CaptureSettings
+and HistoryLineage accept future time.Time instants without a microsecond condition;
+CompileRecorder requires persisted preview deadlines on microsecond boundaries.
+A source expiry with an additional 777ns made the edited route return NotAvailable
+at compile while the SQL-precision case passed (RED exit 1). Repeat now floors the
+lineage cutoff to UTC microseconds before planning, preserving the earlier original
+bound. Both paths, edited settings and original-expiry refusal pass (focused race
+3.715s, exit 0). Current SQL summary/effective expiry and original-anchor duration
+retention are expected microsecond-aligned; this is not attribution to the installed
+failure. The fix is one time normalization per repeat, zero I/O, extra reads, state,
+configuration or deadline extension; no broader time framework is introduced.
+
+Local affected races passed: capture 11.202s, MCP 58.956s, browser 20.108s;
+final required-approval route case 3.715s, local pinned tunnel 1.071s. Canonical
+pre-push exited 0 (227 console tests); no external fixture or collector was run.
+The local route adds five audited browser operations per case (two precision
+cases), zero admissions, and approximately 1.1s unraced synthetic test runtime;
+its mocked compiler does not qualify native libpcap/Gadget behavior.

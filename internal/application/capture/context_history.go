@@ -220,7 +220,7 @@ func (s ContextHistoryService) PreviewEditedRepeat(ctx context.Context, source i
 	if edits.RequestedSeconds > 0 {
 		intent.RequestedSeconds = edits.RequestedSeconds
 	}
-	intent.RepeatedFrom = &value.HistoryLineage{CaptureID: captureID, ExpiresAt: settings.ExpiresAt}
+	intent.RepeatedFrom = &value.HistoryLineage{CaptureID: captureID, ExpiresAt: settings.ExpiresAt.UTC().Truncate(time.Microsecond)}
 	if settings.Composition != nil {
 		previews, ok := s.Previews.(interface {
 			PreviewCompositionRepeat(context.Context, identities.CurrentIdentity, value.ContextIntent, authorization.Target) (RecorderPreviewResult, error)
