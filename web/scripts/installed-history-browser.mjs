@@ -41,7 +41,12 @@ try {
   await page.getByLabel('network / sample / packetAfter', { exact: true }).fill('3s');
   const [previewResponse] = await Promise.all([page.waitForResponse(operation('preview_capture')), page.getByRole('button', { name: 'Review these settings', exact: true }).click()]);
   const preview = await previewResponse.json();
-  assert.equal(preview.status, 'ok');
+  // Closed fixture diagnostics only: never stringify authored settings, result
+  // bodies, identities, credentials or a provider's unbounded error message.
+  const previewStatus = ['ok', 'error', 'pending'].includes(preview.status) ? preview.status : 'invalid';
+  const previewCodes = new Set(['NotAvailable', 'ParametersUnavailable', 'ProfileChanged', 'RequiresSelection', 'RecorderUnavailable', 'InvalidComposition', 'ProfileUnavailable', 'FilterRejected', 'ApprovalRequired', 'FilterCompilerUnavailable', 'UnsupportedRequest', 'SharingNotPermitted', 'TargetReplaced', 'ProcessingCoverageUnavailable', 'CapacityUnavailable']);
+  const previewCode = preview.status === 'error' && previewCodes.has(preview.data?.code) ? preview.data.code : 'other';
+  assert.equal(previewStatus, 'ok', `installed history preview status=${previewStatus} code=${previewCode}`);
   assert.equal(preview.data.repeated_from_capture_id, config.sourceCaptureID);
   assert.equal(preview.data.approval_required, true);
   assert.deepEqual(preview.data.profile_composition.authored.components.map(component => component.profileRef), settings.data.settings.profile_composition.authored.components.map(component => component.profileRef));
