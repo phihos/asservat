@@ -387,6 +387,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
     collector_qualification = installer_continuation and focus in ("approved-recording", "native-paced")
     native_paced = installer_continuation and focus == "native-paced"
+    native_traffic_probe = test_pattern == NATIVE_TRAFFIC_PROBE
     guard = Path("/etc/asservat-disposable-host")
     if collector_qualification and not guard.is_file():
         raise RuntimeError(f"{focus} refused: disposable-host guard is absent; never run a collector on a workstation")
@@ -405,7 +406,6 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     if helm_cluster:
         test_pattern = "^" + helm_test + "$"
     direct_observation = test_pattern == "^TestDirectHolderObservationWithRealKubernetes$"
-    native_traffic_probe = test_pattern == NATIVE_TRAFFIC_PROBE
     # Product federation/connector Pods also run in every owned cluster.
     two_cluster_pods = direct_observation or test_pattern == "^TestFederationRegionalProductWithRealKubernetes$" or installer_continuation
     test_package = "./internal/adapters/kms" if owner_provider_auth else "./internal/adapters/kubernetes" if runtime_object_roundtrip else "./test/integration"

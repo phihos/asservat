@@ -18,6 +18,14 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_traffic_probe_prelude_reaches_selection_without_external_effects(self):
+        # Stop at selection, before cache/build/container work. This catches
+        # a probe flag used by artifact cleanup before it is initialized.
+        with patch.object(Path, "unlink"), patch.object(fixture, "qualification_selection", side_effect=RuntimeError("selection boundary")), patch.object(fixture, "run", side_effect=AssertionError("external effect")) as external:
+            with self.assertRaisesRegex(RuntimeError, "selection boundary"):
+                fixture.main(fixture.NATIVE_TRAFFIC_PROBE)
+            external.assert_not_called()
+
     def test_cpu_limited_traffic_probe_has_one_short_recorded_go_bound(self):
         self.assertEqual(fixture.qualification_go_timeout(native_traffic_probe=True), "2m")
 

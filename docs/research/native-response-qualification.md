@@ -758,3 +758,9 @@ cgroup, including its background work, and do not attribute collector CPU. No
 workstation collector/BPF/Gadget runs, resource increase, extra traffic, new
 service, production permission or runtime machinery is introduced. This is a
 probe preparation, not a result or established cause of the installed failure.
+
+
+The first local launch stopped before fixture creation with an uninitialized
+probe flag in the new artifact-cleanup prelude. The ordering is corrected and a
+pure prelude test now reaches the selection boundary with external effects
+forbidden. That failed launch is retained; it measured no traffic or CPU.
