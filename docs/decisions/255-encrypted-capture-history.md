@@ -386,3 +386,87 @@ pre-push exited 0 (227 console tests); no external fixture or collector was run.
 The local route adds five audited browser operations per case (two precision
 cases), zero admissions, and approximately 1.1s unraced synthetic test runtime;
 its mocked compiler does not qualify native libpcap/Gadget behavior.
+
+### Native40613137981: discovery response visibility
+
+Exact `ad131f4b` failed earlier: after Find diagnostics, the driver's default
+five-second row locator saw zero rows (Go 616.048s / subcase 161.29s). Encrypted
+history still reported available/visible/writer complete/four acknowledged copies.
+Neither diagnostics nor history-list response was retained, and the edited preview
+was not reached; its actual cause remains unknown. The earlier sub-microsecond
+port defect remains distinct and is not an explanation of either installed failure.
+
+The actual React discover controller awaits list_diagnostics and then
+list_capture_history. The fixture now arms both response waiters before the click,
+checks HTTP status plus each body's finite envelope status/code, then starts the unchanged DOM
+row assertion. Network/operation bounds, locator timeout, authorization, quotas
+and retry count are unchanged. Failed/missing/invalid responses fail with a closed
+operation label; early failure still closes the browser and safely settles the
+other waiter. Existing settings/preview checks reuse that same bounded diagnostic.
+This is a small reversible driver sequencing correction, not a new authority or
+wait framework, and cannot qualify the installed history workflow by itself.
+
+Syntax and canonical pre-push passed (227 console unit tests); existing built
+React/HTTPS browser checks passed 23 journeys/20 accessibility scans, plus four
+native-restart boundaries/two scans (Go 21.785s). These existing synthetic checks
+do not run the installed continuation or establish its missing response outcomes.
+No new test framework, timeout, product change or external fixture was added.
+
+### Native40617618424: history target exchange refusal
+
+Exact `d7cdb5d3` failed after the corrected discovery wait: list_diagnostics
+returned HTTP 200/ok; list_capture_history returned HTTP 200/error/NotAvailable
+(Go 589.644s, subcase 153.55s). Encrypted history remained available with four
+acknowledged copies. Neither the DOM wait, lineage precision nor edited preview
+explains this failure. The hub logged `restarts/read/other`: history's regional
+workload resolution failed before ListCaptureHistory's SQL read/eligibility.
+An adjacent canceled route namespace read is not proof of causal ordering;
+stream interruption or later browser cleanup can cancel that read. The underlying
+installed I/O cause is still unknown.
+
+The existing closed stream classifier now recognizes the supported Go net/http
+conversion into the already-used x/net/http2.StreamError. It retains only fixed
+INTERNAL/deadline/CANCEL/PROTOCOL/REFUSED/other classes, never stream IDs, Cause
+text or payload. INTERNAL means deadline only when Cause is exactly
+os.ErrDeadlineExceeded; an unqualified INTERNAL establishes neither timeout nor
+peer origin. Classification invokes no Error/Is/Unwrap methods, but may invoke
+net.Error.Timeout and a directly implemented structured As bridge. These are
+trusted in-process Go error interfaces, as in ordinary Go error handling; network
+input cannot inject Go method implementations. This is not an arbitrary-method-
+free guarantee. A regression executes the direct bridge exactly once and retains
+panic Error/Is/Unwrap methods, including a refused conversion that stays `other`.
+This changes diagnostics only: no transport, query, deadline, authority,
+retry, current check or public response changes.
+
+The actual mTLS/HTTP2 fixture now also tests diagnostics ResolveWorkload followed
+by history ObserveWorkloadRestarts for a zero-Pod workload. Holding the second
+fresh route check across the first query's 500ms cutoff passes, preserving the
+second original deadline and retained source identity. Callback inspection found
+no demonstrated stale-callback defect: stream-affecting frame/setup callbacks
+join before reuse; the remaining cancel-only callbacks own invocation-local
+contexts. This positive synthetic path does not reproduce the installed failure.
+
+A deliberate real HTTP2 write cutoff during that second current route check
+produces a closed target refusal while the caller still has time. It reports
+`restarts/read/http2-deadline` (race pass 1.136s); the legacy classifier reports
+only `restarts/read/other`. The moved existing idle-write-deadline test exercises
+the actual stdlib As conversion and neutral INTERNAL result; fixed-code tests
+retain private-error noninspection. This is a test-induced diagnostic witness,
+not attribution of the installed interruption or completed browser qualification.
+
+Complexity gate: (1) one observed closed history-list failure whose I/O cause is
+unavailable; (2) no accepted timing risk reopened; (3) shared transport diagnostics
+benefit, no typical-path product behavior change; (4) Go's supported StreamError
+conversion, no protocol/error parser; (5) zero privileges/credentials/exposure;
+(6) six diagnostic classes, zero product/fallback states; (7) zero configuration;
+(8) existing Go HTTP2/x/net dependency; (9) zero added API/SQL/network requests,
+watches or goroutines, one type conversion only on errors, CPU unmeasured;
+(10) no wire change, diagnostic-only rollback; (11) retaining `other` cannot
+distinguish the demonstrated transport cutoff. No collector/external fixture or
+hosted rerun is part of this local checkpoint; actual installed cause and complete
+history/repeat qualification remain pending.
+
+Legacy-classifier diagnostic RED exited 1; the corrected actual-cutoff witness
+passed. Full affected races passed: context-start 10.893s and mTLS 38.527s.
+Canonical pre-push exited 0, including 227 console tests. These local gates
+establish neither the installed interruption's cause nor a successful repeat.

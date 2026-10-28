@@ -21,6 +21,24 @@ const page = await context.newPage();
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 const operation = name => response => new URL(response.url()).pathname === '/api/v1/operations/' + name;
+// Observe each response under the existing Playwright network bound. Attach
+// rejection handling when arming: early failure of the first operation still
+// closes the browser in finally without an unhandled second waiter rejection.
+const waitOperation = name => page.waitForResponse(operation(name)).catch(() => null);
+const closedCodes = new Set(['NotAvailable', 'ParametersUnavailable', 'ProfileChanged', 'RequiresSelection', 'RecorderUnavailable', 'InvalidComposition', 'ProfileUnavailable', 'FilterRejected', 'ApprovalRequired', 'FilterCompilerUnavailable', 'UnsupportedRequest', 'SharingNotPermitted', 'TargetReplaced', 'ProcessingCoverageUnavailable', 'CapacityUnavailable']);
+async function readOperation(name, pending) {
+  const response = await pending;
+  const http = response ? response.status() : 0;
+  const reply = response ? await response.json().catch(() => null) : null;
+  // Never stringify settings, bodies, identities, credentials or provider text.
+  const status = !response ? 'unavailable' : ['ok', 'error', 'pending'].includes(reply?.status) ? reply.status : 'invalid';
+  const code = status === 'ok' ? 'none' : status === 'error' && closedCodes.has(reply?.data?.code) ? reply.data.code : 'other';
+  const diagnostic = `installed history ${name} http=${http} status=${status} code=${code}`;
+  process.stderr.write(diagnostic + '\n');
+  assert.equal(http, 200, diagnostic);
+  assert.equal(status, 'ok', diagnostic);
+  return reply;
+}
 try {
   await page.goto(config.origin + '/captures/new');
   await expect(page.getByRole('heading', { name: 'Collect evidence', exact: true })).toBeVisible();
@@ -29,24 +47,23 @@ try {
   await page.getByLabel('Cluster ID', { exact: true }).fill(config.target.cluster_id);
   await page.getByLabel('Namespace', { exact: true }).fill(config.target.namespace);
   await page.getByLabel('Workload or pod name', { exact: true }).fill(config.target.name);
+  // discover awaits diagnostics and then history; a row's five-second DOM
+  // assertion must not also time those two serial public operations.
+  const diagnosticsResponse = waitOperation('list_diagnostics');
+  const historyResponse = waitOperation('list_capture_history');
   await page.getByRole('button', { name: 'Find diagnostics', exact: true }).click();
+  await readOperation('list_diagnostics', diagnosticsResponse);
+  await readOperation('list_capture_history', historyResponse);
   const row = page.getByRole('listitem').filter({ has: page.locator('a[href="/captures/' + config.sourceCaptureID + '"]') });
   await expect(row).toHaveCount(1);
-  const [settingsResponse] = await Promise.all([page.waitForResponse(operation('get_capture_settings')), row.getByRole('button', { name: 'View settings', exact: true }).click()]);
-  const settings = await settingsResponse.json();
-  assert.equal(settings.status, 'ok');
+  const [settingsResponse] = await Promise.all([waitOperation('get_capture_settings'), row.getByRole('button', { name: 'View settings', exact: true }).click()]);
+  const settings = await readOperation('get_capture_settings', settingsResponse);
   assert.equal(settings.data.capture_id, config.sourceCaptureID);
   await expect(page.getByRole('heading', { name: 'Saved settings', exact: true })).toBeVisible();
   await page.getByLabel('network / sample / packetFilter', { exact: true }).fill('tcp dst port 8080');
   await page.getByLabel('network / sample / packetAfter', { exact: true }).fill('3s');
-  const [previewResponse] = await Promise.all([page.waitForResponse(operation('preview_capture')), page.getByRole('button', { name: 'Review these settings', exact: true }).click()]);
-  const preview = await previewResponse.json();
-  // Closed fixture diagnostics only: never stringify authored settings, result
-  // bodies, identities, credentials or a provider's unbounded error message.
-  const previewStatus = ['ok', 'error', 'pending'].includes(preview.status) ? preview.status : 'invalid';
-  const previewCodes = new Set(['NotAvailable', 'ParametersUnavailable', 'ProfileChanged', 'RequiresSelection', 'RecorderUnavailable', 'InvalidComposition', 'ProfileUnavailable', 'FilterRejected', 'ApprovalRequired', 'FilterCompilerUnavailable', 'UnsupportedRequest', 'SharingNotPermitted', 'TargetReplaced', 'ProcessingCoverageUnavailable', 'CapacityUnavailable']);
-  const previewCode = preview.status === 'error' && previewCodes.has(preview.data?.code) ? preview.data.code : 'other';
-  assert.equal(previewStatus, 'ok', `installed history preview status=${previewStatus} code=${previewCode}`);
+  const [previewResponse] = await Promise.all([waitOperation('preview_capture'), page.getByRole('button', { name: 'Review these settings', exact: true }).click()]);
+  const preview = await readOperation('preview_capture', previewResponse);
   assert.equal(preview.data.repeated_from_capture_id, config.sourceCaptureID);
   assert.equal(preview.data.approval_required, true);
   assert.deepEqual(preview.data.profile_composition.authored.components.map(component => component.profileRef), settings.data.settings.profile_composition.authored.components.map(component => component.profileRef));

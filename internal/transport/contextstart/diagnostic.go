@@ -11,6 +11,7 @@ import (
 	execution "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
+	"golang.org/x/net/http2"
 )
 
 // StreamInterruption contains only closed diagnostic codes. It cannot carry a
@@ -96,10 +97,16 @@ const (
 	streamBudget
 	streamPeerInvalid
 	streamPeerChanged
+	streamHTTP2Internal
+	streamHTTP2Deadline
+	streamHTTP2Cancel
+	streamHTTP2Protocol
+	streamHTTP2Refused
+	streamHTTP2Other
 )
 
 func (v StreamInterruption) Reason() string {
-	names := [...]string{"none", "other", "canceled", "deadline", "eof", "short-read", "closed-io", "io-timeout", "invalid", "denied", "unavailable", "protocol", "closed", "concurrent-call", "frame-or-byte-budget", "peer-invalid", "peer-changed"}
+	names := [...]string{"none", "other", "canceled", "deadline", "eof", "short-read", "closed-io", "io-timeout", "invalid", "denied", "unavailable", "protocol", "closed", "concurrent-call", "frame-or-byte-budget", "peer-invalid", "peer-changed", "http2-internal", "http2-deadline", "http2-cancel", "http2-protocol", "http2-refused", "http2-other"}
 	if int(v.reason) >= len(names) {
 		return "unknown"
 	}
@@ -132,8 +139,9 @@ func (d *StreamDiagnostics) Interruption() StreamInterruption {
 	return StreamInterruption{}
 }
 
-// Only known sentinel errors and net.Error's non-text timeout classification
-// are observed. No Error, Is or Unwrap method is invoked on a foreign error.
+// No Error, Is or Unwrap method is invoked. Timeout and the direct structured
+// As bridge below may execute trusted in-process Go error implementations;
+// this is not a guarantee that classification invokes no error methods.
 func streamErrorReason(err error) streamReason {
 	switch err {
 	case nil:
@@ -159,6 +167,33 @@ func streamErrorReason(err error) streamReason {
 	}
 	if timeout, ok := err.(net.Error); ok && timeout.Timeout() {
 		return streamTimeout
+	}
+	// Go's net/http StreamError supports As into x/net/http2.StreamError.
+	// Invoke a direct As method when implemented, without traversing an Unwrap
+	// chain or reading error text. Preserve no stream ID or Cause except the
+	// exact deadline sentinel; INTERNAL alone establishes no timeout or origin.
+	stream, ok := err.(http2.StreamError)
+	if !ok {
+		if convert, supported := err.(interface{ As(any) bool }); supported {
+			ok = convert.As(&stream)
+		}
+	}
+	if ok {
+		switch stream.Code {
+		case http2.ErrCodeInternal:
+			if stream.Cause == os.ErrDeadlineExceeded {
+				return streamHTTP2Deadline
+			}
+			return streamHTTP2Internal
+		case http2.ErrCodeCancel:
+			return streamHTTP2Cancel
+		case http2.ErrCodeProtocol:
+			return streamHTTP2Protocol
+		case http2.ErrCodeRefusedStream:
+			return streamHTTP2Refused
+		default:
+			return streamHTTP2Other
+		}
 	}
 	return streamOther
 }
