@@ -606,10 +606,6 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	var finishUnpaced func() error
 	if measurement != nil {
-		if err := nativePacingRequireNearFullRecording(*download.SizeBytes); err != nil {
-			t.Fatal(err)
-		}
-		measurement.NearFullBytes = *download.SizeBytes
 		if err := finishPrepare(); err != nil {
 			t.Fatal(err)
 		}
@@ -687,9 +683,14 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal("native PCAPNG has no measured traffic overlap")
 		}
 	}
-	// Retain and validate the authenticated control before later comparisons.
-	// A failed range preparation must not erase already downloaded native proof.
+	// Retain authenticated content, statistics and window proof even when the
+	// unchanged size guard refuses an underfilled recording. NearFullBytes is
+	// success-only; a retained small file never qualifies the paced comparison.
 	if measurement != nil {
+		if err := nativePacingRequireNearFullRecording(*download.SizeBytes); err != nil {
+			t.Fatal(err)
+		}
+		measurement.NearFullBytes = *download.SizeBytes
 		qualifyInstalledNativePacing(t, ctx, measurement, transport, identity, origin, evidence.Artifacts[0].ID, download, native, invoke, read, diagnose)
 	}
 	var finishChecks func() error

@@ -323,3 +323,34 @@ pre-push passes (exit 0, 32.733 s, including 231 console tests). Independent
 read-only review found no concrete blocker in checked propagation, original
 bounds, current identity matching or retained SQL/peer fencing. No installed
 transfer or aggregate provider-cost claim follows from these local results.
+
+
+## Retain underfilled content before the unchanged size refusal (2026-10-28)
+
+Native 40776235949 on `faac9dc4d8329fd3ad2e61c5660197e3338cf7a9`
+reached an accepted capture and Ready download metadata of **7,574,464 bytes**,
+below the existing **8,323,072..8,388,608-byte** qualification interval. The genuine
+8.5-second traffic attempt had 11 acknowledged batches, 45,056 complete records
+and 2,949,888 received bytes including the unacknowledged final partial response.
+The deadline was retained correctly, and the independent size guard failed.
+No native body, PCAP statistics or first/last packet evidence was retained before
+that refusal, so the report cannot attribute underfill to hook timing or loss.
+
+The fixture now performs its existing authorized unpaced read and the same
+HTTP/2, hash, filename, PCAP, reviewed-port, interface-statistics and traffic-window
+checks before applying that **same** size assertion. `NearFullBytes` is assigned
+only after the assertion succeeds; it is not an input to those earlier checks.
+An underfilled case still fails before paced/range/owner comparisons or `Complete`.
+The one traffic attempt, target 100m CPU, bytes/record/flush counts, original
+8.5-second traffic, 10-second recording and 20-second response bounds stay fixed.
+
+Cost on a passing case is unchanged. An underfilled failed case can now consume
+one already planned authenticated unpaced transfer of at most 8 MiB, including
+its existing bounded authority, SQL, worker/key/audit effects, then the existing
+local file/tshark/capinfos work. This is added failed-case cost, not a new call
+loop, retry or authority. There are no new APIs, protocols, privileges, services,
+configuration, watches, timers, goroutines or fabricated capture bytes. A retained
+file or a parsed first packet is not proof of exact hook readiness; combined PCAP
+drops still do not provide separate engine/output-full attribution. Local checks
+cover the existing finite-input, HTTP, PCAP and measurement contracts; a new
+installed result remains pending and the underfill cause remains unproven.
