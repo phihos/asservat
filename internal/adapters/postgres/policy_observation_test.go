@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func policyObservationRowFixture() custodydb.PolicyObservationSession {
@@ -219,5 +220,40 @@ func TestRawPolicyCannotUseOrdinaryPreparationOrOmitItsGrant(t *testing.T) {
 	r.RequireApproval = true
 	if !policyRecordingNeedsGrant(r) {
 		t.Fatal("original installation approval setting was dropped")
+	}
+}
+
+func TestPolicyObservationScopeSurvivesActualPostgresTimestampCodec(t *testing.T) {
+	row := policyObservationRowFixture()
+	row.StartedAt.Time = row.StartedAt.Time.Add(123456 * time.Microsecond)
+	row.SessionUntil.Time = row.SessionUntil.Time.Add(123456 * time.Microsecond)
+	row.LeaseUntil.Time = row.LeaseUntil.Time.Add(123456 * time.Microsecond)
+	row.StartBy.Time = row.StartBy.Time.Add(123456 * time.Microsecond)
+	row.BindingScope = policyObservationScope(row)
+	want, err := policyObservationPermit(row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Actual pgx binary codec: PostgreSQL preserves the instant, not Go's UTC
+	// representation. Its ordinary default time.Unix scan also uses time.Local.
+	// FixedZone makes this witness deterministic without changing global clocks.
+	codec := pgtype.NewMap()
+	codec.RegisterType(&pgtype.Type{Name: "timestamptz", OID: pgtype.TimestamptzOID, Codec: &pgtype.TimestamptzCodec{ScanLocation: time.FixedZone("non-UTC SQL receiver", 2*60*60)}})
+	for _, field := range []*pgtype.Timestamptz{&row.SourceObservedAt, &row.SourceFreshUntil, &row.StartedAt, &row.SessionUntil, &row.LeaseUntil, &row.StartBy} {
+		before := field.Time
+		wire, err := codec.Encode(pgtype.TimestamptzOID, pgtype.BinaryFormatCode, *field, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = codec.Scan(pgtype.TimestamptzOID, pgtype.BinaryFormatCode, wire, field); err != nil {
+			t.Fatal(err)
+		}
+		if !field.Time.Equal(before) {
+			t.Fatal("codec changed instant")
+		}
+	}
+	got, err := policyObservationPermit(row)
+	if err != nil || got.Binding != want.Binding || !got.StartBy.Equal(want.StartBy) || !got.LeaseUntil.Equal(want.LeaseUntil) {
+		t.Fatalf("same PostgreSQL instants changed original scope/permit: %v", err)
 	}
 }

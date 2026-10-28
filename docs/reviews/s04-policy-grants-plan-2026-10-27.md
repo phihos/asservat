@@ -1966,3 +1966,34 @@ assembler preflights pass with race (1.094 s), final pre-push actual exit 0 incl
 The new actual SQL test has not yet run; require reviewed frozen exact selection
 and coordinated host slot. Prefix/notice components remain separately qualified
 pure components, not raw execution enablement.
+
+Genuine companion run 1 at frozen bc5aae8b terminated actual exit 1 (Go 5.304 s,
+harness 32.117 s). Actual held original-grant source-cutoff test passed: original
+caller/check still live; independent API/session absent and both observed spends
+zero after rollback. Fresh positive companion failed at effect/observation, so no
+positive/replay qualification is claimed. PostgreSQL log contains only expected
+negative-role errors, no new observation SQL error.
+Archive before source edits:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-genuine-companion-focused-1-artifacts/`;
+report policy102-genuine-companion-focused-1-environment.json SHA-256
+46503319328f4ac473feab93c5229b81790aa5793c56abdc331c45358a171829,
+raw same-prefix .log and provider -postgres.log retained. All 3,282 source hashes
+independently match frozen commit/disk; sourceUnchanged=true, cleanup [], exact
+asservat-custody-32pc3krl-postgres, -s3 and network absent. Host slot released.
+
+The concrete production defect is scope serialization: pgx v5.11.0 binary
+TimestamptzCodec uses time.Unix/time.Local and MarshalJSON retains that zone,
+while the row was hashed before INSERT in UTC. Identical instants could fail
+scope decoding after RETURNING. A deterministic actual pgx binary Encode/Scan
+non-UTC witness failed RED (exit 1, 0.010 s), explicitly checking Equal instants.
+The fix normalizes only all six timestamp representations to UTC on the by-value
+row before hashing. Stored columns, instants, original source/start/lease bounds,
+API preparation identity, credit and caller intervals do not change. No I/O,
+clock/read, compatibility branch or authority relaxation is added. This is the
+unpublished/unwired permit path, not a rewrite of real historical receipts.
+Focused observation/raw tests pass race 1.061 s; final focused adapter/offline
+races actual exit 0 (postgres 1.087 s, integration 1.097 s) and final pre-push
+actual exit 0 including 231 console tests. Absolute log directory
+`/home/phil/.cache/asservat-build/approved-workflow/`: `policy102-companion-utc-fix-pre-push.log`
+and `policy102-companion-utc-fix-races-final.log`. Require one reviewed frozen
+companion-only rerun; no automatic repeat or other source composition first.
