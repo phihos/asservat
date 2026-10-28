@@ -123,3 +123,8 @@ The source-first request observes one actual protected name/UID read before
 current acceptance lookup, so a source observation expired during an outage can
 recover without reauthorization. Healthy source observations last 30s with 15s
 trigger polls; no ordinary five-versus-15 freshness gap is assumed.
+The review reason `policyCollection` identifies this finite recurring-policy
+approval. It is distinct from sensitive action reasons such as a raw-byte filter
+or the installation's recording-approval setting; ordinary header collection is
+not mislabeled as either. The existing grant detail/list and request result carry
+this reason consistently in the browser and MCP contracts.

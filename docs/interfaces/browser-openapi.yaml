@@ -4474,6 +4474,7 @@ components:
                               enum:
                               - rawBytePredicate
                               - recordingApprovalRequired
+                              - policyCollection
                           required:
                           - action_id
                           - code
@@ -8662,6 +8663,7 @@ components:
                         enum:
                         - rawBytePredicate
                         - recordingApprovalRequired
+                        - policyCollection
                     required:
                     - action_id
                     - code
@@ -14104,6 +14106,7 @@ components:
                         enum:
                         - rawBytePredicate
                         - recordingApprovalRequired
+                        - policyCollection
                     required:
                     - action_id
                     - code

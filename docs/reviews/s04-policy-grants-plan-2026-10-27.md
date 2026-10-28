@@ -1283,3 +1283,34 @@ network absent after terminal. Archive before source changes:
 report SHA-256 5aff42437209b9273ac028c085086727a92aa6df49474b06a524ad53ce4cffb4.
 Reuse these unchanged positive cases; a next run requires reviewed focused
 public-fixture selection, not an automatic repeat of the combined batch.
+
+Focused public run 2 at clean 168aec43 terminated exit 1 (Go 5.170s, harness
+phase 25.803s). Original unknown-intent/source-no-mutation and unknown-outcome/
+one-stored-request assertions were reached; same-key result recovery failed.
+No PostgreSQL product permission/constraint error accompanied it. The actual
+PolicyGrantPlans producer emits `policyCollection`, while the public grant reason
+enum accepted only rawBytePredicate/recordingApprovalRequired. Earlier synthetic
+wire/browser fixtures used those old reasons and masked the contract mismatch.
+Using the actual producer reason reproduced local canonical-route RED (exit 1,
+0.435s); the closed browser/MCP enum now includes policyCollection for request,
+detail and list metadata. Sensitive action reason enums remain unchanged. Product
+copy describes separate finite recurring approval/budgets without claiming raw
+sensitivity or installation-required approval. The same route is GREEN (race,
+exit 0, 3.287s). Existing closed FixedStep diagnostics are now logged by the SQL
+fixture on failures; no new diagnostic mechanism or production permission.
+
+All 3,264 source hashes independently matched, sourceUnchanged=true, cleanup[],
+exact `asservat-custody-egt4vrqk-postgres`, `-s3` and their network absent. Archived
+before source edits at
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-public-focused-2-artifacts/`;
+report SHA-256 b82d9259a3db3e1b9acdbf2349ec940e3e2944c97d278c259577410d8cac16c9.
+No automatic retry. Complete public attachment/audit recovery and actual held-row
+NULL decision assertions remain unqualified until reviewed focused SQL GREEN.
+The reason-contract correction passed final pre-push (actual exit 0, including
+231 console tests) and actual built-browser run 6 (exit 0, Go 23.097s,
+25 journeys/24 accessibility scans plus native-restart). Manager and newly
+requested policy detail now exercise policyCollection end-to-end and assert its
+finite-budget explanation. Reports/screenshots archived before tracked restore:
+`/home/phil/.cache/asservat-build/approved-workflow/policy102-public-browser-6-artifacts/`.
+These browser facts still use synthetic accepted authority/store; SQL public
+completion/held-row proof is pending a reviewed focused run.

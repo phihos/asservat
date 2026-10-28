@@ -207,7 +207,8 @@
                         "code": {
                           "enum": [
                             "rawBytePredicate",
-                            "recordingApprovalRequired"
+                            "recordingApprovalRequired",
+                            "policyCollection"
                           ]
                         }
                       },

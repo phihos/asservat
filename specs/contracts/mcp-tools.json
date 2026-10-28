@@ -3428,7 +3428,8 @@
                             "code": {
                               "enum": [
                                 "rawBytePredicate",
-                                "recordingApprovalRequired"
+                                "recordingApprovalRequired",
+                                "policyCollection"
                               ]
                             }
                           },
@@ -4368,7 +4369,8 @@
                                   "code": {
                                     "enum": [
                                       "rawBytePredicate",
-                                      "recordingApprovalRequired"
+                                      "recordingApprovalRequired",
+                                      "policyCollection"
                                     ]
                                   }
                                 },
@@ -14967,7 +14969,8 @@
                             "code": {
                               "enum": [
                                 "rawBytePredicate",
-                                "recordingApprovalRequired"
+                                "recordingApprovalRequired",
+                                "policyCollection"
                               ]
                             }
                           },

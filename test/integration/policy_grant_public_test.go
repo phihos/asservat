@@ -327,6 +327,10 @@ func qualifyPolicyGrantPublicOperations(t *testing.T, ctx context.Context, admin
 		}
 		reply, e := audited.Call(ctx, current, name, raw)
 		if e != nil {
+			var stage interface{ FixedStep() string }
+			if errors.As(e, &stage) {
+				t.Logf("public %s stopped at %s", name, stage.FixedStep())
+			}
 			return nil, e
 		}
 		var result map[string]any

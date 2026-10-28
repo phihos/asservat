@@ -47,7 +47,7 @@ func policyRequestWireView(now time.Time, actor identity.Principal) authapp.Gran
 	g.Policy = &authorization.PolicyGrantScope{Authority: a, RecipeDigest: artifact.Digest{8}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 64 << 20}, ApprovalPolicyRef: revision, ApprovalMaxAge: 30 * 24 * time.Hour}
 	g.Lifetime = 24 * time.Hour
 	g.PolicyNotAfter = now.Add(24 * time.Hour)
-	g.Reasons = []authorization.SensitiveReason{{ActionID: "a1", Code: "recordingApprovalRequired"}}
+	g.Reasons = []authorization.SensitiveReason{{ActionID: "a1", Code: "policyCollection"}}
 	v.Grant = g
 	v.Approver = false
 	v.CanRevoke = true
@@ -57,7 +57,7 @@ func policyRequestWireView(now time.Time, actor identity.Principal) authapp.Gran
 	v.Review.Actions[0].ExecutionMode = "onTrigger"
 	v.Review.Actions[0].Before = "0s"
 	v.Review.Actions[0].After = "2s"
-	v.Review.Actions[0].Sensitive = []string{"recordingApprovalRequired"}
+	v.Review.Actions[0].Sensitive = []string{}
 	v.Grant.Review, _ = json.Marshal(v.Review)
 	v.Grant.ReviewDigest = authapp.ReviewDigest(v.Grant, v.Grant.Review)
 	return v

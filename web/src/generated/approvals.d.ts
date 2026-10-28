@@ -76,7 +76,7 @@ export interface components {
                 reasons: {
                     action_id: string;
                     /** @enum {unknown} */
-                    code: "rawBytePredicate" | "recordingApprovalRequired";
+                    code: "rawBytePredicate" | "recordingApprovalRequired" | "policyCollection";
                 }[];
                 observation_limits?: {
                     max_session_seconds: number;
@@ -254,7 +254,7 @@ export interface components {
                 reasons: {
                     action_id: string;
                     /** @enum {unknown} */
-                    code: "rawBytePredicate" | "recordingApprovalRequired";
+                    code: "rawBytePredicate" | "recordingApprovalRequired" | "policyCollection";
                 }[];
                 observation_limits?: {
                     max_session_seconds: number;
@@ -434,7 +434,7 @@ export interface components {
                     reasons: {
                         action_id: string;
                         /** @enum {unknown} */
-                        code: "rawBytePredicate" | "recordingApprovalRequired";
+                        code: "rawBytePredicate" | "recordingApprovalRequired" | "policyCollection";
                     }[];
                     observation_limits?: {
                         max_session_seconds: number;

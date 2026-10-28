@@ -144,6 +144,7 @@ it('does not tell an independent approved-plan reviewer to continue the requeste
 
 function teamPolicyGrant(): Data<'get_grant'> {
   const value: Data<'get_grant'> = { ...structuredClone(grant), kind: 'policy', phase: 'Approved', revision: 2, capture_deadline_rule: 'policyAuthority',
+    reasons: [{ action_id: 'a1', code: 'policyCollection' }],
     target: { cluster_id: id(1), namespace: 'payments', namespace_uid: 'namespace-uid', workload_kind: 'Deployment', workload_name: 'api', workload_uid: 'workload-uid' },
     policy: { uid: 'team-policy-uid', executor: principal('installation-policy-executor'), authority_issued_at: iso(-86_400_000), authority_not_after: iso(30*86_400_000), max_executions: 10, max_collected_bytes: 64 << 20, max_observed_bytes: 1 << 30, executions_used: 4, collected_bytes_used: 16 << 20, observed_bytes_used: 4000 },
     requested_by: principal('departed-requester'), not_after: iso(3_600_000), can_decide: false, can_revoke: true,
@@ -161,6 +162,7 @@ it('shows original team policy scope and budgets to a current manager without of
   expect(await screen.findByText('team-policy-uid')).toBeTruthy();
   expect(screen.getByText('installation-policy-executor')).toBeTruthy();
   expect(screen.getByText(/4 of 10 executions/)).toBeTruthy();
+  expect(screen.getByText(/recurring policy collection uses a separate finite approval and shared budgets/)).toBeTruthy();
   expect(screen.getByText(/16 MiB of 64 MiB output/)).toBeTruthy();
   expect(screen.getByText(/This approval grants no evidence access/)).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();

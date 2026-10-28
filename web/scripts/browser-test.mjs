@@ -244,6 +244,7 @@ try {
   await expect(page.getByRole('button', { name: 'Continue approved capture' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Find capture; otherwise close request' })).toHaveCount(0);
   await expect(page.getByText(/Pod undefined/)).toHaveCount(0);
+  await page.getByText('recurring policy collection uses a separate finite approval and shared budgets').waitFor();
   await scan('current-policy-manager');
   await page.screenshot({ path: output + '/policy-manager.png', fullPage: true });
   await page.goto(origin + '/policies');

@@ -10,6 +10,7 @@ const date = (value: string) => new Date(value).toLocaleString();
 const reasons: Record<string, string> = {
   rawBytePredicate: 'a raw byte comparison in the packet filter can test payload bytes',
   recordingApprovalRequired: 'this installation requires approval for every recording',
+  policyCollection: 'recurring policy collection uses a separate finite approval and shared budgets',
 };
 const phases: Record<string, string> = {
   Pending: 'Waiting for review', Approved: 'Approved', Denied: 'Denied', Revoked: 'Revoked', Expired: 'Expired', Exhausted: 'Exhausted',
