@@ -10,7 +10,6 @@ import (
 	"time"
 
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -45,8 +44,8 @@ func TestNativePacingTrafficWithRealKubernetes(t *testing.T) {
 	pod.Spec.AutomountServiceAccountToken = ptr.To(false)
 	pod.Spec.Containers[0].Command = []string{"/provider-proxy", "signals"}
 	pod.Spec.Containers[0].Args = nil
-	// Match the installed target, which the former probe left unlimited.
-	pod.Spec.Containers[0].Resources = core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("5m"), core.ResourceMemory: resource.MustParse("16Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}}
+	// Match the declared native-paced target profile, independently of focus.
+	pod.Spec.Containers[0].Resources = regionalWorkloadResources(true)
 	pod.Spec.Containers[0].ReadinessProbe = &core.Probe{ProbeHandler: core.ProbeHandler{TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(8080)}}, PeriodSeconds: 1, TimeoutSeconds: 1, FailureThreshold: 30}
 	created, err := api.CoreV1().Pods("synthetic").Create(ctx, pod, meta.CreateOptions{})
 	if err != nil {

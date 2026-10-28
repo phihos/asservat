@@ -341,8 +341,10 @@ HTTP/2, hash, filename, PCAP, reviewed-port, interface-statistics and traffic-wi
 checks before applying that **same** size assertion. `NearFullBytes` is assigned
 only after the assertion succeeds; it is not an input to those earlier checks.
 An underfilled case still fails before paced/range/owner comparisons or `Complete`.
-The one traffic attempt, target 100m CPU, bytes/record/flush counts, original
-8.5-second traffic, 10-second recording and 20-second response bounds stay fixed.
+At that historical checkpoint the synthetic target remained 100m; the
+native-paced-only profile revision below supersedes that test default. The one
+traffic attempt, bytes/record/flush counts and original 8.5-second traffic,
+10-second recording and 20-second response bounds stay fixed.
 
 Cost on a passing case is unchanged. An underfilled failed case can now consume
 one already planned authenticated unpaced transfer of at most 8 MiB, including
@@ -354,3 +356,45 @@ file or a parsed first packet is not proof of exact hook readiness; combined PCA
 drops still do not provide separate engine/output-full attribution. Local checks
 cover the existing finite-input, HTTP, PCAP and measurement contracts; a new
 installed result remains pending and the underfill cause remains unproven.
+
+
+## Explicit native-paced target resource profile (2026-10-29)
+
+The recovered human run limit is at most twenty minutes; neither 100m target
+CPU nor per-record flushes were human product requirements. The earlier direction
+to preserve 100m was an engineering choice during diagnosis. The shared synthetic
+regional application fixture used a 5m CPU request and 100m limit; that is not a
+qualified product-impact or native-transfer guarantee. The real 100m result in
+Native 40786153907 stays underfilled and unqualified: seven acknowledged batches,
+4,695,860 authenticated PCAP bytes and the unchanged near-full refusal. No cause
+or 200m performance improvement is established.
+
+Only the explicitly selected first regional target in `native-paced` now declares
+CPU request **200m** and limit **200m**. The fast pre-join and later construction
+sites are mutually exclusive; the focus returns after the first regional cluster.
+Exactly one synthetic app, one replica and one container change. All other
+focus defaults remain 5m/100m. The independently selected no-collector traffic
+probe reuses that same resource profile. The read-only CPU observer validates
+actual quota against the original expected Pod's declared 100m or 200m limit,
+refuses changed CPU requests/limits or container identity, and keeps missing or
+incomparable samples unavailable rather than inventing zero usage. Its samples
+include the declared request/limit read by the same existing Pod GET (two numeric
+fields, 16 value bytes per sample; no added API call).
+
+The scheduler reservation increases **195m** for that target's lifetime; its cap
+increases **100m throughout its lifetime**. Over the 8.5-second traffic phase only,
+that adds approximately **0.85 permitted CPU-seconds** (0.85 → 1.70), not measured
+consumption or whole-fixture cost. For lifetime T seconds the extra permitted cap
+is approximately 0.1×T CPU-seconds. The CPU request also affects weighting under
+contention, so a later success would not isolate quota causation. These semantics
+follow the [official Kubernetes resource documentation](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#how-kubernetes-applies-resource-requests-and-limits).
+
+This is a bounded qualification profile, not a product or collector resource
+change. The 4 MiB/65,536×64-byte traffic, actual per-record flush, one attempt,
+8.5-second phase, 10-second recording, twenty-second response, 8 MiB cap and exact
+8,323,072..8,388,608 guard remain unchanged, with the same authority/spend/ACK and
+owner/key checks. No new setting, privilege, API, watch, service or control loop
+is added. The 200m builder/observer/HTTP checks are local component evidence only;
+real route measurement and installed native transfer at this profile are pending.
+A future 200m pass would qualify that named profile, not general throughput,
+collector overhead or the still-unqualified 100m case.

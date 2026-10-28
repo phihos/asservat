@@ -24,10 +24,11 @@ import (
 // cover the target cgroup, including its background work; they do not
 // attribute recorder CPU. Wall intervals also include node-side command overhead.
 type nativeTrafficCPU struct {
-	StartedAt, FinishedAt time.Time
-	ContainerID           string
-	Quota, Period         uint64
-	Counters              map[string]uint64
+	StartedAt, FinishedAt                          time.Time
+	ContainerID                                    string
+	Quota, Period                                  uint64
+	DeclaredRequestMilliCPU, DeclaredLimitMilliCPU int64
+	Counters                                       map[string]uint64
 }
 
 type nativeCPUOutput struct {
@@ -56,6 +57,13 @@ func nativeCPUCommand(ctx context.Context, limit int, args ...string) ([]byte, e
 func nativeTrafficTargetCPU(ctx context.Context, api kubernetes.Interface, expected *core.Pod) (out nativeTrafficCPU, err error) {
 	out.StartedAt = time.Now().UTC()
 	defer func() { out.FinishedAt = time.Now().UTC() }()
+	if expected == nil || len(expected.Spec.Containers) != 1 {
+		return out, errors.New("CPU fixture profile unavailable")
+	}
+	wantCPU := expected.Spec.Containers[0].Resources.Limits.Cpu()
+	if n := wantCPU.MilliValue(); n != 100 && n != 200 {
+		return out, errors.New("CPU fixture profile unavailable")
+	}
 	pod, err := api.CoreV1().Pods(expected.Namespace).Get(ctx, expected.Name, meta.GetOptions{})
 	if err != nil {
 		return out, err
@@ -63,6 +71,11 @@ func nativeTrafficTargetCPU(ctx context.Context, api kubernetes.Interface, expec
 	if pod.UID != expected.UID || pod.Spec.NodeName != expected.Spec.NodeName || pod.DeletionTimestamp != nil || len(pod.Status.ContainerStatuses) != 1 || len(expected.Status.ContainerStatuses) != 1 || pod.Status.ContainerStatuses[0].ContainerID != expected.Status.ContainerStatuses[0].ContainerID {
 		return out, errors.New("CPU target changed")
 	}
+	if len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Cpu().Cmp(*wantCPU) != 0 || pod.Spec.Containers[0].Resources.Requests.Cpu().Cmp(*expected.Spec.Containers[0].Resources.Requests.Cpu()) != 0 {
+		return out, errors.New("CPU target resource profile changed")
+	}
+	out.DeclaredRequestMilliCPU = pod.Spec.Containers[0].Resources.Requests.Cpu().MilliValue()
+	out.DeclaredLimitMilliCPU = pod.Spec.Containers[0].Resources.Limits.Cpu().MilliValue()
 	out.ContainerID = pod.Status.ContainerStatuses[0].ContainerID
 	id := strings.TrimPrefix(out.ContainerID, "containerd://")
 	rawID, e := hex.DecodeString(id)
@@ -90,9 +103,9 @@ func nativeTrafficTargetCPU(ctx context.Context, api kubernetes.Interface, expec
 	if err != nil {
 		return out, err
 	}
-	return parseNativeTrafficCPU(observed, out)
+	return parseNativeTrafficCPU(observed, out, uint64(wantCPU.MilliValue()))
 }
-func parseNativeTrafficCPU(raw []byte, out nativeTrafficCPU) (nativeTrafficCPU, error) {
+func parseNativeTrafficCPU(raw []byte, out nativeTrafficCPU, wantMilliCPU uint64) (nativeTrafficCPU, error) {
 	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
 	if len(lines) < 2 {
 		return out, errors.New("missing CPU measurement")
@@ -110,8 +123,8 @@ func parseNativeTrafficCPU(raw []byte, out nativeTrafficCPU) (nativeTrafficCPU, 
 	if err != nil {
 		return out, err
 	}
-	if out.Quota == 0 || out.Period == 0 || out.Period > 1e9 || out.Quota > 1e9 || out.Quota*10 != out.Period {
-		return out, errors.New("CPU quota is not installed 100m")
+	if out.Quota == 0 || out.Period == 0 || out.Period > 1e9 || out.Quota > 1e9 || (wantMilliCPU != 100 && wantMilliCPU != 200) || out.Quota*1000 != out.Period*wantMilliCPU {
+		return out, errors.New("CPU quota differs from declared fixture profile")
 	}
 	out.Counters = map[string]uint64{}
 	for _, line := range lines[1:] {
@@ -139,7 +152,7 @@ func parseNativeTrafficCPU(raw []byte, out nativeTrafficCPU) (nativeTrafficCPU, 
 	return out, nil
 }
 func nativeTrafficCPUDelta(a, b nativeTrafficCPU) (map[string]uint64, error) {
-	if a.ContainerID == "" || a.ContainerID != b.ContainerID || a.Quota != b.Quota || a.Period != b.Period || len(a.Counters) != 6 || len(b.Counters) != 6 {
+	if a.ContainerID == "" || a.ContainerID != b.ContainerID || a.Quota != b.Quota || a.Period != b.Period || a.DeclaredRequestMilliCPU != b.DeclaredRequestMilliCPU || a.DeclaredLimitMilliCPU != b.DeclaredLimitMilliCPU || len(a.Counters) != 6 || len(b.Counters) != 6 {
 		return nil, errors.New("CPU measurement identity changed")
 	}
 	out := map[string]uint64{}
@@ -155,17 +168,17 @@ func nativeTrafficCPUDelta(a, b nativeTrafficCPU) (map[string]uint64, error) {
 
 func TestNativeTrafficCPUQuotaAndCountersNeverInventAZero(t *testing.T) {
 	raw := []byte("10000 100000\nusage_usec 100\nuser_usec 60\nsystem_usec 40\nnr_periods 9\nnr_throttled 3\nthrottled_usec 700\nburst_usec 0\n")
-	first, err := parseNativeTrafficCPU(raw, nativeTrafficCPU{ContainerID: "exact-owned"})
+	first, err := parseNativeTrafficCPU(raw, nativeTrafficCPU{ContainerID: "exact-owned"}, 100)
 	if err != nil || first.Quota != 10000 || first.Counters["throttled_usec"] != 700 {
 		t.Fatal(first, err)
 	}
-	second, err := parseNativeTrafficCPU(bytes.ReplaceAll(raw, []byte("700"), []byte("900")), nativeTrafficCPU{ContainerID: "exact-owned"})
+	second, err := parseNativeTrafficCPU(bytes.ReplaceAll(raw, []byte("700"), []byte("900")), nativeTrafficCPU{ContainerID: "exact-owned"}, 100)
 	delta, err := nativeTrafficCPUDelta(first, second)
 	if err != nil || delta["throttled_usec"] != 200 || delta["usage_usec"] != 0 {
 		t.Fatal(delta, err)
 	}
 	for _, broken := range [][]byte{nil, bytes.Replace(raw, []byte("10000"), []byte("max"), 1), bytes.Replace(raw, []byte("10000"), []byte("100000"), 1), bytes.Replace(raw, []byte("user_usec 60\n"), nil, 1), append(append([]byte(nil), raw...), []byte("usage_usec 100\n")...)} {
-		if _, err := parseNativeTrafficCPU(broken, nativeTrafficCPU{}); err == nil {
+		if _, err := parseNativeTrafficCPU(broken, nativeTrafficCPU{}, 100); err == nil {
 			t.Fatal("unavailable/changed quota or missing data accepted")
 		}
 	}

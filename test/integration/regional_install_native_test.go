@@ -97,7 +97,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		// join. Discovery walks namespaces in name order, about 100 s per pass,
 		// so a namespace sorting before the system ones is enrolled early in its
 		// first pass instead of the second.
-		w := createRegionalWorkload(t, ctx, region, offer.Image, "apps-regional")
+		w := createRegionalWorkload(t, ctx, region, offer.Image, "apps-regional", index == 1 && installedJourneyFocus() == "native-paced")
 		budget := newRegionalBudget(t, ctx, hub, namespace, issuer, envelope.Binding.ClusterID, index)
 		budget.addPolicy()
 		budget.addBinding(w)
@@ -676,7 +676,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	if existing == nil {
 		budget = newRegionalBudget(t, ctx, hub, namespace, issuer, cluster, index)
 		budget.addPolicy()
-		w = createRegionalWorkload(t, ctx, region, offer.Image, "regional-apps")
+		w = createRegionalWorkload(t, ctx, region, offer.Image, "regional-apps", index == 1 && installedJourneyFocus() == "native-paced")
 		budget.addBinding(w)
 		t.Log("operator added the regional budget policy, pool slot, workload and maintainer binding")
 	}
@@ -955,7 +955,18 @@ type regionalWorkload struct {
 	app *apps.Deployment
 }
 
-func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes.Interface, image, name string) regionalWorkload {
+// Only the explicit native-paced target uses the 200m qualification profile.
+// Default synthetic workloads retain their original 5m request/100m limit.
+func regionalWorkloadResources(nativePaced bool) core.ResourceRequirements {
+	out := core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("5m"), core.ResourceMemory: resource.MustParse("16Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}}
+	if nativePaced {
+		out.Requests[core.ResourceCPU] = resource.MustParse("200m")
+		out.Limits[core.ResourceCPU] = resource.MustParse("200m")
+	}
+	return out
+}
+
+func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes.Interface, image, name string, nativePaced bool) regionalWorkload {
 	t.Helper()
 	// The regional workload: a labeled namespace (the selector guard admits
 	// the administrator) and a Deployment with no replicas.
@@ -980,7 +991,7 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 		Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{AutomountServiceAccountToken: ptr.To(false), TerminationGracePeriodSeconds: ptr.To(int64(3)),
 			SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},
 			Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command,
-				Resources:       core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("5m"), core.ResourceMemory: resource.MustParse("16Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}},
+				Resources:       regionalWorkloadResources(nativePaced),
 				SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}}}}}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal("regional workload", err)
