@@ -180,6 +180,19 @@ func (d *operationDeadline) responseContext(ctx context.Context) (context.Contex
 	return reply.ResponseContext(ctx)
 }
 
+func (d *operationDeadline) write(ctx context.Context, w http.ResponseWriter, status int, body []byte, until time.Time) (bool, error) {
+	d.mu.Lock()
+	reply, closed := d.reply, d.closed
+	d.mu.Unlock()
+	if closed {
+		return false, presentation.ErrOperationDelivery
+	}
+	if reply == nil {
+		return presentation.WriteOperationResponse(ctx, w, status, body, until, d.check)
+	}
+	return presentation.WriteOperationReplyResponse(ctx, w, status, body, *reply, until, d.check)
+}
+
 func (d *operationDeadline) fail(reason string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -729,7 +742,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	writeCtx, finishWrite := delivery.responseContext(ctx)
 	defer finishWrite()
-	if sent, err := presentation.WriteOperationResponse(writeCtx, w, response.status, response.body, deadline, delivery.check); err != nil && !sent {
+	if sent, err := delivery.write(writeCtx, w, response.status, response.body, deadline); err != nil && !sent {
 		h.unavailable(w, "final-disclosure")
 	}
 }

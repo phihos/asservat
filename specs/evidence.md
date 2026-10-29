@@ -77,6 +77,12 @@ The exact query batch consumes its own data/index/manifest key roles under curre
 worker and live-request proof. Download grants and serialized worker proofs cannot
 supply that authority. Local verification/buffer closure is distinct from positive
 remote operation completion; uncertainty retains charges and blocks worker reuse.
+After a fully written and flushed owned query response, HTTP completion without
+additional application payload may use only the earlier of its original cleanup
+and original request cutoffs. This does not extend payload disclosure: partial,
+failed, unaudited and unowned responses retain their original write fences, and
+cleanup remains synchronous with all slots held until joined. No fresh grace
+interval or client-receipt claim is created by HTTP completion.
 This narrow profile does not relax the following isolation and encrypted-scratch
 requirements for offline analysis or other evidence formats. Its implementation
 and native qualification remain pending.
