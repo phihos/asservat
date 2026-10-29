@@ -1,5 +1,37 @@
 # Sustained implementation progress
 
+## Residency witness clock repair; production unchanged (2026-10-29)
+
+Combined `90b474e8` passed local pre-push and fresh review, but
+[CI 40903899154](https://github.com/phihos/asservat/actions/runs/40903899154)
+failed `TestContextStartOriginalResidencyCanEndSelectedQuery` during initial
+opening after 4.04 seconds, before its intended query witness. Thirteen jobs
+passed; the test shard and aggregate failed. No infrastructure retry or
+installed run followed that failure.
+
+The natural local baseline passed. A controlled 1.5-second initial fixture-clock
+age reproduced `process-open` refusal before dialing: the retained owned proof
+had expired while the original setup and caller contexts remained live. The
+test advanced its frozen clock only during a later source read, after the
+original proof's start had already been sampled. The first advancing-clock
+control exposed another fixture issue: separate timestamp samples declared an
+interval slightly longer than five seconds, correctly rejected by production.
+Both failed controls remain recorded. CI lacked the closed stage/initial age,
+so this is a demonstrated fixture defect and inferred CI explanation, not a
+proven exact CI cause or product defect.
+
+The test-only correction selects a coherent advancing clock for that real-time
+witness and samples each returned source/registration observation once. Other
+tests retain their frozen clock. The four-second delay, five-second setup and
+thirty-second residency remain unchanged. The witness now checks that its
+original owned proof starts after opening begins and stays inside the original
+setup bound. A ten-millisecond aged-clock control successfully opened, then
+failed this new assertion, making the regression check deterministic.
+
+Focused race (29.082s), full affected mTLS race (66.739s) and canonical pre-push
+passed on the isolated correction. All production bytes remain identical to
+`90b474e8`; this repairs test setup and does not fix the installed preview error.
+
 ## Caller status equivalence: local correction and real API evidence (2026-10-29)
 
 The remaining caller-observation full-Pod comparison reproduced a local false
