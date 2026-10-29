@@ -192,7 +192,10 @@ Constructor inputs are normalized caller/admin bounds, with the original context
 and hard memory cutoff retained. No source authority, renewal interval, raw
 observation credit or finite policy twenty-second lease is inferred. The owner
 must drive quiet advancement, observation watermarks, stop and joined closure.
-A packet-free interval alone proves no coverage. Parser/filter/control and encoder
+`ObservedThrough(at)` requires all callbacks with original packet time <= at
+to have been processed; a later such callback violates that input precondition.
+The current engine has no qualified event-time watermark. Wall time or a
+packet-free interval alone proves no coverage. Parser/filter/control and encoder
 memory are separate from the framed historical arena.
 
 Finite `Snapshot` still copies only available original-time records. The distinct

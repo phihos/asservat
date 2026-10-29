@@ -133,7 +133,10 @@ func (r *Ring) advance(now time.Time) error {
 func (r *Ring) Advance(now time.Time) error { r.mu.Lock(); defer r.mu.Unlock(); return r.advance(now) }
 
 // ObservedThrough is an explicit owner assertion, never inferred from packets
-// or housekeeping. Its first assertion establishes the observation start; a
+// or housekeeping. The owner guarantees all callbacks with original packet
+// time <= at have already been processed; wall time alone is not that proof.
+// Delivery of such an older packet afterward violates this input precondition.
+// Its first assertion establishes the observation start; a
 // later first assertion cannot backfill earlier quiet coverage or renew bounds.
 func (r *Ring) ObservedThrough(at time.Time) error {
 	r.mu.Lock()
@@ -340,6 +343,9 @@ func (s *RingSnapshot) Next(p *RingPacket) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.nextLocked(p)
+}
+func (s *RingSnapshot) nextLocked(p *RingPacket) error {
 	*p = RingPacket{}
 	if s.closed {
 		return ErrRingClosed
@@ -514,12 +520,14 @@ func (w *WindowSnapshot) Coverage() RingCoverage {
 	return w.final
 }
 func (w *WindowSnapshot) Next(p *RingPacket) error {
+	if p == nil {
+		return ErrInvalid
+	}
 	w.snapshot.mu.Lock()
-	ready := w.finished && w.failure == nil && w.processing.Err() == nil
-	w.snapshot.mu.Unlock()
-	if !ready {
+	defer w.snapshot.mu.Unlock()
+	if !w.finished || w.failure != nil || w.processing.Err() != nil {
 		return ErrRingClosed
 	}
-	return w.snapshot.Next(p)
+	return w.snapshot.nextLocked(p)
 }
 func (w *WindowSnapshot) Close() error { return w.snapshot.Close() }

@@ -815,3 +815,28 @@ func TestRingWindowInvalidCompletionDoesNotSeal(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRingWindowNextChecksProcessingAfterLockWait(t *testing.T) {
+	r, now := ringFixture(t, nil)
+	ringAdd(t, r, now, now)
+	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+	defer cancel()
+	w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, now}, now, now, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if err = w.Complete(now); err != nil {
+		t.Fatal(err)
+	}
+	w.snapshot.mu.Lock()
+	started := make(chan struct{})
+	done := make(chan error, 1)
+	go func() { close(started); var p RingPacket; done <- w.Next(&p) }()
+	<-started
+	cancel()
+	w.snapshot.mu.Unlock()
+	if err = <-done; !errors.Is(err, ErrRingClosed) || w.snapshot.cursor != 0 {
+		t.Fatal("canceled iterator advanced", err)
+	}
+}
