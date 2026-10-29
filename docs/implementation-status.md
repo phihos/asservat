@@ -139,6 +139,16 @@ Settings/edit/repeat remains unqualified; this is not evidence of malformed JSON
 or an established transport cause. Root verified actual exit 1, all 3,408 source
 hashes, unchanged sources and clean teardown. No automatic retry is queued.
 
+The diagnostic-only `960a28bc` passed CI and fresh review, but its single
+[history run 40869970360](https://github.com/phihos/asservat/actions/runs/40869970360)
+failed earlier at storage readiness, before capture or the browser. Its matching
+thirty-second binding had expired despite a current refresh demand; the producer
+cause is not established. Root verified exit 1, all 3,408 source hashes, unchanged
+sources and clean teardown. The new browser failure classifier was not reached.
+Both readiness and settings delivery remain under investigation; no retry is
+queued. These recording-path failures do not prohibit the limited context-only
+experiment described above or establish a supported release date.
+
 ## Next product milestone and forecasting basis
 
 S-02's established context path and remaining acceptance work provide the

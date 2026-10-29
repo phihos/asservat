@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Later history attempt stopped at storage readiness (2026-10-29)
+
+The diagnostic-only candidate `960a28bc` passed all fifteen jobs in
+[CI 40867691109](https://github.com/phihos/asservat/actions/runs/40867691109)
+and fresh requested review with no open findings. The single
+[history run 40869970360](https://github.com/phihos/asservat/actions/runs/40869970360)
+failed before capture or browser execution. Its initial `OutcomeUnknown` resolved
+closed at `request/facts/storage/expired/readiness-tail`. The later diagnostic
+found the original matching thirty-second binding expired by 114.525 seconds,
+while a current refresh demand was 4.062 seconds old. These facts do not identify
+why the producer did not refresh the intended binding. Aggregate regional logs
+include successful guarded observations and permission-scope refusals without
+per-workload correlation. No body-failure classifier or PCAP was reached.
+
+Actual Go/test exits were 1 (596.898s package, 125.52s child); job/run wall times
+were 900/912 seconds, with zero Ubuntu billable milliseconds reported by the API.
+Root verified all 3,408 canonical sources and 36,001 frozen local tracked hashes,
+unchanged sources, provider-log exit 0, empty cleanup failures and removed build
+scratch. Environment SHA-256:
+`a7d4f8c6af22c2d36b07d4b4f7481d36b102a47639f69b27767ea7ad4c9f1bd0`.
+The freeze is released for local investigation; no retry is queued. The earlier
+settings body-read failure remains unresolved and is a separate observed failure.
+
 ## Installed history settings response-read failure (2026-10-29)
 
 The composed owner-read candidate `80c826fe` passed all fifteen jobs in
