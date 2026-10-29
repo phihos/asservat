@@ -965,3 +965,83 @@ func TestRingArrivalSequenceExhaustionRefuses(t *testing.T) {
 		t.Fatal(r.evictedRetainedThrough)
 	}
 }
+
+func TestRingAfterZeroFinalCutPreservesUnknownInput(t *testing.T) {
+	for _, mode := range []string{"merge-after-gap", "closed-after-gap", "closed-no-gap"} {
+		t.Run(mode, func(t *testing.T) {
+			r, now := ringFixture(t, nil)
+			ringAdd(t, r, now, now)
+			ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+			defer cancel()
+			w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, now}, now, now, 1024)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer w.Close()
+			if !w.pre.Complete {
+				t.Fatal("precondition: complete precopy")
+			}
+			if mode != "closed-no-gap" {
+				if err = r.Gap(now.Add(time.Nanosecond)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if mode == "merge-after-gap" {
+				ringAdd(t, r, now, now.Add(2*time.Nanosecond))
+			} else {
+				r.Close()
+			}
+			if err = w.Complete(now.Add(2 * time.Nanosecond)); err != nil {
+				t.Fatal(err)
+			}
+			if mode == "closed-no-gap" {
+				if !w.Coverage().Complete || w.Coverage().InputUnknown {
+					t.Fatal("unchanged frozen pre lost coverage", w.Coverage())
+				}
+				return
+			}
+			if w.Coverage().Complete || !w.Coverage().InputUnknown {
+				t.Fatal("later unknown input disappeared", w.Coverage())
+			}
+			if mode == "merge-after-gap" {
+				current, err := r.Snapshot(RingWindow{now, now}, now.Add(2*time.Nanosecond), 1024)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer current.Close()
+				if current.Coverage().Complete || !current.Coverage().InputUnknown {
+					t.Fatal("finite observation mismatch", current.Coverage())
+				}
+			}
+		})
+	}
+}
+
+func TestRingAfterZeroRetainsKnownStop(t *testing.T) {
+	for _, closeSource := range []bool{false, true} {
+		t.Run(fmt.Sprint(closeSource), func(t *testing.T) {
+			r, now := ringFixture(t, nil)
+			ringAdd(t, r, now, now)
+			ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+			defer cancel()
+			w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, now}, now, now, 1024)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer w.Close()
+			stop := now.Add(time.Nanosecond)
+			if err = r.Stop(stop); err != nil {
+				t.Fatal(err)
+			}
+			if closeSource {
+				r.Close()
+			}
+			if err = w.Complete(now.Add(2 * time.Nanosecond)); err != nil {
+				t.Fatal(err)
+			}
+			if !w.Coverage().Complete || !w.Coverage().SourceStoppedAt.Equal(stop) {
+				t.Fatal("known stop disappeared", w.Coverage())
+			}
+		})
+	}
+}

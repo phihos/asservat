@@ -232,7 +232,13 @@ cancellation refuses output; source cancellation discards the tentative post-cop
 An after-zero window needs no new acquisition; while source memory remains valid
 it can also include late original-window records already delivered by its final
 cut. With closed source memory it can seal a complete pre-copy only if no newer
-retained arrivals could have been omitted, otherwise it stays partial.
+retained arrivals could have been omitted and no newly known unknown input
+affects the original window, otherwise it stays partial. Current unknown-input
+coverage also remains binding when merging late pre records; freezing the
+pre-copy does not hide an intervening Gap. This reads only the existing coverage
+metadata, without importing the current eviction floor into the preserved copy.
+An explicit known Stop timestamp remains in the result, including after-zero
+and Stop followed by Close; Close/cancellation never invents a stop timestamp.
 This adds no stopped-source grace. Snapshot-to-ring lock order matches Close;
 coverage returns a locked value and readers never borrow clearable storage.
 

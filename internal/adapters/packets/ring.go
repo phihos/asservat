@@ -475,10 +475,13 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 	}
 	w.finished = true
 	w.final.SourceStoppedAt = r.stopped
+	// A frozen pre-copy survives eviction, not newly known unknown input.
+	w.final.InputUnknown = w.pre.InputUnknown || r.coverage(w.final.Requested).InputUnknown
 	if err := r.advance(now); err != nil {
-		if w.t0.Equal(w.final.Requested.Until) && r.state.Packets.Retained == w.cut {
+		if w.t0.Equal(w.final.Requested.Until) && r.state.Packets.Retained == w.cut && !w.final.InputUnknown {
 			w.final = w.pre
 		}
+		w.final.SourceStoppedAt = r.stopped
 		return nil
 	}
 	window := w.final.Requested
@@ -523,11 +526,12 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 		post = r.coverage(RingWindow{w.t0.Add(time.Nanosecond), window.Until})
 	}
 	uncopiedEvicted := r.evictedRetainedThrough > w.cut
-	w.final.Complete = w.pre.Complete && (w.t0.Equal(window.Until) || post.Complete) && !uncopiedEvicted
+	unknown := w.final.InputUnknown || post.InputUnknown || uncopiedEvicted
+	w.final.Complete = w.pre.Complete && (w.t0.Equal(window.Until) || post.Complete) && !unknown
 	w.final.ObservedUntil = post.ObservedUntil
-	w.final.SourceStoppedAt = post.SourceStoppedAt
+	w.final.SourceStoppedAt = r.stopped
 	w.final.HistoryEvicted = w.pre.HistoryEvicted || post.HistoryEvicted
-	w.final.InputUnknown = w.pre.InputUnknown || post.InputUnknown || uncopiedEvicted
+	w.final.InputUnknown = unknown
 	return nil
 }
 func (w *WindowSnapshot) Coverage() RingCoverage {
