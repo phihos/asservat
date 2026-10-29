@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-263 — Ordinary ongoing source active leases](263-ordinary-ongoing-source-leases.md)
+selects a distinct thirty-second source-purpose commitment under fresh issuance
+facts, cumulative credit and original hard ends. Contract only; runtime and
+installed qualification remain pending.
+
 [ADR-261 — Finite policy observation admission](261-finite-policy-observation-admission.md)
 records the engineering finite-window contract, original hard bounds, explicit
 revocation residual and held renewal machinery. Authority/prefix/native

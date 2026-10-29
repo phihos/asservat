@@ -14,7 +14,7 @@ under a real accepted policy, its original independently approved grant and real
 capture/Pod. The initial increment supports a recording duration up to 15 seconds
 only when its reviewed session and other original bounds leave sufficient start
 slack. Manual raw observation and default ongoing policy arming remain separate
-unfinished requirements. Their existing unavailable gates remain closed.
+unfinished requirements. Their existing unavailable gates remain closed. The separate ordinary sanitized ongoing source-purpose contract is [ADR-263](263-ordinary-ongoing-source-leases.md); it does not alter this finite twenty-second permit or reinterpret existing PolicyArm result.ValidUntil.
 
 New admission, permit issuance and any future renewal require current identity,
 complete-deny, source, delegation, recovery, target and original-grant checks under
