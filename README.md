@@ -9,7 +9,7 @@ their AI agents.
 > [!WARNING]
 > **Early development: no supported release yet.** Installed tests cover
 > pod-status investigation and bounded manual packet capture with real services.
-> Normal homelab installation and the broader continuous-recording, profiling
+> A supported homelab release and the broader continuous-recording, profiling
 > and crash workflows remain unfinished. See [implementation status](docs/implementation-status.md).
 
 ![Design prototype of the Asservat console with open cases, recording health and captures in progress](design/ui/previews/workspace.png)

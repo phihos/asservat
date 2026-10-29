@@ -1,5 +1,33 @@
 # Sustained implementation progress
 
+## Relevant owner Pod equivalence correction (2026-10-29)
+
+A local HTTPS/native-reader regression reproduced false refusal when an
+informational Pod status/resourceVersion update occurred between a boundary's
+two GETs, while both versions passed the existing protected-object validator
+with the same workload digest. The same update between boundaries already
+passed. The second GET now independently uses that validator and must retain
+the identical canonical digest. Both reads, critical identity/spec/Ready/phase/
+node/address/controller/deletion checks, original dates and terminal cancellation
+remain; this changes no API count, authority interval, pool or permission.
+See [ADR-150](decisions/150-operation-owned-native-observation-proof.md#relevant-pod-equivalence-inside-a-native-boundary-2026-10-29)
+for measured comparison costs, critical negative controls and scope.
+
+One owned real-Kubernetes selection passed all eight required parent/child cases
+on `ce643e54` (Go/test 0, 10.985s), with exact source hashes and independently
+verified cleanup/resource absence. Its later `600a146e` result update is docs-only.
+It qualifies the native primitive, not owner SQL/TLS/ordinal-four composition or
+the cause of the installed failure. No BPF, Gadget or collector ran locally.
+
+The composed candidate passed canonical pre-push on clean `402f980c` (0,
+30.427s, 231 console tests) and broader affected Kubernetes/mTLS owner-observation
+races (0, 68.842s command). All 36,001 tracked hashes stayed unchanged and the
+temporary dependency link was removed. Independent review of all five changed
+candidate paths found no blocker. The full Go gate will use its maintained CI
+shards within the test-time limit; no local full-gate pass is asserted. Fresh
+exact-head CI/review and installed verification remain pending. No automatic
+installed retry is queued.
+
 ## Instrumented history readiness failure (2026-10-29)
 
 Diagnostic-only `80b9a000` passed all fifteen jobs in
