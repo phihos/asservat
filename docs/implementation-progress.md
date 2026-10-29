@@ -1,5 +1,34 @@
 # Sustained implementation progress
 
+## Instrumented history readiness failure (2026-10-29)
+
+Diagnostic-only `80b9a000` passed all fifteen jobs in
+[CI 40847273979](https://github.com/phihos/asservat/actions/runs/40847273979)
+and fresh [review](https://github.com/phihos/asservat/pull/103#issuecomment-6492618037)
+with no open findings; all eighteen comments and zero threads were read.
+The single instrumented
+[history run 40849033981](https://github.com/phihos/asservat/actions/runs/40849033981)
+failed before capture/browser execution. The initial request resolved closed at
+`request/facts/storage/expired/readiness-tail`. At the later diagnostic, its
+original thirty-second binding was expired by 112.625 seconds and its current
+refresh demand was 4.021 seconds old.
+
+A demand refresh reported guarded-read/claim/post refusal after 2.27 seconds.
+Owner logs also reported registration-3/last-read/owner-read/final-native refusal.
+These labels lack per-call identity and wall-clock correlation; they neither
+identify which combined final-native predicate failed nor prove every message
+belongs to that demand. The new browser body classes were not reached. The
+earlier HTTP-200 history failure remains unresolved, alongside intermittent
+readiness. No installed retry follows automatically.
+
+Actual command/Go/test exits were 1 (601.958s package, 125.80s child); job/run wall
+times of 908/923 seconds stayed below the limit, and the API reported zero Ubuntu billable
+milliseconds. Root independently verified all 3,407 canonical source hashes,
+unchanged sources, empty cleanup failures, removed scratch and all 36,000 frozen
+tracked hashes. The freeze is released for local reproduction, not a claimed
+repair or qualification pass. The two scoped positive `c328a5af` recording and
+transfer results below remain source-bound evidence.
+
 ## Browser history response attribution (2026-10-29)
 
 The follow-up to `c328a5af` is diagnostic only. The browser handler reports one

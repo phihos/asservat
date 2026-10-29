@@ -96,7 +96,7 @@ context-only experiment. Such an experiment can precede the full feature set
 while retaining its authority, custody and privacy checks and all accepted
 first-release requirements. No calendar date is established.
 
-The latest frozen PR #103 candidate, `c328a5af`, passed all fifteen CI jobs
+Frozen PR #103 candidate `c328a5af` passed all fifteen CI jobs
 and fresh review. Its installed campaign produced two passes and one failure:
 
 - [Policy 40842273194](https://github.com/phihos/asservat/actions/runs/40842273194)
@@ -122,6 +122,13 @@ failures and local reproductions remain in the progress record. These named
 passes do not establish repeatable homelab readiness. There is no dependable
 calendar ETA or overall completion percentage. The next forecasting checkpoint
 is a stable, repeatable supported workflow rather than another component count.
+
+The later diagnostic-only `80b9a000` passed CI/review, but
+[history run 40849033981](https://github.com/phihos/asservat/actions/runs/40849033981)
+failed earlier at storage readiness, before capture or the browser body checks.
+A demand refresh reported guarded-read/claim/post refusal after 2.27 seconds;
+the precise cause remains unresolved. Root verified exit 1, all 3,407 source
+hashes and clean teardown. No automatic retry is queued.
 
 ## Next product milestone and forecasting basis
 
