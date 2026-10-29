@@ -5,8 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -365,7 +367,8 @@ func TestOwnerLocalObservationCallerPodEquivalence(t *testing.T) {
 				if op != nil {
 					op.Close()
 				}
-				if err == nil || f.pods != 2 {
+				var step interface{ FixedStep() string }
+				if !errors.Is(err, cfg.ErrChanged) || ctx.Err() != nil || !errors.As(err, &step) || !strings.HasSuffix(step.FixedStep(), "caller-objects") || f.pods != 2 {
 					t.Fatalf("critical caller change admitted or second read missing: err=%v reads=%d", err, f.pods)
 				}
 				return

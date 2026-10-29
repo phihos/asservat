@@ -4,14 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	apps "k8s.io/api/apps/v1"
 	auth "k8s.io/api/authentication/v1"
@@ -200,7 +203,8 @@ func TestOwnerLocalObservationCallerStatusWithRealKubernetes(t *testing.T) {
 				if op != nil {
 					op.Close()
 				}
-				if e == nil || reads != 2 || patches != 1 || confirmed != 1 {
+				var step interface{ FixedStep() string }
+				if !errors.Is(e, cfg.ErrChanged) || call.Err() != nil || !errors.As(e, &step) || !strings.HasSuffix(step.FixedStep(), "caller-objects") || reads != 2 || patches != 1 || confirmed != 1 {
 					t.Fatal("critical real mutation not consumer-refused", e, reads, patches, confirmed)
 				}
 				return

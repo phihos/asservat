@@ -42,7 +42,17 @@ updates alone no longer fail this comparison. Caller Running/node/account,
 identity/deletion, controller/template/spec/labels/annotations and original
 bounds remain required; owner-only Ready/address/Service rules are not added.
 This corrects a local HTTPS-adapter regression, with no additional API calls or
-installed-failure attribution. Full installed availability remains unqualified.
+installed-failure attribution. An owned API component run on `a15c5af9` also
+confirmed three admitted informational status changes and six actual caller Pod
+GETs through Begin/Claim/Final in 1.652 seconds, with 3.348 seconds left in the
+original five-second interval. It supplies fixture installation/process pins and
+qualifies neither installed routing availability nor the earlier Native cause.
+Its critical case confirmed an admitted annotation mutation followed by refusal;
+that run did not assert the exact refusal cause. The later native test now also
+requires a live original context, `ErrChanged` and the closed `caller-objects`
+step; this stronger assertion has local compile/vet coverage, not another owned
+API run. Local HTTPS critical controls exercise those exact refusal assertions.
+Full installed availability remains unqualified.
 
 The matching regional primitive now brackets four genuinely new source-value
 reads with two independent native checks. The last native check precedes the
