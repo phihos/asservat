@@ -1,5 +1,63 @@
 # Sustained implementation progress
 
+## History harness observes the application reader (2026-10-29)
+
+Local actual Chromium/Go HTTP2 composition reproduced the same `ERR_ABORTED`
+class while unchanged production `postOperation` successfully read and validated
+the history response. The bounded five-run batch retained one failing inspector
+read and four passing iterations. This demonstrates a possible false harness
+failure; the installed UI outcome remains unestablished. A paired experiment
+skipping cancellation after EOF failed on both baseline and candidate; that
+candidate was restored and is not a repair.
+
+The harness-only follow-up observes bytes returned by the application's own
+reader for four exact metadata POST operations. It adds no reader, clone, tee,
+request or fallback, preserves the same Response/reader/cancellation, and accepts
+only actual EOF within existing byte bounds. Independent canonical output
+validation and all existing row/settings/provenance/edit/UI assertions remain.
+Read errors, abort, headers, duplicates, overflow, malformed JSON/UTF8 and schema
+failures refuse. Buffers are bounded, consumed/cleared and never logged. Product
+Go and web/src remain byte-identical to `7cb581de`. Both new runtime inputs are
+included in canonical source hashing and its inventory regression.
+
+Five local actual HTTP2 runs passed (245 normal replies, fifteen refusal
+controls, 260 requests and matched audit Begin/Finish). Final HTTP2 race,
+Chromium controls, console check/build/browser journeys, native console restart
+and all 24 source-selection tests passed. Independent review was clear. The
+controls use synthetic underlying authority/history fixtures; the UI-negative
+control is synthetic DOM, not installed React qualification. Composed Chromium refusal controls (0.815s), all 24 source-selection tests
+(0.281s) and canonical pre-push (30.267s, 231 console tests) also passed.
+Installed verification remains pending. No installed retry is queued.
+
+## Installed history cancellation class retained (2026-10-29)
+
+Exact `7cb581de` passed all fifteen CI jobs and fresh review. Its one focused
+[installed history diagnostic run 40932727792](https://github.com/phihos/asservat/actions/runs/40932727792)
+failed after initial capture and four acknowledged storage copies. Diagnostics
+was HTTP 200/ok/complete. The HTTP-200 history-list body could not be read by the
+Playwright response helper; the retained closed network code is now `aborted`
+(Chromium `ERR_ABORTED`). Settings, edited preview and repeat were not reached.
+This class does not identify who aborted or establish that the browser UI also
+failed. No return/write-failure stage appears in retained aggregate server logs;
+truncation/aggregation prevents inferring absence. No cause or repair is claimed.
+
+The complete browser-phase bracket is at most 5.3 seconds including startup,
+navigation, authentication, inputs, diagnostics and history. An ordinary new
+10-second request timer or 60-second session refresh cannot explain that bracket.
+The driver sampled the aborted failure before its assertion and final browser
+close; that later close does not explain the sampled flag. The complete server
+history envelope is bounded at 24,576 bytes, below the frontend's 32,768-byte
+limit. These are exclusions, not an identified cancellation source.
+
+Actual Go/test exits were 1 (617.887s package, 149.55s focused child); the native
+job took 926s. Root verified seven artifact files, 58 monitor references, all
+3,413 canonical and 36,006 tracked source hashes, provider-log exit 0, removed
+scratch and empty cleanup failures before releasing the freeze. The retained
+2,060-byte PCAPNG has eighteen enhanced packet blocks and is initial structural
+evidence only. No retry is queued. Local investigation now separates actual
+React/client completion from Playwright response-body retrieval and tests the
+actual Chromium/Go HTTP2 combination, without relaxing failed-body checks.
+
 ## Installed history body failure and bounded diagnostics (2026-10-29)
 
 Exact `47d08aab` passed all fifteen CI jobs and fresh review, then failed its
