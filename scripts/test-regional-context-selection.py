@@ -168,7 +168,7 @@ class RegionalContextSelection(unittest.TestCase):
 
     def test_history_driver_and_locked_browser_dependencies_are_source_pinned(self):
         hashes = fixture.source_hashes()
-        for name in ("web/scripts/installed-history-browser.mjs", "web/package.json", "web/package-lock.json"):
+        for name in ("web/scripts/installed-history-browser.mjs", "web/scripts/installed-history-response.mjs", "web/package.json", "web/package-lock.json"):
             self.assertIn(name, hashes)
             self.assertEqual(len(hashes[name]), 64)
 

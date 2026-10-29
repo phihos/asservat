@@ -4,6 +4,7 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
+import { readInstalledHistoryResponse } from './installed-history-response.mjs';
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
 const first = await lines.next();
@@ -28,12 +29,10 @@ const waitOperation = name => page.waitForResponse(operation(name)).catch(() => 
 const closedCodes = new Set(['NotAvailable', 'ParametersUnavailable', 'ProfileChanged', 'RequiresSelection', 'RecorderUnavailable', 'InvalidComposition', 'ProfileUnavailable', 'FilterRejected', 'ApprovalRequired', 'FilterCompilerUnavailable', 'UnsupportedRequest', 'SharingNotPermitted', 'TargetReplaced', 'ProcessingCoverageUnavailable', 'CapacityUnavailable']);
 async function readOperation(name, pending) {
   const response = await pending;
-  const http = response ? response.status() : 0;
-  const reply = response ? await response.json().catch(() => null) : null;
+  const { http, reply, status, body } = await readInstalledHistoryResponse(response);
   // Never stringify settings, bodies, identities, credentials or provider text.
-  const status = !response ? 'unavailable' : ['ok', 'error', 'pending'].includes(reply?.status) ? reply.status : 'invalid';
   const code = status === 'ok' ? 'none' : status === 'error' && closedCodes.has(reply?.data?.code) ? reply.data.code : 'other';
-  const diagnostic = `installed history ${name} http=${http} status=${status} code=${code}`;
+  const diagnostic = `installed history ${name} http=${http} status=${status} code=${code} body=${body}`;
   process.stderr.write(diagnostic + '\n');
   assert.equal(http, 200, diagnostic);
   assert.equal(status, 'ok', diagnostic);
