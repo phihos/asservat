@@ -398,7 +398,51 @@ change. The 4 MiB/65,536×64-byte traffic, actual per-record flush, one attempt,
 8.5-second phase, 10-second recording, twenty-second response, 8 MiB cap and exact
 8,323,072..8,388,608 guard remain unchanged, with the same authority/spend/ACK and
 owner/key checks. No new setting, privilege, API, watch, service or control loop
-is added. The 200m builder/observer/HTTP checks are local component evidence only;
-real route measurement and installed native transfer at this profile are pending.
-A future 200m pass would qualify that named profile, not general throughput,
-collector overhead or the still-unqualified 100m case.
+is added. The local checks and owned normal-HTTP result below qualify their
+component scope only; installed capture/native transfer at 200m remains pending.
+They do not qualify general throughput, collector overhead or the still-unqualified
+100m case.
+
+
+### Owned 200m normal-HTTP result (2026-10-29)
+
+The one reviewed `TestNativePacingTrafficWithRealKubernetes` selection on frozen
+`15436479b862eb63ca5774ee0e09c093977349d8` passed command/Go/test exits **0/0/0**.
+It completed **16 acknowledged batches / 65,536 records / 4,194,304 bytes** in
+**3.8012512s** parent wall time, with client 3.771321293s (3.443644894s scheduled
+wait and 327.647520ms HTTP work). The final response was 200 with its exact
+262,144-byte body and completion acknowledgement. These are application writes
+and bytes, not a measured TCP packet count.
+
+Before and after samples reported declared request **200m**, limit **200m** and
+effective quota **20,000 / 100,000**, retaining the same exact target container.
+The measured target delta was **197,638µs usage** (176,256µs system / 21,382µs
+user); period/throttled-period/reported-throttled-time deltas were zero in these
+valid counter samples. This is neither an unavailable sample represented by zero
+nor proof of the cause of the earlier 100m installed underfill. There was no
+controlled 100m comparison and no collector/BPF or native-file transfer in this
+selection; it does not establish installed Gadget-path throughput.
+
+Selected test time was **4.32s**, Go package **5.376s**, outer command **62.644s**.
+The existing 90-second test context, two-minute Go timeout and 1100-second outer
+limit plus 10-second kill grace stayed unchanged and below twenty minutes.
+All **3,398 runtime/test source hashes** matched the frozen candidate; source
+remained unchanged and cleanup failures were empty. The four actual current-run
+outputs were archived before restoring generated reports; unchanged historical
+outputs were excluded. After restoration all **35,990 tracked hashes** matched.
+Healthy readback found the five exact owned containers, two networks, Kind
+cluster, helper image (tag and ID), owned-label inventories and exact command
+scratch path absent. The report has no `buildScratchRemoved` field; absence of
+the actual `context-wxiy_6ei` path was checked separately.
+
+The actual helper/node hash was
+`9540c26816da4f79dcb5954f844b82e04959aadd876ef3af880df630c60a9242`.
+Immutable local artifacts are under
+`/home/phil/.cache/asservat-build/codex-bf86-resume/native-paced-200m/owned-1/`;
+`verification.json` SHA-256 is
+`7c922f269aa4f74f99eb7fe35da6daea7094c9d041d23e8ea67a292bae8c7466`,
+with the actual command/terminal and original environment, log, timing and probe
+JSON alongside. This docs-only follow-up leaves tested code byte-identical.
+The old 100m failures remain retained; no performance improvement, causal fix,
+bootstrap/provider-operation, native artifact, owner-renewal or complete installed
+qualification follows from this normal-HTTP component pass.
