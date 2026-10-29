@@ -1,5 +1,30 @@
 # Sustained implementation progress
 
+## Installed history settings response-read failure (2026-10-29)
+
+The composed owner-read candidate `80c826fe` passed all fifteen jobs in
+[CI 40860311182](https://github.com/phihos/asservat/actions/runs/40860311182)
+and fresh requested review with no findings. The single
+[history run 40863490795](https://github.com/phihos/asservat/actions/runs/40863490795)
+failed later in the installed browser journey: the initial submission resolved
+accepted, storage reported four acknowledgements, and diagnostics/history listing
+returned HTTP 200 with complete valid replies. `get_capture_settings` returned
+HTTP 200, but the driver's response-body read failed. The driver obtained no JSON
+parse verdict; this does not identify a server, transport or browser protocol
+cause. A prior Go MCP settings call succeeded. The edited preview and
+repeat were not reached. No automatic retry follows.
+
+Actual Go/test exits were 1 (598.779s package, 154.47s child); job/run wall times
+were 937/952 seconds, with zero Ubuntu billable milliseconds reported by the API.
+Root independently verified all 3,408 canonical sources, unchanged source during
+the test, all 36,001 frozen local tracked hashes, provider-log exit 0, empty
+cleanup failures and removed build scratch. The retained initial PCAPNG is 560
+bytes with three enhanced-packet blocks; it is not a history/repeat qualification.
+The environment SHA-256 is
+`86872558755d4a44a4cb310786ee2b91ca4b78fefdb0b4a910046b4abb0aae9d`.
+The source freeze is released for investigation. PR #103 remains draft; the
+earlier source-bound policy/paced passes remain scoped evidence.
+
 ## Relevant owner Pod equivalence correction (2026-10-29)
 
 A local HTTPS/native-reader regression reproduced false refusal when an
@@ -23,10 +48,10 @@ The composed candidate passed canonical pre-push on clean `402f980c` (0,
 30.427s, 231 console tests) and broader affected Kubernetes/mTLS owner-observation
 races (0, 68.842s command). All 36,001 tracked hashes stayed unchanged and the
 temporary dependency link was removed. Independent review of all five changed
-candidate paths found no blocker. The full Go gate will use its maintained CI
-shards within the test-time limit; no local full-gate pass is asserted. Fresh
-exact-head CI/review and installed verification remain pending. No automatic
-installed retry is queued.
+candidate paths found no blocker. The maintained CI shards subsequently passed
+on exact `80c826fe`; no local full-gate pass is asserted. Fresh review found no
+issues. The installed result above remains a failure, with no causal attribution
+to the locally reproduced Pod-status defect and no automatic retry queued.
 
 ## Instrumented history readiness failure (2026-10-29)
 

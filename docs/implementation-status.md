@@ -130,6 +130,15 @@ A demand refresh reported guarded-read/claim/post refusal after 2.27 seconds;
 the precise cause remains unresolved. Root verified exit 1, all 3,407 source
 hashes and clean teardown. No automatic retry is queued.
 
+The later owner-read correction `80c826fe` passed all fifteen CI jobs and fresh
+review. Its single
+[history run 40863490795](https://github.com/phihos/asservat/actions/runs/40863490795)
+reached successful initial capture and complete diagnostics/history-list replies,
+then failed reading the HTTP-200 settings response body in the browser driver.
+Settings/edit/repeat remains unqualified; this is not evidence of malformed JSON
+or an established transport cause. Root verified actual exit 1, all 3,408 source
+hashes, unchanged sources and clean teardown. No automatic retry is queued.
+
 ## Next product milestone and forecasting basis
 
 S-02's established context path and remaining acceptance work provide the
