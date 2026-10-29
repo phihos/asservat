@@ -87,6 +87,7 @@ libpcap:
 # no capture or BPF load.
 pcap-check: libpcap
 	$(PCAP_ENV) go test -tags libpcap -count=1 ./internal/adapters/pcap/
+	$(PCAP_ENV) go test -tags libpcap -count=1 -run '^TestRawPolicyApprovedTimingReplayIgnoresRequireAllSwitch$$' ./internal/adapters/postgres/
 	$(HUB_BUILD) -o "$(ASSERVAT_BUILD_TMP)/asservat-hub" ./cmd/asservat 2>/dev/null
 	file "$(ASSERVAT_BUILD_TMP)/asservat-hub" | grep -q 'statically linked'
 	rm -f "$(ASSERVAT_BUILD_TMP)/asservat-hub"
@@ -146,8 +147,12 @@ permission-schema-check:
 	$(PYTHON) scripts/manifest-schemas.py --bundle permissions
 
 .PHONY: policy-schema-check
-policy-schema-check:
+policy-schema-check: policy-crd-check
 	$(PYTHON) scripts/manifest-schemas.py --bundle policies
+
+.PHONY: policy-crd-check
+policy-crd-check:
+	$(PYTHON) scripts/policy-crd.py
 
 .PHONY: permission-crd-check
 permission-crd-check:
@@ -182,7 +187,7 @@ identity-integration:
 	$(PYTHON) scripts/test-identity.py
 
 .PHONY: helm-check helm-integration
-helm-check: permission-crd-check start-crd-check retention-crd-check
+helm-check: permission-crd-check policy-crd-check start-crd-check retention-crd-check
 	$(PYTHON) scripts/check-helm.py
 
 helm-integration: helm-check
@@ -216,3 +221,8 @@ gofmt-check:
 
 go-vet:
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go vet ./...
+
+# Metadata-only capability qualification; one owned pinned S3 fixture, no collector.
+.PHONY: history-storage-integration
+history-storage-integration:
+	$(PYTHON) scripts/test-history-storage.py $(or $(HISTORY_RESULT_NAME),history-storage-native-1)

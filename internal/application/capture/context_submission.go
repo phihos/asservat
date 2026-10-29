@@ -29,7 +29,12 @@ type ContextAcceptedStart interface {
 // action. Both retain the actual caller and their original current interval.
 // Downstream failures return the accepted receipt plus an error. That receipt
 // never authorizes disclosure after MetadataValidUntil.
+type ContextHistoryPersistence interface {
+	Persist(context.Context, value.Accepted, identity.Identity, value.HistoryParameters, *value.HistoryLineage) error
+}
+
 type ContextSubmission struct {
+	History ContextHistoryPersistence
 	ContextInvestigation
 	Intents ContextIntentPublication
 	Start   ContextAcceptedStart
@@ -46,7 +51,7 @@ func (s ContextSubmission) Continue(ctx context.Context, current identities.Curr
 	return s.submit(ctx, current, preview, key, true)
 }
 
-func (s ContextSubmission) submit(ctx context.Context, current identities.CurrentIdentity, preview, key string, continuation bool) (value.Accepted, error) {
+func (s ContextSubmission) submit(ctx context.Context, current identities.CurrentIdentity, preview, key string, continuation bool) (result value.Accepted, failure error) {
 	var zero value.Accepted
 	if ctx == nil || ctx.Err() != nil || current == nil || s.Intents == nil || s.Start == nil || !s.ContextInvestigation.configured() {
 		return zero, value.ErrUnavailable
@@ -128,6 +133,31 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 			return a, err
 		}
 	}
+	// Retain one advisory attempt on early failure, but spend the live original
+	// invocation on it before Start can block through that invocation's end.
+	// Replay never writes history and no history outcome changes admission.
+	historyAttempted := false
+	persistHistory := func() {
+		if a.Replay || historyAttempted {
+			return
+		}
+		historyAttempted = true
+		if a.HistoryParameters == nil {
+			return
+		}
+		began := time.Now()
+		e := value.ErrHistoryUnavailable
+		if s.History != nil {
+			e = s.History.Persist(call, a, i, *a.HistoryParameters, a.HistorySource)
+		}
+		auditapp.MarkStep(call, "s-history", began)
+		a.HistoryUnavailable, a.HistoryRecorded = e != nil, e == nil
+	}
+	defer func() {
+		persistHistory()
+		result.HistoryUnavailable, result.HistoryRecorded = a.HistoryUnavailable, a.HistoryRecorded
+		result.HistoryParameters, result.HistorySource = nil, nil
+	}()
 	if err = check(); err != nil {
 		return a, err
 	}
@@ -165,6 +195,12 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		}
 		return a, value.ErrUnavailable
 	}
+	if err = check(); err != nil {
+		return a, err
+	}
+	persistHistory()
+	// History can block, so consume current identity again before dispatch;
+	// neither its completion nor a fresh identity extends the original bound.
 	if err = check(); err != nil {
 		return a, err
 	}

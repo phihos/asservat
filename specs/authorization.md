@@ -64,11 +64,13 @@ Use an authoritative hub SQL transaction to reserve cumulative grant bytes/execu
 
 Default active-reservation ceiling is 64 per grant. Query concurrency defaults to 4 per principal and 32 per installation. Reject or queue within a bounded deadline when those limits are reached; never grow active grant state indefinitely.
 
-Permission-source freshness also bounds permit expiry as specified in [permission management](permissions.md); no cache or permit renewal may extend a stale authorization decision. The hub may delegate a prepaid slice of a policy budget to a local cluster permit; local reservations consume only that slice. Default permit expiry is <=60 seconds. On ambiguous execution, charge the full reservation conservatively and report `Indeterminate`. Reclaim unused budget only after authoritative proof that execution never started; expiry by itself is not that proof. A grant that reaches its active-reservation ceiling queues or rejects work.
+Permission-source freshness also bounds permit expiry as specified in [permission management](permissions.md); no cache or permit renewal may extend a stale authorization decision. [ADR-261](../docs/decisions/261-finite-policy-observation-admission.md) permits only its separately committed finite policy-observation active lease to outlive transient check intervals: new admission, permit issuance and renewal still require original fresh facts, and every reviewed/action/session/grant/capture hard expiry remains binding. The hub may delegate a prepaid slice of a policy budget to a local cluster permit; local reservations consume only that slice. Default permit expiry is <=60 seconds. On ambiguous execution, charge the full reservation conservatively and report `Indeterminate`. Reclaim unused budget only after authoritative proof that execution never started; expiry by itself is not that proof. A grant that reaches its active-reservation ceiling queues or rejects work.
 
-Revocation MUST invalidate new reservations, cursors, sessions and shares-dependent queries. Connected workers receive cancellation; disconnected intrusive work stops accepting starts at permit expiry. State the residual <=permit lifetime revocation window. Started uploads may finish with no new acquisition only while artifact privacy/retention deadlines remain valid. Each query rechecks authorization before delivering output, not merely when the sandbox started.
+Revocation MUST invalidate new reservations, permit issuance/renewal, cursors, sessions and shares-dependent queries once authoritative. Already-issued finite policy-observation work may still start only before its original latestStart and continue to its fixed active lease of at most twenty seconds after issuance. Its packet-stop path is not implemented; do not claim immediate connected cancellation. Other connected workers retain their implemented cancellation, and disconnected intrusive work stops accepting starts at permit expiry. State the residual <=permit lifetime revocation window. Started uploads may finish with no new acquisition only while artifact privacy/retention deadlines remain valid. Each query rechecks authorization before delivering output, not merely when the sandbox started.
 
 ### SC-AUT-004
+
+For a finite policy recorder, prove latestStart is no later than min(original start bound, leaseUntil minus required recording duration); refuse if the full duration cannot fit. Revocation after issuance cannot create another permit or change the existing start/session/rate/credit; unknown dispatch, replay, reconnect and node replacement never rearm or refund it.
 
 Given two simultaneous raw requests sharing a 64 KiB remaining budget, when each asks for 64 KiB, then at most one reservation succeeds. A controller crash after dispatch cannot make the same intrusive action run twice. Revocation during analysis prevents result delivery.
 
@@ -234,13 +236,40 @@ Given two accepted managing owner teams, when the creator leaves and another cur
 
 Given a share managed by owner team A, when a member of A who also belongs to owner team B transfers management to B, then B's members manage it, A's members no longer do, the creator, recipients and expiry are unchanged and the revision increases by one. A transfer naming a team the caller does not belong to (or does not hold `evidence-owner` for the artifact) is refused, and a non-manager's transfer is refused before any catalog read. When B loses its assignment the share is Suspended and no member can transfer it; an installation administrator then assigns owner team C, which currently holds `evidence-owner` inside the artifact's retained audience: the share is Active again with the original creator and expiry, and the recipient reads it. An administrator cannot assign a group without a current `evidence-owner` assignment in that audience (for example a re-added binding), a person, or a revoked share. An installation administrator without any evidence right lists every share without recipients and revokes another team's share; the recipient loses access at the next read and the administrator still cannot read the artifact. A principal who is neither creator, current manager nor administrator cannot revoke, transfer or list all shares.
 
+[ADR-259](../docs/decisions/259-policy-grants-and-observation-spend.md) extends the
+existing grant detail DTO for team policy grants: direct current pinned managers
+can inspect the original workload/policy scope, finite effective expiry and grant
+reservation counters without becoming independent reviewers or gaining evidence
+access. Policy details omit capture/preview/Pod placeholders and personal result
+access. Existing can_revoke reports current management/reviewer rights separately
+from can_decide. The personal ad hoc contract above is unchanged. Shared accepted
+policy counters remain independently binding and belong in policy status; grant
+remaining budget is not guaranteed collection capacity.
+
 ## REQ-AUT-006 — Sensitive observation sessions
 
 Raw packet rings, HTTP parsing and payload-sensitive predicates need authority before any sensitive observation, including discarded bytes. A frozen-output maxBytes is insufficient. Grants for these capabilities MUST additionally specify observationLimits: finite maxSessionSeconds (initial maximum one hour), cumulative maxObservedBytes across the grant, maxBytesPerSecond and maxConcurrentSessions. Charge wire bytes entering the sensitive parser/predicate, including retransmissions, before processing; reserve conservative bounded byte slices before dispatch. Lease renewal/session restart never refills the grant. Stop at exhaustion with `ObservationBudgetExhausted`, close sessions and retain cheap independently authorized monitoring. Never auto-renew a sensitive session into unbounded approval.
 
 Ordinary sanitized network observation still consumes administrator CPU/rate/memory budgets. Short prepaid authority and freshness/revocation bounds apply to all sessions; long approval validity does not mean long disconnected observation. Sharing maxima, snapshot storage and action starts are independent limits. Pending/Spent observation counters and executionsReserved MUST be visible in the authoritative accounting model. A raw-filter predicate on otherwise sanitized output requires these same limits.
 
+The first sensitive runtime increment is policy-only, finite onTrigger/before-zero
+with one packet action per real capture, under [ADR-261](../docs/decisions/261-finite-policy-observation-admission.md).
+Reserve once from both original pools: min(reviewed observed-byte ceiling,
+R × (ceil(actual finite recording seconds) + 1), policy remaining, grant remaining).
+The extra second is the existing initial rate burst, not additional session time.
+At 16 MiB/s for fifteen seconds the rate bound is 256 MiB, not a blind 1 GiB.
+Unused/uncertain credit stays conservative spend. A fitting action of up to fifteen
+seconds needs no periodic authority renewal inside its original active lease of
+at most twenty seconds. Shorter original reviewed/hard windows win; decline when
+start slack cannot fit. Longer finite actions, manual raw authority and ongoing
+arming/renewal remain required but unimplemented; do not globally lift shared
+manual raw refusal. Ordinary sanitized header behavior is unchanged. Raw remains
+unavailable until actual SQL/node binding/transport, prefix/loss, retirement and
+native qualification pass.
+
 ### SC-AUT-006
+
+For the first finite policy case, prove both pools charge once even with zero retained output; an already-issued lease survives only its original bounded residual after revocation, while any new issuance requires fresh facts.
 
 Given a 16 MiB raw ring with a 1 GiB observation grant, when more than 1 GiB would enter the sensitive pipeline, then observation stops even if no snapshot was frozen. Restarting the sensor or changing grantRef cannot reuse spent bytes. Logs and other independently admitted cheap context can remain armed.
 

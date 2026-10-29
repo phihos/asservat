@@ -14,6 +14,7 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -121,6 +122,7 @@ func TestDownloadWorkerProofWithRealKubernetesTLS(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	var returnedExpiry time.Time
 	token := func(audience string, bound *core.Pod) []byte {
 		t.Helper()
 		life := int64(600)
@@ -132,9 +134,11 @@ func TestDownloadWorkerProofWithRealKubernetesTLS(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
+		returnedExpiry = v.Status.ExpirationTimestamp.Time
 		return []byte(v.Status.Token)
 	}
 	original := token(kube.DownloadPeerAudience(b.InstallationID), pod)
+	originalExpiry := returnedExpiry
 	defer clear(original)
 	tokens := &actualDownloadToken{}
 	tokens.set(original)
@@ -148,6 +152,8 @@ func TestDownloadWorkerProofWithRealKubernetesTLS(t *testing.T) {
 		t.Fatal(e)
 	}
 	limited := &rest.Config{Host: config.Host, BearerToken: reviewToken.Status.Token, TLSClientConfig: rest.TLSClientConfig{CAData: config.CAData, CAFile: config.CAFile}}
+	counts := &nativeProofAPICounts{}
+	limited.WrapTransport = counts.wrap
 	client, e := kube.NewPermissionClient(limited, b.ClusterID, cfg.NamespaceRef{Name: ns.Name, UID: string(ns.UID)}, time.Now)
 	if e != nil {
 		t.Fatal(e)
@@ -164,7 +170,7 @@ func TestDownloadWorkerProofWithRealKubernetesTLS(t *testing.T) {
 				w.WriteHeader(403)
 				return
 			}
-			proof, e := source.ReadDownloadPeerProof(r.Context(), b.DownloadID, p)
+			proof, e := source.ReadNativeResponsePeerProof(r.Context(), b.DownloadID, p)
 			if e != nil {
 				w.WriteHeader(403)
 				return
@@ -181,7 +187,7 @@ func TestDownloadWorkerProofWithRealKubernetesTLS(t *testing.T) {
 	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: tlsFixture.roots, Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS13}}
 	defer transport.CloseIdleConnections()
 	httpClient := &http.Client{Transport: transport, Timeout: 5 * time.Second}
-	invoke := func(want int) value.KeyWorkerProof {
+	invoke := func(want int) evidence.NativeResponsePeerProof {
 		t.Helper()
 		response, e := httpClient.Get(tlsFixture.server.URL)
 		if e != nil {
@@ -191,9 +197,9 @@ func TestDownloadWorkerProofWithRealKubernetesTLS(t *testing.T) {
 		if response.StatusCode != want {
 			t.Fatalf("private attestation status=%d want=%d", response.StatusCode, want)
 		}
-		var p value.KeyWorkerProof
+		var p evidence.NativeResponsePeerProof
 		if want == 200 {
-			if json.NewDecoder(io.LimitReader(response.Body, 16384)).Decode(&p) != nil || !p.Valid(time.Now()) || p.Binding != b {
+			if json.NewDecoder(io.LimitReader(response.Body, 16384)).Decode(&p) != nil || !p.Valid(time.Now()) || p.Proof.Binding != b || !p.TokenNotAfter.Equal(originalExpiry) {
 				t.Fatal("incomplete live proof")
 			}
 		}
@@ -217,7 +223,20 @@ func TestDownloadWorkerProofWithRealKubernetesTLS(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	proof := invoke(200)
+	tokens.set(nil)
+	beforeMissing := counts.snapshot()
+	invoke(403)
+	if missing := counts.snapshot().subtract(beforeMissing); missing != (nativeProofAPISnapshot{}) {
+		t.Fatal("missing token caused Kubernetes requests", missing)
+	}
+	tokens.set(original)
+	beforeInitial := counts.snapshot()
+	proof := invoke(200).Proof
+	initialCost := counts.snapshot().subtract(beforeInitial)
+	if initialCost != (nativeProofAPISnapshot{Reviews: 2, Gets: 8}) {
+		t.Fatal("initial real attestation API cost changed", initialCost)
+	}
+	qualifyNativeResponseRealProof(t, ctx, limited, client, source, tokens, b, proof.Peer, originalExpiry, counts)
 	if proof.TokenDigest == (artifact.Digest{}) || proof.FreshUntil.Sub(proof.ObservedAt) > 5*time.Second {
 		t.Fatal("unbounded token proof")
 	}
@@ -303,5 +322,5 @@ func TestDownloadWorkerProofWithRealKubernetesTLS(t *testing.T) {
 	if _, e = admin.CoreV1().Pods(ns.Name).Patch(ctx, pod.Name, types.MergePatchType, []byte(`{"metadata":{"finalizers":[]}}`), meta.PatchOptions{}); e != nil {
 		t.Fatal(e)
 	}
-	t.Log("real dedicated-audience TokenReview, pod binding, live Job/account/spec checks, verified mTLS identity, API role separation and deleting-pod rejection passed; dispatch and certificate issuance remain fixtures")
+	t.Log("real response producer/TokenRequest expiry, two TokenReviews/eight GETs, zero repeated-response Kubernetes calls, dedicated-audience TokenReview, pod binding, live Job/account/spec checks, verified mTLS identity, API role separation and deleting-pod rejection passed; dispatch and certificate issuance remain fixtures")
 }

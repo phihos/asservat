@@ -1,12 +1,43 @@
 package postgres
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/capture"
 )
+
+func TestContextStorageObservationNamesClosedRefusalWithoutChangingCause(t *testing.T) {
+	for _, tc := range []struct {
+		name, predicate string
+		change          func(*custodydb.ObserveContextStorageRow, time.Time)
+		cause           error
+	}{
+		{"missing-field", "shape", func(r *custodydb.ObserveContextStorageRow, _ time.Time) { r.SourceDigest = nil }, value.ErrChanged},
+		{"pool-paused", "pool", func(r *custodydb.ObserveContextStorageRow, _ time.Time) { r.PoolPaused = true }, value.ErrChanged},
+		{"allocation-expired", "allocation", func(r *custodydb.ObserveContextStorageRow, now time.Time) { r.AllocationValidUntil = ts(now) }, value.ErrChanged},
+		{"source-expired", "source-expired", func(r *custodydb.ObserveContextStorageRow, now time.Time) {
+			r.FreshUntil, r.CapacityUntil = ts(now), ts(now)
+		}, value.ErrStorageBindingExpired},
+		{"managed-capacity-expired", "capacity", func(r *custodydb.ObserveContextStorageRow, now time.Time) { r.CapacityUntil = ts(now) }, value.ErrChanged},
+		{"control-expired", "control", func(r *custodydb.ObserveContextStorageRow, now time.Time) { r.ControlAccountUntil = ts(now) }, value.ErrChanged},
+		{"control-exhausted", "control", func(r *custodydb.ObserveContextStorageRow, _ time.Time) { r.ChargedFull = r.ControlAccountFull }, value.ErrCapacity},
+		{"invalid-selection", "selection", func(r *custodydb.ObserveContextStorageRow, _ time.Time) { r.PoolRevision = 0 }, value.ErrChanged},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			row, root, target, now := storageObservationFixture()
+			tc.change(&row, now)
+			got, err := contextStorageObservation(row, root, target, now)
+			var failure contextStorageObservationFailure
+			if !errors.Is(err, tc.cause) || !errors.As(err, &failure) || failure.predicate != tc.predicate || (got.Binding.RootID != "") != errors.Is(tc.cause, value.ErrStorageBindingExpired) {
+				t.Fatal("closed predicate changed cause or returned authority", err, failure.predicate)
+			}
+		})
+	}
+}
 
 func storageObservationFixture() (custodydb.ObserveContextStorageRow, string, authorization.Target, time.Time) {
 	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
@@ -70,7 +101,7 @@ func TestContextStorageObservationRejectsChangedOrInvalidSources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			r, root, target, now := storageObservationFixture()
 			test.change(&r)
-			if _, err := contextStorageObservation(r, root, target, now); err == nil {
+			if _, err := contextStorageObservation(r, root, target, now); err == nil || errors.Is(err, value.ErrStorageBindingExpired) {
 				t.Fatal("invalid storage observation accepted")
 			}
 		})
@@ -130,5 +161,32 @@ func TestContextStorageBindingThirtySecondLifetime(t *testing.T) {
 				t.Fatalf("admitted=%t want=%t error=%v", err == nil, test.want, err)
 			}
 		})
+	}
+}
+
+func TestContextStorageExpiredMetadataRetainsOriginalSelectionWithoutAuthority(t *testing.T) {
+	row, root, target, now := storageObservationFixture()
+	row.ObservedAt = ts(now.Add(-30 * time.Second))
+	row.FreshUntil = ts(now)
+	row.CapacityUntil = row.FreshUntil
+	got, err := contextStorageObservation(row, root, target, now)
+	if !errors.Is(err, value.ErrStorageBindingExpired) || !errors.Is(err, value.ErrUnavailable) || errors.Is(err, value.ErrChanged) || got.Binding.Valid(now) || !got.Binding.Valid(got.Binding.ObservedAt) || !got.Binding.ObservedAt.Equal(row.ObservedAt.Time) || !got.Binding.FreshUntil.Equal(row.FreshUntil.Time) || got.Selection.BindingRevision != got.Binding.Revision {
+		t.Fatal("expired metadata became authority or lost original source", got, err)
+	}
+	// The outer capture-error adapter must preserve the specific readiness type.
+	// Actual Ledger.transaction normalization is covered by the SQL integration
+	// regression; this pure wrapper check cannot exercise that boundary.
+	failure := &contextStorageReadFailure{stage: "observation/source-expired", cause: captureError(err)}
+	if !errors.Is(failure, value.ErrStorageBindingExpired) || !errors.Is(failure, value.ErrUnavailable) || failure.ContextStorageRead() != "observation/source-expired" {
+		t.Fatal("expired result lost at adapter boundary")
+	}
+	row.SourceGeneration++
+	changed, err := contextStorageObservation(row, root, target, now)
+	if !errors.Is(err, value.ErrStorageBindingExpired) || changed.Selection == got.Selection || changed.Binding.Revision.Generation != row.SourceGeneration {
+		t.Fatal("known changed revision hidden by expiry")
+	}
+	row.PoolRevision = 0
+	if _, err := contextStorageObservation(row, root, target, now); errors.Is(err, value.ErrStorageBindingExpired) || !errors.Is(err, value.ErrChanged) {
+		t.Fatal("invalid selection became readiness")
 	}
 }

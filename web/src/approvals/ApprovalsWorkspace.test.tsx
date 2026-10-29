@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ApprovalsWorkspace } from './ApprovalsWorkspace';
-import type { Input, Operation, Operations, Output } from './http';
+import type { Data, Input, Operation, Operations, Output } from './http';
 import { validInput_decide_review, validOutput_get_grant, validOutput_list_reviews, validOutput_decide_review } from '../generated/validate-approvals';
 import { id, result, session, SyntheticOperations, acceptedResult, resolvedAcceptedResult } from '../capture/test-fixtures';
 
@@ -14,14 +14,14 @@ const row = {
   target: { cluster_id: id(1), namespace: 'payments', workload_kind: 'Deployment', workload_name: 'api', pod_name: 'api-a' }, data_class: 'extract',
   reasons: [{ action_id: 'a1', code: 'rawBytePredicate' }], requested_by: principal('synthetic-developer'), requested_at: iso(-60_000), review_until: iso(3_540_000), preview_deadline: iso(-240_000), capture_deadline_rule: 'acceptanceWithinGrant', capture_window_seconds: 300,
   lifetime_seconds: 3600, can_decide: true, can_revoke: true, approval_navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41),
-};
-const grant = { ...row, can_resume: false, can_resolve: false, resume_requires_original_client: false, observation_limits: { max_session_seconds: 15, max_observed_bytes: 1 << 30, max_bytes_per_second: 16 << 20, max_concurrent_sessions: 1 },
+} satisfies Data<'list_reviews'>['approvals'][number];
+const grant: Data<'get_grant'> = { ...row, can_resume: false, can_resolve: false, resume_requires_original_client: false, observation_limits: { max_session_seconds: 15, max_observed_bytes: 1 << 30, max_bytes_per_second: 16 << 20, max_concurrent_sessions: 1 },
   actions: [{ action_id: 'a1', kind: 'packetCapture', execution_mode: 'ongoing', before: '30s', after: '10s', filter: 'tcp[13] & 2 != 0', filter_digest: 'ef'.repeat(32), filter_instructions: 4, max_bytes: 16 << 20, ring_max_bytes: 16 << 20, ring_max_age: '50s', sensitive: ['rawBytePredicate'] }] };
 
 class SyntheticApprovals implements Operations {
   calls: { name: Operation; input: unknown }[] = [];
   decision?: Output<'decide_review'>;
-  detail = grant;
+  detail: Data<'get_grant'> = grant;
   async call<N extends Operation>(name: N, input: Input<N>): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input) });
     if (name === 'list_reviews') return result((input as Input<'list_reviews'>).view === 'pending' ? { approvals: [row] } : { approvals: [] }) as Output<N>;
@@ -139,4 +139,48 @@ it('does not tell an independent approved-plan reviewer to continue the requeste
  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
  await screen.findByText('tcp[13] & 2 != 0');
  expect(screen.queryByText(/original requesting client/)).toBeNull();
+});
+
+
+function teamPolicyGrant(): Data<'get_grant'> {
+  const value: Data<'get_grant'> = { ...structuredClone(grant), kind: 'policy', phase: 'Approved', revision: 2, capture_deadline_rule: 'policyAuthority',
+    reasons: [{ action_id: 'a1', code: 'policyCollection' }],
+    target: { cluster_id: id(1), namespace: 'payments', namespace_uid: 'namespace-uid', workload_kind: 'Deployment', workload_name: 'api', workload_uid: 'workload-uid' },
+    policy: { uid: 'team-policy-uid', executor: principal('installation-policy-executor'), authority_issued_at: iso(-86_400_000), authority_not_after: iso(30*86_400_000), max_executions: 10, max_collected_bytes: 64 << 20, max_observed_bytes: 1 << 30, executions_used: 4, collected_bytes_used: 16 << 20, observed_bytes_used: 4000 },
+    requested_by: principal('departed-requester'), not_after: iso(3_600_000), can_decide: false, can_revoke: true,
+    decision: { decision: 'approved', decided_by: principal('independent-reviewer'), decided_at: iso(-30_000), reason: 'finite team collection', authentication_context: { acr: 'mfa', authenticated_at: iso(-40_000) } },
+    can_resume: false, can_resolve: false, resume_requires_original_client: false,
+  };
+  delete value.capture_id; delete value.preview_id; delete value.preview_deadline; delete value.capture_window_seconds;
+  return value;
+}
+
+it('shows original team policy scope and budgets to a current manager without offering review or personal capture', async () => {
+  const client = new SyntheticApprovals(); client.detail = teamPolicyGrant();
+  expect(validOutput_get_grant(result(client.detail))).toBe(true);
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)} newID={() => 'manager-revoke-key'}/>);
+  expect(await screen.findByText('team-policy-uid')).toBeTruthy();
+  expect(screen.getByText('installation-policy-executor')).toBeTruthy();
+  expect(screen.getByText(/4 of 10 executions/)).toBeTruthy();
+  expect(screen.getByText(/recurring policy collection uses a separate finite approval and shared budgets/)).toBeTruthy();
+  expect(screen.getByText(/16 MiB of 64 MiB output/)).toBeTruthy();
+  expect(screen.getByText(/This approval grants no evidence access/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Continue approved capture' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Find capture; otherwise close request' })).toBeNull();
+  expect(screen.queryByRole('link', { name: 'Sign in with step-up' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Revoke approval' }));
+  await waitFor(() => expect(client.calls.some(call => call.name === 'revoke_grant')).toBe(true));
+  expect(client.calls.find(call => call.name === 'revoke_grant')?.input).toEqual({ grant_id: id(41), expected_revision: 2, idempotency_key: 'manager-revoke-key' });
+  expect(client.calls.some(call => call.name === 'decide_review')).toBe(false);
+});
+
+it('does not infer team revocation from requester provenance and rejects personal placeholders in policy DTOs', async () => {
+  const client = new SyntheticApprovals(); client.detail = { ...teamPolicyGrant(), can_revoke: false };
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+  expect(await screen.findByText('team-policy-uid')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Revoke approval' })).toBeNull();
+  for (const patch of [{ capture_id: id(42) }, { preview_id: id(43) }, { preview_deadline: iso(60_000) }, { can_resume: true }, { can_resolve: true }, { resume_requires_original_client: true }, { target: { ...client.detail.target, pod_name: 'invented' } }]) {
+    expect(validOutput_get_grant(result({ ...client.detail, ...patch }))).toBe(false);
+  }
 });

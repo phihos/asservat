@@ -214,7 +214,7 @@ func (q *Queries) InsertPolicyOccurrence(ctx context.Context, arg InsertPolicyOc
 }
 
 const latestPolicyAcceptance = `-- name: LatestPolicyAcceptance :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2 ORDER BY accepted_at DESC, id DESC LIMIT 1
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key, collected_bytes_spent, observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2 ORDER BY accepted_at DESC, id DESC LIMIT 1
 `
 
 type LatestPolicyAcceptanceParams struct {
@@ -244,6 +244,8 @@ func (q *Queries) LatestPolicyAcceptance(ctx context.Context, arg LatestPolicyAc
 		&i.SharingRevokeKey,
 		&i.SharingStoppedAt,
 		&i.SharingStopKey,
+		&i.CollectedBytesSpent,
+		&i.ObservedBytesSpent,
 	)
 	return i, err
 }
@@ -299,7 +301,7 @@ func (q *Queries) ListActivePolicies(ctx context.Context, rootID pgtype.UUID) ([
 }
 
 const listPolicyOccurrences = `-- name: ListPolicyOccurrences :many
-SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 ORDER BY created_at DESC, id LIMIT 8
+SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector, reserved_capture_id, grant_id, reserved_bytes FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 ORDER BY created_at DESC, id LIMIT 8
 `
 
 type ListPolicyOccurrencesParams struct {
@@ -329,6 +331,9 @@ func (q *Queries) ListPolicyOccurrences(ctx context.Context, arg ListPolicyOccur
 			&i.CaptureID,
 			&i.Outcome,
 			&i.Detector,
+			&i.ReservedCaptureID,
+			&i.GrantID,
+			&i.ReservedBytes,
 		); err != nil {
 			return nil, err
 		}
@@ -462,7 +467,7 @@ func (q *Queries) PrunePolicyWatermarks(ctx context.Context, arg PrunePolicyWate
 }
 
 const readPolicyOccurrence = `-- name: ReadPolicyOccurrence :one
-SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector FROM policy_occurrence WHERE root_id=$1 AND id=$2
+SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector, reserved_capture_id, grant_id, reserved_bytes FROM policy_occurrence WHERE root_id=$1 AND id=$2
 `
 
 type ReadPolicyOccurrenceParams struct {
@@ -486,13 +491,16 @@ func (q *Queries) ReadPolicyOccurrence(ctx context.Context, arg ReadPolicyOccurr
 		&i.CaptureID,
 		&i.Outcome,
 		&i.Detector,
+		&i.ReservedCaptureID,
+		&i.GrantID,
+		&i.ReservedBytes,
 	)
 	return i, err
 }
 
 const readPolicySourceRow = `-- name: ReadPolicySourceRow :one
 
-SELECT root_id, policy_uid, installation_id, cluster_id, namespace_uid, name, generation, spec_digest, resource_version, observed_at, fresh_until, deleted, suspended, collection_digest, intent_version, active_id, creator_json FROM policy_source WHERE root_id=$1 AND policy_uid=$2
+SELECT root_id, policy_uid, installation_id, cluster_id, namespace_uid, name, generation, spec_digest, resource_version, observed_at, fresh_until, deleted, suspended, collection_digest, intent_version, active_id, creator_json, authored_grant_ref, grant_attachment_id FROM policy_source WHERE root_id=$1 AND policy_uid=$2
 `
 
 type ReadPolicySourceRowParams struct {
@@ -522,6 +530,8 @@ func (q *Queries) ReadPolicySourceRow(ctx context.Context, arg ReadPolicySourceR
 		&i.IntentVersion,
 		&i.ActiveID,
 		&i.CreatorJson,
+		&i.AuthoredGrantRef,
+		&i.GrantAttachmentID,
 	)
 	return i, err
 }

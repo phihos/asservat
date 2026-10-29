@@ -93,6 +93,17 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		t.Fatal("synthetic activated installation", e)
 	}
 
+	// Retain the actual previous function and fixture trust row for the
+	// function-only projection migration's Down/Up qualification.
+	const refreshDefinition = `SELECT pg_get_functiondef('public.refresh_capacity_enrollment(uuid,jsonb,bytea,bytea,bytea,jsonb)'::regprocedure)`
+	var originalFunction, originalTrust string
+	if e = conn.QueryRow(ctx, refreshDefinition).Scan(&originalFunction); e != nil {
+		t.Fatal("original refresh function", e)
+	}
+	if e = conn.QueryRow(ctx, `SELECT row_to_json(t)::text FROM fleet_trust t`).Scan(&originalTrust); e != nil {
+		t.Fatal("original fixture trust state", e)
+	}
+
 	upgrade, e := postgres.NewUpgradeSchema(config)
 	if e != nil {
 		t.Fatal(e)
@@ -148,6 +159,24 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	}
 	if from, to, e = upgrade.Run(ctx); e != nil || from != head || to != head {
 		t.Fatal("repeated upgrade was not a no-op", from, to, e)
+	}
+	// Migration 103 changes this function only. Down restores its exact old
+	// definition; it neither rewrites projections nor changes activation state.
+	if head == 103 {
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("projection migration Down", e)
+		}
+		var restoredFunction, restoredTrust string
+		if e = conn.QueryRow(ctx, refreshDefinition).Scan(&restoredFunction); e != nil || restoredFunction != originalFunction {
+			t.Fatal("Down did not restore exact prior refresh function", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT row_to_json(t)::text FROM fleet_trust t`).Scan(&restoredTrust); e != nil || restoredTrust != originalTrust {
+			t.Fatal("Down changed fixture activation/recovery state", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("projection migration Up after Down", from, to, e)
+		}
+		t.Log("projection migration Down restored exact function; Up restored head; fixture activation/recovery unchanged")
 	}
 	// A version this binary does not know is refused, not skipped.
 	if _, e = conn.Exec(ctx, "INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", head+1); e != nil {

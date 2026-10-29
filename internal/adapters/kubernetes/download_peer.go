@@ -46,7 +46,11 @@ func NewDispatchedDownloadPeerAttester(c *PermissionClient, b app.DownloadWorker
 	return &DispatchedDownloadPeerAttester{c, b, t}, nil
 }
 func (s *DispatchedDownloadPeerAttester) ReadDownloadPeerProof(ctx context.Context, session string, peer value.KeyPeer) (value.KeyWorkerProof, error) {
-	var zero value.KeyWorkerProof
+	result, err := s.ReadNativeResponsePeerProof(ctx, session, peer)
+	return result.Proof, err
+}
+func (s *DispatchedDownloadPeerAttester) ReadNativeResponsePeerProof(ctx context.Context, session string, peer value.KeyPeer) (app.NativeResponsePeerProof, error) {
+	var zero app.NativeResponsePeerProof
 	if s == nil || ctx == nil {
 		return zero, artifact.ErrInvalid
 	}
@@ -71,7 +75,8 @@ func (s *DispatchedDownloadPeerAttester) ReadDownloadPeerProof(ctx context.Conte
 	if e != nil {
 		return zero, e
 	}
-	p, e := attester.ReadDownloadPeerProof(ctx, session, peer)
+	result, e := attester.ReadNativeResponsePeerProof(ctx, session, peer)
+	p := result.Proof
 	if e != nil {
 		return zero, e
 	}
@@ -83,7 +88,8 @@ func (s *DispatchedDownloadPeerAttester) ReadDownloadPeerProof(ctx context.Conte
 	if !p.Valid(s.client.now()) {
 		return zero, artifact.ErrInvalid
 	}
-	return p, nil
+	result.Proof = p
+	return result, nil
 }
 
 var _ app.DownloadPeerProofReader = (*DownloadPeerAttester)(nil)
@@ -344,6 +350,10 @@ func (s *AcquisitionPeerAttester) ReadAcquisitionPeerProof(ctx context.Context, 
 // Shared by initial enrollment and certificate-bound key observations. Neither
 // path fabricates a certificate to get through the bootstrap check.
 func (s *AcquisitionPeerAttester) observeToken(ctx context.Context) (artifact.Digest, time.Time, time.Time, error) {
+	digest, start, until, _, err := s.observeTokenDetails(ctx)
+	return digest, start, until, err
+}
+func (s *AcquisitionPeerAttester) observeTokenDetails(ctx context.Context) (artifact.Digest, time.Time, time.Time, time.Time, error) {
 	var zero artifact.Digest
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -351,18 +361,38 @@ func (s *AcquisitionPeerAttester) observeToken(ctx context.Context) (artifact.Di
 	token, e := s.tokens.ReadDownloadPeerToken(ctx)
 	defer clear(token)
 	if e != nil || len(token) == 0 || len(token) > 16<<10 || bytes.IndexAny(token, "\r\n\t ") >= 0 || s.review(ctx, token) != nil {
-		return zero, time.Time{}, time.Time{}, artifact.ErrInvalid
+		return zero, time.Time{}, time.Time{}, time.Time{}, artifact.ErrInvalid
 	}
 	expiry, e := reviewedTokenExpiry(token, s.client.now())
 	if e != nil {
-		return zero, time.Time{}, time.Time{}, artifact.ErrInvalid
+		return zero, time.Time{}, time.Time{}, time.Time{}, artifact.ErrInvalid
 	}
 	if s.live(ctx) != nil || s.review(ctx, token) != nil || s.live(ctx) != nil || s.client.current(ctx, started, 5*time.Second) != nil {
-		return zero, time.Time{}, time.Time{}, artifact.ErrInvalid
+		return zero, time.Time{}, time.Time{}, time.Time{}, artifact.ErrInvalid
 	}
 	until := identity.Earlier(started.Add(5*time.Second), expiry)
 	if !s.client.now().Before(until) {
-		return zero, time.Time{}, time.Time{}, artifact.ErrInvalid
+		return zero, time.Time{}, time.Time{}, time.Time{}, artifact.ErrInvalid
 	}
-	return artifact.Digest(sha256.Sum256(token)), started, until, nil
+	return artifact.Digest(sha256.Sum256(token)), started, until, expiry, nil
+}
+
+func (s *DownloadPeerAttester) ReadNativeResponsePeerProof(ctx context.Context, session string, peer value.KeyPeer) (app.NativeResponsePeerProof, error) {
+	var zero app.NativeResponsePeerProof
+	if s == nil || s.AcquisitionPeerAttester == nil || ctx == nil || ctx.Err() != nil || s.expected.Parent != (value.AcquisitionParent{Purpose: value.AcquisitionDownload, ID: session}) || peer.InstallationID != s.expected.InstallationID || peer.PeerID != s.expected.PodUID || peer.Role != "acquisition" || !peer.Valid(s.client.now()) {
+		return zero, artifact.ErrInvalid
+	}
+	digest, start, until, tokenEnd, err := s.observeTokenDetails(ctx)
+	if err != nil {
+		return zero, err
+	}
+	binding, ok := s.expected.DownloadBinding()
+	if !ok {
+		return zero, artifact.ErrInvalid
+	}
+	result := app.NativeResponsePeerProof{Proof: value.KeyWorkerProof{Binding: binding, Peer: peer, TokenDigest: digest, ObservedAt: start, FreshUntil: identity.Earlier(until, peer.NotAfter)}, TokenNotAfter: tokenEnd}
+	if !result.Valid(s.client.now()) {
+		return zero, artifact.ErrInvalid
+	}
+	return result, nil
 }

@@ -10,6 +10,7 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
@@ -76,8 +77,11 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
+	if intent.RepeatedFrom != nil {
+		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
+	}
 	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.RecorderAssessmentRulesDigest()
-	required, err := s.requireRecordingApproval(ctx, i.Principal.Issuer)
+	required, err := s.requireRecordingApproval(ctx, source, i.Principal)
 	if err != nil {
 		return zero, previewFailure("approvals", err)
 	}
@@ -87,7 +91,16 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	if err != nil {
 		return zero, previewFailure("compile", err)
 	}
-	if !compiler.AcceptableRecorder(plan).Acceptable() {
+	recordable := compiler.AcceptableRecorder(plan).Acceptable()
+	if _, _, policy := authorization.PolicyExecutor(i.Principal); policy {
+		// requireRecordingApproval above already checked the package-private
+		// accepted settings provenance. This structural plan is not a permit:
+		// admission must retain the original reviewed policy grant, and start
+		// must obtain its committed observation receipt for the actual source.
+		_, _, acceptanceErr := compiler.RecordingFor(plan)
+		recordable = acceptanceErr == nil
+	}
+	if !recordable {
 		return zero, errRecordingNotAcceptable
 	}
 	p.CanonicalScope, p.ScopeDigest = slices.Clone(plan.CanonicalScope), plan.ScopeDigest
@@ -131,7 +144,7 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	if !s.Now().Before(until) || ctx.Err() != nil {
 		return zero, previewFailure("response/current", value.ErrUnavailable)
 	}
-	return RecorderPreviewResult{Preview: p.Clone(), Plan: plan, Assessment: assessment, ValidUntil: until, Recordable: true}, nil
+	return RecorderPreviewResult{CollectorImageDigest: f.capability.CollectorImageDigest, ProjectionDigest: f.capability.ProjectionDigest, Preview: p.Clone(), Plan: plan, Assessment: assessment, ValidUntil: until, Recordable: true}, nil
 }
 
 // recordingAssessment checks that the accepted plan still yields the

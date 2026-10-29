@@ -1,6 +1,6 @@
 {
   "name": "get_grant",
-  "description": "Read one approval request or grant (ADR-249): phase, the exact reviewed plan (target, actions, filters, data class and reasons), requester, decision with the approver's authentication context, expiry, revocation and the remaining result-access pool. Visible to its requester and to current approvers of the workload; anyone else is told it is not available.",
+  "description": "Read one approval request or grant: exact reviewed configuration, requester/reviewer, original effective expiry and reservations. Ad hoc grants retain personal capture/result-access scope. Team policy grants show their real workload, policy/executor, finite ceilings and spent grant reservations; no personal capture or evidence access is created. Direct policy lookup permits an eligible requester, current reviewer or exact current pinned team manager; other callers receive not available. Shared policy and admission limits remain independently binding.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -115,7 +115,10 @@
                     "maximum": 3
                   },
                   "kind": {
-                    "const": "adHocCapture"
+                    "enum": [
+                      "adHocCapture",
+                      "policy"
+                    ]
                   },
                   "capture_id": {
                     "type": "string",
@@ -162,14 +165,23 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 253
+                      },
+                      "namespace_uid": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "workload_uid": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
                       }
                     },
                     "required": [
                       "cluster_id",
                       "namespace",
                       "workload_kind",
-                      "workload_name",
-                      "pod_name"
+                      "workload_name"
                     ]
                   },
                   "data_class": {
@@ -195,7 +207,8 @@
                         "code": {
                           "enum": [
                             "rawBytePredicate",
-                            "recordingApprovalRequired"
+                            "recordingApprovalRequired",
+                            "policyCollection"
                           ]
                         }
                       },
@@ -273,8 +286,8 @@
                   },
                   "lifetime_seconds": {
                     "type": "integer",
-                    "minimum": 60,
-                    "maximum": 28800
+                    "minimum": 1,
+                    "maximum": 31536000
                   },
                   "decision": {
                     "type": "object",
@@ -584,9 +597,10 @@
                   "capture_deadline_rule": {
                     "enum": [
                       "previewDeadline",
-                      "acceptanceWithinGrant"
+                      "acceptanceWithinGrant",
+                      "policyAuthority"
                     ],
-                    "description": "Whether the frozen plan uses its preview deadline, or fixes one capture window at acceptance under the original approval expiry."
+                    "description": "Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry."
                   },
                   "capture_window_seconds": {
                     "type": "integer",
@@ -604,6 +618,93 @@
                   "resume_requires_original_client": {
                     "type": "boolean",
                     "description": "Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer."
+                  },
+                  "policy": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "uid": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "executor": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "issuer": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 2048
+                          },
+                          "subject": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          "client_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          }
+                        },
+                        "required": [
+                          "issuer",
+                          "subject",
+                          "client_id"
+                        ]
+                      },
+                      "authority_issued_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "authority_not_after": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "max_executions": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      "executions_used": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "max_collected_bytes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1099511627776
+                      },
+                      "max_observed_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1099511627776
+                      },
+                      "collected_bytes_used": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1099511627776
+                      },
+                      "observed_bytes_used": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1099511627776
+                      }
+                    },
+                    "required": [
+                      "uid",
+                      "executor",
+                      "authority_issued_at",
+                      "authority_not_after",
+                      "max_executions",
+                      "executions_used",
+                      "max_collected_bytes",
+                      "max_observed_bytes",
+                      "collected_bytes_used",
+                      "observed_bytes_used"
+                    ]
                   }
                 },
                 "required": [
@@ -611,8 +712,6 @@
                   "phase",
                   "revision",
                   "kind",
-                  "capture_id",
-                  "preview_id",
                   "execution_digest",
                   "review_digest",
                   "target",
@@ -621,7 +720,6 @@
                   "requested_by",
                   "requested_at",
                   "review_until",
-                  "preview_deadline",
                   "lifetime_seconds",
                   "can_decide",
                   "can_revoke",
@@ -650,6 +748,135 @@
                       "not": {
                         "required": [
                           "capture_window_seconds"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "adHocCapture"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "capture_id",
+                        "preview_id",
+                        "preview_deadline"
+                      ],
+                      "properties": {
+                        "lifetime_seconds": {
+                          "minimum": 60,
+                          "maximum": 28800
+                        },
+                        "target": {
+                          "required": [
+                            "pod_name"
+                          ],
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "namespace_uid"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "workload_uid"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        "capture_deadline_rule": {
+                          "enum": [
+                            "previewDeadline",
+                            "acceptanceWithinGrant"
+                          ]
+                        }
+                      },
+                      "not": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "policy"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "kind": {
+                          "const": "policy"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "policy",
+                        "not_after"
+                      ],
+                      "properties": {
+                        "target": {
+                          "required": [
+                            "namespace_uid",
+                            "workload_uid"
+                          ],
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "pod_name"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        "capture_deadline_rule": {
+                          "const": "policyAuthority"
+                        },
+                        "can_resume": {
+                          "const": false
+                        },
+                        "can_resolve": {
+                          "const": false
+                        },
+                        "resume_requires_original_client": {
+                          "const": false
+                        }
+                      },
+                      "not": {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "capture_id"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "preview_id"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "preview_deadline"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "result_access"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "remaining_bytes"
+                            ]
+                          }
                         ]
                       }
                     }

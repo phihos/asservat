@@ -28,6 +28,8 @@ func TestPublicMetadataReadHasExactExistingReadPrivileges(t *testing.T) {
 		"processing_root", "context_processing", "processing_rule",
 		// ADR-245: read with the permission projection that joins them.
 		"permission_review_source", "permission_review_assignment", "permission_review_decision",
+		// ADR-255: bounded summary state/source cutoff, no custody-copy writes.
+		"capture_history_parameter",
 	} {
 		want = append(want, publicRuntimeGrant{"table", table, "", "SELECT"})
 	}

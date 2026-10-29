@@ -21,7 +21,6 @@ import (
 	containercollection "github.com/inspektor-gadget/inspektor-gadget/pkg/container-collection"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/datasource"
 	gadgetcontext "github.com/inspektor-gadget/inspektor-gadget/pkg/gadget-context"
-	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/logger"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/operators"
 	_ "github.com/inspektor-gadget/inspektor-gadget/pkg/operators/ebpf"
@@ -31,6 +30,7 @@ import (
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/runtime/local"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sys/unix"
 	"oras.land/oras-go/v2/content/memory"
 )
 
@@ -110,11 +110,12 @@ func netns(proc string, pid int) (string, error) {
 // counts the perf reader's lost samples, which the engine reports only as a
 // log line ("reading event: lost %d samples").
 type lossLogger struct {
-	mu    sync.Mutex
-	level logger.Level
-	lost  atomic.Uint64
-	w     io.Writer
-	lines int
+	mu     sync.Mutex
+	level  logger.Level
+	lost   atomic.Uint64
+	w      io.Writer
+	lines  int
+	notice func(InputNotice)
 }
 
 func (l *lossLogger) SetLevel(level logger.Level) { l.mu.Lock(); l.level = level; l.mu.Unlock() }
@@ -126,8 +127,18 @@ func (l *lossLogger) Logf(severity logger.Level, format string, params ...any) {
 	if format == "reading event: lost %d samples" && len(params) == 1 {
 		if n, ok := params[0].(uint64); ok {
 			l.lost.Add(n)
+			if n > 0 && l.notice != nil {
+				l.notice(InputNotice{LostSamples: n})
+			}
 			return
 		}
+	}
+	// Match the pinned tracer's fixed formats, never the provider arguments.
+	// Notice before formatting or the bounded diagnostic log; saturated logging
+	// must not suppress a stop. The callback must not join its own engine.
+	if l.notice != nil && (format == "error reading event: %v" || format == "error processing event: %v") {
+		l.notice(InputNotice{})
+		return
 	}
 	if severity > logger.WarnLevel {
 		return
@@ -151,6 +162,15 @@ func (l *lossLogger) Logf(severity logger.Level, format string, params ...any) {
 // (internal/adapters/packets), so the kernel never runs a second compiler's
 // output (S2).
 func CapturePackets(ctx context.Context, podUID string, snaplen int, deliver func(Frame)) (CaptureStats, error) {
+	return CaptureObservedPackets(ctx, podUID, snaplen, deliver, nil)
+}
+
+// CaptureObservedPackets adds input-gap notifications for metered capture.
+// Notifications and packet delivery are serialized. A non-nil notice callback
+// additionally requires the complete requested prefix and decoded input fields;
+// ordinary CapturePackets retains its existing behavior. This does not itself
+// authorize collection or implement a meter.
+func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, deliver func(Frame), notice func(InputNotice)) (CaptureStats, error) {
 	var stats CaptureStats
 	if snaplen <= 0 || snaplen > 1500 || deliver == nil {
 		return stats, ErrEngineUnavailable
@@ -174,9 +194,16 @@ func CapturePackets(ctx context.Context, podUID string, snaplen int, deliver fun
 	if err != nil {
 		return stats, err
 	}
-	log := &lossLogger{level: logger.WarnLevel, w: os.Stderr}
-	var attachErr error
+	clock, err := newPacketClock(time.Now, readPacketMonotonic)
+	if err != nil {
+		return stats, ErrEngineUnavailable
+	}
 	var delivered sync.Mutex
+	log := &lossLogger{level: logger.WarnLevel, w: os.Stderr}
+	if notice != nil {
+		log.notice = func(n InputNotice) { delivered.Lock(); defer delivered.Unlock(); notice(n) }
+	}
+	var attachErr error
 	capture := simple.New("asservat",
 		simple.WithPriority(10000),
 		simple.OnInit(func(gadgetCtx operators.GadgetContext) error {
@@ -189,15 +216,19 @@ func CapturePackets(ctx context.Context, podUID string, snaplen int, deliver fun
 				return ErrEngineUnavailable
 			}
 			return ds.Subscribe(func(_ datasource.DataSource, data datasource.Data) error {
-				b, err := payload.Bytes(data)
-				if err != nil {
+				b, payloadErr := payload.Bytes(data)
+				wire, wireErr := size.Uint32(data)
+				ts, timeErr := raw.Uint64(data)
+				delivered.Lock()
+				defer delivered.Unlock()
+				if notice != nil && (payloadErr != nil || wireErr != nil || timeErr != nil || !completePrefix(len(b), wire, snaplen)) {
+					notice(InputNotice{})
 					return nil
 				}
-				wire, _ := size.Uint32(data)
-				ts, _ := raw.Uint64(data)
-				delivered.Lock()
-				deliver(Frame{Data: b, Wire: wire, At: time.Unix(0, int64(gadgets.WallTimeFromBootTime(ts))).UTC()})
-				delivered.Unlock()
+				if payloadErr != nil {
+					return nil
+				}
+				clock.deliver(b, wire, ts, notice, deliver)
 				return nil
 			}, 10000)
 		}),
@@ -245,6 +276,13 @@ func CapturePackets(ctx context.Context, podUID string, snaplen int, deliver fun
 	defer runtime.Close()
 	err = runtime.RunGadget(gadgetCtx, nil, map[string]string{"operator.oci.ebpf.snaplen": strconv.Itoa(snaplen)})
 	stats.LostSamples = log.lost.Load()
+	delivered.Lock()
+	invalidTime := clock.invalid
+	delivered.Unlock()
+	if invalidTime {
+		return stats, ErrEngineUnavailable
+	}
+
 	if attachErr != nil {
 		return stats, attachErr
 	}
@@ -252,4 +290,12 @@ func CapturePackets(ctx context.Context, podUID string, snaplen int, deliver fun
 		return stats, fmt.Errorf("running the packet gadget: %w", err)
 	}
 	return stats, nil
+}
+
+func readPacketMonotonic() (int64, error) {
+	var t unix.Timespec
+	if err := unix.ClockGettime(unix.CLOCK_MONOTONIC, &t); err != nil {
+		return 0, err
+	}
+	return packetMonotonicNanos(int64(t.Sec), int64(t.Nsec))
 }

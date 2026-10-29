@@ -56,6 +56,18 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 		if err != nil {
 			return value.ErrDenied
 		}
+		if q.After != nil && q.After.Target != (authorization.Target{}) && q.After.Target != q.Target {
+			return value.ErrInvalid
+		}
+		if q.After != nil && q.After.AuthorizationRevision != (identity.Revision{}) && q.After.AuthorizationRevision != projection.Revision {
+			return value.ErrInvalid
+		}
+		if q.SnapshotBefore.IsZero() {
+			q.SnapshotBefore = first.Time
+		}
+		if q.SnapshotBefore.After(first.Time) {
+			return value.ErrInvalid
+		}
 		n, err := tx.CurrentTime(ctx)
 		if err != nil {
 			return err
@@ -67,7 +79,7 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 			return value.ErrDenied
 		}
 		until := identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(scope.ValidUntil, q.Recovery.FreshUntil))
-		params := custodydb.ListCaptureHistoryParams{RootID: id(s.root), ClusterID: id(q.Target.ClusterID), NamespaceUid: q.Target.NamespaceUID, WorkloadUid: q.Target.WorkloadUID, Origins: origins, NotBefore: ts(first.Time.Add(-value.HistoryLifetime)), PageLimit: value.HistoryScan}
+		params := custodydb.ListCaptureHistoryParams{SelectorKey: q.SelectorKey[:], SnapshotBefore: ts(q.SnapshotBefore), RootID: id(s.root), ClusterID: id(q.Target.ClusterID), NamespaceUid: q.Target.NamespaceUID, WorkloadUid: q.Target.WorkloadUID, Origins: origins, NotBefore: ts(first.Time.Add(-value.HistoryLifetime)), PageLimit: value.HistoryScan}
 		if q.After != nil {
 			params.AfterAt, params.AfterID = ts(q.After.AcceptedAt), id(q.After.CaptureID)
 		}
@@ -76,6 +88,7 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 			return err
 		}
 		var visible []custodydb.ContextCapture
+		actors := map[pgtype.UUID]identity.Principal{}
 		scanned := 0
 		for _, c := range rows {
 			scanned++
@@ -101,6 +114,7 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 			}
 			until = identity.Earlier(until, e.ValidUntil)
 			visible = append(visible, c)
+			actors[c.ID] = intent.Actor
 			if len(visible) == q.Limit {
 				break
 			}
@@ -109,10 +123,13 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 			last := rows[scanned-1]
 			out.Next = &value.HistoryCursor{AcceptedAt: last.CreatedAt.Time.UTC(), CaptureID: uid(last.ID)}
 		}
-		out.Entries, err = historyEntries(ctx, tx, s.root, visible, n.Time)
+		out.Entries, err = historyEntries(ctx, tx, s.root, visible, actors, n.Time)
 		if err != nil {
 			return err
 		}
+		out.Target = q.Target
+		out.SnapshotBefore = q.SnapshotBefore
+		out.AuthorizationRevision = projection.Revision
 		out.ObservedAt, out.ValidUntil = first.Time, until
 		if err = s.recovery.check(ctx, tx, recovery, s.root, q.Recovery); err != nil {
 			return err
@@ -146,7 +163,7 @@ func historyInputAt(a, b time.Time) time.Time {
 // historyEntries derives each visible capture's phase exactly as get_capture
 // does, from one snapshot of its custody, verification, publication and API
 // execution facts.
-func historyEntries(ctx context.Context, tx *custodydb.Queries, root string, visible []custodydb.ContextCapture, now time.Time) ([]value.HistoryEntry, error) {
+func historyEntries(ctx context.Context, tx *custodydb.Queries, root string, visible []custodydb.ContextCapture, actors map[pgtype.UUID]identity.Principal, now time.Time) ([]value.HistoryEntry, error) {
 	out := make([]value.HistoryEntry, 0, len(visible))
 	if len(visible) == 0 {
 		return out, nil
@@ -193,7 +210,31 @@ func historyEntries(ctx context.Context, tx *custodydb.Queries, root string, vis
 			return nil, err
 		}
 		accepted.CreatedAt = accepted.CreatedAt.UTC()
-		out = append(out, value.HistoryEntry{CaptureID: uid(c.ID), Origin: value.HistoryOrigin(c.HistoryOrigin.String), AcceptedAt: accepted.CreatedAt, ExpiresAt: accepted.CreatedAt.Add(value.HistoryLifetime), Phase: p.Phase, EvidenceState: value.HistoryEvidenceState(p.Phase, f.EffectiveExpiresAt.Time, now)})
+		entry := value.HistoryEntry{Requester: actors[c.ID], CaptureID: uid(c.ID), Origin: value.HistoryOrigin(c.HistoryOrigin.String), AcceptedAt: accepted.CreatedAt, ExpiresAt: accepted.CreatedAt.Add(value.HistoryLifetime), Phase: p.Phase, EvidenceState: value.HistoryEvidenceState(p.Phase, f.EffectiveExpiresAt.Time, now), ActionKinds: []string{accepted.Expectation.Type().EvidenceType}, RepeatState: "available", SettingsExpiresAt: accepted.CreatedAt.Add(value.HistoryLifetime)}
+		// Native evidence types differ from recipe action kinds.
+		if accepted.Expectation.Recording == nil {
+			entry.ActionKinds = []string{"kubernetesSnapshot"}
+		} else {
+			entry.ActionKinds = []string{"packetCapture"}
+		}
+		if c.HistoryParametersRequired {
+			if !f.HistoryVisible.Bool || !now.Before(f.HistorySummaryExpires.Time) {
+				continue
+			}
+			entry.ExpiresAt = f.HistorySummaryExpires.Time
+			entry.SettingsExpiresAt = identity.Earlier(entry.ExpiresAt, f.HistorySettingsExpires.Time)
+			if !now.Before(entry.SettingsExpiresAt) {
+				entry.RepeatState = "parametersExpired"
+			} else if f.HistoryParametersState.String != "available" || f.HistoryCustodyState.String != artifact.StoredUnpublished {
+				entry.RepeatState = "parametersUnavailable"
+			} else if entry.Origin == value.HistoryPolicy {
+				entry.RepeatState = "requiresSelection"
+			}
+		}
+		if c.RepeatedFromCaptureID.Valid && now.Before(c.RepeatedFromExpiresAt.Time) {
+			entry.RepeatedFrom = uid(c.RepeatedFromCaptureID)
+		}
+		out = append(out, entry)
 	}
 	return out, nil
 }
@@ -252,6 +293,9 @@ func (s *ContextProgressReads) ReadCaptureSettings(ctx context.Context, q value.
 		}
 		if err != nil {
 			return err
+		}
+		if c.HistoryParametersRequired {
+			return value.ErrSettingsUnavailable
 		}
 		accepted, err := admittedRecord(c)
 		if err != nil {

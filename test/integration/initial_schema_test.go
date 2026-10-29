@@ -203,6 +203,27 @@ func TestInitialSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("hostile grant cleanup unavailable")
 		}
 	})
+	// Both catalog order extremes must be observed, including an unknown
+	// relation after all 130 permanent schema-102 relations (the overflow row).
+	for _, table := range []string{"aaa_unknown_initial_relation", "zzz_unknown_initial_relation"} {
+		if !t.Run("reject-unknown-relation-"+table, func(t *testing.T) {
+			name := pgx.Identifier{"public", table}.Sanitize()
+			if _, err := sqlAdmin.Exec(ctx, "CREATE TABLE "+name+"(id integer)"); err != nil {
+				t.Fatal("unknown relation fault unavailable", err)
+			}
+			if err := s.Run(ctx); err == nil {
+				t.Error("unknown relation accepted")
+			}
+			if _, err := sqlAdmin.Exec(ctx, "DROP TABLE "+name); err != nil {
+				t.Fatal("unknown relation fault cleanup unavailable", err)
+			}
+			if err := s.Run(ctx); err != nil {
+				t.Fatal("exact inventory replay unavailable after repair", err)
+			}
+		}) {
+			t.Fatal("unknown relation prerequisite failed; dependent checks not executed")
+		}
+	}
 	// These independently mutate the actual catalog shape; completed replay
 	// must reject them without repairing the trusted schema on the caller's behalf.
 	for _, fault := range []struct{ name, apply, restore string }{

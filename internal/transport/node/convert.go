@@ -132,6 +132,9 @@ func WireWork(w collector.Work) contracts.NodeWork {
 		if p.ProgramDigest != ([32]byte{}) {
 			c.ProgramDigest = hex.EncodeToString(p.ProgramDigest[:])
 		}
+		if p.Observation != nil {
+			c.Observation = wireObservation(*p.Observation)
+		}
 		out.PacketCapture = c
 	}
 	return out
@@ -175,6 +178,16 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 			return out, true
 		}
 		p.ProgramDigest = d
+		if c.Observation != nil {
+			permit, valid := domainObservation(c.Observation)
+			if !valid {
+				out.Packet = &collector.PacketCapture{}
+				return out, true
+			}
+			p.Observation = permit
+			// Preserve the original finite cutoff exactly; metadata keeps its legacy normalization.
+			out.NotAfter = w.NotAfter.UTC()
+		}
 		out.Packet = p
 	}
 	return out, true

@@ -45,6 +45,26 @@ func TestPolicyExecutorCaptureEligibilityUsesTeamAuthority(t *testing.T) {
 	}
 }
 
+func TestPacketPolicyCaptureEligibilityKeepsCurrentTeamAndAudience(t *testing.T) {
+	i, a, p, target, now := policyCaptureFixture()
+	a.Actions = []string{"packetCapture"}
+	a.Creator.Subject = "departed-creator"
+	i = PolicyExecutorIdentity(a, now, now.Add(20*time.Second))
+	e := PolicyContextEligibility(i, a, p, target, now)
+	if !e.Eligible || e.Principal != a.Executor || len(e.DefaultAudience) != 2 || len(e.ContributingAssignments) != 1 || e.ContributingAssignments[0] != a.Owners[0] {
+		t.Fatal("accepted packet policy lost team authority or actual audience", e)
+	}
+	for _, member := range e.DefaultAudience {
+		if member.SubjectID == a.Creator.Subject || member.Kind == "Workload" {
+			t.Fatal("policy/creator invented evidence audience", member)
+		}
+	}
+	p.Permissions.Denies = []CurrentAssignment{p.Permissions.Allows[0]}
+	if PolicyContextEligibility(i, a, p, target, now).Eligible {
+		t.Fatal("packet policy ignored current sponsoring-team deny")
+	}
+}
+
 func TestPolicyExecutorCaptureEligibilityFailsClosed(t *testing.T) {
 	for _, name := range []string{"sponsor-denied", "executor-denied", "sponsor-removed", "envelope-expired", "binding-expired", "executions-exceed-envelope", "action-not-delegated", "envelope-drops-action", "other-identity", "other-scope", "stale-delegation", "expired-identity", "no-readers"} {
 		t.Run(name, func(t *testing.T) {
@@ -66,7 +86,7 @@ func TestPolicyExecutorCaptureEligibilityFailsClosed(t *testing.T) {
 			case "executions-exceed-envelope":
 				p.Envelope.MaxExecutions = a.Limits.MaxExecutions - 1
 			case "action-not-delegated":
-				a.Actions = []string{"packetCapture"}
+				a.Actions = []string{"logs"}
 			case "envelope-drops-action":
 				p.Envelope.AllowedActions = []string{"packetCapture"}
 			case "other-identity":

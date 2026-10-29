@@ -462,6 +462,16 @@ func (s *ContextDeletions) FinalizeContextDeletion(ctx context.Context, r value.
 		if err = q.MarkDeleted(ctx, custodydb.MarkDeletedParams{ID: row.ID, DeletedAt: n}); err != nil {
 			return err
 		}
+		// ADR-261: one finite child at most. The database trigger additionally
+		// requires this transaction's acknowledged finalization and elapsed lease.
+		// Deletion never refunds the original grant/accepted observation counters.
+		retired, err := q.RetirePolicyObservation(ctx, custodydb.RetirePolicyObservationParams{RootID: id(s.root), CaptureID: id(r.CaptureID)})
+		if err != nil {
+			return err
+		}
+		if retired > 1 {
+			return app.ErrFence
+		}
 		return q.InsertEvent(ctx, custodydb.InsertEventParams{AttemptID: row.ID, Phase: "deleted"})
 	})
 }

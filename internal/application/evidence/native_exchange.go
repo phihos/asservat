@@ -17,6 +17,13 @@ import (
 type NativeOperationReader interface {
 	ObserveNativeOperation(context.Context, value.NativeReference, value.KeyPeer) (value.NativeLease, error)
 }
+
+// NativeOperationRenewer advances only an already admitted response owner
+// after the response has obtained a newer current delivery lease.
+type NativeOperationRenewer interface {
+	RenewNativeOperation(context.Context, value.NativeReference, artifact.DownloadAuthority, value.KeyPeer) (value.NativeLease, error)
+}
+
 type NativeOperations interface {
 	NativeOperationReader
 	ClaimNativeOperation(context.Context, value.WorkerEnrollment, artifact.DownloadAuthority, value.NativeOperation) (value.NativeOperation, error)
@@ -101,13 +108,13 @@ func NewNativeFrameGate(parent context.Context, check NativeCurrentCheck, now fu
 
 // gateUntil bounds a conversation from its first complete check. Approved
 // projection reads span their whole operation (at most the evidence-read
-// window): their 5 s observations must be current at every frame check but no
-// longer end the conversation. Other kinds keep the five-second lease.
+// window). Responses also have a fixed conversation interval, while every
+// returned response observation retains its own shorter validity.
 func gateUntil(started time.Time, l value.NativeLease) time.Time {
-	return identity.Earlier(started.Add(value.NativeLeaseWindow(l.Operation.Kind)), gateCeiling(l))
+	return identity.Earlier(started.Add(value.NativeConversationWindow(l.Operation.Kind)), gateCeiling(l))
 }
 func gateCeiling(l value.NativeLease) time.Time {
-	if l.Operation.Kind == value.NativeProjection {
+	if l.Operation.Kind == value.NativeProjection || l.Operation.Kind == value.NativeResponse {
 		return l.Operation.Until
 	}
 	return l.Until
@@ -177,7 +184,7 @@ func (g *NativeFrameGate) Check(ctx context.Context) (value.NativeLease, error) 
 	join()
 	stop()
 	g.mu.Lock()
-	valid := err == nil && callErr == nil && !g.closed && g.ctx.Err() == nil && l.Valid(g.now()) && l.Operation.CurrentValid(g.now()) && sameNativeOperation(l.Operation, g.lease.Operation) && l.Certificate == g.lease.Certificate && l.Sequence == g.lease.Sequence
+	valid := err == nil && callErr == nil && !g.closed && g.ctx.Err() == nil && l.Valid(g.now()) && l.Operation.CurrentValid(g.now()) && sameNativeOperation(l.Operation, g.lease.Operation) && l.Certificate == g.lease.Certificate && (l.Sequence == g.lease.Sequence || l.Operation.Kind == value.NativeResponse && l.Sequence > g.lease.Sequence)
 	if valid {
 		end := identity.Earlier(g.until, gateCeiling(l))
 		if end.Before(g.until) {
@@ -187,8 +194,24 @@ func (g *NativeFrameGate) Check(ctx context.Context) (value.NativeLease, error) 
 			}
 			g.timer = time.AfterFunc(time.Until(end), g.Close)
 		}
-		l.Until = g.until
+		if l.Operation.Kind == value.NativeResponse {
+			l.Until = identity.Earlier(l.Until, g.until)
+		} else {
+			l.Until = g.until
+		}
+		if l.Operation.Kind == value.NativeResponse && l.Sequence == g.lease.Sequence && l.ObservedAt.Before(g.lease.ObservedAt) {
+			// A lagging observation of the same lease cannot undo a known
+			// restrictive cutoff. A higher sequence remains a new observation.
+			l.Until = identity.Earlier(l.Until, g.lease.Until)
+		}
 		valid = l.Valid(g.now()) && g.now().Before(g.until)
+		if valid && l.Operation.Kind == value.NativeResponse {
+			if l.Sequence > g.lease.Sequence || !l.ObservedAt.Before(g.lease.ObservedAt) {
+				g.lease = l
+			} else {
+				g.lease.Until = l.Until
+			}
+		}
 	}
 	g.mu.Unlock()
 	if !valid {
@@ -220,7 +243,11 @@ func (g *NativeFrameGate) TerminalLease(ctx context.Context) (value.NativeLease,
 		return value.NativeLease{}, artifact.ErrDownloadUnavailable
 	}
 	l := g.lease
-	l.Until = g.until
+	if l.Operation.Kind == value.NativeResponse {
+		l.Until = identity.Earlier(l.Until, g.until)
+	} else {
+		l.Until = g.until
+	}
 	if !l.Valid(g.now()) {
 		return value.NativeLease{}, artifact.ErrDownloadUnavailable
 	}

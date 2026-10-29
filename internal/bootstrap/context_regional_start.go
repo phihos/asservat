@@ -15,9 +15,11 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/authorization"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/collector"
 	execution "asservat.local/asservat/internal/domain/execution"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/contextstart"
 )
 
@@ -113,6 +115,15 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	attachment, e := s.Router.Attach(call, target.ClusterID, id)
 	auditapp.MarkStep(ctx, "st-attach", mark)
 	if e != nil {
+		if s.Report != nil {
+			reason := "unavailable"
+			if errors.Is(e, fleetvalue.ErrCapacity) {
+				reason = "capacity"
+			} else if errors.Is(e, fleetvalue.ErrInvalid) {
+				reason = "invalid"
+			}
+			s.Report("attach (" + reason + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
+		}
 		return notStarted
 	}
 	defer attachment.Close()
@@ -253,6 +264,18 @@ func (p gatedPreparer) PrepareAPIExecution(ctx context.Context, c executionapp.A
 		p.gate.rolledBack()
 	}
 	return r, first, err
+}
+
+func (p gatedPreparer) PreparePolicyRecording(ctx context.Context, c executionapp.APIExecutionCheck, source targets.PacketSourceObservation) (execution.APIExecution, bool, collector.ObservationPermit, error) {
+	preparer, ok := p.APIExecutionPreparer.(executionapp.PolicyRecordingPreparer)
+	if !ok || !p.gate.enter() {
+		return execution.APIExecution{}, false, collector.ObservationPermit{}, errors.Join(execution.ErrUnavailable, execution.ErrNotStarted)
+	}
+	r, first, permit, err := preparer.PreparePolicyRecording(ctx, c, source)
+	if err != nil && errors.Is(err, execution.ErrNotStarted) {
+		p.gate.rolledBack()
+	}
+	return r, first, permit, err
 }
 
 // Diagnostic only: a retained caller deadline is not a fresh start interval.

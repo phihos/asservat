@@ -30,8 +30,9 @@ type ProjectionNativeProofFactory func(DownloadPeerToken) (AcquisitionPeerProofR
 // Connector TLS supplies Peer; the hub separately authenticates the connector
 // before using its exact leaf observation and repeating this Pod/SQL check.
 type NativeOrigin struct {
-	Lease value.NativeLease
-	Proof value.AcquisitionPeerProof
+	Lease    value.NativeLease
+	Proof    value.AcquisitionPeerProof
+	response *nativeResponseAdmission
 }
 type NativeOrigins struct {
 	Locators         NativeLocator
@@ -99,6 +100,9 @@ func (r *NativeRecentObservations) put(k nativeObservationKey, l value.NativeLea
 			delete(r.entries, key)
 		}
 	}
+	if prior, ok := r.entries[k]; ok && prior.lease.Sequence > l.Sequence {
+		return
+	}
 	r.entries[k] = nativeObservation{l, at}
 }
 
@@ -118,6 +122,7 @@ func (s NativeOrigins) CheckAcquisition(ctx context.Context, installation string
 	var p value.AcquisitionPeerProof
 	var l value.NativeLease
 	var e error
+	var responseProof *NativeResponsePeerProof
 	switch parent.Purpose {
 	case value.AcquisitionDownload:
 		if s.Proofs == nil || s.Locators == nil || s.Operations == nil {
@@ -127,7 +132,17 @@ func (s NativeOrigins) CheckAcquisition(ctx context.Context, installation string
 		if err != nil || proofs == nil {
 			return zero, artifact.ErrDownloadUnavailable
 		}
-		original, err := proofs.ReadDownloadPeerProof(call, parent.ID, peer)
+		var original value.KeyWorkerProof
+		if specialized, ok := proofs.(NativeResponseProofReader); ok {
+			result, readErr := specialized.ReadNativeResponsePeerProof(call, parent.ID, peer)
+			if readErr != nil || !result.Valid(s.Now()) {
+				return zero, artifact.ErrDownloadUnavailable
+			}
+			original = result.Proof
+			responseProof = &result
+		} else {
+			original, err = proofs.ReadDownloadPeerProof(call, parent.ID, peer)
+		}
 		if err != nil || !original.Valid(s.Now()) {
 			return zero, artifact.ErrDownloadUnavailable
 		}
@@ -176,11 +191,19 @@ func (s NativeOrigins) CheckAcquisition(ctx context.Context, installation string
 	if !l.Valid(s.Now()) || !p.Valid(s.Now()) || call.Err() != nil {
 		return zero, artifact.ErrDownloadExpired
 	}
-	return NativeOrigin{l, p}, nil
+	origin := NativeOrigin{Lease: l, Proof: p}
+	if l.Operation.Kind == value.NativeResponse {
+		if responseProof == nil || responseProof.Proof.Acquisition() != p || !responseProof.Valid(s.Now()) {
+			return zero, artifact.ErrDownloadUnavailable
+		}
+		origin.response = &nativeResponseAdmission{proof: *responseProof, at: s.Now()}
+	}
+	return origin, nil
 }
 
-// Recheck reuses only the still-current original Pod proof. The SQL/current-peer
-// observation may shorten but never replace its operation or extend its expiry.
+// Recheck retains the exact operation and peer. Responses retain the original
+// admitted Pod identity and independently reviewed token expiry, while every
+// returned SQL/peer observation remains independently short.
 func (s NativeOrigins) Recheck(ctx context.Context, original NativeOrigin) (value.NativeLease, error) {
 	// An approved projection conversation spans its operation: the original
 	// admission's observations bounded only that admission, while this call
@@ -193,11 +216,15 @@ func (s NativeOrigins) Recheck(ctx context.Context, original NativeOrigin) (valu
 	if ctx == nil || s.Now == nil {
 		return value.NativeLease{}, artifact.ErrDownloadUnavailable
 	}
-	if !bound.Valid(s.Now()) {
+	if bound.Operation.Kind != value.NativeResponse && !bound.Valid(s.Now()) || bound.Operation.Kind == value.NativeResponse && (!bound.Operation.CurrentValid(s.Now()) || !s.Now().Before(bound.Operation.Until)) {
 		return value.NativeLease{}, stepped("original-lease", artifact.ErrDownloadUnavailable)
 	}
-	if !original.Proof.Valid(s.Now()) {
-		return value.NativeLease{}, stepped("pod-proof", artifact.ErrDownloadUnavailable)
+	proofUntil, proofErr := s.proofBound(ctx, original)
+	if proofErr != nil {
+		return value.NativeLease{}, stepped("pod-proof", proofErr)
+	}
+	if bound.Operation.Kind == value.NativeResponse {
+		bound.Until = bound.Operation.Until
 	}
 	call, stop := context.WithDeadline(ctx, bound.Until)
 	defer stop()
@@ -228,12 +255,58 @@ func (s NativeOrigins) Recheck(ctx context.Context, original NativeOrigin) (valu
 	if e != nil {
 		return value.NativeLease{}, collapsed("observe", artifact.ErrDownloadUnavailable, e)
 	}
-	if !sameNativeOperation(l.Operation, original.Lease.Operation) || l.Sequence != original.Lease.Sequence || l.Certificate != original.Lease.Certificate {
+	if !sameNativeOperation(l.Operation, original.Lease.Operation) || (l.Sequence != original.Lease.Sequence && !(l.Operation.Kind == value.NativeResponse && l.Sequence > original.Lease.Sequence)) || l.Certificate != original.Lease.Certificate {
 		return value.NativeLease{}, stepped("changed", artifact.ErrDownloadUnavailable)
 	}
-	l.Until = identity.Earlier(l.Until, bound.Until)
-	if !l.Valid(s.Now()) || !original.Proof.Valid(s.Now()) || call.Err() != nil {
+	l.Until = identity.Earlier(l.Until, identity.Earlier(bound.Until, proofUntil))
+	if !l.Valid(s.Now()) || !s.Now().Before(proofUntil) || call.Err() != nil {
 		return value.NativeLease{}, stepped("expired", artifact.ErrDownloadExpired)
 	}
 	return l, nil
+}
+
+// Native response admission retains immutable local facts only, never a token.
+// Every receiving hop obtains these bounds independently from its attester.
+type nativeResponseAdmission struct {
+	proof NativeResponsePeerProof
+	at    time.Time
+}
+
+func (s NativeOrigins) proofBound(ctx context.Context, o NativeOrigin) (time.Time, error) {
+	if ctx == nil || ctx.Err() != nil || s.Now == nil {
+		return time.Time{}, artifact.ErrDownloadUnavailable
+	}
+	if o.Lease.Operation.Kind != value.NativeResponse {
+		if !o.Proof.Valid(s.Now()) {
+			return time.Time{}, artifact.ErrDownloadUnavailable
+		}
+		return o.Proof.FreshUntil, nil
+	}
+	admission := o.response
+	if admission == nil || admission.proof.Proof.Acquisition() != o.Proof || !admission.proof.Valid(admission.at) || admission.at.Before(o.Lease.Operation.StartedAt) || !o.Lease.Operation.CurrentValid(s.Now()) {
+		return time.Time{}, artifact.ErrDownloadUnavailable
+	}
+	until := identity.Earlier(o.Lease.Operation.Until, identity.Earlier(admission.proof.TokenNotAfter, o.Proof.Peer.NotAfter))
+	if !s.Now().Before(until) {
+		return time.Time{}, artifact.ErrDownloadExpired
+	}
+	return until, nil
+}
+
+// JoinNativeObservations combines independently current observations of the
+// same response. A cache may lag the newly acknowledged sequence; it still
+// shortens validity, while a known newer sequence can never move backward.
+func JoinNativeObservations(a, b value.NativeLease, now time.Time) (value.NativeLease, error) {
+	if !a.Valid(now) || !b.Valid(now) || !a.Operation.Equal(b.Operation) || a.Certificate != b.Certificate || (a.Sequence != b.Sequence && a.Operation.Kind != value.NativeResponse) {
+		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	}
+	out := a
+	if b.Sequence > a.Sequence {
+		out = b
+	}
+	out.Until = identity.Earlier(a.Until, b.Until)
+	if !out.Valid(now) {
+		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	}
+	return out, nil
 }

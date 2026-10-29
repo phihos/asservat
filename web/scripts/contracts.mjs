@@ -90,7 +90,7 @@ async function operationBundle(names, bundle) {
     `export declare function ${name}(value: unknown): value is components['schemas']['${key}'];\n`).join('');
 
 }
-await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'resolve_capture_request', 'get_capture', 'list_capture_history'], 'capture');
+await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'resolve_capture_request', 'get_capture', 'list_capture_history', 'get_capture_settings'], 'capture');
 await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
 await operationBundle(['get_file_excerpt', 'get_query_result'], 'projection');
 await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');
@@ -98,7 +98,7 @@ await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_
 await operationBundle(['explain_access'], 'access');
 await operationBundle(['preview_access_change'], 'access-preview');
 await operationBundle(['preview_retention_change'], 'retention-preview');
-await operationBundle(['get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
+await operationBundle(['request_policy_grant', 'get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
 
 // AJV's standalone ESM source references a small fixed set of CommonJS helpers.
 // Explicit ESM imports let Vite bundle them; no browser require/eval is allowed.

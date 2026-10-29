@@ -3434,6 +3434,9 @@
           },
           "profile_composition": {
             "$ref": "#/$defs/d15"
+          },
+          "original_effective_retention": {
+            "$ref": "#/$defs/d8"
           }
         },
         "required": [

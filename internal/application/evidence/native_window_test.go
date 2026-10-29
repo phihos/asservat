@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -15,22 +16,36 @@ import (
 // registrations and releases so a window can be shown to use one conversation.
 type windowNativePorts struct {
 	unusedActiveNativePorts
-	exchange      *windowExchange
-	registrations int
-	releases      int
+	exchange       *windowExchange
+	registrations  int
+	releases       int
+	onRegister     func(NativeExchangeRegistration, func(context.Context, NativeOrigin) (value.NativeLease, error))
+	observation    value.NativeLease
+	nextLease      artifact.DownloadDeliveryLease
+	renewals       int
+	registered     value.NativeOperation
+	normalizeClaim bool
 }
 
 func (p *windowNativePorts) NextNativeFence(context.Context, string) (int64, error) { return 1, nil }
 func (p *windowNativePorts) ClaimNativeOperation(_ context.Context, _ value.WorkerEnrollment, _ artifact.DownloadAuthority, o value.NativeOperation) (value.NativeOperation, error) {
+	if p.normalizeClaim {
+		o.StartedAt = o.StartedAt.UTC().Truncate(time.Microsecond)
+		o.Until = o.Until.UTC().Truncate(time.Microsecond)
+	}
 	return o, nil
 }
 func (p *windowNativePorts) ReleaseNativeOperation(context.Context, value.NativeOperation) error {
 	p.releases++
 	return nil
 }
-func (p *windowNativePorts) RegisterNativeExchange(_ context.Context, r NativeExchangeRegistration, _ func(context.Context, NativeOrigin) error, _ func(context.Context, NativeOrigin) (value.NativeLease, error)) (NativePendingExchange, error) {
+func (p *windowNativePorts) RegisterNativeExchange(_ context.Context, r NativeExchangeRegistration, _ func(context.Context, NativeOrigin) error, check func(context.Context, NativeOrigin) (value.NativeLease, error)) (NativePendingExchange, error) {
 	p.registrations++
+	p.registered = r.Operation
 	p.exchange.delivery = r.Delivery
+	if p.onRegister != nil {
+		p.onRegister(r, check)
+	}
 	return windowPending{p.exchange}, nil
 }
 
@@ -42,11 +57,12 @@ func (windowPending) Close()                                         {}
 // windowExchange serves exact chunks of body inside its delivery window and
 // records the final-sink acknowledgements it receives.
 type windowExchange struct {
-	body     []byte
-	delivery artifact.DownloadDeliveryLease
-	reads    []int64
-	acks     []int64
-	failAck  bool
+	body          []byte
+	delivery      artifact.DownloadDeliveryLease
+	reads         []int64
+	acks          []int64
+	failAck       bool
+	missingCutoff bool
 }
 
 func (e *windowExchange) Commit(context.Context) error { return nil }
@@ -55,14 +71,18 @@ func (e *windowExchange) Prepared(context.Context) (artifact.NativeDownloadMetad
 	return artifact.NativeDownloadMetadata{}, artifact.ErrDownloadUnavailable
 }
 func (e *windowExchange) ReadChunk(_ context.Context, l artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
-	if l != e.delivery || offset+length > int64(len(e.body)) {
+	if !SameNativeWindow(l, e.delivery) || l.Sequence < e.delivery.Sequence || !l.Allows(offset, length, time.Now()) || offset+length > int64(len(e.body)) {
 		return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
 	}
 	e.reads = append(e.reads, offset)
-	return NativeResponseChunk{Bytes: append([]byte(nil), e.body[offset:offset+length]...), FinalVerified: true}, nil
+	until := l.Until
+	if e.missingCutoff {
+		until = time.Time{}
+	}
+	return NativeResponseChunk{Bytes: append([]byte(nil), e.body[offset:offset+length]...), FinalVerified: true, NativeUntil: until}, nil
 }
 func (e *windowExchange) AcknowledgeNativeChunk(_ context.Context, l artifact.DownloadDeliveryLease, offset, length int64) error {
-	if l != e.delivery || e.failAck {
+	if !SameNativeWindow(l, e.delivery) || l.Sequence < e.delivery.Sequence || !l.Allows(offset, length, time.Now()) || e.failAck {
 		return artifact.ErrDownloadUnavailable
 	}
 	e.acks = append(e.acks, offset+length)
@@ -74,11 +94,11 @@ func (e *windowExchange) AcknowledgeNativeChunk(_ context.Context, l artifact.Do
 // the window's last acknowledgement (or a failed one) closes it, and a new
 // lease opens a new conversation.
 func TestRemoteContextSourceServesWindowChunksThroughOneConversation(t *testing.T) {
-	for _, mode := range []string{"complete", "failed-ack"} {
+	for _, mode := range []string{"complete", "failed-ack", "missing-cutoff", "representation-read", "representation-ack"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newActiveEnrollmentFixture(t)
 			body := []byte("0123456789abcdefg") // a 17-byte window read as 10+7
-			ports := &windowNativePorts{exchange: &windowExchange{body: body, failAck: mode == "failed-ack"}}
+			ports := &windowNativePorts{exchange: &windowExchange{body: body, failAck: mode == "failed-ack", missingCutoff: mode == "missing-cutoff"}, normalizeClaim: true}
 			en := *f.lookup.value.Enrollment
 			f.r.config.Native = NativeAttachmentConfig{HubPodUID: en.Worker.Binding.PodUID, HubProcessEpoch: en.Worker.Intent.ID, KeyScope: value.KeyScope{InstallationID: en.Worker.Binding.InstallationID, Purpose: "artifact", KeyID: "synthetic"}, Owners: ports, Fences: ports, Origins: NativeOrigins{Operations: ports, Now: f.r.config.Now}, Registrar: ports, PreparationKeys: ports, WindowKeys: ports}
 			attachment, err := f.r.native(en)
@@ -86,7 +106,9 @@ func TestRemoteContextSourceServesWindowChunksThroughOneConversation(t *testing.
 				t.Fatal(err)
 			}
 			request := ContextDownloadRequest{SessionID: f.f.s.ID, Scope: f.f.s.Scope, Expectation: f.source.Expectation, Copies: f.source.Copies}
-			source, err := NewRemoteContextSource(t.Context(), attachment, request, artifact.DownloadPreparation{SessionID: f.f.s.ID, BatchID: "30000000-0000-4000-8000-000000000001", Generation: 1})
+			owner, stopOwner := context.WithDeadline(t.Context(), time.Now().UTC().Truncate(time.Microsecond).Add(10*time.Second+123*time.Nanosecond))
+			defer stopOwner()
+			source, err := NewRemoteContextSource(owner, attachment, request, artifact.DownloadPreparation{SessionID: f.f.s.ID, BatchID: "30000000-0000-4000-8000-000000000001", Generation: 1})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -102,13 +124,26 @@ func TestRemoteContextSourceServesWindowChunksThroughOneConversation(t *testing.
 				t.Fatal("window opened away from its offset")
 			}
 			first, err := source.ReadChunkCurrent(ctx, f.f, lease, 0, 10)
+			if mode == "missing-cutoff" {
+				if err == nil || ports.releases != 1 {
+					t.Fatal("remote cutoff omitted", err, ports.releases)
+				}
+				return
+			}
+			if end, _ := owner.Deadline(); ports.registered.Until.After(end) {
+				t.Fatal("native operation advertised past original response owner", ports.registered.Until, end)
+			}
 			if err != nil || !bytes.Equal(first.Bytes, body[:10]) {
 				t.Fatal("first chunk", err)
 			}
 			if _, err = source.ReadChunkCurrent(ctx, f.f, lease, 10, 7); err == nil {
 				t.Fatal("next chunk read before the final-sink acknowledgement")
 			}
-			err = source.AcknowledgeNativeChunk(ctx, lease, 0, 10)
+			ackLease := lease
+			if mode == "representation-ack" {
+				ackLease = sameInstantWindowLease(t, lease)
+			}
+			err = source.AcknowledgeNativeChunk(ctx, ackLease, 0, 10)
 			if mode == "failed-ack" {
 				if err == nil || ports.releases != 1 {
 					t.Fatal("failed acknowledgement kept the conversation", err, ports.releases)
@@ -124,11 +159,29 @@ func TestRemoteContextSourceServesWindowChunksThroughOneConversation(t *testing.
 			if _, err = source.ReadChunkCurrent(ctx, f.f, lease, 11, 6); err == nil {
 				t.Fatal("gap admitted")
 			}
-			last, err := source.ReadChunkCurrent(ctx, f.f, lease, 10, 7)
+			readLease := lease
+			if mode == "representation-read" {
+				readLease = sameInstantWindowLease(t, lease)
+			}
+			changed := readLease
+			changed.Authority.Scope.Principal.Subject = "different-scope"
+			if _, err := source.ReadChunkCurrent(ctx, f.f, changed, 10, 7); err == nil {
+				t.Fatal("changed lease scope continued the window")
+			}
+			last, err := source.ReadChunkCurrent(ctx, f.f, readLease, 10, 7)
 			if err != nil || !bytes.Equal(last.Bytes, body[10:]) {
 				t.Fatal("last chunk", err)
 			}
-			if err = source.AcknowledgeNativeChunk(ctx, lease, 10, 7); err != nil {
+			expired := readLease
+			expired.Until = time.Now().Add(-time.Second)
+			if err = source.AcknowledgeNativeChunk(ctx, expired, 10, 7); err == nil {
+				t.Fatal("expired lease acknowledged a chunk")
+			}
+			finalLease := lease
+			if mode == "representation-read" || mode == "representation-ack" {
+				finalLease = sameInstantWindowLease(t, readLease)
+			}
+			if err = source.AcknowledgeNativeChunk(ctx, finalLease, 10, 7); err != nil {
 				t.Fatal("last acknowledgement", err)
 			}
 			if ports.registrations != 1 || ports.releases != 1 || len(ports.exchange.reads) != 2 || len(ports.exchange.acks) != 2 {
@@ -142,6 +195,23 @@ func TestRemoteContextSourceServesWindowChunksThroughOneConversation(t *testing.
 			}
 		})
 	}
+}
+
+func sameInstantWindowLease(t *testing.T, lease artifact.DownloadDeliveryLease) artifact.DownloadDeliveryLease {
+	t.Helper()
+	raw, err := json.Marshal(lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var represented artifact.DownloadDeliveryLease
+	if err := json.Unmarshal(raw, &represented); err != nil {
+		t.Fatal(err)
+	}
+	represented.Until = represented.Until.In(time.FixedZone("same-instant", 3600))
+	if represented == lease || !represented.Until.Equal(lease.Until) || !represented.StartedAt.Equal(lease.StartedAt) || !represented.Valid(time.Now()) {
+		t.Fatal("equivalent lease fixture changed validity or instants")
+	}
+	return represented
 }
 
 // Worker-side window reads: pod status is served from its single checked
@@ -237,3 +307,193 @@ func (s *framedSourceFixture) ReadNext(_ context.Context, offset, length int64) 
 	return append([]byte(nil), s.f.body[offset:offset+length]...), true, nil
 }
 func (*framedSourceFixture) Close() {}
+
+func (p *windowNativePorts) ObserveNativeOperation(context.Context, value.NativeReference, value.KeyPeer) (value.NativeLease, error) {
+	return p.observation, nil
+}
+func (p *windowNativePorts) RenewNativeOperation(_ context.Context, ref value.NativeReference, a artifact.DownloadAuthority, peer value.KeyPeer) (value.NativeLease, error) {
+	p.renewals++
+	if ref != p.observation.Operation.Reference || peer.Certificate != p.observation.Certificate || p.nextLease.Sequence <= p.observation.Sequence {
+		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	}
+	p.observation.Sequence = p.nextLease.Sequence
+	p.observation.ObservedAt = p.nextLease.StartedAt
+	p.observation.Until = p.nextLease.Until
+	p.exchange.delivery = p.nextLease
+	return p.observation, nil
+}
+
+func TestRemoteContextSourceRenewalPreservesCursorAndRejectsDowngrade(t *testing.T) {
+	testNativeResponseRenewal(t, false, false, "complete")
+}
+
+func TestContextNativeResponseRenewalPreservesCursorAndRejectsDowngrade(t *testing.T) {
+	testNativeResponseRenewal(t, true, false, "complete")
+}
+
+func TestContextNativeResponseCheckedRenewalReusesCoordinatorAuthority(t *testing.T) {
+	for _, mode := range []string{"complete", "changed-identity", "cancelled", "expired"} {
+		t.Run(mode, func(t *testing.T) { testNativeResponseRenewal(t, true, true, mode) })
+	}
+}
+
+func testNativeResponseRenewal(t *testing.T, composed, checked bool, mode string) {
+	f := newActiveEnrollmentFixture(t)
+	if composed {
+		f.f.a.ValidUntil = f.f.now.Add(400 * time.Millisecond)
+		f.f.identity.ValidUntil = f.f.a.ValidUntil
+	}
+	body := []byte("0123456789abcdefg")
+	ports := &windowNativePorts{exchange: &windowExchange{body: body}}
+	en := *f.lookup.value.Enrollment
+	peer := value.KeyPeer{InstallationID: en.Worker.Binding.InstallationID, PeerID: en.Worker.Binding.PodUID, Role: "acquisition", Certificate: artifact.Digest{31}, NotBefore: f.f.now.Add(-time.Second), NotAfter: en.Worker.Intent.RunUntil}
+	ports.onRegister = func(r NativeExchangeRegistration, check func(context.Context, NativeOrigin) (value.NativeLease, error)) {
+		ports.observation = value.NativeLease{Operation: r.Operation, Certificate: peer.Certificate, Sequence: r.Delivery.Sequence, ObservedAt: f.f.now, Until: r.Delivery.Until}
+		origin := NativeOrigin{Lease: ports.observation, Proof: value.AcquisitionPeerProof{Binding: en.Worker.Binding.Acquisition(), Peer: peer, TokenDigest: artifact.Digest{1}, ObservedAt: f.f.now, FreshUntil: r.Delivery.Until}}
+		keyProof, _ := origin.Proof.DownloadProof()
+		origin.response = &nativeResponseAdmission{proof: NativeResponsePeerProof{Proof: keyProof, TokenNotAfter: en.Worker.Intent.RunUntil}, at: f.f.now}
+		if _, err := check(t.Context(), origin); err != nil {
+			t.Fatal("synthetic initial current check", err)
+		}
+	}
+	f.r.config.Native = NativeAttachmentConfig{HubPodUID: en.Worker.Binding.PodUID, HubProcessEpoch: en.Worker.Intent.ID, KeyScope: value.KeyScope{InstallationID: en.Worker.Binding.InstallationID, Purpose: "artifact", KeyID: "synthetic"}, Owners: ports, Fences: ports, Origins: NativeOrigins{Operations: ports, Now: f.r.config.Now, Recent: NewNativeRecentObservations()}, Registrar: ports, PreparationKeys: ports, WindowKeys: ports}
+	var source interface {
+		CurrentNativeResponseSource
+		NativeResponseDeliveryAcknowledger
+	}
+	var closeSource func()
+	if composed {
+		f.f.s.State = artifact.DownloadReady
+		f.lookup.value.State = f.f.s.State
+		f.lookup.value.MetadataAttempted = true
+		f.lookup.value.ResponseBusy = true
+		f.lookup.value.Preparation = &artifact.DownloadPreparation{SessionID: f.f.s.ID, BatchID: "30000000-0000-4000-8000-000000000001", Generation: 1}
+		f.r.config.Sources = &downloadControlFixture{source: f.source}
+		outer, err := NewContextNativeResponse(t.Context(), f.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Immutable metadata was verified by preparation. Only its warm cache pin
+		// is synthetic; the window opening, current SQL read, inner source and
+		// renewal are the production composition below.
+		key, err := contextMetadataKey(f.f.s, f.lookup.value, f.f.a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		outer.session, outer.key, outer.described = f.f.s, key, true
+		source, closeSource = outer, outer.Close
+	} else {
+		attachment, err := f.r.native(en)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request := ContextDownloadRequest{SessionID: f.f.s.ID, Scope: f.f.s.Scope, Expectation: f.source.Expectation, Copies: f.source.Copies}
+		inner, err := NewRemoteContextSource(t.Context(), attachment, request, artifact.DownloadPreparation{SessionID: f.f.s.ID, BatchID: "30000000-0000-4000-8000-000000000001", Generation: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		source, closeSource = inner, inner.Close
+	}
+	defer closeSource()
+	read := source.ReadChunkCurrent
+	if checked {
+		read = source.(*ContextNativeResponse).readChunkChecked
+	}
+	id := f.f.s.ID
+	lease := artifact.DownloadDeliveryLease{ResponseID: id, WindowID: id, OwnerID: id, Generation: 1, Sequence: 1, Length: int64(len(body)), StartedAt: f.f.now, Until: f.f.a.ValidUntil, Authority: f.f.a}
+	first, err := read(t.Context(), f.f, lease, 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clear(first.Bytes)
+	if err = source.AcknowledgeNativeChunk(t.Context(), lease, 0, 10); err != nil {
+		t.Fatal(err)
+	}
+	// Refused ownership changes cannot reopen or replace the active cursor.
+	for _, change := range []string{"response", "window", "owner", "generation", "range", "scope"} {
+		foreign := lease
+		switch change {
+		case "response":
+			foreign.ResponseID = "30000000-0000-4000-8000-000000000002"
+		case "window":
+			foreign.WindowID = "30000000-0000-4000-8000-000000000002"
+		case "owner":
+			foreign.OwnerID = "30000000-0000-4000-8000-000000000002"
+		case "generation":
+			foreign.Generation++
+		case "range":
+			foreign.Length--
+		case "scope":
+			foreign.Authority.Scope.Principal.Subject = "replacement"
+		}
+		if _, err := read(t.Context(), f.f, foreign, 10, 7); err == nil {
+			t.Fatal("changed window continued", change)
+		}
+	}
+	next := lease
+	next.Sequence++
+	if composed {
+		if !ports.registered.Until.After(lease.Until) {
+			t.Fatal("native response retained initial observation deadline")
+		}
+		f.f.refresh(time.Now().UTC().Truncate(time.Microsecond))
+		f.f.a.Environment.Processing.ObservedAt = f.f.now
+		f.f.a.Environment.Processing.ValidUntil = f.f.a.ValidUntil
+		next.StartedAt, next.Until, next.Authority = f.f.now, f.f.a.ValidUntil, f.f.a
+	}
+	ports.nextLease = next
+	if mode != "complete" {
+		call, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		switch mode {
+		case "changed-identity":
+			f.f.identity.Policy.Generation++
+		case "cancelled":
+			cancel()
+		case "expired":
+			next.Until = time.Now().Add(-time.Second)
+		default:
+			t.Fatal("unknown test mode")
+		}
+		chunk, err := read(call, f.f, next, 10, 7)
+		if err == nil || len(chunk.Bytes) != 0 || len(ports.exchange.reads) != 1 || ports.renewals != 0 || f.f.count("current-authority") != 0 {
+			t.Fatal("invalid checked renewal disclosed or reconstructed full authority", err, ports.renewals)
+		}
+		return
+	}
+	last, err := read(t.Context(), f.f, next, 10, 7)
+	if err != nil || !bytes.Equal(last.Bytes, body[10:]) {
+		t.Fatal("renewed exact cursor", err, "renewals", ports.renewals)
+	}
+	clear(last.Bytes)
+	if err = source.AcknowledgeNativeChunk(t.Context(), lease, 10, 7); err == nil {
+		t.Fatal("old lease acknowledged renewed chunk")
+	}
+	if composed {
+		// The old setup context and initial delivery lease actually end. Renewed
+		// current authority must keep this exact original cursor alive until ACK.
+		timer := time.NewTimer(time.Until(lease.Until.Add(20 * time.Millisecond)))
+		defer timer.Stop()
+		select {
+		case <-t.Context().Done():
+			t.Fatal(t.Context().Err())
+		case <-timer.C:
+		}
+	}
+	if err = source.AcknowledgeNativeChunk(t.Context(), next, 10, 7); err != nil {
+		t.Fatal(err)
+	}
+	wantAuthorityChecks := 2
+	if composed {
+		wantAuthorityChecks++
+	}
+	if checked {
+		wantAuthorityChecks = 0
+	}
+	if got := f.f.count("current-authority"); got != wantAuthorityChecks {
+		t.Fatalf("full C03 checks=%d want=%d: coordinator handoff repeated authority or direct path bypassed it", got, wantAuthorityChecks)
+	}
+	if ports.registrations != 1 || ports.renewals != 1 || ports.releases != 1 {
+		t.Fatal("renewal reopened/refilled conversation", ports.registrations, ports.renewals, ports.releases)
+	}
+}

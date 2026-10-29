@@ -40,30 +40,63 @@ func NewContextStorageReader(ctx context.Context, pool *pgxpool.Pool, root strin
 
 func contextStorageObservation(row custodydb.ObserveContextStorageRow, root string, target authorization.Target, now time.Time) (app.ContextStorageObservation, error) {
 	var out app.ContextStorageObservation
-	if !authorization.UUID(root) || !target.Valid() || row.AllocationPaused || row.PoolPaused || row.ServiceClass != "context" || len(row.SourceDigest) != 32 || !row.ObservedAt.Valid || !row.FreshUntil.Valid || !row.CapacityUntil.Valid || !now.Before(row.CapacityUntil.Time) || row.CapacityUntil.Time.After(row.FreshUntil.Time) || !row.PoolValidUntil.Valid || !row.AllocationValidUntil.Valid || !now.Before(row.PoolValidUntil.Time) || !now.Before(row.AllocationValidUntil.Time) {
-		return out, value.ErrChanged
+	refuse := func(predicate string, cause error) (app.ContextStorageObservation, error) {
+		return app.ContextStorageObservation{}, contextStorageObservationFailure{predicate: predicate, cause: cause}
+	}
+	if !authorization.UUID(root) || !target.Valid() || row.ServiceClass != "context" || len(row.SourceDigest) != 32 || !row.ObservedAt.Valid || !row.FreshUntil.Valid || !row.CapacityUntil.Valid || !row.PoolValidUntil.Valid || !row.AllocationValidUntil.Valid {
+		return refuse("shape", value.ErrChanged)
+	}
+	if row.PoolPaused || !now.Before(row.PoolValidUntil.Time) {
+		return refuse("pool", value.ErrChanged)
+	}
+	if row.AllocationPaused || !now.Before(row.AllocationValidUntil.Time) {
+		return refuse("allocation", value.ErrChanged)
 	}
 	var d artifact.Digest
 	copy(d[:], row.SourceDigest)
 	b := value.StorageBinding{RootID: uid(row.RootID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, AllocationID: uid(row.AllocationID), Revision: identity.Revision{UID: row.SourceUid, Generation: row.SourceGeneration, Digest: d}, ObservedAt: row.ObservedAt.Time, FreshUntil: row.FreshUntil.Time}
+	selection := value.ContextStorageSelection{StoreID: uid(row.StoreID), AllocationID: b.AllocationID, PoolRevision: row.PoolRevision, AllocationRevision: row.AllocationRevision, BindingRevision: b.Revision}
 	// Validate the original observation before shortening; clamping must not
 	// make a source with an invalid, overlong freshness interval acceptable.
-	if b.RootID != root || !b.Matches(target) || !b.Valid(now) {
-		return out, value.ErrChanged
+	if b.RootID != root || !b.Matches(target) || !b.Valid(b.ObservedAt) || b.ObservedAt.After(now) {
+		return refuse("source", value.ErrChanged)
+	}
+	if !now.Before(b.FreshUntil) {
+		if !selection.Valid() {
+			return refuse("selection", value.ErrChanged)
+		}
+		// Expired metadata identifies the original selection only. The nonnil
+		// error supplies no authority; a later protected read must be current.
+		return app.ContextStorageObservation{Binding: b, Selection: selection}, contextStorageObservationFailure{predicate: "source-expired", cause: value.ErrStorageBindingExpired}
+	}
+	if !now.Before(row.CapacityUntil.Time) || row.CapacityUntil.Time.After(row.FreshUntil.Time) {
+		return refuse("capacity", value.ErrChanged)
 	}
 	controlPool := custodydb.ContextControlPool{RootID: row.RootID, Configured: row.ControlPoolConfigured, Paused: row.ControlPoolPaused, Revision: row.ControlPoolRevision, ValidUntil: row.ControlPoolUntil, FullLimit: row.ControlPoolFull, ReplayLimit: row.ControlPoolReplay, BackedFull: row.BackedFull, BackedReplay: row.BackedReplay}
 	controlAccount := custodydb.ContextControlAccount{RootID: row.RootID, AllocationID: row.AllocationID, Configured: row.ControlAccountConfigured, Paused: row.ControlAccountPaused, Revision: row.ControlAccountRevision, ValidUntil: row.ControlAccountUntil, FullLimit: row.ControlAccountFull, ReplayLimit: row.ControlAccountReplay, ChargedFull: row.ChargedFull, ChargedReplay: row.ChargedReplay}
 	controlUntil, err := controlCapacityDeadline(controlPool, controlAccount, root, b.AllocationID, now)
 	if err != nil {
-		return out, err
+		return refuse("control", err)
 	}
 	b.FreshUntil = identity.Earlier(row.CapacityUntil.Time, identity.Earlier(controlUntil, identity.Earlier(b.FreshUntil, identity.Earlier(row.PoolValidUntil.Time, row.AllocationValidUntil.Time))))
-	out = app.ContextStorageObservation{Binding: b, Selection: value.ContextStorageSelection{StoreID: uid(row.StoreID), AllocationID: b.AllocationID, PoolRevision: row.PoolRevision, AllocationRevision: row.AllocationRevision, BindingRevision: b.Revision}}
+	out = app.ContextStorageObservation{Binding: b, Selection: selection}
 	if !out.Selection.Valid() || !out.Binding.Valid(now) {
-		return app.ContextStorageObservation{}, value.ErrChanged
+		return refuse("selection", value.ErrChanged)
 	}
 	return out, nil
 }
+
+// Only the rejecting predicate survives; it carries no row values or SQL text.
+// Keep the original cause so diagnostics cannot change the public refusal.
+type contextStorageObservationFailure struct {
+	predicate string
+	cause     error
+}
+
+func (e contextStorageObservationFailure) Error() string {
+	return "context storage observation unavailable"
+}
+func (e contextStorageObservationFailure) Unwrap() error { return e.cause }
 
 func (s *ContextStorageReader) ContextStorage(ctx context.Context, target authorization.Target) (app.ContextStorageObservation, error) {
 	var out app.ContextStorageObservation
@@ -93,6 +126,10 @@ func (s *ContextStorageReader) ContextStorage(ctx context.Context, target author
 		out, err = contextStorageObservation(row, s.root, target, now.Time)
 		if err != nil {
 			stage = "observation"
+			var failure contextStorageObservationFailure
+			if errors.As(err, &failure) {
+				stage += "/" + failure.predicate
+			}
 			return err
 		}
 		return ctx.Err()
@@ -103,7 +140,11 @@ func (s *ContextStorageReader) ContextStorage(ctx context.Context, target author
 			// A retry can fail before its callback resets the prior phase.
 			stage = "transaction"
 		}
-		return app.ContextStorageObservation{}, &contextStorageReadFailure{stage: stage, cause: captureError(err)}
+		failure := &contextStorageReadFailure{stage: stage, cause: captureError(err)}
+		if errors.Is(err, value.ErrStorageBindingExpired) {
+			return out, failure
+		}
+		return app.ContextStorageObservation{}, failure
 	}
 	return out, nil
 }

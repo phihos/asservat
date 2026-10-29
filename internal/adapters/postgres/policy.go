@@ -29,6 +29,7 @@ type Policies struct {
 var _ app.PolicySourceWriter = (*Policies)(nil)
 var _ app.PolicyAcceptor = (*Policies)(nil)
 var _ authapp.AcceptedPolicyReader = (*Policies)(nil)
+var _ app.PolicyGrantAcceptanceReader = (*Policies)(nil)
 
 func NewPolicies(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*Policies, error) {
 	guard, err := NewRecoveryTransactionGuard(root, installation)
@@ -42,7 +43,7 @@ func NewPolicies(ctx context.Context, pool *pgxpool.Pool, root, installation str
 	return &Policies{l, root, installation, guard}, nil
 }
 func policySource(row custodydb.PolicySource) value.PolicySource {
-	s := value.PolicySource{InstallationID: uid(row.InstallationID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, Name: row.Name, Revision: identity.Revision{UID: row.PolicyUid, Generation: row.Generation}, ResourceVersion: row.ResourceVersion, ObservedAt: row.ObservedAt.Time.UTC(), FreshUntil: row.FreshUntil.Time.UTC(), Deleted: row.Deleted, Suspended: row.Suspended}
+	s := value.PolicySource{InstallationID: uid(row.InstallationID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, Name: row.Name, Revision: identity.Revision{UID: row.PolicyUid, Generation: row.Generation}, ResourceVersion: row.ResourceVersion, ObservedAt: row.ObservedAt.Time.UTC(), FreshUntil: row.FreshUntil.Time.UTC(), Deleted: row.Deleted, Suspended: row.Suspended, AuthoredGrantRef: row.AuthoredGrantRef}
 	copy(s.Revision.Digest[:], row.SpecDigest)
 	copy(s.CollectionDigest[:], row.CollectionDigest)
 	return s
@@ -69,7 +70,7 @@ func (s *Policies) ObservePolicy(ctx context.Context, in value.PolicySource) err
 		if !in.Valid(now.Time) {
 			return value.ErrChanged
 		}
-		err = q.InsertPolicySource(ctx, custodydb.InsertPolicySourceParams{RootID: id(s.root), PolicyUid: in.Revision.UID, InstallationID: id(s.installation), ClusterID: id(in.ClusterID), NamespaceUid: in.NamespaceUID, Name: in.Name, Generation: in.Revision.Generation, SpecDigest: in.Revision.Digest[:], ResourceVersion: in.ResourceVersion, ObservedAt: ts(in.ObservedAt), FreshUntil: ts(in.FreshUntil), Deleted: in.Deleted, Suspended: in.Suspended, CollectionDigest: in.CollectionDigest[:]})
+		err = q.InsertPolicySource(ctx, custodydb.InsertPolicySourceParams{RootID: id(s.root), PolicyUid: in.Revision.UID, InstallationID: id(s.installation), ClusterID: id(in.ClusterID), NamespaceUid: in.NamespaceUID, Name: in.Name, Generation: in.Revision.Generation, SpecDigest: in.Revision.Digest[:], ResourceVersion: in.ResourceVersion, ObservedAt: ts(in.ObservedAt), FreshUntil: ts(in.FreshUntil), Deleted: in.Deleted, Suspended: in.Suspended, CollectionDigest: in.CollectionDigest[:], AuthoredGrantRef: in.AuthoredGrantRef})
 		if err != nil {
 			return err
 		}
@@ -85,7 +86,7 @@ func (s *Policies) ObservePolicy(ctx context.Context, in value.PolicySource) err
 			if in != old {
 				return value.ErrChanged
 			}
-		} else if err = q.UpdatePolicySource(ctx, custodydb.UpdatePolicySourceParams{RootID: id(s.root), PolicyUid: in.Revision.UID, Generation: in.Revision.Generation, SpecDigest: in.Revision.Digest[:], ResourceVersion: in.ResourceVersion, ObservedAt: ts(in.ObservedAt), FreshUntil: ts(in.FreshUntil), Deleted: in.Deleted, Suspended: in.Suspended, CollectionDigest: in.CollectionDigest[:]}); err != nil {
+		} else if err = q.UpdatePolicySource(ctx, custodydb.UpdatePolicySourceParams{RootID: id(s.root), PolicyUid: in.Revision.UID, Generation: in.Revision.Generation, SpecDigest: in.Revision.Digest[:], ResourceVersion: in.ResourceVersion, ObservedAt: ts(in.ObservedAt), FreshUntil: ts(in.FreshUntil), Deleted: in.Deleted, Suspended: in.Suspended, CollectionDigest: in.CollectionDigest[:], AuthoredGrantRef: in.AuthoredGrantRef}); err != nil {
 			return err
 		}
 		now, err = q.CurrentTime(ctx)
@@ -178,7 +179,13 @@ func (s *Policies) AcceptPolicy(ctx context.Context, in value.PolicyAdmission) (
 		} else if json.Unmarshal(row.CreatorJson, &creator) != nil || creator != in.Authority.Creator {
 			return value.ErrDenied
 		}
-		current, err := automationProjection(ctx, q, stream, s.installation, in.Authority, in.Target)
+		var current authorization.AutomationProjection
+		if in.Workload != nil {
+			target := authorization.Target{ClusterID: in.Workload.ClusterID, NamespaceUID: in.Workload.NamespaceUID, WorkloadUID: in.Workload.WorkloadUID}
+			current, err = automationProjectionFor(ctx, q, stream, s.installation, in.Authority.Delegation, target, nil)
+		} else {
+			current, err = automationProjection(ctx, q, stream, s.installation, in.Authority, in.Target)
+		}
 		if err != nil {
 			return err
 		}
@@ -188,6 +195,12 @@ func (s *Policies) AcceptPolicy(ctx context.Context, in value.PolicyAdmission) (
 		}
 		use := authorization.PolicyUse{PolicyUID: in.Authority.PolicyUID, ScopeDigest: in.Authority.ScopeDigest, Target: in.Target, Purpose: authorization.PolicyIncident}
 		eligibility := authorization.ValidatePolicyAcceptance(in.Author, in.Authority, current, use, now.Time)
+		var workloadScope authorization.WorkloadAutomationProjection
+		if in.Workload != nil {
+			p := current.Permissions
+			workloadScope = authorization.WorkloadAutomationProjection{InstallationID: current.InstallationID, Delegation: current.Delegation, Envelope: current.Envelope, ObservedAt: current.ObservedAt, FreshUntil: current.FreshUntil, NotAfter: current.NotAfter, Disabled: current.Disabled, Permissions: authorization.WorkloadProjection{Target: *in.Workload, Revision: p.Revision, ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil, DeniesComplete: p.DeniesComplete, DeniesObservedAt: p.DeniesObservedAt, DeniesFreshUntil: p.DeniesFreshUntil, Allows: p.Allows, Denies: p.Denies}}
+			eligibility = authorization.ValidatePolicyWorkloadAcceptance(in.Author, in.Authority, workloadScope, now.Time)
+		}
 		if !eligibility.Eligible {
 			return value.ErrDenied
 		}
@@ -200,6 +213,9 @@ func (s *Policies) AcceptPolicy(ctx context.Context, in value.PolicyAdmission) (
 				sponsors = append(sponsors, o.SubjectID)
 			}
 			result, management := authorization.PolicyShareManagement(in.Author, current.Permissions, in.Target, in.Authority.Delegation.UID, sponsors, now.Time)
+			if in.Workload != nil {
+				result, management = authorization.PolicyWorkloadShareManagement(in.Author, workloadScope.Permissions, *in.Workload, in.Authority.Delegation.UID, sponsors, now.Time)
+			}
 			if !result.Eligible || !slices.Equal(management, in.Sharing.Management) || !in.Sharing.NotAfter.After(now.Time) {
 				return value.ErrSharingDenied
 			}
@@ -252,9 +268,18 @@ func (s *Policies) AcceptPolicy(ctx context.Context, in value.PolicyAdmission) (
 }
 
 func (s *Policies) AcceptedPolicyAuthority(ctx context.Context, policy string) (authorization.AcceptedPolicySnapshot, error) {
+	out, _, err := s.AcceptedPolicyRecord(ctx, policy)
+	return out, err
+}
+
+// AcceptedPolicyRecord returns the same current, independently audited team
+// authority with its immutable source provenance for server-side grant planning.
+// It reuses the existing accepted read transaction and role, not a new lookup.
+func (s *Policies) AcceptedPolicyRecord(ctx context.Context, policy string) (authorization.AcceptedPolicySnapshot, value.PolicyAcceptance, error) {
 	var out authorization.AcceptedPolicySnapshot
+	var record value.PolicyAcceptance
 	if !identity.Text(policy, 64) {
-		return out, value.ErrInvalid
+		return out, record, value.ErrInvalid
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		// A restored database never makes accepted authority available until the
@@ -270,13 +295,13 @@ func (s *Policies) AcceptedPolicyAuthority(ctx context.Context, policy string) (
 		if err != nil {
 			return err
 		}
-		out, _, err = acceptedPolicyIn(ctx, q, s.root, s.installation, trust, row)
+		out, record, err = acceptedPolicyIn(ctx, q, s.root, s.installation, trust, row)
 		return err
 	})
 	if err != nil {
-		return authorization.AcceptedPolicySnapshot{}, captureError(err)
+		return authorization.AcceptedPolicySnapshot{}, value.PolicyAcceptance{}, captureError(err)
 	}
-	return out, nil
+	return out, record, nil
 }
 
 // acceptedPolicyIn checks the current acknowledged acceptance of one policy
@@ -318,5 +343,5 @@ func acceptedPolicyIn(ctx context.Context, q *custodydb.Queries, root, installat
 	if now.Time.Before(started) || !source.Valid(now.Time) || !r.Authority.Valid(now.Time) || !now.Time.Before(until) {
 		return zero, value.PolicyAcceptance{}, value.ErrUnavailable
 	}
-	return authorization.AcceptedPolicySnapshot{Authority: r.Authority, ObservedAt: source.ObservedAt, FreshUntil: until, SourceUntil: identity.Earlier(source.FreshUntil, r.Authority.NotAfter)}, r, nil
+	return authorization.AcceptedPolicySnapshot{IntentVersion: r.IntentVersion, SourceRevision: r.Source.Revision, Authority: r.Authority, ObservedAt: source.ObservedAt, FreshUntil: until, SourceUntil: identity.Earlier(source.FreshUntil, r.Authority.NotAfter)}, r, nil
 }

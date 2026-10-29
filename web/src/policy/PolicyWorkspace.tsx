@@ -58,6 +58,50 @@ function occurrence(o: Status['recent'][number]): string {
   return o.detector === 'probe' && o.failed_at ? `probe failure at ${new Date(o.failed_at).toLocaleString()}` : `restart ${o.restarts ?? ''}`;
 }
 
+function PolicyGrantControls({ entry, controller }: { entry: Entry; controller: Policies }) {
+  const s = entry.status!;
+  const [executions, setExecutions] = useState(Math.min(s.max_executions, 10));
+  const [output, setOutput] = useState(Math.min(s.max_collected_bytes, 8 << 20));
+  const [observed, setObserved] = useState(s.max_observed_bytes);
+  const [days, setDays] = useState('');
+  const [seconds, setSeconds] = useState(10);
+  const [rate, setRate] = useState(16 << 20);
+  const [concurrent, setConcurrent] = useState(1);
+  const [grantID, setGrantID] = useState('');
+  return <section aria-label={'Policy approval for ' + entry.name}>
+    <h3>Policy approval</h3>
+    {s.attached_grant_id ? <p>Attached policy grant: <a href={'/approvals/' + s.attached_grant_id}>{s.attached_grant_id}</a>. Current authority, budgets and recorder readiness still apply.</p> : <p>No policy grant is attached.</p>}
+    <p>A different human approver reviews this workload, configuration and finite limits. Approval gives no personal evidence access.</p>
+    <form onSubmit={event => { event.preventDefault(); void controller.requestGrant(entry.name, {
+      limits: { max_executions: executions, max_collected_bytes: output, max_observed_bytes: observed },
+      ...(days ? { lifetime_seconds: Number(days) * 86400 } : {}),
+      ...(observed > 0 ? { observation_limits: { max_session_seconds: seconds, max_observed_bytes: observed, max_bytes_per_second: rate, max_concurrent_sessions: concurrent } } : {}),
+    }); }}>
+      <fieldset disabled={entry.busy || entry.requestPending}>
+        <legend>Approval limits</legend>
+        <label>Maximum executions<input type="number" required min={1} max={s.max_executions} step={1} value={executions} onChange={e => setExecutions(Number(e.target.value))}/></label>
+        <label>Maximum output (bytes)<input type="number" required min={1} max={s.max_collected_bytes} step={1} value={output} onChange={e => setOutput(Number(e.target.value))}/></label>
+        <label>Maximum observed input (bytes)<input type="number" required min={0} max={s.max_observed_bytes} step={1} value={observed} onChange={e => setObserved(Number(e.target.value))}/></label>
+        <label>Approval period (days, optional)<input type="number" min={1} max={365} step={1} value={days} onChange={e => setDays(e.target.value)}/></label>
+        <p>Leave the period empty to use the installation default. The original policy expiry still applies.</p>
+        {observed > 0 && <>
+          <label>Maximum session (seconds)<input type="number" required min={1} max={3600} step={1} value={seconds} onChange={e => setSeconds(Number(e.target.value))}/></label>
+          <label>Maximum input rate (bytes/second)<input type="number" required min={1} max={1 << 30} step={1} value={rate} onChange={e => setRate(Number(e.target.value))}/></label>
+          <label>Maximum concurrent sessions<input type="number" required min={1} max={1000} step={1} value={concurrent} onChange={e => setConcurrent(Number(e.target.value))}/></label>
+        </>}
+      </fieldset>
+      {entry.requestPending && <p>Retry keeps the original request and selected limits.</p>}
+      <Button type="submit" className="button secondary" isDisabled={entry.busy}>{entry.requestPending ? 'Retry approval request' : 'Request policy approval'}</Button>
+    </form>
+    {entry.grant && <p>Approval request recorded. <a href={entry.grant.approval_navigation_uri}>View policy approval</a>.</p>}
+    <form onSubmit={event => { event.preventDefault(); void controller.attachGrant(entry.name, grantID.trim()); }}>
+      <label>Approved policy grant ID<input disabled={entry.busy || !!entry.attachmentPending} required pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" value={grantID} onChange={e => setGrantID(e.target.value)} autoComplete="off" spellCheck={false}/></label>
+      <p>A current team manager can attach the reviewed grant. This keeps the original policy expiry and shared spend.</p>
+      <Button type="submit" className="button secondary" isDisabled={entry.busy}>{entry.attachmentPending ? 'Retry attachment' : 'Attach approved grant'}</Button>
+    </form>
+  </section>;
+}
+
 function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies }) {
   const s = entry.status;
   const active = s?.state === 'active';
@@ -67,13 +111,17 @@ function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies
       <p role="status">{states[s.state] ?? s.state}</p>
       <dl className="facts">
         {s.detector && <><dt>Trigger</dt><dd>{detector(s.detector)}</dd></>}
-        <dt>Executions</dt><dd>{s.executions_spent} of {s.max_executions} used</dd>
+        <dt>Shared policy executions</dt><dd>{s.executions_spent} of {s.max_executions} used</dd>
+        <dt>Shared output reservations</dt><dd>{s.collected_bytes_spent.toLocaleString()} of {s.max_collected_bytes.toLocaleString()} bytes reserved</dd>
+        <dt>Shared observation charges</dt><dd>{s.observed_bytes_spent.toLocaleString()} of {s.max_observed_bytes.toLocaleString()} bytes charged before filtering</dd>
         <dt>Expires</dt><dd>{new Date(s.expires_at).toLocaleString()}</dd>
         <dt>Watched pods</dt><dd>{s.watched_pods}</dd>
         <dt>Occurrences</dt><dd>{s.occurrences}, {s.captured} captured</dd>
         {s.sharing && <><dt>Sharing</dt><dd>{sharing(s.sharing)}</dd></>}
         {s.suppressions.length > 0 && <><dt>Suppressed</dt><dd>{s.suppressions.map(x => `${x.count} × ${reasons[x.reason] ?? x.reason}`).join('; ')}</dd></>}
       </dl>
+      <p>These policy budgets are shared across captures and grants. Reservations and uncertain spend stay charged; they are not measurements of gathered user data. Grant and workload limits may further restrict collection.</p>
+      {s.collection_kind === 'packetCapture' && s.state === 'active' && <PolicyGrantControls entry={entry} controller={controller}/>}
       {s.recent.length > 0 && <ul className="progress-actions" aria-label="Recent occurrences">{s.recent.map(o => <li key={o.occurrence_id}>
         <span>{new Date(o.created_at).toLocaleString()} ({occurrence(o)})</span>
         <span>{o.capture_id ? <a href={'/captures/' + o.capture_id}>View capture</a> : o.outcome}</span>

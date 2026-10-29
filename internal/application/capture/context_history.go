@@ -7,6 +7,7 @@ import (
 
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
@@ -34,6 +35,7 @@ type ContextRepeatPreview interface {
 // assessment is reused.
 type ContextHistoryService struct {
 	RootID, InstallationID string
+	Keys                   HistoryKeys
 	Reader                 ContextHistoryReader
 	Targets                ContextTargets
 	// Workloads resolves a Deployment or StatefulSet to its current object
@@ -119,10 +121,26 @@ func (s ContextHistoryService) List(ctx context.Context, source identities.Curre
 	if err != nil {
 		return zero, err
 	}
-	page, err := s.Reader.ListCaptureHistory(ctx, value.HistoryQuery{RootID: s.RootID, Target: target, Origins: origins, After: after, Limit: limit, Identity: i, Recovery: r})
+	selector := value.HistorySelector{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadKind: ref.Kind, WorkloadUID: target.WorkloadUID}
+	if ref.Kind == "Pod" {
+		selector.WorkloadUID = target.PodUID
+	}
+	var selectorKey artifact.Digest
+	if s.Keys != nil {
+		selectorKey, err = HistorySelectorKey(s.Keys, s.RootID, selector)
+		if err != nil {
+			return zero, err
+		}
+	}
+	snapshot := s.Now().UTC().Truncate(time.Microsecond)
+	if after != nil && !after.SnapshotBefore.IsZero() {
+		snapshot = after.SnapshotBefore
+	}
+	page, err := s.Reader.ListCaptureHistory(ctx, value.HistoryQuery{SelectorKey: selectorKey, SnapshotBefore: snapshot, RootID: s.RootID, Target: target, Origins: origins, After: after, Limit: limit, Identity: i, Recovery: r})
 	if err != nil {
 		return zero, err
 	}
+	page.Target = target
 	until := identity.Earlier(identity.Earlier(page.ValidUntil, i.ValidUntil), identity.Earlier(r.FreshUntil, observedUntil))
 	if page.ValidUntil, err = s.finish(ctx, source, i, until); err != nil {
 		return zero, err
@@ -170,14 +188,61 @@ func (s ContextHistoryService) Settings(ctx context.Context, source identities.C
 // An optional sharing instruction (ADR-235) is the caller's new one; the
 // original capture's sharing is never restored.
 func (s ContextHistoryService) PreviewRepeat(ctx context.Context, source identities.CurrentIdentity, captureID string, sharing *value.ContextSharing) (ContextPreviewResult, value.CaptureSettings, error) {
+	return s.PreviewEditedRepeat(ctx, source, captureID, sharing, value.HistoryRepeatEdits{})
+}
+
+func (s ContextHistoryService) PreviewEditedRepeat(ctx context.Context, source identities.CurrentIdentity, captureID string, sharing *value.ContextSharing, edits value.HistoryRepeatEdits) (ContextPreviewResult, value.CaptureSettings, error) {
 	settings, err := s.Settings(ctx, source, captureID)
 	if err != nil {
 		return ContextPreviewResult{}, value.CaptureSettings{}, err
 	}
+	originalTarget := targets.WorkloadRequest{ClusterID: settings.ClusterID, Namespace: settings.Namespace, Kind: settings.WorkloadKind, Name: settings.WorkloadName}
+	if edits.Target != nil && *edits.Target != originalTarget {
+		return ContextPreviewResult{}, value.CaptureSettings{}, value.ErrInvalid
+	}
+	if edits.Selection != "" && edits.Selection != "currentEligiblePod" {
+		return ContextPreviewResult{}, value.CaptureSettings{}, value.ErrInvalid
+	}
+	if settings.Selection == "triggeringPod" && edits.Selection != "currentEligiblePod" {
+		return ContextPreviewResult{}, value.CaptureSettings{}, value.ErrHistorySelectionRequired
+	}
 	intent := value.ContextIntent{Target: targets.WorkloadRequest{ClusterID: settings.ClusterID, Namespace: settings.Namespace, Kind: settings.WorkloadKind, Name: settings.WorkloadName}, Diagnostic: value.ContextDiagnosticName, RequestedSeconds: settings.RequestedSeconds, Sharing: sharing}
-	result, err := s.Previews.PreviewRepeat(ctx, source, intent, authorization.Target{ClusterID: settings.ClusterID, NamespaceUID: settings.NamespaceUID, WorkloadUID: settings.WorkloadUID})
+	if settings.Composition != nil {
+		intent.Diagnostic = ""
+		intent.Composition = settings.Composition.Clone()
+	}
+	if edits.Composition != nil {
+		if settings.Composition == nil {
+			return ContextPreviewResult{}, value.CaptureSettings{}, value.ErrInvalid
+		}
+		intent.Composition = edits.Composition.Clone()
+	}
+	if edits.RequestedSeconds > 0 {
+		intent.RequestedSeconds = edits.RequestedSeconds
+	}
+	intent.RepeatedFrom = &value.HistoryLineage{CaptureID: captureID, ExpiresAt: settings.ExpiresAt.UTC().Truncate(time.Microsecond)}
+	if settings.Composition != nil {
+		previews, ok := s.Previews.(interface {
+			PreviewCompositionRepeat(context.Context, identities.CurrentIdentity, value.ContextIntent, authorization.Target) (RecorderPreviewResult, error)
+		})
+		if !ok {
+			return ContextPreviewResult{}, value.CaptureSettings{}, value.ErrSettingsUnavailable
+		}
+		recorder, e := previews.PreviewCompositionRepeat(ctx, source, intent, authorization.Target{ClusterID: settings.ClusterID, NamespaceUID: settings.NamespaceUID, WorkloadUID: settings.WorkloadUID, PodUID: settings.ExplicitPodUID})
+		if e != nil {
+			return ContextPreviewResult{}, value.CaptureSettings{}, e
+		}
+		if !historyDependenciesMatch(settings, recorder.CollectorImageDigest, recorder.ProjectionDigest, recorder.Plan.Profiles) || !historyFiltersMatch(settings.FrozenFilters, recorder.Plan.CanonicalScope, edits.Composition != nil) {
+			return ContextPreviewResult{}, value.CaptureSettings{}, value.ErrProfileChanged
+		}
+		return ContextPreviewResult{Preview: recorder.Preview, ValidUntil: recorder.ValidUntil, Recorder: &recorder}, settings, nil
+	}
+	result, err := s.Previews.PreviewRepeat(ctx, source, intent, authorization.Target{ClusterID: settings.ClusterID, NamespaceUID: settings.NamespaceUID, WorkloadUID: settings.WorkloadUID, PodUID: settings.ExplicitPodUID})
 	if err != nil {
 		return ContextPreviewResult{}, value.CaptureSettings{}, err
+	}
+	if !historyDependenciesMatch(settings, result.CollectorImageDigest, result.ProjectionDigest, nil) {
+		return ContextPreviewResult{}, value.CaptureSettings{}, value.ErrProfileChanged
 	}
 	return result, settings, nil
 }

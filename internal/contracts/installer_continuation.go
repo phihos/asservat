@@ -66,17 +66,18 @@ type InstallerContinuation struct {
 // InstallerPublicSettings become the browser and identity settings
 // ConfigMaps. Revisions, the browser root and the session epoch are generated.
 type InstallerPublicSettings struct {
-	Origin             string            `json:"origin"`
-	Issuer             string            `json:"issuer"`
-	ClientID           string            `json:"clientID"`
-	MaxLifetimeSeconds int               `json:"maxLifetimeSeconds"`
-	MaxLogins          int               `json:"maxLogins"`
-	MaxSessions        int               `json:"maxSessions"`
-	MaxLogoutEvents    int               `json:"maxLogoutEvents"`
-	Clients            []IdentityClient  `json:"clients"`
-	EligibleSubjects   []IdentitySubject `json:"eligibleSubjects"`
-	EligibleGroups     []string          `json:"eligibleGroups"`
-	GroupMaxAgeSeconds int               `json:"groupMaxAgeSeconds"`
+	CaptureHistory     *CaptureHistoryLimits `json:"captureHistory,omitempty"`
+	Origin             string                `json:"origin"`
+	Issuer             string                `json:"issuer"`
+	ClientID           string                `json:"clientID"`
+	MaxLifetimeSeconds int                   `json:"maxLifetimeSeconds"`
+	MaxLogins          int                   `json:"maxLogins"`
+	MaxSessions        int                   `json:"maxSessions"`
+	MaxLogoutEvents    int                   `json:"maxLogoutEvents"`
+	Clients            []IdentityClient      `json:"clients"`
+	EligibleSubjects   []IdentitySubject     `json:"eligibleSubjects"`
+	EligibleGroups     []string              `json:"eligibleGroups"`
+	GroupMaxAgeSeconds int                   `json:"groupMaxAgeSeconds"`
 	// Approvals passes protected step-up and manual-recording policy unchanged.
 	Approvals *IdentityApprovals `json:"approvals,omitempty"`
 	// PermissionDelegations are the trusted delegated AccessBinding writers

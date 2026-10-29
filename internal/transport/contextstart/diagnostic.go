@@ -2,15 +2,18 @@ package contextstart
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"os"
 	"sync/atomic"
+	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	execution "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
+	"golang.org/x/net/http2"
 )
 
 // StreamInterruption contains only closed diagnostic codes. It cannot carry a
@@ -96,10 +99,16 @@ const (
 	streamBudget
 	streamPeerInvalid
 	streamPeerChanged
+	streamHTTP2Internal
+	streamHTTP2Deadline
+	streamHTTP2Cancel
+	streamHTTP2Protocol
+	streamHTTP2Refused
+	streamHTTP2Other
 )
 
 func (v StreamInterruption) Reason() string {
-	names := [...]string{"none", "other", "canceled", "deadline", "eof", "short-read", "closed-io", "io-timeout", "invalid", "denied", "unavailable", "protocol", "closed", "concurrent-call", "frame-or-byte-budget", "peer-invalid", "peer-changed"}
+	names := [...]string{"none", "other", "canceled", "deadline", "eof", "short-read", "closed-io", "io-timeout", "invalid", "denied", "unavailable", "protocol", "closed", "concurrent-call", "frame-or-byte-budget", "peer-invalid", "peer-changed", "http2-internal", "http2-deadline", "http2-cancel", "http2-protocol", "http2-refused", "http2-other"}
 	if int(v.reason) >= len(names) {
 		return "unknown"
 	}
@@ -108,11 +117,13 @@ func (v StreamInterruption) Reason() string {
 func (v StreamInterruption) Present() bool { return v.stage != streamNoStage }
 
 // StreamDiagnostics is one invocation-owned fixed snapshot. It accepts no
-// callback, error, source value or caller-supplied diagnostic. A fixture can
+// callback, error, source body or caller-supplied diagnostic. Its optional
+// transport cutoff is non-authoritative and retains its original instant. A fixture can
 // carry separate instances on its original hub and regional contexts; absence
 // of a recorder changes neither work nor error normalization.
 type StreamDiagnostics struct {
-	first atomic.Pointer[StreamInterruption]
+	first         atomic.Pointer[StreamInterruption]
+	workPeerUntil atomic.Pointer[time.Time]
 }
 type streamDiagnosticKey struct{}
 
@@ -132,33 +143,78 @@ func (d *StreamDiagnostics) Interruption() StreamInterruption {
 	return StreamInterruption{}
 }
 
-// Only known sentinel errors and net.Error's non-text timeout classification
-// are observed. No Error, Is or Unwrap method is invoked on a foreign error.
+// WorkPeerDeadline is the first work lease's actual transport cutoff, after
+// intersecting the complete peer observation with its original frame caller.
+// It is diagnostic only, never returned through an authority/process port.
+func (d *StreamDiagnostics) WorkPeerDeadline() (time.Time, bool) {
+	if d != nil {
+		if until := d.workPeerUntil.Load(); until != nil {
+			return *until, true
+		}
+	}
+	return time.Time{}, false
+}
+
+func recordWorkPeerDeadline(ctx context.Context, until time.Time) {
+	if ctx != nil {
+		if d, ok := ctx.Value(streamDiagnosticKey{}).(*StreamDiagnostics); ok && d != nil {
+			original := until
+			d.workPeerUntil.CompareAndSwap(nil, &original)
+		}
+	}
+}
+
+// Classification uses standard trusted in-process Go error protocols (Is, As,
+// Unwrap and Timeout). It never renders Error text or retains provider payloads.
+// Network input cannot inject Go implementations of those methods.
 func streamErrorReason(err error) streamReason {
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return streamNoReason
-	case context.Canceled:
+	case errors.Is(err, context.Canceled):
 		return streamCanceled
-	case context.DeadlineExceeded, os.ErrDeadlineExceeded:
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, os.ErrDeadlineExceeded):
 		return streamExpired
-	case io.EOF:
+	case errors.Is(err, io.EOF):
 		return streamEOF
-	case io.ErrUnexpectedEOF:
+	case errors.Is(err, io.ErrUnexpectedEOF):
 		return streamShortRead
-	case io.ErrClosedPipe, net.ErrClosed:
+	case errors.Is(err, io.ErrClosedPipe), errors.Is(err, net.ErrClosed):
 		return streamClosedIO
-	case fleet.ErrInvalid, identity.ErrInvalid, execution.ErrInvalid:
+	case errors.Is(err, fleet.ErrInvalid), errors.Is(err, identity.ErrInvalid), errors.Is(err, execution.ErrInvalid):
 		return streamInvalid
-	case fleet.ErrDenied, identity.ErrDenied, execution.ErrDenied:
+	case errors.Is(err, fleet.ErrDenied), errors.Is(err, identity.ErrDenied), errors.Is(err, execution.ErrDenied):
 		return streamDenied
-	case fleet.ErrUnavailable, identity.ErrUnavailable, execution.ErrUnavailable:
+	case errors.Is(err, fleet.ErrUnavailable), errors.Is(err, identity.ErrUnavailable), errors.Is(err, execution.ErrUnavailable):
 		return streamUnavailable
-	case contracts.ErrAPIContextProtocol:
+	case errors.Is(err, contracts.ErrAPIContextProtocol):
 		return streamProtocol
 	}
-	if timeout, ok := err.(net.Error); ok && timeout.Timeout() {
+	var timeout net.Error
+	if errors.As(err, &timeout) && timeout.Timeout() {
 		return streamTimeout
+	}
+	// Go's net/http supports As into x/net/http2.StreamError, including through
+	// standard wrappers. Retain no ID or Cause text; INTERNAL alone proves no
+	// timeout or origin. Only its exact known deadline Cause gets that label.
+	var stream http2.StreamError
+	ok := errors.As(err, &stream)
+	if ok {
+		switch stream.Code {
+		case http2.ErrCodeInternal:
+			if stream.Cause == os.ErrDeadlineExceeded {
+				return streamHTTP2Deadline
+			}
+			return streamHTTP2Internal
+		case http2.ErrCodeCancel:
+			return streamHTTP2Cancel
+		case http2.ErrCodeProtocol:
+			return streamHTTP2Protocol
+		case http2.ErrCodeRefusedStream:
+			return streamHTTP2Refused
+		default:
+			return streamHTTP2Other
+		}
 	}
 	return streamOther
 }

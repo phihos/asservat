@@ -126,12 +126,43 @@ type NodeWork struct {
 // ProgramDigest its SHA-256 over little-endian struct sock_filter bytes in
 // lowercase hex (empty with an empty program).
 type NodePacketCapture struct {
-	CaptureID      string               `json:"captureID"`
-	PodUID         string               `json:"podUID"`
-	Program        []NodeBPFInstruction `json:"program"`
-	ProgramDigest  string               `json:"programDigest"`
-	DurationMillis int64                `json:"durationMillis"`
-	MaxBytes       int64                `json:"maxBytes"`
+	CaptureID      string                 `json:"captureID"`
+	PodUID         string                 `json:"podUID"`
+	Program        []NodeBPFInstruction   `json:"program"`
+	ProgramDigest  string                 `json:"programDigest"`
+	DurationMillis int64                  `json:"durationMillis"`
+	MaxBytes       int64                  `json:"maxBytes"`
+	Observation    *NodeObservationPermit `json:"observation,omitempty"`
+}
+
+// NodeObservationPermit carries one committed finite original allowance over
+// the authenticated node channel. Digests use the existing lowercase hex codec.
+type NodeObservationPermit struct {
+	Binding        NodeObservationBinding `json:"binding"`
+	StartedAt      time.Time              `json:"startedAt"`
+	SessionUntil   time.Time              `json:"sessionUntil"`
+	LeaseUntil     time.Time              `json:"leaseUntil"`
+	StartBy        time.Time              `json:"startBy"`
+	DurationMillis int64                  `json:"durationMillis"`
+	Sequence       uint64                 `json:"sequence"`
+	Credit         int64                  `json:"credit"`
+	BytesPerSecond int64                  `json:"bytesPerSecond"`
+}
+
+type NodeObservationBinding struct {
+	Scope             string `json:"scope"`
+	ProgramDigest     string `json:"programDigest"`
+	ExpectationDigest string `json:"expectationDigest"`
+	AccountingRule    string `json:"accountingRule"`
+	SessionID         string `json:"sessionID"`
+	Fence             string `json:"fence"`
+	CaptureID         string `json:"captureID"`
+	ActionID          string `json:"actionID"`
+	PodUID            string `json:"podUID"`
+	NodeUID           string `json:"nodeUID"`
+	BootID            string `json:"bootID"`
+	CollectorPodUID   string `json:"collectorPodUID"`
+	CollectorEpoch    string `json:"collectorEpoch"`
 }
 
 type NodeBPFInstruction struct {

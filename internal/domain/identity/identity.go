@@ -113,6 +113,7 @@ type Policy struct {
 	// recordings then need the same individual approval as sensitive ones.
 	StepUp                   StepUpPolicy
 	RequireRecordingApproval bool
+	PolicyGrants             *PolicyGrantApproval
 }
 
 type Identity struct {
@@ -165,7 +166,7 @@ func Earlier(a, b time.Time) time.Time {
 }
 
 func (p Policy) Validate(now time.Time) error {
-	if !p.Revision.Valid() || !Text(p.Issuer, 2048) || !Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || len(p.Clients) < 1 || len(p.Clients) > 64 || len(p.EligibleSubjects) > 256 || len(p.EligibleGroups) > 256 || len(p.EligibleSubjects)+len(p.EligibleGroups) == 0 || !p.GroupsAtIssueQualified || p.GroupMaxAge <= 0 || p.GroupMaxAge > 5*time.Minute || !Strings(p.EligibleGroups, 256, 256) || !p.StepUp.valid() {
+	if !p.Revision.Valid() || !Text(p.Issuer, 2048) || !Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || len(p.Clients) < 1 || len(p.Clients) > 64 || len(p.EligibleSubjects) > 256 || len(p.EligibleGroups) > 256 || len(p.EligibleSubjects)+len(p.EligibleGroups) == 0 || !p.GroupsAtIssueQualified || p.GroupMaxAge <= 0 || p.GroupMaxAge > 5*time.Minute || !Strings(p.EligibleGroups, 256, 256) || !p.StepUp.valid() || p.PolicyGrants != nil && !p.PolicyGrants.Valid() {
 		return ErrUnavailable
 	}
 	clients := map[string]bool{}

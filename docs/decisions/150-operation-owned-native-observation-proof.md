@@ -107,13 +107,17 @@ end. It is deliberately not a child of the completed GET handler. Setup
 cancellation remains linked and joined until the possible-delivery boundary.
 The original finite context then survives GET completion without renewal.
 POST cancellation joins actual native/SQL/frame/output work. Spent markers stay
-in the same slot until the original end, and delayed cleanup compares the exact
-entry pointer. Process restart, missing state, changed token/leaf/sequence or
+until the original end, and delayed cleanup compares the exact entry pointer.
+The active-call versus retained-marker accounting revision below supersedes
+counting a fully joined marker as active concurrency. Process restart, missing state, changed token/leaf/sequence or
 unknown previous claim cannot create or adopt a replacement operation.
 
-H keeps at most two admitted operations and two active transports shared across
-those operations and all losing candidates. A retains its existing pending and
-active-request ceilings. Every slot includes admitted work and joined cleanup.
+H retains its compiled active-operation and transport ceilings, shared across
+operations and losing candidates. The original single-region ceiling is two;
+current installed composition scales it with regional clusters as recorded in
+the accounting revision below. A retains that active-request ceiling and the
+separate finite total-marker bound. Active slots include admitted work and
+joined cleanup.
 The original listener accept-time two-second prelude and five-/thirty-second
 finite/standby bounds remain separate additional caps, not new time at dispatch.
 
@@ -191,3 +195,182 @@ success, the real native primitive's 28/6 result or the passing SQL49 test canno
 qualify this graph. Installed caller/backend receipts, fresh-format consumer
 selection and the final fixed listener composition remain separate missing
 boundaries until their actual qualification passes.
+
+
+## Joined active capacity and bounded replay markers (2026-10-28)
+
+This revises an agent-authored throughput restriction, not a maintainer security
+requirement. The installed single-region composition supplies two concurrent
+observation slots. Previously, two distinct completed operations retained both
+slots until their original five-second ends, even after all native/claim/GET
+work joined and tokens were cleared. A local regression reproduces the next
+fresh demand's refusal with both original markers still live. It does not prove
+this caused Native 40776231613's locator failure; that run instead establishes
+an expired full-30-second binding and a current demand, with no matching fresh
+publication before the request's unchanged readiness cutoff. The SQL permission
+denial in that run is the intentional fixture privilege probe.
+
+Use the existing pending map with two separate admission conditions:
+`active <= maximum` and `retained entries <= 2 * maximum`. Every admitted entry
+counts as active through preparation, possible delivery, claim, native/reservation
+closure, joined GET/claim owners and token clearing. Only the end of `closeWork`
+releases its active count. Entering the Spent phase, cancellation or an unknown
+reply does not release it. The same root/request marker remains until the exact
+original end; no replay, replacement, refund or authority extension follows.
+The store counter is released outside the entry mutex to preserve store-before-
+entry lock order. Shutdown still joins all retained entries.
+
+A separate spent-marker ceiling of only `maximum` would still reject a fresh
+third request after two joined calls. The chosen total ceiling allows bounded
+headroom without an unbounded completed-request ledger. Fast distinct calls can
+still fill that total and must refuse until natural expiry; this is not an
+availability or throughput guarantee. Existing caller/proof five-second ends,
+active HTTP/native ceilings, demand pacing, input grants and budgets are unchanged.
+No public setting, credential, privilege, watch or service is added. SQL/API
+request counts are unchanged per admitted operation. Additional headroom can
+admit more distinct calls, so aggregate provider work can increase; active
+concurrency, provider limits and input budgets remain unchanged.
+
+Measured amd64 value sizes are entry 832 bytes, key 32 bytes and claim 104 bytes;
+these are not retained-heap or CPU measurements. With one region, active remains
+2 and total entries become at most 4 (3,328 entry-value bytes). With the current
+maximum eight regional clusters, active remains 9 and total at most 18 (14,976
+entry-value bytes; +7,488 over the previous ceiling). Active token capacity stays
+9 * 16 KiB = 144 KiB and joined markers retain no token. Map buckets, original
+contexts, callbacks and referenced graphs are additional. The store also adds one 8-byte active counter. Each admitted entry
+uses the existing retention deadline/context and callbacks, so the larger total
+can retain up to nine additional such timer/context instances; there is no new
+timer kind or background loop. Runtime/SQL/native-provider qualification remains
+separate from these local lifecycle checks.
+
+
+The local lifecycle regression reproduces RED with unchanged runtime (race exit
+1, package 0.082s), then passes after the accounting change (all LocalPending
+race cases, exit 0, 1.388s). Controls include blocked native Close plus possible
+delivery, same-ID denial, total retained saturation, natural original expiry,
+concurrent admission and joined shutdown. Full affected races pass: bootstrap
+62.841s, mTLS 66.762s, cluster-observation transport 3.214s and native transport
+98.965s. Integration compilation, affected vet, specification and architecture
+gates pass. Fixture authority/native facts remain synthetic; these checks do not
+establish an installed locator cause, real-provider throughput, collection or
+an end-to-end history result. The subsequent owned run is recorded below.
+
+
+### Owned direct-observation result
+
+The one reviewed existing `TestDirectHolderObservationWithRealKubernetes` run on
+clean `c9d45572` passed: command/Go/test exits 0, parent 48.93s and Go 50.005s.
+All five purposes passed, along with the changed-original-regional-template
+refusal. The actual observation wall times were 2.379096s (namespace candidates),
+2.347821s (workload candidates), 2.485707s (workload), 2.741297s (namespace guard)
+and 2.935617s (guarded workload). Each retained at least 2.064384s of its original
+five-second interval. These are component measurements, not a comparison with
+old runtime or an installed cold-refresh service guarantee.
+
+The existing helper exercised real Kubernetes objects/admission checks, scoped
+SQL, S3, HTTPS and regional framed streams in two owned clusters with synthetic
+installer/issuer setup. Helper SHA-256 was
+`6fd417a2977e2b341b96b75ab965d4e1d63d99ed4bf8d391d5c95132f47d12e6`;
+all 3,397 retained source hashes matched the frozen candidate, and all 35,989
+tracked files were unchanged apart from three generated reports archived before
+restoration. Sources were unchanged during the run, cleanup failures were empty,
+and build scratch was removed. Healthy Docker readback confirmed the six exact
+owned containers, two networks and helper image absent; both Kind clusters and
+owned-label inventories were absent. No collector ran and no retry occurred.
+
+The outer bound was the existing 1,100 seconds plus 10-second kill grace; the
+test's eight-minute context and generic runner's Go limit were unchanged. The
+terminal reports/raw current artifacts are retained in the existing build cache
+under `codex-bf86-resume/owner-observation-active-accounting/owned-1`. Historical
+tracked outputs copied during initial archival are separately identified and
+excluded from current-run evidence. This does not qualify a complete installed
+workflow, native evidence collection, demand/discovery contention under load,
+or the cause of Native 40776231613's unavailable locator.
+
+## Relevant Pod equivalence inside a native boundary (2026-10-29)
+
+The full-Pod/resourceVersion equality check between a boundary's two Pod GETs
+was an engineering shortcut for detecting concurrent changes. It also rejected
+a status-only update whose protected identity, full spec and current Ready/IP
+facts remained identical. A deterministic HTTPS/native-reader regression changes
+only a PodReady condition's informational LastProbeTime and resourceVersion on
+the second GET of the final boundary. Both versions independently pass the
+existing object validator and have the same workload digest, yet the previous
+comparison refuses them. The same status update *between* boundaries already
+succeeds. This is a component availability defect, not proof of the cause of
+Native 40849033981's combined `owner-read/final-native` refusal or a claim that
+every readiness probe writes Pod status.
+
+Each boundary now validates its second Pod through the **same existing** native
+object validator and requires the identical canonical workload digest. Both GETs
+remain. The second Pod must independently retain exact UID/non-deletion,
+account/node/controller/template/image/spec/labels/annotations, Running state,
+one True Ready condition, selected endpoint addresses and the existing finalizer
+rules. Critical changes remain terminal; no unknown read is retried. The
+operation's original peers, dates, source/namespace/guard/Service brackets,
+registration, TLS and cancellation remain binding. This follows the existing
+status/RV-only enrollment comparison and the operation's own cross-boundary
+identity/behavior comparison. Neither comparison establishes absence of
+unobserved A-to-B-to-A changes. ResourceVersion is an object modification version,
+not a security-specific identity; see [Kubernetes API concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions).
+This is an engineering comparison revision, not a newly asserted maintainer
+requirement or an authority interval extension.
+
+The actual HTTPS regression covers informational status changes in both initial
+and final brackets, status changes between boundaries, and second-read changes
+to UID/spec/labels/annotations/Ready/phase/address/node/deletion/controller and
+finalizers. Failed operations cannot reopen or repeat native I/O. The obsolete
+initial RV-only denial fixture now changes the actual Pod spec and retains its
+refusal. Existing original-deadline/cancellation/join/peer/service tests still
+apply. Installed attribution and the targeted real-API qualification are separate.
+
+There are zero added API/SQL requests, watches, timers, privileges, credentials,
+pools, retained state or configuration. The single-Pod primitive still uses
+30 observer and six independent probe requests over two boundaries (including
+ADR-227 release-record reads). Representative synthetic comparison measurements
+were 18,258 ns/9,363 allocated bytes/18 allocations for the old comparison and
+114,023 ns/34,298 bytes/228 allocations for the reused validator. The increment
+is about 0.192 ms and 49,870 allocated bytes for one Pod/two boundaries, or
+0.383 ms and 99,740 bytes for two distinct Pods. These are representative
+allocation totals, not retained/peak memory, installed overhead or worst-case
+payload cost. At most four additional canonical digests of the existing 128 KiB
+maximum are computed per two-peer operation. Reuse avoids another partially
+duplicate security-sensitive comparison. No native availability success is
+claimed from these local results.
+
+### Owned real-API result for relevant Pod equivalence
+
+One existing `TestOwnerObservationOperationWithRealKubernetes` selection passed
+on frozen `ce643e545b8d630cc30c5416ae230fe3dcaaab6b`, using two fresh owned
+Kind clusters and the existing provider fixture. Outer, Go and selected-test
+exits were zero; the selected parent took 9.92 seconds and the Go command
+10.985 seconds. All eight required parent/child PASS markers were present:
+a cold pair, five immediately consecutive pairs using the same clients, and
+an actual administrator Pod-annotation mutation that suppresses final facts.
+Each successful pair used exactly 30 observer and six independent probe requests
+with four expected HTTP negative results: two denied dry-run updates and two
+absent legacy release-record GETs. The cold pair took 0.502 seconds; subsequent
+pairs took 1.499–1.500 seconds, retaining 3.499–3.501 seconds of the original
+five-second interval. No API count or authority bound was increased.
+
+All 3,408 retained source hashes matched the frozen candidate and remained
+unchanged. The two actual current output reports were archived before restoring
+only their two generated paths; all 36,001 tracked files then matched the tested
+head. Cleanup failures were empty. Independent checks against a healthy Docker
+daemon found the six owned containers, two networks, two Kind clusters, helper
+image tag/ID and owned temporary directory absent, with no new volumes remaining.
+The generic metadata mode reports neither a separate build-scratch field nor a
+provider-log exit; those are not silently represented as successful zero values.
+The worker binary SHA256 was
+`a744e97c3a8a1ba72ddf45334454aeef0ed4d7c4979b126683a98017efadf7e8`;
+the actual environment report SHA256 was
+`55d79e3734279cdf383eabcd6aafdbf208146e888c81d08da961535161a6d4b7`.
+The archived verification report SHA256 is
+`996e40d42857b8e1fac3e0ce111b35fe495369b2e39beb3b92df67819af940d0`.
+
+This qualifies the real Kubernetes native primitive. Installation pins and
+process identifiers remain synthetic; this test does not qualify the owner
+SQL/TLS/ordinal-four wire composition or an installed workflow. The exact
+within-bracket status overlap remains the separately proven synthetic HTTPS
+regression. No BPF, Gadget or node collector ran locally. Native 40849033981's
+combined final-native failure is still unattributed; no hosted retry followed.

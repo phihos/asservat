@@ -30,6 +30,7 @@ input::placeholder { color: #65717c; }
 .retention-edit { margin: 4px 0 28px; }
 summary { cursor: pointer; min-height: 44px; padding: 8px 0; color: #126b54; }
 .review-section, .diagnostic { padding: 24px 0; border-top: 1px solid #e3e6e9; }
+.saved-settings pre { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .diagnostic { margin-bottom: 24px; }
 .selected-name { color: #20252b; font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
 .facts { display: grid; grid-template-columns: 145px minmax(0, 1fr); gap: 12px 20px; margin: 8px 0 24px; }

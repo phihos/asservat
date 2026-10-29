@@ -84,8 +84,12 @@ func (a *ConnectorAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 			return local, e
 		}
 		other, e := remote.Check(c)
-		if e != nil || !other.Operation.Equal(local.Operation) || other.Certificate != local.Certificate || other.Sequence != local.Sequence {
-			return value.NativeLease{}, artifact.ErrDownloadUnavailable
+		if e != nil {
+			return value.NativeLease{}, e
+		}
+		local, e = evidence.JoinNativeObservations(local, other, a.now())
+		if e != nil {
+			return value.NativeLease{}, e
 		}
 		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, other.Until)))
 		return local, nil
@@ -166,8 +170,12 @@ func (a *HubAdmission) OpenNative(ctx context.Context, state *tls.ConnectionStat
 			return peer, e
 		}
 		local, e := inner.Gate().Check(c)
-		if e != nil || !local.Operation.Equal(peer.Operation) || local.Certificate != peer.Certificate || local.Sequence != peer.Sequence {
-			return value.NativeLease{}, artifact.ErrDownloadUnavailable
+		if e != nil {
+			return value.NativeLease{}, e
+		}
+		local, e = evidence.JoinNativeObservations(local, peer, a.now())
+		if e != nil {
+			return value.NativeLease{}, e
 		}
 		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, peer.Until)))
 		return local, nil
@@ -176,7 +184,7 @@ func (a *HubAdmission) OpenNative(ctx context.Context, state *tls.ConnectionStat
 		inner.Close()
 		return nil, e
 	}
-	return &peerConversation{inner, gate}, nil
+	return &peerConversation{inner: inner, gate: gate}, nil
 }
 
 type peerConversation struct {
@@ -206,8 +214,25 @@ func (s *peerStream) sendCompleted(ctx context.Context, f contracts.NativeFrame,
 	if !ok || proof.gate == nil || proof.gate != s.inner {
 		return step("completion-proof", contracts.ErrNativeProtocol)
 	}
-	proof.gate = s.outer
-	return terminal.sendCompleted(ctx, f, proof)
+	// The peer gate can still hold its valid previous response observation
+	// while the inner operation has acknowledged closure at a newer sequence.
+	// This is only a zero-byte completion bridge, never a lease for new work.
+	inner, innerErr := s.inner.TerminalLease(ctx)
+	outer, outerErr := s.outer.TerminalLease(ctx)
+	if innerErr != nil || outerErr != nil || !proof.lease.Valid(time.Now()) ||
+		!inner.Operation.Equal(proof.lease.Operation) || inner.Certificate != proof.lease.Certificate || inner.Sequence != proof.lease.Sequence ||
+		!outer.Operation.Equal(proof.lease.Operation) || outer.Certificate != proof.lease.Certificate || outer.Sequence > proof.lease.Sequence ||
+		(outer.Sequence != proof.lease.Sequence && outer.Operation.Kind != value.NativeResponse) {
+		return step("completion-lease", contracts.ErrNativeProtocol)
+	}
+	// Retain all three original cutoffs and the caller's context. Mapping to
+	// the exact outer snapshot lets the server keep its strict comparison;
+	// it does not claim SQL closed under the older peer observation.
+	until := identity.Earlier(proof.lease.Until, identity.Earlier(inner.Until, outer.Until))
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	proof.gate, proof.lease = s.outer, outer
+	return terminal.sendCompleted(call, f, proof)
 }
 func (c *peerConversation) Close() error {
 	c.gate.Close()
@@ -221,7 +246,7 @@ func (c *peerConversation) Close() error {
 // conversation (up to the evidence-read window) is not ended by the stale
 // admission observation. Other kinds keep it.
 func admissionServing(l value.NativeLease, serving time.Time) time.Time {
-	if l.Operation.Kind == value.NativeProjection {
+	if l.Operation.Kind == value.NativeProjection || l.Operation.Kind == value.NativeResponse {
 		return l.Operation.Until
 	}
 	return serving

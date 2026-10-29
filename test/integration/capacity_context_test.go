@@ -33,11 +33,27 @@ func (f *capacitySQLFixture) admitManagedContext(t *testing.T, root app.RootConf
 // request; the existing renewal cases retain their original 20-second default.
 func (f *capacitySQLFixture) admitManagedContextRetention(t *testing.T, root app.RootConfiguration, enrollment app.Enrollment, retentionSeconds int64) (captureAdmissionScenario, capturevalue.Accepted) {
 	t.Helper()
+	s, publisher, policies := f.prepareManagedContext(t, root, enrollment, retentionSeconds)
+	f.checkManagedProcessingAdmission(t, s.s, s.recovery.guard, policies, s.a)
+	start := time.Now()
+	accepted, err := s.s.AdmitContext(f.ctx, s.a)
+	if err != nil {
+		t.Fatal("actual managed SQL52 admission", err)
+	}
+	if _, err = publisher.AcknowledgedCaptureIntent(f.ctx, accepted.CaptureID); err != nil {
+		t.Fatal("actual managed encrypted intent pair", err)
+	}
+	t.Logf("managed_admission_pair_ms=%d original_request_remaining_ms=%d", time.Since(start).Milliseconds(), time.Until(s.a.Eligibility.ValidUntil).Milliseconds())
+	return s, accepted
+}
+
+func (f *capacitySQLFixture) prepareManagedContext(t *testing.T, root app.RootConfiguration, enrollment app.Enrollment, retentionSeconds int64, additional ...privacy.ScopedPolicy) (captureAdmissionScenario, auditapp.CaptureOperationPublication, privacy.PolicySet) {
+	t.Helper()
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	target := capacityNativeTarget(f.input.ControlClusterID, f.namespace, f.workloads[0], n)
 	policyInput := capacityNativeRetentionPolicy()
 	policyInput.Policy.DefaultSeconds = retentionSeconds
-	retention := newRetentionEffectFixturesWithPolicy(t, f.ctx, f.fixturePool, f.store, f.keys, policyInput)(t, f.input.PermissionRootID, target.Target())
+	retention := newRetentionEffectFixturesWithPolicy(t, f.ctx, f.fixturePool, f.store, f.keys, policyInput, additional...)(t, f.input.PermissionRootID, target.Target())
 	recovery := &recoveryEffectFixture{installation: f.input.InstallationID}
 	var err error
 	recovery.observation, err = readSyntheticFleetObservationBinding(f.ctx, f.admin, f.input.InstallationID)
@@ -133,17 +149,7 @@ func (f *capacitySQLFixture) admitManagedContextRetention(t *testing.T, root app
 		t.Fatal(err)
 	}
 	request := capturevalue.Admission{Recovery: proof, RootID: f.input.PermissionRootID, IdempotencyKey: "capacity-managed-session", SubmissionDigest: artifact.Digest{24}, Plan: plan, Eligibility: eligibility, Storage: selected.Binding, Registration: r, CaseID: custodyID(), OccurrenceID: custodyID()}
-	f.checkManagedProcessingAdmission(t, admission, recovery.guard, policies, request)
-	start := time.Now()
-	accepted, err := admission.AdmitContext(f.ctx, request)
-	if err != nil {
-		t.Fatal("actual managed SQL52 admission", err)
-	}
-	if _, err = publisher.AcknowledgedCaptureIntent(f.ctx, accepted.CaptureID); err != nil {
-		t.Fatal("actual managed encrypted intent pair", err)
-	}
-	t.Logf("managed_admission_pair_ms=%d original_request_remaining_ms=%d", time.Since(start).Milliseconds(), time.Until(actor.ValidUntil).Milliseconds())
-	return captureAdmissionScenario{p: f.permission, s: admission, batch: f.batch, a: request, poolID: f.qualification.Backends[0].PoolID, retention: retention, recovery: recovery}, accepted
+	return captureAdmissionScenario{p: f.permission, s: admission, batch: f.batch, a: request, poolID: f.qualification.Backends[0].PoolID, retention: retention, recovery: recovery}, publisher, policies
 }
 
 func (f *capacitySQLFixture) currentManagedPublication(ctx context.Context, s captureAdmissionScenario, e artifact.ContextExpectation) (artifact.PublicationAuthority, error) {

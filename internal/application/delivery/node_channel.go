@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 var (
@@ -437,10 +438,10 @@ func (c *NodeChannel) Enqueue(nodeUID string, kind collector.WorkKind, notAfter 
 	if !kind.Valid() || kind == collector.WorkPacketCapture {
 		return collector.Work{}, ErrNodeInvalid
 	}
-	return c.enqueue(nodeUID, kind, notAfter, nil)
+	return c.enqueue(nodeUID, kind, notAfter, nil, nil, nil)
 }
 
-func (c *NodeChannel) enqueue(nodeUID string, kind collector.WorkKind, notAfter time.Time, packet *collector.PacketCapture) (collector.Work, error) {
+func (c *NodeChannel) enqueue(nodeUID string, kind collector.WorkKind, notAfter time.Time, packet *collector.PacketCapture, ctx context.Context, expected *targets.PacketSourceObservation) (collector.Work, error) {
 	var raw [16]byte
 	if _, err := rand.Read(raw[:]); err != nil {
 		return collector.Work{}, ErrNodeUnavailable
@@ -451,6 +452,28 @@ func (c *NodeChannel) enqueue(nodeUID string, kind collector.WorkKind, notAfter 
 	now := c.now()
 	if e == nil || !now.Before(notAfter) {
 		return collector.Work{}, ErrNodeUnavailable
+	}
+	// This check and insertion share the same mutex: a replaced collector
+	// cannot inherit work observed for an earlier process or boot.
+	if expected != nil {
+		if ctx == nil || ctx.Err() != nil || !expected.Valid(now) || packet == nil ||
+			packet.PodUID != expected.PodUID || e.id.NodeUID != expected.NodeUID ||
+			e.id.BootID != expected.BootID || e.id.PodUID != expected.CollectorPodUID ||
+			e.id.Epoch != expected.CollectorEpoch || !c.view(e, now).PacketRecorderAvailable() ||
+			notAfter.After(now.Add(collector.PacketCaptureStartWithin)) {
+			return collector.Work{}, ErrNodeUnavailable
+		}
+		if deadline, ok := ctx.Deadline(); ok && !now.Before(deadline) {
+			return collector.Work{}, ErrNodeUnavailable
+		}
+		if permit := packet.Observation; permit != nil {
+			b := permit.Binding
+			if !permit.ValidFinite(now) || !permit.StartBy.Equal(notAfter) || permit.Duration != packet.Duration ||
+				b.CaptureID != packet.CaptureID || b.PodUID != packet.PodUID || b.ProgramDigest != packet.ProgramDigest ||
+				b.NodeUID != e.id.NodeUID || b.BootID != e.id.BootID || b.CollectorPodUID != e.id.PodUID || b.CollectorEpoch != e.id.Epoch {
+				return collector.Work{}, ErrNodeUnavailable
+			}
+		}
 	}
 	for id, p := range e.captures {
 		if !now.Before(p.until) {

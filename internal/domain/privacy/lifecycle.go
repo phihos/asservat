@@ -22,7 +22,7 @@ type RetainedArtifact struct {
 func (r RetainedArtifact) Valid() bool {
 	d := r.Effective
 	o := r.Registration
-	return authorization.UUID(r.RootID) && o.Validate() == nil && r.Sequence >= 0 && ValidPolicyOrigins(r.OriginPolicies) && r.Input.Target.Valid() && r.Input.Target.ClusterID == o.Location.ClusterID && r.Input.AnchorAt.Equal(o.AnchorAt) && r.Input.RequestedSeconds > 0 && class(r.Input.PrivacyClass) && evidenceType(r.Input.EvidenceType) && d.ValidRetained() && d.AnchorAt.Equal(o.AnchorAt) && !d.ExpiresAt.After(o.ExpiresAt) && !d.DeleteBy.After(o.DeleteBy)
+	return (r.Input.ControlKind == "" || r.Input.ControlKind == "case-metadata") && authorization.UUID(r.RootID) && o.Validate() == nil && r.Sequence >= 0 && ValidPolicyOrigins(r.OriginPolicies) && r.Input.Target.Valid() && r.Input.Target.ClusterID == o.Location.ClusterID && r.Input.AnchorAt.Equal(o.AnchorAt) && r.Input.RequestedSeconds > 0 && class(r.Input.PrivacyClass) && evidenceType(r.Input.EvidenceType) && d.ValidRetained() && d.AnchorAt.Equal(o.AnchorAt) && !d.ExpiresAt.After(o.ExpiresAt) && !d.DeleteBy.After(o.DeleteBy)
 }
 
 // LifecycleDecision records only monotonic policy shortening. It cannot grant

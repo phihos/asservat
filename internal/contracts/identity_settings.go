@@ -18,8 +18,9 @@ type IdentitySettings struct {
 // IdentityApprovals configures approval step-up and whether metadata
 // packet/syscall recordings also need individual approval (REQ-SYS-002).
 type IdentityApprovals struct {
-	StepUp                   *IdentityStepUp `json:"stepUp,omitempty"`
-	RequireRecordingApproval bool            `json:"requireRecordingApproval,omitempty"`
+	PolicyGrants             *PolicyGrantApproval `json:"policyGrants,omitempty"`
+	StepUp                   *IdentityStepUp      `json:"stepUp,omitempty"`
+	RequireRecordingApproval bool                 `json:"requireRecordingApproval,omitempty"`
 }
 
 // IdentityStepUp names the IdP acr values accepted as step-up and their
@@ -36,4 +37,11 @@ type IdentityClient struct {
 type IdentitySubject struct {
 	ID   string `json:"id"`
 	Kind string `json:"kind"`
+}
+
+// PolicyGrantApproval configures finite team-policy review periods.
+type PolicyGrantApproval struct {
+	DefaultAgeSeconds    int64 `json:"defaultAgeSeconds"`
+	MaxAgeSeconds        int64 `json:"maxAgeSeconds"`
+	RenewalNoticeSeconds int64 `json:"renewalNoticeSeconds"`
 }

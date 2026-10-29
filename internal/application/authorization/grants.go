@@ -39,9 +39,7 @@ type GrantReviewAction struct {
 }
 
 // GrantObservationLimits are the plan's REQ-AUT-006 limits.
-type GrantObservationLimits struct {
-	MaxSessionSeconds, MaxObservedBytes, MaxBytesPerSecond, MaxConcurrentSessions int64
-}
+type GrantObservationLimits = value.ObservationLimits
 
 // GrantReview is the bounded review summary stored with the request. The
 // frozen Scope remains the authority; this is its presentation.
@@ -135,6 +133,10 @@ type GrantRecovery interface {
 type GrantService struct {
 	RootID, InstallationID string
 	Permissions            ProjectionReader
+	WorkloadPermissions    WorkloadProjectionReader
+	PolicyPlans            PolicyGrantPlanReader
+	PolicyRequests         PolicyGrantRequestReader
+	ApprovalSettings       PolicyApprovalSettingsReader
 	Store                  GrantStore
 	Recovery               GrantRecovery
 	NewID                  func() string
@@ -146,8 +148,10 @@ type GrantView struct {
 	Grant  value.Grant
 	Phase  value.GrantPhase
 	Review GrantReview
-	// Approver reports that the caller may decide or revoke it now.
+	// Approver reports independent review authority; manager control is separate.
 	Approver bool
+	// CanRevoke is current team/approver control, never inferred from provenance.
+	CanRevoke bool
 	// CanResume is an advisory hint for the current original requester/client.
 	// Capture admission remains authoritative.
 	CanResume bool
@@ -162,18 +166,29 @@ func (s GrantService) ready() bool {
 	return s.Permissions != nil && s.Store != nil && s.Recovery != nil && s.NewID != nil && s.Now != nil && value.UUID(s.RootID) && value.UUID(s.InstallationID)
 }
 
-func (s GrantService) human(ctx context.Context, current identities.CurrentIdentity, scopes ...string) (identity.Identity, error) {
+func (s GrantService) actor(ctx context.Context, current identities.CurrentIdentity, scopes ...string) (identity.Identity, error) {
 	if current == nil {
 		return identity.Identity{}, identity.ErrDenied
 	}
 	i, err := current.ResolveIdentity(ctx)
-	if err != nil || !i.Valid(s.Now()) || i.Principal.Kind != identity.Human || !slices.Contains(i.Scopes, "evidence:read") {
+	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") {
 		return identity.Identity{}, identity.ErrDenied
 	}
 	for _, scope := range scopes {
 		if !slices.Contains(i.Scopes, scope) {
 			return identity.Identity{}, identity.ErrDenied
 		}
+	}
+	return i, nil
+}
+
+func (s GrantService) human(ctx context.Context, current identities.CurrentIdentity, scopes ...string) (identity.Identity, error) {
+	i, err := s.actor(ctx, current, scopes...)
+	if err != nil {
+		return identity.Identity{}, err
+	}
+	if i.Principal.Kind != identity.Human {
+		return identity.Identity{}, identity.ErrDenied
 	}
 	return i, nil
 }
@@ -217,6 +232,19 @@ func ResultAccessDigest(captureID string, execution artifact.Digest, r value.Res
 // result-access digests, target, data class, reasons, lifetime and the
 // review summary. Every use recomputes it from the stored row.
 func ReviewDigest(g value.Grant, review []byte) artifact.Digest {
+	if g.Kind == value.GrantPolicy {
+		b, _ := json.Marshal(struct {
+			Kind            string
+			Policy          *value.PolicyGrantScope
+			ExecutionDigest artifact.Digest
+			DataClass       string
+			Reasons         []value.SensitiveReason
+			LifetimeSeconds int64
+			Review          json.RawMessage
+		}{g.Kind, g.Policy, g.ExecutionDigest, g.DataClass, g.Reasons, int64(g.Lifetime / time.Second), review})
+		return sha256.Sum256(b)
+	}
+
 	b, _ := json.Marshal(struct {
 		Kind, PreviewID, CaptureID          string
 		Target                              value.Target
@@ -380,7 +408,7 @@ func (s GrantService) Decide(ctx context.Context, current identities.CurrentIden
 	if err != nil {
 		return zero, false, err
 	}
-	eligible, err := s.collector(ctx, i, g.Target, value.ApproveAction)
+	eligible, err := s.grantEligibility(ctx, i, g, value.ApproveAction)
 	if err != nil {
 		return zero, false, err
 	}
@@ -392,25 +420,37 @@ func (s GrantService) Decide(ctx context.Context, current identities.CurrentIden
 	if !eligible.Eligible || eligible.Principal != i.Principal || !s.Now().Before(eligible.ValidUntil) {
 		return zero, false, value.ErrNotApprover
 	}
-	if g.Decision != nil {
-		// Only a retry of exactly this recorded decision (same reviewer and
-		// key) is answered, as a replay; anything else is not pending.
-		return s.Store.DecideGrant(ctx, GrantDecisionInput{GrantID: grantID, Approve: approve, Approver: i.Principal, Reason: reason, IdempotencyKey: key}, recovery)
-	}
-	if err = value.CheckDecision(g, i, eligible, approve, s.Now()); err != nil {
-		return zero, false, err
+	// A historical exact decision replay needs current metadata eligibility,
+	// not a new step-up. Fresh approval retains its original assurance bound.
+	freshDecision := g.Decision == nil
+	if freshDecision {
+		if err = value.CheckDecision(g, i, eligible, approve, s.Now()); err != nil {
+			return zero, false, err
+		}
 	}
 	in := GrantDecisionInput{GrantID: grantID, Approve: approve, Approver: i.Principal, Reason: reason, IdempotencyKey: key}
-	if approve {
+	until := identity.Earlier(i.ValidUntil, eligible.ValidUntil)
+	if freshDecision && approve {
 		in.ACR, in.AuthTime = i.Assurance.ACR, i.Assurance.AuthenticatedAt
+		until = identity.Earlier(until, i.Assurance.StepUpUntil)
 	}
-	out, replay, err := s.Store.DecideGrant(ctx, in, recovery)
+	until = until.UTC().Truncate(time.Microsecond)
+	if !s.Now().Before(until) {
+		return zero, false, ErrGrantUnavailable
+	}
+	effect, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	out, replay, err := s.Store.DecideGrant(effect, in, recovery)
 	if err != nil {
 		return zero, false, err
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	if err = s.finalGrantMetadata(effect, current, i, g.Kind == value.GrantPolicy); err != nil {
 		return zero, false, err
 	}
+	if !s.Now().Before(until) {
+		return zero, false, ErrGrantUnavailable
+	}
+
 	return out, replay, nil
 }
 
@@ -439,44 +479,48 @@ func (s GrantService) Revoke(ctx context.Context, current identities.CurrentIden
 		return zero, false, err
 	}
 	approver := value.Result{}
-	if !sameHuman(g.Requester, i.Principal) {
-		if approver, err = s.collector(ctx, i, g.Target, value.ApproveAction); err != nil {
+	if g.Kind == value.GrantPolicy || !sameHuman(g.Requester, i.Principal) {
+		if approver, err = s.revocationEligibility(ctx, i, g); err != nil {
 			return zero, false, err
 		}
 	}
 	// Who may revoke is settled before any state of the grant is disclosed.
 	currentApprover := approver.Eligible && approver.Principal == i.Principal && s.Now().Before(approver.ValidUntil)
-	if !sameHuman(g.Requester, i.Principal) && !currentApprover {
+	if (g.Kind == value.GrantPolicy || !sameHuman(g.Requester, i.Principal)) && !currentApprover {
 		return zero, false, value.ErrNotApprover
 	}
-	if !g.RevokedAt.IsZero() {
-		// Only the same revoker's retry with the same key is a replay.
-		return s.Store.RevokeGrant(ctx, GrantRevocationInput{GrantID: grantID, Revoker: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}, recovery)
-	}
-	if !value.CanRevoke(g, i, approver, s.Now()) {
+	// The store resolves the same revoker/key replay. Both fresh and replay
+	// results retain the final caller check after a potentially blocking lock.
+	if g.RevokedAt.IsZero() && !value.CanRevoke(g, i, approver, s.Now()) {
 		return zero, false, value.ErrNotApprover
 	}
 	out, replay, err := s.Store.RevokeGrant(ctx, GrantRevocationInput{GrantID: grantID, Revoker: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}, recovery)
 	if err != nil {
 		return zero, false, err
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	if err = s.finalGrantMetadata(ctx, current, i, g.Kind == value.GrantPolicy); err != nil {
 		return zero, false, err
+	}
+	if g.Kind == value.GrantPolicy && !s.Now().Before(approver.ValidUntil) {
+		return zero, false, ErrGrantUnavailable
 	}
 	return out, replay, nil
 }
 
 func sameHuman(a, b identity.Principal) bool { return a.Issuer == b.Issuer && a.Subject == b.Subject }
 
-// Get returns one grant to its requesting human or a current approver for
-// its target; anyone else gets ErrGrantNotFound (no existence disclosure).
+// Get returns grant metadata to its requester, current reviewer, or exact
+// current pinned policy manager. Management never implies review authority.
+// Policy requesters additionally need current collection rights on the exact
+// workload; historical provenance is not perpetual visibility. Ad hoc behavior
+// remains unchanged. Others get ErrGrantNotFound (no existence disclosure).
 func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentity, grantID string) (GrantView, time.Time, error) {
 	if ctx == nil || ctx.Err() != nil || !s.ready() {
 		return GrantView{}, time.Time{}, ErrGrantUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	i, err := s.human(ctx, current)
+	i, err := s.actor(ctx, current)
 	if err != nil {
 		return GrantView{}, time.Time{}, err
 	}
@@ -490,10 +534,27 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 	if err != nil {
 		return GrantView{}, time.Time{}, ErrGrantUnavailable
 	}
+	if i.Principal.Kind != identity.Human && (g.Kind != value.GrantPolicy || g.Requester != i.Principal) {
+		return GrantView{}, time.Time{}, ErrGrantNotFound
+	}
 	until := i.ValidUntil
-	v := GrantView{Grant: g, Phase: g.Phase(s.Now()), CanResolve: i.Principal == g.Requester && g.Decision != nil && g.Decision.Approved}
-	if !sameHuman(g.Requester, i.Principal) {
-		r, err := s.collector(ctx, i, g.Target, value.ApproveAction)
+	v := GrantView{Grant: g, Phase: g.Phase(s.Now()), CanResolve: g.Kind == value.GrantAdHocCapture && i.Principal == g.Requester && g.Decision != nil && g.Decision.Approved}
+	if g.Kind == value.GrantPolicy {
+		if g.Policy == nil || s.WorkloadPermissions == nil {
+			return GrantView{}, time.Time{}, ErrGrantNotFound
+		}
+		p, err := s.WorkloadPermissions.WorkloadPermissions(ctx, g.Policy.Workload())
+		if err != nil {
+			return GrantView{}, time.Time{}, ErrGrantNotFound
+		}
+		r, approver, revoke := policyGrantMetadataRights(i, g, p, s.Now())
+		if !r.Eligible {
+			return GrantView{}, time.Time{}, ErrGrantNotFound
+		}
+		v.Approver, v.CanRevoke = approver, revoke
+		until = identity.Earlier(until, r.ValidUntil)
+	} else if !grantRequesterMatches(g, i.Principal) {
+		r, err := s.grantEligibility(ctx, i, g, value.ApproveAction)
 		if err != nil || !r.Eligible {
 			return GrantView{}, time.Time{}, ErrGrantNotFound
 		}
@@ -505,7 +566,7 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 	var timing struct {
 		Timing string `json:"timing"`
 	}
-	marked := json.Unmarshal(g.Scope, &timing) == nil && timing.Timing == "approvedAcceptance/v1"
+	marked := g.Kind == value.GrantAdHocCapture && json.Unmarshal(g.Scope, &timing) == nil && timing.Timing == "approvedAcceptance/v1"
 	v.ResumeRequiresOriginalClient = marked && v.Phase == value.GrantApproved && sameHuman(g.Requester, i.Principal) && i.Principal != g.Requester && slices.Contains(i.Scopes, "evidence:capture")
 	if i.Principal == g.Requester && slices.Contains(i.Scopes, "evidence:capture") && marked &&
 		ReviewDigest(g, g.Review) == g.ReviewDigest &&
@@ -520,24 +581,31 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 	if json.Unmarshal(g.Review, &v.Review) != nil {
 		return GrantView{}, time.Time{}, ErrGrantUnavailable
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	if err = s.finalGrantMetadata(ctx, current, i, g.Kind == value.GrantPolicy); err != nil {
 		return GrantView{}, time.Time{}, err
+	}
+	if g.Kind == value.GrantPolicy && !s.Now().Before(until) {
+		return GrantView{}, time.Time{}, ErrGrantNotFound
 	}
 	return v, until, nil
 }
 
 // List returns the approver inbox (view "pending": reviewable requests of
 // other people on targets where the caller is a current approver) or the
-// caller's own requests (view "requested").
+// caller's own requests (view "requested"). Policy requester rows require
+// current collection rights on their exact workload and are omitted otherwise.
 func (s GrantService) List(ctx context.Context, current identities.CurrentIdentity, view string, limit int) ([]GrantView, time.Time, error) {
 	if ctx == nil || ctx.Err() != nil || !s.ready() || limit < 1 || limit > 100 || view != "pending" && view != "requested" {
 		return nil, time.Time{}, value.ErrGrantInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	i, err := s.human(ctx, current)
+	i, err := s.actor(ctx, current)
 	if err != nil {
 		return nil, time.Time{}, err
+	}
+	if view == "pending" && i.Principal.Kind != identity.Human {
+		return nil, time.Time{}, identity.ErrDenied
 	}
 	var rows []value.Grant
 	if view == "pending" {
@@ -550,19 +618,47 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 	}
 	until := i.ValidUntil
 	results := map[value.Target]value.Result{}
+	workloadResults := map[value.WorkloadTarget]value.WorkloadProjection{}
 	out := make([]GrantView, 0, min(limit, len(rows)))
 	for _, g := range rows {
 		if len(out) == limit {
 			break
 		}
 		v := GrantView{Grant: g, Phase: g.Phase(s.Now())}
-		if view == "pending" {
+		if g.Kind == value.GrantPolicy {
+			if g.Policy == nil || s.WorkloadPermissions == nil {
+				return nil, time.Time{}, ErrGrantUnavailable
+			}
+			if view == "pending" && (sameHuman(g.Requester, i.Principal) || v.Phase != value.GrantPending) {
+				continue
+			}
+			if view == "requested" && !grantRequesterMatches(g, i.Principal) {
+				continue
+			}
+			target := g.Policy.Workload()
+			p, ok := workloadResults[target]
+			if !ok {
+				p, err = s.WorkloadPermissions.WorkloadPermissions(ctx, target)
+				if err != nil {
+					p = value.WorkloadProjection{}
+				}
+				workloadResults[target] = p
+			}
+			r, approver, revoke := policyGrantMetadataRights(i, g, p, s.Now())
+			// A manager's direct lookup never adds a team-wide pending inbox.
+			if !r.Eligible || view == "pending" && !approver {
+				continue
+			}
+			v.Approver, v.CanRevoke = approver, revoke
+			until = identity.Earlier(until, r.ValidUntil)
+		} else if view == "pending" {
 			if sameHuman(g.Requester, i.Principal) || v.Phase != value.GrantPending {
 				continue
 			}
 			r, ok := results[g.Target]
 			if !ok {
-				if r, err = s.collector(ctx, i, g.Target, value.ApproveAction); err != nil {
+				r, err = s.grantEligibility(ctx, i, g, value.ApproveAction)
+				if err != nil {
 					r = value.Result{}
 				}
 				results[g.Target] = r
@@ -571,7 +667,7 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 				continue
 			}
 			v.Approver, until = true, identity.Earlier(until, r.ValidUntil)
-		} else if !sameHuman(g.Requester, i.Principal) {
+		} else if !grantRequesterMatches(g, i.Principal) || i.Principal.Kind != identity.Human {
 			return nil, time.Time{}, ErrGrantUnavailable
 		}
 		if json.Unmarshal(g.Review, &v.Review) != nil {
@@ -579,8 +675,12 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 		}
 		out = append(out, v)
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	policyMetadata := slices.ContainsFunc(out, func(v GrantView) bool { return v.Grant.Kind == value.GrantPolicy })
+	if err = s.finalGrantMetadata(ctx, current, i, policyMetadata); err != nil {
 		return nil, time.Time{}, err
+	}
+	if policyMetadata && !s.Now().Before(until) {
+		return nil, time.Time{}, ErrGrantUnavailable
 	}
 	return out, until, nil
 }

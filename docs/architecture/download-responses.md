@@ -48,4 +48,50 @@ Focused domain tests simulate a 1 TiB whole response and 16,384 windows. Coordin
 
 A completed metadata observation releases and joins its first current-identity batch before response/window admission. The same request-owned live reader acquires a new, independently checked batch for the exact original actor/client and artifact/version. The old observation is never extended, and metadata discovery/decryption is not repeated. Only the already verified immutable native facts are retained; current access/deletion dates and original session/response/connection bounds are intersected before content admission. Current denial or cancellation prevents a response reservation and any native read. This prevents a normally slow metadata conversation from consuming almost all of the following content conversation's five-second authority interval.
 
-The SQL45 fixture uses the actual browser live-reader implementation with explicitly synthetic session storage, rather than a one-use fake reader. This does not qualify a real provider or generic large-file throughput; each individual context conversation remains bounded by its original five-second proof/operation interval.
+The SQL45 fixture uses the actual browser live-reader implementation with explicitly synthetic session storage, rather than a one-use fake reader. This does not qualify a real provider or generic large-file throughput; that historical fixture bounded each individual context conversation by its original five-second proof/operation interval. ADR-258 below separates the regional response conversation from current disclosure observations.
+
+
+## Regional response renewal (ADR-258)
+
+One remote cursor and its original key opening serve the same prepaid window,
+source/version, range, owner and generation across multiple current delivery
+leases. Between acknowledged chunks, the live caller may provide a new
+independently checked identity batch. A higher delivery sequence is atomically
+bound to the existing native owner using the existing SQL renewal transition;
+its acknowledged sequence replaces the process cache. Unknown renewal closes
+the conversation and retains uncertain spend. No old identity batch, lease,
+failed write or closed owner can be revived.
+
+The native response operation pins processing identity from a proof valid at
+its original StartedAt. That immutable identity is not current processing or
+disclosure authority: SQL claim, observation and renewal independently check
+current processing state, recovery, parent and worker/certificate. The original
+proof's dates remain unchanged. Other operation kinds retain their existing
+processing-observation rules. Response ownership has one fixed candidate
+20-second ceiling, intersected with original caller, worker and access bounds;
+each returned native/delivery observation still lasts at most five seconds.
+Inbound waits may use the fixed ceiling; outbound disclosure requires the short
+current check. No observation rolls the original conversation forward.
+
+The full initial worker attestation also returns its independently reviewed
+actual token expiry through a local purpose-specific port. NativeOrigin retains
+that immutable admission privately; short proof dates are never extended and
+key binding still requires fresh five-second proof. Each receiving hop attests
+independently. During the fixed response SQL worker/certificate/processing and
+permission checks continue, with no extra Kubernetes calls or retained raw token.
+A Kubernetes-only identity change can take at most the original twenty-second
+window to be independently observed; the next window fully reattests. Actual
+token/certificate/worker/access cutoffs still bound every final write and ACK
+through the exact checked chunk's NativeUntil. Missing remote cutoff denies.
+
+Local qualification uses real two-hop mTLS and the production final HTTPS sink,
+with deterministic 750 ms blocking final writes: an 8,126,572-byte window took
+6.313 s (1.228 MiB/s), with 70 current-check callbacks and two lease renewals.
+Resume and stale If-Range fallback retained exact bytes and one source opening
+per window. Paced revocation stopped after 7,340,032 bytes and original-request
+expiry after 4,194,304 bytes. SQL/source/identity in this transport test are
+synthetic; callback count is not an API/SQL count. Actual native SQL renewal,
+real Kubernetes attestation and the full SQL/S3/KMS cost remain separately qualified.
+The candidate ceiling still implies about 0.4 MiB/s for a full 8 MiB window
+before control overhead; these results do not establish arbitrary slow-client
+support or complete the installed download requirement.

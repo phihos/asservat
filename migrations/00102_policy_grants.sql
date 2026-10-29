@@ -1,0 +1,473 @@
+-- +goose Up
+-- ADR-259: distinct team-policy review, request-anchored periods and prepaid
+-- observation. Existing ad hoc rows retain their original contract.
+LOCK TABLE access_grant,operation_audit IN ACCESS EXCLUSIVE MODE;
+
+ALTER TABLE access_grant ADD COLUMN requester_kind text NOT NULL DEFAULT 'human';
+ALTER TABLE access_grant ADD COLUMN request_operation text NOT NULL DEFAULT 'requestGrant';
+ALTER TABLE access_grant ADD COLUMN requester_key bytea;
+ALTER TABLE access_grant ALTER COLUMN preview_id DROP NOT NULL;
+ALTER TABLE access_grant ALTER COLUMN capture_id DROP NOT NULL;
+ALTER TABLE access_grant ALTER COLUMN pod_uid DROP NOT NULL;
+ALTER TABLE access_grant ADD COLUMN policy_uid text;
+ALTER TABLE access_grant ADD COLUMN policy_acceptance_id uuid REFERENCES policy_acceptance(id);
+ALTER TABLE access_grant ADD COLUMN policy_scope jsonb;
+ALTER TABLE access_grant ADD COLUMN policy_not_after timestamptz;
+ALTER TABLE access_grant ADD COLUMN policy_max_executions bigint GENERATED ALWAYS AS ((policy_scope#>>'{Limits,MaxExecutions}')::bigint) STORED;
+ALTER TABLE access_grant ADD COLUMN policy_max_bytes bigint GENERATED ALWAYS AS ((policy_scope#>>'{Limits,MaxBytes}')::bigint) STORED;
+ALTER TABLE access_grant ADD COLUMN policy_max_observed_bytes bigint GENERATED ALWAYS AS ((policy_scope#>>'{Limits,MaxObservedBytes}')::bigint) STORED;
+ALTER TABLE access_grant ADD COLUMN policy_executions_spent bigint NOT NULL DEFAULT 0;
+ALTER TABLE access_grant ADD COLUMN policy_bytes_spent bigint NOT NULL DEFAULT 0;
+ALTER TABLE access_grant ADD COLUMN policy_observed_bytes_spent bigint NOT NULL DEFAULT 0;
+
+-- Only the old kind/lifetime/expiry and requester-key constraints change.
+-- The original target/digest/decision/revocation/disclosure checks remain.
+-- +goose StatementBegin
+DO $$ DECLARE c record; BEGIN
+ FOR c IN SELECT conname FROM pg_constraint
+  WHERE conrelid='public.access_grant'::regclass
+   AND ((contype='c' AND (pg_get_constraintdef(oid) LIKE '%kind = ''adHocCapture''%'
+         OR pg_get_constraintdef(oid) LIKE '%lifetime_seconds%'))
+    OR (contype='u' AND pg_get_constraintdef(oid) LIKE '%requester_issuer, requester_subject, idempotency_key%'))
+ LOOP EXECUTE format('ALTER TABLE public.access_grant DROP CONSTRAINT %I',c.conname); END LOOP;
+END $$;
+-- +goose StatementEnd
+ALTER TABLE access_grant ADD CONSTRAINT access_grant_kind CHECK(kind IN('adHocCapture','policy'));
+ALTER TABLE access_grant ADD CONSTRAINT access_grant_requester_kind CHECK(requester_kind IN('human','workload'));
+ALTER TABLE access_grant ADD CONSTRAINT access_grant_scope_kind CHECK((
+ (kind='adHocCapture' AND requester_kind='human' AND request_operation='requestGrant' AND requester_key IS NULL
+  AND preview_id IS NOT NULL AND capture_id IS NOT NULL AND pod_uid IS NOT NULL
+  AND policy_uid IS NULL AND policy_acceptance_id IS NULL AND policy_scope IS NULL AND policy_not_after IS NULL
+  AND lifetime_seconds BETWEEN 60 AND 28800
+  AND policy_executions_spent=0 AND policy_bytes_spent=0 AND policy_observed_bytes_spent=0)
+ OR
+ (kind='policy' AND request_operation='requestPolicyGrant'
+  AND requester_key IS NOT NULL AND octet_length(requester_key)=32
+  AND requester_key=sha256(int4send(octet_length(convert_to(requester_issuer,'UTF8'))) || convert_to(requester_issuer,'UTF8') || int4send(octet_length(convert_to(requester_subject,'UTF8'))) || convert_to(requester_subject,'UTF8') || int4send(octet_length(convert_to(requester_client,'UTF8'))) || convert_to(requester_client,'UTF8') || int4send(octet_length(convert_to(requester_kind,'UTF8'))) || convert_to(requester_kind,'UTF8'))
+  AND preview_id IS NULL AND capture_id IS NULL AND pod_uid IS NULL
+  AND policy_uid IS NOT NULL AND octet_length(policy_uid) BETWEEN 1 AND 64
+  AND policy_acceptance_id IS NOT NULL AND policy_scope IS NOT NULL
+  AND jsonb_typeof(policy_scope)='object' AND octet_length(policy_scope::text)<=65536
+  AND policy_scope ?& ARRAY['Authority','Limits','ApprovalPolicyRef','ApprovalMaxAge','RecipeDigest']
+  AND policy_scope#>>'{Authority,PolicyUID}'=policy_uid
+  AND policy_scope#>>'{Authority,ClusterID}'=cluster_id::text
+  AND policy_scope#>>'{Authority,NamespaceUID}'=namespace_uid
+  AND policy_scope#>>'{Authority,WorkloadUID}'=workload_uid
+  AND lifetime_seconds BETWEEN 1 AND 31536000
+  AND (policy_scope->>'ApprovalMaxAge')::bigint BETWEEN lifetime_seconds::bigint*1000000000 AND 31536000000000000
+  AND policy_not_after IS NOT NULL AND policy_not_after>requested_at
+  AND policy_not_after<=requested_at+make_interval(secs=>lifetime_seconds)
+  AND policy_not_after<=(policy_scope#>>'{Authority,NotAfter}')::timestamptz
+  AND result_access IS NULL AND result_access_digest IS NULL AND not_after IS NULL
+  AND max_artifacts=0 AND max_bytes=0 AND max_operations=0
+  AND artifacts_spent=0 AND bytes_spent=0 AND operations_spent=0
+  AND policy_max_executions IS NOT NULL AND policy_max_executions>0
+  AND policy_max_bytes IS NOT NULL AND policy_max_bytes>0
+  AND policy_max_observed_bytes IS NOT NULL AND policy_max_observed_bytes>=0)
+) IS TRUE);
+ALTER TABLE access_grant ADD CONSTRAINT access_grant_policy_pool CHECK(
+ policy_executions_spent>=0 AND policy_bytes_spent>=0 AND policy_observed_bytes_spent>=0
+ AND (kind<>'policy' OR (policy_executions_spent<=policy_max_executions
+  AND policy_bytes_spent<=policy_max_bytes AND policy_observed_bytes_spent<=policy_max_observed_bytes
+  AND (decision IS NOT DISTINCT FROM 'approved' OR (policy_executions_spent=0 AND policy_bytes_spent=0 AND policy_observed_bytes_spent=0))))
+);
+ALTER TABLE access_grant ADD CONSTRAINT access_grant_expiry_kind CHECK(
+ decision IS DISTINCT FROM 'approved' OR
+ (decision_acr IS NOT NULL AND decision_auth_time IS NOT NULL AND decision_auth_time<=decided_at
+ AND ((kind='adHocCapture' AND expires_at=LEAST(decided_at+make_interval(secs=>lifetime_seconds),COALESCE(not_after,'infinity'::timestamptz)))
+   OR (kind='policy' AND expires_at=policy_not_after)))
+);
+CREATE UNIQUE INDEX access_grant_legacy_request ON access_grant(root_id,requester_issuer,requester_subject,idempotency_key) WHERE kind='adHocCapture';
+CREATE UNIQUE INDEX access_grant_policy_request ON access_grant(root_id,requester_key,request_operation,idempotency_key) WHERE kind='policy';
+CREATE INDEX access_grant_policy_deadline ON access_grant(root_id,policy_not_after) WHERE kind='policy' AND (decision IS NULL OR decision='approved');
+
+-- Policy grants have no capture identity and therefore cannot parent personal
+-- artifact children. Preserve the exact original root/capture of legacy rows.
+ALTER TABLE access_grant ADD CONSTRAINT access_grant_child_scope UNIQUE(root_id,id,capture_id);
+ALTER TABLE access_grant_child ADD CONSTRAINT access_grant_child_exact_parent FOREIGN KEY(root_id,parent_id,capture_id) REFERENCES access_grant(root_id,id,capture_id);
+ALTER TABLE policy_acceptance ADD CONSTRAINT policy_acceptance_grant_scope UNIQUE(root_id,id,policy_uid);
+ALTER TABLE access_grant ADD CONSTRAINT access_grant_exact_policy_acceptance
+ FOREIGN KEY(root_id,policy_acceptance_id,policy_uid) REFERENCES policy_acceptance(root_id,id,policy_uid);
+ALTER TABLE access_grant ADD CONSTRAINT access_grant_policy_parent UNIQUE(root_id,id,policy_acceptance_id,policy_uid);
+
+-- Separate from browser session settings. Original bounded observations and
+-- accepted lower maxima are published atomically with the monotonic clamp.
+CREATE TABLE policy_grant_settings (
+ root_id uuid PRIMARY KEY REFERENCES permission_stream(id),
+ installation_id uuid NOT NULL,
+ issuer text NOT NULL CHECK(octet_length(issuer) BETWEEN 1 AND 2048),
+ source_uid text NOT NULL CHECK(octet_length(source_uid) BETWEEN 1 AND 64),
+ source_generation bigint NOT NULL CHECK(source_generation BETWEEN 1 AND 2147483647),
+ source_digest bytea NOT NULL CHECK(octet_length(source_digest)=32),
+ observed_at timestamptz NOT NULL,
+ fresh_until timestamptz NOT NULL,
+ default_age_seconds integer NOT NULL CHECK(default_age_seconds BETWEEN 1 AND 31536000),
+ max_age_seconds integer NOT NULL CHECK(max_age_seconds BETWEEN default_age_seconds AND 31536000),
+ renewal_notice_seconds integer NOT NULL CHECK(renewal_notice_seconds BETWEEN 1 AND max_age_seconds),
+ CHECK(fresh_until>observed_at AND fresh_until<=observed_at+interval '30 seconds')
+);
+
+-- Immutable original authority is separate from these cumulative counters.
+-- Replacing/reattaching a grant never replaces the acceptance's spent pool.
+ALTER TABLE policy_acceptance ADD COLUMN collected_bytes_spent bigint NOT NULL DEFAULT 0;
+ALTER TABLE policy_acceptance ADD COLUMN observed_bytes_spent bigint NOT NULL DEFAULT 0;
+ALTER TABLE policy_acceptance ADD CONSTRAINT policy_acceptance_byte_pools CHECK (
+ collected_bytes_spent BETWEEN 0 AND COALESCE((record#>>'{Authority,Limits,MaxBytes}')::bigint,0)
+ AND observed_bytes_spent BETWEEN 0 AND COALESCE((record#>>'{Authority,Limits,MaxObservedBytes}')::bigint,0)
+);
+
+-- Historical execution/occurrence state cannot prove an exact pre-102 output or
+-- observation reservation. Preserve uncertainty at the ORIGINAL authored maxima.
+-- Include pending/refused/unlinked occurrences, not just successful replies.
+-- Pristine acceptances without any execution or occurrence keep their zero pool.
+UPDATE policy_acceptance SET
+ collected_bytes_spent=COALESCE((record#>>'{Authority,Limits,MaxBytes}')::bigint,0),
+ observed_bytes_spent=COALESCE((record#>>'{Authority,Limits,MaxObservedBytes}')::bigint,0)
+WHERE executions_spent>0 OR id IN(SELECT acceptance_id FROM policy_occurrence);
+
+-- The existing trigger occurrence already spent one accepted execution.
+-- Capture admission freezes its output reservation; no second use journal.
+ALTER TABLE policy_occurrence ADD COLUMN reserved_capture_id uuid UNIQUE REFERENCES context_capture(id);
+ALTER TABLE policy_occurrence ADD COLUMN grant_id uuid;
+ALTER TABLE policy_occurrence ADD COLUMN reserved_bytes bigint NOT NULL DEFAULT 0;
+ALTER TABLE policy_occurrence ADD CONSTRAINT policy_occurrence_grant_scope
+ FOREIGN KEY(root_id,grant_id,acceptance_id,policy_uid) REFERENCES access_grant(root_id,id,policy_acceptance_id,policy_uid);
+ALTER TABLE policy_occurrence ADD CONSTRAINT policy_occurrence_reservation CHECK (
+ (reserved_capture_id IS NULL AND grant_id IS NULL AND reserved_bytes=0)
+ OR (reserved_capture_id IS NOT NULL AND reserved_bytes BETWEEN 1 AND 1099511627776)
+);
+-- +goose StatementBegin
+CREATE FUNCTION protect_policy_occurrence_reservation() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+ IF OLD.reserved_capture_id IS NOT NULL AND
+  (TG_OP='DELETE' OR ROW(NEW.reserved_capture_id,NEW.grant_id,NEW.reserved_bytes)
+   IS DISTINCT FROM ROW(OLD.reserved_capture_id,OLD.grant_id,OLD.reserved_bytes)) THEN
+  RAISE EXCEPTION 'policy capture reservation never changes or refunds' USING ERRCODE='23514';
+ END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION protect_policy_occurrence_reservation() FROM PUBLIC;
+CREATE TRIGGER policy_occurrence_reservation_immutable BEFORE UPDATE OR DELETE ON policy_occurrence
+ FOR EACH ROW EXECUTE FUNCTION protect_policy_occurrence_reservation();
+
+ALTER TABLE policy_source ADD COLUMN authored_grant_ref text NOT NULL DEFAULT ''
+ CHECK(authored_grant_ref='' OR authored_grant_ref ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
+
+-- An explicit activate_policy receipt, never a newest-grant index or new
+-- authority. The transport acknowledges its encrypted intent before mutation.
+CREATE TABLE policy_grant_attachment (
+ id uuid PRIMARY KEY,
+ root_id uuid NOT NULL,
+ installation_id uuid NOT NULL,
+ policy_uid text NOT NULL,
+ acceptance_id uuid NOT NULL REFERENCES policy_acceptance(id),
+ grant_id uuid NOT NULL REFERENCES access_grant(id),
+ authority_digest bytea NOT NULL CHECK(octet_length(authority_digest)=32),
+ authored_grant_ref text NOT NULL CHECK(authored_grant_ref='' OR authored_grant_ref=grant_id::text),
+ actor_issuer text NOT NULL CHECK(octet_length(actor_issuer) BETWEEN 1 AND 2048),
+ actor_subject text NOT NULL CHECK(octet_length(actor_subject) BETWEEN 1 AND 256),
+ actor_client text NOT NULL CHECK(octet_length(actor_client) BETWEEN 1 AND 256),
+ actor_key bytea NOT NULL CHECK(octet_length(actor_key)=32 AND actor_key=sha256(int4send(octet_length(convert_to(actor_issuer,'UTF8'))) || convert_to(actor_issuer,'UTF8') || int4send(octet_length(convert_to(actor_subject,'UTF8'))) || convert_to(actor_subject,'UTF8') || int4send(octet_length(convert_to(actor_client,'UTF8'))) || convert_to(actor_client,'UTF8') || int4send(5) || convert_to('human','UTF8'))),
+ idempotency_key text NOT NULL CHECK(octet_length(idempotency_key) BETWEEN 1 AND 128),
+ request_digest bytea NOT NULL CHECK(octet_length(request_digest)=32),
+ attached_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+ FOREIGN KEY(root_id,policy_uid) REFERENCES policy_source(root_id,policy_uid),
+ FOREIGN KEY(root_id,grant_id,acceptance_id,policy_uid) REFERENCES access_grant(root_id,id,policy_acceptance_id,policy_uid),
+ UNIQUE(root_id,actor_key,idempotency_key),
+ UNIQUE(root_id,policy_uid,id)
+);
+CREATE TRIGGER policy_grant_attachment_immutable BEFORE UPDATE OR DELETE ON policy_grant_attachment
+ FOR EACH ROW EXECUTE FUNCTION protect_access_grant_history();
+ALTER TABLE policy_source ADD COLUMN grant_attachment_id uuid;
+ALTER TABLE policy_source ADD CONSTRAINT policy_source_exact_grant_attachment
+ FOREIGN KEY(root_id,policy_uid,grant_attachment_id) REFERENCES policy_grant_attachment(root_id,policy_uid,id);
+
+-- ADR-261: one finite policy-only recorder session/fence. All input credit is
+-- spent in both original pools, including uncertain replies. No renewal/refund.
+CREATE TABLE policy_observation_session (
+ id uuid PRIMARY KEY,
+ root_id uuid NOT NULL,
+ policy_uid text NOT NULL,
+ acceptance_id uuid NOT NULL,
+ grant_id uuid NOT NULL,
+ capture_id uuid NOT NULL UNIQUE,
+ attempt_id uuid NOT NULL REFERENCES custody_attempt(id),
+ fence uuid NOT NULL,
+ action_id text NOT NULL CHECK(octet_length(action_id) BETWEEN 1 AND 128),
+ pod_uid text NOT NULL CHECK(octet_length(pod_uid) BETWEEN 1 AND 128),
+ node_uid text NOT NULL CHECK(octet_length(node_uid) BETWEEN 1 AND 128),
+ boot_id text NOT NULL CHECK(octet_length(boot_id) BETWEEN 1 AND 128),
+ collector_pod_uid text NOT NULL CHECK(octet_length(collector_pod_uid) BETWEEN 1 AND 128),
+ collector_epoch text NOT NULL CHECK(octet_length(collector_epoch) BETWEEN 1 AND 128),
+ expectation_digest bytea NOT NULL CHECK(octet_length(expectation_digest)=32),
+ program_digest bytea NOT NULL CHECK(octet_length(program_digest)=32),
+ binding_scope bytea NOT NULL CHECK(octet_length(binding_scope)=32),
+ accounting_rule bytea NOT NULL CHECK(accounting_rule=decode('4d3f2eea2ed280bd7017ea2398a4cde18d94daacbcc4c8741a98d52c56697453','hex')),
+ source_observed_at timestamptz NOT NULL,
+ source_fresh_until timestamptz NOT NULL,
+ started_at timestamptz NOT NULL,
+ session_until timestamptz NOT NULL,
+ lease_until timestamptz NOT NULL,
+ start_by timestamptz NOT NULL,
+ duration_millis bigint NOT NULL CHECK(duration_millis BETWEEN 1000 AND 15000),
+ sequence bigint NOT NULL CHECK(sequence=1),
+ credit bigint NOT NULL CHECK(credit BETWEEN 1 AND 1099511627776),
+ max_bytes_per_second bigint NOT NULL CHECK(max_bytes_per_second BETWEEN 1 AND 1073741824),
+ ended_at timestamptz,
+ FOREIGN KEY(capture_id,root_id) REFERENCES context_capture(id,root_id),
+ FOREIGN KEY(root_id,grant_id,acceptance_id,policy_uid) REFERENCES access_grant(root_id,id,policy_acceptance_id,policy_uid),
+ CHECK(session_until>started_at AND session_until<=started_at+interval '20 seconds'),
+ CHECK(lease_until=session_until),
+ CHECK(start_by>started_at AND start_by<=started_at+interval '10 seconds'
+  AND start_by+duration_millis*interval '1 millisecond'<=lease_until),
+ CHECK(source_observed_at<=started_at AND source_fresh_until>started_at
+  AND source_fresh_until<=source_observed_at+interval '5 seconds'),
+ CHECK(ended_at IS NULL OR ended_at>=started_at)
+);
+CREATE INDEX policy_observation_active ON policy_observation_session(root_id,acceptance_id,lease_until) WHERE ended_at IS NULL;
+-- +goose StatementBegin
+CREATE FUNCTION protect_policy_observation_session() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+ IF TG_OP='INSERT' THEN
+  IF NEW.ended_at IS NOT NULL OR clock_timestamp()>=NEW.start_by
+   OR clock_timestamp()>=NEW.source_fresh_until OR NEW.started_at>clock_timestamp()
+   OR NOT EXISTS(SELECT 1 FROM public.context_capture c WHERE c.id=NEW.capture_id
+     AND c.root_id=NEW.root_id AND c.attempt_id=NEW.attempt_id) THEN
+   RAISE EXCEPTION 'invalid original observation session' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+ END IF;
+ IF TG_OP='DELETE' THEN
+  -- The same protected finalizer already proved writer/backend quiescence and
+  -- acknowledged encrypted deletion audit. An expired lease alone is not enough.
+  IF clock_timestamp()<OLD.lease_until OR NOT EXISTS(
+   SELECT 1 FROM public.context_deletion_checkpoint d
+   JOIN public.custody_attempt a ON a.id=d.attempt_id
+   WHERE d.root_id=OLD.root_id AND d.attempt_id=OLD.attempt_id AND d.capture_id=OLD.capture_id
+    AND d.audit_acknowledged_at IS NOT NULL AND d.finalization_xid=pg_current_xact_id()
+    AND a.state='deleted') THEN
+   RAISE EXCEPTION 'observation retirement requires finalized capture' USING ERRCODE='23514';
+  END IF;
+  RETURN OLD;
+ END IF;
+ IF OLD.ended_at IS NOT NULL OR NEW.ended_at IS NULL
+  OR (to_jsonb(NEW)-'ended_at')<>(to_jsonb(OLD)-'ended_at') THEN
+  RAISE EXCEPTION 'original finite observation session is immutable' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION protect_policy_observation_session() FROM PUBLIC;
+CREATE TRIGGER policy_observation_session_monotonic BEFORE INSERT OR UPDATE OR DELETE ON policy_observation_session
+ FOR EACH ROW EXECUTE FUNCTION protect_policy_observation_session();
+
+-- +goose StatementBegin
+CREATE FUNCTION protect_policy_collection_spend() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+ IF NEW.executions_spent<OLD.executions_spent
+  OR NEW.collected_bytes_spent<OLD.collected_bytes_spent
+  OR NEW.observed_bytes_spent<OLD.observed_bytes_spent THEN
+  RAISE EXCEPTION 'policy collection spend never decreases' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION protect_policy_collection_spend() FROM PUBLIC;
+CREATE TRIGGER policy_acceptance_collection_monotonic BEFORE UPDATE ON policy_acceptance
+ FOR EACH ROW EXECUTE FUNCTION protect_policy_collection_spend();
+
+-- A restrictive settings overlay is the only non-spend edit to a reviewed
+-- lifetime. It does not change revision, decision time or original review.
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION protect_access_grant() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+DECLARE
+ counters text[] := ARRAY['artifacts_spent','bytes_spent','operations_spent',
+  'policy_executions_spent','policy_bytes_spent','policy_observed_bytes_spent'];
+ mutable text[] := ARRAY['decision','approver_issuer','approver_subject','approver_client','decision_reason','decision_acr','decision_auth_time','decided_at','decision_key','expires_at',
+  'revoked_at','revoker_issuer','revoker_subject','revoker_client','revoke_key','revision','policy_not_after',
+  'artifacts_spent','bytes_spent','operations_spent','policy_executions_spent','policy_bytes_spent','policy_observed_bytes_spent'];
+ spent boolean;
+ before_row jsonb;
+ after_row jsonb;
+BEGIN
+ -- Stored generated values are computed after BEFORE triggers. Compare the
+ -- immutable source columns, never NEW's not-yet-computed generated fields.
+ before_row := to_jsonb(OLD)-ARRAY['policy_max_executions','policy_max_bytes','policy_max_observed_bytes'];
+ after_row := to_jsonb(NEW)-ARRAY['policy_max_executions','policy_max_bytes','policy_max_observed_bytes'];
+ IF TG_OP='DELETE' OR (after_row-mutable)<>(before_row-mutable) THEN
+  RAISE EXCEPTION 'access grant is immutable' USING ERRCODE='23514';
+ END IF;
+ spent := ROW(NEW.artifacts_spent,NEW.bytes_spent,NEW.operations_spent,NEW.policy_executions_spent,NEW.policy_bytes_spent,NEW.policy_observed_bytes_spent)
+   IS DISTINCT FROM ROW(OLD.artifacts_spent,OLD.bytes_spent,OLD.operations_spent,OLD.policy_executions_spent,OLD.policy_bytes_spent,OLD.policy_observed_bytes_spent);
+ IF NEW.artifacts_spent<OLD.artifacts_spent OR NEW.bytes_spent<OLD.bytes_spent OR NEW.operations_spent<OLD.operations_spent
+  OR NEW.policy_executions_spent<OLD.policy_executions_spent OR NEW.policy_bytes_spent<OLD.policy_bytes_spent OR NEW.policy_observed_bytes_spent<OLD.policy_observed_bytes_spent THEN
+  RAISE EXCEPTION 'access grant spend never decreases' USING ERRCODE='23514';
+ END IF;
+ IF OLD.decision IS NULL AND NEW.decision IS NOT NULL THEN
+  IF spent OR NEW.policy_not_after IS DISTINCT FROM OLD.policy_not_after
+   OR OLD.revoked_at IS NOT NULL OR NEW.revoked_at IS NOT NULL OR NEW.revision<>OLD.revision+1
+   OR clock_timestamp()>=OLD.review_until OR (OLD.kind='policy' AND clock_timestamp()>=OLD.policy_not_after) THEN
+   RAISE EXCEPTION 'access grant decision refused' USING ERRCODE='23514';
+  END IF;
+ ELSIF OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL THEN
+  IF spent OR NEW.revision<>OLD.revision+1 OR (after_row-ARRAY['revoked_at','revoker_issuer','revoker_subject','revoker_client','revoke_key','revision'])<>(before_row-ARRAY['revoked_at','revoker_issuer','revoker_subject','revoker_client','revoke_key','revision']) THEN
+   RAISE EXCEPTION 'access grant revocation refused' USING ERRCODE='23514';
+  END IF;
+ ELSIF NEW.policy_not_after IS DISTINCT FROM OLD.policy_not_after THEN
+  IF OLD.kind<>'policy' OR NEW.policy_not_after IS NULL OR NEW.policy_not_after>=OLD.policy_not_after
+   OR (after_row-ARRAY['policy_not_after','expires_at'])<>(before_row-ARRAY['policy_not_after','expires_at'])
+   OR NEW.expires_at IS DISTINCT FROM (CASE WHEN OLD.decision='approved' THEN NEW.policy_not_after ELSE NULL END) THEN
+   RAISE EXCEPTION 'access grant deadline only shortens' USING ERRCODE='23514';
+  END IF;
+ ELSIF spent THEN
+  IF OLD.decision IS DISTINCT FROM 'approved' OR OLD.revoked_at IS NOT NULL OR clock_timestamp()>=OLD.expires_at
+   OR (after_row-counters)<>(before_row-counters) THEN
+   RAISE EXCEPTION 'access grant pool is not usable' USING ERRCODE='23514';
+  END IF;
+ ELSE
+  RAISE EXCEPTION 'access grant is immutable' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+DO $$ BEGIN
+ EXECUTE 'COMMENT ON TABLE public.goose_db_version IS ''asservat:oldest-binary-schema=102''';
+END $$;
+-- +goose StatementEnd
+
+-- Existing encrypted operation-audit envelope, with one new closed command.
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION operation_audit_lane(operation_name text) RETURNS text
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+ SELECT CASE WHEN operation_name IN ('connector_process_enrollment','connector_client_certificate','connector_server_certificate','connector_backing_acceptance','connector_retirement') THEN 'identity'
+ WHEN operation_name='persist_capture_intent' THEN 'capture' WHEN operation_name='release_processing' THEN 'processing'
+ WHEN operation_name='resolve_capture_request' THEN 'resolution'
+ WHEN operation_name IN ('list_diagnostics','preview_capture','request_capture','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','download_artifact_content','initialize_processing','restrict_processing','get_file_excerpt','get_query_result','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing','preview_retention_change','get_grant','list_reviews','decide_review','revoke_grant','request_policy_grant') THEN 'normal' ELSE NULL END
+$$;
+CREATE OR REPLACE FUNCTION operation_audit_human_input_valid(operation_name text,input_format text) RETURNS boolean
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+ SELECT CASE WHEN operation_name IN ('get_file_excerpt','get_query_result') THEN input_format='context-query-input/v1'
+ WHEN operation_name='download_artifact_content' THEN input_format='native-content-input/v1'
+ WHEN operation_name='persist_capture_intent' THEN input_format='capture-intent/v2'
+ WHEN operation_name IN ('initialize_processing','restrict_processing','release_processing') THEN input_format='processing-input/v1'
+ WHEN operation_name IN ('list_diagnostics','preview_capture','request_capture','resolve_capture_request','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing','preview_retention_change','get_grant','list_reviews','decide_review','revoke_grant','request_policy_grant') THEN input_format IN ('context-input/v1','invalid-input/v1') ELSE false END
+$$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION operation_audit_lane(text),operation_audit_human_input_valid(text,text) FROM PUBLIC;
+
+-- +goose Down
+-- Refuse incompatible survivors rather than destroy authority or spent state.
+LOCK TABLE access_grant,operation_audit IN ACCESS EXCLUSIVE MODE;
+-- +goose StatementBegin
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM operation_audit WHERE intent->>'Name'='request_policy_grant')
+  OR EXISTS(SELECT 1 FROM access_grant WHERE kind<>'adHocCapture')
+  OR EXISTS(SELECT 1 FROM policy_grant_attachment)
+  OR EXISTS(SELECT 1 FROM policy_observation_session)
+  OR EXISTS(SELECT 1 FROM policy_occurrence WHERE reserved_capture_id IS NOT NULL)
+  OR EXISTS(SELECT 1 FROM policy_acceptance WHERE collected_bytes_spent<>0 OR observed_bytes_spent<>0)
+  OR EXISTS(SELECT 1 FROM access_grant GROUP BY root_id,requester_issuer,requester_subject,idempotency_key HAVING count(*)>1) THEN
+  RAISE EXCEPTION 'policy grant state prevents rollback' USING ERRCODE='23514';
+ END IF;
+END $$;
+-- +goose StatementEnd
+DROP TRIGGER policy_occurrence_reservation_immutable ON policy_occurrence;
+DROP FUNCTION protect_policy_occurrence_reservation();
+ALTER TABLE policy_occurrence DROP CONSTRAINT policy_occurrence_grant_scope, DROP CONSTRAINT policy_occurrence_reservation;
+ALTER TABLE policy_occurrence DROP COLUMN reserved_capture_id, DROP COLUMN grant_id, DROP COLUMN reserved_bytes;
+DROP TABLE policy_observation_session;
+DROP FUNCTION protect_policy_observation_session();
+ALTER TABLE policy_source DROP CONSTRAINT policy_source_exact_grant_attachment;
+ALTER TABLE policy_source DROP COLUMN grant_attachment_id, DROP COLUMN authored_grant_ref;
+DROP TABLE policy_grant_attachment;
+DROP TRIGGER policy_acceptance_collection_monotonic ON policy_acceptance;
+DROP FUNCTION protect_policy_collection_spend();
+ALTER TABLE policy_acceptance DROP CONSTRAINT policy_acceptance_byte_pools;
+ALTER TABLE policy_acceptance DROP COLUMN collected_bytes_spent, DROP COLUMN observed_bytes_spent;
+DROP TABLE policy_grant_settings;
+ALTER TABLE access_grant_child DROP CONSTRAINT access_grant_child_exact_parent;
+ALTER TABLE access_grant DROP CONSTRAINT access_grant_child_scope;
+ALTER TABLE access_grant DROP CONSTRAINT access_grant_policy_parent, DROP CONSTRAINT access_grant_exact_policy_acceptance;
+ALTER TABLE policy_acceptance DROP CONSTRAINT policy_acceptance_grant_scope;
+DROP INDEX access_grant_policy_deadline;
+DROP INDEX access_grant_policy_request;
+DROP INDEX access_grant_legacy_request;
+ALTER TABLE access_grant DROP CONSTRAINT access_grant_kind, DROP CONSTRAINT access_grant_requester_kind,
+ DROP CONSTRAINT access_grant_scope_kind, DROP CONSTRAINT access_grant_policy_pool, DROP CONSTRAINT access_grant_expiry_kind;
+ALTER TABLE access_grant DROP COLUMN requester_key, DROP COLUMN requester_kind, DROP COLUMN request_operation,
+ DROP COLUMN policy_uid, DROP COLUMN policy_acceptance_id, DROP COLUMN policy_max_executions,
+ DROP COLUMN policy_max_bytes, DROP COLUMN policy_max_observed_bytes, DROP COLUMN policy_scope,
+ DROP COLUMN policy_not_after, DROP COLUMN policy_executions_spent, DROP COLUMN policy_bytes_spent,
+ DROP COLUMN policy_observed_bytes_spent;
+ALTER TABLE access_grant ALTER COLUMN preview_id SET NOT NULL, ALTER COLUMN capture_id SET NOT NULL, ALTER COLUMN pod_uid SET NOT NULL;
+ALTER TABLE access_grant ADD CHECK(kind='adHocCapture'), ADD CHECK(lifetime_seconds BETWEEN 60 AND 28800),
+ ADD UNIQUE(root_id,requester_issuer,requester_subject,idempotency_key),
+ ADD CHECK (decision IS DISTINCT FROM 'approved' OR (expires_at=LEAST(decided_at+make_interval(secs => lifetime_seconds),COALESCE(not_after,'infinity'::timestamptz)) AND decision_acr IS NOT NULL AND decision_auth_time IS NOT NULL AND decision_auth_time<=decided_at));
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION protect_access_grant() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+DECLARE
+ mutable text[] := ARRAY['decision','approver_issuer','approver_subject','approver_client','decision_reason','decision_acr','decision_auth_time','decided_at','decision_key','expires_at',
+  'revoked_at','revoker_issuer','revoker_subject','revoker_client','revoke_key','revision','artifacts_spent','bytes_spent','operations_spent'];
+ spent boolean;
+BEGIN
+ IF TG_OP='DELETE' OR (to_jsonb(NEW)-mutable)<>(to_jsonb(OLD)-mutable) THEN
+  RAISE EXCEPTION 'access grant is immutable' USING ERRCODE='23514';
+ END IF;
+ spent := NEW.artifacts_spent<>OLD.artifacts_spent OR NEW.bytes_spent<>OLD.bytes_spent OR NEW.operations_spent<>OLD.operations_spent;
+ IF NEW.artifacts_spent<OLD.artifacts_spent OR NEW.bytes_spent<OLD.bytes_spent OR NEW.operations_spent<OLD.operations_spent THEN
+  RAISE EXCEPTION 'access grant spend never decreases' USING ERRCODE='23514';
+ END IF;
+ IF OLD.decision IS NULL AND NEW.decision IS NOT NULL THEN
+  IF spent OR OLD.revoked_at IS NOT NULL OR NEW.revoked_at IS NOT NULL OR NEW.revision<>OLD.revision+1 OR clock_timestamp()>=OLD.review_until THEN
+   RAISE EXCEPTION 'access grant decision refused' USING ERRCODE='23514';
+  END IF;
+ ELSIF OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL THEN
+  IF spent OR NEW.revision<>OLD.revision+1 OR (to_jsonb(NEW)-ARRAY['revoked_at','revoker_issuer','revoker_subject','revoker_client','revoke_key','revision'])<>(to_jsonb(OLD)-ARRAY['revoked_at','revoker_issuer','revoker_subject','revoker_client','revoke_key','revision']) THEN
+   RAISE EXCEPTION 'access grant revocation refused' USING ERRCODE='23514';
+  END IF;
+ ELSIF spent THEN
+  IF OLD.decision IS DISTINCT FROM 'approved' OR OLD.revoked_at IS NOT NULL OR clock_timestamp()>=OLD.expires_at
+   OR (to_jsonb(NEW)-ARRAY['artifacts_spent','bytes_spent','operations_spent'])<>(to_jsonb(OLD)-ARRAY['artifacts_spent','bytes_spent','operations_spent']) THEN
+   RAISE EXCEPTION 'access grant pool is not usable' USING ERRCODE='23514';
+  END IF;
+ ELSE
+  RAISE EXCEPTION 'access grant is immutable' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+DO $$ BEGIN
+ EXECUTE 'COMMENT ON TABLE public.goose_db_version IS ''asservat:oldest-binary-schema=81''';
+END $$;
+-- +goose StatementEnd
+
+-- Restore the schema-101 closed audit command functions only after survivor refusal.
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION operation_audit_lane(operation_name text) RETURNS text
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+ SELECT CASE WHEN operation_name IN ('connector_process_enrollment','connector_client_certificate','connector_server_certificate','connector_backing_acceptance','connector_retirement') THEN 'identity'
+ WHEN operation_name='persist_capture_intent' THEN 'capture' WHEN operation_name='release_processing' THEN 'processing'
+ WHEN operation_name='resolve_capture_request' THEN 'resolution'
+ WHEN operation_name IN ('list_diagnostics','preview_capture','request_capture','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','download_artifact_content','initialize_processing','restrict_processing','get_file_excerpt','get_query_result','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing','preview_retention_change','get_grant','list_reviews','decide_review','revoke_grant') THEN 'normal' ELSE NULL END
+$$;
+CREATE OR REPLACE FUNCTION operation_audit_human_input_valid(operation_name text,input_format text) RETURNS boolean
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+ SELECT CASE WHEN operation_name IN ('get_file_excerpt','get_query_result') THEN input_format='context-query-input/v1'
+ WHEN operation_name='download_artifact_content' THEN input_format='native-content-input/v1'
+ WHEN operation_name='persist_capture_intent' THEN input_format='capture-intent/v2'
+ WHEN operation_name IN ('initialize_processing','restrict_processing','release_processing') THEN input_format='processing-input/v1'
+ WHEN operation_name IN ('list_diagnostics','preview_capture','request_capture','resolve_capture_request','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing','preview_retention_change','get_grant','list_reviews','decide_review','revoke_grant') THEN input_format IN ('context-input/v1','invalid-input/v1') ELSE false END
+$$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION operation_audit_lane(text),operation_audit_human_input_valid(text,text) FROM PUBLIC;

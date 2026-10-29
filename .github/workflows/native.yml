@@ -72,7 +72,7 @@ jobs:
           console: "${{ !startsWith(matrix.suite, 'collector-') }}"
           sql-tools: "${{ !startsWith(matrix.suite, 'collector-') }}"
           kind: "true"
-          helm: "${{ startsWith(matrix.suite, 'helm') || startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' }}"
+          helm: "${{ startsWith(matrix.suite, 'helm') || startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' }}"
       # ADR-243 decision 4: the harness's product image links the pinned
       # static libpcap (make hub-binary), shared with ci.yml's pcap-check
       # cache; building it needs flex and bison. The collector image does not.
@@ -87,12 +87,12 @@ jobs:
       # ADR-246: collector suites load BPF programs into the runner's kernel.
       # This fresh, disposable VM is the only place that creates the guard
       # file without which the harness and the collector refuse to start.
-      - if: startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording'
+      - if: startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording'
         name: Disposable-host guard
         run: sudo touch /etc/asservat-disposable-host
       # ADR-248: the collector suites open the downloaded PCAPNG with tshark
       # (offline file read only; nothing captures on the runner itself).
-      - if: startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording'
+      - if: startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording'
         name: tshark
         timeout-minutes: 3
         run: |
@@ -106,6 +106,21 @@ jobs:
           fi
           tshark --version | head -1
           capinfos --version | head -1
+      # The history composition drives real React on the installed recording
+      # focus. Reuse console CI's pinned Playwright browser/cache; no new image.
+      - if: matrix.suite == 'continuation-approved-recording'
+        id: playwright
+        run: echo "version=$(node -p "require('./web/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - if: matrix.suite == 'continuation-approved-recording'
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - if: matrix.suite == 'continuation-approved-recording'
+        name: Installed history browser
+        timeout-minutes: 3
+        working-directory: web
+        run: timeout --signal=TERM --kill-after=5s 170s npm exec --offline -- playwright install --only-shell chromium
       - name: Run ${{ matrix.suite }}
         env:
           SUITE: ${{ matrix.suite }}

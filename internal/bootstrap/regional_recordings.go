@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/application/evidence"
 	compiler "asservat.local/asservat/internal/application/planning"
@@ -236,8 +237,9 @@ type preparedRecording struct {
 }
 
 var (
-	_ evidence.PreparedContext = (*preparedRecording)(nil)
-	_ evidence.ContextRecorder = (*preparedRecording)(nil)
+	_ evidence.PreparedContext       = (*preparedRecording)(nil)
+	_ evidence.ContextRecorder       = (*preparedRecording)(nil)
+	_ evidence.PolicyContextRecorder = (*preparedRecording)(nil)
 )
 
 func (p *preparedRecording) StoreContext(context.Context, []byte, time.Time, time.Time) (artifact.Copies, error) {
@@ -252,6 +254,12 @@ func (p *preparedRecording) Close() {
 }
 
 func (p *preparedRecording) StartRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time) (time.Time, error) {
+	// The legacy operation carries no committed input permit. Refuse before
+	// transferring prepared ownership; only the future typed policy start may
+	// carry a current exact source and the original SQL observation reservation.
+	if r := p.expectation.Recording; r != nil && r.Filter != nil && compiler.RawBytePredicate(r.Filter.Expression) {
+		return time.Time{}, value.ErrUnavailable
+	}
 	p.mu.Lock()
 	prepared := p.prepared
 	p.prepared = nil
@@ -268,4 +276,55 @@ type noJournal struct{}
 
 func (noJournal) AdvanceStreaming(context.Context, artifact.StreamingPlan, artifact.StreamingStep) (artifact.StreamingState, bool, error) {
 	return artifact.StreamingState{}, false, errors.New("streaming journal unavailable on the connector")
+}
+
+// StartPolicyRecording consumes the original receipt only after all immutable
+// preflight checks. The expected-source queue rechecks the same facts against
+// its independently authenticated live node entry under the queue mutex.
+func (p *preparedRecording) StartPolicyRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time, source targets.PacketSourceObservation, permit collector.ObservationPermit) (time.Time, error) {
+	h, e := p.holder, p.expectation
+	r, b := e.Recording, permit.Binding
+	now := h.now()
+	if ctx == nil || ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || started.After(now) || started.Before(permit.StartedAt) || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID || source.PodUID != e.PodUID || r == nil || !r.Valid() || r.Filter == nil || !compiler.RawBytePredicate(r.Filter.Expression) || b.CaptureID != e.CaptureUID || b.ActionID != e.ActionID || b.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch || b.ExpectationDigest != [32]byte(evidence.ContextExpectationDigest(e)) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || permit.SessionUntil.After(e.Registration.WriteUntil) {
+		return time.Time{}, value.ErrDenied
+	}
+	work := collector.PacketCapture{CaptureID: e.CaptureUID, PodUID: e.PodUID, Duration: permit.Duration, MaxBytes: r.MaxBytes, Observation: &permit}
+	work.Program = make([]planning.BPFInstruction, len(r.Filter.Program))
+	for i, ins := range r.Filter.Program {
+		work.Program[i] = planning.BPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
+	}
+	work.ProgramDigest = [32]byte(compiler.FilterProgramDigest(work.Program))
+	if work.ProgramDigest != b.ProgramDigest || packets.CheckPrefixProgram(work.Program) != nil || !work.Valid() {
+		return time.Time{}, value.ErrDenied
+	}
+	queue, ok := h.nodes.(interface {
+		EnqueuePacketExpected(context.Context, targets.PacketSourceObservation, collector.PacketCapture, time.Time) (collector.Work, error)
+	})
+	if !ok {
+		return time.Time{}, value.ErrUnavailable
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.prepared == nil {
+		return time.Time{}, value.ErrDenied
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	now = h.now()
+	h.expireLocked(now)
+	if ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || len(h.held) >= maxHeldRecordings {
+		return time.Time{}, value.ErrUnavailable
+	}
+	if _, exists := h.held[e.CaptureUID]; exists {
+		return time.Time{}, value.ErrUnavailable
+	}
+	prepared := p.prepared
+	p.prepared = nil // entering the queue effect is single-use, including unknown replies
+	w, err := queue.EnqueuePacketExpected(ctx, source, work, permit.StartBy)
+	if err != nil {
+		return time.Time{}, value.ErrUnavailable
+	}
+	queued := now.UTC().Truncate(time.Microsecond)
+	h.held[e.CaptureUID] = &heldRecording{expectation: e, digest: evidence.ContextExpectationDigest(e), prepared: prepared, nodeUID: source.NodeUID, workID: w.ID, queued: queued, expires: e.Registration.WriteUntil.Add(recordingRetain), outcome: evidence.RecordingCollection{State: evidence.RecordingPending}}
+	return queued, nil
 }

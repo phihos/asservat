@@ -1,7 +1,9 @@
 package presentation
 
 import (
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/transport/conversion"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,76 +26,17 @@ type RecorderPreviewUseCase interface {
 
 // CompositionInput is the runtime subset of capture-composition.schema.json.
 // The input schema has already fixed each override's value shape by field.
-type CompositionInput struct {
-	Components []struct {
-		ID         string `json:"id"`
-		ProfileRef struct {
-			Catalog string `json:"catalog"`
-			Name    string `json:"name"`
-			Version string `json:"version"`
-		} `json:"profileRef"`
-		Overrides []struct {
-			ActionID string          `json:"actionID"`
-			Field    string          `json:"field"`
-			Value    json.RawMessage `json:"value"`
-		} `json:"overrides"`
-	} `json:"components"`
-	MaxTotalBytes int64  `json:"maxTotalBytes"`
-	MaxDuration   string `json:"maxDuration"`
-}
+type CompositionInput contracts.CaptureComposition
 
-type ringInput struct {
-	MaxAge            string `json:"maxAge"`
-	MaxBytes          int64  `json:"maxBytes"`
-	SegmentBytes      int64  `json:"segmentBytes"`
-	MaxSegments       int    `json:"maxSegments"`
-	Medium            string `json:"medium"`
-	StorageProfileRef string `json:"storageProfileRef"`
-}
-
-// composition converts typed literal values. Fields whose value types this
-// release does not model stay Unmodeled; the compiler refuses them by path.
 func (in *CompositionInput) composition() (*planning.ProfileComposition, error) {
-	out := &planning.ProfileComposition{MaxTotalBytes: in.MaxTotalBytes, MaxDuration: in.MaxDuration}
-	for _, c := range in.Components {
-		component := planning.ProfileComponent{ID: c.ID, Profile: planning.ProfileRef{Catalog: c.ProfileRef.Catalog, Name: c.ProfileRef.Name, Version: c.ProfileRef.Version}}
-		for _, o := range c.Overrides {
-			e := planning.ProfileEdit{ActionID: o.ActionID, Field: o.Field}
-			var err error
-			switch o.Field {
-			case "packetFilter", "packetBefore", "packetAfter", "syscallMode", "syscallBefore", "syscallAfter", "actionTimeout", "actionExecutionMode", "filePath", "profileDuration":
-				err = json.Unmarshal(o.Value, &e.Text)
-				e.TextSet = err == nil && e.Text == "" // present but empty: the field validator gives the remedy
-			case "syscallMaxEvents", "syscallRate", "actionMaxBytes":
-				err = json.Unmarshal(o.Value, &e.Number)
-			case "packetRing", "syscallRing":
-				var r ringInput
-				err = json.Unmarshal(o.Value, &r)
-				e.Ring = &planning.RingSettings{MaxAge: r.MaxAge, MaxBytes: r.MaxBytes, SegmentBytes: r.SegmentBytes, MaxSegments: r.MaxSegments, Medium: r.Medium, StorageProfileRef: r.StorageProfileRef}
-			case "syscallFilter":
-				var f struct {
-					Mode  string   `json:"mode"`
-					Names []string `json:"names"`
-				}
-				err = json.Unmarshal(o.Value, &f)
-				e.Syscalls = &planning.SyscallSelection{Mode: f.Mode, Names: f.Names}
-			default:
-				e.Unmodeled = true
-			}
-			if err != nil {
-				return nil, err
-			}
-			component.Edits = append(component.Edits, e)
-		}
-		out.Components = append(out.Components, component)
-	}
-	return out, nil
+	return conversion.CompositionFromWire(contracts.CaptureComposition(*in))
 }
 
 // RecorderPreviewData is preview_capture's composition reply (ADR-243). The
 // plan is complete and reviewable; capture_enabled is true only for a manual
 // network-header plan whose node recorder is available (ADR-248).
 type RecorderPreviewData struct {
+	RepeatedFrom     string             `json:"repeated_from_capture_id,omitempty"`
 	PreviewID        string             `json:"preview_id"`
 	ExpiresAt        time.Time          `json:"expires_at"`
 	ExecutionDigest  string             `json:"execution_digest"`
@@ -199,6 +142,9 @@ func (s *ContextOperations) recorderPreview(ctx context.Context, current identit
 	if err != nil {
 		return RecorderPreviewData{}, time.Time{}, err
 	}
+	return s.recorderPreviewResult(result, in.Target)
+}
+func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResult, target WorkloadReference) (RecorderPreviewData, time.Time, error) {
 	provenance, err := compiler.CompositionProvenance(result.Plan)
 	if err != nil {
 		return RecorderPreviewData{}, time.Time{}, value.ErrUnavailable
@@ -238,6 +184,6 @@ func (s *ContextOperations) recorderPreview(ctx context.Context, current identit
 		blockers = append(blockers, collectionBlockers(false)...)
 	}
 	return RecorderPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: len(blockers) == 0, ApprovalRequired: approval, Blockers: blockers,
-		Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: in.Target,
+		Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: target,
 		SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}}, result.ValidUntil, nil
 }

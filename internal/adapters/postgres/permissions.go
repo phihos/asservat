@@ -571,6 +571,28 @@ func (p *Permissions) Permissions(ctx context.Context, target authorization.Targ
 	return out, nil
 }
 
+// WorkloadPermissions reads only whole-workload assignments, excluding
+// decision-time single-Pod reviews. It shares the current accepted stream,
+// locks and audited assignment projection with concrete-Pod permission reads.
+func (p *Permissions) WorkloadPermissions(ctx context.Context, target authorization.WorkloadTarget) (authorization.WorkloadProjection, error) {
+	if !target.Valid() {
+		return authorization.WorkloadProjection{}, cfg.ErrInvalid
+	}
+	var concrete authorization.Projection
+	err := p.transaction(ctx, func(q *custodydb.Queries) error {
+		stream, err := q.SharePermissionStream(ctx, id(p.root))
+		if err != nil {
+			return err
+		}
+		concrete, err = permissionProjection(ctx, q, stream, authorization.Target{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID})
+		return err
+	})
+	if err != nil {
+		return authorization.WorkloadProjection{}, err
+	}
+	return authorization.WorkloadProjection{Target: target, Revision: concrete.Revision, ObservedAt: concrete.ObservedAt, FreshUntil: concrete.FreshUntil, DeniesComplete: concrete.DeniesComplete, DeniesObservedAt: concrete.DeniesObservedAt, DeniesFreshUntil: concrete.DeniesFreshUntil, Allows: concrete.Allows, Denies: concrete.Denies}, nil
+}
+
 // permissionProjection runs with the permission stream already locked. It may
 // be reused by named admission facets after taking their remaining SQL locks.
 func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, target authorization.Target) (authorization.Projection, error) {
@@ -631,21 +653,23 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 	// ADR-245: fresh decision-time allows of this exact Pod, each one
 	// principal's own recorded review by a current, acknowledged source. They
 	// are allow-only, so the row bound drops the oldest rather than failing.
-	reviews, err := q.SelectPermissionReviews(ctx, custodydb.SelectPermissionReviewsParams{StreamID: s.ID, Epoch: s.Epoch, SeenSequence: s.Sequence, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, WorkloadUid: target.WorkloadUID, PodUid: target.PodUID})
-	if err != nil {
-		return authorization.Projection{}, err
-	}
-	for _, r := range reviews {
-		if len(out.Allows)+len(out.Denies) >= 256 {
-			break
+	if target.PodUID != "" {
+		reviews, err := q.SelectPermissionReviews(ctx, custodydb.SelectPermissionReviewsParams{StreamID: s.ID, Epoch: s.Epoch, SeenSequence: s.Sequence, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, WorkloadUid: target.WorkloadUID, PodUid: target.PodUID})
+		if err != nil {
+			return authorization.Projection{}, err
 		}
-		deadline := identity.Earlier(until, r.FreshUntil.Time)
-		if !rootAudited || !n.Time.Before(deadline) || !currentAuthorityAuditReceipt(uid(s.ID), uid(r.AcceptedAuditID), r.AcknowledgedAt.Valid, r.ObjectKey, r.ObjectVersion, r.ObjectEtag, r.ObjectBytes, r.ObjectSha256) {
-			continue
+		for _, r := range reviews {
+			if len(out.Allows)+len(out.Denies) >= 256 {
+				break
+			}
+			deadline := identity.Earlier(until, r.FreshUntil.Time)
+			if !rootAudited || !n.Time.Before(deadline) || !currentAuthorityAuditReceipt(uid(s.ID), uid(r.AcceptedAuditID), r.AcknowledgedAt.Valid, r.ObjectKey, r.ObjectVersion, r.ObjectEtag, r.ObjectBytes, r.ObjectSha256) {
+				continue
+			}
+			audience := artifact.AudienceAssignment{Kind: "User", Issuer: r.Issuer, SubjectID: r.SubjectID, Role: r.Role, BasisKind: "PermissionSource", BasisUID: r.SourceUid, AssignmentID: uid(r.ID)}
+			copy(audience.BasisDigest[:], r.BasisDigest)
+			out.Allows = append(out.Allows, authorization.CurrentAssignment{Audience: audience, ObservedAt: r.DecidedAt.Time, FreshUntil: deadline, Reviewed: true})
 		}
-		audience := artifact.AudienceAssignment{Kind: "User", Issuer: r.Issuer, SubjectID: r.SubjectID, Role: r.Role, BasisKind: "PermissionSource", BasisUID: r.SourceUid, AssignmentID: uid(r.ID)}
-		copy(audience.BasisDigest[:], r.BasisDigest)
-		out.Allows = append(out.Allows, authorization.CurrentAssignment{Audience: audience, ObservedAt: r.DecidedAt.Time, FreshUntil: deadline, Reviewed: true})
 	}
 	n, err = q.CurrentTime(ctx)
 	if err != nil {

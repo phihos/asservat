@@ -461,3 +461,14 @@ func TestCaptureFailurePhaseRecordsTheCause(t *testing.T) {
 		}
 	}
 }
+
+func TestPolicyRawRunnerRequiresSameWorkSourceBeforePreparation(t *testing.T) {
+	f, s, current := apiRunner(t)
+	f.work.Actor = authorization.PolicyPrincipal("11111111-1111-4111-8111-111111111111", "policy")
+	f.work.Accepted.Expectation.Recording = &artifact.Recording{Filter: &artifact.RecordingFilter{Expression: "tcp[13] & 2 != 0"}}
+	_, err := s.execute(t.Context(), current, f.work, f.now.Add(5*time.Second), nil, nil)
+	var step apiCheckStep
+	if err == nil || !errors.As(err, &step) || step.step != "ResolvePacketSource" || f.prepares.Load() != 0 || f.captures.Load() != 0 {
+		t.Fatal("unsupported exact source reached preparation/acquisition", err, f.prepares.Load(), f.captures.Load())
+	}
+}

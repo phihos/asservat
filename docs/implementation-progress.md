@@ -1,5 +1,1209 @@
 # Sustained implementation progress
 
+## History harness observes the application reader (2026-10-29)
+
+Local actual Chromium/Go HTTP2 composition reproduced the same `ERR_ABORTED`
+class while unchanged production `postOperation` successfully read and validated
+the history response. The bounded five-run batch retained one failing inspector
+read and four passing iterations. This demonstrates a possible false harness
+failure; the installed UI outcome remains unestablished. A paired experiment
+skipping cancellation after EOF failed on both baseline and candidate; that
+candidate was restored and is not a repair.
+
+The harness-only follow-up observes bytes returned by the application's own
+reader for four exact metadata POST operations. It adds no reader, clone, tee,
+request or fallback, preserves the same Response/reader/cancellation, and accepts
+only actual EOF within existing byte bounds. Independent canonical output
+validation and all existing row/settings/provenance/edit/UI assertions remain.
+Read errors, abort, headers, duplicates, overflow, malformed JSON/UTF8 and schema
+failures refuse. Buffers are bounded, consumed/cleared and never logged. Product
+Go and web/src remain byte-identical to `7cb581de`. Both new runtime inputs are
+included in canonical source hashing and its inventory regression.
+
+Five local actual HTTP2 runs passed (245 normal replies, fifteen refusal
+controls, 260 requests and matched audit Begin/Finish). Final HTTP2 race,
+Chromium controls, console check/build/browser journeys, native console restart
+and all 24 source-selection tests passed. Independent review was clear. The
+controls use synthetic underlying authority/history fixtures; the UI-negative
+control is synthetic DOM, not installed React qualification. Composed Chromium refusal controls (0.815s), all 24 source-selection tests
+(0.281s) and canonical pre-push (30.267s, 231 console tests) also passed.
+Installed verification remains pending. No installed retry is queued.
+
+## Installed history cancellation class retained (2026-10-29)
+
+Exact `7cb581de` passed all fifteen CI jobs and fresh review. Its one focused
+[installed history diagnostic run 40932727792](https://github.com/phihos/asservat/actions/runs/40932727792)
+failed after initial capture and four acknowledged storage copies. Diagnostics
+was HTTP 200/ok/complete. The HTTP-200 history-list body could not be read by the
+Playwright response helper; the retained closed network code is now `aborted`
+(Chromium `ERR_ABORTED`). Settings, edited preview and repeat were not reached.
+This class does not identify who aborted or establish that the browser UI also
+failed. No return/write-failure stage appears in retained aggregate server logs;
+truncation/aggregation prevents inferring absence. No cause or repair is claimed.
+
+The complete browser-phase bracket is at most 5.3 seconds including startup,
+navigation, authentication, inputs, diagnostics and history. An ordinary new
+10-second request timer or 60-second session refresh cannot explain that bracket.
+The driver sampled the aborted failure before its assertion and final browser
+close; that later close does not explain the sampled flag. The complete server
+history envelope is bounded at 24,576 bytes, below the frontend's 32,768-byte
+limit. These are exclusions, not an identified cancellation source.
+
+Actual Go/test exits were 1 (617.887s package, 149.55s focused child); the native
+job took 926s. Root verified seven artifact files, 58 monitor references, all
+3,413 canonical and 36,006 tracked source hashes, provider-log exit 0, removed
+scratch and empty cleanup failures before releasing the freeze. The retained
+2,060-byte PCAPNG has eighteen enhanced packet blocks and is initial structural
+evidence only. No retry is queued. Local investigation now separates actual
+React/client completion from Playwright response-body retrieval and tests the
+actual Chromium/Go HTTP2 combination, without relaxing failed-body checks.
+
+## Installed history body failure and bounded diagnostics (2026-10-29)
+
+Exact `47d08aab` passed all fifteen CI jobs and fresh review, then failed its
+single [installed history run 40913094447](https://github.com/phihos/asservat/actions/runs/40913094447).
+Initial capture succeeded with four acknowledged storage copies. Browser
+`list_diagnostics` was HTTP 200/ok/complete; `list_capture_history` was HTTP
+200 with `network-failed`, `requestFailed=true` and an unreadable body. Its
+exact Chromium network error was not retained. Settings, edited preview and
+repeat were not reached. Aggregated server diagnostics have no per-request
+linkage. The caller correction therefore establishes neither the cause nor a
+repair of this separate transport failure.
+
+Go/test exited 1 (603.900s package, 152.29s focused child); the native job took
+905s. Root verified all 3,413 canonical and 36,006 tracked source hashes,
+provider-log exit 0, removed build scratch and empty cleanup failures before
+releasing the source freeze. The retained initial PCAPNG is 1,460 bytes with
+twelve enhanced packet blocks; it does not qualify history/repeat.
+
+The next diagnostic candidate adds exact closed Chromium network-error codes
+after body-read rejection and failure-only server return facts for diagnostics,
+history and settings. The server records both original context state and the
+effective metadata deadline after normal cleanup, before its own cancellation;
+it does not infer which caused the failure. Successful replies emit no new log.
+Only existing reporting runs on failure; no new remote calls, authority windows,
+timers, retries or writer behavior are added. Forced cleanup holds in actual
+TLS/HTTP2 controls are explicitly test-induced, not an installed-cause claim.
+Focused and full browser races and canonical pre-push passed on the isolated
+server candidate; real Chromium diagnostic controls and console checks passed
+on the isolated browser candidate. Composed full browser race (53.357s), real Chromium controls (0.381s) and
+canonical pre-push (29.764s, 231 console tests) also passed. Independent review
+found no blocker in defer ordering, closed logging or unchanged authority/writer
+behavior. Root verified both candidate reports, all 26 artifact references and
+each clean candidate's 36,006 tracked hashes. No new installed retry is queued.
+
+## Residency witness clock repair; production unchanged (2026-10-29)
+
+Combined `90b474e8` passed local pre-push and fresh review, but
+[CI 40903899154](https://github.com/phihos/asservat/actions/runs/40903899154)
+failed `TestContextStartOriginalResidencyCanEndSelectedQuery` during initial
+opening after 4.04 seconds, before its intended query witness. Thirteen jobs
+passed; the test shard and aggregate failed. No infrastructure retry or
+installed run followed that failure.
+
+The natural local baseline passed. A controlled 1.5-second initial fixture-clock
+age reproduced `process-open` refusal before dialing: the retained owned proof
+had expired while the original setup and caller contexts remained live. The
+test advanced its frozen clock only during a later source read, after the
+original proof's start had already been sampled. The first advancing-clock
+control exposed another fixture issue: separate timestamp samples declared an
+interval slightly longer than five seconds, correctly rejected by production.
+Both failed controls remain recorded. CI lacked the closed stage/initial age,
+so this is a demonstrated fixture defect and inferred CI explanation, not a
+proven exact CI cause or product defect.
+
+The test-only correction selects a coherent advancing clock for that real-time
+witness and samples each returned source/registration observation once. Other
+tests retain their frozen clock. The four-second delay, five-second setup and
+thirty-second residency remain unchanged. The witness now checks that its
+original owned proof starts after opening begins and stays inside the original
+setup bound. A ten-millisecond aged-clock control successfully opened, then
+failed this new assertion, making the regression check deterministic.
+
+Focused race (29.082s), full affected mTLS race (66.739s) and canonical pre-push
+passed on the isolated correction. All production bytes remain identical to
+`90b474e8`; this repairs test setup and does not fix the installed preview error.
+
+## Caller status equivalence: local correction and real API evidence (2026-10-29)
+
+The remaining caller-observation full-Pod comparison reproduced a local false
+refusal on resource-version-only and informational-status-only updates. The
+actual HTTPS/client-go regression retained twelve critical-field negatives.
+The separate `f31e8400` correction independently validates both already-read
+caller Pods with the existing caller-specific checks and unchanged v1 workload
+digest, plus explicit finalizer equality. It adds no owner-routing Ready/IP
+condition, permission, API request, timer or deadline extension. Focused races
+and canonical pre-push passed; independent source review was clear. This is a
+confirmed local defect, not an established cause of the installed history error.
+
+A synthetic full-validation benchmark measured an extra 118,169 ns, 25,017
+allocated bytes and 233 allocations per stabilized boundary: about 0.355 ms and
+75,052 allocated bytes across three boundaries. These are local arithmetic
+estimates, not installed overhead or a CPU-neutrality claim.
+
+One frozen `a15c5af9` metadata-only run used two owned Kind clusters and the
+existing provider fixture; the scenario itself used the first cluster. Actual
+Pod-bound TokenRequest/TokenReview and API status PATCHes exercised the corrected
+caller. Three confirmed status changes and six caller GETs completed the original
+Begin/Claim/Final operation in 1.652 seconds with 3.348 seconds remaining. Go and
+qualification exited 0 (4.776s package, 149.864s whole command). The annotation
+negative confirmed an admitted mutation, its actual GET reflection and refusal;
+its generic-error assertion did not isolate the refusal's cause or explicitly
+check the live context. Review caught that test gap after the frozen run began.
+Its evidence remains narrowly scoped, and stronger assertions require their own
+execution before being called qualified.
+
+Root verified all 3,413 canonical and 36,006 tracked hashes, empty cleanup
+failures and exact owned container/network/image/scratch absence. No BPF or
+collector executed. Installation/process pins remain fixture inputs. The local
+correction and test follow-up are not merged, and recording history/repeat
+remains installed-unqualified.
+
+## Edited recording preview reaches a concrete failure (2026-10-29)
+
+Composed `08c0a804` passed all fifteen CI jobs and fresh review. Its single
+[installed history run 40891973567](https://github.com/phihos/asservat/actions/runs/40891973567)
+accepted the initial capture and acknowledged all four storage copies. The
+built React driver then read diagnostics, capture history and saved settings:
+all three responses were HTTP 200, `ok`, with complete bodies. The edited
+`preview_capture` returned HTTP 200 with `ParametersUnavailable`, also with a
+complete body and no request failure. Approval/repeat after that preview was
+not reached. This attempt does not reproduce the earlier unreadable settings
+body or establish that it is repaired.
+
+Aggregated server diagnostics include `history dispatch:
+exchange-stream/read/other` and `history unavailable: read/execute/live`.
+They have no per-request linkage and do not establish the failing exchange's
+cause. The new initial-storage permission flags did not emit because that
+failure callback was not taken. A remaining full-Pod equality check in the
+caller-observation path is a source lead under investigation, not an installed
+cause or verified fix.
+
+Go/test exited 1 (633.953s package, 154.65s focused child); the native job took
+928s. Root verified all 3,412 canonical hashes, all 36,005 unchanged tracked
+files, provider-log exit 0, removed build scratch and empty cleanup failures.
+The 1,460-byte retained initial PCAPNG contains twelve enhanced packet blocks;
+it does not qualify recording history/repeat. Source freeze was released only
+after terminal verification. No automatic retry is queued.
+
+## Composed diagnostics, timestamp correction and merged query fix (2026-10-29)
+
+[PR #104](https://github.com/phihos/asservat/pull/104) merged as `5b427315` after
+all fifteen CI jobs and fresh review passed. Automatic main CI also passed all
+fifteen jobs; root read back a merged tree identical to the tested head. Its
+typed owned-query writer preserves the original payload deadline and synchronous
+cleanup while allowing bounded zero-payload HTTP completion. Unowned settings
+and history replies do not use that ownership path, so this is not their repair.
+The transport evidence uses actual audited C18 composition and TLS/HTTP2 with
+synthetic underlying authority/reader ports; full installed query qualification
+is not established by those tests.
+
+The packet adapter now pairs the published program's MONOTONIC timestamps with
+one matching sample per capture instead of a BOOTTIME offset. A pinned-helper
+injected-clock regression reproduced a one-hour error from a known prior suspend
+offset. Pure/tagged tests and a static collector build passed; no BPF ran locally.
+The legacy zero-timestamp arrival fallback remains explicit. Actual suspend,
+wall-clock changes and installed timestamp qualification remain pending.
+
+Clean composed `270bcde2` passed canonical pre-push (0, 30.226s, 231 console
+tests), full presentation/MCP/browser races (0, 94.618s command) and tagged
+Gadget/bootstrap races (0, 74.395s command). Independent review checked the
+browser merge: owned queries retain the shared 64 KiB contract, while only
+authenticated unowned settings retain their existing 160 KiB allowance.
+
+The failure-only exact-preview diagnostic now also reports bounded ordinary
+Allow-basis, sequence, lifetime, maintainer and acknowledgement flags using the
+same single three-second SQL read. Stored permission observations use the
+existing thirty-second contract; the separate derived operation proof remains
+five seconds. PermissionReview decision-source scopes and complete authorizing
+observations are deliberately not inferred from these fixture-admin facts.
+
+The first local context-harness attempt was rejected because its native branch
+returns before the selected preview child: Go exited 0, but no required child
+ran and the harness exited 1. That is a selection failure, not a SQL pass or
+product defect. The corrected custody-harness selection passed the required
+preview child and all six named permission controls (outer/Go/qualification 0,
+15.840s outer, 2.096s Go package, 0.65s child). Five-/thirty-second positives,
+suspension, lease/date preservation and genuine unacknowledged activation checks
+also completed. Root independently verified all 3,369 custody-source, 3,412
+canonical-source and 36,005 tracked hashes, empty cleanup failures and exact
+owned resource/workdir absence. Neither provider-log nor build-scratch fields
+were reported by that successful harness; no such result is invented. Individual
+SQL-query duration was not measured separately.
+
+These changes do not repair or qualify installed recording history. The latest
+installed run below still failed at readiness before capture/browser execution.
+The new stored-state flags must distinguish the next observed failure before a
+producer change is justified. The separate local ring component remains unwired;
+SourceManager, ongoing authority, Save and installed source coverage remain open.
+
+## Later history attempt stopped at storage readiness (2026-10-29)
+
+The diagnostic-only candidate `960a28bc` passed all fifteen jobs in
+[CI 40867691109](https://github.com/phihos/asservat/actions/runs/40867691109)
+and fresh requested review with no open findings. The single
+[history run 40869970360](https://github.com/phihos/asservat/actions/runs/40869970360)
+failed before capture or browser execution. Its initial `OutcomeUnknown` resolved
+closed at `request/facts/storage/expired/readiness-tail`. The later diagnostic
+found the original matching thirty-second binding expired by 114.525 seconds,
+while a current refresh demand was 4.062 seconds old. These facts do not identify
+why the producer did not refresh the intended binding. Aggregate regional logs
+include successful guarded observations and permission-scope refusals without
+per-workload correlation. No body-failure classifier or PCAP was reached.
+
+Actual Go/test exits were 1 (596.898s package, 125.52s child); job/run wall times
+were 900/912 seconds, with zero Ubuntu billable milliseconds reported by the API.
+Root verified all 3,408 canonical sources and 36,001 frozen local tracked hashes,
+unchanged sources, provider-log exit 0, empty cleanup failures and removed build
+scratch. Environment SHA-256:
+`a7d4f8c6af22c2d36b07d4b4f7481d36b102a47639f69b27767ea7ad4c9f1bd0`.
+The freeze is released for local investigation; no retry is queued. The earlier
+settings body-read failure remains unresolved and is a separate observed failure.
+
+## Installed history settings response-read failure (2026-10-29)
+
+The composed owner-read candidate `80c826fe` passed all fifteen jobs in
+[CI 40860311182](https://github.com/phihos/asservat/actions/runs/40860311182)
+and fresh requested review with no findings. The single
+[history run 40863490795](https://github.com/phihos/asservat/actions/runs/40863490795)
+failed later in the installed browser journey: the initial submission resolved
+accepted, storage reported four acknowledgements, and diagnostics/history listing
+returned HTTP 200 with complete valid replies. `get_capture_settings` returned
+HTTP 200, but the driver's response-body read failed. The driver obtained no JSON
+parse verdict; this does not identify a server, transport or browser protocol
+cause. A prior Go MCP settings call succeeded. The edited preview and
+repeat were not reached. No automatic retry follows.
+
+Actual Go/test exits were 1 (598.779s package, 154.47s child); job/run wall times
+were 937/952 seconds, with zero Ubuntu billable milliseconds reported by the API.
+Root independently verified all 3,408 canonical sources, unchanged source during
+the test, all 36,001 frozen local tracked hashes, provider-log exit 0, empty
+cleanup failures and removed build scratch. The retained initial PCAPNG is 560
+bytes with three enhanced-packet blocks; it is not a history/repeat qualification.
+The environment SHA-256 is
+`86872558755d4a44a4cb310786ee2b91ca4b78fefdb0b4a910046b4abb0aae9d`.
+The source freeze is released for investigation. PR #103 remains draft; the
+earlier source-bound policy/paced passes remain scoped evidence.
+
+## Relevant owner Pod equivalence correction (2026-10-29)
+
+A local HTTPS/native-reader regression reproduced false refusal when an
+informational Pod status/resourceVersion update occurred between a boundary's
+two GETs, while both versions passed the existing protected-object validator
+with the same workload digest. The same update between boundaries already
+passed. The second GET now independently uses that validator and must retain
+the identical canonical digest. Both reads, critical identity/spec/Ready/phase/
+node/address/controller/deletion checks, original dates and terminal cancellation
+remain; this changes no API count, authority interval, pool or permission.
+See [ADR-150](decisions/150-operation-owned-native-observation-proof.md#relevant-pod-equivalence-inside-a-native-boundary-2026-10-29)
+for measured comparison costs, critical negative controls and scope.
+
+One owned real-Kubernetes selection passed all eight required parent/child cases
+on `ce643e54` (Go/test 0, 10.985s), with exact source hashes and independently
+verified cleanup/resource absence. Its later `600a146e` result update is docs-only.
+It qualifies the native primitive, not owner SQL/TLS/ordinal-four composition or
+the cause of the installed failure. No BPF, Gadget or collector ran locally.
+
+The composed candidate passed canonical pre-push on clean `402f980c` (0,
+30.427s, 231 console tests) and broader affected Kubernetes/mTLS owner-observation
+races (0, 68.842s command). All 36,001 tracked hashes stayed unchanged and the
+temporary dependency link was removed. Independent review of all five changed
+candidate paths found no blocker. The maintained CI shards subsequently passed
+on exact `80c826fe`; no local full-gate pass is asserted. Fresh review found no
+issues. The installed result above remains a failure, with no causal attribution
+to the locally reproduced Pod-status defect and no automatic retry queued.
+
+## Instrumented history readiness failure (2026-10-29)
+
+Diagnostic-only `80b9a000` passed all fifteen jobs in
+[CI 40847273979](https://github.com/phihos/asservat/actions/runs/40847273979)
+and fresh [review](https://github.com/phihos/asservat/pull/103#issuecomment-6492618037)
+with no open findings; all eighteen comments and zero threads were read.
+The single instrumented
+[history run 40849033981](https://github.com/phihos/asservat/actions/runs/40849033981)
+failed before capture/browser execution. The initial request resolved closed at
+`request/facts/storage/expired/readiness-tail`. At the later diagnostic, its
+original thirty-second binding was expired by 112.625 seconds and its current
+refresh demand was 4.021 seconds old.
+
+A demand refresh reported guarded-read/claim/post refusal after 2.27 seconds.
+Owner logs also reported registration-3/last-read/owner-read/final-native refusal.
+These labels lack per-call identity and wall-clock correlation; they neither
+identify which combined final-native predicate failed nor prove every message
+belongs to that demand. The new browser body classes were not reached. The
+earlier HTTP-200 history failure remains unresolved, alongside intermittent
+readiness. No installed retry follows automatically.
+
+Actual command/Go/test exits were 1 (601.958s package, 125.80s child); job/run wall
+times of 908/923 seconds stayed below the limit, and the API reported zero Ubuntu billable
+milliseconds. Root independently verified all 3,407 canonical source hashes,
+unchanged sources, empty cleanup failures, removed scratch and all 36,000 frozen
+tracked hashes. The freeze is released for local reproduction, not a claimed
+repair or qualification pass. The two scoped positive `c328a5af` recording and
+transfer results below remain source-bound evidence.
+
+## Browser history response attribution (2026-10-29)
+
+The follow-up to `c328a5af` is diagnostic only. The browser handler reports one
+fixed `response-write-started` stage if its existing write/flush fails after
+output starts; it does not append another response or change any deadline.
+An actual audited TLS/HTTP2 regression reproduced the previously silent branch
+(RED 1.318s); focused races and the full browser race suite passed (33.622s).
+Synthetic witnesses received either a prefix or complete JSON followed by a
+transport error. Neither is attributed to the installed history failure.
+
+The installed driver now distinguishes body-read, empty, UTF-8, JSON and envelope
+failures without retaining response bytes or exception text in diagnostics.
+Nine actual Chromium/loopback controls passed, including truncation and client
+abort. Both armed response waiters retain immediate rejection handling and the
+browser still closes on failure. The imported helper is explicitly included in
+the existing canonical source inventory and its regression check. These changes
+repair missing attribution, not history availability; no functional frontend
+defect or installed cause has been established.
+
+Final combined checks passed on clean `d70077b7`: canonical pre-push returned 0
+(30.222s, 231 console tests), the full browser race suite returned 0 (34.462s),
+all nine actual Chromium controls passed, and the explicit source-inventory
+regression and both driver/helper syntax checks passed. All 36,000 tracked
+hashes stayed unchanged, the temporary dependency link was removed and the tree
+was clean. Independent review of all nine candidate files found no blocker.
+The result update is docs-only. Fresh exact-head CI/review and any further
+installed attempt remain pending; no automatic retry is queued.
+
+## Installed finite policy and renewed native transfer (2026-10-29)
+
+Frozen `c328a5af` passed all fifteen jobs in
+[CI 40841093762](https://github.com/phihos/asservat/actions/runs/40841093762),
+with fresh [review approval](https://github.com/phihos/asservat/pull/103#issuecomment-6491607029)
+and no findings. All thirteen comments and zero review threads were read.
+One three-command installed campaign then established two scoped passes:
+
+- [Policy 40842273194](https://github.com/phihos/asservat/actions/runs/40842273194)
+  passed the exact one-byte collector refusal, creator disablement/readback,
+  current sponsoring manager and original expiry, replacement attachment and
+  original-grant revocation, second restart/publication, authenticated retrieval
+  and actual tshark ACK/header/no-payload checks. The retained native PCAPNG is
+  2,660 bytes with 24 packets, SHA-256
+  `fa1071a85ae82c5371de48fb256e59b909e1dc31acc54d79cfcf70f88fb52076`.
+  Go/test returned 0 (573.017s package, 101.68s policy child). The 48 MiB + 1
+  input and 16 MiB output values are reservations, not measured produced bytes.
+- [Paced 40842297608](https://github.com/phihos/asservat/actions/runs/40842297608)
+  passed unpaced and 6.518-second paced retrieval of the same 8,388,476-byte
+  PCAPNG, SHA-256
+  `f85dca73d1fee208d4cdfe3d0cb3af40dbb6636bc7e22338dcb1f2b612853c99`.
+  Root independently matched both whole bodies, the two 4,194,238-byte ranges
+  and stale-If-Range whole result against retained bytes. Original owner/window,
+  at least one lease renewal, one key row/three consumed slots, final ACK and
+  joined closure passed; Complete is true. The actual target was the documented
+  200m reference profile. Go/test returned 0 (660.717s, 191.34s child). This is
+  not a 100m comparison, large-core qualification or an exact renewal-count trace.
+
+[History 40842283977](https://github.com/phihos/asservat/actions/runs/40842283977)
+failed after initial acceptance, native PCAP verification and four storage
+acknowledgements. Ten demand refreshes succeeded in 2.33–2.86 seconds; readiness
+did not fail in this attempt. The built React driver's history-list observation
+reported HTTP 200 with an unclassifiable reply. Its current diagnostic conflates
+body retrieval/JSON failure with an unrecognized status, so the response's cause
+is unresolved. Browser history, edited settings and repeated capture remain
+unqualified. Go/test returned 1 (612.786s, 151.32s child). The earlier intermittent
+cold-readiness failures are not explained or repaired by this attempt.
+
+Root independently verified every run's actual exits, all 3,405 canonical source
+hashes, unchanged sources, empty cleanup failures, removed build scratch and all
+35,997 frozen local tracked hashes. Each job stayed below twenty minutes. API
+timing reports zero Ubuntu billable milliseconds; actual job durations were
+935/987/1,005 seconds. The source freeze is released for isolated local browser
+reproduction; no automatic retry is queued. PR #103 remains draft. Full backing,
+maximum-shape, ongoing sources/rings/save and supported homelab readiness remain
+unfinished; the named passes do not complete S-04.
+
+## Follow-up to the fc0a installed failures (2026-10-29)
+
+All three guarded installed commands on frozen `fc0a4491` failed, despite
+fifteen passing CI jobs and fresh review. Policy run
+[40794684939](https://github.com/phihos/asservat/actions/runs/40794684939)
+passed creator disablement/readback, manager grant attachment/revocation and
+authenticated native retrieval, then failed the ACK-only field validator.
+History run [40794688705](https://github.com/phihos/asservat/actions/runs/40794688705)
+failed earlier at expired storage readiness; it did not reach the browser
+diagnostic. Paced run
+[40794692300](https://github.com/phihos/asservat/actions/runs/40794692300)
+verified an unpaced 8,388,460-byte PCAP and the actual 200m target profile, then
+failed renewed-stream completion at `send-done/proof-lease`. None qualifies the
+complete workflow. Each retained environment report records unchanged sources,
+empty cleanup failures and removed build scratch; actual Go/test exits were 1.
+
+An offline real-tshark regression reproduced the field mismatch: the tool emits
+`True`/`False`, whereas the fixture expected `1`. The validator now requires
+`True`, preserves the empty-payload requirement and emits closed failure classes.
+The installed fixture retains the bounded, authenticated and hash-checked PCAP
+before field validation, so a future refusal remains inspectable. An ephemeral
+Ubuntu container ran actual tshark 4.2.2 on synthetic product-recorder output:
+RED failed and GREEN passed without a skip, including non-ACK and payload
+negatives. No host collector or package was installed; the container was removed.
+This does not prove the failed installed artifact satisfied the privacy rule.
+
+A separate regression through the real admission/router and two-hop TLS path
+reproduced completion refusal when the retained outer response observation was
+older than the inner completion observation. The private zero-byte completion
+bridge now validates both current observations and preserves their earliest
+deadline while carrying the exact outer lease. Older observations are permitted
+only for this response completion; the strict server and evidence-byte paths are
+unchanged. Focused races include expired/changed identities, cancellation and
+invalid terminal frames. This establishes a local defect at the observed stage,
+not the unique cause or successful repair of the installed failure.
+
+Cold readiness remains unresolved. The existing capacity-demand reporting hook
+now reports closed `read`, `read-deadline` and `cluster-unmatched` stages that
+were previously silent. Missing candidate read budgets are explicitly
+not-applicable. This adds at most one report per serial refresh step, no backend
+requests, watches or background tasks, and changes no pool size, scheduling,
+freshness or authority deadline. Local regressions reproduce the missing reports;
+they do not establish why the installed readiness observation expired.
+
+Final combined checks passed on clean `4bdead35`: canonical `make pre-push`
+returned 0 (30.790s, including 231 console tests), maintained `make pcap-check`
+returned 0 (24.750s), and the native/capacity/bootstrap race command returned 0
+(101.701s). All five selected policy-fixture test families passed without skips
+(27.057s command). The separate tagged comparison against freshly compiled
+libpcap ACK instructions passed without a skip (20.093s command). All 35,997
+tracked file hashes remained unchanged and the temporary dependency link was
+removed; the tree was clean. The result update is documentation only.
+Fresh exact-head review/CI and installed qualification remain pending. Ongoing
+sources, rings and Save existing recordings remain unfinished; these corrections
+do not complete S-04.
+
+## Corrections after the c253 installed failures (2026-10-29)
+
+The fixture administrator correction obtains one fresh master/admin-cli token
+immediately before creator disablement and the same mandatory exact provider
+readback. A private fixture copy retains the pinned HTTPS client and five-second
+request timeout and attributes failures to the current child test. Cached
+administrator authorization was rejected; its exact expiry was not retained.
+Actual TLS RED reproduced HTTP 401 (0.017s); focused GREEN races passed (1.913s).
+The original fixture, user authority, TTLs and no-retry behavior remain intact.
+Cost is one fixture token request and zero product-runtime requests. The live
+creator-offboarding and positive artifact chain remain unqualified.
+
+The browser no-outcome branch now retains only ten existing outer failure-stage
+labels or other, stripping nested/provider details without calling Error().
+A real TLS/session/CSRF/audited Begin-failure regression reproduced the lost
+stage (RED 2.305s); focused and full browser/presentation races passed. This adds
+no I/O, state, timer or authority-window change and preserves the HTTP 503 wire
+response. It does not establish or repair the installed history failure's cause;
+see [ADR-255](decisions/255-encrypted-capture-history.md#closed-browser-no-outcome-diagnostic-2026-10-29).
+
+The synthetic native-paced target now has an explicit 200m CPU request/limit;
+all other fixture defaults remain 5m request/100m limit. Review found no product
+100m mandate. Exactly one target changes, with +195m scheduler reservation and
++100m permitted cap for its lifetime; +0.85 CPU-seconds is only the added cap
+within the 8.5-second traffic phase, not actual or whole-fixture consumption.
+Both traffic paths require the actual fetched Pod to declare that exact profile;
+optional CPU diagnostics cannot substitute for it. Traffic records/flushes,
+windows, the 8 MiB cap/near-full guard, product/collector resources and authority
+are unchanged. The old 100m failure remains underfilled and unqualified.
+
+One owned ordinary-HTTP probe on clean `15436479` passed (outer/Go/test 0,
+62.644s outer, 5.376s Go): 16 acknowledged batches, 65,536 records and 4 MiB in
+3.801s. Both actual declarations were 200m and effective quota was 20000/100000
+on the same container. All 3,398 source hashes matched; 35,990 tracked hashes
+matched after archiving generated reports and restoring them. Cleanup was empty
+and exact owned resources/scratch were independently absent.
+It used no collector/BPF or native artifact and supplies no 100m comparison,
+installed Gadget/native-transfer or causal performance result. See
+[ADR-258](decisions/258-slow-native-response-windows.md#explicit-native-paced-target-resource-profile-2026-10-29).
+
+The corrections passed final combined checks on clean `9a9d5c0f`: canonical
+pre-push 0 (30.020s, including 231 console tests), maintained libpcap 0 (7.476s),
+browser no-outcome races 0 and all eight selected fixture/profile races 0.
+All 35,992 tracked hashes stayed unchanged; the tree was clean after checks.
+Independent review of all twelve changed files versus `c253525f` found no blocker.
+The subsequent measured-result updates are docs-only with code byte-identical.
+Fresh exact-head CI/review and installed qualification remain pending; no hosted
+retry is queued. The accepted ongoing/source-save work remains unfinished.
+
+## Installed recording correction results (2026-10-29)
+
+Fresh CI [40784874267](https://github.com/phihos/asservat/actions/runs/40784874267)
+passed all fifteen jobs on `c253525f`, and fresh Gitar review approved with no
+findings. Three guarded installed commands on that frozen candidate all failed:
+
+- [Policy 40786145588](https://github.com/phihos/asservat/actions/runs/40786145588)
+  again proved the exact collector's one-byte ObservationBudgetExhausted refusal.
+  The corrected normal 64/64 MiB grant then passed request, review and retrieval.
+  The fixture's next Keycloak administrator PUT to disable the creator returned
+  HTTP 401, before the mandatory disabled-account readback. Creator departure,
+  manager attachment/revocation, positive artifact and native download remain
+  unqualified. Go/test returned 1 (524.703s package, policy child 65.81s). The
+  later parent-test FailNow message is secondary. Test, upload and Complete-job
+  steps finished by 23:30:18 UTC; GitHub's enclosing run/job still reported
+  in_progress at the independent evidence readback. The delayed parent status
+  finalized failure at 23:41:11 UTC; actual job execution was 837s. The provider
+  reported 1,500s total including delayed finalization, separately from the
+  finalized command failure and artifact evidence.
+- [History 40786150168](https://github.com/phihos/asservat/actions/runs/40786150168)
+  resolved initial AcquisitionNotStarted to accepted and retained the initial
+  authenticated 2,060-byte PCAPNG. The browser loaded diagnostics (HTTP 200),
+  then list_capture_history returned HTTP 503 before settings/edit/repeat.
+  The exact server diagnostic was call-no-outcome: the audited operation failed
+  without a delivery outcome, and this branch discarded its typed failure step.
+  Actual five-second expiry is not established. History listing uses the shared
+  identity/recovery/workload/SQL service, not RegionalHistoryDispatch; successful
+  sampled peer exchanges do not diagnose this failed list. Go/test returned 1
+  (600.004s package, approved child 150.09s), run 949s.
+- [Paced 40786153907](https://github.com/phihos/asservat/actions/runs/40786153907)
+  retained an authenticated unpaced 4,695,860-byte PCAPNG in 1.371s with matching
+  hash and passing native port/statistics/window checks. It then failed the
+  unchanged required 8,323,072–8,388,608-byte interval. The file contains 46,956
+  retained TCP packets on the reviewed port; combined reported drops are zero,
+  which does not establish upstream loss or hook readiness. Traffic reached its
+  genuine deadline after seven acknowledged batches. The unchanged 100m target
+  was throttled in all 85 measured periods and spent most reported CPU in system
+  time; this does not establish a cause. Paced body, ranges, owner/key renewal and
+  completion were not reached. Go/test returned 1 (630.034s package, approved
+  child 166.28s), run 995s.
+
+Independent root readback matched all 3,397 canonical source hashes for each
+command and all 35,989 frozen local tracked hashes. Sources were unchanged,
+cleanup failures empty and build scratch removed. Hosted cleanup is the retained
+runner report, not an independent remote Docker inspection. GitHub reports zero
+Ubuntu billable milliseconds; nonzero runner time remains recorded. Artifacts,
+per-file hashes, provider status and root reports are retained under
+`codex-bf86-resume/integrated-c253-*` in the existing build cache.
+
+All actual commands and artifact uploads are finalized; the execution-source
+freeze is released for isolated corrections. No automatic retry is queued and
+no complete installed workflow is qualified. Investigate the fixture admin
+credential, expose only a closed existing browser failure step with no extra IO,
+and establish a concrete traffic-path cost before changing that helper. Keep all
+production authority, CPU/traffic/window/cap limits and qualification guards.
+
+## Combined recording correction candidate (2026-10-29)
+
+Clean `bc48249c` composes the observation accounting correction, authored grant
+budget correction and native PCAP evidence ordering described below. Independent
+review of all ten changed files found no blocker. Combined `make pre-push`
+passed (30.369s, including 231 console tests), as did `make pcap-check` (5.873s,
+real user-space compiler/replay and static hub build). Full bootstrap races
+passed (63.431s package), authored-grant input races passed (1.615s package), and
+integration compilation passed. Every command returned 0; all 35,989 tracked
+file hashes stayed unchanged and the tree was clean after checks. No collector
+ran on this workstation. Evidence is retained under
+`codex-bf86-resume/post-faac-final-candidate-1` in the existing build cache.
+
+The owned native observation component result below remains separate from
+installed workflow qualification. The three failed `faac9dc4` runs remain the
+latest installed evidence. Fresh CI/review and bounded installed qualification
+of this composition are pending; history recovery and packet completeness
+remain unqualified. No limit, deadline, permission or guard was relaxed.
+
+## Observation active capacity and bounded replay retention (2026-10-28)
+
+Native 40776231613 failed before capture/history with an exact full-30-second
+binding expired by 106.948562 seconds and a current demand recorded 4.018931
+seconds before the diagnostic. That rules out the first-short-binding defect
+for this request. Its locator failures remain unattributed; the SQL permission
+denial is the intentional installed permission-reader negative probe.
+
+A separate local regression reproduces two fully joined operations consuming
+the production two-call active envelope until original expiry. The correction
+keeps active calls at the same ceiling, releases them only after all cleanup
+joins/token clearing, and retains same-ID markers in the existing map under a
+finite total of twice that ceiling. It changes an agent-authored concurrency
+restriction, not original authority, grants, input budgets or replay semantics.
+Maximum installed region scale remains nine active operations and eighteen
+retained entries; extra contexts/timers are bounded, not zero. Exact value sizes,
+residual saturation and terminal local checks are in [ADR-150](decisions/150-operation-owned-native-observation-proof.md#joined-active-capacity-and-bounded-replay-markers-2026-10-28).
+The one reviewed existing real-Kubernetes direct-observation selection on clean
+`c9d45572` passed (command/Go/test 0, parent 48.93s/Go 50.005s), including all five
+purposes and changed-template refusal. Actual observations took 2.347821–2.935617s
+within the original five seconds. All 3,397 source/35,989 tracked hashes matched,
+with generated reports archived before restoration, empty cleanup failures and
+independently verified exact owned-resource absence. No collector or retry ran.
+Synthetic initial authority and component scope remain explicit; installed cold
+refresh/history and Native causation remain unqualified. See ADR-150 for the
+archive, helper hash, bounds and proof limits.
+
+
+## Installed policy grant budget fixture corrected (2026-10-28)
+
+The frozen faac policy Native run 40776227145 reached the first real one-byte
+refusal: its control flow required public Failed, SQL captureFailed, original
+session credit of 1 byte and the exact original collector/Node's
+ObservationBudgetExhausted log. It then failed the second `request_policy_grant`
+with InvalidApprovalRequest, before creator departure, replacement grant,
+positive packet publication or payload/native-download checks. Go and the test
+returned exit 1 (502.631 s; policy child 49.56 s), all 3,396 canonical source
+hashes matched, and cleanup was empty. This partial meter evidence is not a
+complete installed-policy qualification.
+
+The normal authored grant requested 128 MiB total observed bytes but 64 MiB in
+its observation limits. Production PolicyGrantScope validation requires
+equality; the one-byte request had overwritten both fields to 1 and masked
+this fixture error. The correction lowers only the authored total to the
+existing 64 MiB; accepted 128 MiB policy authority and all production checks
+and settings stay intact. The existing authored-input preflight now passes the
+genuine compiled recorder scope and normal/tiny/mismatched inputs through the
+same Grant.Valid predicate used by RequestPolicy before storage, with synthetic
+accepted identity, owner and settings facts reused from the existing typed
+fixture. The old normal input failed while tiny and mismatch-refusal cases
+passed; no network, collector, authority bypass, new framework or runtime cost
+was introduced. Local results remain distinct from the next installed
+qualification, which has not run. Focused installed-input/proof races passed
+in 1.888 s, finite producer/trigger and ongoing-refusal races in 1.064 s, and
+the maintained-libpcap approved raw replay with require-all=false passed in
+1.078 s. Integration vet, spec, policy-schema and architecture gates returned
+exit 0; no external fixture or hosted run was started.
+
+
+## Combined recording follow-ups before installed qualification (2026-10-28)
+
+The isolated diagnostic-only Native run
+[40767389365](https://github.com/phihos/asservat/actions/runs/40767389365)
+on `bda42ccb` failed before capture and history. The initial approved request
+returned `OutcomeUnknown`, then resolved `closed`; its correlated refusal was
+`request/facts/storage/expired/readiness-tail`. Go exited 1 after 604.791s
+(approved child 132.32s). All 3,390 retained source hashes matched the frozen
+commit, sources were unchanged, cleanup failures were empty and build scratch
+was removed. The complete hosted run took 1,051s with zero billable milliseconds.
+No history exchange or edited-preview result was obtained, so its original
+cancellation cause remains unresolved. No automatic replacement run followed.
+
+The combined candidate now contains the independently checked raw-policy replay
+correction, single-call foreground worker retirement, signed/peer history budget
+diagnostics, exact-preview initial-failure diagnostics, and migration 00103's
+initial storage-binding projection correction. Component evidence is recorded
+below, in [ADR-200](decisions/200-on-demand-capacity-refresh.md#measured-sql-result-2026-10-28)
+and [worker dispatch](architecture/download-worker-dispatch.md#owned-single-call-measurement).
+The projection correction is a separately reproduced defect; it is not an
+established cause of this installed failure. No caller/proof deadline, permission,
+quota or retry was relaxed. The owned SQL and Kubernetes fixtures are terminal,
+archived and cleaned up; no collector ran on this workstation.
+
+At this checkpoint the next work is final combined local checks, fresh PR review
+and exact-head CI, then guarded installed policy/history/paced qualification on
+one frozen candidate. Existing successful whole native bodies and component
+passes do not complete the failed installed workflows or S-04/S-02. PR #103
+remains a draft; no release, registry publication or public enablement is included.
+
+
+## Exact-preview initial storage diagnostic qualified (2026-10-28)
+
+Fixture-only initial-failure evidence now queries the exact immutable preview's
+stored target/selection before expensive native diagnostics. One administrator
+SELECT, bounded to three seconds, emits eleven booleans and five original/current
+timestamps for binding, enrollment and demand. It prints no identities, target
+names, filters, parameters, credentials, keys or row dumps. The callback runs at
+most once during initial submission failure, including transport/read failure;
+successful recovery clears it. No product authority, freshness, permission,
+demand scheduling, budget, retry or limit changes are included.
+
+The separately reviewed `initial-storage-evidence-2` PG/S3 selection on 55029bc3
+passed (runner/Go0; Go 2.010s, parent 0.95s, exact preview child 0.57s). Actual SQL
+checked missing/exact preview, original selection/dates, allocation mismatch,
+three-second and thirty-second expired raw intervals, absent enrollment/demand,
+and the existing immutable/actor-client/deadline preview invariants. All 3,352
+harness / 3,394 reviewed sources and 35,986 tracked-file hashes remained unchanged;
+cleanup was empty and exact owned PG/S3 names, IDs and network were absent.
+
+Run1 remains archived: its diagnostic SELECT assertions reached the original
+interval cases, then unsupported synthetic demand insertion failed the real
+capacity-source foreign key. The fixture correction removed only that setup
+and its assertions, without fabricating a parent or bypassing the constraint.
+Positive recorded/current demand and exact Ready-publication equality remain
+unqualified by this no-enrollment child. This result does not establish an
+installed invocation, Native storage failure cause, availability improvement,
+collector behavior or completed workflow. No collector, push or hosted run was
+performed. Terminal reports and both raw archives are retained in the existing
+`approved-workflow` cache; changes after the passing frozen source are docs only.
+
+
+## Corrected raw-policy SQL replay qualified (2026-10-28)
+
+The one reviewed `policy-raw-approved-replay-2` companion-only PG/S3 run on
+51a9ee69 passed (runner/Go0; Go 16.366s, child 14.93s). Actual admission Lookup
+returned the original capture/scope/deadline with require-all=false. The same
+case independently proved held-grant/source-expiry rollback (API/session NULL,
+both observed spends zero), one immutable preparation/session on replay, and
+original dates/sequence. Typed holder/channel/encrypted producer/stored SQL ACK
+used 4,592 synthetic PCAPNG bytes; 32 MiB prepaid input stayed unchanged. Protected
+purge, separate encrypted audit ACK and narrow finalization deleted the child
+without refunding either observed pool; terminal reprepare still refused.
+
+All 3,350 harness / 3,392 reviewed source hashes and 35,984 tracked files matched the
+frozen source, with empty cleanup and exact owned PG/S3 names/IDs/network absent.
+Run1's fixture mismatch remains archived. This qualifies the SQL/component path
+with synthetic target/node/process/packet provenance; graph/WAL samples remain
+explicitly unqualified. It proves no actual collector, publication, native
+download, installed attachment cause or native meter outcome. No broader suite,
+collector, push or new Native ran. Subsequent changes here are documentation only.
+
+
+## Raw replay fixture input correction (2026-10-28)
+
+The one authorized `policy-raw-approved-replay-1` PG/S3 run on f450d839 failed
+(Go 4.764s, selected child 4.32s, runner 21.205s): the actual accepted replay was
+found without error, but the new false-setting assertion met a shared fixture
+assembler hardcoded to true. This is a fixture-input mismatch, not evidence
+against the decoder correction. All 3,350 harness / 3,392 reviewed source hashes and
+35,984 tracked files matched; cleanup was empty and exact owned PG/S3/network
+absence verified. The complete failed archive and terminal report are retained.
+
+The assembler now takes the existing protected setting as an explicit test input:
+raw companion false, ordinary require-all cases true. Offline preflight checks
+headers/true, raw/true and raw/false, including unchanged independent raw approval
+and frozen plan/preview/authority/storage invariants. The test's reviewed-timing
+preflight uses the canonical marker rather than confusing it with that setting.
+No production, role, grant, funded output or observation limit changes. A fresh
+focused PG run requires separate root review/coordination; no automatic repeat.
+
+
+## Raw policy replay and initial attachment evidence (2026-10-28)
+
+Native run 40756795839 on immutable e0d failed at the one-byte refusal wait
+(child 105.88s, Go 566.766s); it did not prove node execution or meter refusal.
+An admitted occurrence was logged, but initial start stopped at router Attach,
+whose original failure kind/budget was not retained. Accepted continuation had
+a concrete separate defect: explicit approved timing from a raw predicate was
+wrongly gated on the installation require-all-recordings flag, false here.
+
+Historical decoding now uses the existing validated timing marker and recorder
+expectation independently of that flag. Current grant/permission/recovery and
+original deadlines remain unchanged. Real maintained-libpcap policy compilation
+reproduced RED exit 1 (0.011s), then focused race GREEN 1.079s including malformed/changed
+historical negatives and exact ordinary absolute deadlines. An initial three
+fixture-preflight failures were retained separately before the meaningful RED.
+The existing user-space pcap-check now includes that one anchored tagged test;
+default Go gates alone do not run it. Actual pcap-check exited 0, including the
+new test 0.012s, existing compiler tests 0.015s and the static hub build check.
+
+Initial Attach diagnostics retain fixed capacity/invalid/unavailable plus the
+original remaining/bound; return behavior is unchanged. Real StartContext/Router
+RED exit 1 (0.051s) became focused race GREEN; same-cluster history attachment must join
+before replacement reaches the existing runner preparation (combined 1.359s).
+Native wait preserves last public status/code/error/phase and SQL scan/phase.
+The exact original collector/capture budget-exhaustion log remains mandatory.
+
+Composed affected libpcap races exited 0: PostgreSQL 2.617s, bootstrap 62.028s,
+planning 1.225s, capture 12.500s and contextstart 13.795s. Specification, architecture,
+Go imports, formatting and vet passed; integration compile passed. This is not
+a full broad go-check or installed fix qualification. The existing raw companion
+adds actual admission Lookup replay with the same original IDs/scope/deadline
+and false setting under its already compiled capture-admit role; its external
+selection awaits root review. No new fixture/collector/Native/push ran.
+
+## Recording readiness follow-up assembled locally (2026-10-28)
+
+The failed 3f candidate's policy review input/parent return and traffic-helper
+header-deadline defects have focused RED/GREEN coverage. The helper still returns
+nonnil incomplete traffic; actual artifact size, contents and download completion
+remain independent gates. Its actual HTTP/parent race selections passed in
+21.114s and 9.586s.
+
+The real SQL storage reader now has core Request/preview/admission/replay
+composition coverage: all four cases passed on f5b6e3bc (Go 3.291s), after two
+retained fixture setup failures were corrected. Identity, target, processing and
+source publication in that witness remain synthetic. It does not establish the
+installed history failure's exact cause or qualify worker refresh.
+
+A separately reviewed scheduling change moves the existing single recording
+readiness hint before grant I/O, preserving original request/identity/recovery
+bounds and post-grant authority. Its final full capture race passed in 12.457s.
+It can add one coalesced refresh demand for denied or pending preview owners;
+this is an engineering tradeoff under the maintainer's proportionality guidance,
+not an explicit maintainer requirement. Exact passive-preview read bounds and
+shared configuration-credit costs are recorded in
+[ADR-213](decisions/213-storage-readiness-at-consumption.md). Installed availability
+and aggregate load remain unqualified. Final assembled checks, publication and
+installed runs have not yet completed.
+
+## Installed recording candidate 3f: terminal results (2026-10-28)
+
+All three guarded runs of `3f434f00966bf50a45331bd56539982a4878aac1`
+failed. Their actual Go and fixture exits were 1; each retained environment
+matched all 3,387 historical source hashes, reported unchanged sources and
+an empty cleanup-failure list. None establishes a completed installed workflow.
+
+- Policy run 40744737424 reached the review operation after the CRD correction,
+  then rejected an extra fixture field. Its later parent fallthrough panic was
+  independent; the focused local correction is described below.
+- Paced run 40744850604 failed in traffic generation before native transfer.
+  Seven batches acknowledged 28,672 records and 1,835,008 body bytes; the next
+  request retained no response headers. The helper reported `request` after
+  8.417 seconds within an 8.506-second parent phase. These measurements do not
+  establish the underlying error cause or the resulting capture size. The
+  near-8-MiB artifact, owner renewal, ranges and completion remain unqualified.
+- History run 40744858749 returned `OutcomeUnknown`, then resolved the intent
+  closed after storage readiness refusal. Its `source-expired` diagnostic can
+  represent a correctly recognized expired source followed by an exhausted
+  readiness interval or failed refresh demand. It does not establish another
+  lost error marker. Capture and edited-history repetition were not reached.
+
+The paced run's completed setup phase lasted 139.636 seconds, including the
+deliberate preview-expiry wait and background work. Its retained OID-to-login
+mapping attributes 16,851 SQL calls and 6,976 ms of summed executor time to
+the capacity login, out of 83,297 calls and 10,998 ms overall. The shared
+owner-runtime login accounts for 24,125 calls. These are aggregate statement
+counters, not per-request cost, CPU attribution or a steady-state baseline.
+They motivate reviewing the combined readiness path before another installed
+attempt; increasing freshness intervals or resource limits is not supported
+by these measurements.
+
+## Policy focus input and parent return correction (2026-10-28)
+
+Native40744737424 on frozen3f failed decide_review HTTP400 because its authored
+body supplied the revocation-only expected_revision field. The later index2/len2
+panic was a separate missing parent return for the two-cluster policy focus.
+An isolated fixture-only correction keeps canonical decision/revocation contracts
+unchanged and reuses the existing recording-focus predicate. Both meaningful
+REDs, corrected pure tests and the complete authored-input audit are retained
+in the [S04 plan](reviews/s04-policy-grants-plan-2026-10-27.md). No approval, packet
+execution or installed pass follows from this failed run or these local checks.
+
+## Go gate reporting correction (2026-10-28)
+
+The earlier af9 “zero explicit Kubernetes skips” summary was incorrect. Its
+retained actual log has 663 discovered top-level entries: 662 pass and
+TestInitialRuntimeObjectRoundTripWithRealKubernetes skips because its separate
+owned native harness is not selected by ordinary make go-check. The log and
+original report remain retained, with a separate correction in the session
+cache. The current broad local gate records the same default skip. No skip
+condition, selection, test or native qualification requirement was changed.
+
+## Integrated installed candidate remains unqualified (2026-10-28)
+
+PR 103 at frozen af9 passed local broad Go/pre-push/gadget compilation, hosted CI and
+Gitar review, then all three guarded installed focuses failed. Root verified
+all 3,384 historical source hashes in each unchanged run and their actual exit 1,
+removed scratch and empty cleanup failures. Policy run 40648562303 rejects profile
+composition in the installed structural CRD before acceptance; history run 40648568602
+fails storage source expiry before capture. The SQL transaction erased the typed expiry result; its one-sentinel correction
+passes the actual SQL reader regression. These failures remain retained, and
+installed outcomes require a new candidate.
+
+Paced run 40648565357 captured and downloaded a real 8,388,488-byte PCAPNG at full speed,
+then failed its paced response. The public native-response wrapper still pinned
+the initial lease and setup authorizer despite the inner source's renewal
+support. The [ADR-258 composition correction](decisions/258-slow-native-response-windows.md#public-response-composition-correction-2026-10-28)
+keeps setup short and retains the cursor under its original finite response;
+fresh per-chunk leases/SQL/current identity remain mandatory. Its private checked
+handoff also reaches the inner source on renewal, preserving the coordinator's
+thirty-second entitlement reuse rather than duplicating full authorization.
+Direct callers retain their independent full checks. Installed paced,
+range and completion, edited history and finite policy outcomes remain open;
+no complete S-04/S-02 or user enablement is claimed.
+
+## Production policy CRD correction after native failure (2026-10-28)
+
+Native policy run 40648562303 stopped before grant creation: the shipped CRD
+pruned unknown profileComposition and required recipeRef. An isolated correction
+aligns its bounded composition and UUID grantRef projection with the existing
+canonical schema/compiler, enforcing exactly one recipe or composition. Exact
+installed-input RED and corrected local schema/pruning tests are retained in the
+[S04 plan](reviews/s04-policy-grants-plan-2026-10-27.md). No permissive fixture,
+authority bypass, new runtime dependency or privileged collector is used.
+Actual corrected API/installed qualification and full backing remain pending;
+frozen PR 103 at af9 and its prior evidence are untouched.
+## Scoped protected policy metadata witnesses (2026-10-28)
+
+The two-case owned PostgreSQL/S3/OpenBao metadata fixture passed on frozen
+`0060ff581c0422f162323c1ab5fb3f1393eb96e9`: exit0, Go17.001s,
+outer25.090s, all3346 historical source hashes matched, unchanged=true,
+cleanup[] and exact owned-resource absence independently checked. Actual policy
+admission, finite permit and joined encrypted synthetic PCAPNG stored ACK passed
+for32audience/64retention and254instructions/64retention. Ordinary record tuple
+growth was71624B and52163B against131072B each. Full measurements, report/env
+hashes, prior failure causes and the fixture's3records/root48 versus native's
+4records/root64 distinction are in the [S04 plan](reviews/s04-policy-grants-plan-2026-10-27.md#protected-metadata-shape-witnesses-2026-10-28).
+Input credit was conservatively reserved, not measured input/CPU. This is scoped
+component evidence; publication/native, physical/bloat/backups and universal
+maximum-shape backing are not qualified. Prior attempts remain failed; no new
+runtime gate is enabled by this documentation checkpoint.
+
+## Unpublished finite policy-packet candidate (2026-10-28)
+
+The isolated S04 candidate now composes the reviewed node meter/wire/prefix/loss
+components, current history/pacing7254 and storage-expiry e3bf1ea9. Under the
+maintainer's qualification sequencing it removes only the finite private-policy
+raw producer placeholder. Manual raw, ordinary preparation bypass and legacy raw
+start remain refused; no qualification bypass, flag or user rollout is added.
+Original reviewed grant/positive observation limits, both prepaid pools and the
+typed committed same-work permit are still mandatory. The new guarded
+`continuation-policy-recording` focus is prepared for a fresh GitHub runner only;
+its actual collector/privacy/publication/download outcome is unrun. No installed
+pass, full S04 completion or user exposure follows from local component evidence.
+
+The native candidate requests10s within the authored10s review (the earlier
+schema-valid15s request failed real preflight), records2s and conservatively
+prepays48MiB input plus a separate one-byte refusal attempt. Its maintained
+libpcap ACK fixture equality and pure input/focus tests pass. The actual node
+component includes the reproduced same-epoch replay and late loss/unknown error
+precedence corrections; source-bound proof and numeric cache costs are in the
+[S04 plan](reviews/s04-policy-grants-plan-2026-10-27.md). That plan distinguishes
+the component full gate from the pending final assembled broad gate, retains the
+merged Python NameError RED/fix, and records protected-backing/native gaps.
+
+## Public policy grant and recorder producer continuation (2026-10-28)
+
+The isolated S-04 branch's public request/review/attachment boundary passed its
+focused real PostgreSQL/encrypted S3 fixture at frozen 8caf2ee4: actual Go exit0,
+9.703s, both original reviewer/step-up held-row cases independently left decision
+NULL after their bound. Request and attachment both preserved unknown encrypted
+intent/outcome semantics, exact original journals/expiry and zero execution spend;
+source refresh did not run before acknowledged Begin. Six encrypted acknowledged
+operations and two uncertain outcomes were retained. All3,264 hashes matched and
+owned resources were absent after cleanup. Exact archives and earlier failures
+are in the [existing S-04 plan](reviews/s04-policy-grants-plan-2026-10-27.md).
+The unchanged combined134080 positives also qualify original-grant acquisition
+before/after attachment replacement, revocation refusal without resetting pools,
+shared status, attachment and revised migration Up/Down. This supersedes the
+historical unqualified original-grant/public status below, without rewriting its
+failure evidence. Actual protected Kubernetes/IdP/initial trust remain synthetic
+fixture facts, so this is component qualification, not an installed workflow.
+
+The next source slice composes finite onTrigger/before-zero network-header policy
+triggers through the existing recorder preview/request/occurrence path. Accepted
+settings issuer is immutable provenance, not creator reauthentication; current
+team delegation and final SQL action/grant/counter checks remain mandatory.
+Local unit/race and actual-libpcap pure compilation checks pass. The real
+Tick/reviewed recorder admission component now passes at frozen 6e12afa4
+(Go 9.272 s): one pre-spent accepted execution; initial admission plus exact
+replay retains one 8 MiB OUTPUT RESERVATION, one grant execution and one original
+occurrence/capture reservation. Snapshot-only authority refuses the recorder
+with zero output/grant reservations. No packets were collected or native artifact
+produced/published by this SQL fixture. All 3,271 source hashes matched; cleanup
+was empty and owned containers/network absent. Reuse f94be53c's separate 36.81 s
+policy-share/original-grant acquisition/revocation/status pass. Exact failures,
+fixes, archives and report hashes remain in the existing S-04 plan.
+
+[ADR-261](decisions/261-finite-policy-observation-admission.md) records the approved
+engineering finite policy-observation lease: fresh issuance facts, a separate
+active window of at most twenty seconds within original hard bounds, latestStart
+that fits the full finite action and no periodic renewal for a fitting short
+action. It is not a maintainer-selected interval or the download timing rule.
+Raw remains unavailable until actual SQL/node binding/transport, prefix/loss,
+retirement/backing and native qualification pass. Manual raw and default ongoing
+arming/renewal remain separate unfinished requirements. No chart/public collection
+or installed recorder claim follows.
+
+
+
+## Team-policy grant SQL checkpoint (ADR-259, 2026-10-27)
+
+History correction 3673c264 is retained, including its eviction mutation-count
+fence and installation inventory fix. The composed schema-102 inventory is 130
+permanent tables; catalog bounds now derive from those exact names plus one
+unknown-detection row, with only the two existing replay-transient exceptions.
+The old 128-table guard reproduced a local failure. The composed schema-102
+real installation test now passes 16.96s on a3f9c8da, including all 13 direct
+children and both activation-incarnation nested cases, with 3,258 unchanged
+hashes and empty cleanup. Its combined run exits 1 in the new acquisition
+fixture's invalid installed role name before adapter construction; original-grant
+replacement/revocation remains unqualified. History's schema-101 pass is separate
+evidence.
+
+The isolated policy-grants branch composes canonical main `eed85940`, history
+101 and schema 102 request/settings,
+explicit current-manager attachment and occurrence-backed capture accounting.
+The public requester/reviewer/activate-policy audit, UI and installed recorder
+composition remain unfinished; this checkpoint does not enable policy recording.
+
+The existing trigger occurrence has already spent one accepted execution.
+Capture admission now atomically retains that original occurrence/capture/grant
+and native-output reservation, debiting accepted output and optional grant
+execution/output once. Replays, new adapters, grant attachment/replacement and
+sharing controls do not refill the original pools. Output is separate from
+sensitive pre-filter observation; the existing raw-predicate refusal remains.
+Migration 102 conservatively fills ORIGINAL authored output/observation maxima
+for pre-102 acceptances with spent executions or any occurrence, including
+unknown unlinked replies. Pristine scopes remain zero. This preserves uncertain
+spend and intentionally stops further collection under previously spent legacy
+scopes; same-intent renewal remains a separate unfinished lifecycle. Down refuses
+preserved spend. See the [decision](decisions/259-policy-grants-and-observation-spend.md)
+and [source-bound plan/results](reviews/s04-policy-grants-plan-2026-10-27.md).
+
+The existing get_policy_status now exposes original shared accepted execution,
+output-reservation and observation-charge budgets through browser/MCP and React,
+using the already-read acceptance/authority with no added SQL queries or polling.
+Current viewer eligibility and final identity checks remain; the status confers
+no execution/evidence rights. Real built-console checks pass 25 journeys/22
+accessibility scans (Go 22.598s) with synthetic ledger/source/projection facts.
+The adjacent revoked-grant replay now applies the same final current policy
+identity and original manager deadline after blocking storage; three reproduced
+blocked-replay regressions pass, without a second workload read. Full affected
+races and final pre-push pass. Actual SQL status mapping and original-grant
+acquisition replacement/revocation remain pending the corrected-role fixture.
+
+Actual owned PostgreSQL/S3 evidence is component scoped. The revised legacy
+migration and request/settings/attachment cases passed on `da522a48` (2.93s and
+3.25s respectively), while that overall batch failed in a later new fixture.
+The complete expanded policy-share/accounting case passed on `2319c48d` (child
+31.61s, Go 33.070s, runner phase 52.108s; actual exit 0). Its log shows grant
+executions/output 4/16,384 bytes, accepted executions/output 5/16,384 bytes and
+no fifth output reservation. Publication after source/sharing changes, expiry,
+stop and revoke-all retains its existing behavior. All 3,249 source hashes
+matched, sources stayed unchanged and cleanup was empty; exact owned containers
+were absent. Report SHA-256
+`e19b5a75f8bf331ebca9e535df5a3d17cc35f101eb93065c1e10414c49f3d41e`.
+Three prior fixture failures remain archived with unchanged sources and cleanup;
+none is relabeled as a pass. Current identity/review/protected inputs are still
+synthetic. Original-grant replacement/revocation acquisition races, public audit/
+UI composition and genuine ongoing sensitive observation/session qualification
+remain pending.
+
+## Expired storage source uses existing readiness owner (2026-10-28)
+
+Paced Native 40634973872 on `93074b84` refused original source validation before
+traffic. Its exact source timestamps are unavailable; natural expiry is not yet
+the established installed cause. A local actual-Request RED separately reproduces
+a legal 30-second binding expiring after an early ready hint: two reads, no demand
+and no admission. Typed expired-only metadata can now enter the existing bounded
+readiness owner after original shape/selection validation, requiring an independent
+fresh successful read. Known revision changes, malformed/future/mismatched metadata,
+failed demands and original authority expiry remain terminal. The persisted
+30-second lifetime, one demand, 250 ms cadence, response reserve and original
+caller/non-storage deadlines remain unchanged. No SQL/migration or external fixture
+is added. Affected capture/PostgreSQL/domain races passed (capture 11.917s);
+canonical pre-push, including spec and architecture gates, passed. Full assembled
+Go validation and installed qualification remain separate pending gates. See [the failure and qualification limits](research/native-response-qualification.md#natural-source-expiry-at-authoritative-consumption-2026-10-28)
+and [the engineering contract correction](decisions/213-storage-readiness-at-consumption.md#natural-source-expiry-correction-2026-10-28).
+
+
+## Paced helper setup omission reproduced before bootstrap (2026-10-28)
+
+Native 40605062812 on `e9e3c64e` failed before any helper invocation because
+its descriptor was absent. Actual Go was 586.959s, approved recording 137.49s;
+all 3,230 source hashes matched, unchanged with cleanup `[]`. No direct traffic,
+native body or renewal was qualified. Copying was incorrectly gated by the
+Helm/private-registry branch, absent from the actual fast provider-pair path.
+
+The pure setup-path RED reproduces that gate (0.019s). Common owned-node setup
+now copies/hash-checks the exact binary for both topologies, and Python plus the
+actual Go bootstrap entry fail early if the serialized descriptor is missing.
+Seventeen setup tests pass (0.032s), affected parent races pass (1.197s). A new
+single-Kind probe on frozen `092cbe4f` passed (test 7.94s / Go 9.011s,
+terminal exit 0): exact helper hash/Pod UID/IP/node boot, sixteen batches / 4 MiB
+in 7.556s including launch/join. Common one-node helper setup took 0.121s for
+11,293,151 copied bytes. All 3,231 source hashes match, unchanged with cleanup
+`[]`; exact owned containers, networks, image and cluster are independently
+absent. No bootstrap/Keycloak/collector ran. This is synthetic route/setup proof;
+installed capture size/native delivery/combined costs remain pending. Limits,
+ownership checks and the no-fallback contract remain unchanged. See the
+[retained failure and preflight](research/native-response-qualification.md#missing-helper-setup-branch-and-early-preflight-2026-10-28).
+
+## Paced traffic route correction after retained failure (2026-10-28)
+
+Native 40600135398 on `4d2e1033` retained valid setup SQL statistics but failed
+the fixed traffic phase: seven acknowledged batches / 28,672 complete records /
+1,863,232 bytes in 8.500202059s, including an incomplete eighth batch. Actual Go
+was 603.040s, approved recording 146.39s. All 3,230 source hashes matched,
+unchanged with cleanup `[]`. No near-full/download/renewal result passed.
+
+The fixture now reuses its existing static provider binary for direct traffic
+from the exact owned node to the live UID-checked selected Pod IP. It avoids the
+serialized API Pod proxy without port-forwarding or substituting a workload.
+All sixteen 4,096-write batches, 64-byte records, 500ms schedule, 8.5s phase,
+10s capture and 8 MiB native cap remain unchanged. Binary copying/hash/ownership
+checks happen during setup; the finite process uses the original absolute
+cutoff, EOF cancellation, joined exit and a bounded closed numeric receipt.
+No product code, privileges, image, Pod or service is added.
+
+The actual fixture client's local synthetic delayed-proxy RED failed in 8.504s;
+GREEN preserves that failure and completes identical direct traffic in 7.538s.
+Fixture races pass in 17.709s and parent target/cancellation/receipt/size races in
+1.127s. These checks are synthetic; actual node-to-Pod traffic, near-full native
+size and aggregate costs remain pending installed qualification. Full retained
+reports, hashes, costs and limitations are in the
+[qualification record](research/native-response-qualification.md#serialized-traffic-route-failure-and-direct-fixture-client-2026-10-28).
+
+The review follow-up separates the child's exact eight-field receipt from
+parent-owned report validity/timing. Injected parent fields now refuse without
+tainting error artifacts; valid partial receipt diagnostics remain available.
+The local regression reproduced the defect (Go 0.035s, exit 1); affected parent
+races pass in 1.134s and canonical pre-push including vet/218 console checks
+exits 0. The traffic
+client, authority/capture limits, process lifecycle and network path are unchanged.
+
+## Paced measurement failure retained and PostgreSQL mechanism checked (2026-10-28)
+
+Native 40595384061 on `76bae03c` failed after accepted-capture resolution,
+before traffic/pacing, because setup SQL snapshots were not comparable. Actual
+Go was 596.503s; the old report writer saved no numeric edges, so the exact
+comparison failure remains unknown. Its frozen environment report is retained;
+no paced native delivery or aggregate cost is qualified.
+
+Test-only corrections persist incomplete edges plus a closed refusal reason,
+and reset the owned private statistics once after completed bootstrap, strictly
+before the initial measurement baseline. No product calls, roles, permissions,
+limits or retry behavior change. A report-persistence regression passed RED then
+GREEN; the existing PG/S3-only fixture mode also passed on `0b83e8a5` with
+PostgreSQL 18.6/default 5,000 entries and the unchanged 20s context (test 0.30s,
+Go 1.360s). It proved distinct numeric role-DDL entries, rollback, inherited
+saturation, valid post-reset counting, and refusal of midphase eviction/reset.
+Two preceding fixture failures remain unqualified and archived. All three runs
+matched 3,187 source hashes, unchanged with cleanup `[]` and exact container
+absence. See the [full evidence and limits](research/native-response-qualification.md#incomplete-sql-measurement-and-owned-postgresql-proof-2026-10-28).
+
+This remains a fresh matched-install qualification. Mixed peers may refuse the
+longer operation; regional/download-worker upgrade support remains ADR-227's
+existing backlog. No installed rolling-upgrade or new drain mechanism is claimed.
+A fresh installed pacing run with complete numeric edges is still pending.
+
+## Installed pacing request correction (2026-10-27)
+
+The first pacing run 40591118979 failed on `fa69b019` before approval or traffic:
+its fixture requested a non-editable `actionMaxBytes` field. Actual Go exited 1
+in 480.868s; all 3,223 source hashes matched, sources stayed unchanged and cleanup
+completed. The incomplete report has no capture/download/renewal or aggregate
+cost result. The fixture now relies on the builtin's existing 8 MiB recorder cap
+and has an actual-planner RED/GREEN preflight; production validation, profiles,
+quotas and original authority are unchanged. See the
+[qualification record](research/native-response-qualification.md#first-installed-pacing-attempt-and-request-preflight-2026-10-27).
+Fresh installed pacing qualification remains pending.
+
+## Paced native continuation composed with qualified PR100 (2026-10-27)
+
+At the local composition checkpoint before publication, the paced candidate includes canonical main
+`eed8594020645fe6d10f8c6565e69a6235c7507d`, preserving final PR100 storage response
+scheduling, operational-recorder refusal, closed diagnostics and API metadata
+freshness. A content comparison against the prior 21806d0d API checkpoint found
+25 final100-only changed files; all 25 match canonical main byte-for-byte. All 24
+PR101 production files match its reviewed 298110cc source. Only the progress
+record and two approved-recording fixture files overlap the paced additions.
+Squash-history merge conflicts were resolved against their actual shared
+content checkpoint, retaining the final approved-preview blocker guard.
+
+The qualified PR100 baseline Native 40586980099 passed with Go 620.173s,
+approved-recording 155.60s and whole-job 964s. Its frozen 3,201 source hashes
+matched, cleanup was empty, and the environment report SHA-256 is
+`d86eef8c74434bdb9240530927c3dd0edbbe6d1defb333ce432ff245843063da`.
+It verifies actual independent approval, expired-preview submission and a
+2,360-byte PCAPNG with 21 reviewed-port packets, not paced or near-full delivery.
+Historical pending statements below describe their original candidate checkpoints.
+
+The paced focus replaces that approved-recording focus with one independently
+reviewed 10s recording and four existing-budget download sessions. History is
+excluded. The proposed extra 200s phase allowance projects 1,164s total job time,
+leaving 36s below the immutable 1,200s cap; Go would project 820.173s, leaving 259.827s
+below its immutable 1,080s cap. These are planning arithmetic from one observed
+baseline, not a measured fit or a worst-case guarantee: preparation polling,
+in-flight calls, setup and snapshot costs can vary. No timeout or authority
+bound is increased. A timed-out or incomplete experiment cannot qualify this
+candidate. Actual paced payload/backpressure, aggregate costs and two-version
+or installed rolling-upgrade behavior remain unqualified.
+
+Local composed verification exits 0: canonical `make pre-push` with the existing
+spec virtualenv and pinned sqlc (including 218 console checks); full affected
+race packages for evidence (4.868s), native transport (100.206s), mTLS (40.347s),
+objectstore (5.132s) and authorization values (1.486s); selected pacing and
+approved-recording fixture regressions (22.722s); and the ignored provider-proxy
+fixture tested explicitly by file (1.645s). The selected integration tests use
+synthetic facts and actual loopback transport, without opt-in external suites.
+No collector, real-service fixture or hosted paced run was started for this
+composition. Logs are retained under
+`~/.cache/asservat-build/codex-bf86-resume/native-paced-final100-*.log`.
+
+
 ## Storage readiness response reserve (2026-10-27)
 
 Installed run 40581901798 on 1862f1bf failed during the initial preview, before
@@ -236,6 +1440,466 @@ check that owner at existing gates. Deterministic reproduction, full evidence
 race tests and 100 cancellation repetitions pass locally. No deadlines,
 interfaces, API requests, timers, goroutines or durable state were added.
 The combined candidate still needs final gates, review and native qualification.
+
+## Slow regional native response renewal (ADR-258, 2026-10-27)
+
+The same prepaid regional window can now retain its source cursor and key
+opening across independently current delivery leases. SQL advances the existing
+native owner sequence; original response/source/window/owner/generation,
+processing identity and fixed operation deadline remain unchanged. Responses
+use a candidate 20-second conversation ceiling; actual disclosure observations
+remain at most five seconds. Initial full attestation also supplies its reviewed actual token expiry as a
+private immutable admission bound. No raw token or recurring Kubernetes proof
+read is retained; SQL checks continue and actual expiry caps final write/ACK.
+Kubernetes-only identity changes are independently observed by the next window,
+within the original twenty-second ceiling.
+
+Four complete affected race packages passed (authorization 1.645 s,
+evidence 4.895 s, native transport 97.335 s, mTLS 34.884 s). The paced real two-hop
+TLS/production HTTPS-sink regression delivered 8,126,572 exact bytes in 6.313 s
+(1.228 MiB/s), with 70 current-check callbacks and 2 lease renewals, one cursor
+per window, exact resume and stale-If-Range fallback. Paced revocation and the
+original caller deadline stopped partial transfers. Source/SQL/identity inputs
+in that transport test remain synthetic.
+
+Selected actual PostgreSQL/S3 native-owner renewal passed with one immutable
+20-second operation crossing its old five-second observation: fresh independent
+authority advances the existing owner; expired, same-sequence, wrong-caller,
+worker, changed-processing and closed-owner cases deny. Subtest 10.75 s;
+Go exit 0; source hashes unchanged; cleanup failures empty and owned Docker
+resources gone. Local archived report
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-owner-renewal-1-environment.json`
+has SHA256 `0b8e675ae6c23b111738a3e480e1561520cdd76a5cae70334267e600e717e5c3`.
+The pre-cancellation-guard combined native run also passed both selected cases:
+`download-worker-native-exchange` 9.60 s and
+`download-worker-native-owner-renewal` 10.64 s; top-level 20.63 s, Go exit 0,
+harness phase including compile 46.783 s. Source hashes were unchanged and
+cleanup failures were empty. The existing 4 KiB response traverses the production
+attachment/reader path with actual TLS, PostgreSQL/S3 audit and three one-use key
+slots. Archived report
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-exchange-7-environment.json`
+has SHA256 `b6124d1124b6e25ece89edbad571f299005c88382b0ebfbdc18a71230028dff8`.
+
+Earlier composed failures exposed post-clamp timestamp precision mismatch and
+the reader's shared initial-opening/cursor deadline. Both have failing-before,
+passing-after regressions: normalize operation ends after all clamps, and keep
+initial metadata/three unwraps within five seconds while the cursor retains its
+original response owner. Encrypted-object tests confirm no reopening after the
+short context is canceled and no reads after owner cancellation. After the reader correction,
+objectstore/evidence race suites passed (4.767 s/4.852 s), and integration
+compilation passed. No runtime assertion was weakened.
+
+Strengthening the owner-cancellation check
+then reproduced a separate buffered-read defect: a valid contiguous range could
+return after cancellation without another cursor read. Caller/owner cancellation now
+closes the source and clears plaintext before buffered return and after blocking
+reads. Expiry of a short piece observation during an owned frame load preserves
+the cursor; fresh disclosure authority remains mandatory before delivery. The
+blocked-object regression distinguishes that expiry from explicit cancellation.
+
+Final post-guard qualification passed with these cancellation and short-piece
+contracts present: native exchange 9.36 s, owner renewal 10.21 s, top-level
+19.96 s, Go exit 0, harness phase including compile 43.429 s. Source hashes were
+unchanged and cleanup failures were empty. Archived report
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-exchange-8-environment.json`
+has SHA256 `e4ff44c6e6945dccd6f970cf06d023e581b7fdd4f1a0ff892eddcf767a553a7a`.
+The final objectstore/evidence/native race suites passed
+(5.081 s/4.847 s/98.921 s), as did the full pre-push gate. The native report
+retains the same actual 4 KiB SQL/S3/TLS/key-slot scope and synthetic authority
+boundaries; the earlier native7 report remains labeled as the prior candidate.
+
+The response-proof producer now also passes the existing owned Kubernetes/TLS
+fixture: selected test 7.44 s, Go package 8.559 s, exit 0. Its reviewed expiry
+matches the actual TokenRequest expiration. The proof factory consumes the
+actual token supplied to NativeOrigins; an invalid supplied token is refused by
+one TokenReview before any GET. Initial attestation made two
+TokenReviews and eight GETs; twelve response checks after the original proof's
+actual five-second expiry made zero Kubernetes requests and twelve synthetic SQL
+observations. Missing token/expiry producer, wrong audience/binding, changed spec
+and deleting-object negatives pass. Advancing only the trusted attester clock to
+the actual returned expiration refuses after one real wall-time TokenReview and
+zero GETs; this does not claim real-time token expiration. All 3,180 recorded
+hashes match, cleanup is empty and no owned Docker/Kind resources remain.
+Archived report
+`~/.cache/asservat-build/codex-bf86-resume/native-response-qualification/native-response-proof-kube-2-environment.json`
+has SHA256 `b7d5db04b506d0dc5b51a68a38231daa4e8cfabf220339c61ee718a97984ab7b`.
+
+Subsequent review regressions reproduce and fix accepting a higher sequence
+without retaining it when its observation timestamp is older, and rejecting
+same-instant UTC/offset/JSON lease representations. Accepted sequences stay
+monotonic, lagging cutoffs remain conservative, and renewal/ACK use exact window
+and sequence with current expiry. Both regressions failed before their fixes;
+changed scope, lower sequence and expired ACK still deny. Full affected race
+packages pass (evidence 4.883 s, native 101.577 s, mTLS 41.284 s). The external
+reports above qualify their recorded sources and predate these review corrections.
+
+The next review also reproduced prematurely retaining an unconfirmed caller
+lease and consuming pending bytes with a future ACK sequence. The operation now
+retains only gate-confirmed delivery, clears plaintext/cancels on confirmation
+failure, and checks live ownership plus exact accepted sequence before ACK state
+changes. No retry, refund or new state is added. Mutation-boundary RED/GREEN
+regressions and complete native/evidence/mTLS races pass
+(98.944 s/4.854 s/34.752 s). Existing external custody/SQL/Kubernetes results
+remain evidence for their recorded source versions, before this later fix.
+
+The SQL transfer's Pod-proof/bootstrap/human inputs and the Kubernetes producer
+fixture's SQL/dispatch/certificate-issuance inputs remain synthetic. Installed
+composition of both, paced composed 8 MiB transfer and aggregate installed
+SQL/S3/KMS/API cost,
+installed transfer and practical slower-link qualification remain pending. The
+candidate ceiling implies roughly 0.4 MiB/s
+for a full 8 MiB window before control overhead. This does not complete S-02 or
+claim arbitrary slow-client support; ADR-258 records the proof/API cost floor.
+## Encrypted capture history (ADR-255, implementation checkpoint)
+
+Installed history run 40594022159 on `80386c5d` failed during initial schema
+setup, before any preview, approval, collector capture or React history path.
+Produce succeeded; schema returned the fixed saved-installation mismatch remedy
+(Go exit 1, 107.875s). All 3,249 hashes independently matched, sources were
+unchanged and cleanup was empty; environment report SHA-256
+`ac45448db577464cc363be78cd2636bdfda82c5d5b22c1c70705810dc8f234bc`.
+That broad remedy alone does not establish a changed UID or immutable input.
+
+Source analysis found a deterministic schema mismatch: migration 00101 creates
+`capture_history_parameter` and `capture_history_quota`, but the exact permanent
+installation inventory omitted both. `initialSchemaInventory` therefore rejects
+them as unknown during replay and at final equality; an ordinary Goose fixture
+does not exercise that installer boundary. The focused regression binds both
+names to the actual embedded migration and fails on unchanged production
+(exit 1, 0.009s). The correction adds only the two sorted names: 127 tables,
+within the unchanged 128-table catalog bound. Unknown schemas/relations, exact
+owner/shape, empty-table, original migration prefix, immutable root/bundle/UID,
+replay and database-incarnation checks remain binding.
+
+The shared exact inventory also feeds existing installation privileges and
+pristine checks. Preparation and activation each acquire their existing
+`SELECT`/`MAINTAIN` pair on these exact two new tables; the deduplicated setup
+manager union adds four corresponding grant-option tuples. No INSERT/UPDATE/
+DELETE, runtime role, object pattern or privilege bound is expanded. Once the
+tables exist, each relevant pristine inventory pass adds two existing-style
+`SELECT EXISTS` checks; role/history creation also includes those relations in
+its existing empty-database scan. There is no new service, credential, watch,
+configuration or background work. Excluding the tables or raising the bound
+would not satisfy this observed first-install defect.
+
+On frozen correction `1212b57b`, the existing real PostgreSQL schema test passes
+with actual exit 0: `TestInitialSchemaWithRealPostgres` 16.03s, Go 17.094s,
+runner phase 46.530s. It covers original-prefix resume and lost completion,
+exact manager grant union and extra-DELETE refusal, altered migration metadata,
+foreign/down/reordered history, changed database/process incarnation, original
+session-lock exclusion and completed read-only replay. Its existing 100-second
+context and fixture limits are unchanged. All 3,213 source hashes independently
+match; sources stayed unchanged, cleanup was empty, and the exact owned
+PostgreSQL/S3 containers were absent. Report SHA-256
+`700e8d36a1f13ec89c594110ddadc931ffc8fc32a3792223e8e81ab9d69cbc74`;
+archive `history-initial-schema-green-1-artifacts` in the local build cache.
+Full PostgreSQL adapter race checks pass (2.613s), as does canonical pre-push,
+including 227 console tests. SQL root facts are synthetic in this component
+fixture; it does not qualify native Kubernetes guards or the installed history
+workflow. Fresh installed qualification remains required. No collector or host
+Kubernetes fixture ran locally.
+
+The current history composition merges canonical main
+`eed8594020645fe6d10f8c6565e69a6235c7507d` into the isolated history branch
+(merge `e0e700d1`). PR100's exact reviewed candidate passed installed run
+40586980099: Go 620.173s, approved subtest 155.60s, actual original-expiry wait
+115.4091899s, one independently approved accepted capture, 2,360 native PCAPNG
+bytes and 21 tshark packets. The initial uncertain reply resolved to the same
+capture. Its source stayed unchanged and cleanup was empty; report SHA-256
+`d86eef8c74434bdb9240530927c3dd0edbbe6d1defb333ce432ff245843063da`.
+That run excludes history and is not installed qualification for this branch.
+
+Installed history run 40596917652 on `3673c264` failed after the original
+approved capture and authenticated 2,660-byte native PCAPNG download, at the first
+MCP settings read (`ParametersUnavailable`), before React/repeat. Go was 625.780s,
+selected approved subtest 152.28s; all 3,249 source hashes matched, source stayed
+unchanged and cleanup was empty. Report SHA-256
+`7c1509ce004a716d6dfe3b85d52a9da111af9d76213d5ff57bc943812bd2d1f9`.
+The accepted/PCAPNG portion is partial evidence; the whole case failed and its
+final approved-recording report was not written.
+
+A local deterministic RED reproduces deferred advisory history starvation when
+Start consumes the original five-second invocation. The sequencing correction
+runs that same single synchronous attempt after acknowledged intent and before
+Start, retaining original authority/cancellation and passive replay. Quick
+history failure still permits dispatch; slow history can exhaust the original
+budget and prevent dispatch without rolling back admission. Provider operation
+counts stay unchanged, but their latency moves before Start, followed by one
+additional current identity recheck per dispatch attempt reaching that boundary
+(including explicit continuation). No timeout, background task, retry or storage workaround
+is added. The hosted failure's exact phase is not established by that regression.
+Closed write/read diagnostics and a fixture-only exact state/receipt count lookup
+now separate missing/pending storage from read/relay/codec failure at the next
+installed attempt. See ADR-255 for scope and retained failure provenance. Installed
+combined timing and the complete browser history/repeat workflow remain pending.
+Local capture/bootstrap/presentation races pass (11.019s/52.790s/74.493s), the
+browser proxy helper race passes (1.072s), and canonical pre-push passes. No
+external fixture or collector ran for this sequencing correction.
+
+The following exact `c267cde7` installed run 40601041862 failed with decisive
+coarse state: history required, write_claimed/visible, generic custody reserved,
+no writer completion and zero acknowledged copies. Closed diagnostics reported
+write/execute/deadline, then read/storage/live. That does not establish which
+Execute subphase failed or whether physical objects were written. Go was
+618.860s, selected subtest 159.45s; all 3,251 recorded sources were unchanged and
+cleanup was empty. Report SHA-256
+`63886dbb9427659877c0bbe41a11e140412defc117346e1ff5a734ae04929593`.
+
+The least-cost local real mTLS/H2/JWS/private-history composition reproduces a
+redundant receiver/source round trip exhausting a 500ms original parent under
+controlled 200ms source latency, before an object effect. Execute now reuses
+Prepare's original checked receiver only within its original proof and unchanged
+minimum deadline; live attachment and actual current work-source/peer checks
+remain. Source reads drop three→two, and the same controlled case succeeds in
+406ms (434ms under parent race). Current-source change, closed attachment,
+cancellation and original expiry still deny all effects. Closed finite timing
+buckets and existing stream diagnostics now distinguish preparation, signing
+and exchange without extra I/O. This corrects the reproduced composed cost
+problem; the old installed inner cause and full installed workflow remain
+unqualified. No external fixture, collector, timeout increase or retry ran. Affected mTLS/
+context-start/bootstrap/capture races pass (38.143s/10.800s/56.057s/11.082s),
+as does canonical pre-push including 227 console tests. Independent read-only
+review found no blocker.
+
+PR102 review identified unchecked mutation counts in history eviction: hiding the
+old row and decrementing the two quota rows previously checked errors but ignored
+zero affected rows. This is a test-induced inconsistent-counter case, not an
+observed production corruption or cap bypass: the checked positive increments
+still enforce their ceilings. The correction checks all three already returned
+counts and uses the existing custody fence error, matching summary expiry. It
+adds no SQL/API calls, privileges, state, background work or configuration.
+
+The real PostgreSQL/S3 regression first sets an existing visible row's selector
+quota to zero and forces eviction through the installation limit of one. On
+unchanged production (`942a8cfb`) it fails as expected: reservation returns nil,
+hides the old row and creates a new history/attempt, charging 1,671,168 bytes
+and four objects. RED Go exit 1 (2.785s; selected case 2.34s), report SHA-256
+`77c092c2d22b46231be59c9bf1fc7fb954c34f29c26c35fe9b3a5017649f371c`.
+With the correction (`7918a152`), the same operation returns the fence error;
+old visibility, original installation count and injected selector value remain,
+and allocation/pool counters, attempt count and absence of a new reservation
+prove rollback of the earlier custody insert. The fixture restores its selector
+counter before continuing the existing positive eviction, encrypted read/write
+and real prefix inventory/retirement checks. GREEN Go exit 0 (8.705s; selected
+case 7.25s), report SHA-256
+`306bc747c14ce0b779e4d1270d27283b2bc42af9d1f7b1c1db56df507bcd5229`.
+Both runs independently match all 3,213 frozen source hashes, report unchanged
+source and empty cleanup failures, and their exact owned PostgreSQL/S3 containers
+were independently absent. Cache archives are
+`history-eviction-fence-red-2-artifacts` and
+`history-eviction-fence-green-1-artifacts`. No collector or installed browser
+ran. The first setup attempt used nonexistent pool charge columns; its actual
+exit 1 and cleanup report are retained separately as unqualified fixture failure
+(`history-eviction-fence-red-1-artifacts`), then the query was corrected to the
+existing pool allocation columns before RED. No adversarial trigger framework
+or speculative new security mechanism was added.
+Fresh canonical pre-push passes, including 227 console tests and pinned SQL
+generation; the full PostgreSQL adapter race package passes (2.661s). Final
+documentation spec-check also passes (13,279 assertions). This SQL correction
+still does not establish installed React/history qualification.
+
+The semantic merge base was the prior shared PR100 source `21806d0d`, because
+main contains its squash. The sole remaining content overlap combined history's
+original-target replacement check with main's tri-state recorder availability;
+operational failures still refuse before blueprint storage. All 21 non-overlap
+files changed since that base remain byte-identical to canonical main. The
+seven overlapping files retain history changes beside final main behavior,
+including original request/observation bounds, storage response scheduling,
+closed endpoint diagnostics and audit failure timing. Funding is still schema
+100 and history 101. No other worktree was changed.
+
+Fresh local pre-push passes, including 227 console tests, pinned SQL generation
+(61 files), spec-check (13,279 assertions), architecture-check (1,326 positive
+checks) and Go architecture (66 packages, 390 edges). Full affected race packages
+pass: capture 11.275s, presentation 86.895s, context-start 11.363s, mTLS 39.154s,
+object-store 5.405s, domain capture 1.011s and bootstrap 52.561s. Four positively
+selected Kubernetes endpoint/history checks pass in 11.704s; no unsplit broad
+Kubernetes run was repeated. The built React/Go TLS gate passes 23 synthetic
+journeys and 20 accessibility scans plus native restart (Go 21.789s). These use
+synthetic identity/evidence ports, not an installed history capture. Logs are
+`history-canonical-main-*.log` and `history-canonical-browser.log` in the local
+build cache; generated browser results were archived before restoring only
+those generated tracked outputs. The six positively selected noncollector
+harness/tunnel/approval guard tests pass under race (1.338s); the installed
+browser script passes syntax checking.
+
+The earlier `history101-parameters-native-1` SQL/S3 evidence remains attached to
+`11806a29`. Nine relevant migration/query/history custody/codec/service/domain
+and fixture files were independently compared to that environment report's
+hashes and remain identical. The report still records actual exit 0, unchanged
+source and empty cleanup. Other source has changed; that result is reused only
+for the unchanged history custody behavior, never as a new full-source or
+installed qualification.
+
+Practical fixed-budget estimate before the next hosted run: use the conservative
+964s approved baseline against the unchanged 1,200s job cap (236s remaining),
+and 620.173s Go against 1,080s (459.827s remaining). Baseline setup already
+installs the same locked console modules. The exact additional Playwright 1.64.0
+headless install command takes 0.761s with the local warm cache; one fresh
+owned-cache measurement takes 13.249s, downloads the reported 120 MiB headless
+shell and 2.2 MiB FFmpeg archives, and extracts 290,381,670 file bytes. Only that
+owned duplicate cache was then removed and its absence verified. This host uses
+the Ubuntu 24.04 fallback build; runner/network timing can differ. The initial
+measurement wrapper lacked `/usr/bin/time`; the preserved successful measurements
+use a monotonic Python clock. No package/root changes or collectors ran.
+
+The first approved path's active 40.191s excludes its measured 115.409s expiry
+wait. The repeat needs no second expiry wait and keeps the existing traffic
+loop; its edited recording is three seconds. Allowing 60–120s for React,
+encrypted settings, a new independent review and native transfer is an
+engineering estimate, not measured installed history runtime. With the measured
+cold setup it projects roughly 1,037–1,097s total, leaving 103–163s. The actual
+21.789s synthetic built-browser suite informs browser/setup feasibility only.
+Browser setup retains its 170s command cap; if it consumes that bound instead,
+the same projection can exceed 20 minutes. The existing five-minute browser
+and three-minute native helper caps are local ceilings, not reserved runtime or
+an overall extension. The unchanged job/Go bounds govern; slow, timed-out or
+incomplete runs fail. All history assertions remain mandatory, and no quota,
+source expiry or timeout is raised to fit. One guarded installed history run,
+its actual terminal result, source hashes and cleanup remain required before
+claiming that workflow qualified.
+
+Earlier composition records follow; their pending PR100 statements describe
+those historical candidates, not the merged mainline above.
+
+The next isolated composition merges exact PR100 candidate `21806d0d` and
+ADR-260 without conflicts. The four changed production target/transport files
+remain byte-identical to that candidate. API metadata retains its earliest-read
+five-second interval after a successfully completed authenticated query; I/O,
+current authority, the original Request context, exact target identity and
+queue-time checks keep their independent bounds. History schema 101, encrypted
+settings, source-cutoff repeat and the canonical installed browser caller remain
+unchanged. PR100's installed run was still pending at composition.
+
+Selected race tests across Kubernetes, context transport, bootstrap, capture
+and the object-store codec passed; domain capture compiled with no matching
+tests in that selection. Coverage includes the composed short
+transport-proof/longer target-observation regression and its original-authority
+negative cases. Specification, architecture, Go dependency rules and pinned
+61-file SQL generation passed. No unsplit Kubernetes package or external fixture
+was repeated. Existing SQL/S3 evidence stays attached to `11806a29`, and the
+prior built-browser evidence stays attached to its recorded source; neither
+is relabeled as installed history qualification for this new candidate.
+
+The current isolated composition also merges exact approved-recording candidate
+`e6a2fbfb`, including combined packet target/recorder observation and its original
+bounds. Its installed run and CI were pending at composition; no passing PR100
+or installed history result is inferred. History-only test fakes now implement
+the new combined recorder resolver through their original target fixture.
+
+The existing `continuation-approved-recording` focus now calls the actual React
+history driver after its first genuine PCAPNG on this history branch. It uses
+the original human requester's browser, a fresh preview and a new independent
+reviewer decision with fresh real step-up, then verifies the second native
+PCAPNG. Other focuses, including paced delivery, do not invoke that helper.
+There is no hidden fixture flag, synthetic grant row or additional traffic loop.
+The native workflow reuses console CI's pinned Playwright headless-shell setup
+and cache under a three-minute setup bound. The driver and locked browser
+package inputs are included in the existing source-hash report.
+
+This adds one capture and one native-download session (two total of each), within
+the existing four-record/four-session ceilings. The current helper bounds are
+five minutes for React collection plus three minutes for its native preparation
+and transfer. Against prior approximately 9m24s–9m45s Go runs, those worst-case
+bounds leave only 15–36 seconds inside the unchanged 18-minute Go envelope;
+additional settings/metadata reads consume that headroom, and setup also
+consumes the unchanged 20-minute job budget. The five-minute browser context
+caps its approval callback; the original three-minute native context includes
+the first preparation call. Typical additional time
+and whole-job fit remain unqualified and must be measured once PR100 passes.
+No quota, source expiry, retention, timeout or refund is raised to make it fit.
+
+
+Local canonical pre-push passed after this composition. The corrected full
+capture race package and full bootstrap/contextstart race packages passed, as
+did all five focused packet/API target regressions with positive test selection.
+A broader unsplit Kubernetes package run reached its unchanged ten-minute test
+timeout; the repository's canonical inventory splits this expensive package
+into 40-test groups, so that unsplit attempt is retained as a failure, not a
+full-package pass. The initial run also caught two history-only fakes lacking
+the new delegated target reader; those were corrected before the capture rerun.
+No production target or deadline behavior was changed for these fakes.
+
+The actual built React/Go TLS boundary passed 23 synthetic browser journeys and
+20 accessibility scans plus native restart checks (Go 21.880 s). The installed
+history driver passed syntax checking, its exact-destination/cancellation
+loopback tunnel passed under race, workflow YAML parsed, and ten pure harness
+selection/source-pinning tests passed. These tests do not run the installed
+history journey or qualify its provider/collector path. Earlier real SQL/S3
+results below remain tied to `11806a29`; the unchanged history custody path was
+not rerun solely for this target/fixture composition.
+
+The isolated schema-101 composition at `11806a29` combines clean history
+checkpoint `c36d6452` with committed approved-recording candidate `f3a1fb60`.
+Funding remains migration 00100; encrypted history follows as 00101 and the
+compiled schema guard is 101. That checkpoint did not include the later PR100 capture-target work. Both sets of approval/history
+contracts and prior qualification records are retained.
+
+Local full pre-push, pinned SQL generation, all 12 affected Go race packages and
+227 console tests passed. Focused real PostgreSQL/S3
+`history101-parameters-native-1` then passed with actual exit 0: selected
+`history-parameters-custody` 7.36 s, parent 7.81 s, Go 8.874 s, and harness phase
+33.022 s including compilation. All 3,200 source hashes independently matched,
+cleanup failures were empty, and both owned containers were independently absent.
+The run measured 4,208 ciphertext bytes against 1,671,168 reserved bytes and
+retained the existing synthetic authority/process boundaries. Its environment
+report SHA-256 is
+`1fd8289ae2778ef0eb94e62c9693253dc73fd240f68b0bfc3361a093a7dbbee3`;
+logs/report remain in the local qualification cache. No collector or Kubernetes
+fixture ran. This is composed custody evidence, not installed browser/full
+history qualification, publication or completion of the full goal.
+
+Migration 00101 and the typed history service add bounded encrypted parameter
+snapshots on the existing regional store, separate history-prefix capabilities,
+keyed selector/settings lookup, independent case-metadata retention, quota
+eviction and typed physical retirement. New captures cannot reconstruct missing
+settings from execution scope. Recorder repeats retain authored filters/windows,
+profile versions and policy-source provenance, persist opaque source lineage and
+use current preview/admission/approval. A source deadline also bounds approved
+acceptance; a later grant cannot renew it. History failure leaves an independently
+accepted incident and its start intact. Browser settings/pagination are bounded
+in memory and clear at their original deadlines and session/scope changes.
+
+The following component evidence predates schema-101 renumbering and composition
+with the approved-recording funding/cancellation candidate; it does not qualify
+the newly composed source. Focused real SQL/S3 `history-parameters-native-10` passed: actual exit 0, unchanged
+source hashes (including 4,311 captured repository files), empty cleanup failures
+and independently absent owned containers; selected subtest 7.67 s / Go 9.142 s. It covers
+encrypted roundtrip, persisted lineage and source-cutoff/unknown-source refusal,
+own-selector eviction, no plaintext fallback, nanosecond deadline normalization,
+ordinary evidence-prefix deletion refusal, actual matching-prefix inventory before
+refund, and settled projection/counter pruning. Its synthetic snapshot used
+4,214 physical ciphertext bytes against 1,671,168 reserved bytes. Reports/logs
+for all runs 1–10 remain in the local qualification cache. Earlier failures are
+retained: role/identity/time fixture corrections, UTC registration normalization,
+and source authority checked too late after self-eviction. This is component
+evidence, with explicit synthetic authority/process inputs.
+
+Affected package race tests, console checks, specification/architecture/design,
+SQL generation and Helm render/schema gates pass at the recorded checkpoints.
+The authenticated browser alone has a fixed 160 KiB settings response budget,
+under the existing authorization/audit path, covering the 128 KiB snapshot and
+envelope. MCP keeps its standard limit and receives browser navigation when too
+large. Canonical output preserves HTML/multibyte strings without escaping growth;
+only minimized HMAC/count/reference facts enter audit. Direct capture pages now
+open settings and explicitly prepare fresh repeats without inheriting the old
+receipt/grant/sharing. Wrapped, keyboard-scrollable JSON sections keep large
+values within desktop/mobile layouts. The final frozen built-browser gate passed 23
+synthetic journeys / 20 accessibility scans and four restart boundaries / two
+scans, with 4,311 unchanged source hashes and a 22.616 s Go fixture. The 224-test
+console gate, full affected race suites and final pre-push pass. The Discovery
+origin filter is recognized without inventing a discovery capture producer.
+The actual installed recorder → protected
+settings → edited React repeat → new independent grant → native result journey
+is being composed using the existing installed OIDC/recorder fixture. Neither
+API parity nor synthetic UI tests qualify that full workflow. The 100,000-row
+minimal TEMP-table comparison passes old/new 81-ID/fair keyset equivalence:
+the actual indexed retirement adapter took 0.605–0.958 ms over ten executions,
+avoiding a demonstrated cached generic-plan regression near 0.54 s. Two partial
+indexes occupied 90,112 bytes each after churn; detailed transition costs and
+all failed probes remain in ADR-255. These are local synthetic SQL measurements,
+not installed aggregate latency. Final installed qualification remains pending; REQ-HIS-001–004 and
+the full increment are not marked complete by this checkpoint.
 
 
 ## Authored packet custody funding correction (2026-10-27)

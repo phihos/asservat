@@ -440,6 +440,42 @@
                       "not_after",
                       "revision"
                     ]
+                  },
+                  "collected_bytes_spent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1099511627776,
+                    "description": "Conservative native-output reservations shared by this acceptance; uncertain spend remains charged. Not measured bytes."
+                  },
+                  "max_collected_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1099511627776,
+                    "description": "Original accepted cumulative native-output ceiling, shared across grant replacements and controls."
+                  },
+                  "observed_bytes_spent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1099511627776,
+                    "description": "Conservative pre-filter observation charges shared by this acceptance, including uncertain legacy spend. Not collected output."
+                  },
+                  "max_observed_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1099511627776,
+                    "description": "Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition."
+                  },
+                  "collection_kind": {
+                    "enum": [
+                      "podStatus",
+                      "packetCapture"
+                    ],
+                    "description": "Accepted collection action; controls available approval commands, not acquisition authority."
+                  },
+                  "attached_grant_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection."
                   }
                 },
                 "required": [
@@ -455,7 +491,12 @@
                   "occurrences",
                   "captured",
                   "recent",
-                  "suppressions"
+                  "suppressions",
+                  "collected_bytes_spent",
+                  "max_collected_bytes",
+                  "observed_bytes_spent",
+                  "max_observed_bytes",
+                  "collection_kind"
                 ]
               }
             },

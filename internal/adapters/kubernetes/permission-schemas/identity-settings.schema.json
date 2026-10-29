@@ -131,6 +131,10 @@
         },
         "requireRecordingApproval": {
           "type": "boolean"
+        },
+        "policyGrants": {
+          "$ref": "https://asservat.io/spec/v1/approval-policy.schema.json#/$defs/policyGrants",
+          "description": "Finite policy grant periods. Omitted defaults: seven days, maximum thirty days, renewal notice one day. An accepted lower maximum irreversibly clamps all earlier-issued grants from their original issuedAt; raising it does not extend them."
         }
       }
     }

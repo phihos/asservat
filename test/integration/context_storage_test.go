@@ -32,7 +32,9 @@ import (
 )
 
 type fixture struct {
-	S3, KMS, Postgres string
+	S3, KMS, Postgres   string
+	NativeSQLStatistics bool
+	NativeTrafficHelper nativeTrafficHelper
 	// PostgresContainer names the owned PostgreSQL container (installed
 	// journey: lossless restart, ADR-226).
 	PostgresContainer string

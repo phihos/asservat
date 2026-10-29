@@ -9,6 +9,8 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
@@ -19,10 +21,11 @@ import (
 // Preview is persisted, so request_capture can refuse it with the same
 // RecorderUnavailable blocker before acceptance; nothing is reserved.
 type RecorderPreviewResult struct {
-	Preview    value.ContextPreview
-	Plan       planning.RecorderPlan
-	Assessment planning.RecorderAssessment
-	ValidUntil time.Time // Original metadata-delivery authority; never persisted.
+	CollectorImageDigest, ProjectionDigest artifact.Digest
+	Preview                                value.ContextPreview
+	Plan                                   planning.RecorderPlan
+	Assessment                             planning.RecorderAssessment
+	ValidUntil                             time.Time // Original metadata-delivery authority; never persisted.
 	// Recordable marks an acceptable plan for an available node recorder
 	// (ADR-248): request_capture can accept it.
 	Recordable bool
@@ -36,6 +39,16 @@ type RecorderPreviewResult struct {
 // errors are reported only after eligibility, so they disclose nothing about
 // an unauthorized target. The libpcap compiler runs on the hub (S2).
 func (s ContextInvestigation) PreviewComposition(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent) (result RecorderPreviewResult, failure error) {
+	return s.previewComposition(ctx, source, intent, nil)
+}
+
+func (s ContextInvestigation) PreviewCompositionRepeat(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, original authorization.Target) (RecorderPreviewResult, error) {
+	if !authorization.UUID(original.ClusterID) || !identity.Text(original.NamespaceUID, 64) || !identity.Text(original.WorkloadUID, 64) {
+		return RecorderPreviewResult{}, value.ErrInvalid
+	}
+	return s.previewComposition(ctx, source, intent, &original)
+}
+func (s ContextInvestigation) previewComposition(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, original *authorization.Target) (result RecorderPreviewResult, failure error) {
 	defer func() { s.reportPreviewFailure(failure) }()
 	var zero RecorderPreviewResult
 	if !s.configured() || ctx == nil || source == nil || ctx.Err() != nil {
@@ -63,6 +76,13 @@ func (s ContextInvestigation) PreviewComposition(ctx context.Context, source ide
 	}
 	if !target.Valid(s.Now()) {
 		return zero, previewFailure("facts/target", value.ErrChanged)
+	}
+	if original != nil && (original.ClusterID != target.Request.ClusterID || original.NamespaceUID != target.Request.Namespace.UID || original.WorkloadUID != target.Request.Workload.UID || (original.PodUID != "" && target.Request.PodUID != original.PodUID)) {
+		eligible := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
+		if !eligible.Eligible {
+			return zero, value.ErrDenied
+		}
+		return zero, value.ErrTargetReplaced
 	}
 	available, err := s.packetRecorderAvailable(ctx, intent, target)
 	if err != nil {
@@ -98,8 +118,11 @@ func (s ContextInvestigation) PreviewComposition(ctx context.Context, source ide
 	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Retention: retentionReview(r), Audience: slices.Clone(eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
+	if intent.RepeatedFrom != nil {
+		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
+	}
 	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.RecorderAssessmentRulesDigest()
-	required, err := s.requireRecordingApproval(ctx, i.Principal.Issuer)
+	required, err := s.requireRecordingApproval(ctx, source, i.Principal)
 	if err != nil {
 		return zero, previewFailure("approvals", err)
 	}

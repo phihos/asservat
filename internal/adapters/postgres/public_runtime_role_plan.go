@@ -138,6 +138,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	read("goose_db_version")
 	switch purpose {
 	case "hub-metadata-read":
+		read("capture_history_parameter")
 		// The hub's seven metadata facets share only their existing read and
 		// row-lock privileges. No evidence-object locators, credentials or effect writes.
 		read("authority_audit", "context_capture", "context_case_locator", "context_catalog", "context_control_account", "context_control_pool", "context_execution", "context_processing", "context_storage_binding", "context_verification", "custody_allocation", "custody_attempt", "custody_pool", "fleet_current_trust", "permission_assignment", "permission_basis", "permission_stream", "processing_root", "processing_rule", "retention_catchup", "retention_catchup_effect", "retention_checkpoint", "retention_decision", "retention_source")
@@ -149,7 +150,26 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// SQL54 independently pins this actual session_user OID and original
 		// provenance. Root/qualification arguments are not a role boundary.
 		out = append(out, publicRuntimeGrant{"function", "read_capacity_audit_profiles(uuid,uuid,uuid,bytea,text,timestamptz,timestamptz)", "", "EXECUTE"})
+	case "capture-history":
+		// ADR-255: encrypted metadata shares ordinary hub SQL custody, without
+		// a new credential or evidence-key authority. Payloads stay regional.
+		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_capture", "capture_history_parameter", "capture_history_quota", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision", "policy_source", "policy_acceptance")
+		add("fleet_current_trust", "UPDATE", "installation_id")
+		add("permission_stream", "UPDATE", "id")
+		add("retention_source", "UPDATE", "root_id")
+		add("custody_pool", "UPDATE", "id")
+		add("custody_allocation", "UPDATE", "id", "charged_bytes", "charged_objects")
+		add("custody_attempt", "UPDATE", "id", "state", "copies_digest", "deletion_fence", "lease_until", "deleted_at")
+		add("custody_copy", "UPDATE", "ciphertext_bytes", "ciphertext_sha256", "etag", "version_id")
+		for _, table := range []string{"custody_attempt", "custody_copy", "custody_event", "capture_history_parameter", "capture_history_quota"} {
+			add(table, "INSERT")
+		}
+		add("capture_history_parameter", "DELETE")
+		add("capture_history_quota", "DELETE")
+		add("capture_history_quota", "UPDATE", "used")
+		add("capture_history_parameter", "UPDATE", "capture_id", "visible", "state", "write_id", "write_digest", "write_started_at", "write_until", "write_executor_epoch", "writer_completion_json", "copies_digest", "delete_id", "delete_executor_epoch", "delete_started_at", "delete_until", "delete_fence", "purge_completion_json")
 	case "capture-admit":
+		read("capture_history_parameter", "custody_copy")
 		out = append(out, publicRuntimeGrant{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"})
 		// Original publication coverage only; no processing initialization,
 		// restriction, lineage or counter mutation is delegated to admission.
@@ -159,6 +179,11 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// storage binding and quota/source configuration remain read-only.
 		// ADR-228: a policy executor re-checks its acceptance after locks.
 		read("policy_source", "policy_acceptance")
+		read("policy_occurrence", "policy_grant_attachment", "access_grant")
+		add("policy_source", "UPDATE", "policy_uid") // row lock only
+		add("policy_occurrence", "UPDATE", "reserved_capture_id", "grant_id", "reserved_bytes")
+		add("policy_acceptance", "UPDATE", "collected_bytes_spent")
+		add("access_grant", "UPDATE", "id", "policy_executions_spent", "policy_bytes_spent")
 		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_storage_binding", "context_preview", "context_preview_fence", "context_control_pool", "context_control_account", "context_control_charge", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "custody_event", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
@@ -183,14 +208,17 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 		add("policy_source", "INSERT")
-		add("policy_source", "UPDATE", "generation", "spec_digest", "resource_version", "observed_at", "fresh_until", "deleted", "suspended", "intent_version", "collection_digest", "creator_json", "active_id")
+		add("policy_source", "UPDATE", "generation", "spec_digest", "resource_version", "observed_at", "fresh_until", "deleted", "suspended", "intent_version", "collection_digest", "creator_json", "active_id", "authored_grant_ref", "grant_attachment_id")
+		read("access_grant", "policy_grant_attachment")
+		add("access_grant", "UPDATE", "id") // row lock; immutable trigger refuses ID edits
+		add("policy_grant_attachment", "INSERT")
 		add("policy_acceptance", "INSERT")
-		add("policy_acceptance", "UPDATE", "acknowledged_at", "receipt_json", "executions_spent")
+		add("policy_acceptance", "UPDATE", "acknowledged_at", "receipt_json", "executions_spent", "collected_bytes_spent")
 		add("policy_pod_watermark", "INSERT")
 		add("policy_pod_watermark", "DELETE")
 		add("policy_pod_watermark", "UPDATE", "restarts", "last_seen", "detector", "armed")
 		add("policy_occurrence", "INSERT")
-		add("policy_occurrence", "UPDATE", "capture_id", "outcome")
+		add("policy_occurrence", "UPDATE", "capture_id", "outcome", "reserved_capture_id", "grant_id", "reserved_bytes")
 		add("policy_workload_window", "INSERT")
 		add("policy_workload_window", "UPDATE", "tat")
 		add("policy_suppression", "INSERT")
@@ -226,9 +254,13 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// decision, one revocation and monotonic pool spend may change a row
 		// (its trigger enforces it); children and uses are append-only.
 		read("access_grant", "access_grant_child", "access_grant_use")
+		// Policy requests reuse the current accepted-policy read and settings
+		// projection, serialized by the existing permission root.
+		read("permission_stream", "policy_source", "policy_grant_settings")
+		add("permission_stream", "UPDATE", "id")
 		add("access_grant", "INSERT")
 		add("access_grant", "UPDATE", "decision", "approver_issuer", "approver_subject", "approver_client", "decision_reason", "decision_acr", "decision_auth_time", "decided_at", "decision_key", "expires_at",
-			"revoked_at", "revoker_issuer", "revoker_subject", "revoker_client", "revoke_key", "revision", "artifacts_spent", "bytes_spent", "operations_spent")
+			"revoked_at", "revoker_issuer", "revoker_subject", "revoker_client", "revoke_key", "revision", "artifacts_spent", "bytes_spent", "operations_spent", "policy_executions_spent", "policy_bytes_spent")
 		add("access_grant_child", "INSERT")
 		add("access_grant_use", "INSERT")
 	case "capture-journal":
@@ -269,6 +301,15 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("permission_stream", "permission_basis", "permission_assignment", "permission_acceptance", "authority_audit")
 		add("permission_stream", "INSERT")
 		add("permission_stream", "UPDATE", "epoch", "sequence", "initial_audit_id", "trust_digest", "projection_digest", "lease_until", "observed_at", "fresh_until", "suspended")
+		// The joined protected-settings observer uses this existing credential.
+		// Grant updates can only shorten effective periods; its trigger forbids
+		// changing scope, decisions, revision or spend in the same statement.
+		add("permission_stream", "UPDATE", "id")
+		read("policy_grant_settings")
+		add("access_grant", "SELECT", "root_id", "kind", "decision", "requested_at", "policy_not_after")
+		add("policy_grant_settings", "INSERT")
+		add("policy_grant_settings", "UPDATE", "issuer", "source_uid", "source_generation", "source_digest", "observed_at", "fresh_until", "default_age_seconds", "max_age_seconds", "renewal_notice_seconds")
+		add("access_grant", "UPDATE", "policy_not_after", "expires_at")
 		add("permission_acceptance", "INSERT")
 		add("permission_basis", "INSERT")
 		add("permission_basis", "UPDATE", "generation", "resource_version", "spec_digest", "scope_digest", "workload_uids", "effect", "not_after", "seen_sequence", "observation_version", "automation_json", "automation_audit_id")
@@ -300,6 +341,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("retention_checkpoint")
 		add("retention_checkpoint", "UPDATE", "audit_acknowledged_at", "audit_receipt")
 	case "retention-catchup":
+		read("capture_history_parameter")
 		read("permission_stream", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "retention_decision")
 		add("permission_stream", "UPDATE", "id")
 		add("custody_pool", "UPDATE", "id")
@@ -415,6 +457,10 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			// admits its FOR UPDATE lock, and the guard trigger refuses changes.
 			add("context_deletion_checkpoint", "UPDATE", "attempt_id", "audit_receipt_json", "audit_acknowledged_at")
 		case "context-cleanup-finalize":
+			// ADR-261: only the exact expired observation child, protected by the
+			// existing audited finalization transaction; no pool counter updates.
+			add("policy_observation_session", "SELECT", "root_id", "capture_id")
+			add("policy_observation_session", "DELETE")
 			// The one-use finalization claim, charge release, receipt clearing,
 			// tombstone and outbox event; triggers require the acknowledged audit.
 			add("context_deletion_checkpoint", "UPDATE", "attempt_id", "finalization_xid")

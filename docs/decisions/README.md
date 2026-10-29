@@ -1,9 +1,20 @@
 # Decision records
 
+[ADR-261 — Finite policy observation admission](261-finite-policy-observation-admission.md)
+records the engineering finite-window contract, original hard bounds, explicit
+revocation residual and held renewal machinery. Authority/prefix/native
+qualification remains pending; manual raw and ongoing modes are not enabled.
+
+[ADR-259 — Policy grants and observation spend](259-policy-grants-and-observation-spend.md)
+records accepted team-policy grants and prepaid observation; ADR-261 refines the
+first finite policy lease without a periodic renewal loop.
+Implementation and installed qualification remain in progress.
+
 [ADR-253 — Approval step-up sign-in](253-approval-stepup-login.md) adds an explicit console
 sign-in path using current protected ACR settings and fresh authentication. The
 existing signed-claim check still decides assurance; real-provider LoA qualification
 remains pending. No migration or new credential.
+- **ADR-255 — Encrypted parameterized capture history:** [Bounded immutable settings and faithful repeat](255-encrypted-capture-history.md); implementation in progress, native qualification pending.
 
 [ADR-249 — Sensitive acquisition grants](249-sensitive-acquisition-grants.md) is S-04 increment
 12 (12a, individual approval): an adHocCapture AccessGrant per reviewed packet/syscall plan that
@@ -1020,5 +1031,7 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [252 — Approved capture acceptance](252-approved-capture-acceptance.md): retain bounded immutable review blueprints and fix a separately bounded capture deadline under the original current grant.
 
 - [ADR-257: preserve authored packet evidence funding](257-approved-recording-funding.md)
+
+- [258 — Native response windows under slow delivery](258-slow-native-response-windows.md): retain one fixed response owner and cursor across fresh short leases, preserve actual credential expiry, and reuse the existing native-owner renewal. Selected SQL/S3/TLS qualification passes; installed aggregate-cost and slower-link qualification remain pending.
 
 - [ADR-260: API target observations after completed authenticated queries](260-api-target-observation-freshness.md)

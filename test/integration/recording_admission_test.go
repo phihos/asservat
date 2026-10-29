@@ -91,7 +91,12 @@ func (c recordingCollect) CollectRecording(context.Context) (evidence.RecordingC
 // the node's recorder writes it.
 func syntheticRecording(t *testing.T, started time.Time) []byte {
 	t.Helper()
-	rec, err := packets.NewRecorder(recordingProgram, 1<<20, started, "synthetic")
+	return syntheticFilteredRecording(t, started, recordingProgram, 0)
+}
+
+func syntheticFilteredRecording(t *testing.T, started time.Time, program []planvalue.BPFInstruction, flags byte) []byte {
+	t.Helper()
+	rec, err := packets.NewRecorder(program, 1<<20, started, "synthetic")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,6 +106,7 @@ func syntheticRecording(t *testing.T, started time.Time) []byte {
 		binary.BigEndian.PutUint16(tcp[0:2], 40000)
 		binary.BigEndian.PutUint16(tcp[2:4], 80)
 		tcp[12] = 5 << 4
+		tcp[13] = flags
 		payload := strings.Repeat("SYNTHETIC-MARKER", 8)
 		binary.BigEndian.PutUint16(ip[2:4], uint16(len(ip)+len(tcp)+len(payload)))
 		f := append(append(append([]byte{0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 6, 8, 0}, ip...), tcp...), payload...)

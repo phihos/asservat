@@ -2,6 +2,7 @@ package capture
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -200,27 +201,44 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 			return zero, expired()
 		}
 		v, err := s.Storage.ContextStorage(call, f.target.Target())
-		if err != nil {
+		expiredSource := errors.Is(err, value.ErrStorageBindingExpired)
+		if err != nil && !expiredSource {
 			return zero, previewFailure("facts/storage", err)
 		}
 		if !current() {
 			return zero, expired()
 		}
-		if !s.storageCurrent(v, f.target.Target(), s.Now()) {
+		// Expired metadata is never authority. Validate its original shape and
+		// exact selection before reusing this owner's existing readiness wait.
+		if expiredSource && (!s.storageCurrent(v, f.target.Target(), v.Binding.ObservedAt) || v.Binding.ObservedAt.After(s.Now()) || s.Now().Before(v.Binding.FreshUntil)) {
 			return zero, previewFailure("facts/current/storage", value.ErrChanged)
 		}
-		if w.selection == (value.ContextStorageSelection{}) {
+		if !expiredSource && !s.storageCurrent(v, f.target.Target(), s.Now()) {
+			return zero, previewFailure("facts/current/storage", value.ErrChanged)
+		}
+		if w.selection == (value.ContextStorageSelection{}) && !expiredSource {
 			w.selection = v.Selection
-		} else if w.selection != v.Selection {
+		} else if w.selection != (value.ContextStorageSelection{}) && w.selection != v.Selection {
 			return zero, previewFailure("facts/storage", contextStorageSelectionChange{})
 		}
-		if !v.Binding.FreshUntil.Before(s.Now().Add(storageMargin)) {
+		if !expiredSource && !v.Binding.FreshUntil.Before(s.Now().Add(storageMargin)) {
 			return v, nil
 		}
 		// A valid but thin observation supplies no admission authority. Only
 		// another independent protected read may replace it. Other facts,
 		// selection and original deadlines cannot be replaced or extended.
 		if s.Refresh == nil || w.demand == storageDemandFailed || !readinessCurrent() {
+			if expiredSource {
+				// The typed read was recognized. Keep the original error, and
+				// distinguish the bounded readiness decision from a read failure.
+				reason := "readiness-tail"
+				if s.Refresh == nil {
+					reason = "refresh-unavailable"
+				} else if w.demand == storageDemandFailed {
+					reason = "demand-failed"
+				}
+				return zero, previewFailure("facts/storage/expired/"+reason, err)
+			}
 			return zero, previewFailure("facts/storage", contextStorageMarginRefusal{})
 		}
 		if w.demand == storageDemandUnused {

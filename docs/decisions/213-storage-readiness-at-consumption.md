@@ -26,8 +26,9 @@ enter a consumption phase; it does not start another hint or another
 independent wait.
 
 The authoritative storage read still requires a valid binding and the
-existing one-second selection margin. Only a valid same-selection binding
-with less than that margin permits consumption polling. With refresh configured,
+existing one-second selection margin. A valid same-selection binding
+with less than that margin, or the typed expired-only result described below,
+permits consumption polling. With refresh configured,
 use the call's sole demand attempt if it has not already been spent, then
 read at the existing 250 ms interval. A failed demand prevents further polling.
 Each candidate retains its own original observation and freshness timestamps;
@@ -39,8 +40,8 @@ caller, initial identity/recovery, preview, exact target, eligibility and
 verified identity, capability, retention/proof/expiry and optional reason
 deadline. The first thin binding's freshness is not the consumption wait's
 deadline: that binding is discarded, while every retained non-storage fact
-must remain current. An expired or otherwise invalid binding returned by the
-authoritative reader still refuses the operation.
+must remain current. A malformed expired or otherwise invalid binding returned without the explicit
+expired-only result still refuses the operation.
 
 Request binds the storage selection already reviewed in the passive preview.
 Preview and CheckDiagnostic bind their first valid authoritative selection.
@@ -106,3 +107,306 @@ this correction and reaches installed admission, acquisition and publication.
 Its timing logs do not establish whether a consumption-phase poll was
 required. The complete test failed in subsequent client recovery before
 public retrieval/download and expiry/deletion qualification.
+
+## Natural source expiry correction (2026-10-28)
+
+The prior terminal-expiry rule was an engineering choice in these tests/contracts,
+not a maintainer requirement. A local actual-Request regression reproduces a legal
+30-second original source near expiry: the early hint succeeds, but the later
+authoritative read reports its natural expiry and previously returned immediately
+without using the existing refresh owner. Native 40634973872 refused source
+validation before traffic; its row timestamps were not retained, so this local
+defect does not establish the installed failure's exact cause.
+
+A dedicated availability result may retain expired original Binding/Selection
+metadata with a nonnil error. The consumer validates the original interval, rejects
+future/malformed/mismatched metadata and compares Request's exact preview selection
+before waiting. It reuses the existing sole demand, 250 ms cadence, response reserve
+and original caller/non-storage bounds; an earlier failed demand prevents waiting.
+Only a new successful, current, margin-sufficient same-selection read can authorize
+admission. Known source/pool revisions refuse before or after waiting. No TTL,
+demand lifetime, permission, audit, admission retry or authority interval is extended;
+the persisted binding already lasts 30 seconds under ADR-200/migration 00072.
+
+
+## SQL transaction classification correction (2026-10-28)
+
+Native 40648568602 on af9bb589 stopped before capture at
+`request/facts/storage/read/observation/source-expired`, despite the typed natural
+expiry change above. Its demand worker completed refreshes in about 2.3–4 seconds;
+the first 3.98-second refresh reported only 880 ms left on its original guarded
+namespace/workload observation, sampled before its 70 ms reconciliation. That
+number is not the persisted raw binding cutoff or the consumer's final effective
+cutoff, and cannot establish a one-second storage-margin refusal. Migration 00072
+keeps the raw source binding's original 30-second interval separate from checked
+work facts/receipts within their original five seconds. The storage reader tests
+raw source expiry before its successful-result managed/control/pool/allocation
+intersection. Later successful observations must still be independently read
+inside the request's unchanged authority/readiness cutoffs. These measurements
+neither justify extending source freshness nor identify every request's exact
+timing.
+
+A concrete adapter defect prevented this existing readiness path: the real
+Ledger.transaction error list included generic capture unavailability but omitted
+its more specific ErrStorageBindingExpired child. Its callback correctly marked
+source expiry, then transaction normalization erased that classification. The
+reader consequently discarded expired Binding/Selection metadata, and the
+consumer immediately returned generic unavailability. The earlier pure adapter
+wrapper and synthetic Request-port tests bypassed that actual SQL transaction
+boundary; their passing results did not prove preservation through it.
+
+The new focused existing PG/S3 fixture calls the real SELECT-only storage reader
+and real Ledger.transaction. A valid original 30-second binding is made naturally
+expired by the fixture administrator; the unchanged implementation returns the
+wrong generic class and zero selection (RED exit 1, child 0.57 s, Go package
+1.103 s). The same case checks changed expired selection, malformed/future source,
+canceled SQL read and an independent restored-original successful read, with no
+capture admission. Protected source setup remains synthetic; this is SQL adapter
+qualification, not a new installed run or runtime refresh authority.
+
+The correction adds the specific expiry marker before generic unavailability in
+the existing closed error list. It retains the original metadata and nonnil
+availability error so only the existing sole readiness owner can demand/poll;
+only a later current same-selection read can authorize admission. No query,
+transaction, timer, watcher, provider call, credential, retry, schema or authority
+interval is added. The worker's cumulative refresh cost is unchanged. The
+installed path and combined runtime budget still need their own later result;
+this fix is not a promise that every refresh fits an already-short caller.
+
+The identical selected SQL case passed after the one-sentinel fix on 606c43e2
+(command/Go exit 0, child 0.52 s, Go package 1.995 s). RED used unchanged production
+on 2f95706f; GREEN's dates, selection and negative checks were unchanged. Both
+owned PG/S3 runs matched all 3,343 source hashes, reported unchanged sources and
+empty cleanup failures, and independently confirmed exact owned container/network
+absence. The role remained SELECT-only and no capture row was created. Offline
+complete PostgreSQL-adapter and capture races also exited 0 (2.577 s and 12.256 s).
+The SQL proofs establish this normalization boundary, not installed capture,
+regional refresh speed or end-to-end response success. No broader external suite
+or hosted run was executed for this fix.
+
+
+## Readiness decision diagnostics and composed boundary (2026-10-28)
+
+Native 40744858749 on `3f434f00` again ended at
+`request/facts/storage/read/observation/source-expired`, before capture (Go
+599.782s, approved-recording case 132.28s). The corrected transaction marker was
+present. A full source trace finds the real storage reader assigned directly to
+`ContextInvestigation.Storage` and carried unchanged into `ContextSubmission`.
+The old final label also described recognized typed expiry when the existing
+readiness cutoff was exhausted or the single wakeup demand had failed. It did
+not prove another lost-marker defect or identify the installed failure branch.
+
+Keep the returned typed cause and all behavior unchanged. Recognized expired
+metadata now distinguishes the fixed private readiness decisions
+`facts/storage/expired/readiness-tail`, `demand-failed` and
+`refresh-unavailable`. An unrecognized/read failure retains its old read-stage
+classification. `q-pre-storage` uses the existing bounded timing recorder to
+measure Request's initial identity/recovery/replay/preview/approval work before
+its first storage hint. Shared timing logs sample powers of two, so a given
+request's timing may still be absent; the first fixed refusal label can identify
+its decision without request identifiers, dependency strings or new machinery.
+
+A failed wakeup is not authority. A fresh, current, margin-sufficient independent
+first/final read is accepted **before** the failed-demand gate. That gate stops
+additional polling only. Whether allowing further bounded polling improves
+availability after failed/uncertain demand is an engineering load choice; the
+retained Native does not identify that branch, so no polling behavior changes.
+
+The composed fixture exercises actual Ledger/ContextStorageReader through
+Preview/Request with actual SQL previews, replay and admission. Source publication,
+identity, target and processing facts remain explicit synthetic inputs; it does
+not qualify the worker or protected source producer. Cases cover one demand and
+fresh source, failed demand followed by an independently fresh source, failed
+wakeup without a fresh source and an original short-parent readiness tail.
+Accepted replay must recover the original capture without storage refresh.
+External execution of this new composition remains pending.
+
+This adds zero SQL/API/provider calls, watches, credentials, timers, retries or
+authority intervals. It adds three fixed diagnostic labels and two clock reads
+for one existing timing step. Request retains its original five seconds and the
+one-second response reserve. With a cold source, a 2.48–3.11s successful producer
+exchange leaves at most 1.52–0.89s of that four-second readiness ceiling for all
+pre-hint work, polling jitter and other overhead; earlier original bounds may
+shorten it further. This is source-bound arithmetic, not a measurement of the
+failed request's prefix or proof of its exact cause. The deliberate two-minute
+preview-expiry wait can outlast both the 60s demand and raw 30s source binding.
+No earlier wakeup, extra demand, new deadline or TTL change is implemented here.
+
+The first authorized composed PG/S3 run on `f2f7d2a` failed initial Preview in
+all four cases (child 1.20s, Go 1.644s, exit 1), before the expired-row Request
+checks. All 3,347 source hashes and 35,980 tracked files were unchanged; cleanup
+was empty and exact owned resources were absent. Its environment SHA256 is
+`a64a0b594b1b1de65396d75536d7825c13bb69cd5f89f525efc3906c3a79b333`.
+This failed setup provides no composed expiry or admission qualification.
+
+Source review found a deterministic fixture error: its synthetic processing
+coverage used `now+5s` after the original identity/recovery bounds had already
+begun, while the real consumer rejects a proof beyond those bounds. A pure test
+reproduced this contract violation (exit 1, Go 0.014s) for both caller-first and
+recovery-first cutoffs. The fixture now intersects its five-second ceiling with
+the received caller deadline and original recovery freshness; the unchanged
+consumer still verifies every original bound. The focused race passes (exit 0,
+Go 1.060s). The fixture diagnostic callback now precedes initial Preview, so a
+later setup failure retains its fixed stage. The first failed run did not retain
+that stage; the deterministic defect is not presented as an observed Native
+cause. Independent source preflight of identity/permission, target/pin/class,
+capability, retention, preview and admission found no second concrete mismatch.
+Corrected composed PostgreSQL execution remains pending separate authorization.
+
+The second composed run on `991e3ff8` passed initial Preview but failed both
+fresh-source cases before their fixture publication (child 1.49s, Go 1.925s,
+exit 1). Both reported the recognized-expiry `demand-failed` decision with one
+demand attempt and zero captures. The failed-demand and short-tail cases passed,
+but the former exercised a real SQL permission failure, not its intended
+controlled failure after successful SQL. The short-tail case refused in 39.17ms
+with no demand; the failed-demand case took 37.10ms and had 3.9886s left on its
+original demand context. All 3,347 qualification source hashes and 35,980 tracked
+files were unchanged, cleanup was empty, and owned resources were absent.
+Environment SHA256:
+`6288350d8faf463e621f1552c515a16a5e5a4024c483b4d901c4d269f5ed8337`.
+
+The retained PostgreSQL log records three permission denials for the exact
+`demand_capacity_refresh` function. Production already supplies its exact
+`EXECUTE` right through the compiled capture-preview duty, alongside
+`context_preview_read_until`; the legacy owned fixture's preview role omitted
+that migration-66 right. The fixture now mirrors that existing one-function
+grant, with no production role or direct demand-table grant change. Before any
+case it checks both intended function rights, absence of demand-worker read
+rights and absence of direct demand-table INSERT. Per-case counters require the
+actual SQL method to succeed before the intentionally failed-wakeup path and
+require publication before claiming a fresh-source case. An unenrolled SQL call
+may still be a silent no-op; method success is not worker consumption or refresh
+acknowledgement. No enrolled-workload seeding, broader roles or source authority
+is added. The existing exact production-purpose role test passes under race
+(Go 1.046s); the fixture processing-bound preflight remains green (Go 1.060s).
+A further composed PostgreSQL execution remains pending separate authorization.
+
+The third authorized composed PG/S3 run on frozen `f5b6e3bc` passed all four
+cases (child 1.85s, Go 3.291s, command/test/qualification exit 0). The actual
+Reader→Request→SQL admission path accepted fresh storage after one successful
+SQL demand call in 101.166ms, and independently fresh storage after a failed
+wakeup in 76.607ms. Both recorded one successful SQL call, one fixture source
+publication and one capture; exact accepted replay after source re-expiry reused
+the original capture with no new demand. Controlled wakeup failure **after** a
+successful SQL call, without publication, refused in 36.779ms with zero captures
+and the fixed `expired/demand-failed` label. The original 750ms parent refused in
+37.786ms with no demand and `expired/readiness-tail`. Demand contexts retained
+3.986–3.989s at submission in these local cases; this is remaining original
+budget, not an installed pre-hint latency measurement.
+
+All 3,347 qualification source hashes and 35,980 tracked files were unchanged;
+cleanup was empty and exact owned PG/S3 names/IDs/network were absent. The
+retained environment SHA256 is
+`c2dfc97ef28272f13b69efde63116c28f2c1fb30a06245ce0dabe930241f746c`;
+verification SHA256 is
+`d31723df5cb15205142e79da54028eb4a5bc4e12f6a19f8e11ce1b2b35b2bed5`.
+All three immutable archives remain under
+`codex-bf86-resume/history-storage-readiness-reasons/history-storage-request-composition-{1,2,3}-artifacts/`.
+
+This qualifies the previously separate actual SQL-reader and core Request
+boundary using builtin pod-status, including original selection, deadline,
+real replay/admission and failed-wakeup ordering. It does not qualify the
+approved recorder's pre-hint grant reads, runtime source producer, enrolled
+refresh acknowledgement, collector or installed history workflow. The identity,
+pinned source facts, processing projection and administrator source publication
+remain synthetic. No fresh-positive defect was claimed on the old runtime:
+only fixed diagnostic ambiguity and the two retained fixture defects were
+changed. Original authority and readiness behavior remain unchanged; the
+separate earlier-hint proposal and a later installed result have their own
+review and qualification obligations.
+
+
+## Earlier single recording hint (2026-10-28)
+
+Move the existing Request readiness owner before recording approval I/O only for
+an actor-matching packet preview with its existing storage selection. Accepted
+replay, current identity/recovery and exact preview lookup still precede it.
+The non-authoritative owner retains the original request/identity/recovery
+cutoffs; an expired retained approved preview cannot cut it off prematurely.
+After approval, authoritative consumption additionally inherits the resulting
+preview deadline, already capped by the original grant/history bounds. The
+wait's original cutoff is never mutated concurrently. Pending/denied/error
+returns cancel and join it. Ordinary requests keep their existing ordering.
+No current fact, grant or authority deadline is renewed.
+
+The accepted engineering tradeoff is bounded extra wakeup load: an owner of a
+retained preview whose current collection or review rights have since been
+withdrawn can now request a refresh before the gate refuses. This conveys zero
+collection authority but is not zero cost. Preview itself already permits a
+wakeup after current eligibility; this change adds the withdrawn-rights case.
+The preview is readable only before context_preview_read_until: the maximum of
+its original deadline and the exact matching grant's review_until/expires_at.
+Approval/revocation does not shorten that passive read interval. SQL refuses
+reads after it even if cleanup has not deleted the row; the risk is not bounded
+by the two-minute preview alone.
+
+Complexity assessment (maintainer proportionality rule, items 1–11):
+
+1. Observed installed history 40744858749 failed at storage expiry. Twenty
+   successful demand exchanges had median 2.555s, range 2.48–3.11s, before the
+   existing 250ms lane pause. Actual failing Request pre-grant latency was not
+   sampled; the channel RED proves scheduling only, not its installed cause.
+2. This implementation chooses bounded extra denied/pending wakeups under the
+   maintainer's proportionality guidance. This is an engineering tradeoff, not
+   an explicit maintainer requirement. No in-flight authority or permission
+   guarantee is weakened.
+3. This helps cold approved recording after human review. The deliberate 2min
+   preview wait outlasts the original 60s demand and raw 30s storage binding.
+4. Reuse existing asynchronous readiness demand/coalescing; no new mechanism or
+   external precedent is needed for moving this one existing call.
+5. Added privileges/credentials/providers/watches: zero. No extra auth read.
+6. Added fallback/retry states: zero; the same wait and errors remain.
+7. Added configuration/TTL/limits: zero.
+8. Existing regional/API/SQL dependencies unchanged; their measured latency
+   motivates overlap, not a new dependency.
+9. At most one existing demand SQL call per cold pending/denied Request, zero
+   if the hint already finds sufficient freshness. Same target coalesces one
+   SQL row for 60s from the latest demand. One global serial demand lane plus
+   250ms pause projects 60/(2.555+.25)=21.39 attempts per busy minute from the
+   observed median (not steady-state qualification); repeated calls can keep
+   it hot. Each successful refresh spends one shared configuration credit.
+   The actual native profile compiles 4096 ConfigurationTransitions, shared
+   with other configuration effects; aggregate exhaustion is unqualified.
+   At that projected rate 4096 credits last about 191.5min if this is the only
+   spender and demand stays hot: arithmetic, not measured deployment lifetime.
+   Permitted Preview/demand traffic already has this cost; earlier denied
+   wakeups add a trigger path, not a new allowance.
+   There is no per-request worker/goroutine beyond the existing one wait.
+10. No migration or persisted format changes; reverting scheduling restores
+    the previous order. Current request cancellation and joined cleanup remain.
+11. Moving one existing hint is smaller than extra cache, retry, entitlement
+    lookup or source TTL extension. Doing nothing leaves grant I/O consuming
+    the existing four-second readiness ceiling before warming a cold binding.
+
+Cost provenance: the approved pre-hint route previously crossed four identity
+resolution boundaries, one settings read, one recovery read, accepted replay,
+preview, grant lookup and permission projection. These are logical port calls,
+not asserted one-query adapters or measured grant latency. Covering alone adds
+two identity resolutions, grant lookup and permission projection. A successful
+ContextStorage Ledger read uses BEGIN, one Exec with four SET LOCAL statements,
+observation SELECT, current-time SELECT and COMMIT: five application protocol
+exchanges/eight top-level SQL statements absent preparation/retries. Existing
+hint plus final authoritative read therefore remains at least two reads, with
+250ms polling only inside the same original owner. The whole setup report on
+3f counted 83,297 top-level SQL calls over 139.636s including background work and
+intentional review expiry, summed executor time 10,998ms; it does not attribute
+CPU, waits or a failed request cause. No cumulative-load qualification is claimed.
+
+Local coverage uses a blocked grant/channel dependency, pending/denied/error
+cancel-and-join, expired approved review, original cancellation and shortened
+identity/recovery/grant bounds, exact one demand and accepted replay zero hint.
+These are application scheduling tests with synthetic storage/grant inputs;
+installed availability and worker behavior remain separately unqualified.
+
+Known different issuer epochs or current assessment rules skip the early hint;
+the existing post-gate refusal remains in place with unchanged public priority.
+The same-epoch expired approved case still overlaps. The current rule digest is
+computed once; the check adds no I/O.
+
+Local evidence: original-order channel RED exited 1 (3.007s); the final capture
+race suite, including changed epoch/rules zero-hint cases, exited 0 (12.457s).
+The earlier complete suite also passed 12.447s before that narrow guard. The
+canonical pre-push on that prior source exited 2 solely because this isolated
+worktree lacked the console yaml package; make -k still ran the remaining
+checks including Go vet. Final affected checks are recorded separately. No
+external fixture, installed run, push or authority qualification is claimed.

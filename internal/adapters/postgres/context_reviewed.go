@@ -10,6 +10,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	app "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"github.com/jackc/pgx/v5"
 )
@@ -57,7 +58,11 @@ func approvedContextPlan(a value.Admission) bool {
 }
 
 func currentReviewedContext(ctx context.Context, q *custodydb.Queries, p value.ContextPreview, a value.Admission) error {
-	if !approvedContextPlan(a) {
+	_, _, policy := authorization.PolicyExecutor(a.Plan.Input.Executor)
+	if !approvedContextPlan(a) || policy {
+		// A team grant binds its accepted policy, not this ephemeral per-Pod
+		// preview or a personal manual approval. Its locked reservation below
+		// checks that separate current grant. The preview must still be fresh.
 		return currentPreview(ctx, q, p)
 	}
 	actor := a.Plan.Input.Executor

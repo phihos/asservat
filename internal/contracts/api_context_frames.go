@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"time"
 )
 
 const (
@@ -38,6 +39,14 @@ const (
 	APIContextAnswerFrame
 )
 
+// History has a distinct range; retired/unknown common kinds remain rejected.
+const (
+	HistoryWorkFrame APIContextFrameKind = 32 + iota
+	HistoryRequestFrame
+	HistoryResponseFrame
+	HistoryReceiptFrame
+)
+
 // ADR-178 source frames per exchange: one after Hello, a request and reply at
 // attach and at work send, one immediately before the result, and a request
 // and reply before each ADR-179 query.
@@ -65,12 +74,14 @@ func apiContextFrameLimit(kind APIContextFrameKind) int {
 	switch kind {
 	case APIContextHelloFrame:
 		return APIContextWorkBytes
-	case APIContextWorkFrame:
+	case APIContextWorkFrame, HistoryWorkFrame:
 		return APIContextSignedWorkBytes
-	case APIContextResultFrame, APIContextReceiptFrame:
+	case APIContextResultFrame, APIContextReceiptFrame, HistoryReceiptFrame:
 		return 1024
 	case APIContextOperationRequestFrame, APIContextOperationResponseFrame, APIContextQueryFrame, APIContextAnswerFrame:
 		return APIContextOperationBytes
+	case HistoryRequestFrame, HistoryResponseFrame:
+		return HistoryCiphertextFrameBytes
 	case APIContextSourceRequestFrame:
 		return 1024
 	case APIContextSourceFrame:
@@ -121,6 +132,8 @@ func WriteAPIContextFrame(w io.Writer, f APIContextFrame) error {
 type APIContextHello struct {
 	Format  string            `json:"format"`
 	Channel APIContextChannel `json:"channel"`
+	// Original connector conversation end; availability only, never authority.
+	StandbyUntil time.Time `json:"standbyUntil"`
 }
 
 // Result is a bounded disposition, not evidence or a catalog publication.
@@ -180,11 +193,14 @@ func DecodeAPIContextOperationReply(b []byte) (APIContextOperationReply, error) 
 }
 
 func EncodeAPIContextHello(v APIContextHello) ([]byte, error) {
+	if v.StandbyUntil.IsZero() {
+		return nil, ErrAPIContextProtocol
+	}
 	return canonicalAPIContext(v, APIContextWorkBytes)
 }
 func DecodeAPIContextHello(b []byte) (APIContextHello, error) {
 	v, e := decodeClosedRPC[APIContextHello](bytes.NewReader(b), APIContextWorkBytes)
-	if e != nil {
+	if e != nil || v.StandbyUntil.IsZero() {
 		return APIContextHello{}, ErrAPIContextProtocol
 	}
 	return v, nil

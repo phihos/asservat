@@ -192,11 +192,17 @@
             "connector",
             "executor"
           ]
+        },
+        "standbyUntil": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Original connector conversation expiry, capped by the local native/request end; availability only, never peer or work authority."
         }
       },
       "required": [
         "format",
-        "channel"
+        "channel",
+        "standbyUntil"
       ]
     },
     {

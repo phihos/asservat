@@ -97,7 +97,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		// join. Discovery walks namespaces in name order, about 100 s per pass,
 		// so a namespace sorting before the system ones is enrolled early in its
 		// first pass instead of the second.
-		w := createRegionalWorkload(t, ctx, region, offer.Image, "apps-regional")
+		w := createRegionalWorkload(t, ctx, region, offer.Image, "apps-regional", index == 1 && installedJourneyFocus() == "native-paced")
 		budget := newRegionalBudget(t, ctx, hub, namespace, issuer, envelope.Binding.ClusterID, index)
 		budget.addPolicy()
 		budget.addBinding(w)
@@ -113,6 +113,13 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		}
 		clear(credential)
 		args = append(args, "--evidence-credential", evidenceFile)
+		historyFile := filepath.Join(dir, contracts.RegionalHistoryCredentialFile)
+		history := installerRegionalHistoryCredential(t, ctx, providers, offer.EvidenceStore.Bucket, offer.PermissionRootID, envelope.Binding.ClusterID)
+		if os.WriteFile(historyFile, history, 0o600) != nil {
+			t.Fatal("history credential file")
+		}
+		clear(history)
+		args = append(args, "--history-credential", historyFile)
 	}
 	if executor && installedJourneyFocus() == "alert" && index == 1 {
 		// ADR-231: the operator's in-cluster Alertmanager, named at install.
@@ -123,7 +130,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		// warm-up (no installer input names it).
 		installMetricsServer(t, ctx, region, f.MetricsServerImage)
 	}
-	if executor && installedJourneyFocus() == "approved-recording" && index == 1 {
+	if executor && installedRecordingFocus() && index == 1 {
 		if _, err := region.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: "asservat-collector"}}, meta.CreateOptions{}); err != nil {
 			t.Fatal("collector namespace prerequisite", err)
 		}
@@ -137,7 +144,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 	if json.Unmarshal(first.Bytes(), &installed) != nil || installed.Secret.UID == "" {
 		t.Fatal("installer-cluster result")
 	}
-	if executor && installedJourneyFocus() == "approved-recording" && index == 1 {
+	if executor && installedRecordingFocus() && index == 1 {
 		installApprovedRecordingCollector(t, ctx, region, f.Clusters[index].Config, f.CollectorImage, installation, envelope.Binding.ClusterID, installed.Namespace.Name)
 	}
 	peer := envelope.Binding.PeerID
@@ -669,7 +676,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	if existing == nil {
 		budget = newRegionalBudget(t, ctx, hub, namespace, issuer, cluster, index)
 		budget.addPolicy()
-		w = createRegionalWorkload(t, ctx, region, offer.Image, "regional-apps")
+		w = createRegionalWorkload(t, ctx, region, offer.Image, "regional-apps", index == 1 && installedJourneyFocus() == "native-paced")
 		budget.addBinding(w)
 		t.Log("operator added the regional budget policy, pool slot, workload and maintainer binding")
 	}
@@ -874,7 +881,7 @@ func (b *regionalBudget) addPolicy() {
 	// The operator's regional budget: a policy for the joined cluster and its
 	// slot in the existing pool, with the pool's capacity raised to fit.
 	reserveBytes := int64(4 * 1544192)
-	if installedJourneyFocus() == "approved-recording" {
+	if installedRecordingFocus() {
 		// Four records/16 objects remain the existing root protocol limit;
 		// the operator reserves the actual packet ciphertext size, rather than
 		// the smaller pod-status bytes of the original journey.
@@ -915,7 +922,7 @@ func (b *regionalBudget) addPolicy() {
 func (b *regionalBudget) addBinding(w regionalWorkload) {
 	b.t.Helper()
 	roles := []any{"workload-maintainer"}
-	if installedJourneyFocus() == "approved-recording" {
+	if installedRecordingFocus() {
 		roles = append(roles, "action-approver")
 	}
 	if installedJourneyFocus() == "share" || installedJourneyFocus() == "browser" {
@@ -948,12 +955,23 @@ type regionalWorkload struct {
 	app *apps.Deployment
 }
 
-func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes.Interface, image, name string) regionalWorkload {
+// Only the explicit native-paced target uses the 200m qualification profile.
+// Default synthetic workloads retain their original 5m request/100m limit.
+func regionalWorkloadResources(nativePaced bool) core.ResourceRequirements {
+	out := core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("5m"), core.ResourceMemory: resource.MustParse("16Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}}
+	if nativePaced {
+		out.Requests[core.ResourceCPU] = resource.MustParse("200m")
+		out.Limits[core.ResourceCPU] = resource.MustParse("200m")
+	}
+	return out
+}
+
+func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes.Interface, image, name string, nativePaced bool) regionalWorkload {
 	t.Helper()
 	// The regional workload: a labeled namespace (the selector guard admits
 	// the administrator) and a Deployment with no replicas.
 	labels := map[string]string{"team": "regional"}
-	if installedJourneyFocus() == "approved-recording" {
+	if installedRecordingFocus() {
 		labels["pod-security.kubernetes.io/enforce"] = "restricted"
 	}
 	ns, err := region.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: name, Labels: labels}}, meta.CreateOptions{})
@@ -962,7 +980,7 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	}
 	labels = map[string]string{"app": "regional-app"}
 	command := []string{"/provider-proxy", "http://127.0.0.1:1", "http://127.0.0.1:1", "127.0.0.1:1"}
-	if installedJourneyFocus() == "logresource" || installedJourneyFocus() == "approved-recording" {
+	if installedJourneyFocus() == "logresource" || installedRecordingFocus() {
 		// ADR-241: the fixture's synthetic signal workload, which writes a
 		// requested line or keeps its CPU busy on demand.
 		command = []string{"/provider-proxy", "signals"}
@@ -973,7 +991,7 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 		Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{AutomountServiceAccountToken: ptr.To(false), TerminationGracePeriodSeconds: ptr.To(int64(3)),
 			SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},
 			Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command,
-				Resources:       core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("5m"), core.ResourceMemory: resource.MustParse("16Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}},
+				Resources:       regionalWorkloadResources(nativePaced),
 				SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}}}}}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal("regional workload", err)

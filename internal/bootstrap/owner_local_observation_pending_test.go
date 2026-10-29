@@ -22,12 +22,38 @@ func (n *localPendingNative) Claim(ctx context.Context, _ []byte, _ string) (tim
 }
 func localPendingFixture(t *testing.T) (*pendingFixture, *ownerLocalObservationPending, *ownerLocalObservationPendingEntry, *localPendingNative, value.ClusterObservationLocator) {
 	t.Helper()
-	f := newPendingFixture(t)
-	s, err := newOwnerLocalObservationPending(context.Background(), f.store.pin, f.server.Binding, 1, time.Now)
-	if err != nil {
-		t.Fatal(err)
+	return localPendingFixtureIn(t, nil, nil, 1, 0)
+}
+
+func localPendingFixtureIn(t *testing.T, s *ownerLocalObservationPending, anchor *pendingFixture, maximum int, lifetime time.Duration) (*pendingFixture, *ownerLocalObservationPending, *ownerLocalObservationPendingEntry, *localPendingNative, value.ClusterObservationLocator) {
+	t.Helper()
+	var f *pendingFixture
+	if anchor == nil {
+		f = newPendingFixture(t)
+	} else {
+		cloned := *anchor
+		f = &cloned
 	}
-	t.Cleanup(s.Close)
+	if lifetime > 0 {
+		f.request.RequestedAt = time.Now()
+		f.request.NotAfter = f.request.RequestedAt.Add(lifetime)
+		var cancel context.CancelFunc
+		f.get, cancel = context.WithDeadline(context.Background(), f.request.NotAfter)
+		t.Cleanup(cancel)
+	}
+	if s == nil {
+		var err error
+		s, err = newOwnerLocalObservationPending(context.Background(), f.store.pin, f.server.Binding, maximum, time.Now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(s.Close)
+	}
+	// Every fixture retains independent operation identity in the shared store.
+	if lifetime > 0 {
+		f.request.ID = ownerRandomID()
+		f.request.Challenge = ownerRandomID()
+	}
 	e, err := s.reserve(f.get, f.request.LocatorQuery(), observationForwardID(701), []byte(localObservationFixtureToken), f.server)
 	if err != nil {
 		t.Fatal(err)
@@ -97,9 +123,11 @@ func TestLocalPendingRetainsTokenAndOriginalGETLifetime(t *testing.T) {
 	}
 	other := f.request.LocatorQuery()
 	other.RequestID = observationForwardID(900)
-	if _, err = s.reserve(call, other, observationForwardID(701), []byte(localObservationFixtureToken), f.server); err == nil {
-		t.Fatal("completed or unknown output refunded original slot")
+	next, err := s.reserve(call, other, observationForwardID(701), []byte(localObservationFixtureToken), f.server)
+	if err != nil {
+		t.Fatal("joined completion retained active capacity", err)
 	}
+	next.finishGET()
 }
 func TestLocalPendingOneConcurrentClaim(t *testing.T) {
 	f, s, e, native, locator := localPendingFixture(t)

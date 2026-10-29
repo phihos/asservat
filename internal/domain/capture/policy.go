@@ -19,12 +19,15 @@ type PolicySource struct {
 	ResourceVersion                               string
 	ObservedAt, FreshUntil                        time.Time
 	CollectionDigest                              artifact.Digest
-	Suspended                                     bool
-	Deleted                                       bool
+	// AuthoredGrantRef is current runtime attachment control, excluded from
+	// CollectionDigest and accepted execution identity. Empty means unpinned.
+	AuthoredGrantRef string `json:",omitempty"`
+	Suspended        bool
+	Deleted          bool
 }
 
 func (s PolicySource) Valid(now time.Time) bool {
-	return s.CollectionDigest != (artifact.Digest{}) && authorization.UUID(s.InstallationID) && authorization.UUID(s.ClusterID) && identity.Text(s.NamespaceUID, 64) && identity.Text(s.Name, 253) && s.Revision.Valid() && s.Revision.Generation <= 2147483647 && identity.Text(s.ResourceVersion, 128) && identity.Fresh(s.ObservedAt, s.FreshUntil, now, PolicySourceInterval)
+	return (s.AuthoredGrantRef == "" || authorization.UUID(s.AuthoredGrantRef)) && s.CollectionDigest != (artifact.Digest{}) && authorization.UUID(s.InstallationID) && authorization.UUID(s.ClusterID) && identity.Text(s.NamespaceUID, 64) && identity.Text(s.Name, 253) && s.Revision.Valid() && s.Revision.Generation <= 2147483647 && identity.Text(s.ResourceVersion, 128) && identity.Fresh(s.ObservedAt, s.FreshUntil, now, PolicySourceInterval)
 }
 
 // VerifiedPolicySubmission comes only from independently verified ingress and
@@ -56,14 +59,21 @@ type PolicyAdmission struct {
 	Author       identity.Identity
 	Authority    authorization.AcceptedPolicyAuthority
 	Target       authorization.Target
-	Recovery     artifact.RecoveryProof
+	// Workload is the real future-replica scope of a recorder policy. It is
+	// mutually exclusive with the legacy concrete target projection.
+	Workload *authorization.WorkloadTarget
+	Recovery artifact.RecoveryProof
 	// Sharing is the activation's recurring sharing decision (ADR-239).
 	Sharing *PolicyShareInstruction
 }
 
 func (a PolicyAdmission) Valid(now time.Time) bool {
 	s, p := a.Submission, a.Authority
-	return authorization.UUID(a.RootID) && s.Valid(now) && a.Verification.Valid(now) && a.Verification.Submission == s && a.Verification.RootID == a.RootID && a.Verification.InstallationID == p.InstallationID && a.Verification.IssuerEpoch == a.Recovery.IssuerEpoch && a.Author.Valid(now) && a.Author.Principal == s.Actor && p.Valid(now) && a.Target.Valid() && a.Target.ClusterID == p.ClusterID && a.Target.NamespaceUID == p.NamespaceUID && a.Target.WorkloadUID == p.WorkloadUID && s.Source.UID == p.PolicyUID && s.ScopeDigest == p.ScopeDigest && a.Recovery.Valid(now) && a.Recovery.InstallationID == p.InstallationID && (a.Sharing == nil || a.Sharing.Valid() && a.Sharing.Creator == a.Author.Principal && a.Sharing.NotAfter.After(now))
+	targetValid := a.Target.Valid() && a.Target.ClusterID == p.ClusterID && a.Target.NamespaceUID == p.NamespaceUID && a.Target.WorkloadUID == p.WorkloadUID
+	if a.Workload != nil {
+		targetValid = a.Target == (authorization.Target{}) && a.Workload.Valid() && a.Workload.ClusterID == p.ClusterID && a.Workload.NamespaceUID == p.NamespaceUID && a.Workload.WorkloadUID == p.WorkloadUID
+	}
+	return authorization.UUID(a.RootID) && s.Valid(now) && a.Verification.Valid(now) && a.Verification.Submission == s && a.Verification.RootID == a.RootID && a.Verification.InstallationID == p.InstallationID && a.Verification.IssuerEpoch == a.Recovery.IssuerEpoch && a.Author.Valid(now) && a.Author.Principal == s.Actor && p.Valid(now) && targetValid && s.Source.UID == p.PolicyUID && s.ScopeDigest == p.ScopeDigest && a.Recovery.Valid(now) && a.Recovery.InstallationID == p.InstallationID && (a.Sharing == nil || a.Sharing.Valid() && a.Sharing.Creator == a.Author.Principal && a.Sharing.NotAfter.After(now))
 }
 
 // PolicyAcceptance is immutable provenance, not a permit or current eligibility.

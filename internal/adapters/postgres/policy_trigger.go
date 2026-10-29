@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -306,7 +307,8 @@ func (s *PolicyTriggers) Status(ctx context.Context, policy string) (value.Polic
 		return out, value.ErrInvalid
 	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		row, err := q.ReadPolicySourceRow(ctx, custodydb.ReadPolicySourceRowParams{RootID: id(s.root), PolicyUid: policy})
+		source, err := q.ReadPolicyStatusSource(ctx, custodydb.ReadPolicyStatusSourceParams{RootID: id(s.root), PolicyUid: policy})
+		row := source.PolicySource
 		if errors.Is(err, pgx.ErrNoRows) {
 			return value.ErrUnavailable
 		}
@@ -347,7 +349,16 @@ func (s *PolicyTriggers) Status(ctx context.Context, policy string) (value.Polic
 			out.ActiveID = record.ID
 		}
 		out.Authority, out.ExecutionsSpent, out.MaxExecutions, out.NotAfter, out.AcceptedIntentVersion, out.AcceptedGeneration = a, accepted.ExecutionsSpent, a.Limits.MaxExecutions, a.NotAfter.UTC(), record.IntentVersion, record.Source.Revision.Generation
+		out.CollectedBytesSpent, out.MaxCollectedBytes = accepted.CollectedBytesSpent, a.Limits.MaxBytes
+		out.ObservedBytesSpent, out.MaxObservedBytes = accepted.ObservedBytesSpent, a.Limits.MaxObservedBytes
 		out.ClusterID, out.NamespaceUID, out.WorkloadUID = a.ClusterID, a.NamespaceUID, a.WorkloadUID
+		if row.GrantAttachmentID.Valid && row.ActiveID.Valid {
+			if !source.AttachedGrantID.Valid || !bytes.Equal(source.AttachedAuthorityDigest, a.ScopeDigest[:]) {
+				return value.ErrUnavailable
+			}
+			out.AttachedGrantID = uid(source.AttachedGrantID)
+		}
+
 		if record.Sharing != nil {
 			out.Sharing = &value.PolicySharingStatus{Instruction: *record.Sharing, Spent: int64(accepted.SharesSpent)}
 			if accepted.SharingRevokedAt.Valid {
@@ -450,6 +461,15 @@ func (s *PolicyTriggers) DeactivatePolicy(ctx context.Context, policy, acceptanc
 // covers the workload (ADR-059: a sole qualifying binding is chosen
 // automatically; none or several requires a visible operator choice).
 func (s *PolicyTriggers) Delegation(ctx context.Context, target authorization.Target) (identity.Revision, error) {
+	if !target.Valid() {
+		return identity.Revision{}, value.ErrInvalid
+	}
+	return s.WorkloadDelegation(ctx, authorization.WorkloadTarget{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID})
+}
+
+// WorkloadDelegation selects the sole current automation basis without
+// inventing a Pod identity for policy activation.
+func (s *PolicyTriggers) WorkloadDelegation(ctx context.Context, target authorization.WorkloadTarget) (identity.Revision, error) {
 	var out identity.Revision
 	if s == nil || !target.Valid() {
 		return out, value.ErrInvalid

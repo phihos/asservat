@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { PolicyWorkspace } from './PolicyWorkspace';
 import { Policies } from './policies';
 import { operations, type Input, type Operation, type Operations, type Output } from './http';
 import { validOutput_get_policy_status, validOutput_deactivate_policy, validOutput_activate_policy } from '../generated/validate-policy';
 import { validOutput_revoke_share, validOutput_stop_future_sharing } from '../generated/validate-sharing';
+import type { Operations as GrantOperations, Output as GrantOutput } from '../approvals/http';
 import type { Operations as ShareOperations } from '../sharing/http';
 import { id, result, session } from '../capture/test-fixtures';
 
@@ -19,7 +20,7 @@ const detectors: Record<Kind, unknown> = {
 };
 const status = (state: string, kind: Kind = 'exit') => result<'get_capture'>({
   policy_uid: 'policy-uid', acceptance_id: id(9), state, generation: 1, expires_at: new Date(Date.now() + 3_600_000).toISOString(),
-  executor: { kind: 'policy', policy_uid: 'policy-uid' }, executions_spent: 2, max_executions: 10, watched_pods: 3, occurrences: 2, captured: 1,
+  collection_kind: 'podStatus', executor: { kind: 'policy', policy_uid: 'policy-uid' }, executions_spent: 2, max_executions: 10, collected_bytes_spent: 8192, max_collected_bytes: 65536, observed_bytes_spent: 0, max_observed_bytes: 0, watched_pods: 3, occurrences: 2, captured: 1,
   recent: [kind !== 'exit'
     ? { occurrence_id: id(10), capture_id: id(8), outcome: 'captured', detector: kind, failed_at: '2026-10-26T12:00:00Z', created_at: new Date().toISOString() }
     : { occurrence_id: id(10), capture_id: id(8), outcome: 'captured', detector: 'exit', restarts: 1, created_at: new Date().toISOString() }],
@@ -34,18 +35,21 @@ class SyntheticPolicies implements Operations {
   state = 'active';
   unknown = false;
   kind: Kind = 'exit';
+  packet = false;
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), csrf });
     if (name === 'deactivate_policy') { this.state = 'deactivated'; return result({ policy_uid: 'policy-uid', acceptance_id: id(9), state: 'deactivated', replay: false }) as unknown as Output<N>; }
     if (name === 'activate_policy') return failure('PolicyDeactivated', 'This policy revision was deactivated and cannot be activated again.') as Output<N>;
-    return (this.unknown ? failure('NotAvailable', 'Not available.') : status(this.state, this.kind)) as Output<N>;
+    const reply = this.unknown ? failure('NotAvailable', 'Not available.') : status(this.state, this.kind);
+    if (reply.status==='ok' && this.packet) (reply.data as {collection_kind:string}).collection_kind='packetCapture';
+    return reply as Output<N>;
   }
 }
 
 const controllers: Policies[] = [];
 afterEach(() => { cleanup(); for (const c of controllers) c.reset(); controllers.length = 0; vi.unstubAllGlobals(); });
-function mount() {
-  const client = new SyntheticPolicies(); let n = 20; const controller = new Policies(client, () => id(n++)); controllers.push(controller);
+function mount(grants?: GrantOperations, packet = false) {
+  const client = new SyntheticPolicies();client.packet=packet; let n = 20; const controller = new Policies(client, () => id(n++), undefined, grants); controllers.push(controller);
   render(<PolicyWorkspace session={session} scope={new AbortController().signal} controller={controller}/>);
   return { client, controller };
 }
@@ -66,6 +70,9 @@ it('shows content-free status and deactivates with CSRF and one idempotency key'
   fireEvent.click(screen.getByRole('button', { name: 'Show policy' }));
   expect(await screen.findByText('Active')).toBeTruthy();
   expect(screen.getByText('2 of 10 used')).toBeTruthy();
+  expect(screen.getByText(`${(8192).toLocaleString()} of ${(65536).toLocaleString()} bytes reserved`)).toBeTruthy();
+  expect(screen.getByText('0 of 0 bytes charged before filtering')).toBeTruthy();
+  expect(screen.getByText(/budgets are shared across captures and grants/)).toBeTruthy();
   expect(screen.getByText('10 × cooldown or workload budget')).toBeTruthy();
   expect(screen.getByRole('link', { name: 'View capture' }).getAttribute('href')).toBe('/captures/' + id(8));
   expect(screen.queryByRole('button', { name: 'Activate' })).toBeNull();
@@ -204,4 +211,36 @@ it('sends the identical idempotency header for policy commands', async () => {
   await operations.call('deactivate_policy', { policy_name: 'p', idempotency_key: id(3) }, 'C'.repeat(43), new AbortController().signal);
   expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/deactivate_policy');
   expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': 'C'.repeat(43), 'Idempotency-Key': id(3) } });
+});
+
+it('rejects missing shared pools and does not present charges as gathered output', () => {
+ const reply = structuredClone(status('active'));
+ if (reply.status !== 'ok') throw new Error('fixture');
+ const missing = structuredClone(reply) as unknown as { data: Record<string, unknown> };
+ delete missing.data.observed_bytes_spent;
+ expect(validOutput_get_policy_status(missing)).toBe(false);
+ reply.data.observed_bytes_spent = 8192; reply.data.max_observed_bytes = 8192;
+ expect(validOutput_get_policy_status(reply)).toBe(true);
+});
+
+it('policy approval retries pin the original finite selection and actor key after an unknown response', async () => {
+ const calls: unknown[]=[];
+ const grants: GrantOperations={call: async(_name,input) => {
+  calls.push(structuredClone(input));
+  if(calls.length===1) throw new Error('unknown response');
+  return result({grant_id:id(41),kind:'policy',approval_navigation_uri:'https://asservat.example.invalid/approvals/'+id(41)}) as unknown as GrantOutput<'request_policy_grant'> as never;
+ }};
+ const {controller}=mount(grants,true);
+ fireEvent.change(screen.getByLabelText('Policy name'),{target:{value:'p'}});
+ fireEvent.click(screen.getByRole('button',{name:'Show policy'}));
+ await screen.findByText('No policy grant is attached.');
+ fireEvent.change(screen.getByLabelText('Maximum executions'),{target:{value:'3'}});
+ fireEvent.click(screen.getByRole('button',{name:'Request policy approval'}));
+ await screen.findByRole('button',{name:'Retry approval request'});
+ expect(screen.getByLabelText('Maximum executions').matches(':disabled')).toBe(true);
+ await act(async () => { await controller.requestGrant('p',{limits:{max_executions:1,max_collected_bytes:1,max_observed_bytes:0}}); });
+ expect(calls).toHaveLength(2);expect(calls[1]).toEqual(calls[0]);
+ expect(calls[0]).toEqual({policy_uid:'policy-uid',policy_name:'p',idempotency_key:id(20),limits:{max_executions:3,max_collected_bytes:65536,max_observed_bytes:0}});
+ expect(await screen.findByRole('link',{name:'View policy approval'})).toBeTruthy();
+ expect(screen.queryByRole('button',{name:'Continue approved capture'})).toBeNull();
 });

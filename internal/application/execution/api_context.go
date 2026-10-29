@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/collector"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
@@ -62,6 +63,15 @@ type APIExecutionPreparer interface {
 	PrepareAPIExecution(context.Context, APIExecutionCheck) (value.APIExecution, bool, error)
 	BindAPIStart(context.Context, APIExecutionCheck, value.APIExecution, value.PreparedStart) (value.APIExecution, error)
 }
+
+// PolicyRecordingPreparer is the finite policy-only companion. It atomically
+// commits the original API preparation and both observed-input pool debits.
+// The runner must not use the ordinary preparation for a sensitive policy action.
+// Implementing this port alone does not qualify or enable that acquisition mode.
+type PolicyRecordingPreparer interface {
+	PreparePolicyRecording(context.Context, APIExecutionCheck, targets.PacketSourceObservation) (value.APIExecution, bool, collector.ObservationPermit, error)
+}
+
 type APIExecutionRecorder interface {
 	RecordAPIStart(context.Context, APIExecutionCheck, value.APIExecution, value.Disposition) (value.APIExecution, error)
 	RecordAPIOutcome(context.Context, value.APIExecution, value.APIProcessObservation) (value.APIExecution, error)
@@ -109,16 +119,40 @@ func APIExecutionDigest(r value.APIExecution) artifact.Digest {
 	b, _ := json.Marshal(r)
 	return artifact.Digest(sha256.Sum256(b))
 }
-func (s APIContextRunner) checkObserved(ctx context.Context, current identities.CurrentIdentity, w APIContextWork, original time.Time, capability *planning.ContextCapability, observedRecovery *artifact.RecoveryProof) (APIExecutionCheck, error) {
+func (s APIContextRunner) checkObserved(ctx context.Context, current identities.CurrentIdentity, w APIContextWork, original time.Time, capability *planning.ContextCapability, observedRecovery *artifact.RecoveryProof) (APIExecutionCheck, *targets.PacketSourceObservation, error) {
 	var out APIExecutionCheck
+	var source *targets.PacketSourceObservation
 	start := s.Now().UTC().Truncate(time.Microsecond)
-	t, err := s.Targets.ResolvePod(ctx, w.Target)
+	var t targets.PodResolution
+	var err error
+	resolveStep := "ResolvePod"
+	if policyRawRecording(w) {
+		resolveStep = "ResolvePacketSource"
+		resolver, ok := s.Targets.(interface {
+			ResolvePacketSource(context.Context, targets.Request) (targets.RecorderResolution, error)
+		})
+		if !ok {
+			return out, nil, apiCheckStep{"ResolvePacketSource", value.ErrUnavailable}
+		}
+		var resolved targets.RecorderResolution
+		resolved, err = resolver.ResolvePacketSource(ctx, w.Target)
+		if err == nil && !resolved.ValidSource(s.Now()) {
+			err = value.ErrDenied
+		}
+		if err == nil {
+			t = resolved.Target
+			copy := *resolved.Recorder.Source
+			source = &copy
+		}
+	} else {
+		t, err = s.Targets.ResolvePod(ctx, w.Target)
+	}
 	if err != nil {
-		return out, apiCheckStep{"ResolvePod", err}
+		return out, nil, apiCheckStep{resolveStep, err}
 	}
 	eligible := s.Eligibility.ContextEligibilityCurrent(ctx, current, t.Target())
 	if !eligible.Eligible {
-		return out, apiCheckStep{"Eligibility", value.ErrDenied}
+		return out, nil, apiCheckStep{"Eligibility", value.ErrDenied}
 	}
 	var cap planning.ContextCapability
 	if capability != nil {
@@ -126,7 +160,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	} else {
 		cap, err = s.Capabilities.ContextCapability(ctx, t.Target())
 		if err != nil {
-			return out, apiCheckStep{"Capability", err}
+			return out, nil, apiCheckStep{"Capability", err}
 		}
 	}
 	e := w.Accepted.Expectation
@@ -137,13 +171,13 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	var recorder *planning.RecorderContext
 	if e.Recording != nil {
 		if recorder, err = compiler.RecorderContextFor(e.Recording); err != nil {
-			return out, apiCheckStep{"Recording", value.ErrInvalid}
+			return out, nil, apiCheckStep{"Recording", value.ErrInvalid}
 		}
 		evidenceType = e.Type().EvidenceType
 	}
 	retention, err := s.Retention.Resolve(ctx, privacy.Input{Target: t.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: evidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt})
 	if err != nil {
-		return out, apiCheckStep{"Retention", err}
+		return out, nil, apiCheckStep{"Retention", err}
 	}
 	caseID := e.CaseID
 	if recorder != nil {
@@ -151,7 +185,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	}
 	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: caseID, Executor: w.Actor, Deadline: w.Accepted.Deadline, Target: t, Capability: cap, Retention: retention, Recorder: recorder}, s.Now())
 	if err != nil {
-		return out, apiCheckStep{"Compile", err}
+		return out, nil, apiCheckStep{"Compile", err}
 	}
 	var recovery artifact.RecoveryProof
 	if observedRecovery != nil {
@@ -159,12 +193,12 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	} else {
 		recovery, err = s.Recovery.RecoveryState(ctx)
 		if err != nil {
-			return out, apiCheckStep{"Recovery", err}
+			return out, nil, apiCheckStep{"Recovery", err}
 		}
 	}
 	process, err := s.Process.ReadAPIProcess(ctx)
 	if err != nil {
-		return out, apiCheckStep{"Process", err}
+		return out, nil, apiCheckStep{"Process", err}
 	}
 	until := identity.Earlier(original, start.Add(5*time.Second))
 	for _, d := range []time.Time{plan.ValidUntil, eligible.ValidUntil, recovery.FreshUntil, process.ValidUntil, e.Registration.WriteUntil} {
@@ -172,9 +206,9 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	}
 	out = APIExecutionCheck{w, plan, eligible, recovery, process, start, until.UTC().Truncate(time.Microsecond)}
 	if err := out.current(ctx, s.Now()); err != nil {
-		return APIExecutionCheck{}, err
+		return APIExecutionCheck{}, nil, err
 	}
-	return out, nil
+	return out, source, nil
 }
 
 // current checks the one request-owned observation without renewing any fact.
@@ -246,14 +280,25 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	var zero ContextResult
 	startCtx, stop := context.WithDeadline(ctx, original)
 	defer stop()
-	check, err := s.checkObserved(startCtx, current, w, original, capability, recovery)
+	check, source, err := s.checkObserved(startCtx, current, w, original, capability, recovery)
 	if err != nil {
 		// The check only reads; nothing was prepared or started. The runner
 		// never inspects a dependency's error: the composing start classifies
 		// a temporary unavailability from the fixed Check step (ADR-250).
 		return zero, executeStep{"Check", err}
 	}
-	r, mayCreate, err := s.Prepare.PrepareAPIExecution(startCtx, check)
+	var r value.APIExecution
+	var mayCreate bool
+	var permit collector.ObservationPermit
+	if source != nil {
+		preparer, ok := s.Prepare.(PolicyRecordingPreparer)
+		if !ok {
+			return zero, executeStep{"PreparePolicyRecording", value.ErrUnavailable}
+		}
+		r, mayCreate, permit, err = preparer.PreparePolicyRecording(startCtx, check, *source)
+	} else {
+		r, mayCreate, err = s.Prepare.PrepareAPIExecution(startCtx, check)
+	}
 	if err != nil {
 		return zero, executeStep{"PrepareAPIExecution[" + check.limit(original, s.Now()) + "]", err}
 	}
@@ -347,11 +392,20 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 		// execution stays started until a later collect exchange records
 		// the stored completion (CollectRecording). Only a start the region
 		// refused is recorded as failed now.
-		recorder, ok := prepared.(evidence.ContextRecorder)
-		if !ok {
-			return zero, executeStep{"StartRecording", value.ErrUnavailable}
+		var queued time.Time
+		if source != nil {
+			sensitive, ok := prepared.(evidence.PolicyContextRecorder)
+			if !ok {
+				return zero, executeStep{"StartPolicyRecording", value.ErrUnavailable}
+			}
+			queued, err = sensitive.StartPolicyRecording(ctx, w.Accepted.Pin, r.StartedAt, d.ValidUntil, *source, permit)
+		} else {
+			recorder, ok := prepared.(evidence.ContextRecorder)
+			if !ok {
+				return zero, executeStep{"StartRecording", value.ErrUnavailable}
+			}
+			queued, err = recorder.StartRecording(ctx, w.Accepted.Pin, r.StartedAt, d.ValidUntil)
 		}
-		queued, err := recorder.StartRecording(ctx, w.Accepted.Pin, r.StartedAt, d.ValidUntil)
 		if err == nil && !queued.IsZero() && queued.Before(d.ValidUntil) && !queued.Before(r.StartedAt) {
 			return ContextResult{State: "Recording"}, nil
 		}
@@ -472,4 +526,12 @@ func captureFailurePhase(err error) string {
 		return "denied"
 	}
 	return "captureFailed"
+}
+
+// policyRawRecording selects the finite companion without changing the frozen
+// approval identity. Ordinary/manual recorders never acquire this authority.
+func policyRawRecording(w APIContextWork) bool {
+	_, _, policy := authorization.PolicyExecutor(w.Actor)
+	r := w.Accepted.Expectation.Recording
+	return policy && r != nil && r.Filter != nil && compiler.RawBytePredicate(r.Filter.Expression)
 }

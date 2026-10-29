@@ -467,7 +467,7 @@ func typedQueryFraming(t *testing.T, mode string) {
 		writeCtx, finish := reply.ResponseContext(ctx)
 		defer finish()
 		if mode == "browser" {
-			_, err = WriteOperationReplyResponse(writeCtx, w, http.StatusOK, reply.Body, reply, until, reply.CheckDisclosure)
+			_, err = WriteBrowserOperationResponse(writeCtx, w, http.StatusOK, "get_file_excerpt", reply, until)
 		} else {
 			expected, err = json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "result": map[string]any{"content": []any{map[string]string{"type": "text", "text": string(reply.Body)}}}})
 			if err == nil {

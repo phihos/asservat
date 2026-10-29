@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // ADR-248: a recording is a prepared output whose acquisition runs for its
@@ -19,6 +21,13 @@ import (
 // start). Ownership of the prepared keys moves to the regional holder.
 type ContextRecorder interface {
 	StartRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time) (time.Time, error)
+}
+
+// PolicyContextRecorder consumes the original finite SQL observation receipt
+// and the source resolved within this same authenticated work exchange. It is
+// distinct from the ordinary recording start, which cannot dispatch raw work.
+type PolicyContextRecorder interface {
+	StartPolicyRecording(context.Context, artifact.PinnedPod, time.Time, time.Time, targets.PacketSourceObservation, collector.ObservationPermit) (time.Time, error)
 }
 
 // Recording collection states.

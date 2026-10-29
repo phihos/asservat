@@ -40,6 +40,7 @@ func TestContextDeletionRolesHaveExactFixtureGrants(t *testing.T) {
 	acknowledge := join(common,
 		table("context_deletion_checkpoint", "UPDATE", "attempt_id", "audit_receipt_json", "audit_acknowledged_at"))
 	finalize := join(common, custody,
+		table("policy_observation_session", "SELECT", "root_id", "capture_id"), table("policy_observation_session", "DELETE"),
 		table("context_deletion_checkpoint", "UPDATE", "attempt_id", "finalization_xid"),
 		table("custody_allocation", "UPDATE", "charged_bytes", "charged_objects"),
 		table("custody_attempt", "UPDATE", "state", "deleted_at", "lease_until"),
@@ -61,8 +62,8 @@ func TestContextDeletionRolesHaveExactFixtureGrants(t *testing.T) {
 				t.Fatalf("purpose grants differ: got %v, want %v", keys(got), keys(want[purpose]))
 			}
 			for _, g := range got {
-				// No purpose deletes rows or executes a function.
-				if g.privilege == "DELETE" || g.kind == "function" {
+				// Only the finalizer deletes the protected finite observation child.
+				if g.kind == "function" || g.privilege == "DELETE" && (purpose != "context-cleanup-finalize" || g.object != "policy_observation_session") {
 					t.Fatal("effect beyond the purpose", g.key())
 				}
 			}

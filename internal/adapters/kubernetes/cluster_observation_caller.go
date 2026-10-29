@@ -107,7 +107,8 @@ func (s *ClusterObservationCallerAdmission) live(ctx context.Context, name, uid 
 // liveObjects shares only the existing concrete object reads/validation. The
 // ordinary full caller reader keeps its original namespace/read sequence.
 // The fixed local-operation boundary can instead bracket these reads with its
-// own actual namespace/guard reads and require a second identical Pod response.
+// own actual namespace/guard reads and independently validate both protected
+// workload projections.
 func (s *ClusterObservationCallerAdmission) liveObjects(ctx context.Context, name, uid string, stabilize bool) (clusterObservationWorkload, error) {
 	var zero clusterObservationWorkload
 	p := s.pin
@@ -146,14 +147,38 @@ func (s *ClusterObservationCallerAdmission) liveObjects(ctx context.Context, nam
 	if e != nil {
 		return zero, e
 	}
-	if connectorAPITemplateMatch(&d, &rs, &pod, p.TemplateDigest, p.ImageDigest, release, workload) != nil {
-		return zero, cfg.ErrChanged
+	out, e := s.validateCallerPod(name, uid, d, rs, pod, release, workload)
+	if e != nil {
+		return zero, e
 	}
 	if stabilize {
 		last, err := ownerResource[core.Pod](r, ctx, base+"pods/"+name, "v1", "Pod")
-		if err != nil || last.ResourceVersion != pod.ResourceVersion || !equalJSON(last, pod) {
+		if err != nil {
 			return zero, cfg.ErrChanged
 		}
+		final, err := s.validateCallerPod(name, uid, d, rs, last, release, workload)
+		if err != nil || final != out || !slices.Equal(last.Finalizers, pod.Finalizers) {
+			return zero, cfg.ErrChanged
+		}
+	}
+	return out, nil
+}
+
+// validateCallerPod uses the caller's existing protected projection, not the
+// owner's additional Ready/address/Service rules. Both API responses must pass
+// independently; informational status and resourceVersion are not digest data.
+func (s *ClusterObservationCallerAdmission) validateCallerPod(name, uid string, d apps.Deployment, rs apps.ReplicaSet, pod core.Pod, release *contracts.ReleaseRecord, workload releaseWorkload) (clusterObservationWorkload, error) {
+	var zero clusterObservationWorkload
+	p := s.pin
+	if !ownerMetadata(pod.ObjectMeta, p.Namespace.Name, name, uid) || pod.Spec.ServiceAccountName != p.Account || pod.Spec.NodeName == "" || pod.Status.Phase != core.PodRunning || !ownerEnrollmentSelector(d.Spec.Selector, pod.Labels) || !ownerEnrollmentSelector(rs.Spec.Selector, pod.Labels) {
+		return zero, value.ErrUnavailable
+	}
+	ref, ok := ownerController(pod.OwnerReferences, "ReplicaSet", "apps/v1")
+	if !ok || ref.Name != rs.Name || ref.UID != rs.UID {
+		return zero, value.ErrUnavailable
+	}
+	if connectorAPITemplateMatch(&d, &rs, &pod, p.TemplateDigest, p.ImageDigest, release, workload) != nil {
+		return zero, cfg.ErrChanged
 	}
 	raw, e := json.Marshal(struct {
 		Pin                      value.ClusterObservationCallerPin

@@ -476,6 +476,19 @@ func PolicyShareManagement(i identity.Identity, p Projection, t Target, delegati
 		return Result{Reason: "InvalidRequest"}, nil
 	}
 	r := ScopeEligibility(i, p, ReadApproved, t, now)
+	return policyShareOwners(i, r, delegation, sponsors)
+}
+
+// PolicyWorkloadShareManagement applies the same current team sharing rules to
+// a future-replica workload scope. A concrete Pod review cannot sponsor it.
+func PolicyWorkloadShareManagement(i identity.Identity, p WorkloadProjection, t WorkloadTarget, delegation string, sponsors []string, now time.Time) (Result, []artifact.AudienceAssignment) {
+	if i.Principal.Kind != identity.Human || delegation == "" {
+		return Result{Reason: "InvalidRequest"}, nil
+	}
+	return policyShareOwners(i, WorkloadScopeEligibility(i, p, ReadApproved, t, now), delegation, sponsors)
+}
+
+func policyShareOwners(i identity.Identity, r Result, delegation string, sponsors []string) (Result, []artifact.AudienceAssignment) {
 	if !r.Eligible {
 		return r, nil
 	}

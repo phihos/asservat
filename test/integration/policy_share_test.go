@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -127,6 +128,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// the activation does after its checks, and acknowledges its audit.
 	var active string
 	var authority authorization.AcceptedPolicyAuthority
+	var authorityScope []byte
 	accept := func(scope byte, maxCaptures int, notAfter time.Time) string {
 		t.Helper()
 		refresh()
@@ -136,7 +138,16 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		if err != nil {
 			t.Fatal(err)
 		}
-		authority = authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policyUID, Creator: creator, Executor: authorization.PolicyPrincipal(installation, policyUID), ScopeDigest: artifact.Digest{scope}, ClusterID: pod.ClusterID, NamespaceUID: pod.NamespaceUID, WorkloadUID: pod.WorkloadUID,
+		authorityScope, err = json.Marshal(struct {
+			Format   string
+			Version  byte
+			Workload authorization.WorkloadTarget
+			Recipe   artifact.Digest
+		}{"synthetic-policy-scope/v1", scope, authorization.WorkloadTarget{ClusterID: pod.ClusterID, NamespaceUID: pod.NamespaceUID, WorkloadUID: pod.WorkloadUID}, planning.RecipeDigest()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		authority = authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policyUID, Creator: creator, Executor: authorization.PolicyPrincipal(installation, policyUID), ScopeDigest: sha256.Sum256(authorityScope), ClusterID: pod.ClusterID, NamespaceUID: pod.NamespaceUID, WorkloadUID: pod.WorkloadUID,
 			Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{sponsor}, Actions: []string{authorization.PolicyContextAction}, Limits: authorization.AutomationLimits{MaxExecutions: 50, MaxBytes: 1 << 20}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
 		author := identity.Identity{Principal: creator, Scopes: []string{"evidence:read", "evidence:capture", authorization.ShareScope}, Groups: []string{"maintainers"}, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
 		in := capture.PolicyAdmission{RootID: root, Recovery: recovery, Target: workload, Authority: authority, Author: author,
@@ -158,7 +169,8 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	}
 	// admit admits one policy-executor capture of the triggering Pod through
 	// the given admission adapter, with every current check.
-	admit := func(admissions *postgres.ContextAdmissions) capture.Accepted {
+	var restartOrdinal int64 // the real Pod counter survives accepted-scope replacement
+	admitInput := func(asAPI bool) capture.Admission {
 		t.Helper()
 		refresh()
 		observe()
@@ -183,6 +195,10 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		in := a.Plan.Input
 		in.CaptureID, in.Executor = custodyID(), executor.Principal
 		in.Deadline = now.Add(time.Minute)
+		if asAPI {
+			in.Target.ExecutionClass, in.Capability.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+			in.Target.NodeUID, in.Target.NodeBootID, in.Target.Pin.NodeName = "", "", ""
+		}
 		// The test spans minutes: renew the scenario's synthetic Pod, capability,
 		// retention and storage-binding observations as the hub's readers would.
 		in.Target.ObservedAt, in.Target.FreshUntil = now, now.Add(5*time.Second)
@@ -200,20 +216,40 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		if err != nil {
 			t.Fatal(err)
 		}
-		a.Plan, a.Eligibility, a.Recovery, a.IdempotencyKey = plan, eligibility, recovery, "policy-occurrence-"+in.CaptureID
+		// Fixture only: model Tick's already-spent original occurrence. Product
+		// Tick performs these under its source lock; admission must not debit
+		// accepted execution a second time.
+		key := custodyID()
+		if _, err = admin.Exec(ctx, `UPDATE policy_acceptance SET executions_spent=executions_spent+1 WHERE id=$1`, active); err != nil {
+			t.Fatal(err)
+		}
+		restartOrdinal++
+		if _, err = admin.Exec(ctx, `INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, key, root, policyUID, active, pod.ClusterID, pod.WorkloadUID, pod.PodUID, restartOrdinal); err != nil {
+			t.Fatal("synthetic Tick occurrence", active, restartOrdinal, err)
+		}
+		a.Plan, a.Eligibility, a.Recovery, a.IdempotencyKey = plan, eligibility, recovery, key
 		a.Registration.Location.ArtifactID, a.Registration.Location.AttemptID = custodyID(), custodyID()
 		a.Registration.WriteUntil = in.Deadline
 		a.CaseID, a.OccurrenceID = custodyID(), custodyID()
+		return a
+	}
+	admit := func(admissions *postgres.ContextAdmissions, asAPI ...bool) capture.Accepted {
+		t.Helper()
+		a := admitInput(len(asAPI) > 0 && asAPI[0])
 		got, err := admissions.AdmitContext(ctx, a)
 		if err != nil {
 			use := authorization.PolicyUse{PolicyUID: authority.PolicyUID, ScopeDigest: authority.ScopeDigest, Target: pod, Purpose: authorization.PolicyIncident}
 			e := (authapp.AutomationEvaluator{Accepted: reader, Current: automation, Now: time.Now}).Eligibility(ctx, use)
-			t.Fatalf("policy capture admission: %v (evaluator %s, eligible until %s, now %s)", err, e.Reason, eligibility.ValidUntil, time.Now())
+			t.Fatalf("policy capture admission: %v (evaluator %s, eligible until %s, now %s)", err, e.Reason, a.Eligibility.ValidUntil, time.Now())
 		}
 		// A replayed admission (a lost reply) returns the same capture and
 		// claims no second slot.
 		if again, err := admissions.AdmitContext(ctx, a); err != nil || again.CaptureID != got.CaptureID {
 			t.Fatal("policy capture replay", again.CaptureID, err)
+		}
+		var executions, output, reservations int64
+		if err := admin.QueryRow(ctx, `SELECT executions_spent,collected_bytes_spent,(SELECT count(*) FROM policy_occurrence WHERE acceptance_id=$1 AND reserved_capture_id IS NOT NULL) FROM policy_acceptance WHERE id=$1`, active).Scan(&executions, &output, &reservations); err != nil || output != reservations*artifact.MaxContextBytes || executions != reservations {
+			t.Fatal("capture/replay doubled execution or changed conservative output", executions, output, reservations, err)
 		}
 		return got
 	}
@@ -296,11 +332,31 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 
 	// Acceptance A of generation 1 shares at most three captures.
 	first := accept(61, 3, time.Now().Add(time.Hour))
+	firstGrant := attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope, "accounting-review")
 	hub := captureAdmissions("policy_share_admit_a_")
 	c1, c2 := admit(hub), admit(hub)
 	// A restarted hub (a new admission adapter) continues the stored counter.
 	restarted := captureAdmissions("policy_share_admit_b_")
-	c3, c4 := admit(restarted), admit(restarted)
+	c3, c4 := admit(restarted), admit(restarted, true)
+	// The same original grant/acceptance pools survive a new adapter and lost
+	// admission replies. A fifth occurrence stays pre-spent, but its refused
+	// capture adds neither grant nor output spend and creates no reservation.
+	refused := admitInput(false)
+	if _, err := restarted.AdmitContext(ctx, refused); !errors.Is(err, capture.ErrCapacity) {
+		t.Fatal("exhausted attached grant admitted a fifth capture", err)
+	}
+	var grantExecutions, grantBytes, acceptedExecutions, acceptedBytes int64
+	if err := admin.QueryRow(ctx, `SELECT policy_executions_spent,policy_bytes_spent FROM access_grant WHERE id=$1`, firstGrant).Scan(&grantExecutions, &grantBytes); err != nil || grantExecutions != 4 || grantBytes != 4*artifact.MaxContextBytes {
+		t.Fatal("grant replay/restart/refusal refilled or overspent", grantExecutions, grantBytes, err)
+	}
+	if err := admin.QueryRow(ctx, `SELECT executions_spent,collected_bytes_spent FROM policy_acceptance WHERE id=$1`, first).Scan(&acceptedExecutions, &acceptedBytes); err != nil || acceptedExecutions != 5 || acceptedBytes != 4*artifact.MaxContextBytes {
+		t.Fatal("accepted execution double-debit or output refund", acceptedExecutions, acceptedBytes, err)
+	}
+	var reserved bool
+	if err := admin.QueryRow(ctx, `SELECT reserved_capture_id IS NOT NULL FROM policy_occurrence WHERE id=$1`, refused.IdempotencyKey).Scan(&reserved); err != nil || reserved {
+		t.Fatal("refused capture retained a new output reservation", err)
+	}
+	t.Logf("accounting checkpoint: grant executions=%d bytes=%d; accepted executions=%d bytes=%d; fifth reservation=%t", grantExecutions, grantBytes, acceptedExecutions, acceptedBytes, reserved)
 	for _, c := range []capture.Accepted{c1, c2, c3} {
 		if w := stored(c); w == nil || w.Acceptance != first {
 			t.Fatal("capture within the limit is unshared", c.CaptureID, w)
@@ -315,6 +371,12 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	f1, f2 := prepare(t, s, c1, true), prepare(t, s, c2, false)
 	publish(f1)
 	publish(f2)
+	// Existing intent publishers have now acknowledged all four original
+	// captures. Only c4 uses API execution, so this is the actual acquisition
+	// reader/gate without altering the existing Node publication fixtures.
+	qualifyOriginalPolicyGrantAcquisition(t, ctx, admin, poolFor, s, authority, c4, firstGrant, func() string {
+		return attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope, "replacement-review")
+	}, func() { refresh(); observe() })
 	got := shares()
 	if len(got) != 2 || got["capture:"+c1.CaptureID].Acceptance != first || got["capture:"+c2.CaptureID].Acceptance != first || got["capture:"+c1.CaptureID].ID != stored(c1).ShareID {
 		t.Fatal("published policy captures were not shared under their acceptance", got)
@@ -323,6 +385,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// Editing the DebugPolicy (generation 2) stops sharing: acceptance B of the
 	// new revision starts its own counter, and nothing earlier is backfilled.
 	source.Revision.Generation, source.Revision.Digest = 2, artifact.Digest{54}
+	source.CollectionDigest[0]++ // an explicitly changed collection scope, not sharing-only reauthorization
 	observe()
 	second := accept(62, 3, time.Now().Add(25*time.Second))
 	c5, c6 := admit(hub), admit(hub)
@@ -419,10 +482,14 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if !got["capture:"+c1.CaptureID].Revoked || !got["capture:"+c2.CaptureID].Revoked || got["capture:"+c5.CaptureID].Revoked {
 		t.Fatal("revoke-all did not revoke exactly its acceptance's shares", got)
 	}
-	// Stop future sharing (REQ-SHR-007) of acceptance C (generation 3): a
+	// Stop future sharing (REQ-SHR-007) of acceptance C (generation 4): a
 	// current team member stops it; the capture that claimed its slot before
 	// the Stop still publishes its share, the next capture claims none, and
 	// revoke-all at revision 2 then revokes that share.
+	// This separate accepted collection scope is not a sharing-only reset.
+	source.Revision.Generation, source.Revision.Digest = 4, artifact.Digest{56}
+	source.CollectionDigest[0]++
+	observe()
 	third := accept(63, 3, time.Now().Add(time.Hour))
 	c8 := admit(hub)
 	if w := stored(c8); w == nil || w.Acceptance != third {

@@ -102,11 +102,15 @@ type PacketCapture struct {
 	ProgramDigest [32]byte
 	Duration      time.Duration
 	MaxBytes      int64
+	Observation   *ObservationPermit
 }
 
 // Valid checks the payload's own bounds; the node checks the digest against
 // the program it received.
 func (p PacketCapture) Valid() bool {
+	if o := p.Observation; o != nil && (!o.ValidFinite(o.StartedAt) || o.Duration != p.Duration || o.Binding.CaptureID != p.CaptureID || o.Binding.PodUID != p.PodUID || o.Binding.ProgramDigest != p.ProgramDigest) {
+		return false
+	}
 	return validUUID(p.CaptureID) && validUUID(p.PodUID) && len(p.Program) <= planning.MaxFilterInstructions && (len(p.Program) == 0) == (p.ProgramDigest == [32]byte{}) &&
 		p.Duration >= time.Second && p.Duration <= MaxPacketCaptureDuration && p.Duration%time.Millisecond == 0 && p.MaxBytes >= MinPacketCaptureBytes && p.MaxBytes <= MaxPacketCaptureBytes
 }

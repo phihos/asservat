@@ -43,8 +43,9 @@ type permissionWorker struct {
 	contextDeletion *contextDeletionWorker
 	// browser projects the browser settings into SQL (ADR-210); nil without
 	// its section.
-	browser *identities.BrowserSettingsObserver
-	closers []func()
+	browser             *identities.BrowserSettingsObserver
+	policyGrantSettings *app.PolicyGrantSettingsObserver
+	closers             []func()
 }
 
 func (p *permissionWorker) Close() {
@@ -217,6 +218,11 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 			return nil, &fixedStepError{"identity/directory", e}
 		}
 		w.reconciler.Directory = identityDirectory{settings}
+		grants, e := postgres.NewPolicies(startup, pools["permission-accept"], c.RootID, c.InstallationID)
+		if e != nil {
+			return nil, &fixedStepError{"identity/policy-grant-settings", e}
+		}
+		w.policyGrantSettings = &app.PolicyGrantSettingsObserver{Issuer: id.Issuer, Source: settings, Projection: grants, Now: time.Now}
 	}
 	if r := c.Review; r != nil {
 		review, e := kube.NewBootstrapReviewClient(observer, r.Name, r.UID)
@@ -306,6 +312,14 @@ func (p *permissionWorker) run(ctx context.Context) error {
 	}()
 	// ADR-210: one projection per second keeps the five-second settings
 	// observation current for console logins; a failed read fences it.
+	if p.policyGrantSettings != nil {
+		settings := make(chan struct{})
+		go func() {
+			defer close(settings)
+			p.policyGrantSettings.Run(ctx, capacitySourceReporter("hub-worker policy grant settings: "))
+		}()
+		defer func() { <-settings }()
+	}
 	if p.browser != nil {
 		browser := make(chan struct{})
 		go func() {

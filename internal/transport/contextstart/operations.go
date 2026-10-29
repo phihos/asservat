@@ -11,10 +11,14 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/collector"
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
@@ -23,15 +27,17 @@ import (
 // data keys never cross the exchange: acquisition captures, encrypts and
 // uploads in the region and returns copy receipts only.
 const (
-	opResolvePod    = "resolve-pod"
-	opReadProcess   = "read-process"
-	opPrepareStart  = "prepare-start"
-	opReadyStart    = "ready-start"
-	opConsumeStart  = "consume-start"
-	opPrepareOutput = "prepare-output"
-	opAcquire       = "acquire-context"
-	opComplete      = "complete-stored"
-	opFinish        = "finish"
+	opResolvePod           = "resolve-pod"
+	opResolvePacketSource  = "resolve-packet-source"
+	opStartPolicyRecording = "start-policy-recording"
+	opReadProcess          = "read-process"
+	opPrepareStart         = "prepare-start"
+	opReadyStart           = "ready-start"
+	opConsumeStart         = "consume-start"
+	opPrepareOutput        = "prepare-output"
+	opAcquire              = "acquire-context"
+	opComplete             = "complete-stored"
+	opFinish               = "finish"
 	// ADR-248: a recording is started within the committed start and
 	// collected by a later exchange for the same verified capture.
 	opStartRecording = "start-recording"
@@ -79,6 +85,13 @@ type acquireRequest struct {
 	Pin            artifact.PinnedPod
 	Started, Until time.Time
 }
+type policyRecordingRequest struct {
+	Pin            artifact.PinnedPod
+	Started, Until time.Time
+	Source         targets.PacketSourceObservation
+	Permit         collector.ObservationPermit
+}
+
 type acquireReply struct {
 	Acquired time.Time
 	Copies   artifact.Copies
@@ -168,6 +181,12 @@ func (h *HubOperations) ResolvePod(ctx context.Context, r targets.Request) (targ
 	err := h.call(ctx, opResolvePod, r, &out)
 	return out, err
 }
+func (h *HubOperations) ResolvePacketSource(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {
+	var out targets.RecorderResolution
+	err := h.call(ctx, opResolvePacketSource, r, &out)
+	return out, err
+}
+
 func (h *HubOperations) ReadAPIProcess(ctx context.Context) (value.APIProcessObservation, error) {
 	var out value.APIProcessObservation
 	err := h.call(ctx, opReadProcess, struct{}{}, &out)
@@ -221,6 +240,12 @@ var (
 func (o *remoteOutput) StartRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time) (time.Time, error) {
 	var out recordingReply
 	err := o.h.call(ctx, opStartRecording, acquireRequest{pin, started, until}, &out)
+	return out.Queued, err
+}
+
+func (o *remoteOutput) StartPolicyRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time, source targets.PacketSourceObservation, permit collector.ObservationPermit) (time.Time, error) {
+	var out recordingReply
+	err := o.h.call(ctx, opStartPolicyRecording, policyRecordingRequest{pin, started, until, source, permit}, &out)
 	return out.Queued, err
 }
 
@@ -325,6 +350,7 @@ type RegionalLocal struct {
 	Source fleetapp.ConnectorIdentitySourceReader
 	// Recordings answers collects of held recordings (ADR-248); optional.
 	Recordings RegionalRecordings
+	History    *HistoryLocal
 	Now        func() time.Time
 }
 
@@ -347,11 +373,13 @@ type regionalSession struct {
 	work  fleet.APIContextWork
 	// process is this work's one complete process observation (ADR-173). Later
 	// operations reuse it until its original deadline; it is never renewed.
-	process  *value.APIProcessObservation
-	resolved *targets.PodResolution
-	prepared evidence.PreparedContext
-	consumed *value.Disposition
-	acquired bool
+	process      *value.APIProcessObservation
+	resolved     *targets.PodResolution
+	packetSource *targets.PacketSourceObservation
+	expectation  *artifact.ContextExpectation
+	prepared     evidence.PreparedContext
+	consumed     *value.Disposition
+	acquired     bool
 }
 
 func (s *regionalSession) close() {
@@ -401,6 +429,9 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 	l := s.local
 	switch q.Method {
 	case opResolvePod:
+		if s.packetSource != nil {
+			return nil, value.ErrDenied
+		}
 		var r targets.Request
 		if err := decodeOperationBody(q.Body, &r); err != nil {
 			return nil, err
@@ -413,6 +444,28 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 			return nil, value.ErrDenied
 		}
 		s.resolved = &out
+		return out, nil
+	case opResolvePacketSource:
+		var r targets.Request
+		if err := decodeOperationBody(q.Body, &r); err != nil {
+			return nil, err
+		}
+		_, _, policy := authorization.PolicyExecutor(s.work.Actor)
+		resolver, ok := l.Targets.(interface {
+			ResolvePacketSource(context.Context, targets.Request) (targets.RecorderResolution, error)
+		})
+		if !policy || !ok || s.resolved != nil {
+			return nil, value.ErrDenied
+		}
+		out, err := resolver.ResolvePacketSource(ctx, r)
+		if err != nil {
+			return nil, err
+		}
+		if !out.ValidSource(l.Now()) || out.Target.Target() != s.work.Target {
+			return nil, value.ErrDenied
+		}
+		target, source := out.Target, *out.Recorder.Source
+		s.resolved, s.packetSource = &target, &source
 		return out, nil
 	case opReadProcess:
 		return s.readProcess(ctx)
@@ -463,6 +516,7 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 			return nil, err
 		}
 		s.prepared = prepared
+		s.expectation = &e
 		return struct{}{}, nil
 	case opAcquire:
 		var r acquireRequest
@@ -493,6 +547,23 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		}
 		s.acquired = true
 		queued, err := recorder.StartRecording(ctx, r.Pin, r.Started, r.Until)
+		if err != nil {
+			return nil, err
+		}
+		return recordingReply{Queued: queued}, nil
+	case opStartPolicyRecording:
+		var r policyRecordingRequest
+		if err := decodeOperationBody(q.Body, &r); err != nil {
+			return nil, err
+		}
+		d := s.consumed
+		recorder, ok := s.prepared.(evidence.PolicyContextRecorder)
+		_, _, policy := authorization.PolicyExecutor(s.work.Actor)
+		if s.acquired || !policy || !ok || s.resolved == nil || s.packetSource == nil || s.expectation == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || !r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !samePacketSource(r.Source, *s.packetSource) || !r.Source.Valid(l.Now()) || !r.Permit.ValidFinite(l.Now()) || r.Permit.Binding.ExpectationDigest != [32]byte(s.work.ExpectationDigest) || r.Permit.Binding.CaptureID != s.work.CaptureID || r.Permit.Binding.ActionID != s.expectation.ActionID || !policyRecordingMatches(*s.expectation, r.Source, r.Permit) || !l.Now().Before(r.Until) {
+			return nil, value.ErrDenied
+		}
+		s.acquired = true
+		queued, err := recorder.StartPolicyRecording(ctx, r.Pin, r.Started, r.Until, r.Source, r.Permit)
 		if err != nil {
 			return nil, err
 		}
@@ -538,13 +609,17 @@ func ServeRegionalOperations(ctx context.Context, stream Stream, receiver fleet.
 	}
 	stage = streamRegionalWork
 	f, current, err := stream.AwaitWork(ctx)
-	if err != nil || f.Kind != contracts.APIContextWorkFrame {
+	if err != nil || f.Kind != contracts.APIContextWorkFrame && f.Kind != contracts.HistoryWorkFrame {
 		clear(f.Payload)
 		return contracts.ErrAPIContextProtocol
 	}
 	if current.Channel != receiver.Channel || !current.Valid(now()) {
 		clear(f.Payload)
 		return fleet.ErrDenied
+	}
+	if f.Kind == contracts.HistoryWorkFrame {
+		defer clear(f.Payload)
+		return serveRegionalHistory(ctx, stream, current, f.Payload, local.History, now)
 	}
 	stage = streamRegionalVerify
 	authenticated, err := verifier.VerifyAPIContextWork(ctx, f.Payload, current)
@@ -644,4 +719,25 @@ func (s *regionalSession) finish(ctx context.Context, stream Stream, q contracts
 		return contracts.ErrAPIContextProtocol
 	}
 	return nil
+}
+
+// Compare instants rather than Go time representations: SQL receipts may have
+// passed through a driver-local zone without changing their original bounds.
+func samePacketSource(a, b targets.PacketSourceObservation) bool {
+	return a.PodUID == b.PodUID && a.NodeUID == b.NodeUID && a.BootID == b.BootID && a.CollectorPodUID == b.CollectorPodUID && a.CollectorEpoch == b.CollectorEpoch && a.ObservedAt.Equal(b.ObservedAt) && a.FreshUntil.Equal(b.FreshUntil)
+}
+
+// The expectation was checked against independently verified signed work at
+// prepare-output; the source was resolved locally in this exchange. Neither is
+// recovered from the permit's caller-supplied copies.
+func policyRecordingMatches(e artifact.ContextExpectation, source targets.PacketSourceObservation, permit collector.ObservationPermit) bool {
+	r, b := e.Recording, permit.Binding
+	if r == nil || !r.Valid() || r.Filter == nil || !compiler.RawBytePredicate(r.Filter.Expression) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || b.PodUID != e.PodUID || source.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch {
+		return false
+	}
+	program := make([]planning.BPFInstruction, len(r.Filter.Program))
+	for i, ins := range r.Filter.Program {
+		program[i] = planning.BPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
+	}
+	return b.ProgramDigest == [32]byte(compiler.FilterProgramDigest(program))
 }

@@ -99,8 +99,10 @@ require a new review. Updated observation times do not change reviewed scope or
 extend a prior observation's deadline.
 
 Each call owns at most one non-authoritative capacity readiness wait.
-Request starts it beside exact-Pod resolution using the preview's pinned
-target; Preview and CheckDiagnostic start it after target resolution. The
+For a packet preview with a storage selection, Request starts it after accepted
+replay misses and the actor-matching preview read, before recording grant I/O.
+Other requests retain their existing start beside exact-Pod resolution. Preview
+and CheckDiagnostic start it after target resolution. The
 same wait overlaps eligibility, capability and retention reads in their
 existing order, then joins before the authoritative storage read. Early
 failure cancels and joins it before returning. Under
@@ -128,8 +130,15 @@ opportunity to finish; slow reads or audit can still exhaust the request.
 
 Request pins the preview's exact storage selection; Preview and
 CheckDiagnostic pin their first valid authoritative selection. Read errors,
-invalid/expired bindings, changed selections and cancellation refuse
-consumption. Missing refresh or a failed demand prevents polling for a thin
+invalid bindings, changed selections and cancellation refuse
+consumption. An explicitly typed, naturally expired source may retain its original
+binding/selection metadata solely for comparison. After validating its original
+interval and exact reviewed selection, consumption may use the same bounded
+readiness owner and sole demand attempt as a thin result. No expired value
+authorizes admission: an independently fresh successful read is required.
+Generic read failures and malformed, future or mismatched expired metadata
+remain terminal. Expired metadata does not validate capacity/control; the fresh
+successful read must still pass those unchanged checks. Missing refresh or a failed demand prevents polling for a thin
 result; a valid final read with sufficient margin can still succeed.
 The wait uses the earliest original
 caller, initial identity/recovery, preview, target, eligibility/identity,

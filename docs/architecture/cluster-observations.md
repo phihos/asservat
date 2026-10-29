@@ -26,6 +26,34 @@ five later requests take about 1.40 seconds each. The fixture supplies installat
 pins and process identifiers. It does not run the SQL/TLS consumers or normal
 background reconciliation, so it does not qualify complete sustained routing.
 
+Within each owner native boundary, both Pod reads now independently pass the
+same existing protected-object validator and must produce the same canonical
+workload digest. Informational status/resourceVersion changes alone do not
+invalidate that comparison; UID/deletion, full pinned spec/controller/node,
+current Running/Ready and selected address changes still refuse. Original
+operation dates and final guard/namespace/Service checks remain unchanged. This
+engineering correction and its explicit component-versus-installed limits are
+recorded in [ADR-150](../decisions/150-operation-owned-native-observation-proof.md#relevant-pod-equivalence-inside-a-native-boundary-2026-10-29).
+
+The direct HWORK caller boundary likewise validates both already-read Pods with
+its existing caller-specific protected projection and compares the unchanged v1
+workload digest plus finalizer equality. Informational status/resourceVersion
+updates alone no longer fail this comparison. Caller Running/node/account,
+identity/deletion, controller/template/spec/labels/annotations and original
+bounds remain required; owner-only Ready/address/Service rules are not added.
+This corrects a local HTTPS-adapter regression, with no additional API calls or
+installed-failure attribution. An owned API component run on `a15c5af9` also
+confirmed three admitted informational status changes and six actual caller Pod
+GETs through Begin/Claim/Final in 1.652 seconds, with 3.348 seconds left in the
+original five-second interval. It supplies fixture installation/process pins and
+qualifies neither installed routing availability nor the earlier Native cause.
+Its critical case confirmed an admitted annotation mutation followed by refusal;
+that run did not assert the exact refusal cause. The later native test now also
+requires a live original context, `ErrChanged` and the closed `caller-objects`
+step; this stronger assertion has local compile/vet coverage, not another owned
+API run. Local HTTPS critical controls exercise those exact refusal assertions.
+Full installed availability remains unqualified.
+
 The matching regional primitive now brackets four genuinely new source-value
 reads with two independent native checks. The last native check precedes the
 fourth value read, so a source change during probing is still compared before
@@ -580,3 +608,14 @@ separately covers actual translated-port TLS/h2, unchanged original SNI/HTTP
 authority, wrong roots/name/candidates, no replay and joined cancellation.
 Synthetic initial setup roots and fixture signing still bound the native scope;
 this does not qualify real provider latency or installed runtime selection.
+
+
+The direct HWORK receiver distinguishes active operations from retained same-ID
+markers under [ADR-150's accounting revision](../decisions/150-operation-owned-native-observation-proof.md#joined-active-capacity-and-bounded-replay-markers-2026-10-28).
+The existing map admits at most `maximum` active entries and `2 * maximum`
+retained entries. Only positively joined native/reservation/GET/claim cleanup
+and token clearing release active capacity; markers retain the original expiry
+and refuse replay. Possible delivery or a phase change alone releases nothing.
+Total saturation remains a bounded refusal, with unchanged authority intervals,
+input budgets and active transport/native limits. The added retained context and
+timer instances are bounded by the same total; no watch or new service is added.
