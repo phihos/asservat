@@ -449,6 +449,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			if e != nil || string(pod.UID) != preview.Pods[0].UID || pod.Spec.NodeName == "" {
 				t.Fatal("exact traffic Pod is unavailable", e)
 			}
+			if e := nativePacingRequireTargetProfile(pod); e != nil {
+				t.Fatal("declared native-paced target", e)
+			}
 			// These two optional diagnostics consume existing time, never extend the
 			// capture or gate authority. Each edge uses a short diagnostic context;
 			// missing data is recorded as unavailable rather than a new failure gate.

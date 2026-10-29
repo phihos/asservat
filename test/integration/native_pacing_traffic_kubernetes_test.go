@@ -95,6 +95,9 @@ func TestNativePacingTrafficWithRealKubernetes(t *testing.T) {
 	if len(fields) != 2 || fields[0] != f.NativeTrafficHelper.SHA256 || fields[1] != "/asservat-fixture-traffic" {
 		t.Fatal("serialized descriptor differs from actual helper bytes")
 	}
+	if err := nativePacingRequireTargetProfile(current); err != nil {
+		t.Fatal("declared native-paced target", err)
+	}
 	beforeCPU, err := nativeTrafficTargetCPU(ctx, api, current)
 	if err != nil {
 		t.Fatal("exact target CPU baseline", err)

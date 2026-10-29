@@ -370,7 +370,11 @@ Native 40786153907 stays underfilled and unqualified: seven acknowledged batches
 or 200m performance improvement is established.
 
 Only the explicitly selected first regional target in `native-paced` now declares
-CPU request **200m** and limit **200m**. The fast pre-join and later construction
+CPU request **200m** and limit **200m**. Both real traffic call sites assert
+that exact single-container declaration from the already fetched Pod before
+traffic. This closed gate is independent of the optional effective CPU samples:
+an actual 100m Pod cannot silently qualify the 200m profile. No extra GET or
+measurement-dependent authority gate is added. The fast pre-join and later construction
 sites are mutually exclusive; the focus returns after the first regional cluster.
 Exactly one synthetic app, one replica and one container change. All other
 focus defaults remain 5m/100m. The independently selected no-collector traffic

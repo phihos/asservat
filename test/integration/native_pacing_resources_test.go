@@ -36,6 +36,9 @@ func TestNativePacingTargetResourceProfileIsExplicit(t *testing.T) {
 			if err != nil || len(deployed.Spec.Template.Spec.Containers) != 1 || deployed.Spec.Replicas == nil || *deployed.Spec.Replicas != 1 {
 				t.Fatal("actual target shape", err)
 			}
+			if err := nativePacingRequireTargetProfile(&core.Pod{Spec: deployed.Spec.Template.Spec}); (err == nil) != c.paced {
+				t.Fatal("actual built target passed the wrong declared-profile gate", err)
+			}
 			r := deployed.Spec.Template.Spec.Containers[0].Resources
 			if r.Requests.Cpu().MilliValue() != c.request || r.Limits.Cpu().MilliValue() != c.limit || r.Requests.Memory().Value() != 16<<20 || r.Limits.Memory().Value() != 64<<20 {
 				t.Fatal("declared profile changed another resource", r)
@@ -69,6 +72,9 @@ func TestNativePacingCPUObserverMatchesDeclaredPodProfile(t *testing.T) {
 				current.Spec.Containers[0].Resources.Limits[core.ResourceCPU] = resource.MustParse("100m")
 			case "request":
 				current.Spec.Containers[0].Resources.Requests[core.ResourceCPU] = resource.MustParse("5m")
+			}
+			if err := nativePacingRequireTargetProfile(current); (err == nil) != (c.paced && c.changed == "") {
+				t.Fatal("changed/100m actual declaration passed native-paced gate", err)
 			}
 			api := fake.NewClientset(current)
 			dir := t.TempDir()

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -54,6 +55,21 @@ func nativeCPUCommand(ctx context.Context, limit int, args ...string) ([]byte, e
 	}
 	return b.Bytes(), nil
 }
+
+// This declared-profile qualification gate is independent of optional CPU
+// measurements. Its exact 200m contract must not follow a changed builder.
+func nativePacingRequireTargetProfile(pod *core.Pod) error {
+	if pod == nil || len(pod.Spec.Containers) != 1 {
+		return errors.New("native-paced target profile unavailable")
+	}
+	want := resource.MustParse("200m")
+	r := pod.Spec.Containers[0].Resources
+	if r.Requests.Cpu().Cmp(want) != 0 || r.Limits.Cpu().Cmp(want) != 0 {
+		return errors.New("native-paced target must declare 200m request and limit")
+	}
+	return nil
+}
+
 func nativeTrafficTargetCPU(ctx context.Context, api kubernetes.Interface, expected *core.Pod) (out nativeTrafficCPU, err error) {
 	out.StartedAt = time.Now().UTC()
 	defer func() { out.FinishedAt = time.Now().UTC() }()
