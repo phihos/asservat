@@ -463,16 +463,20 @@ func qualifyInstalledPolicyRecording(t *testing.T, ctx context.Context, admin *p
 	if err != nil || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || int64(len(native)) > artifact.RecordingNativeLimit || hex.EncodeToString(digest[:]) != download.SHA256 || bytes.Contains(native, []byte("synthetic-policy-payload-marker")) {
 		t.Fatal("policy native byte/privacy proof", response.StatusCode, len(native), err)
 	}
-	file := filepath.Join(t.TempDir(), "policy.pcapng")
+	// Preserve the authenticated, already capped native bytes for failure analysis.
+	// Only this owned synthetic fixture writes this private artifact; no row or
+	// raw payload is rendered in logs. The existing workflow archives results.
+	file := filepath.Join("..", "results", "policy-recording.pcapng")
 	if err = os.WriteFile(file, native, 0600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.CommandContext(ctx, "tshark", "-r", file, "-T", "fields", "-E", "occurrence=f", "-e", "frame.number", "-e", "tcp.flags.ack", "-e", "tcp.payload").Output()
+	out, err := exec.CommandContext(ctx, "tshark", policyRecordingFieldArgs(file)...).Output()
 	if err != nil {
 		t.Fatal("offline native Wireshark read", err)
 	}
 	packets, err := policyRecordingPacketFields(out)
 	if err != nil {
+		t.Logf("native ACK/header evidence retained: policy-recording.pcapng bytes=%d SHA256=%x", len(native), digest)
 		t.Fatal("native ACK/header privacy scope", err)
 	}
 	if packets < 1 {
@@ -522,17 +526,36 @@ func policyRecordingCreditRefusal(logs []byte, captureID string) bool {
 	return false
 }
 
+// The offline regression and actual installed read use identical field options.
+func policyRecordingFieldArgs(file string) []string {
+	return []string{"-r", file, "-T", "fields", "-E", "occurrence=f", "-e", "frame.number", "-e", "tcp.flags.ack", "-e", "tcp.payload"}
+}
+
 // Keep the trailing empty payload column; TrimSpace would silently discard a
 // valid last packet or hide malformed decoder output during expensive native work.
 func policyRecordingPacketFields(out []byte) (int, error) {
 	count := 0
-	for _, line := range strings.Split(strings.TrimRight(string(out), "\r\n"), "\n") {
+	for row, line := range strings.Split(strings.TrimRight(string(out), "\r\n"), "\n") {
 		if line == "" {
 			continue
 		}
 		fields := strings.Split(line, "\t")
-		if len(fields) != 3 || fields[0] == "" || fields[1] != "1" || fields[2] != "" {
-			return 0, fmt.Errorf("native packet violates ACK-only header projection")
+		// The actual maintained tshark fields exporter emits True/False for
+		// this boolean, rather than the numeric spelling assumed by the old
+		// synthetic rows. Keep a strict ACK-true and empty-payload predicate.
+		class := ""
+		switch {
+		case len(fields) != 3:
+			class = "columns"
+		case fields[0] == "":
+			class = "frame-number"
+		case fields[1] != "True":
+			class = "ack"
+		case fields[2] != "":
+			class = "payload"
+		}
+		if class != "" {
+			return 0, fmt.Errorf("native packet violates ACK-only header projection: row %d (%s)", row+1, class)
 		}
 		count++
 	}

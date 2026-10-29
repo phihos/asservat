@@ -286,16 +286,20 @@ func TestInstalledPolicyRecordingAuthoredInputs(t *testing.T) {
 
 func TestInstalledPolicyRecordingNativeFieldProof(t *testing.T) {
 	for _, item := range []struct {
-		input  string
-		count  int
-		refuse bool
+		input string
+		count int
+		class string
 	}{
-		{"1\t1\t\n", 1, false}, {"1\t1\t\n2\t1\t\n", 2, false}, {"", 0, false},
-		{"1\t1\t616263\n", 0, true}, {"1\t0\t\n", 0, true}, {"1\t1\n", 0, true},
+		{"1\tTrue\t\n", 1, ""}, {"1\tTrue\t\n2\tTrue\t\n", 2, ""}, {"", 0, ""},
+		{"1\tTrue\t616263\n", 0, "payload"}, {"1\t1\t\n", 0, "ack"}, {"\tTrue\t\n", 0, "frame-number"},
+		{"1\tTrue\t\textra\n", 0, "columns"}, {"1\tFalse\t\n", 0, "ack"}, {"1\tTrue\n", 0, "columns"},
 	} {
 		got, err := policyRecordingPacketFields([]byte(item.input))
-		if (err != nil) != item.refuse || got != item.count {
-			t.Fatalf("native fields count=%d err=%v want=%d/refuse%v", got, err, item.count, item.refuse)
+		if (err != nil) != (item.class != "") || got != item.count {
+			t.Fatalf("native fields count=%d err=%v want=%d/class=%s", got, err, item.count, item.class)
+		}
+		if err != nil && (strings.Contains(err.Error(), "616263") || !strings.Contains(err.Error(), "row 1 ("+item.class+")")) {
+			t.Fatal("field failure lost its closed row evidence or rendered payload")
 		}
 	}
 }
