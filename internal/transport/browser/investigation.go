@@ -130,6 +130,25 @@ func noOutcomeStage(err error) string {
 	return "other"
 }
 
+// Only original context state and the retained metadata cutoff are observed.
+func metadataReturnReason(ctx context.Context, deadline time.Time) string {
+	expired := !time.Now().Before(deadline)
+	state := "live"
+	switch ctx.Err() {
+	case context.Canceled:
+		state = "canceled"
+	case context.DeadlineExceeded:
+		state = "deadline"
+	}
+	if state == "live" && !expired {
+		return ""
+	}
+	if expired {
+		return state + "/metadata-expired"
+	}
+	return state + "/metadata-live"
+}
+
 // failure is sessionFailure, reporting the stage when it answers 503.
 func (h *InvestigationHandler) failure(w http.ResponseWriter, stage string, err error) {
 	if h.Report != nil && !errors.Is(err, identity.ErrSessionBusy) && !errors.Is(err, identity.ErrDenied) && !errors.Is(err, identity.ErrInvalid) && !errors.Is(err, identity.ErrSessionCapacity) {
@@ -193,6 +212,18 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	r = r.WithContext(ctx)
 	controller := http.NewResponseController(w)
 	deadline, _ := ctx.Deadline()
+	metadata := name == "list_diagnostics" || name == "list_capture_history" || name == "get_capture_settings"
+	written := false
+	// Runs after reply/body/accounting cleanup, before our own outer cancel.
+	defer func() {
+		if !metadata || !written || h.Report == nil {
+			return
+		}
+		reason := metadataReturnReason(ctx, deadline)
+		if reason != "" {
+			h.Report("response-return/" + reason + "/" + name)
+		}
+	}()
 	if controller.SetReadDeadline(deadline) != nil || controller.SetWriteDeadline(deadline) != nil {
 		h.unavailable(w, "deadline-setup")
 		return
@@ -323,7 +354,13 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 			h.unavailable(w, "response-write")
 		} else if h.Report != nil {
 			// Output already started: report without appending another response.
-			h.Report("response-write-started")
+			stage := "response-write-started"
+			if metadata {
+				stage += "/" + name
+			}
+			h.Report(stage)
 		}
+	} else {
+		written = true
 	}
 }
