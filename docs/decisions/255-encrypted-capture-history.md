@@ -795,3 +795,41 @@ Affected vet, integration compilation, specification and design/import
 architecture gates pass. The injected non-Begin cases qualify closed diagnostic
 mapping at the strict handler boundary, not production SQL/provider outcomes.
 No unchanged external matrix or hosted run was repeated.
+
+### Browser response completion diagnostics (2026-10-29)
+
+Installed history run 40842283977 on `c328a5af` accepted the initial approved
+capture, verified its native artifact, and retained four acknowledged history
+copies. React's diagnostics operation returned HTTP 200/ok, then its history
+list returned HTTP 200 with a driver classification of `invalid`. That driver
+classification combines failure to retrieve/parse JSON with an absent or
+unrecognized envelope status. It is not a canonical backend error code. Neither
+an exhausted authority interval nor a Playwright body-retrieval failure is
+established by that artifact.
+
+The Go response writer already refuses failed writes/flushes and does not append
+another response once output starts. The browser handler now also reports the
+fixed `response-write-started` stage through its existing diagnostic callback on
+that failure path. The label asserts only that output started: an HTTP/2 stream
+can fail after some **or all** canonical JSON bytes were sent. The pre-output
+`response-write`/503 path is unchanged. No provider error text or response body
+enters this diagnostic, and the original write/authority deadlines still apply.
+
+The actual audited TLS/HTTP2 metadata regression flushes a synthetic prefix and
+then reaches the original one-second reply deadline. It reproduces an HTTP 200
+whose body read fails, with Begin/Finish acknowledged once, and the formerly
+missing callback. Depending on transport buffering, retained local witnesses
+received either 282 of 565 bytes or all 565 valid JSON bytes followed by a stream
+error. The exact-body positive control verifies write/flush/deferred clearing
+and emits no failure report. These are synthetic transport faults on an ordinary
+metadata operation, not a SQL history qualification or attribution of the
+installed failure. Normal history output is validated within 24 KiB, below the
+console's 32 KiB list-response cap; this evidence does not justify raising either
+limit or retrying the operation.
+
+Successful operations add only the error branch check. A failed operation may
+invoke the existing optional callback/log at most once after output starts.
+There are zero added backend/API/SQL requests, timers, watches, credentials,
+permissions, operation state, retries or authority changes. Logging I/O may
+increase on this previously silent failure path. Native history/settings/edit/
+repeat qualification remains pending.

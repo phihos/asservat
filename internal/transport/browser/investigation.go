@@ -32,7 +32,8 @@ type InvestigationHandler struct {
 	mu         sync.Mutex
 	active     map[identity.Principal]int
 	stopActive map[identity.Principal]int
-	// Report receives a fixed stage label for every 503 (diagnostics only).
+	// Report receives fixed failure stages, including errors after response output
+	// started. It never supplies public response content (diagnostics only).
 	Report func(string)
 }
 
@@ -317,7 +318,12 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	writeCtx, finishWrite := out.ResponseContext(ctx)
 	defer finishWrite()
-	if sent, err := presentation.WriteBrowserOperationResponse(writeCtx, w, http.StatusOK, name, out, deadline); err != nil && !sent {
-		h.unavailable(w, "response-write")
+	if sent, err := presentation.WriteBrowserOperationResponse(writeCtx, w, http.StatusOK, name, out, deadline); err != nil {
+		if !sent {
+			h.unavailable(w, "response-write")
+		} else if h.Report != nil {
+			// Output already started: report without appending another response.
+			h.Report("response-write-started")
+		}
 	}
 }
