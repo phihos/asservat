@@ -1,10 +1,9 @@
 # Sustained implementation progress
 
-
 ## Protected ongoing resource projection: SQL component qualified (2026-10-29)
 
 [ADR-262](decisions/262-protected-ongoing-resource-projection.md) records the
-protected resource producer and migration104 on frozen `e261801d`. One owned
+protected resource producer and migration 104 on frozen `e261801d`. One owned
 existing PostgreSQL/S3/OpenBao fixture passed both selected top-level tests and
 all 17 required children (20 actual PASS names). Outer/Go/test exits were 0;
 outer 63.371s, Go command 53.815s including compilation, package 13.452s. Root
@@ -29,6 +28,25 @@ Actual archive: build cache
 `codex-bf86-resume/packet-source-resource-producer/owned-fleet-1`.
 Environment SHA256 `a4f11c974c3efeebe9b82863a400f6952d2c98cacdd72714186a8b23fa1313ae`;
 Go log SHA256 `305481d1732745f8170366786509b77fe918fb99ba181390bb0c3ec49d33232a`.
+
+## Ordinary source lease contract selected; runtime pending (2026-10-29)
+
+[ADR-263](decisions/263-ordinary-ongoing-source-leases.md) selects a fixed
+30-second active leaf for a new private ordinary source-purpose commitment,
+issued under original current five-second facts and all earlier hard ends.
+It reuses the existing 15-second policy loop. Same-source quiet renewals retain
+positive cumulative prepaid credit without another debit; increases prepay
+only their positive delta. Source identity, counters, ring and rate tokens do
+not reset. This is an engineering choice, not a maintainer-required interval.
+Existing PolicyArm results, finite ADR-261/manual/browser/download permits and
+per-segment content retention retain their separate contracts.
+
+The bounded source-state transaction, authenticated control and owned timer/quiet
+stop are not implemented. The next implementation must reuse original accepted
+policy funding across metadata-only generations, prevent overlapping live
+policy/action/Pod incarnations, preserve uncertain spend and bound terminal row
+retirement. All-replica arming, snapshots/Save and installed resource/lifecycle
+qualification remain required; these documents enable no collection.
 
 ## Residency witness clock repair; production unchanged (2026-10-29)
 

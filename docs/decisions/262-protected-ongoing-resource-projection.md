@@ -25,7 +25,7 @@ individual quantities. Existing ring/frozen lowering values are retained in
 raw object. Node user-space CPU remains request 20m/limit 500m; no per-source CPU
 estimate or bound on kernel TC execution is claimed.
 
-Migration104 validates a closed, bounded optional sibling and permits exactly one
+Migration 104 validates a closed, bounded optional sibling and permits exactly one
 same-generation projection enrichment: old decoded policy has only Resource,
 Scope, Pool and the original eight-field Budget; new value minus SourceResources
 is identical, under the same original UID/Kind/Name/generation/full Spec/deleting
@@ -59,7 +59,7 @@ This slice implements no source ledger, resource reservation, arming, lease,
 renewal, source service or Save. A future producer must reserve count/rate/burst
 slices across the actual authorized replica set before attach; sums must fit
 shared workload/node caps. Source authority and original hard ends remain separate.
-No30s active-leaf contract is selected here (the separate proposal is ADR-263).
+[ADR-263](263-ordinary-ongoing-source-leases.md) defines the separate ordinary active-leaf contract; its runtime remains unimplemented.
 
 ## Cost and proportionality
 
@@ -72,7 +72,7 @@ No30s active-leaf contract is selected here (the separate proposal is ADR-263).
 7. Three resource quantities, not machinery-tuning configuration.
 8. Existing strict Kubernetes/Helm/SQL/node interfaces only.
 9. Three 64-bit node scalars; optional 80-byte policy pair plus pointer/encoding;
-   <=64 policy values/pool,5 KiB of values before overhead. Zero added backend
+   <=64 policy values/pool, 5 KiB of values before overhead. Zero added backend
    roundtrips. The rare same-generation enrichment lazily revalidates the bounded complete
    snapshot once per monotonic invocation (<=64 policies and 16 pools), never
    once per changed policy. Unchanged observations do not pay this added check.
@@ -107,7 +107,7 @@ or transparent downgrade qualification.
 The synthetic maximum 64-policy validator/monotonic query took 97.006953ms on this
 host/fixture. It is bounded metadata timing, not full 64-policy admission, packet
 throughput, safe source count, CPU/kernel or development-reference qualification.
-All3,377 runner source hashes and 36,014 tracked hashes matched; cleanup was empty,
+All 3,377 runner source hashes and 36,014 tracked hashes matched; cleanup was empty,
 with exact three owned container names/IDs, network and scratch absent. Root
 independently verified the terminal evidence. The retained environment SHA256 is
 `a4f11c974c3efeebe9b82863a400f6952d2c98cacdd72714186a8b23fa1313ae`;

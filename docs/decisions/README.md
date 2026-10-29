@@ -5,6 +5,10 @@ selects a distinct thirty-second source-purpose commitment under fresh issuance
 facts, cumulative credit and original hard ends. Contract only; runtime and
 installed qualification remain pending.
 
+[ADR-262 — Protected ongoing resource projection](262-protected-ongoing-resource-projection.md)
+
+Carry optional source limits alongside accepted policy observations while preserving storage identities. The bounded SQL upgrade is qualified; ongoing runtime and native resource profiles remain pending.
+
 [ADR-261 — Finite policy observation admission](261-finite-policy-observation-admission.md)
 records the engineering finite-window contract, original hard bounds, explicit
 revocation residual and held renewal machinery. Authority/prefix/native
