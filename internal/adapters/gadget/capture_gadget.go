@@ -21,7 +21,6 @@ import (
 	containercollection "github.com/inspektor-gadget/inspektor-gadget/pkg/container-collection"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/datasource"
 	gadgetcontext "github.com/inspektor-gadget/inspektor-gadget/pkg/gadget-context"
-	"github.com/inspektor-gadget/inspektor-gadget/pkg/gadgets"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/logger"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/operators"
 	_ "github.com/inspektor-gadget/inspektor-gadget/pkg/operators/ebpf"
@@ -31,6 +30,7 @@ import (
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/runtime/local"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sys/unix"
 	"oras.land/oras-go/v2/content/memory"
 )
 
@@ -194,6 +194,10 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 	if err != nil {
 		return stats, err
 	}
+	clock, err := newPacketClock(time.Now, readPacketMonotonic)
+	if err != nil {
+		return stats, ErrEngineUnavailable
+	}
 	var delivered sync.Mutex
 	log := &lossLogger{level: logger.WarnLevel, w: os.Stderr}
 	if notice != nil {
@@ -224,7 +228,7 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 				if payloadErr != nil {
 					return nil
 				}
-				deliver(Frame{Data: b, Wire: wire, At: time.Unix(0, int64(gadgets.WallTimeFromBootTime(ts))).UTC()})
+				clock.deliver(b, wire, ts, notice, deliver)
 				return nil
 			}, 10000)
 		}),
@@ -272,6 +276,13 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 	defer runtime.Close()
 	err = runtime.RunGadget(gadgetCtx, nil, map[string]string{"operator.oci.ebpf.snaplen": strconv.Itoa(snaplen)})
 	stats.LostSamples = log.lost.Load()
+	delivered.Lock()
+	invalidTime := clock.invalid
+	delivered.Unlock()
+	if invalidTime {
+		return stats, ErrEngineUnavailable
+	}
+
 	if attachErr != nil {
 		return stats, attachErr
 	}
@@ -279,4 +290,12 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 		return stats, fmt.Errorf("running the packet gadget: %w", err)
 	}
 	return stats, nil
+}
+
+func readPacketMonotonic() (int64, error) {
+	var t unix.Timespec
+	if err := unix.ClockGettime(unix.CLOCK_MONOTONIC, &t); err != nil {
+		return 0, err
+	}
+	return packetMonotonicNanos(int64(t.Sec), int64(t.Nsec))
 }

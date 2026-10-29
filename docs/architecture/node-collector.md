@@ -163,3 +163,23 @@ allocations for256. These are synthetic per-plan checks, not installed CPU or
 packet throughput measurements. There is no added per-frame code, SQL/API/provider
 call, watch, timer, goroutine, service, credential, privilege or runtime knob.
 No compiler/node call site is wired by this component; raw gates remain closed.
+
+## Packet timestamp clock domain
+
+The pinned tcpdump program emits `CLOCK_MONOTONIC` nanoseconds. Each capture
+pairs that clock once with wall reads before/after the sample, before engine
+attachment; valid nonzero records retain their original relative times through
+that immutable UTC mapping. The previous process-global Gadget converter used
+`CLOCK_BOOTTIME`, whose suspend accounting differs. The correction adds one
+MONOTONIC syscall and two wall reads per capture, with no per-packet clock reads,
+wire fields, new authority interval or clock revalidation mechanism.
+
+Sampling failure refuses before attachment. An unrepresentable nonzero packet
+time emits the existing unknown-input notice when present and sets one failure
+flag under the existing callback mutex. After the engine joins, both observed
+and nil-notice capture return `ErrEngineUnavailable`; invalid times are never
+clamped or replaced by arrival time. The existing zero-timestamp arrival fallback
+is deliberately preserved as legacy behavior, not original kernel-time evidence.
+The pair does not qualify wall-clock steps, uncertainty, suspend behavior or
+installed failure causation. Source health, original-window and ongoing-source
+qualification remain separate; this adds no event-time watermark guarantee.
