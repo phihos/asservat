@@ -29,10 +29,10 @@ const waitOperation = name => page.waitForResponse(operation(name)).catch(() => 
 const closedCodes = new Set(['NotAvailable', 'ParametersUnavailable', 'ProfileChanged', 'RequiresSelection', 'RecorderUnavailable', 'InvalidComposition', 'ProfileUnavailable', 'FilterRejected', 'ApprovalRequired', 'FilterCompilerUnavailable', 'UnsupportedRequest', 'SharingNotPermitted', 'TargetReplaced', 'ProcessingCoverageUnavailable', 'CapacityUnavailable']);
 async function readOperation(name, pending) {
   const response = await pending;
-  const { http, reply, status, body } = await readInstalledHistoryResponse(response);
+  const { http, reply, status, body, readFailure = 'none', requestFailed = false } = await readInstalledHistoryResponse(response);
   // Never stringify settings, bodies, identities, credentials or provider text.
   const code = status === 'ok' ? 'none' : status === 'error' && closedCodes.has(reply?.data?.code) ? reply.data.code : 'other';
-  const diagnostic = `installed history ${name} http=${http} status=${status} code=${code} body=${body}`;
+  const diagnostic = `installed history ${name} http=${http} status=${status} code=${code} body=${body} readFailure=${readFailure} requestFailed=${requestFailed}`;
   process.stderr.write(diagnostic + '\n');
   assert.equal(http, 200, diagnostic);
   assert.equal(status, 'ok', diagnostic);

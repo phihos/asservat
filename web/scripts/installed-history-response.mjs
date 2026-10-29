@@ -5,7 +5,17 @@ export async function readInstalledHistoryResponse(response) {
   const http = response.status();
   let bytes;
   try { bytes = await response.body(); }
-  catch { return { http, status: 'invalid', body: 'read-failed', reply: null }; }
+  catch (error) {
+    const requestFailed = response.request().failure() !== null;
+    const text = typeof error?.message === 'string' ? error.message : '';
+    const protocol = text.includes('Protocol error (Network.getResponseBody)');
+    const readFailure = requestFailed ? 'network-failed'
+      : protocol && text.includes('Request content was evicted from inspector cache') ? 'inspector-evicted'
+      : protocol && text.includes('No resource with given identifier found') ? 'inspector-no-resource'
+      : protocol && text.includes('No data found for resource with given identifier') ? 'inspector-no-data'
+      : 'other';
+    return { http, status: 'invalid', body: 'read-failed', reply: null, requestFailed, readFailure };
+  }
   if (bytes.length === 0) return { http, status: 'invalid', body: 'empty', reply: null };
   let text;
   try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
