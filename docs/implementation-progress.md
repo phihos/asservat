@@ -17,8 +17,16 @@ abort. Both armed response waiters retain immediate rejection handling and the
 browser still closes on failure. The imported helper is explicitly included in
 the existing canonical source inventory and its regression check. These changes
 repair missing attribution, not history availability; no functional frontend
-defect or installed cause has been established. Combined checks, fresh CI/review
-and any further installed attempt remain pending.
+defect or installed cause has been established.
+
+Final combined checks passed on clean `d70077b7`: canonical pre-push returned 0
+(30.222s, 231 console tests), the full browser race suite returned 0 (34.462s),
+all nine actual Chromium controls passed, and the explicit source-inventory
+regression and both driver/helper syntax checks passed. All 36,000 tracked
+hashes stayed unchanged, the temporary dependency link was removed and the tree
+was clean. Independent review of all nine candidate files found no blocker.
+The result update is docs-only. Fresh exact-head CI/review and any further
+installed attempt remain pending; no automatic retry is queued.
 
 ## Installed finite policy and renewed native transfer (2026-10-29)
 
