@@ -158,9 +158,9 @@ def packet(work, report):
         started = time.monotonic()
         test = subprocess.run(["go", "test", "-tags", "libpcap", "-count=1", "-v", "-timeout", "12m", "-run", "^TestNodeCollectorWithRealKubernetes$", "./test/integration"],
                               cwd=ROOT, env=dict(env, CGO_ENABLED="1", CGO_CFLAGS=f"-I{prefix}/include", CGO_LDFLAGS=f"-L{prefix}/lib", ASSERVAT_COLLECTOR_FIXTURES=str(work / "fixture.json")))
-        for name in ("filtered", "unfiltered", "encrypted"):
-            if (work / (name + ".pcapng")).exists():
-                shutil.copy(work / (name + ".pcapng"), ROOT / "test/results" / ("collector-packet-" + name + ".pcapng"))
+        for artifact_name in ("filtered", "unfiltered", "encrypted"):
+            if (work / (artifact_name + ".pcapng")).exists():
+                shutil.copy(work / (artifact_name + ".pcapng"), ROOT / "test/results" / ("collector-packet-" + artifact_name + ".pcapng"))
         report["testSeconds"] = round(time.monotonic() - started, 1)
         if (work / "native-results.json").exists():
             report["native"] = json.loads((work / "native-results.json").read_text())
