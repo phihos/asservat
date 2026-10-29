@@ -4,7 +4,7 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
-import { readInstalledHistoryResponse } from './installed-history-response.mjs';
+import { installHistoryReadTap, readHistoryAppResponse } from './installed-history-read-tap.mjs';
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
 const first = await lines.next();
@@ -16,6 +16,7 @@ assert.equal(new URL(config.proxy).hostname, '127.0.0.1');
 assert.match(config.sourceCaptureID, /^[0-9a-f-]{36}$/);
 const browser = await chromium.launch({ headless: true, proxy: { server: config.proxy, bypass: '<-loopback>' }, ...(process.env.ASSERVAT_CHROMIUM ? { executablePath: process.env.ASSERVAT_CHROMIUM } : {}) });
 const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } });
+await context.addInitScript(installHistoryReadTap);
 await context.addCookies(config.cookies);
 config.cookies = [];
 const page = await context.newPage();
@@ -29,10 +30,10 @@ const waitOperation = name => page.waitForResponse(operation(name)).catch(() => 
 const closedCodes = new Set(['NotAvailable', 'ParametersUnavailable', 'ProfileChanged', 'RequiresSelection', 'RecorderUnavailable', 'InvalidComposition', 'ProfileUnavailable', 'FilterRejected', 'ApprovalRequired', 'FilterCompilerUnavailable', 'UnsupportedRequest', 'SharingNotPermitted', 'TargetReplaced', 'ProcessingCoverageUnavailable', 'CapacityUnavailable']);
 async function readOperation(name, pending) {
   const response = await pending;
-  const { http, reply, status, body, readFailure = 'none', requestFailed = false, networkFailure = 'none' } = await readInstalledHistoryResponse(response);
+  const { http, reply, status, body } = await readHistoryAppResponse(page, name, response);
   // Never stringify settings, bodies, identities, credentials or provider text.
   const code = status === 'ok' ? 'none' : status === 'error' && closedCodes.has(reply?.data?.code) ? reply.data.code : 'other';
-  const diagnostic = `installed history ${name} http=${http} status=${status} code=${code} body=${body} readFailure=${readFailure} requestFailed=${requestFailed} networkFailure=${networkFailure}`;
+  const diagnostic = `installed history ${name} http=${http} status=${status} code=${code} appBody=${body}`;
   process.stderr.write(diagnostic + '\n');
   assert.equal(http, 200, diagnostic);
   assert.equal(status, 'ok', diagnostic);
@@ -93,6 +94,7 @@ try {
   assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
   process.stdout.write(JSON.stringify({ Kind: 'captured', GrantID: grantID, PreviewID: preview.data.preview_id, Digest: preview.data.execution_digest, CaptureID: captureID, SettingsDigest: settings.data.settings_digest, SourceExpiresAt: settings.data.expires_at }) + '\n');
 } finally {
+  await page.evaluate(() => window.__asservatHistoryReadTap?.clear()).catch(() => {});
   await context.close();
   await browser.close();
   process.stdin.destroy();
