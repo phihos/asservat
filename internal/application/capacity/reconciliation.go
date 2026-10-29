@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -361,14 +362,23 @@ func (s *CapacityReconciler) reconcileCandidate(call context.Context, current *c
 }
 
 // runDemands is the ADR-200 demand lane. Each step reads the active demands
-// and reconciles one of them, round robin, with no pace: a regional refresh
-// takes about one exchange, and the binding stays fresh for five seconds
-// from its observation. Discovery keeps enrolling new workloads beside it.
+// and reconciles one of them, round robin, with the existing 250ms step pause.
+// A binding's stored projection lasts 30 seconds from its original observation;
+// proof and receipt intervals remain shorter. Discovery continues beside it.
 func (s *CapacityReconciler) runDemands(root context.Context, current *capacityCurrentSource) {
 	turn := 0
 	capacitySerialLoop(root, 250*time.Millisecond, func(call context.Context) {
+		readStarted := s.Work.Now()
 		demands, err := s.Demands.ReadCapacityRefreshDemands(call)
 		if err != nil || call.Err() != nil {
+			if s.DemandReport != nil {
+				stage := "read"
+				if errors.Is(err, context.DeadlineExceeded) || call.Err() == context.DeadlineExceeded {
+					stage = "read-deadline"
+				}
+				// Only a closed category crosses this diagnostic boundary.
+				s.DemandReport(cfg.ErrUnavailable, s.Work.Now().Sub(readStarted), 0, stage)
+			}
 			// The previous set stays in force until its own NotAfter.
 			return
 		}
@@ -406,6 +416,9 @@ func (s *CapacityReconciler) runDemands(root context.Context, current *capacityC
 				s.DemandReport(err, s.Work.Now().Sub(started), left, strings.Join(stages, " "))
 			}
 			return
+		}
+		if s.DemandReport != nil {
+			s.DemandReport(cfg.ErrUnavailable, s.Work.Now().Sub(readStarted), 0, "cluster-unmatched")
 		}
 	})
 }

@@ -339,3 +339,66 @@ The final documentation follow-up leaves tested code byte-identical. Guard,
 source, workload and history inputs remain synthetic; this is actual SQL/role,
 adapter, enrollment and migration evidence, without collector execution,
 installed Native cause attribution, physical backing or measured CPU/WAL claims.
+
+
+## Closed demand-lane boundary diagnostics (2026-10-29)
+
+Native 40794688705 on frozen `fc0a4491` failed before capture/history: the exact
+selected binding had a complete 30-second interval but was expired by
+115.911311s, while its persisted current demand was 4.008091s old. No matching
+fresh publication reached the final authoritative read. All 3,400 source hashes
+matched, Go/test exited 1 (594.875s; approved child 126.05s), and cleanup reported
+no failures. The retained worker dump contained no demand-refresh outcome line.
+That does not establish a joined-slot, permission, locator or pool-contention
+cause. The repeated permission denial is the deliberate fixture reader probe.
+
+The pre-candidate boundary previously returned silently on demand-reader error
+or original-step expiry and when a selected demand matched no configured cluster.
+A local test reproduces those missing reports, with an empty-success control
+remaining quiet (RED exit 1, 0.404s). The existing callback now receives only
+`read`, `read-deadline` or `cluster-unmatched`, generic unavailable and elapsed
+wall time with zero read-left; no provider error text, namespace/workload/cluster
+identity or source body is passed. A blocked read retains its original context
+cutoff. Known clusters still reconcile; unknown clusters cause no observation.
+This is diagnostic correction, not an availability fix or new retry policy.
+
+No provider/API/SQL request, SQL grant, connection, timer, watch, service,
+persistent state or public setting is added. New Report invocations can add logging I/O. The reader returns
+at most sixteen demands, but each iteration selects exactly one round-robin
+candidate, scans for its cluster and then returns after at most one callback.
+It does not report once per demand in the batch or once per configured cluster.
+Read failure returns immediately after its single report; empty success stays
+quiet. The existing serial loop pauses 250ms after each completed iteration.
+Consequently, with iteration duration L, the long-run rate is at most
+`1 / (L + 0.25s)`: four reports/second/root for immediate errors or unmatched
+clusters, or about 0.19/second for a full five-second read expiry. Over a finite
+T-second interval, the ceiling is `floor(T / 0.25s) + 1`, including an initial
+report. Batch size sixteen does not multiply these limits. Before-read clock
+sampling has the same four/second long-run ceiling. Normal reconciliation,
+priority publication, original authority intervals and SQL checks are unchanged.
+Degraded reader/cluster states can thus produce additional log lines compared
+with the formerly silent path, bounded by this existing single-lane cadence.
+No sampler, counter or new reporting state is introduced.
+
+The installed pool is intentionally `MaxConns=1`. Source tracing rules out
+self-nesting inside the demand reader: its generated SQL call is one
+`pool.QueryRow(...).Scan`; pinned pgx v5.11.0 `pgxpool.poolRow.Scan` releases that
+connection before the adapter decodes/filters the result. The pool's only
+BeforeConnect hook rereads a mounted credential, not SQL; no current-config,
+recovery or owner callback borrows the pool inside this reader. Inspected
+capacity source/root/enrollment transactions use their transaction-bound queries
+and local decoding/MAC checks. Other concurrent facets still share the single
+pool and can wait; a later idle SQL snapshot cannot establish or exclude earlier
+contention. No real-SQL production-composition or Native self-blocking experiment
+is claimed. SQL row selection, decoding keys, role/connection limit, cluster
+wiring, original ownership and bounded batch order showed no functional mismatch
+in this source review. Functional cold-readiness causation remains unresolved.
+
+
+Local GREEN passes the focused boundary/known-cluster controls (race exit 0,
+3.612s), then full capacity races (9.444s) and bootstrap races (62.517s).
+Integration compilation (0.013s), affected vet, specification and design/import
+architecture gates pass. Error/deadline/cluster conditions are intentionally
+supplied test controls, not reconstructed Native facts. No SQL/Kubernetes
+fixture, hosted run or collector was started for this diagnostic checkpoint;
+functional evidence is still required before another installed attempt.
