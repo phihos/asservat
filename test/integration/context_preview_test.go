@@ -332,6 +332,37 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if !facts.TargetBasisWithinLimit || !facts.PermissionStream || !facts.InitialACK || !facts.EpochACK || !facts.TargetBasis || !facts.TargetSequence || !facts.TargetLifetime || !facts.TargetMaintainer || !facts.TargetActivationACK {
 			t.Fatal("accepted namespace-wide permission diagnostic", facts)
 		}
+		var originalLease time.Time
+		if err := admin.QueryRow(ctx, "SELECT lease_until FROM permission_stream WHERE id=$1", p.RootID).Scan(&originalLease); err != nil {
+			t.Fatal(err)
+		}
+		for _, observationSeconds := range []int{5, 30} {
+			observed := time.Now().UTC().Truncate(time.Microsecond)
+			freshUntil := observed.Add(time.Duration(observationSeconds) * time.Second)
+			if _, err := admin.Exec(ctx, "UPDATE permission_stream SET observed_at=$2,fresh_until=$3 WHERE id=$1", p.RootID, observed, freshUntil); err != nil {
+				t.Fatal("stored observation interval witness", err)
+			}
+			for _, suspended := range []bool{false, true} {
+				if _, err := admin.Exec(ctx, "UPDATE permission_stream SET suspended=$2 WHERE id=$1", p.RootID, suspended); err != nil {
+					t.Fatal(err)
+				}
+				f, err := readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+				if err != nil || f.PermissionCurrent == suspended || !f.InitialACK || !f.EpochACK {
+					t.Fatal("stored observation lifetime/suspension diagnostic", observationSeconds, f, err)
+				}
+			}
+			if _, err := admin.Exec(ctx, "UPDATE permission_stream SET suspended=false,lease_until=clock_timestamp()-interval '1 second' WHERE id=$1", p.RootID); err != nil {
+				t.Fatal(err)
+			}
+			f, err := readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+			if err != nil || f.PermissionCurrent || !f.InitialACK || !f.EpochACK {
+				t.Fatal("expired original lease diagnostic", f, err)
+			}
+			var storedObserved, storedFresh time.Time
+			if err := admin.QueryRow(ctx, "UPDATE permission_stream SET lease_until=$2 WHERE id=$1 RETURNING observed_at,fresh_until", p.RootID, originalLease).Scan(&storedObserved, &storedFresh); err != nil || !storedObserved.Equal(observed) || !storedFresh.Equal(freshUntil) {
+				t.Fatal("diagnostic changed original stored observation dates", err)
+			}
+		}
 		for _, witness := range []struct {
 			name, statement                       string
 			basis, sequence, lifetime, maintainer bool

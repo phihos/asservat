@@ -29,7 +29,7 @@ SELECT p.root_id IS NOT NULL,b.root_id IS NOT NULL,w.id IS NOT NULL,w.ready_at I
  d.root_id IS NOT NULL,coalesce(n.at<d.not_after,false),
  b.observed_at,b.fresh_until,n.at,d.requested_at,d.not_after,
  ps.id IS NOT NULL,coalesce(NOT ps.suspended AND ps.observed_at<=n.at AND
- ps.fresh_until<=ps.observed_at+interval '5 seconds' AND n.at<ps.fresh_until AND n.at<ps.lease_until,false),
+ ps.fresh_until<=ps.observed_at+interval '30 seconds' AND n.at<ps.fresh_until AND n.at<ps.lease_until,false),
  ia.acknowledged_at IS NOT NULL,ea.acknowledged_at IS NOT NULL,
  coalesce(q.within_limit,false),coalesce(q.basis,false),coalesce(q.current_sequence,false),coalesce(q.live_lifetime,false),
  coalesce(q.maintainer,false),coalesce(q.activation_ack,false)
@@ -72,7 +72,9 @@ SELECT p.root_id IS NOT NULL,b.root_id IS NOT NULL,w.id IS NOT NULL,w.ready_at I
 
 // Target flags are successive stored-basis predicates, using the production
 // namespace-wide (empty workload list) semantics and bounded basis scan. They
-// deliberately do not claim the complete ReadCapacityPermissions contract.
+// deliberately cover ordinary Allow bases only, not migration 00096 review
+// sources or the complete ReadCapacityPermissions contract. The stored stream
+// bound is 30 seconds (00074); a derived operation proof remains separate.
 type installedInitialStorageFacts struct {
 	PermissionStream, PermissionCurrent, InitialACK, EpochACK                            bool
 	TargetBasisWithinLimit                                                               bool
@@ -112,7 +114,7 @@ func installedInitialStorageDiagnostics(t *testing.T, ctx context.Context, pool 
 		f.Preview, f.Binding, f.Enrolled, f.Ready, f.SelectedAllocation, f.EnrolledAllocation,
 		f.ShortInterval, f.ThirtySecondInterval, f.ReadyPublication, f.DemandRecorded, f.DemandCurrent,
 		date(f.ObservedAt), date(f.FreshUntil), date(f.Now), date(f.DemandRequested), date(f.DemandNotAfter))
-	t.Logf("installed stored/current permission state: stream=%t current=%t initialACK=%t epochACK=%t targetBasisWithinLimit=%t targetBasis=%t targetSequence=%t targetLifetime=%t targetMaintainer=%t targetActivationACK=%t",
+	t.Logf("installed stored/current permission state: stream=%t current=%t initialACK=%t epochACK=%t targetAllowBasisWithinLimit=%t targetAllowBasis=%t targetSequence=%t targetLifetime=%t targetMaintainer=%t targetActivationACK=%t",
 		f.PermissionStream, f.PermissionCurrent, f.InitialACK, f.EpochACK,
 		f.TargetBasisWithinLimit, f.TargetBasis, f.TargetSequence, f.TargetLifetime, f.TargetMaintainer, f.TargetActivationACK)
 }
