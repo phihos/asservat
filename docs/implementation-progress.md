@@ -1,5 +1,39 @@
 # Sustained implementation progress
 
+## Installed history body failure and bounded diagnostics (2026-10-29)
+
+Exact `47d08aab` passed all fifteen CI jobs and fresh review, then failed its
+single [installed history run 40913094447](https://github.com/phihos/asservat/actions/runs/40913094447).
+Initial capture succeeded with four acknowledged storage copies. Browser
+`list_diagnostics` was HTTP 200/ok/complete; `list_capture_history` was HTTP
+200 with `network-failed`, `requestFailed=true` and an unreadable body. Its
+exact Chromium network error was not retained. Settings, edited preview and
+repeat were not reached. Aggregated server diagnostics have no per-request
+linkage. The caller correction therefore establishes neither the cause nor a
+repair of this separate transport failure.
+
+Go/test exited 1 (603.900s package, 152.29s focused child); the native job took
+905s. Root verified all 3,413 canonical and 36,006 tracked source hashes,
+provider-log exit 0, removed build scratch and empty cleanup failures before
+releasing the source freeze. The retained initial PCAPNG is 1,460 bytes with
+twelve enhanced packet blocks; it does not qualify history/repeat.
+
+The next diagnostic candidate adds exact closed Chromium network-error codes
+after body-read rejection and failure-only server return facts for diagnostics,
+history and settings. The server records both original context state and the
+effective metadata deadline after normal cleanup, before its own cancellation;
+it does not infer which caused the failure. Successful replies emit no new log.
+Only existing reporting runs on failure; no new remote calls, authority windows,
+timers, retries or writer behavior are added. Forced cleanup holds in actual
+TLS/HTTP2 controls are explicitly test-induced, not an installed-cause claim.
+Focused and full browser races and canonical pre-push passed on the isolated
+server candidate; real Chromium diagnostic controls and console checks passed
+on the isolated browser candidate. Composed full browser race (53.357s), real Chromium controls (0.381s) and
+canonical pre-push (29.764s, 231 console tests) also passed. Independent review
+found no blocker in defer ordering, closed logging or unchanged authority/writer
+behavior. Root verified both candidate reports, all 26 artifact references and
+each clean candidate's 36,006 tracked hashes. No new installed retry is queued.
+
 ## Residency witness clock repair; production unchanged (2026-10-29)
 
 Combined `90b474e8` passed local pre-push and fresh review, but
