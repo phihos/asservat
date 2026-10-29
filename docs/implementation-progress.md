@@ -44,9 +44,17 @@ requests, watches or background tasks, and changes no pool size, scheduling,
 freshness or authority deadline. Local regressions reproduce the missing reports;
 they do not establish why the installed readiness observation expired.
 
-Final combined checks, fresh exact-head review/CI and installed qualification of
-these corrections remain pending. Ongoing sources, rings and Save existing
-recordings remain unfinished; these corrections do not complete S-04.
+Final combined checks passed on clean `4bdead35`: canonical `make pre-push`
+returned 0 (30.790s, including 231 console tests), maintained `make pcap-check`
+returned 0 (24.750s), and the native/capacity/bootstrap race command returned 0
+(101.701s). All five selected policy-fixture test families passed without skips
+(27.057s command). The separate tagged comparison against freshly compiled
+libpcap ACK instructions passed without a skip (20.093s command). All 35,997
+tracked file hashes remained unchanged and the temporary dependency link was
+removed; the tree was clean. The result update is documentation only.
+Fresh exact-head review/CI and installed qualification remain pending. Ongoing
+sources, rings and Save existing recordings remain unfinished; these corrections
+do not complete S-04.
 
 ## Corrections after the c253 installed failures (2026-10-29)
 
