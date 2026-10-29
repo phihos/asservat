@@ -31,8 +31,8 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 	return compilePolicy(spec, recipeName, recipeDigest, nil, false)
 }
 
-// CompilePolicyWithRecorders accepts only the finite onTrigger recording path;
-// ongoing sources remain unavailable until their separate arming implementation.
+// CompilePolicyWithRecorders compiles finite recorders and ordinary ongoing
+// source intent. Compilation grants no source or incident authority.
 func CompilePolicyWithRecorders(spec []byte, recipeName string, recipeDigest artifact.Digest, compileRecorder PolicyRecorderCompiler) (value.RestartPolicy, error) {
 	return compilePolicy(spec, recipeName, recipeDigest, compileRecorder, true)
 }

@@ -255,7 +255,7 @@ func (s *frameStream) Send(ctx context.Context, f contracts.APIContextFrame) err
 // pre-work query transition. Generic Send never changes completed deadlines.
 func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (time.Time, error) {
 	// ADR-178: the work check needs the region's fresh source first.
-	if s != nil && (f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame) {
+	if s != nil && (f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame || f.Kind == contracts.SourceWorkFrame) {
 		if e := s.pullSource(ctx); e != nil {
 			return time.Time{}, fleet.ErrUnavailable
 		}
@@ -267,7 +267,7 @@ func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (ti
 		}
 	}
 	mode := peerFrame
-	if f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame {
+	if f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame || f.Kind == contracts.SourceWorkFrame {
 		s.mu.Lock()
 		s.historyWork = f.Kind == contracts.HistoryWorkFrame
 		s.mu.Unlock()
@@ -505,7 +505,7 @@ func (s *frameStream) AwaitWork(ctx context.Context) (contracts.APIContextFrame,
 		}
 	}
 	reason := streamNoReason
-	if f.Kind != contracts.APIContextWorkFrame && f.Kind != contracts.HistoryWorkFrame {
+	if f.Kind != contracts.APIContextWorkFrame && f.Kind != contracts.HistoryWorkFrame && f.Kind != contracts.SourceWorkFrame {
 		reason = streamProtocol
 	} else if err := call.Err(); err != nil {
 		reason = streamErrorReason(err)

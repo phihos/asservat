@@ -158,7 +158,9 @@ func RunNode(ctx context.Context, podUID string) error {
 		budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr}
 	p.packets = &nodePackets{engine: gadget.CapturePackets, observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
+	p.sources = &nodeSources{engine: gadget.CaptureObservedPackets, identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
 	err = p.Run(ctx)
+	p.sources.Close()
 	p.packets.wg.Wait()
 	return err
 }
@@ -217,6 +219,7 @@ type nodeProcess struct {
 	log        io.Writer
 	// packets runs packet captures (ADR-248); nil refuses every item.
 	packets *nodePackets
+	sources *nodeSources
 	// root is the process context: captures outlive a re-enrollment.
 	root context.Context
 
@@ -295,6 +298,11 @@ func (p *nodeProcess) enroll(ctx context.Context) (time.Time, error) {
 }
 
 func (p *nodeProcess) report() collector.Report {
+	var sources []collector.SourceStatus
+	var sourceAsOf time.Time
+	if p.sources != nil {
+		sources, sourceAsOf = p.sources.Status()
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.sequence++
@@ -303,7 +311,10 @@ func (p *nodeProcess) report() collector.Report {
 		n = collector.MaxReceipts
 	}
 	now := p.now()
-	return collector.Report{Sequence: p.sequence, ObservedAt: now.UTC(), Facts: p.facts, Mechanisms: p.mechanisms, Budget: p.budget.Usage(now), Receipts: append([]collector.Receipt{}, p.receipts[:n]...)}
+	if !sourceAsOf.IsZero() {
+		now = sourceAsOf
+	}
+	return collector.Report{Sequence: p.sequence, ObservedAt: now.UTC(), Facts: p.facts, Mechanisms: p.mechanisms, Budget: p.budget.Usage(now), Receipts: append([]collector.Receipt{}, p.receipts[:n]...), Sources: sources}
 }
 
 // statusLoop sends the first report at once and then one every
@@ -407,6 +418,13 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 					root = ctx
 				}
 				r = p.packets.start(root, p.epoch, w)
+			}
+			if (w.Kind == collector.WorkPacketSource || w.Kind == collector.WorkStopPacketSource) && p.sources != nil {
+				root := p.root
+				if root == nil {
+					root = ctx
+				}
+				r = p.sources.decide(root, p.epoch, w)
 			}
 			p.mu.Lock()
 			p.receipts = append(p.receipts, r)

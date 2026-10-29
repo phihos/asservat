@@ -40,6 +40,8 @@ const occurrenceSettleAge = 2 * time.Minute
 // The executor is the policy principal; every check a human capture passes
 // still runs, with team authority replacing the human's personal rights.
 type PolicyTrigger struct {
+	// OngoingSources uses this same poll; nil keeps source execution unavailable.
+	OngoingSources         *PolicySourceRuntime
 	RootID, InstallationID string
 	RecipeName             string
 	RecipeDigest           artifact.Digest
@@ -142,6 +144,11 @@ func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) {
 	if err := t.Audit.PublishPolicyAcceptances(ctx); err != nil {
 		t.report("audit/" + failureClass(err))
 	}
+	if t.OngoingSources != nil {
+		if err := t.OngoingSources.Sweep(ctx); err != nil {
+			t.report("source-sweep/" + failureClass(err))
+		}
+	}
 	policies, err := t.Ledger.ActivePolicies(ctx)
 	if err != nil {
 		t.report("list/" + failureClass(err))
@@ -151,7 +158,7 @@ func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) {
 		if ctx.Err() != nil {
 			return
 		}
-		if r != nil && r.running(p.PolicyUID) {
+		if r != nil && r.running(p.PolicyUID) && t.OngoingSources == nil {
 			t.report("tick/busy")
 			continue
 		}
@@ -179,6 +186,9 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 		return err
 	}
 	if source.Suspended || source.Deleted {
+		if t.OngoingSources != nil {
+			return t.OngoingSources.StopPolicy(tick, p.PolicyUID)
+		}
 		return nil
 	}
 	var compiled value.RestartPolicy
@@ -189,6 +199,12 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	}
 	if err != nil {
 		return err
+	}
+	ongoing := compiled.Recorder != nil && compiled.Recorder.Action.ExecutionMode == "ongoing"
+	// Finite busy policies retain incident coalescing. Ongoing sources still
+	// renew before the busy/cooldown gate below.
+	if !ongoing && r != nil && r.running(p.PolicyUID) {
+		return nil
 	}
 	// A finite recorder proceeds through the real preview/admission and typed
 	// source/observation start. No ordinary/manual raw path is enabled here.
@@ -213,6 +229,17 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	if observation.Namespace.UID != a.NamespaceUID || observation.Workload.UID != a.WorkloadUID {
 		// A replaced namespace or workload is outside the accepted scope.
 		return value.ErrChanged
+	}
+	if ongoing {
+		if t.OngoingSources == nil {
+			return value.ErrRecorderUnavailable
+		}
+		if err := t.OngoingSources.Maintain(tick, compiled, a, observation); err != nil {
+			return err
+		}
+		// Source arming is not an incident. Until source-window Save is
+		// composed, do not spend an occurrence or substitute finite capture.
+		return value.ErrRecorderUnavailable
 	}
 	occurrences, err := t.Ledger.Tick(tick, value.PolicyTick{Policy: compiled, Authority: a, Observation: observation})
 	if err != nil {

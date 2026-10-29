@@ -51,6 +51,7 @@ type Ring struct {
 	arena                                                   []byte
 	write                                                   int
 	now, through, floor, cleanSince, stopped, evictedBefore time.Time
+	nextExpiry                                              time.Time
 	state                                                   RingState
 	evictedRetainedThrough                                  uint64
 }
@@ -109,6 +110,7 @@ func (r *Ring) closeLive() {
 	r.decoder = nil
 	r.state.LiveBytes = 0
 	r.state.Closed = true
+	r.nextExpiry = time.Time{}
 }
 func (r *Ring) advance(now time.Time) error {
 	if r.state.Closed {
@@ -124,15 +126,35 @@ func (r *Ring) advance(now time.Time) error {
 	r.now = now
 	cutoff := now.Add(-r.limits.MaxAge)
 	r.floor = later(r.floor, cutoff)
+	r.nextExpiry = time.Time{}
 	for i := 0; i < r.limits.MaxSegments; i++ {
 		s := r.segment(i)
 		if ringEndian.Uint32(s[4:]) > 0 && time.Unix(0, int64(ringEndian.Uint64(s[8:]))).Before(cutoff) {
 			r.evict(i)
 		}
+		if ringEndian.Uint32(s[4:]) > 0 {
+			r.includeExpiry(time.Unix(0, int64(ringEndian.Uint64(s[8:]))))
+		}
 	}
 	return nil
 }
 func (r *Ring) Advance(now time.Time) error { r.mu.Lock(); defer r.mu.Unlock(); return r.advance(now) }
+
+// NextExpiry lets the existing source owner use its one deadline timer for
+// quiet erasure as well as leaf expiry. It creates no timer or coverage proof.
+// advance's existing strict-before cutoff expires at the following nanosecond.
+func (r *Ring) NextExpiry() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.nextExpiry
+}
+
+func (r *Ring) includeExpiry(at time.Time) {
+	until := at.Add(r.limits.MaxAge).Add(time.Nanosecond)
+	if r.nextExpiry.IsZero() || until.Before(r.nextExpiry) {
+		r.nextExpiry = until
+	}
+}
 
 // ObservedThrough records owner-supplied continuous source operation through at,
 // under declared clock/cut/loss semantics, not every future callback's timestamp.
@@ -264,6 +286,7 @@ func (r *Ring) Add(frame []byte, wire uint32, at, observedAt time.Time) error {
 	}
 	r.state.Packets.Retained++
 	r.state.Packets.WireBytes += uint64(wire)
+	r.includeExpiry(at)
 	return nil
 }
 func (r *Ring) State() RingState { r.mu.Lock(); defer r.mu.Unlock(); return r.state }

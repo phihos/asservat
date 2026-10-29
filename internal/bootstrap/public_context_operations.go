@@ -185,6 +185,11 @@ func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOpera
 		return nil, nil, err
 	}
 	trigger := &captureapp.PolicyTrigger{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters), Ledger: pc.policyTriggers, Documents: pc.hubPolicies, Sources: pc.policies, Accepted: pc.policies, Observer: observer, Capture: v.submission, Audit: pc.policyAudit, Now: c.Now, Report: timedEventLog(os.Stderr, "policy trigger")}
+	if sourceObserver, ok := v.submission.Targets.(captureapp.OngoingRecorderObserver); ok && pc.policySources != nil && v.submission.Approvals != nil {
+		trigger.OngoingSources = &captureapp.PolicySourceRuntime{Ledger: pc.policySources, Dispatcher: pc.sourceDispatch, Observer: sourceObserver, Recovery: v.submission.Recovery, Retention: v.submission.Retention, Settings: v.submission.Approvals, Now: c.Now, NewID: c.NewID}
+	}
+	// The public compiler above intentionally remains finite-only until the
+	// source-window Save workflow and installed qualification are complete.
 	return operations, trigger, nil
 }
 

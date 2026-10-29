@@ -13,6 +13,16 @@ import (
 // validation and action normalization with manual captures. Its result is inert
 // configuration, with no manual preview, capture UID or invented target.
 func CompilePolicyRecorder(c value.ProfileComposition, filters FilterCompiler) (value.PolicyRecorderConfiguration, error) {
+	return compilePolicyRecorder(c, filters, false)
+}
+
+// CompileOngoingPolicyRecorder is the private source-purpose compiler. Runtime
+// composition must qualify the source/Save path before selecting it publicly.
+func CompileOngoingPolicyRecorder(c value.ProfileComposition, filters FilterCompiler) (value.PolicyRecorderConfiguration, error) {
+	return compilePolicyRecorder(c, filters, true)
+}
+
+func compilePolicyRecorder(c value.ProfileComposition, filters FilterCompiler, sources bool) (value.PolicyRecorderConfiguration, error) {
 	var out value.PolicyRecorderConfiguration
 	actions, profile, err := expand(c, filters)
 	if err != nil {
@@ -29,11 +39,17 @@ func CompilePolicyRecorder(c value.ProfileComposition, filters FilterCompiler) (
 	if summary.PacketProfile != "networkHeaders" {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "only network-header recording is available")
 	}
-	if summary.ExecutionMode != "onTrigger" || summary.Before != "0s" {
-		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "an explicit onTrigger recording with before 0s is required; ongoing policy source arming is not implemented yet")
+	if summary.ExecutionMode != "onTrigger" && summary.ExecutionMode != "ongoing" || summary.ExecutionMode == "onTrigger" && summary.Before != "0s" {
+		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "select an ongoing source or an explicit onTrigger recording with before 0s")
+	}
+	if summary.ExecutionMode == "ongoing" && !sources {
+		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "ongoing source and Save qualification is not enabled")
+	}
+	if summary.ExecutionMode == "ongoing" && len(actions[0].sensitive) > 0 {
+		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "ongoing sources support ordinary network-header predicates only")
 	}
 	after, ok := durationValue(summary.After, true)
-	if !ok || after < time.Second || after > 5*time.Minute {
+	if !ok || after > 5*time.Minute || after < time.Second && summary.ExecutionMode != "ongoing" {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "a policy incident records between one second and five minutes")
 	}
 	for n, e := range component.Edits {

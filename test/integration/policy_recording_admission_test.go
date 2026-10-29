@@ -33,6 +33,10 @@ import (
 // Explicit test-only reuse of the existing protected fixture's original roles
 // and intent publisher. Nil preserves the legacy component cases unchanged.
 type policyRecorderProtectedCase struct {
+	// SourceAccepted stops before any occurrence/capture: a real audited policy
+	// acceptance can qualify the separate ordinary source ledger in this fixture.
+	Ongoing             bool
+	SourceAccepted      func(*testing.T, policySourceAcceptedFixture)
 	Hub                 *pgxpool.Pool
 	Admissions          *postgres.ContextAdmissions
 	Filters             planning.FilterCompiler
@@ -41,6 +45,15 @@ type policyRecorderProtectedCase struct {
 	Intent              func(context.Context, string) error
 	Stored              func(policyObservationRetirementInput)
 	PermissionsAccepted func(cfg.PermissionBatch)
+}
+
+type policySourceAcceptedFixture struct {
+	Scenario  captureAdmissionScenario
+	Compiled  capture.RestartPolicy
+	Authority authorization.AcceptedPolicyAuthority
+	Source    capture.PolicySource
+	Sources   *postgres.Policies
+	Record    capture.AcceptedPolicy
 }
 
 // Real Tick -> immutable occurrence -> recording admission and shared/grant
@@ -72,6 +85,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if len(protected) > 0 {
 				filters = protected[0].Filters
 				compilePolicy = policyMetadataCompile(filters)
+				if protected[0].Ongoing {
+					compilePolicy = policySourceCompile(filters)
+				}
 			}
 			clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 			root, installation := s.a.RootID, s.recovery.installation
@@ -189,6 +205,14 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				component := authored["profileComposition"].(map[string]any)["components"].([]any)[0].(map[string]any)
 				for _, entry := range component["overrides"].([]any) {
 					edit := entry.(map[string]any)
+					if len(protected) > 0 && protected[0].Ongoing {
+						if edit["field"] == "actionExecutionMode" {
+							edit["value"] = "ongoing"
+						}
+						if edit["field"] == "packetBefore" {
+							edit["value"] = "10s"
+						}
+					}
 					if edit["field"] == "packetFilter" {
 						edit["value"] = policyRawExpression
 						if len(protected) > 0 {
@@ -236,6 +260,10 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			}
 			if err = (auditapp.PolicyAcceptancePublisher{Ledger: auditor, Objects: &objectstore.PolicyAcceptanceObjects{Store: store, Seal: keys, Open: keys}}).PublishPolicyAcceptances(ctx); err != nil {
 				t.Fatal(err)
+			}
+			if len(protected) > 0 && protected[0].SourceAccepted != nil {
+				protected[0].SourceAccepted(t, policySourceAcceptedFixture{Scenario: s, Compiled: compiled, Authority: authority, Source: source, Sources: sources, Record: record})
+				return
 			}
 			var grant string
 			if packetPolicy {
@@ -519,4 +547,18 @@ func policyRecorderSponsor(author identity.Identity, projection authorization.Pr
 func policyRecorderCloneBatch(b cfg.PermissionBatch) cfg.PermissionBatch {
 	b.Bases = slices.Clone(b.Bases)
 	return b
+}
+
+func policySourceCompile(filters planning.FilterCompiler) func(json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+	return func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+		var wire contracts.CaptureComposition
+		if err := json.Unmarshal(raw, &wire); err != nil {
+			return planvalue.PolicyRecorderConfiguration{}, err
+		}
+		c, err := conversion.CompositionFromWire(wire)
+		if err != nil || c == nil {
+			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
+		}
+		return planning.CompileOngoingPolicyRecorder(*c, filters)
+	}
 }

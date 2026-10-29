@@ -36,6 +36,9 @@ func WireStatus(epoch string, r collector.Report) contracts.NodeStatus {
 	for _, rc := range r.Receipts {
 		out.Receipts = append(out.Receipts, contracts.NodeReceipt{WorkID: rc.WorkID, Sequence: rc.Sequence, Outcome: string(rc.Outcome), Reason: string(rc.Reason)})
 	}
+	for _, s := range r.Sources {
+		out.Sources = append(out.Sources, contracts.NodeSourceStatus{SourceID: s.SourceID, Fence: s.Fence, IssuedAt: s.IssuedAt.UTC(), LeafUntil: s.LeafUntil.UTC(), Credit: s.Credit, ObservedBytes: s.ObservedBytes, Closed: s.Closed, Stopped: s.Stopped, InputUnknown: s.InputUnknown})
+	}
 	return out
 }
 
@@ -68,7 +71,7 @@ func support(s string) (collector.Support, bool) {
 // value must be one of the closed values; free text is short printable ASCII.
 func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 	var r collector.Report
-	if s.Format != contracts.NodeStatusFormat || s.Sequence == 0 || s.ObservedAt.IsZero() || len(s.Mechanisms) > 8 || len(s.Receipts) > collector.MaxReceipts {
+	if s.Format != contracts.NodeStatusFormat || s.Sequence == 0 || s.ObservedAt.IsZero() || len(s.Mechanisms) > 8 || len(s.Receipts) > collector.MaxReceipts || int64(len(s.Sources)) > collector.SourceStatusLimit {
 		return r, false
 	}
 	p := s.Probe
@@ -118,11 +121,28 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 		}
 		r.Receipts = append(r.Receipts, v)
 	}
+	seen := make(map[string]bool, len(s.Sources))
+	for _, s := range s.Sources {
+		state := collector.SourceStatus{SourceID: s.SourceID, Fence: s.Fence, IssuedAt: s.IssuedAt.UTC(), LeafUntil: s.LeafUntil.UTC(), Credit: s.Credit, ObservedBytes: s.ObservedBytes, Closed: s.Closed, Stopped: s.Stopped, InputUnknown: s.InputUnknown}
+		if !state.Valid(r.ObservedAt) || seen[state.SourceID] {
+			return collector.Report{}, false
+		}
+		seen[state.SourceID] = true
+		r.Sources = append(r.Sources, state)
+	}
 	return r, true
 }
 
 func WireWork(w collector.Work) contracts.NodeWork {
 	out := contracts.NodeWork{ID: w.ID, Sequence: w.Sequence, Kind: string(w.Kind), NotAfter: w.NotAfter.UTC()}
+	if w.Source != nil {
+		source := WirePacketSource(*w.Source)
+		out.PacketSource = &source
+	}
+	if w.StopSource != nil {
+		binding := WireSourceBinding(*w.StopSource)
+		out.StopPacketSource = &binding
+	}
 	if p := w.Packet; p != nil {
 		c := &contracts.NodePacketCapture{CaptureID: p.CaptureID, PodUID: p.PodUID, Program: make([]contracts.NodeBPFInstruction, len(p.Program)),
 			DurationMillis: p.Duration.Milliseconds(), MaxBytes: p.MaxBytes}
@@ -161,6 +181,21 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 		return collector.Work{}, false
 	}
 	out := collector.Work{ID: w.ID, Sequence: w.Sequence, Kind: collector.WorkKind(w.Kind), NotAfter: w.NotAfter.UTC().Truncate(time.Microsecond)}
+	if w.PacketSource != nil {
+		source, valid := DomainPacketSource(*w.PacketSource)
+		if !valid {
+			source = collector.PacketSource{}
+		}
+		out.Source = &source
+		out.NotAfter = w.NotAfter.UTC() // preserve the exact original dispatch bound
+	}
+	if w.StopPacketSource != nil {
+		binding, valid := DomainSourceBinding(*w.StopPacketSource)
+		if !valid {
+			binding = collector.SourceBinding{}
+		}
+		out.StopSource = &binding
+	}
 	if c := w.PacketCapture; c != nil {
 		// An unusable payload stays an invalid item, answered WorkUnknown.
 		if len(c.Program) > planning.MaxFilterInstructions || c.DurationMillis < 0 || c.DurationMillis > collector.MaxPacketCaptureDuration.Milliseconds() || !text(c.CaptureID, 36) || !text(c.PodUID, 36) {

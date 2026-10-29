@@ -351,6 +351,7 @@ type RegionalLocal struct {
 	// Recordings answers collects of held recordings (ADR-248); optional.
 	Recordings RegionalRecordings
 	History    *HistoryLocal
+	Sources    *SourceLocal
 	Now        func() time.Time
 }
 
@@ -609,13 +610,17 @@ func ServeRegionalOperations(ctx context.Context, stream Stream, receiver fleet.
 	}
 	stage = streamRegionalWork
 	f, current, err := stream.AwaitWork(ctx)
-	if err != nil || f.Kind != contracts.APIContextWorkFrame && f.Kind != contracts.HistoryWorkFrame {
+	if err != nil || f.Kind != contracts.APIContextWorkFrame && f.Kind != contracts.HistoryWorkFrame && f.Kind != contracts.SourceWorkFrame {
 		clear(f.Payload)
 		return contracts.ErrAPIContextProtocol
 	}
 	if current.Channel != receiver.Channel || !current.Valid(now()) {
 		clear(f.Payload)
 		return fleet.ErrDenied
+	}
+	if f.Kind == contracts.SourceWorkFrame {
+		defer clear(f.Payload)
+		return serveRegionalSource(ctx, stream, current, f.Payload, local.Sources, now)
 	}
 	if f.Kind == contracts.HistoryWorkFrame {
 		defer clear(f.Payload)

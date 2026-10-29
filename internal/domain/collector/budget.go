@@ -108,10 +108,56 @@ func (c Ceilings) Intersect(p PolicyLimits) Ceilings {
 // to the burst. A reservation that does not fit fails without partial effect.
 // Budget is not safe for concurrent use; its owner serializes access.
 type Budget struct {
-	ceilings     Ceilings
-	ring, frozen int64
-	tokens       int64
-	refilled     time.Time
+	ceilings                       Ceilings
+	ring, frozen                   int64
+	tokens                         int64
+	refilled                       time.Time
+	sources, inputRate, inputBurst int64
+}
+
+// SourceReservation is held once for a live source, across all renewals.
+// The owner releases it only after acquisition joins and its live ring closes.
+// Frozen snapshot copies retain their separate existing reservation.
+type SourceReservation struct{ RingBytes, InputBytesPerSecond, InputBurstBytes int64 }
+
+func (r SourceReservation) Valid() bool {
+	return r.RingBytes > 0 && r.RingBytes <= MaxNodeRingBytes && r.InputBytesPerSecond > 0 && r.InputBytesPerSecond <= MaxInputRate && r.InputBurstBytes > 0 && r.InputBurstBytes <= MaxInputBurst
+}
+
+func (b *Budget) ReserveSource(r SourceReservation) error {
+	return b.ReserveSourceWithin(r, PolicyLimits{})
+}
+func (b *Budget) ReserveSourceWithin(r SourceReservation, p PolicyLimits) error {
+	if !p.Valid() {
+		return ErrInvalid
+	}
+	c := b.ceilings.Intersect(p)
+	if !r.Valid() {
+		return ErrInvalid
+	}
+	if !c.SourceLimits.Enabled() || b.sources >= c.MaxActiveSources || r.RingBytes > c.RingBytes-b.ring || r.InputBytesPerSecond > c.InputBytesPerSecond-b.inputRate || r.InputBurstBytes > c.InputBurstBytes-b.inputBurst {
+		return ErrExceeded
+	}
+	b.sources++
+	b.ring += r.RingBytes
+	b.inputRate += r.InputBytesPerSecond
+	b.inputBurst += r.InputBurstBytes
+	return nil
+}
+
+func (b *Budget) ReleaseSource(r SourceReservation) error {
+	if !r.Valid() || b.sources == 0 || r.RingBytes > b.ring || r.InputBytesPerSecond > b.inputRate || r.InputBurstBytes > b.inputBurst {
+		return ErrInvalid
+	}
+	b.sources--
+	b.ring -= r.RingBytes
+	b.inputRate -= r.InputBytesPerSecond
+	b.inputBurst -= r.InputBurstBytes
+	return nil
+}
+
+func (b *Budget) SourceUsage() (count, inputRate, inputBurst int64) {
+	return b.sources, b.inputRate, b.inputBurst
 }
 
 func NewBudget(c Ceilings, now time.Time) (*Budget, error) {
@@ -145,6 +191,12 @@ func release(held *int64, n int64) error {
 func (b *Budget) ReserveRing(n int64) error   { return reserve(&b.ring, b.ceilings.RingBytes, n) }
 func (b *Budget) ReleaseRing(n int64) error   { return release(&b.ring, n) }
 func (b *Budget) ReserveFrozen(n int64) error { return reserve(&b.frozen, b.ceilings.FrozenBytes, n) }
+func (b *Budget) ReserveFrozenWithin(n int64, p PolicyLimits) error {
+	if !p.Valid() {
+		return ErrInvalid
+	}
+	return reserve(&b.frozen, b.ceilings.Intersect(p).FrozenBytes, n)
+}
 func (b *Budget) ReleaseFrozen(n int64) error { return release(&b.frozen, n) }
 func (b *Budget) refill(now time.Time) {
 	if !now.After(b.refilled) {

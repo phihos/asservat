@@ -72,6 +72,19 @@ func (s publicSigners) SignHistoryWork(ctx context.Context, w fleetapp.HistoryWo
 	return signer.SignHistoryWork(ctx, w)
 }
 
+// Source purpose remains distinct from capture/history signing even though
+// each cluster reuses its existing accepted signing trust and key provider.
+func (s publicSigners) SignSourceWork(ctx context.Context, w fleetapp.SourceWork) ([]byte, error) {
+	signer := s[w.Channel.Connector.Binding.ClusterID]
+	if signer == nil {
+		return nil, fleet.ErrUnavailable
+	}
+	if !w.Stop && w.Target.Request.ClusterID != w.Channel.Connector.Binding.ClusterID {
+		return nil, fleet.ErrUnavailable
+	}
+	return signer.SignSourceWork(ctx, w)
+}
+
 // publicContext holds the ADR-180 P3 services: the investigation, its audit
 // intents, the hub-run regional start, progress and cases.
 type publicContext struct {
@@ -108,6 +121,8 @@ type publicContext struct {
 	// audit, team delegation reads and the trigger ledger.
 	policies       *postgres.Policies
 	policyTriggers *postgres.PolicyTriggers
+	policySources  *postgres.PolicySources
+	sourceDispatch RegionalSourceDispatch
 	automation     *postgres.AutomationAuthorities
 	hubPolicies    *kube.HubPolicySources
 	policyAudit    auditapp.PolicyAcceptancePublisher
@@ -327,6 +342,10 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if out.policyTriggers, err = postgres.NewPolicyTriggers(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	if out.policySources, err = postgres.NewPolicySources(ctx, sql["policy-automation"], root, installation, shared.guards); err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.sourceDispatch = RegionalSourceDispatch{Router: router, Signer: signers, Now: time.Now}
 	if out.automation, err = postgres.NewAutomationAuthorities(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable
 	}

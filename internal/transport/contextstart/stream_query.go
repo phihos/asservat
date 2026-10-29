@@ -27,8 +27,9 @@ const (
 	queryReviewAccess = "review-access"
 	// ADR-248: whether the target Pod's node collector offers the packet
 	// recorder now.
-	queryPacketRecorder        = "packet-recorder"
-	queryResolvePacketRecorder = "resolve-packet-recorder"
+	queryPacketRecorder          = "packet-recorder"
+	queryResolvePacketRecorder   = "resolve-packet-recorder"
+	queryResolveOngoingRecorders = "resolve-ongoing-recorders"
 )
 
 // RecorderTargets is the region's optional packet recorder availability
@@ -49,6 +50,10 @@ type ReviewTargets interface {
 // without this query capability returns a closed unsupported reply.
 type PacketTargetResolver interface {
 	ResolvePacketRecorder(context.Context, targets.Request) (targets.RecorderResolution, error)
+}
+
+type OngoingTargetResolver interface {
+	ResolveOngoingRecorders(context.Context, []targets.OngoingRecorderRequest) ([]targets.OngoingRecorderResolution, error)
 }
 
 // RestartTargets is the region's optional restart observation (ADR-228). A
@@ -340,6 +345,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if recorders, ok := s.targets.(RecorderTargets); ok && r.Valid() {
 			out, e = recorders.PacketRecorder(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryResolveOngoingRecorders:
+		var r []targets.OngoingRecorderRequest
+		if decodeOperationBody(q.Body, &r) != nil || !targets.ValidOngoingRecorderBatch(r) {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(OngoingTargetResolver); ok {
+			out, e = resolver.ResolveOngoingRecorders(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}

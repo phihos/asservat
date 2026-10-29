@@ -60,6 +60,53 @@ type RecorderResolution struct {
 	Recorder RecorderAnswer
 }
 
+// OngoingRecorderResolution explicitly adds the authenticated node's configured
+// aggregate ceilings. It is a separate query so finite/manual source bytes and
+// their independent contracts remain unchanged. These facts confer no permit.
+type OngoingRecorderResolution struct {
+	Recorder                     RecorderResolution
+	Ceilings                     RecorderSourceCeilings
+	State                        *RecorderSourceState `json:",omitempty"`
+	ReportedAt, ReportFreshUntil time.Time
+}
+type OngoingRecorderRequest struct {
+	Target          Request
+	SourceID, Fence string
+}
+
+// Sixteen maximum legal-name replies measured45,985 bytes, exceeding the
+// existing31,744-byte body budget. Eight fit without raising transport caps.
+const OngoingRecorderBatchLimit = 8
+
+func ValidOngoingRecorderBatch(requests []OngoingRecorderRequest) bool {
+	if len(requests) == 0 || len(requests) > OngoingRecorderBatchLimit {
+		return false
+	}
+	first := requests[0].Target
+	seen := make(map[string]bool, len(requests))
+	for _, r := range requests {
+		if !r.Valid() || r.Target.ClusterID != first.ClusterID || r.Target.Namespace != first.Namespace || r.Target.Workload != first.Workload || seen[r.Target.PodUID] {
+			return false
+		}
+		seen[r.Target.PodUID] = true
+	}
+	return true
+}
+
+func (r OngoingRecorderRequest) Valid() bool {
+	return r.Target.Valid() && ((r.SourceID == "" && r.Fence == "") || (len(r.SourceID) == 36 && len(r.Fence) == 36))
+}
+
+type RecorderSourceState struct {
+	SourceID, Fence                             string
+	IssuedAt, LeafUntil, ObservedAt, FreshUntil time.Time
+	Credit, ObservedBytes                       int64
+	Closed, Stopped, InputUnknown               bool
+}
+type RecorderSourceCeilings struct {
+	MaxActiveSources, InputBytesPerSecond, InputBurstBytes, RingBytes, FrozenBytes int64
+}
+
 func (r RecorderResolution) Valid(now time.Time) bool {
 	return r.Target.ExecutionClass == artifact.ContextAPIExecution && r.Target.Valid(now) && r.Recorder.Valid()
 }

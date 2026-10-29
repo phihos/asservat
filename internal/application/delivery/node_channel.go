@@ -379,13 +379,20 @@ func sameAssessment(a, b []collector.Availability) bool {
 // closer than StatusMinimumSpacing are refused. Receipts remove the work they
 // answer from the queue.
 func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error {
-	if r.Sequence == 0 || r.ObservedAt.IsZero() || len(r.Receipts) > collector.MaxReceipts || len(r.Mechanisms) > 8 {
+	if r.Sequence == 0 || r.ObservedAt.IsZero() || len(r.Receipts) > collector.MaxReceipts || len(r.Mechanisms) > 8 || int64(len(r.Sources)) > collector.SourceStatusLimit {
 		return ErrNodeInvalid
 	}
 	for _, rc := range r.Receipts {
 		if (rc.Outcome != collector.OutcomeAccepted && rc.Outcome != collector.OutcomeRefused) || (rc.Reason != "" && !rc.Reason.Valid()) {
 			return ErrNodeInvalid
 		}
+	}
+	seenSources := make(map[string]bool, len(r.Sources))
+	for _, source := range r.Sources {
+		if !source.Valid(r.ObservedAt) || seenSources[source.SourceID] {
+			return ErrNodeInvalid
+		}
+		seenSources[source.SourceID] = true
 	}
 	c.mu.Lock()
 	e, err := c.current(p, epoch)
@@ -422,6 +429,7 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 	}
 	e.work = kept
 	stored := r
+	stored.Sources = append([]collector.SourceStatus(nil), r.Sources...)
 	e.report, e.reportedAt = &stored, now
 	e.reports++
 	view := c.view(e, now)
@@ -435,7 +443,7 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 // Enqueue queues one work item without payload for the node's current
 // process and wakes its poll. Packet captures use EnqueuePacket.
 func (c *NodeChannel) Enqueue(nodeUID string, kind collector.WorkKind, notAfter time.Time) (collector.Work, error) {
-	if !kind.Valid() || kind == collector.WorkPacketCapture {
+	if !kind.Valid() || kind == collector.WorkPacketCapture || kind == collector.WorkPacketSource || kind == collector.WorkStopPacketSource {
 		return collector.Work{}, ErrNodeInvalid
 	}
 	return c.enqueue(nodeUID, kind, notAfter, nil, nil, nil)
@@ -499,6 +507,7 @@ func (c *NodeChannel) view(e *nodeEntry, now time.Time) NodeView {
 	v := NodeView{Identity: e.id, EnrolledAt: e.enrolledAt, ReportedAt: e.reportedAt, Reports: e.reports, Queued: len(e.work)}
 	if e.report != nil {
 		r := *e.report
+		r.Sources = append([]collector.SourceStatus(nil), e.report.Sources...)
 		v.Report = &r
 		v.Current = now.Sub(e.reportedAt) <= collector.StatusStaleAfter
 	}

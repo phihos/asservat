@@ -2158,6 +2158,30 @@ type PolicyPodWatermark struct {
 	Armed     bool
 }
 
+type PolicyRecordingSource struct {
+	RootID           pgtype.UUID
+	ID               pgtype.UUID
+	Fence            pgtype.UUID
+	PolicyUid        string
+	AcceptanceID     pgtype.UUID
+	ActionID         string
+	ClusterID        pgtype.UUID
+	NamespaceUid     string
+	WorkloadUid      string
+	PodUid           string
+	AllocationID     pgtype.UUID
+	BindingJson      []byte
+	StartedAt        pgtype.Timestamptz
+	HardUntil        pgtype.Timestamptz
+	StartBy          pgtype.Timestamptz
+	InitialLeafUntil pgtype.Timestamptz
+	InitialCredit    int64
+	Credit           int64
+	BytesPerSecond   int64
+	EndedAt          pgtype.Timestamptz
+	SlotReleasedAt   pgtype.Timestamptz
+}
+
 type PolicySource struct {
 	RootID            pgtype.UUID
 	PolicyUid         string

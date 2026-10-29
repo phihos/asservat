@@ -201,6 +201,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
 		}
 	case "policy-automation":
+		out = append(out, publicRuntimePolicySourceGrants()...)
 		// ADR-228: hub-api policy activation, source observation, acceptance
 		// audit acknowledgement and the restart trigger ledger, in the ordinary
 		// hub union (ADR-222). Delegation and permission reads are read-only.

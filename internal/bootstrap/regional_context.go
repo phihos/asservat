@@ -266,6 +266,9 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.TrustSettings.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
+		if queue, ok := r.output.recordings.nodes.(contextstart.SourceQueue); ok {
+			local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Queue: queue}
+		}
 	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
 	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: reportedWorkVerifier{r.verifier, eventLog(os.Stderr, "regional work refused")}, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)

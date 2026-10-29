@@ -62,11 +62,13 @@ const (
 	WorkPeerGeneration WorkKind = "peerGeneration"
 	// WorkPacketCapture is one finite manual networkHeaders capture
 	// (ADR-248). It is the only kind with a typed payload in this version.
-	WorkPacketCapture WorkKind = "packetCapture"
+	WorkPacketCapture    WorkKind = "packetCapture"
+	WorkPacketSource     WorkKind = "packetSource"
+	WorkStopPacketSource WorkKind = "stopPacketSource"
 )
 
 func (k WorkKind) Valid() bool {
-	return k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture
+	return k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource
 }
 
 // Work is one item the connector queued for one node process. Sequence is
@@ -78,7 +80,9 @@ type Work struct {
 	Kind     WorkKind
 	NotAfter time.Time
 	// Packet is the payload of exactly the packetCapture kind.
-	Packet *PacketCapture
+	Packet     *PacketCapture
+	Source     *PacketSource
+	StopSource *SourceBinding
 }
 
 // Packet capture bounds (ADR-248). The output cap is the interim 8 MiB per
@@ -190,7 +194,9 @@ type Receipt struct {
 func Decide(w Work, now time.Time) Receipt {
 	r := Receipt{WorkID: w.ID, Sequence: w.Sequence, Outcome: OutcomeRefused, Reason: ReasonRecorderNotImplemented}
 	switch {
-	case !w.Kind.Valid() || (w.Kind == WorkPacketCapture) != (w.Packet != nil) || w.Packet != nil && !w.Packet.Valid():
+	case !w.Kind.Valid() || (w.Kind == WorkPacketCapture) != (w.Packet != nil) || w.Packet != nil && !w.Packet.Valid() ||
+		(w.Kind == WorkPacketSource) != (w.Source != nil) || w.Source != nil && (!w.Source.Valid() || w.NotAfter.After(w.Source.Permit.DispatchUntil)) ||
+		(w.Kind == WorkStopPacketSource) != (w.StopSource != nil) || w.StopSource != nil && !w.StopSource.Valid():
 		r.Reason = ReasonWorkUnknown
 	case !now.Before(w.NotAfter):
 		r.Reason = ReasonWorkExpired
@@ -219,4 +225,5 @@ type Report struct {
 	Mechanisms []Availability
 	Budget     Usage
 	Receipts   []Receipt
+	Sources    []SourceStatus
 }
