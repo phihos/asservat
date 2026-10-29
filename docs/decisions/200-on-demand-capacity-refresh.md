@@ -357,8 +357,12 @@ or original-step expiry and when a selected demand matched no configured cluster
 A local test reproduces those missing reports, with an empty-success control
 remaining quiet (RED exit 1, 0.404s). The existing callback now receives only
 `read`, `read-deadline` or `cluster-unmatched`, generic unavailable and elapsed
-wall time with zero read-left; no provider error text, namespace/workload/cluster
-identity or source body is passed. A blocked read retains its original context
+wall time and a private zero placeholder in the generic read-left argument.
+The consumer renders `read left not-applicable` for these three stages because
+no source-read proof exists there; zero must never imply a measured exhausted
+proof. Numeric leftovers for actual candidate reconciliation are unchanged.
+No provider error text, namespace/workload/cluster identity or source body is
+passed. A blocked read retains its original context
 cutoff. Known clusters still reconcile; unknown clusters cause no observation.
 This is diagnostic correction, not an availability fix or new retry policy.
 
@@ -402,3 +406,11 @@ architecture gates pass. Error/deadline/cluster conditions are intentionally
 supplied test controls, not reconstructed Native facts. No SQL/Kubernetes
 fixture, hosted run or collector was started for this diagnostic checkpoint;
 functional evidence is still required before another installed attempt.
+
+
+A consumer-format regression reproduces the misleading `read left 0s [read]`
+with the earlier format (RED exit 1, 0.013s). The correction passes its race test
+(exit 0, 1.054s): all three pre-candidate stages are not-applicable, while real
+candidate numeric leftovers, including a real supplied zero, remain unchanged.
+The same callback and single logging write are used; there are no extra clock
+samples or I/O calls. This format correction adds no authority or budget fact.
