@@ -156,6 +156,14 @@ Both readiness and settings delivery remain under investigation; no retry is
 queued. These recording-path failures do not prohibit the limited context-only
 experiment described above or establish a supported release date.
 
+The later composed `08c0a804` passed all fifteen CI jobs and fresh review.
+[History run 40891973567](https://github.com/phihos/asservat/actions/runs/40891973567)
+accepted the initial capture, acknowledged four storage copies and successfully
+read browser history and settings. Its edited preview returned a complete
+`ParametersUnavailable` error. Repeat remains unqualified; the earlier settings
+body failure was not reproduced or shown repaired. Root verified exit 1, all
+3,412 canonical hashes, unchanged sources and clean teardown. No retry is queued.
+
 ## Next product milestone and forecasting basis
 
 S-02's established context path and remaining acceptance work provide the

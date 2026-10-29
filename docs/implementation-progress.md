@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## Edited recording preview reaches a concrete failure (2026-10-29)
+
+Composed `08c0a804` passed all fifteen CI jobs and fresh review. Its single
+[installed history run 40891973567](https://github.com/phihos/asservat/actions/runs/40891973567)
+accepted the initial capture and acknowledged all four storage copies. The
+built React driver then read diagnostics, capture history and saved settings:
+all three responses were HTTP 200, `ok`, with complete bodies. The edited
+`preview_capture` returned HTTP 200 with `ParametersUnavailable`, also with a
+complete body and no request failure. Approval/repeat after that preview was
+not reached. This attempt does not reproduce the earlier unreadable settings
+body or establish that it is repaired.
+
+Aggregated server diagnostics include `history dispatch:
+exchange-stream/read/other` and `history unavailable: read/execute/live`.
+They have no per-request linkage and do not establish the failing exchange's
+cause. The new initial-storage permission flags did not emit because that
+failure callback was not taken. A remaining full-Pod equality check in the
+caller-observation path is a source lead under investigation, not an installed
+cause or verified fix.
+
+Go/test exited 1 (633.953s package, 154.65s focused child); the native job took
+928s. Root verified all 3,412 canonical hashes, all 36,005 unchanged tracked
+files, provider-log exit 0, removed build scratch and empty cleanup failures.
+The 1,460-byte retained initial PCAPNG contains twelve enhanced packet blocks;
+it does not qualify recording history/repeat. Source freeze was released only
+after terminal verification. No automatic retry is queued.
+
 ## Composed diagnostics, timestamp correction and merged query fix (2026-10-29)
 
 [PR #104](https://github.com/phihos/asservat/pull/104) merged as `5b427315` after
