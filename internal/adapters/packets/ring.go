@@ -315,15 +315,19 @@ func (r *Ring) Snapshot(window RingWindow, now time.Time, maxCopyBytes int64) (*
 		r.closeLive()
 		return nil, ErrRingClosed
 	}
+	c := r.coverage(window)
+	r.state.FrozenBytes += int64(cap(data))
+	r.state.Snapshots++
+	return &RingSnapshot{ring: r, data: data, coverage: c}, nil
+}
+func (r *Ring) coverage(window RingWindow) RingCoverage {
 	observed := r.through
 	if !r.stopped.IsZero() && observed.After(r.stopped) {
 		observed = r.stopped
 	}
 	c := RingCoverage{Requested: window, AvailableFrom: later(r.floor, r.cleanSince), ObservedUntil: observed, SourceStoppedAt: r.stopped, HistoryEvicted: !r.evictedBefore.IsZero() && window.From.Before(r.evictedBefore), InputUnknown: window.From.Before(r.cleanSince)}
 	c.Complete = !window.From.Before(c.AvailableFrom) && !observed.IsZero() && !window.Until.After(observed)
-	r.state.FrozenBytes += int64(cap(data))
-	r.state.Snapshots++
-	return &RingSnapshot{ring: r, data: data, coverage: c}, nil
+	return c
 }
 func (s *RingSnapshot) Coverage() RingCoverage { return s.coverage }
 
@@ -363,7 +367,7 @@ func (s *RingSnapshot) Close() error {
 	}
 	s.closed = true
 	n := int64(cap(s.data))
-	clear(s.data)
+	clear(s.data[:cap(s.data)])
 	s.data = nil
 	s.ring.mu.Lock()
 	defer s.ring.mu.Unlock()
@@ -371,3 +375,151 @@ func (s *RingSnapshot) Close() error {
 	s.ring.state.Snapshots--
 	return nil
 }
+
+// WindowSnapshot reserves one fixed arena for an immutable pre/post window.
+// It is not authority: the owner supplies the original processing context.
+// Its pending iterator is inaccessible until Complete seals it exactly once.
+type WindowSnapshot struct {
+	snapshot   *RingSnapshot
+	processing context.Context
+	t0         time.Time
+	pre        RingCoverage
+	final      RingCoverage
+	finished   bool
+	failure    error
+}
+
+func (r *Ring) BeginWindowSnapshot(processing context.Context, window RingWindow, t0, now time.Time, maxCopyBytes int64) (*WindowSnapshot, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	deadline, ok := time.Time{}, false
+	if processing != nil {
+		deadline, ok = processing.Deadline()
+	}
+	if !ok || processing.Err() != nil || !now.Before(deadline) || window.From.IsZero() || t0.Before(window.From) || t0.After(window.Until) || t0.After(now) || maxCopyBytes < 1 || maxCopyBytes > r.limits.MaxFrozenBytes {
+		return nil, ErrInvalid
+	}
+	if err := r.advance(now); err != nil {
+		return nil, err
+	}
+	if r.state.Snapshots >= r.limits.MaxConcurrentSnapshots || maxCopyBytes > r.limits.MaxFrozenBytes-r.state.FrozenBytes {
+		return nil, ErrRingCapacity
+	}
+	preWindow := RingWindow{window.From, t0}
+	var used int
+	r.walk(preWindow, func(b []byte) { used += len(b) })
+	if int64(used) > maxCopyBytes {
+		return nil, ErrRingCapacity
+	}
+	data := make([]byte, int(maxCopyBytes))
+	used = 0
+	r.walk(preWindow, func(b []byte) { used += copy(data[used:], b) })
+	if processing.Err() != nil || r.ctx.Err() != nil {
+		clear(data)
+		return nil, ErrRingClosed
+	}
+	pre := r.coverage(preWindow)
+	final := pre
+	final.Requested = window
+	final.Complete = false
+	snapshot := &RingSnapshot{ring: r, data: data[:used]}
+	r.state.FrozenBytes += maxCopyBytes
+	r.state.Snapshots++
+	return &WindowSnapshot{snapshot: snapshot, processing: processing, t0: t0, pre: pre, final: final}, nil
+}
+
+// Complete copies posthistory once, never growing the admission arena. Source
+// memory expiry can preserve only the independent pre-copy, not renew its data.
+func (w *WindowSnapshot) Complete(now time.Time) error {
+	s := w.snapshot
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || w.finished || w.processing.Err() != nil {
+		return ErrRingClosed
+	}
+	if now.Before(w.t0) {
+		return ErrInvalid
+	}
+	deadline, _ := w.processing.Deadline()
+	if !now.Before(deadline) {
+		return context.DeadlineExceeded
+	}
+	if w.t0.Equal(w.final.Requested.Until) {
+		w.finished = true
+		w.final = w.pre
+		return nil
+	}
+	r := s.ring
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if now.Before(r.now) {
+		return ErrInvalid
+	}
+	if now.Before(w.final.Requested.Until) && !r.state.Stopped && !r.state.Closed && now.Before(r.bounds.Until) && r.ctx.Err() == nil {
+		return ErrInvalid
+	}
+	w.finished = true
+	w.final.SourceStoppedAt = r.stopped
+	if err := r.advance(now); err != nil {
+		return nil
+	}
+	window := RingWindow{w.t0, w.final.Requested.Until}
+	var used int
+	r.walk(window, func(b []byte) {
+		if time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) {
+			used += len(b)
+		}
+	})
+	if used > cap(s.data)-len(s.data) {
+		w.failure = ErrRingCapacity
+		return w.failure
+	}
+	if w.processing.Err() != nil {
+		w.failure = ErrRingClosed
+		return w.failure
+	}
+	if r.ctx.Err() != nil {
+		r.closeLive()
+		return nil
+	}
+	at := len(s.data)
+	s.data = s.data[:at+used]
+	r.walk(window, func(b []byte) {
+		if time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) {
+			at += copy(s.data[at:], b)
+		}
+	})
+	if w.processing.Err() != nil {
+		w.failure = ErrRingClosed
+		return w.failure
+	}
+	if r.ctx.Err() != nil {
+		clear(s.data[at-used:])
+		s.data = s.data[:at-used]
+		r.closeLive()
+		return nil
+	}
+	// Records have nanosecond timestamps; postcoverage excludes the copied t0.
+	post := r.coverage(RingWindow{w.t0.Add(time.Nanosecond), window.Until})
+	w.final.Complete = w.pre.Complete && post.Complete
+	w.final.ObservedUntil = post.ObservedUntil
+	w.final.SourceStoppedAt = post.SourceStoppedAt
+	w.final.HistoryEvicted = w.pre.HistoryEvicted || post.HistoryEvicted
+	w.final.InputUnknown = w.pre.InputUnknown || post.InputUnknown
+	return nil
+}
+func (w *WindowSnapshot) Coverage() RingCoverage {
+	w.snapshot.mu.Lock()
+	defer w.snapshot.mu.Unlock()
+	return w.final
+}
+func (w *WindowSnapshot) Next(p *RingPacket) error {
+	w.snapshot.mu.Lock()
+	ready := w.finished && w.failure == nil && w.processing.Err() == nil
+	w.snapshot.mu.Unlock()
+	if !ready {
+		return ErrRingClosed
+	}
+	return w.snapshot.Next(p)
+}
+func (w *WindowSnapshot) Close() error { return w.snapshot.Close() }

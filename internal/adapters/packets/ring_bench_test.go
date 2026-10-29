@@ -25,6 +25,9 @@ func ringBench(b *testing.B, filled bool) (*Ring, time.Time, []byte) {
 		b.Fatal(e)
 	}
 	b.Cleanup(func() { r.Close() })
+	if e = r.ObservedThrough(now); e != nil {
+		b.Fatal(e)
+	}
 	frame := ringBenchFrame(b)
 	if filled {
 		for i := 0; i < (16<<20)/84-4; i++ {
@@ -256,6 +259,44 @@ func BenchmarkRingAppendShape(b *testing.B) {
 				if e := r.Add(frame, 1500, now, now); e != nil {
 					b.Fatal(e)
 				}
+			}
+		})
+	}
+}
+
+func BenchmarkRingWindow(b *testing.B) {
+	for _, phase := range []string{"admit-fixed-16MiB", "complete"} {
+		b.Run(phase, func(b *testing.B) {
+			r, now, _ := ringBench(b, true)
+			end := now.Add(time.Nanosecond)
+			if err := r.ObservedThrough(end); err != nil {
+				b.Fatal(err)
+			}
+			ctx, cancel := context.WithDeadline(b.Context(), now.Add(time.Hour))
+			defer cancel()
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				if phase == "complete" {
+					b.StopTimer()
+				}
+				w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, end, 16<<20)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if phase == "complete" {
+					b.StartTimer()
+					if err = w.Complete(end); err != nil {
+						b.Fatal(err)
+					}
+					b.StopTimer()
+				} else {
+					b.StopTimer()
+				}
+				if err = w.Close(); err != nil {
+					b.Fatal(err)
+				}
+				b.StartTimer()
 			}
 		})
 	}

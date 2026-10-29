@@ -183,3 +183,41 @@ is deliberately preserved as legacy behavior, not original kernel-time evidence.
 The pair does not qualify wall-clock steps, uncertainty, suspend behavior or
 installed failure causation. Source health, original-window and ongoing-source
 qualification remain separate; this adds no event-time watermark guarantee.
+
+## Unwired sanitized ring and original-window copy component
+
+`adapters/packets.Ring` is a local foundation for REQ-NET-003 and
+REQ-LIF-003/004, not an implemented C-12 SourceManager or Save executor.
+Constructor inputs are normalized caller/admin bounds, with the original context
+and hard memory cutoff retained. No source authority, renewal interval, raw
+observation credit or finite policy twenty-second lease is inferred. The owner
+must drive quiet advancement, observation watermarks, stop and joined closure.
+A packet-free interval alone proves no coverage. Parser/filter/control and encoder
+memory are separate from the framed historical arena.
+
+Finite `Snapshot` still copies only available original-time records. The distinct
+`BeginWindowSnapshot` reserves one full `maxCopyBytes` arena and one local snapshot
+slot before pre-copying `[from,t0]`. `Complete` copies only `(t0,until]` once into
+remaining capacity: no allocation growth, second slot, shifted window or general
+extension. Full capacity is retained even for a quiet window and released once on
+Close; aggregate node/workload reservations belong to the future owner. Pending
+iteration refuses. Successful completion seals immutable records; capacity failure
+is terminal and refuses iteration until cleanup. Invalid early/backward completion
+refuses without advancing the source or sealing the handle. Pre/post coverage is
+computed independently: later live prehistory eviction cannot erase the admitted
+copy, while post eviction, gaps and early stop remain partial.
+
+The original processing context/deadline is independent of the ring's source
+memory bound. Completion at or after that memory bound cannot read new post bytes;
+only the existing pre-copy may survive as partial under still-valid processing
+bounds. Cancellation while copying is rechecked before completion: processing
+cancellation refuses output; source cancellation discards the tentative post-copy.
+An after-zero window needs no new acquisition and may seal its existing pre-copy.
+This adds no stopped-source grace. Snapshot-to-ring lock order matches Close;
+coverage returns a locked value and readers never borrow clearable storage.
+
+This component adds no engine owner, goroutine, timer, SQL/wire/API, configuration
+or permission. Existing source/session admission, actual quiet expiry and callback
+join, replica ceilings, original post-window scheduling, Save, publication, native
+and history/repeat composition remain pending. Ordinary sanitized collection does
+not inherit sensitive raw-predicate credit/session limits.

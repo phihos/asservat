@@ -539,3 +539,279 @@ func TestRingDecoderBorrowEndsWhenAddReturns(t *testing.T) {
 		})
 	}
 }
+
+func TestRingWindowOneReservation(t *testing.T) {
+	r, now := ringFixture(t, func(l *RingLimits) { l.MaxConcurrentSnapshots = 1; l.MaxFrozenBytes = 168 })
+	end := now.Add(time.Second)
+	ringAdd(t, r, now, now)
+	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+	defer cancel()
+	w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, now, 168)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if s := r.State(); s.Snapshots != 1 || s.FrozenBytes != 168 {
+		t.Fatal(s)
+	}
+	var p RingPacket
+	if err = w.Next(&p); err == nil {
+		t.Fatal("pending read")
+	}
+	if err = w.Complete(now); err == nil {
+		t.Fatal("early completion")
+	}
+	ringAdd(t, r, end, end)
+	if err = r.ObservedThrough(end); err != nil {
+		t.Fatal(err)
+	}
+	backing := &w.snapshot.data[:cap(w.snapshot.data)][0]
+	if err = w.Complete(end); err != nil {
+		t.Fatal(err)
+	}
+	if backing != &w.snapshot.data[0] || cap(w.snapshot.data) != 168 || !w.Coverage().Complete {
+		t.Fatal("reservation or coverage changed", w.Coverage())
+	}
+	for _, at := range []time.Time{now, end} {
+		if err = w.Next(&p); err != nil || !p.At.Equal(at) {
+			t.Fatal(p, err)
+		}
+	}
+	if err = w.Next(&p); err != io.EOF {
+		t.Fatal(err)
+	}
+	if err = w.Complete(end); err == nil {
+		t.Fatal("second completion")
+	}
+	if s := r.State(); s.Snapshots != 1 || s.FrozenBytes != 168 {
+		t.Fatal(s)
+	}
+	w.Close()
+	w.Close()
+	if s := r.State(); s.Snapshots != 0 || s.FrozenBytes != 0 {
+		t.Fatal(s)
+	}
+}
+
+func TestRingWindowStopExpiryAndCancellation(t *testing.T) {
+	for _, mode := range []string{"stop", "gap", "close", "expiry", "after-expiry", "processing-expired", "cancel"} {
+		t.Run(mode, func(t *testing.T) {
+			r, now := ringFixture(t, nil)
+			end := now.Add(time.Second)
+			ringAdd(t, r, now, now)
+			ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+			defer cancel()
+			w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, now, 1024)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer w.Close()
+			switch mode {
+			case "stop":
+				r.Stop(now)
+			case "gap":
+				r.Gap(end)
+				r.ObservedThrough(end)
+			case "close":
+				r.Close()
+			case "expiry":
+				r.bounds.Until = end
+			case "after-expiry":
+				r.bounds.Until = end.Add(-time.Nanosecond)
+			case "processing-expired":
+				end = now.Add(time.Minute)
+			case "cancel":
+				cancel()
+			}
+			err = w.Complete(end)
+			if mode == "processing-expired" || mode == "cancel" {
+				if err == nil {
+					t.Fatal("processing lifetime ignored")
+				}
+				return
+			}
+			if err != nil || w.Coverage().Complete {
+				t.Fatal(err, w.Coverage())
+			}
+			var p RingPacket
+			if err = w.Next(&p); err != nil || !p.At.Equal(now) {
+				t.Fatal("precopy lost", err)
+			}
+		})
+	}
+}
+
+func TestRingWindowCapacityAndConcurrentClose(t *testing.T) {
+	r, now := ringFixture(t, nil)
+	end := now.Add(time.Second)
+	ringAdd(t, r, now, now)
+	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+	defer cancel()
+	w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, now, 84)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ringAdd(t, r, end, end)
+	r.ObservedThrough(end)
+	if err = w.Complete(end); !errors.Is(err, ErrRingCapacity) {
+		t.Fatal(err)
+	}
+	var refused RingPacket
+	if w.Next(&refused) == nil {
+		t.Fatal("failed completion exposed iterator")
+	}
+	if cap(w.snapshot.data) != 84 || r.State().FrozenBytes != 84 || w.Coverage().Complete {
+		t.Fatal("capacity grew")
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var p RingPacket
+			w.Next(&p)
+			w.Coverage()
+			w.Complete(end)
+			w.Close()
+		}()
+	}
+	wg.Wait()
+	if s := r.State(); s.Snapshots != 0 || s.FrozenBytes != 0 {
+		t.Fatal(s)
+	}
+}
+
+func TestRingWindowPreEvictionDoesNotEraseCopiedCoverage(t *testing.T) {
+	r, now := ringFixture(t, nil)
+	end := now.Add(8 * time.Nanosecond)
+	ringAdd(t, r, now, now)
+	ringAdd(t, r, now, now)
+	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+	defer cancel()
+	w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, now, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	for i := 1; i <= 7; i++ {
+		at := now.Add(time.Duration(i) * time.Nanosecond)
+		ringAdd(t, r, at, at)
+	}
+	r.ObservedThrough(end)
+	if r.State().HistoryEvicted == 0 {
+		t.Fatal("test did not evict live prehistory")
+	}
+	if err = w.Complete(end); err != nil || !w.Coverage().Complete || w.Coverage().HistoryEvicted {
+		t.Fatal(err, w.Coverage())
+	}
+	n := 0
+	var p RingPacket
+	for w.Next(&p) == nil {
+		n++
+	}
+	if n != 9 {
+		t.Fatal(n)
+	}
+}
+func TestRingWindowAfterZeroHasNoNewAcquisition(t *testing.T) {
+	r, now := ringFixture(t, nil)
+	ringAdd(t, r, now, now)
+	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+	defer cancel()
+	w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, now}, now, now, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	r.Close()
+	if err = w.Complete(now); err != nil || !w.Coverage().Complete {
+		t.Fatal(err, w.Coverage())
+	}
+}
+
+type ringCheckingContext struct {
+	context.Context
+	check func() error
+}
+
+func (c ringCheckingContext) Err() error { return c.check() }
+
+func TestRingWindowCopyCancellationChecks(t *testing.T) {
+	for _, phase := range []string{"admit-processing", "admit-source", "complete-processing", "complete-source"} {
+		t.Run(phase, func(t *testing.T) {
+			r, now := ringFixture(t, nil)
+			end := now.Add(time.Second)
+			ringAdd(t, r, now, now)
+			ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+			defer cancel()
+			calls := 0
+			checked := func(base context.Context, n int) context.Context {
+				return ringCheckingContext{Context: base, check: func() error {
+					calls++
+					if calls >= n {
+						return context.Canceled
+					}
+					return nil
+				}}
+			}
+			if phase == "admit-processing" {
+				ctx = checked(ctx, 2)
+			}
+			if phase == "admit-source" {
+				r.ctx = checked(r.ctx, 2)
+			}
+			w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, now, 1024)
+			if phase == "admit-processing" || phase == "admit-source" {
+				if err == nil || w != nil || r.State().FrozenBytes != 0 || r.State().Snapshots != 0 {
+					t.Fatal("canceled admission retained hold", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer w.Close()
+			ringAdd(t, r, end, end)
+			r.ObservedThrough(end)
+			if phase == "complete-processing" {
+				w.processing = checked(ctx, 3)
+			} else {
+				r.ctx = checked(r.ctx, 3)
+			}
+			err = w.Complete(end)
+			if w.Coverage().Complete {
+				t.Fatal("canceled copy became complete")
+			}
+			var p RingPacket
+			if phase == "complete-processing" {
+				if err == nil || w.Next(&p) == nil {
+					t.Fatal("processing cancellation exposed bytes")
+				}
+			} else {
+				if err != nil || w.Next(&p) != nil || !p.At.Equal(now) || w.Next(&p) != io.EOF {
+					t.Fatal("source cancellation failed to preserve only prehistory", err, p)
+				}
+			}
+		})
+	}
+}
+
+func TestRingWindowInvalidCompletionDoesNotSeal(t *testing.T) {
+	r, now := ringFixture(t, nil)
+	end := now.Add(time.Second)
+	ringAdd(t, r, now, now)
+	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+	defer cancel()
+	w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, now, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	r.Stop(end.Add(time.Second))
+	if err = w.Complete(end); !errors.Is(err, ErrInvalid) || w.finished {
+		t.Fatal("backward completion sealed", err)
+	}
+	if err = w.Complete(end.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+}
