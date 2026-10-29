@@ -7,10 +7,10 @@ their AI agents.
 [![CI](https://github.com/phihos/asservat/actions/workflows/ci.yml/badge.svg)](https://github.com/phihos/asservat/actions/workflows/ci.yml)
 
 > [!WARNING]
-> **Early development: not usable yet.** Sign-in, permission checks, encrypted
-> storage, downloads and a small pod-status capture pass tests against real
-> Kubernetes, PostgreSQL, OpenBao and S3. The other evidence types are not ready,
-> and there is no release. See [implementation status](docs/implementation-status.md).
+> **Early development: no supported release yet.** Installed tests cover
+> pod-status investigation and bounded manual packet capture with real services.
+> Normal homelab installation and the broader continuous-recording, profiling
+> and crash workflows remain unfinished. See [implementation status](docs/implementation-status.md).
 
 ![Design prototype of the Asservat console with open cases, recording health and captures in progress](design/ui/previews/workspace.png)
 <sub>Design prototype with synthetic data.</sub>

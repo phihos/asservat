@@ -2,7 +2,7 @@
 
 Helm is Asservat's officially supported installation method. The release layout is one hub and one cluster release per workload cluster; `combined` is for single-cluster evaluation. PostgreSQL, S3-compatible storage, KMS and Keycloak are operated separately. No dependency chart, external download hook or operator-managed credentials are bundled.
 
-**Current version: configuration foundation with optional installer.** By default this development chart installs the four implemented CRDs and a small release inventory ConfigMap. The optional `bootstrap.enabled` hook performs initial schema and activation; `bootstrap.continuation.enabled` adds runtime continuation as its fifth sequential command. The consolidated single-Pod layout awaits its own qualification; earlier installed evidence is recorded in [implementation status](../../docs/implementation-status.md). Rendering the chart alone does not activate permissions, qualify an identity provider or collect evidence. `runtime.enabled: true` is rejected. The inventory ConfigMap records intent and is never an authority/readiness source.
+**Current version: configuration foundation with optional installer.** By default this development chart installs the seven implemented CRDs and a small release inventory ConfigMap. The optional `bootstrap.enabled` hook performs initial schema and activation; `bootstrap.continuation.enabled` adds runtime continuation as its fifth sequential command. The consolidated single-Pod layout awaits its own qualification; earlier installed evidence is recorded in [implementation status](../../docs/implementation-status.md). Rendering the chart alone does not activate permissions, qualify an identity provider or collect evidence. `runtime.enabled: true` is rejected. The inventory ConfigMap records intent and is never an authority/readiness source.
 
 ## Install the current foundation
 
@@ -54,9 +54,11 @@ With `mode=cluster` or `combined` and `collector.enabled`, the chart creates the
 namespace (the only namespace with the privileged Pod Security exception) and the `asservat node`
 DaemonSet ([ADR-246](../../docs/decisions/246-node-collector-role.md)). Every collector Pod
 mounts the host file `/etc/asservat-disposable-host` (hostPath type `File`), so it starts only on
-disposable test hosts that carry it. In this version it probes its node and reports status to the
-connector; it records nothing. With `cluster.enabled` and an empty `collector.connector`, the
-connector installer provisions the node listener and the chart reads its endpoint and root on the
+disposable test hosts that carry it. It reports node capabilities and can execute
+bounded, authorized manual header-only packet recordings when the matching Gadget-enabled product image,
+regional listener and supported test-node profile are installed. Ongoing packet
+and syscall sources remain unavailable. With `cluster.enabled` and an empty
+`collector.connector`, the connector installer provisions the node listener and the chart reads its endpoint and root on the
 next `helm upgrade`. See [node collector](../../docs/installation/helm.md#node-collector-test-hosts-only).
 
 ## Upgrade and uninstall

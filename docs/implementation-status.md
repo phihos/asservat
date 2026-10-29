@@ -1,9 +1,17 @@
 # Product implementation status
 
-Baseline reviewed on 2026-10-12; runtime-profile, owner-startup and regional-collection updates on 2026-10-14; installed-workflow qualification updated on 2026-10-24. This tracks the accepted first-release scope in
-[product](product.md) and the [implementation slices](architecture/implementation-slices.md).
-Actual commands, source snapshots, failures and subsequent corrections remain in
+Status checked on **2026-10-29** against merged main through
+[PR #100](https://github.com/phihos/asservat/pull/100) and the separately identified
+unmerged [PR #103](https://github.com/phihos/asservat/pull/103). This tracks the
+accepted first-release scope in [product](product.md) and the
+[implementation slices](architecture/implementation-slices.md). Actual commands,
+source snapshots, failures and corrections remain in
 [implementation progress](implementation-progress.md).
+
+**There is no supported homelab release yet.** The control plane and several
+installed developer workflows exist. The complete recording, inspection and
+operational platform is unfinished. Merged code, focused installed tests and
+production qualification are distinguished below.
 
 **The installed investigation journey passed end to end for the first time in native92
 (2026-10-24):** install with an interrupted and resumed installer, regional enrollment,
@@ -43,21 +51,21 @@ the features that depend on them.
 | Developer or operator outcome | Established evidence | Work still required |
 | --- | --- | --- |
 | Bootstrap with Helm | Packaged native reference tests cover replay, managed setup cleanup, uninstall preservation and the protected runtime handover. The continuation now deploys the hub API/console/MCP, worker, federation, regional connector, key service and publisher with protected inputs. | Complete and qualify the supported installed developer workflow and operational lifecycle. The chart still rejects direct runtime enablement. |
-| Sign in through browser/MCP | Keycloak, session/refresh/logout and browser/MCP components have real integration evidence. The installed fixture signs in through the console, initializes processing and makes authenticated MCP preview/request calls. | Broader installed session lifecycle, reviewer step-up and the internal-user alternative. |
+| Sign in through browser/MCP | Keycloak session/refresh/logout and browser/MCP components have real integration evidence. Installed tests sign in through the console, initialize processing, make authenticated MCP calls and perform configured reviewer step-up for an approved recording. | Broader installed session/identity-provider lifecycle, operator configuration and the internal-user alternative. |
 | Request and browse workload context | The bounded pod-status diagnostic, shared UI/MCP controls, SQL admission and encrypted publication have component/native evidence. Earlier regional fixtures complete collection, publication, case lookup, native download, Stop and revocation with synthetic authority inputs. Installed native107 completes browser and MCP capture, publication, approved inspection and native download in two workload clusters. | Reconnect import and Partial states listed below. The diagnostic remains limited to 4,096 native bytes and is not generic file/log/command collection. |
-| Download, Stop and deliberately retry | The combined real-service run passes content, range resume, interrupted original/new sessions, control negatives, exactly-one-winner admission, native exchange and retention-observation expiry. Authenticated ranges reconstruct a 352-byte artifact without budget refill. Browser restart and cancellation/denial boundaries pass. Installed hub-local worker/profile provisioning and configuration acceptance also pass. | Installed transfer, Range resume, Stop, revocation and expiry pass in native107. Active-stream interruption on Stop, sustained availability and large-artifact qualification remain pending. The component fixture's synthetic authority inputs and earlier failures remain explicit in the chronological tracker. |
-| Download every evidence type for local tools | Persistent framed format and bounded decoder exist; a separate earlier feasibility lab transferred 2 GiB. | Generic large-object publication, full native transfer/window lifecycle, interruption, throughput/memory and local-tool qualification for product cores, PCAPs and derivatives. |
-| Automatic suspicious-event collection | Policy source, automation identity and acceptance components exist. | Resolved policy/trigger engine, logs/resources/probes/external triggers, all-replica observation, correlation, storm controls and fair incident dispatch. |
+| Download, Stop and deliberately retry | Real-service component tests cover ranges, interrupted original/new sessions, control negatives, exactly-one-winner admission and retention-observation expiry; authenticated ranges reconstruct a 352-byte artifact without budget refill. Installed native107 covers context transfer, Range resume, Stop, revocation and expiry. | Active-stream interruption on Stop, sustained availability and larger-artifact qualification remain pending. Component synthetic authority inputs and earlier failures remain explicit; the extended PR #103 native stream is not qualified. |
+| Download every evidence type for local tools | Native context download and bounded manual packet PCAPNG download have installed evidence; the current packet cap is 8 MiB. Persistent framed formats and decoders exist. The earlier 2 GiB feasibility lab remains separate prototype evidence. | Large cores/profiles/derivatives and their full publication/window/memory/local-tool qualification remain. PR #103 reached a valid near-full unpaced PCAPNG, but its paced stream, ranges and final completion are unqualified. |
+| Automatic suspicious-event collection | Restart, probe, Alertmanager, log and resource trigger implementations are merged. Focused installed log/resource and bounded recurring-sharing journeys passed ([PR #82](https://github.com/phihos/asservat/pull/82), [PR #79](https://github.com/phihos/asservat/pull/79)). Only bounded counts/metadata leave detector readers. | Ongoing source arming, complete storm/scale coverage and unsupported cgroup-only metrics/log-stream selectors remain. The finite policy-packet grant path in PR #103 is not installed-qualified. |
 | Files, logs, processes and commands | Designed; pod-status is the implemented narrow exception. | Confined whole-pod adapters, bounded execution, partial/error handling, native output and platform qualification. |
-| Packet/syscall rings, save and live watch | Designed; packet/compiler/peer/ring feasibility is separate from a product recorder. | Production recorders, dynamic peers, lifecycle/quotas/loss accounting, approved projections, save-only dispatch and UI/MCP live delivery. |
+| Packet/syscall rings, save and live watch | Bounded manual header-only PCAPNG capture through the published Inspektor Gadget is merged and native-tested on the named disposable Linux/amd64 profile ([PR #95](https://github.com/phihos/asservat/pull/95)). Approved request continuation passed an installed workflow ([PR #100](https://github.com/phihos/asservat/pull/100)). Each capture is finite, has no prehistory and is capped at 8 MiB. | Ongoing packet/syscall sources, rings, dynamic peers, Save existing recordings and live delivery remain unfinished. The collector retains its disposable-test-host guard. PR #103 has separate incomplete policy, privacy and streaming qualifications. |
 | Runtime profiles and offline analysis | Bounded Go pprof/trace HTTP acquisition preserves native bytes in encrypted frames. Acquisition and passive named-endpoint planning pass component tests, including a real Go CPU handler and synthetic Kubernetes API observations. Guard/node connections and catalog acceptance remain explicit fixture inputs. | Protected endpoint catalog acceptance, profile admission, qualified node dialing, custody/publication and native download; hostile-input-safe analysis, encrypted scratch/Jobs, bounded queries and derivatives. A required console flamegraph viewer has not been accepted or implemented. |
 | Core dumps and compatible debugger workflows | Disposable-VM helper/crash/local-debugger feasibility exists. | Product helper lifecycle, prepaid crash path, live/process selection, exact companions, large downloads and supported node/runtime qualification. |
-| Combined approval and evidence sharing | Designed; ordinary eligibility/authority foundations exist. | Independent reviewer flow, bounded collection/result grants, multiple owner-team management, future/concrete shares, recipient access and revocation. |
-| Capture profiles, guidance, history and repeat | Designed; the single context preset has narrow implemented preview/recovery flows. | Versioned profile composition, useful recommendations, selector history, repeat with fresh checks and complete investigation navigation. |
-| Permission/privacy administration | Protected-source, retention, restriction and deletion backend subsets have native tests. Installed console processing initialization passes. Deletion supervision is implemented and merged in PR #41, with SQL paging and focused backend-permission checks. | Processing release, browser-session cleanup, administration UX, previews/overdue reporting and complete managed-copy/backup/history lifetime closure. Installed expiry, failed-cleanup recovery and deletion charge release remain unqualified. |
+| Combined approval and evidence sharing | Independent ad hoc acquisition approval, configured Keycloak step-up and continuation of the original approved recording are merged. Sharing, recipient views, multiple manager teams, capture-time sharing and bounded recurring-policy sharing have merged implementations and focused tests. | Complete cross-feature qualification, remaining raw/result-access grant cases and upgrade role re-production remain. Policy-packet grants in PR #103 are unmerged; its latest privacy validator refusal is unresolved. |
+| Capture profiles, guidance, history and repeat | Typed versioned packet/syscall planning and manual network-header execution are merged. Recent context captures, settings and Collect again passed an installed share workflow ([PR #76](https://github.com/phihos/asservat/pull/76)). | General catalog publication/composition/execution, guidance and source-save repetition remain. Encrypted parameterized recording history in PR #103 is not installed-qualified; context history success does not establish recording-history availability. |
+| Permission/privacy administration | Explicit and inherited permissions, access explanations, team/share controls and permission/retention impact previews are implemented. Installed context tests cover revocation, expiry, failed-cleanup charge retention and verified deletion; processing initialization and deletion supervision also exist. | Processing release, overdue/admin reporting, complete operational qualification, browser-session cleanup, managed-copy/backup lifetime closure and sustained availability remain. In-place upgrades have explicitly documented role-grant limitations. |
 | Incident notification and recurrence investigation | Designed, with narrow context case/navigation components. | Trigger-to-case grouping, notification delivery, timelines, findings and recurrence comparison. |
 | Small deployment alternatives | Local wrapping/signing/key-service components exist. | Installed internal accounts, local PKI lifecycle, bundled PostgreSQL/pgBackRest/evidence store and provider lifecycle qualification. |
-| Recover, upgrade and operate production | Initial bootstrap and database-incarnation fencing have native evidence. | Supported restart/restore activation, failover, partitions, upgrades, sustained operation, support matrices and complete production acceptance. |
+| Recover, upgrade and operate production | Initial bootstrap, database-incarnation fencing and schema/image upgrade components have focused native evidence. Installed context tests exercise interrupted/resumed installation and lifecycle negatives. | Complete supported backup/restore, failover/partition and version-skew profiles, sustained operation, distributable verified artifacts and production acceptance remain. |
 
 The [detailed baseline](../test/results/implementation-baseline-20261012/INVENTORY.md.txt)
 records 17 capability groups and seven shared dependencies, with
@@ -65,16 +73,55 @@ records 17 capability groups and seven shared dependencies, with
 It is a dated evidence snapshot; later tracker entries supersede its transient
 failure descriptions. These rows are deliberately not converted into a percentage.
 
+## Homelab trial status
+
+A source-built developer experiment in an owned disposable environment is
+possible today. It uses explicit external PostgreSQL, S3-compatible storage,
+OpenBao and Keycloak inputs and the documented private installer/continuation.
+It is not a supported normal homelab installation or a published release.
+The default Helm package does not start the runtime, `runtime.enabled: true`
+is rejected, and collectors require the disposable-host marker. Internal users
+and the bundled small-deployment profile remain unfinished.
+
+A repeatable homelab alpha needs a declared supported feature/node profile,
+reliable installed acquisition and download paths, completed privacy checks and
+a verified operator installation procedure with matching build artifacts. It
+can precede the complete feature set without removing any accepted first-release
+requirements. No alpha scope or calendar date is established yet.
+
+The latest frozen PR #103 candidate, `fc0a4491`, passed CI and review but all
+three installed commands failed:
+
+- [Policy 40794684939](https://github.com/phihos/asservat/actions/runs/40794684939)
+  completed real creator-disable/readback, manager continuation, publication and
+  authenticated download checks, then failed the ACK/header validator. The
+  rejected rows/file were not retained, so this does not establish a payload leak
+  or the exact failed predicate.
+- [History 40794688705](https://github.com/phihos/asservat/actions/runs/40794688705)
+  stopped before collection: an exact full-thirty-second storage binding was
+  expired despite a current refresh demand. Demand handling remains unproven.
+- [Paced 40794692300](https://github.com/phihos/asservat/actions/runs/40794692300)
+  verified an 8,388,460-byte unpaced PCAPNG under the explicit 200m synthetic
+  target profile, then failed the paced HTTP/2 stream. Ranges, owner/key renewal
+  and final completion were not qualified.
+
+All three recorded test exit 1, matching source hashes and no cleanup failures.
+These failures remain release/trial blockers; local reproductions and fixes are
+tracked separately until installed verification passes. There is no dependable
+calendar ETA or overall completion percentage. The next forecasting checkpoint
+is a stable, repeatable supported workflow rather than another component count.
+
 ## Next product milestone and forecasting basis
 
-S-02 remains the next complete developer outcome: use an installed hub to select
+S-02's established context path and remaining acceptance work provide the
+baseline: use an installed hub to select
 an authorized workload in either of two clusters, preview/request context through
 browser and MCP, collect and publish encrypted evidence, inspect/download it, then
 verify denial on expiry/revocation and deletion of managed copies. Authority and
 capacity must come from product-provisioned accepted sources, not fixture seeding.
 
 Native107 (2026-10-24, [record](../test/results/resumed-c62e02ac-native107/README.md))
-passes the installed S-02 exit in two workload clusters through one hub: browser and MCP
+passes the named core S-02 journey in two workload clusters through one hub: browser and MCP
 preview/request/inspection/download with reply parity, duplicate and conflicting idempotency,
 Range resume, catalog minimization, an unrelated principal refused exactly as for absent
 objects, Stop, Deny revocation, expiry refusal, a failed cleanup that retains its charges and
