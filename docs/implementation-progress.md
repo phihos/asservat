@@ -1,5 +1,53 @@
 # Sustained implementation progress
 
+## Follow-up to the fc0a installed failures (2026-10-29)
+
+All three guarded installed commands on frozen `fc0a4491` failed, despite
+fifteen passing CI jobs and fresh review. Policy run
+[40794684939](https://github.com/phihos/asservat/actions/runs/40794684939)
+passed creator disablement/readback, manager grant attachment/revocation and
+authenticated native retrieval, then failed the ACK-only field validator.
+History run [40794688705](https://github.com/phihos/asservat/actions/runs/40794688705)
+failed earlier at expired storage readiness; it did not reach the browser
+diagnostic. Paced run
+[40794692300](https://github.com/phihos/asservat/actions/runs/40794692300)
+verified an unpaced 8,388,460-byte PCAP and the actual 200m target profile, then
+failed renewed-stream completion at `send-done/proof-lease`. None qualifies the
+complete workflow. Each retained environment report records unchanged sources,
+empty cleanup failures and removed build scratch; actual Go/test exits were 1.
+
+An offline real-tshark regression reproduced the field mismatch: the tool emits
+`True`/`False`, whereas the fixture expected `1`. The validator now requires
+`True`, preserves the empty-payload requirement and emits closed failure classes.
+The installed fixture retains the bounded, authenticated and hash-checked PCAP
+before field validation, so a future refusal remains inspectable. An ephemeral
+Ubuntu container ran actual tshark 4.2.2 on synthetic product-recorder output:
+RED failed and GREEN passed without a skip, including non-ACK and payload
+negatives. No host collector or package was installed; the container was removed.
+This does not prove the failed installed artifact satisfied the privacy rule.
+
+A separate regression through the real admission/router and two-hop TLS path
+reproduced completion refusal when the retained outer response observation was
+older than the inner completion observation. The private zero-byte completion
+bridge now validates both current observations and preserves their earliest
+deadline while carrying the exact outer lease. Older observations are permitted
+only for this response completion; the strict server and evidence-byte paths are
+unchanged. Focused races include expired/changed identities, cancellation and
+invalid terminal frames. This establishes a local defect at the observed stage,
+not the unique cause or successful repair of the installed failure.
+
+Cold readiness remains unresolved. The existing capacity-demand reporting hook
+now reports closed `read`, `read-deadline` and `cluster-unmatched` stages that
+were previously silent. Missing candidate read budgets are explicitly
+not-applicable. This adds at most one report per serial refresh step, no backend
+requests, watches or background tasks, and changes no pool size, scheduling,
+freshness or authority deadline. Local regressions reproduce the missing reports;
+they do not establish why the installed readiness observation expired.
+
+Final combined checks, fresh exact-head review/CI and installed qualification of
+these corrections remain pending. Ongoing sources, rings and Save existing
+recordings remain unfinished; these corrections do not complete S-04.
+
 ## Corrections after the c253 installed failures (2026-10-29)
 
 The fixture administrator correction obtains one fresh master/admin-cli token
