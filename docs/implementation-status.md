@@ -164,6 +164,13 @@ read browser history and settings. Its edited preview returned a complete
 body failure was not reproduced or shown repaired. Root verified exit 1, all
 3,412 canonical hashes, unchanged sources and clean teardown. No retry is queued.
 
+A subsequent local caller-observation correction passes the reproduced
+status/resource-version regression and a real API status-equivalence check.
+It preserves current caller workload checks and original deadlines. This does
+not establish the installed failure's cause or qualify recording repeat; the
+native critical-change test's narrower evidence and pending assertion
+qualification are recorded in [implementation progress](implementation-progress.md).
+
 ## Next product milestone and forecasting basis
 
 S-02's established context path and remaining acceptance work provide the

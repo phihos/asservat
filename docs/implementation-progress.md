@@ -1,5 +1,40 @@
 # Sustained implementation progress
 
+## Caller status equivalence: local correction and real API evidence (2026-10-29)
+
+The remaining caller-observation full-Pod comparison reproduced a local false
+refusal on resource-version-only and informational-status-only updates. The
+actual HTTPS/client-go regression retained twelve critical-field negatives.
+The separate `f31e8400` correction independently validates both already-read
+caller Pods with the existing caller-specific checks and unchanged v1 workload
+digest, plus explicit finalizer equality. It adds no owner-routing Ready/IP
+condition, permission, API request, timer or deadline extension. Focused races
+and canonical pre-push passed; independent source review was clear. This is a
+confirmed local defect, not an established cause of the installed history error.
+
+A synthetic full-validation benchmark measured an extra 118,169 ns, 25,017
+allocated bytes and 233 allocations per stabilized boundary: about 0.355 ms and
+75,052 allocated bytes across three boundaries. These are local arithmetic
+estimates, not installed overhead or a CPU-neutrality claim.
+
+One frozen `a15c5af9` metadata-only run used two owned Kind clusters and the
+existing provider fixture; the scenario itself used the first cluster. Actual
+Pod-bound TokenRequest/TokenReview and API status PATCHes exercised the corrected
+caller. Three confirmed status changes and six caller GETs completed the original
+Begin/Claim/Final operation in 1.652 seconds with 3.348 seconds remaining. Go and
+qualification exited 0 (4.776s package, 149.864s whole command). The annotation
+negative confirmed an admitted mutation, its actual GET reflection and refusal;
+its generic-error assertion did not isolate the refusal's cause or explicitly
+check the live context. Review caught that test gap after the frozen run began.
+Its evidence remains narrowly scoped, and stronger assertions require their own
+execution before being called qualified.
+
+Root verified all 3,413 canonical and 36,006 tracked hashes, empty cleanup
+failures and exact owned container/network/image/scratch absence. No BPF or
+collector executed. Installation/process pins remain fixture inputs. The local
+correction and test follow-up are not merged, and recording history/repeat
+remains installed-unqualified.
+
 ## Edited recording preview reaches a concrete failure (2026-10-29)
 
 Composed `08c0a804` passed all fifteen CI jobs and fresh review. Its single
