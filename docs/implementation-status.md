@@ -1,7 +1,7 @@
 # Product implementation status
 
 Status checked on **2026-10-29** against merged main through
-[PR #100](https://github.com/phihos/asservat/pull/100) and the separately identified
+[PR #104](https://github.com/phihos/asservat/pull/104) and the separately identified
 unmerged [PR #103](https://github.com/phihos/asservat/pull/103). This tracks the
 accepted first-release scope in [product](product.md) and the
 [implementation slices](architecture/implementation-slices.md). Actual commands,
@@ -95,6 +95,13 @@ availability limits below remain relevant limitations, not prerequisites for a
 context-only experiment. Such an experiment can precede the full feature set
 while retaining its authority, custody and privacy checks and all accepted
 first-release requirements. No calendar date is established.
+
+PR #104 fixes HTTP completion for owned query replies during joined cleanup;
+its local transport checks, pre-merge CI and automatic main CI passed. It does
+not fix recording-history/settings replies, which use the unowned path, or
+establish an installed query workflow. The separate working candidate's packet
+clock correction and real SQL qualification of failure diagnostics are component
+results; installed recording history remains unqualified.
 
 Frozen PR #103 candidate `c328a5af` passed all fifteen CI jobs
 and fresh review. Its installed campaign produced two passes and one failure:

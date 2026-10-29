@@ -1,5 +1,56 @@
 # Sustained implementation progress
 
+## Composed diagnostics, timestamp correction and merged query fix (2026-10-29)
+
+[PR #104](https://github.com/phihos/asservat/pull/104) merged as `5b427315` after
+all fifteen CI jobs and fresh review passed. Automatic main CI also passed all
+fifteen jobs; root read back a merged tree identical to the tested head. Its
+typed owned-query writer preserves the original payload deadline and synchronous
+cleanup while allowing bounded zero-payload HTTP completion. Unowned settings
+and history replies do not use that ownership path, so this is not their repair.
+The transport evidence uses actual audited C18 composition and TLS/HTTP2 with
+synthetic underlying authority/reader ports; full installed query qualification
+is not established by those tests.
+
+The packet adapter now pairs the published program's MONOTONIC timestamps with
+one matching sample per capture instead of a BOOTTIME offset. A pinned-helper
+injected-clock regression reproduced a one-hour error from a known prior suspend
+offset. Pure/tagged tests and a static collector build passed; no BPF ran locally.
+The legacy zero-timestamp arrival fallback remains explicit. Actual suspend,
+wall-clock changes and installed timestamp qualification remain pending.
+
+Clean composed `270bcde2` passed canonical pre-push (0, 30.226s, 231 console
+tests), full presentation/MCP/browser races (0, 94.618s command) and tagged
+Gadget/bootstrap races (0, 74.395s command). Independent review checked the
+browser merge: owned queries retain the shared 64 KiB contract, while only
+authenticated unowned settings retain their existing 160 KiB allowance.
+
+The failure-only exact-preview diagnostic now also reports bounded ordinary
+Allow-basis, sequence, lifetime, maintainer and acknowledgement flags using the
+same single three-second SQL read. Stored permission observations use the
+existing thirty-second contract; the separate derived operation proof remains
+five seconds. PermissionReview decision-source scopes and complete authorizing
+observations are deliberately not inferred from these fixture-admin facts.
+
+The first local context-harness attempt was rejected because its native branch
+returns before the selected preview child: Go exited 0, but no required child
+ran and the harness exited 1. That is a selection failure, not a SQL pass or
+product defect. The corrected custody-harness selection passed the required
+preview child and all six named permission controls (outer/Go/qualification 0,
+15.840s outer, 2.096s Go package, 0.65s child). Five-/thirty-second positives,
+suspension, lease/date preservation and genuine unacknowledged activation checks
+also completed. Root independently verified all 3,369 custody-source, 3,412
+canonical-source and 36,005 tracked hashes, empty cleanup failures and exact
+owned resource/workdir absence. Neither provider-log nor build-scratch fields
+were reported by that successful harness; no such result is invented. Individual
+SQL-query duration was not measured separately.
+
+These changes do not repair or qualify installed recording history. The latest
+installed run below still failed at readiness before capture/browser execution.
+The new stored-state flags must distinguish the next observed failure before a
+producer change is justified. The separate local ring component remains unwired;
+SourceManager, ongoing authority, Save and installed source coverage remain open.
+
 ## Later history attempt stopped at storage readiness (2026-10-29)
 
 The diagnostic-only candidate `960a28bc` passed all fifteen jobs in
