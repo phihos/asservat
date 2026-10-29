@@ -286,3 +286,54 @@ tracked outputs copied during initial archival are separately identified and
 excluded from current-run evidence. This does not qualify a complete installed
 workflow, native evidence collection, demand/discovery contention under load,
 or the cause of Native 40776231613's unavailable locator.
+
+## Relevant Pod equivalence inside a native boundary (2026-10-29)
+
+The full-Pod/resourceVersion equality check between a boundary's two Pod GETs
+was an engineering shortcut for detecting concurrent changes. It also rejected
+a status-only update whose protected identity, full spec and current Ready/IP
+facts remained identical. A deterministic HTTPS/native-reader regression changes
+only a PodReady condition's informational LastProbeTime and resourceVersion on
+the second GET of the final boundary. Both versions independently pass the
+existing object validator and have the same workload digest, yet the previous
+comparison refuses them. The same status update *between* boundaries already
+succeeds. This is a component availability defect, not proof of the cause of
+Native 40849033981's combined `owner-read/final-native` refusal or a claim that
+every readiness probe writes Pod status.
+
+Each boundary now validates its second Pod through the **same existing** native
+object validator and requires the identical canonical workload digest. Both GETs
+remain. The second Pod must independently retain exact UID/non-deletion,
+account/node/controller/template/image/spec/labels/annotations, Running state,
+one True Ready condition, selected endpoint addresses and the existing finalizer
+rules. Critical changes remain terminal; no unknown read is retried. The
+operation's original peers, dates, source/namespace/guard/Service brackets,
+registration, TLS and cancellation remain binding. This follows the existing
+status/RV-only enrollment comparison and the operation's own cross-boundary
+identity/behavior comparison. Neither comparison establishes absence of
+unobserved A-to-B-to-A changes. ResourceVersion is an object modification version,
+not a security-specific identity; see [Kubernetes API concepts](https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions).
+This is an engineering comparison revision, not a newly asserted maintainer
+requirement or an authority interval extension.
+
+The actual HTTPS regression covers informational status changes in both initial
+and final brackets, status changes between boundaries, and second-read changes
+to UID/spec/labels/annotations/Ready/phase/address/node/deletion/controller and
+finalizers. Failed operations cannot reopen or repeat native I/O. The obsolete
+initial RV-only denial fixture now changes the actual Pod spec and retains its
+refusal. Existing original-deadline/cancellation/join/peer/service tests still
+apply. Installed attribution and the targeted real-API qualification are separate.
+
+There are zero added API/SQL requests, watches, timers, privileges, credentials,
+pools, retained state or configuration. The single-Pod primitive still uses
+30 observer and six independent probe requests over two boundaries (including
+ADR-227 release-record reads). Representative synthetic comparison measurements
+were 18,258 ns/9,363 allocated bytes/18 allocations for the old comparison and
+114,023 ns/34,298 bytes/228 allocations for the reused validator. The increment
+is about 0.192 ms and 49,870 allocated bytes for one Pod/two boundaries, or
+0.383 ms and 99,740 bytes for two distinct Pods. These are representative
+allocation totals, not retained/peak memory, installed overhead or worst-case
+payload cost. At most four additional canonical digests of the existing 128 KiB
+maximum are computed per two-peer operation. Reuse avoids another partially
+duplicate security-sensitive comparison. No native availability success is
+claimed from these local results.

@@ -26,6 +26,15 @@ five later requests take about 1.40 seconds each. The fixture supplies installat
 pins and process identifiers. It does not run the SQL/TLS consumers or normal
 background reconciliation, so it does not qualify complete sustained routing.
 
+Within each owner native boundary, both Pod reads now independently pass the
+same existing protected-object validator and must produce the same canonical
+workload digest. Informational status/resourceVersion changes alone do not
+invalidate that comparison; UID/deletion, full pinned spec/controller/node,
+current Running/Ready and selected address changes still refuse. Original
+operation dates and final guard/namespace/Service checks remain unchanged. This
+engineering correction and its explicit component-versus-installed limits are
+recorded in [ADR-150](../decisions/150-operation-owned-native-observation-proof.md#relevant-pod-equivalence-inside-a-native-boundary-2026-10-29).
+
 The matching regional primitive now brackets four genuinely new source-value
 reads with two independent native checks. The last native check precedes the
 fourth value read, so a source change during probing is still compared before
