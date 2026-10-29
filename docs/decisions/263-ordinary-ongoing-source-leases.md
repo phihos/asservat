@@ -17,7 +17,7 @@ delegation/permission, complete deny, recovery, retention, target and local
 process facts under their original at-most-five-second issuance bounds. Recheck
 after blocking work, before commit/sign/dispatch. Do not replace these checks
 with a thirty-second precommit permission cache or renew an observation timestamp.
-The existing protected source-resource producer supplies administrator ceilings;
+Source admission must consume a protected source-resource projection of administrator ceilings;
 see [capacity production](../architecture/capacity-production.md). No new default
 resource limits are selected here.
 
