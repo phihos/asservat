@@ -30,6 +30,7 @@ type connectorPairFixture struct {
 	mu                   sync.Mutex
 	now                  time.Time
 	advance              atomic.Int64
+	realClock            atomic.Bool
 	revoked              atomic.Bool
 	clientCA, serverCA   ownerTestCA
 	profile              value.ConnectorCredentialProfile
@@ -54,7 +55,12 @@ func newConnectorPairFixture(t *testing.T) *connectorPairFixture {
 	f.roles = value.ConnectorIdentityRoles{Source: "source", Journal: "journal", Acknowledgement: "ack", Cleanup: "cleanup", Verifier: "verifier", Finalizer: "finalizer"}
 	return f
 }
-func (f *connectorPairFixture) clock() time.Time { return f.now.Add(time.Duration(f.advance.Load())) }
+func (f *connectorPairFixture) clock() time.Time {
+	if f.realClock.Load() {
+		return time.Now().UTC()
+	}
+	return f.now.Add(time.Duration(f.advance.Load()))
+}
 func (f *connectorPairFixture) owner() *ConnectorProcessCredentials {
 	c, e := NewConnectorProcessCredentials(context.Background(), f.profile, ownerTestID, f, f, f, f, f.clock)
 	if e != nil {
@@ -152,16 +158,18 @@ func (f *connectorPairFixture) IssueProcess(ctx context.Context, id, usage strin
 	return out.Clone(), nil
 }
 func (f *connectorPairFixture) ReadConnectorIdentitySource(context.Context) (value.ConnectorIdentitySource, error) {
-	return value.ConnectorIdentitySource{Observation: value.ConnectorCredentialObservation{Backing: value.ConnectorBackingObservation{Revision: 1, Digest: artifact.Digest{31}, SourceDigest: artifact.Digest{32}}, Profile: f.profile.Clone(), ObservedAt: f.clock(), FreshUntil: f.clock().Add(5 * time.Second)}, Roles: f.roles}, nil
+	now := f.clock()
+	return value.ConnectorIdentitySource{Observation: value.ConnectorCredentialObservation{Backing: value.ConnectorBackingObservation{Revision: 1, Digest: artifact.Digest{31}, SourceDigest: artifact.Digest{32}}, Profile: f.profile.Clone(), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Roles: f.roles}, nil
 }
 func (f *connectorPairFixture) ConnectorLeafRegistration(_ context.Context, c value.ConnectorCredentialCertificate) (app.ConnectorLeafRegistration, error) {
+	now := f.clock()
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	origin, ok := f.origins[c.Digest]
 	if f.revoked.Load() || !ok || origin != f.active || !c.Valid(f.clock()) {
 		return app.ConnectorLeafRegistration{}, value.ErrDenied
 	}
-	return app.ConnectorLeafRegistration{Certificate: c, Process: origin, Revision: f.profile.Revision, ObservedAt: f.clock(), FreshUntil: f.clock().Add(5 * time.Second)}, nil
+	return app.ConnectorLeafRegistration{Certificate: c, Process: origin, Revision: f.profile.Revision, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
 }
 func TestConnectorPairedProcessKeysRenewAndAutomaticallyReplace(t *testing.T) {
 	f := newConnectorPairFixture(t)

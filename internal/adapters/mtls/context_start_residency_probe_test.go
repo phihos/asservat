@@ -16,16 +16,6 @@ import (
 	"asservat.local/asservat/internal/transport/contextstart"
 )
 
-// The original short tests freeze this synthetic attester clock. A real
-// 30-second witness needs a fresh current observation on each actual read.
-// Original setup handles and operation/residency dates remain unchanged.
-type residencyCurrentSource struct{ base *connectorPairFixture }
-
-func (s residencyCurrentSource) ReadConnectorIdentitySource(ctx context.Context) (value.ConnectorIdentitySource, error) {
-	s.base.advance.Store(int64(time.Since(s.base.now)))
-	return s.base.ReadConnectorIdentitySource(ctx)
-}
-
 type residencyProbeReader struct {
 	io.ReadCloser
 	failures chan error
@@ -47,8 +37,8 @@ func (r residencyProbeReader) Read(p []byte) (int, error) {
 func TestContextStartOriginalResidencyCanEndSelectedQuery(t *testing.T) {
 	setup := newContextStartSetupFixture(t)
 	f := setup.f
-	currentSource := residencyCurrentSource{f.connector}
-	f.credential.source = currentSource
+	f.connector.realClock.Store(true)
+	currentSource := f.connector
 	setup.begin = func(ctx context.Context) error {
 		timer := time.NewTimer(4 * time.Second)
 		defer timer.Stop()
@@ -106,9 +96,22 @@ func TestContextStartOriginalResidencyCanEndSelectedQuery(t *testing.T) {
 	opened := time.Now()
 	exchange, e := f.client.Open(owner, f.owner)
 	if e != nil {
-		t.Fatal("original five-second setup failed", e)
+		var diagnostic *contextStartOpeningError
+		if errors.As(e, &diagnostic) {
+			elapsed, remaining := diagnostic.OpeningTiming()
+			t.Fatalf("original five-second setup failed: stage=%s elapsed=%s remaining=%s", diagnostic.FixedStep(), elapsed, remaining)
+		}
+		t.Fatal("original five-second setup failed: closed diagnostic unavailable")
 	}
 	defer exchange.Close()
+	if setup.setup == nil {
+		t.Fatal("opening omitted original setup handle")
+	}
+	setupEnd, bounded := setup.setup.root.Deadline()
+	owned := setup.setup.owned
+	if !bounded || owned.ObservedAt.Before(opened) || !owned.ValidUntil.After(owned.ObservedAt) || owned.ValidUntil.After(owned.ObservedAt.Add(5*time.Second)) || owned.ValidUntil.After(setupEnd) {
+		t.Fatal("setup did not retain a current original bounded proof")
+	}
 	until := <-hubDeadline
 	response, writer, socket, e := exchange.IO()
 	if e != nil {
