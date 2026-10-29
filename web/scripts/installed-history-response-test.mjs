@@ -53,6 +53,7 @@ try {
     if (kind === 'partial' || kind === 'abort') {
       assert.equal(result.requestFailed, true);
       assert.equal(result.readFailure, 'network-failed');
+      assert.equal(result.networkFailure, kind === 'abort' ? 'aborted' : 'content-length');
     } else if (kind === 'navigate') {
       assert.equal(result.requestFailed, false);
       assert.equal(result.readFailure, 'inspector-no-resource');
@@ -76,5 +77,33 @@ for (const [message, failed, expected] of [
   ['Protocol error (Network.getResponseBody): No data found for resource with given identifier', true, 'network-failed'],
 ]) {
   const response = { status: () => 200, body: async () => { throw new Error(message); }, request: () => ({ failure: () => failed ? { errorText: 'synthetic private failure content' } : null }) };
-  assert.deepEqual(await readInstalledHistoryResponse(response), { http: 200, status: 'invalid', body: 'read-failed', reply: null, requestFailed: failed, readFailure: expected });
+  assert.deepEqual(await readInstalledHistoryResponse(response), { http: 200, status: 'invalid', body: 'read-failed', reply: null, requestFailed: failed, readFailure: expected, networkFailure: failed ? 'other' : 'none' });
+}
+
+// The failure snapshot is taken once, only after body rejection. Exact known
+// Chromium strings become finite enums; unknown/private strings never escape.
+for (const [errorText, expected] of [
+  ['net::ERR_ABORTED', 'aborted'],
+  ['net::ERR_HTTP2_PROTOCOL_ERROR', 'http2-protocol'],
+  ['net::ERR_HTTP2_SERVER_REFUSED_STREAM', 'http2-refused'],
+  ['net::ERR_CONNECTION_RESET', 'connection-reset'],
+  ['net::ERR_CONNECTION_CLOSED', 'connection-closed'],
+  ['net::ERR_CONTENT_LENGTH_MISMATCH', 'content-length'],
+  ['net::ERR_INCOMPLETE_CHUNKED_ENCODING', 'incomplete-chunked'],
+  ['net::ERR_FAILED', 'other'],
+  ['private https://secret.invalid/user?token=secret', 'other'],
+  ['net::ERR_ABORTED private suffix', 'other'],
+  [undefined, 'other'],
+]) {
+  let bodyRejected = false, snapshots = 0;
+  const secret = { get message() { throw new Error('exception inspected'); }, toString() { throw new Error('exception rendered'); } };
+  const response = {
+    status: () => 200,
+    body: async () => { bodyRejected = true; throw secret; },
+    request: () => ({ failure: () => { assert(bodyRejected); assert.equal(++snapshots, 1); return { errorText }; } }),
+  };
+  const result = await readInstalledHistoryResponse(response);
+  assert.deepEqual(result, { http: 200, status: 'invalid', body: 'read-failed', reply: null, requestFailed: true, readFailure: 'network-failed', networkFailure: expected });
+  assert.equal(snapshots, 1);
+  assert(!JSON.stringify(result).includes('secret'));
 }
