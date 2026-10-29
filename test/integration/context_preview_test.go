@@ -327,6 +327,56 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 				t.Fatal("original binding interval diagnostic", facts, err)
 			}
 		}
+		// The query is diagnostic only. These administrator-controlled row
+		// witnesses do not substitute for a current authorizing observation.
+		if !facts.TargetBasisWithinLimit || !facts.PermissionStream || !facts.InitialACK || !facts.EpochACK || !facts.TargetBasis || !facts.TargetSequence || !facts.TargetLifetime || !facts.TargetMaintainer || !facts.TargetActivationACK {
+			t.Fatal("accepted namespace-wide permission diagnostic", facts)
+		}
+		for _, witness := range []struct {
+			name, statement                       string
+			basis, sequence, lifetime, maintainer bool
+		}{
+			{"exact-workload", "UPDATE permission_basis SET workload_uids=ARRAY[$2]::text[] WHERE stream_id=$1", true, true, true, true},
+			{"wrong-workload", "UPDATE permission_basis SET workload_uids=ARRAY['other-workload']::text[] WHERE stream_id=$1 AND $2::text<>''", false, false, false, false},
+			{"wrong-namespace", "UPDATE permission_basis SET namespace_uid='other-namespace' WHERE stream_id=$1 AND $2::text<>''", false, false, false, false},
+			{"stale-sequence", "UPDATE permission_basis SET seen_sequence=seen_sequence+1 WHERE stream_id=$1 AND $2::text<>''", true, false, false, false},
+			{"expired-scope", "UPDATE permission_basis SET not_after=clock_timestamp()-interval '1 second' WHERE stream_id=$1 AND $2::text<>''", true, true, false, false},
+			{"no-live-maintainer", "UPDATE permission_assignment SET retired_at=clock_timestamp(),retirement_audit_id=activation_audit_id WHERE stream_id=$1 AND role='workload-maintainer' AND $2::text<>''", true, true, true, false},
+		} {
+			t.Run("stored-permission-"+witness.name, func(t *testing.T) {
+				if _, err := admin.Exec(ctx, witness.statement, p.RootID, s.a.Plan.Input.Target.Request.Workload.UID); err != nil {
+					t.Fatal("controlled permission diagnostic witness", err)
+				}
+				f, err := readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+				if err != nil || !f.TargetBasisWithinLimit || f.TargetBasis != witness.basis || f.TargetSequence != witness.sequence || f.TargetLifetime != witness.lifetime || f.TargetMaintainer != witness.maintainer || f.TargetActivationACK != witness.maintainer {
+					t.Fatal("stored permission diagnostic", f, err)
+				}
+			})
+			if _, err := admin.Exec(ctx, "UPDATE permission_basis SET namespace_uid=$2,workload_uids='{}',seen_sequence=(SELECT sequence FROM permission_stream WHERE id=$1),not_after=NULL WHERE stream_id=$1", p.RootID, s.batch.Bases[0].Scope.Namespace.UID); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Use a genuine accepted change for an unacknowledged activation,
+		// retaining the original acknowledged initial and epoch records.
+		batch := s.batch
+		batch.Bases = append([]cfg.PermissionBasis(nil), batch.Bases...)
+		batch.Initial = nil
+		batch.RequestID = custodyID()
+		batch.InputDigest = artifact.Digest{93}
+		batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+		batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
+		batch.Bases[0].Resource.Generation++
+		batch.Bases[0].Resource.ResourceVersion = "diagnostic-change"
+		batch.Bases[0].Resource.SpecDigest = artifact.Digest{94}
+		batch.Bases[0].Subjects = []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "changed-maintainers"}}
+		batch.Bases[0].ScopeDigest = configapp.PermissionScopeDigest(batch.Bases[0])
+		if _, err := s.p.AcceptPermissions(ctx, batch); err != nil {
+			t.Fatal("unacknowledged accepted permission witness", err)
+		}
+		facts, err = readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+		if err != nil || !facts.PermissionCurrent || !facts.InitialACK || !facts.EpochACK || !facts.TargetSequence || !facts.TargetLifetime || !facts.TargetMaintainer || facts.TargetActivationACK {
+			t.Fatal("unacknowledged activation diagnostic", facts, err)
+		}
 		// This raw-preview fixture has no protected capacity_source/enrollment
 		// parent. Positive demand and Ready-publication diagnostics remain
 		// unqualified here; never bypass their foreign keys to seed witnesses.
