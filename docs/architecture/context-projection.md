@@ -376,6 +376,24 @@ clearing owned bytes and releasing the slot. A failed close retains uncertainty;
 it never produces a positive remote-completion receipt. HTTP transport slots
 remain held until this cleanup returns.
 
+For an acknowledged owned query only, the browser/MCP typed writer sets the
+exact serialized response Content-Length and refuses declared trailers. After
+the existing complete payload write/Flush succeeds and its deadline callback
+joins, a still-live original write context may hand off the HTTP framing deadline
+to min(original owner request deadline, original cleanup cutoff). The byte
+deadline must still be live when this handoff acquires the owner lock; an expired
+or canceled fence is never reset. No room means no handoff, preserving the
+existing successful writer result and unchanged byte deadline. Failed unsent output
+restores the previous Content-Length for the existing problem response; partial
+output keeps the fixed length and forbids appending a problem response.
+The transport handlers perform no later application payload/header/trailer
+writes on this success path. Content-Length rejects additional nonempty writes
+in Go HTTP/1 and HTTP/2; it is not a general seal on a raw ResponseWriter's mutable
+Header map. Ordinary metadata replies have no private owner and keep their
+existing behavior. This handoff adds no authority, completion receipt or retry.
+Flush completion is an application write boundary, not an acknowledgement of
+peer receipt or an instantaneous physical-wire cutoff.
+
 The delivery's read-only `Done` signal is also linked to that reply owner. The
 application request is a child of the HTTP request, so its earlier cutoff or
 cancellation would not otherwise interrupt a blocked outward write. One bounded
