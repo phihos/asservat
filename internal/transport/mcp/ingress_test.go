@@ -340,3 +340,27 @@ func TestMCPRejectionPreservesOriginalDeadlineThroughFinalRead(t *testing.T) {
 		}
 	}
 }
+
+func TestMCPReplyWriterRetainsMetadataClosureFence(t *testing.T) {
+	for _, closed := range []bool{false, true} {
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		until, _ := ctx.Deadline()
+		delivery := &operationDeadline{until: until}
+		if !delivery.retain(presentation.OperationReply{Body: []byte(`{"status":"ok"}`), ValidUntil: until}) {
+			t.Fatal("metadata reply not retained")
+		}
+		if closed {
+			delivery.close(ctx)
+		}
+		w := &deadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
+		sent, err := delivery.write(ctx, w, 200, []byte(`{"result":"metadata"}`), until)
+		cancel()
+		if closed {
+			if err == nil || sent || w.Body.Len() != 0 {
+				t.Fatal("closed metadata reply escaped")
+			}
+		} else if err != nil || !sent || w.Body.String() != `{"result":"metadata"}` || !w.until.Equal(until) || w.Header().Get("Content-Length") != "" {
+			t.Fatal("unowned metadata changed", err)
+		}
+	}
+}

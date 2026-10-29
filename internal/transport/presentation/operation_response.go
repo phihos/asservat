@@ -3,6 +3,8 @@ package presentation
 import (
 	"context"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/domain/identity"
@@ -45,4 +47,54 @@ func WriteOperationResponse(ctx context.Context, w http.ResponseWriter, status i
 		return true, ErrOperationDelivery
 	}
 	return true, nil
+}
+
+// WriteOperationReplyResponse preserves the private owner through browser/MCP
+// serialization. Unowned output retains the existing fixed 64KiB writer.
+func WriteOperationReplyResponse(ctx context.Context, w http.ResponseWriter, status int, body []byte, reply OperationReply, until time.Time, check func(context.Context) error) (bool, error) {
+	if w == nil {
+		return false, ErrOperationDelivery
+	}
+	if reply.owner == nil {
+		return WriteOperationResponse(ctx, w, status, body, until, check)
+	}
+	if len(body) == 0 {
+		return false, ErrOperationDelivery
+	}
+	// No payload or trailers may be appended in the framing-only interval.
+	for key := range w.Header() {
+		if strings.EqualFold(key, "Trailer") || strings.HasPrefix(key, http.TrailerPrefix) {
+			return false, ErrOperationDelivery
+		}
+	}
+	previous, present := w.Header()["Content-Length"]
+	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	sent, err := WriteOperationResponse(ctx, w, status, body, until, check)
+	if err != nil {
+		if !sent {
+			if present {
+				w.Header()["Content-Length"] = previous
+			} else {
+				w.Header().Del("Content-Length")
+			}
+		}
+		return sent, err
+	}
+	// The payload callback has joined. Only HTTP completion may now use the
+	// original finite cleanup/request interval while synchronous Close joins.
+	o := reply.owner
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	end, ok := o.ctx.Deadline()
+	end = identity.Earlier(end, o.cleanupUntil)
+	if !ok || ctx.Err() != nil || !time.Now().Before(until) || o.ctx.Err() != nil || o.closed || !o.acknowledged || !time.Now().Before(end) {
+		return sent, ErrOperationDelivery
+	}
+	if !until.Before(end) {
+		return sent, nil
+	}
+	if http.NewResponseController(w).SetWriteDeadline(end) != nil {
+		return sent, ErrOperationDelivery
+	}
+	return sent, nil
 }

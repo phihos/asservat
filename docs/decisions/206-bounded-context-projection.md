@@ -130,3 +130,49 @@ The [architecture acceptance cases](../architecture/context-projection.md#accept
 must pass before runtime composition advertises either tool. This ADR and its
 offline documentation gates are not evidence of implemented reads, qualified
 native transport, a completed S-02 or existing-install upgrade compatibility.
+
+## Owned HTTP framing after successful payload flush
+
+A local actual TLS/HTTP2 counterexample showed that a complete JSON payload can
+arrive before its original disclosure deadline, with Write/Flush succeeding,
+while deferred synchronous owner cleanup holds the handler past that deadline.
+Go emits END_STREAM after handler return; the retained stream write timer can
+reset the stream before that empty completion. This is a reproduced owned-query
+lifecycle defect, not an attribution of an installed history/settings failure:
+`get_capture_settings` and history metadata replies have no such private owner.
+
+The engineering correction keeps original payload checks, deadlines and joined
+cleanup. Only a successfully flushed acknowledged owned reply can move the
+framing deadline to the earlier ORIGINAL owner/request and cleanup cutoff while
+both the original write context and byte deadline remain live. There is no
+now-plus-grace, timer clearing, asynchronous cleanup or extra application body.
+Exact Content-Length and no declared trailers apply to these owned responses;
+the actual browser/MCP success paths write no later headers or trailers. Failed
+and partial writes never receive this handoff. When both original cutoffs coincide,
+a successful writer remains successful
+without a handoff: immediate joined cleanup can finish normally, while cleanup
+crossing the unchanged deadline can still fail naturally. Unowned metadata stays
+on the existing writer path.
+
+Per owned response this adds one stream-deadline control call, one owner mutex
+acquisition and a bounded Content-Length header value; it adds zero backend/API/
+SQL operations, credentials, watches, services, application timers or goroutines.
+The existing HTTP transport may reset its own stream timer. Aggregate work scales
+with already admitted query responses and preserves their concurrency/output
+ceilings. No new configuration, fallback or upgrade protocol is needed; response
+JSON and public authority intervals are unchanged. Resetting a deadline to zero,
+moving cleanup into a goroutine, or closing/wiping before payload delivery were
+rejected as broader or unsafe alternatives. Doing nothing preserves a concrete
+loss of successful owned responses. This is an agent engineering comparison,
+not a new maintainer requirement or installed-query qualification.
+
+The typed C20/C18/audit fixture exercises real TLS/H2 with synthetic underlying
+authority/reader/ledger ports: full payload arrives before its original cutoff,
+cleanup remains held through that cutoff, and EOF plus actual completion follow
+only after release. Browser serialization and an MCP-shaped wrapper use the
+same typed writer. This does not prove the full production MCP SDK/query route,
+SQL/provider custody or installed public query execution. HTTP/1/H2 controls
+cover exact-length overshoot rejection, valid unsent problem output, original
+parent/cleanup caps, lock-delayed expired/canceled handoff, failed/partial writes,
+trailer refusal and unchanged unowned metadata. Go Flush may complete through
+connection buffering; the contract describes application writes, not peer ACK.
