@@ -52,6 +52,7 @@ type Ring struct {
 	write                                                   int
 	now, through, floor, cleanSince, stopped, evictedBefore time.Time
 	state                                                   RingState
+	evictedRetainedThrough                                  uint64
 }
 
 const ringSegmentHeader = 32
@@ -95,6 +96,7 @@ func (r *Ring) evict(i int) {
 	n := uint64(ringEndian.Uint32(s[4:]))
 	if n > 0 {
 		r.state.HistoryEvicted += n
+		r.evictedRetainedThrough = max(r.evictedRetainedThrough, ringEndian.Uint64(s[24:])+n-1)
 		r.evictedBefore = later(r.evictedBefore, time.Unix(0, int64(ringEndian.Uint64(s[16:]))).Add(time.Nanosecond))
 		r.floor = later(r.floor, r.evictedBefore)
 	}
@@ -132,12 +134,11 @@ func (r *Ring) advance(now time.Time) error {
 }
 func (r *Ring) Advance(now time.Time) error { r.mu.Lock(); defer r.mu.Unlock(); return r.advance(now) }
 
-// ObservedThrough is an explicit owner assertion, never inferred from packets
-// or housekeeping. The owner guarantees all callbacks with original packet
-// time <= at have already been processed; wall time alone is not that proof.
-// Delivery of such an older packet afterward violates this input precondition.
-// Its first assertion establishes the observation start; a
-// later first assertion cannot backfill earlier quiet coverage or renew bounds.
+// ObservedThrough records owner-supplied continuous source operation through at,
+// under declared clock/cut/loss semantics, not every future callback's timestamp.
+// Late buffered records may arrive. The owner must not infer continuity from
+// wall time or an empty queue; actual engine health/clock qualification is pending.
+// The first assertion starts coverage and cannot backfill earlier quiet history.
 func (r *Ring) ObservedThrough(at time.Time) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -225,6 +226,10 @@ func (r *Ring) Add(frame []byte, wire uint32, at, observedAt time.Time) error {
 	if drop != DropNone {
 		return nil
 	}
+	if r.state.Packets.Retained == ^uint64(0) {
+		r.cleanSince = later(r.cleanSince, observedAt.Add(time.Nanosecond))
+		return ErrRingCapacity
+	}
 	size := ringRecordHeader + (n+3)&^3
 	if size > int(r.limits.SegmentBytes)-ringSegmentHeader {
 		r.state.Oversized++
@@ -248,6 +253,9 @@ func (r *Ring) Add(frame []byte, wire uint32, at, observedAt time.Time) error {
 	count := ringEndian.Uint32(s[4:])
 	ringEndian.PutUint32(s[4:], count+1)
 	stamp := uint64(at.UnixNano())
+	if count == 0 {
+		ringEndian.PutUint64(s[24:], r.state.Packets.Retained+1)
+	}
 	if count == 0 || stamp < ringEndian.Uint64(s[8:]) {
 		ringEndian.PutUint64(s[8:], stamp)
 	}
@@ -279,16 +287,21 @@ type RingSnapshot struct {
 }
 
 func (r *Ring) walk(window RingWindow, visit func([]byte)) {
+	r.walkRetained(window, func(b []byte, _ uint64) { visit(b) })
+}
+func (r *Ring) walkRetained(window RingWindow, visit func([]byte, uint64)) {
 	for step := 1; step <= r.limits.MaxSegments; step++ {
 		s := r.segment((r.write + step) % r.limits.MaxSegments)
 		end := ringSegmentHeader + int(ringEndian.Uint32(s))
+		sequence := ringEndian.Uint64(s[24:])
 		for at := ringSegmentHeader; at < end; {
 			n := int(ringEndian.Uint16(s[at+12:]))
 			size := ringRecordHeader + (n+3)&^3
 			t := time.Unix(0, int64(ringEndian.Uint64(s[at:])))
 			if !t.Before(window.From) && !t.After(window.Until) {
-				visit(s[at : at+size])
+				visit(s[at:at+size], sequence)
 			}
+			sequence++
 			at += size
 		}
 	}
@@ -393,6 +406,7 @@ type WindowSnapshot struct {
 	final      RingCoverage
 	finished   bool
 	failure    error
+	cut        uint64
 }
 
 func (r *Ring) BeginWindowSnapshot(processing context.Context, window RingWindow, t0, now time.Time, maxCopyBytes int64) (*WindowSnapshot, error) {
@@ -431,7 +445,7 @@ func (r *Ring) BeginWindowSnapshot(processing context.Context, window RingWindow
 	snapshot := &RingSnapshot{ring: r, data: data[:used]}
 	r.state.FrozenBytes += maxCopyBytes
 	r.state.Snapshots++
-	return &WindowSnapshot{snapshot: snapshot, processing: processing, t0: t0, pre: pre, final: final}, nil
+	return &WindowSnapshot{snapshot: snapshot, processing: processing, t0: t0, pre: pre, final: final, cut: r.state.Packets.Retained}, nil
 }
 
 // Complete copies posthistory once, never growing the admission arena. Source
@@ -450,11 +464,6 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 	if !now.Before(deadline) {
 		return context.DeadlineExceeded
 	}
-	if w.t0.Equal(w.final.Requested.Until) {
-		w.finished = true
-		w.final = w.pre
-		return nil
-	}
 	r := s.ring
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -467,12 +476,15 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 	w.finished = true
 	w.final.SourceStoppedAt = r.stopped
 	if err := r.advance(now); err != nil {
+		if w.t0.Equal(w.final.Requested.Until) && r.state.Packets.Retained == w.cut {
+			w.final = w.pre
+		}
 		return nil
 	}
-	window := RingWindow{w.t0, w.final.Requested.Until}
+	window := w.final.Requested
 	var used int
-	r.walk(window, func(b []byte) {
-		if time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) {
+	r.walkRetained(window, func(b []byte, sequence uint64) {
+		if time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) || sequence > w.cut {
 			used += len(b)
 		}
 	})
@@ -490,8 +502,8 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 	}
 	at := len(s.data)
 	s.data = s.data[:at+used]
-	r.walk(window, func(b []byte) {
-		if time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) {
+	r.walkRetained(window, func(b []byte, sequence uint64) {
+		if time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) || sequence > w.cut {
 			at += copy(s.data[at:], b)
 		}
 	})
@@ -506,12 +518,16 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 		return nil
 	}
 	// Records have nanosecond timestamps; postcoverage excludes the copied t0.
-	post := r.coverage(RingWindow{w.t0.Add(time.Nanosecond), window.Until})
-	w.final.Complete = w.pre.Complete && post.Complete
+	post := w.pre
+	if !w.t0.Equal(window.Until) {
+		post = r.coverage(RingWindow{w.t0.Add(time.Nanosecond), window.Until})
+	}
+	uncopiedEvicted := r.evictedRetainedThrough > w.cut
+	w.final.Complete = w.pre.Complete && (w.t0.Equal(window.Until) || post.Complete) && !uncopiedEvicted
 	w.final.ObservedUntil = post.ObservedUntil
 	w.final.SourceStoppedAt = post.SourceStoppedAt
 	w.final.HistoryEvicted = w.pre.HistoryEvicted || post.HistoryEvicted
-	w.final.InputUnknown = w.pre.InputUnknown || post.InputUnknown
+	w.final.InputUnknown = w.pre.InputUnknown || post.InputUnknown || uncopiedEvicted
 	return nil
 }
 func (w *WindowSnapshot) Coverage() RingCoverage {

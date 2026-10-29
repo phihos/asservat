@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -838,5 +839,129 @@ func TestRingWindowNextChecksProcessingAfterLockWait(t *testing.T) {
 	w.snapshot.mu.Unlock()
 	if err = <-done; !errors.Is(err, ErrRingClosed) || w.snapshot.cursor != 0 {
 		t.Fatal("canceled iterator advanced", err)
+	}
+}
+
+// Revised operational cuts permit buffered late delivery; original times stay
+// binding. These are a correction of the old mathematical watermark premise.
+func TestRingWindowRetainsLatePreAtFinalCut(t *testing.T) {
+	r, now := ringFixture(t, nil)
+	end := now.Add(time.Second)
+	ringAdd(t, r, now, now)
+	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+	defer cancel()
+	w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, now, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	ringAdd(t, r, now, now.Add(time.Millisecond))
+	ringAdd(t, r, end, end)
+	r.ObservedThrough(end)
+	if err = w.Complete(end); err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	var p RingPacket
+	for w.Next(&p) == nil {
+		n++
+	}
+	if n != 3 {
+		t.Fatalf("late pre omitted: got%d want3", n)
+	}
+}
+func TestRingWindowEvictedLatePreIsPartial(t *testing.T) {
+	r, now := ringFixture(t, nil)
+	end := now.Add(time.Second)
+	ringAdd(t, r, now, now)
+	ringAdd(t, r, now, now)
+	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+	defer cancel()
+	w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, now, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	ringAdd(t, r, now, now.Add(time.Nanosecond))
+	ringAdd(t, r, now, now.Add(2*time.Nanosecond))
+	for i := 1; i <= 7; i++ {
+		at := now.Add(time.Duration(i) * time.Millisecond)
+		ringAdd(t, r, at, at)
+	}
+	r.ObservedThrough(end)
+	if err = w.Complete(end); err != nil {
+		t.Fatal(err)
+	}
+	if w.Coverage().Complete || !w.Coverage().InputUnknown {
+		t.Fatal("evicted uncopied late-pre reported full", w.Coverage())
+	}
+}
+
+func TestRingWindowArrivalCutDelayedAndAfterZero(t *testing.T) {
+	for _, afterZero := range []bool{false, true} {
+		t.Run(fmt.Sprint(afterZero), func(t *testing.T) {
+			r, now := ringFixture(t, nil)
+			end := now.Add(time.Second)
+			if afterZero {
+				end = now
+			}
+			ringAdd(t, r, now, now)
+			if !afterZero {
+				ringAdd(t, r, end, end)
+			}
+			r.ObservedThrough(end)
+			ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+			defer cancel()
+			w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, end, 1024)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer w.Close()
+			// Late pre crosses q0; out-of-window newer data must never compensate it.
+			ringAdd(t, r, now, end.Add(time.Nanosecond))
+			ringAdd(t, r, end.Add(2*time.Nanosecond), end.Add(2*time.Nanosecond))
+			if err = w.Complete(end.Add(2 * time.Nanosecond)); err != nil {
+				t.Fatal(err)
+			}
+			n := 0
+			var p RingPacket
+			for w.Next(&p) == nil {
+				n++
+				if p.At.After(end) {
+					t.Fatal("window widened", p.At)
+				}
+			}
+			want := 3
+			if afterZero {
+				want = 2
+			}
+			if n != want {
+				t.Fatal(n, want)
+			}
+			if !w.Coverage().Complete {
+				t.Fatal(w.Coverage())
+			}
+		})
+	}
+}
+func TestRingArrivalSequenceExhaustionRefuses(t *testing.T) {
+	r, now := ringFixture(t, nil)
+	r.state.Packets.Retained = ^uint64(0) - 1
+	ringAdd(t, r, now, now)
+	var sequence uint64
+	r.walkRetained(RingWindow{now, now}, func(_ []byte, q uint64) { sequence = q })
+	if sequence != ^uint64(0) {
+		t.Fatal(sequence)
+	}
+	frame := tcp4(t, true)
+	if err := r.Add(frame[:min(len(frame), Snaplen)], uint32(len(frame)), now, now); !errors.Is(err, ErrRingCapacity) {
+		t.Fatal(err)
+	}
+	if r.state.Packets.Retained != ^uint64(0) {
+		t.Fatal("counter refilled")
+	}
+	r.evict(0)
+	if r.evictedRetainedThrough != ^uint64(0) {
+		t.Fatal(r.evictedRetainedThrough)
 	}
 }

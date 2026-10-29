@@ -192,15 +192,23 @@ Constructor inputs are normalized caller/admin bounds, with the original context
 and hard memory cutoff retained. No source authority, renewal interval, raw
 observation credit or finite policy twenty-second lease is inferred. The owner
 must drive quiet advancement, observation watermarks, stop and joined closure.
-`ObservedThrough(at)` requires all callbacks with original packet time <= at
-to have been processed; a later such callback violates that input precondition.
-The current engine has no qualified event-time watermark. Wall time or a
-packet-free interval alone proves no coverage. Parser/filter/control and encoder
+`ObservedThrough(at)` records consumer-established continuous source operation
+under declared clock, delivered-record cut and loss semantics. It does not
+assert that every future callback has a newer timestamp. The earlier inclusive
+all-future-callback prerequisite was an agent-added restriction, corrected here;
+original window, no-known-gap and explicit uncertainty requirements remain.
+Wall time or a packet-free interval alone proves no coverage. Actual engine
+health, clock mapping and backend backlog qualification remain pending. Parser/filter/control and encoder
 memory are separate from the framed historical arena.
 
 Finite `Snapshot` still copies only available original-time records. The distinct
 `BeginWindowSnapshot` reserves one full `maxCopyBytes` arena and one local snapshot
-slot before pre-copying `[from,t0]`. `Complete` copies only `(t0,until]` once into
+slot before pre-copying `[from,t0]` and recording its retained-arrival cut.
+`Complete` copies original-window records not already copied: original time >t0
+or arrival sequence after that cut. This includes buffered late pre records
+available by the final locked cut, without duplicating the pre-copy or shifting
+original timestamps. Later callbacks are outside the sealed delivered-record set,
+not evidence of lossless physical acquisition. It copies once into
 remaining capacity: no allocation growth, second slot, shifted window or general
 extension. Full capacity is retained even for a quiet window and released once on
 Close; aggregate node/workload reservations belong to the future owner. Pending
@@ -208,14 +216,23 @@ iteration refuses. Successful completion seals immutable records; capacity failu
 is terminal and refuses iteration until cleanup. Invalid early/backward completion
 refuses without advancing the source or sealing the handle. Pre/post coverage is
 computed independently: later live prehistory eviction cannot erase the admitted
-copy, while post eviction, gaps and early stop remain partial.
+copy, while post eviction, gaps and early stop remain partial. First arrival
+sequence fits the existing segment header; record framing/arena size is unchanged.
+A coalesced eviction high-watermark detects post-admission uncopied arrivals:
+these conservatively mark unknown/partial, including evicted late pre records.
+This may also mark partial for unrelated newer arrivals; it is not a measured
+selected-window loss count. Evicting only already-copied pre records does not
+invalidate their independent copy. Sequence exhaustion refuses without refill.
 
 The original processing context/deadline is independent of the ring's source
 memory bound. Completion at or after that memory bound cannot read new post bytes;
 only the existing pre-copy may survive as partial under still-valid processing
 bounds. Cancellation while copying is rechecked before completion: processing
 cancellation refuses output; source cancellation discards the tentative post-copy.
-An after-zero window needs no new acquisition and may seal its existing pre-copy.
+An after-zero window needs no new acquisition; while source memory remains valid
+it can also include late original-window records already delivered by its final
+cut. With closed source memory it can seal a complete pre-copy only if no newer
+retained arrivals could have been omitted, otherwise it stays partial.
 This adds no stopped-source grace. Snapshot-to-ring lock order matches Close;
 coverage returns a locked value and readers never borrow clearable storage.
 
