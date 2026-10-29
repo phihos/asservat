@@ -247,3 +247,29 @@ or permission. Existing source/session admission, actual quiet expiry and callba
 join, replica ceilings, original post-window scheduling, Save, publication, native
 and history/repeat composition remain pending. Ordinary sanitized collection does
 not inherit sensitive raw-predicate credit/session limits.
+
+The private, unused `runPacketRingEngine` bridge now connects the existing finite
+observed-engine callback contract to the real sanitized ring. Its caller supplies
+the same original bounded source context used to create the ring and retains all
+reservations through actual engine join and explicit ring cleanup. Notices mark
+known gaps and cancel acquisition; final loss remains an explicit unknown outcome
+even after source memory expiry. Real engine errors and original cancellation
+remain distinguishable. No callback joins the engine. The bridge asserts no
+`ObservedThrough` or quiet health, and preserves original frame times and the
+processed-arrival window cut; it does not make a new source Ready.
+
+There is no production caller, authority issuer, raw meter, registry, timer,
+goroutine, watch, wire or provider change. Existing finite captures are unchanged.
+Global ring/frozen/CPU/kernel accounting, independently accepted ongoing source
+identity/leases, quiet erasure while a join is delayed, qualified clock/health,
+snapshot processing/encoding/custody and Save remain unwired. Caller-supplied
+objects and synthetic tests cannot replace those owners. The older Gadget clock
+on this branch must compose the independently reviewed MONOTONIC fix before
+actual engine-time qualification. This bridge qualifies callback/ring ownership
+with synthetic finite engines only; it is not an installed ongoing workflow.
+
+A local Linux/amd64 Ryzen7 5700X3D sample (GOMAXPROCS2, three300ms runs) measured
+direct ring callbacks253.8–262.5ns and bridge callbacks258.8–269.2ns, both0B/0alloc
+per callback. Both sample the same owner clock and process synthetic TCP with no
+filter. The sample means differ5.9ns and ranges overlap; this is not installed
+CPU, filter throughput, per-source closure allocation or source-health evidence.
