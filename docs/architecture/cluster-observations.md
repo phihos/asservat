@@ -35,6 +35,15 @@ operation dates and final guard/namespace/Service checks remain unchanged. This
 engineering correction and its explicit component-versus-installed limits are
 recorded in [ADR-150](../decisions/150-operation-owned-native-observation-proof.md#relevant-pod-equivalence-inside-a-native-boundary-2026-10-29).
 
+The direct HWORK caller boundary likewise validates both already-read Pods with
+its existing caller-specific protected projection and compares the unchanged v1
+workload digest plus finalizer equality. Informational status/resourceVersion
+updates alone no longer fail this comparison. Caller Running/node/account,
+identity/deletion, controller/template/spec/labels/annotations and original
+bounds remain required; owner-only Ready/address/Service rules are not added.
+This corrects a local HTTPS-adapter regression, with no additional API calls or
+installed-failure attribution. Full installed availability remains unqualified.
+
 The matching regional primitive now brackets four genuinely new source-value
 reads with two independent native checks. The last native check precedes the
 fourth value read, so a source change during probing is still compared before

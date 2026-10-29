@@ -36,6 +36,7 @@ type ownerLocalNativeFixture struct {
 	token                         []byte
 	revoke, changedPod            bool
 	reviews, pods                 int
+	podReadChange                 func(int, *core.Pod)
 	block                         bool
 	entered, handlerDone, release chan struct{}
 	once, releaseOnce             sync.Once
@@ -115,6 +116,9 @@ func newOwnerLocalNativeFixture(t *testing.T) *ownerLocalNativeFixture {
 		case "/api/v1/namespaces/owners/pods/hwork-rs-pod":
 			f.pods++
 			p := f.pod.DeepCopy()
+			if f.podReadChange != nil {
+				f.podReadChange(f.pods, p)
+			}
 			if f.changedPod {
 				p.Spec.Containers[0].Args = []string{"changed"}
 			}
@@ -305,5 +309,83 @@ func TestOwnerLocalObservationCannotAliasCallerAndOwner(t *testing.T) {
 	pin.Namespace = cfg.NamespaceRef{Name: "other", UID: ownerID(90)}
 	if _, err := NewOwnerLocalObservationOperationReader(f.reader.owner.client, f.reader.owner.guard, f.base.pin, pin); err == nil {
 		t.Fatal("other namespace caller")
+	}
+}
+
+// Both current Pod responses must retain the caller's actual protected fields;
+// resourceVersion and informational status alone are not a workload change.
+func TestOwnerLocalObservationCallerPodEquivalence(t *testing.T) {
+	for _, mode := range []string{"unchanged", "resource-version", "informational-status", "uid", "name", "namespace", "phase", "deletion", "account", "node", "command", "labels", "annotations", "owners", "finalizers"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newOwnerLocalNativeFixture(t)
+			f.podReadChange = func(n int, p *core.Pod) {
+				if n%2 != 0 {
+					return
+				}
+				switch mode {
+				case "resource-version":
+					p.ResourceVersion = "11"
+				case "informational-status":
+					p.ResourceVersion = "11"
+					p.Status.Message = "controller status update"
+					p.Status.Conditions = []core.PodCondition{{Type: core.PodReady, Status: core.ConditionTrue, LastTransitionTime: meta.NewTime(f.base.start)}}
+					p.Status.ContainerStatuses = []core.ContainerStatus{{Name: p.Spec.Containers[0].Name, RestartCount: 1}}
+				case "uid":
+					p.UID = types.UID(ownerID(99))
+				case "name":
+					p.Name = "replacement"
+				case "namespace":
+					p.Namespace = "other"
+				case "phase":
+					p.Status.Phase = core.PodFailed
+				case "deletion":
+					p.DeletionTimestamp = &meta.Time{Time: f.base.start}
+				case "account":
+					p.Spec.ServiceAccountName = "other"
+				case "node":
+					p.Spec.NodeName = "other"
+				case "command":
+					p.Spec.Containers[0].Command = []string{"other"}
+				case "labels":
+					p.Labels["other"] = "changed"
+				case "annotations":
+					p.Annotations = map[string]string{"other": "changed"}
+				case "owners":
+					p.OwnerReferences[0].UID = types.UID(ownerID(99))
+				case "finalizers":
+					p.Finalizers = []string{"example.test/changed"}
+				}
+			}
+			ctx, cancel := context.WithDeadline(context.Background(), f.base.start.Add(5*time.Second))
+			defer cancel()
+			request := value.OwnerObservationRequest{RootID: f.base.pin.RootID, ID: ownerID(80), Challenge: ownerID(81), RequestedAt: f.base.start, NotAfter: f.base.start.Add(5 * time.Second)}
+			op, err := f.reader.Begin(ctx, request, f.base.v.binding, f.token, string(f.pod.UID))
+			positive := mode == "unchanged" || mode == "resource-version" || mode == "informational-status"
+			if !positive {
+				if op != nil {
+					op.Close()
+				}
+				if err == nil || f.pods != 2 {
+					t.Fatalf("critical caller change admitted or second read missing: err=%v reads=%d", err, f.pods)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("equivalent caller rejected: %v (Pod reads=%d)", err, f.pods)
+			}
+			defer op.Close()
+			first, err := op.Original(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			end, err := op.Claim(ctx, f.token, string(f.pod.UID))
+			if err != nil || end.After(first.FreshUntil) {
+				t.Fatal("claim did not retain original bound", err)
+			}
+			final, err := op.Final(ctx)
+			if err != nil || !final.Final || !final.ObservedAt.Equal(first.ObservedAt) || final.FreshUntil.After(first.FreshUntil) || f.pods != 6 || f.reviews != 6 {
+				t.Fatalf("final caller proof/bounds/read count changed: err=%v Pod reads=%d reviews=%d", err, f.pods, f.reviews)
+			}
+		})
 	}
 }
