@@ -75,19 +75,26 @@ failure descriptions. These rows are deliberately not converted into a percentag
 
 ## Homelab trial status
 
-A source-built developer experiment in an owned disposable environment is
-possible today. It uses explicit external PostgreSQL, S3-compatible storage,
-OpenBao and Keycloak inputs and the documented private installer/continuation.
-It is not a supported normal homelab installation or a published release.
-The default Helm package does not start the runtime, `runtime.enabled: true`
-is rejected, and collectors require the disposable-host marker. Internal users
-and the bundled small-deployment profile remain unfinished.
+A source-built, context-only developer experiment can use an ordinary owned
+homelab Kubernetes cluster without a node collector or disposable-node marker.
+It requires external PostgreSQL, S3-compatible storage, OpenBao and Keycloak;
+matching source-built, digest-pinned images accessible to the cluster; and the
+[documented installer setup](installation/helm.md#optional-initial-bootstrap-checkpoint),
+including separate credentials, identity and permission configuration, delegation
+setup where needed, regional enrollment, and private-registry credentials only
+when used. The default Helm install starts no services, but
+`bootstrap.enabled: true` with `bootstrap.continuation.enabled: true` runs the
+existing runtime continuation while `runtime.enabled` remains `false`.
+`runtime.enabled: true` is still rejected.
 
-A repeatable homelab alpha needs a declared supported feature/node profile,
-reliable installed acquisition and download paths, completed privacy checks and
-a verified operator installation procedure with matching build artifacts. It
-can precede the complete feature set without removing any accepted first-release
-requirements. No alpha scope or calendar date is established yet.
+Packet collectors remain [disposable-test-host only](installation/helm.md#node-collector-test-hosts-only);
+do not enable them on ordinary homelab nodes. Internal users and the bundled
+small-deployment profile remain unfinished, and no supported release or alpha
+scope is established. The browser recording-history failure and intermittent
+availability limits below remain relevant limitations, not prerequisites for a
+context-only experiment. Such an experiment can precede the full feature set
+while retaining its authority, custody and privacy checks and all accepted
+first-release requirements. No calendar date is established.
 
 The latest frozen PR #103 candidate, `c328a5af`, passed all fifteen CI jobs
 and fresh review. Its installed campaign produced two passes and one failure:
