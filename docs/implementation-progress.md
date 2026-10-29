@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+
+## Protected ongoing resource projection: SQL component qualified (2026-10-29)
+
+[ADR-262](decisions/262-protected-ongoing-resource-projection.md) records the
+protected resource producer and migration104 on frozen `e261801d`. One owned
+existing PostgreSQL/S3/OpenBao fixture passed both selected top-level tests and
+all 17 required children (20 actual PASS names). Outer/Go/test exits were 0;
+outer 63.371s, Go command 53.815s including compilation, package 13.452s. Root
+independently verified all 3,377 runner source hashes and 36,014 tracked hashes,
+unchanged source, empty cleanup failures and absence of the three exact owned
+containers/IDs, network and scratch. No collector, Kind, BPF or hosted run.
+
+The real SQL path enriched the same original source UID/generation/spec once,
+kept stable later observations, preserved existing finite ready-root reads and
+storage pool/selected-source bytes/charges, committed typed-mutation suspension,
+refused the original expired proof without refund, and preserved rows/fences
+through Down/Up. Prior function definitions/trust were restored exactly. Old
+validators refuse the enriched shape; no rolling/transparent downgrade claim.
+Targets, protection and physical capacity qualification were synthetic. The
+maximum 64-policy metadata check 97.006953ms is not source arm/kernel/CPU or safe
+16-source/16MiB/s performance qualification. Positive observed credit, ordinary
+current authority, source ledger/backing/terminal retirement, actual resource
+reservations, source ownership/quiet stop and Save remain next. ADR-263 active
+lease work is separate and no 30s source lease was implemented here.
+
+Actual archive: build cache
+`codex-bf86-resume/packet-source-resource-producer/owned-fleet-1`.
+Environment SHA256 `a4f11c974c3efeebe9b82863a400f6952d2c98cacdd72714186a8b23fa1313ae`;
+Go log SHA256 `305481d1732745f8170366786509b77fe918fb99ba181390bb0c3ec49d33232a`.
+
 ## Residency witness clock repair; production unchanged (2026-10-29)
 
 Combined `90b474e8` passed local pre-push and fresh review, but
@@ -815,7 +845,7 @@ frozen PR 103 at af9 and its prior evidence are untouched.
 ## Scoped protected policy metadata witnesses (2026-10-28)
 
 The two-case owned PostgreSQL/S3/OpenBao metadata fixture passed on frozen
-`0060ff581c0422f162323c1ab5fb3f1393eb96e9`: exit0, Go17.001s,
+`0060ff581c0422f162323c1ab5fb3f1393eb96e9`: exit 0, Go17.001s,
 outer25.090s, all3346 historical source hashes matched, unchanged=true,
 cleanup[] and exact owned-resource absence independently checked. Actual policy
 admission, finite permit and joined encrypted synthetic PCAPNG stored ACK passed
@@ -854,7 +884,7 @@ merged Python NameError RED/fix, and records protected-backing/native gaps.
 ## Public policy grant and recorder producer continuation (2026-10-28)
 
 The isolated S-04 branch's public request/review/attachment boundary passed its
-focused real PostgreSQL/encrypted S3 fixture at frozen 8caf2ee4: actual Go exit0,
+focused real PostgreSQL/encrypted S3 fixture at frozen 8caf2ee4: actual Go exit 0,
 9.703s, both original reviewer/step-up held-row cases independently left decision
 NULL after their bound. Request and attachment both preserved unknown encrypted
 intent/outcome semantics, exact original journals/expiry and zero execution spend;

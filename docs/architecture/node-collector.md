@@ -330,6 +330,8 @@ No administrator source edit is required for the agent projection correction.
 Existing typed values cannot mutate/disappear at the same generation. Storage
 budgets/pool plans/selected-source canonical bytes remain exactly the old shapes;
 complete accepted-resource digests bind the new sibling. Old absent values retain
-the original nil/canonical representation. Actual SQL qualification is pending.
+the original nil/canonical representation. The owned SQL resource-projection component passed on `e261801d`; see ADR-262
+for actual exits, scope, hashes and rollback limits. No source arming, kernel/CPU
+or safe reference-throughput qualification follows.
 No cached raw CRD bypass is
 needed to retrieve the limits.

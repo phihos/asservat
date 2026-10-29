@@ -1,6 +1,6 @@
 # ADR-262 — Protected ongoing-source resource projection
 
-Date: 2026-10-29. Status: implementation; real SQL qualification pending.
+Date: 2026-10-29. Status: resource projection SQL component qualified; ongoing sources pending.
 Requirements: REQ-LIF-004, REQ-CAP-001/002, REQ-AUT-006.
 
 ## Decision
@@ -22,7 +22,7 @@ by replicas or incident `maxPods`. Missing older node caps mean no ongoing capac
 finite behavior remains. Partial node caps refuse, while policy fields may lower
 individual quantities. Existing ring/frozen lowering values are retained in
 `collector.PolicyLimits`, rather than dropped or fetched later from an unaccepted
-raw object. Node user-space CPU remains request20m/limit500m; no per-source CPU
+raw object. Node user-space CPU remains request 20m/limit 500m; no per-source CPU
 estimate or bound on kernel TC execution is claimed.
 
 Migration104 validates a closed, bounded optional sibling and permits exactly one
@@ -71,10 +71,10 @@ No30s active-leaf contract is selected here (the separate proposal is ADR-263).
 6. Existing absent/invalid/current outcomes; one-way enrichment, no fallback.
 7. Three resource quantities, not machinery-tuning configuration.
 8. Existing strict Kubernetes/Helm/SQL/node interfaces only.
-9. Three64-bit node scalars; optional80-byte policy pair plus pointer/encoding;
+9. Three 64-bit node scalars; optional 80-byte policy pair plus pointer/encoding;
    <=64 policy values/pool,5 KiB of values before overhead. Zero added backend
    roundtrips. The rare same-generation enrichment lazily revalidates the bounded complete
-   snapshot once per monotonic invocation (<=64 policies and16 pools), never
+   snapshot once per monotonic invocation (<=64 policies and 16 pools), never
    once per changed policy. Unchanged observations do not pay this added check.
    This is metadata upgrade work, never packet-path work. Existing SQL loop bounds remain.
 10. Old absent policy values retain canonical bytes; Down preserves historical
@@ -85,3 +85,33 @@ No30s active-leaf contract is selected here (the separate proposal is ADR-263).
 Kernel/perf-buffer/parser CPU and combined source/frozen RAM require actual native
 profile qualification. These reference caps do not prove safe throughput; existing
 capacity rows/amounts and all disclosure/acquisition authority remain unchanged.
+
+## Measured component result (2026-10-29)
+
+One owned existing fleet fixture on frozen `e261801d` passed both selected top-level
+tests and all 17 required children (20 actual PASS names including the existing
+SQL type-alias preflight). Actual outer command exit 0 in 63.371s; Go command 53.815s
+including compilation, reported integration package 13.452s. PostgreSQL/S3/OpenBao
+initial activation and narrow SQL calls were real; target/protection/physical
+qualification facts were explicitly synthetic. No collector, Kind or BPF ran.
+
+The same original source UID/generation/spec advanced the accepted revision once,
+then retained it on identical observations. Existing finite ready-root reads,
+storage pool/selected-source bytes and storage commitments remained unchanged.
+Typed mutation committed suspension, original expired proof refused, and no storage
+refund occurred. Down/Up preserved accepted/negative state and charges; the old
+validator correctly refused the new shape. Separate upgrade checks restored the
+exact prior functions and unchanged trust state. This is not old-binary rolling
+or transparent downgrade qualification.
+
+The synthetic maximum 64-policy validator/monotonic query took 97.006953ms on this
+host/fixture. It is bounded metadata timing, not full 64-policy admission, packet
+throughput, safe source count, CPU/kernel or development-reference qualification.
+All3,377 runner source hashes and 36,014 tracked hashes matched; cleanup was empty,
+with exact three owned container names/IDs, network and scratch absent. Root
+independently verified the terminal evidence. The retained environment SHA256 is
+`a4f11c974c3efeebe9b82863a400f6952d2c98cacdd72714186a8b23fa1313ae`;
+Go log SHA256 is `305481d1732745f8170366786509b77fe918fb99ba181390bb0c3ec49d33232a`.
+The local archive is `codex-bf86-resume/packet-source-resource-producer/owned-fleet-1`
+under the build cache. Source-purpose ledger/backing/retirement, resource
+reservations, authority/lease/arming, quiet erasure and Save remain unimplemented.
