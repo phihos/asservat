@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Browser history response attribution (2026-10-29)
+
+The follow-up to `c328a5af` is diagnostic only. The browser handler reports one
+fixed `response-write-started` stage if its existing write/flush fails after
+output starts; it does not append another response or change any deadline.
+An actual audited TLS/HTTP2 regression reproduced the previously silent branch
+(RED 1.318s); focused races and the full browser race suite passed (33.622s).
+Synthetic witnesses received either a prefix or complete JSON followed by a
+transport error. Neither is attributed to the installed history failure.
+
+The installed driver now distinguishes body-read, empty, UTF-8, JSON and envelope
+failures without retaining response bytes or exception text in diagnostics.
+Nine actual Chromium/loopback controls passed, including truncation and client
+abort. Both armed response waiters retain immediate rejection handling and the
+browser still closes on failure. The imported helper is explicitly included in
+the existing canonical source inventory and its regression check. These changes
+repair missing attribution, not history availability; no functional frontend
+defect or installed cause has been established. Combined checks, fresh CI/review
+and any further installed attempt remain pending.
+
 ## Installed finite policy and renewed native transfer (2026-10-29)
 
 Frozen `c328a5af` passed all fifteen jobs in
