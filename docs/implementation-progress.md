@@ -1,5 +1,49 @@
 # Sustained implementation progress
 
+## Corrections after the c253 installed failures (2026-10-29)
+
+The fixture administrator correction obtains one fresh master/admin-cli token
+immediately before creator disablement and the same mandatory exact provider
+readback. A private fixture copy retains the pinned HTTPS client and five-second
+request timeout and attributes failures to the current child test. Cached
+administrator authorization was rejected; its exact expiry was not retained.
+Actual TLS RED reproduced HTTP 401 (0.017s); focused GREEN races passed (1.913s).
+The original fixture, user authority, TTLs and no-retry behavior remain intact.
+Cost is one fixture token request and zero product-runtime requests. The live
+creator-offboarding and positive artifact chain remain unqualified.
+
+The browser no-outcome branch now retains only ten existing outer failure-stage
+labels or other, stripping nested/provider details without calling Error().
+A real TLS/session/CSRF/audited Begin-failure regression reproduced the lost
+stage (RED 2.305s); focused and full browser/presentation races passed. This adds
+no I/O, state, timer or authority-window change and preserves the HTTP 503 wire
+response. It does not establish or repair the installed history failure's cause;
+see [ADR-255](decisions/255-encrypted-capture-history.md#closed-browser-no-outcome-diagnostic-2026-10-29).
+
+The synthetic native-paced target now has an explicit 200m CPU request/limit;
+all other fixture defaults remain 5m request/100m limit. Review found no product
+100m mandate. Exactly one target changes, with +195m scheduler reservation and
++100m permitted cap for its lifetime; +0.85 CPU-seconds is only the added cap
+within the 8.5-second traffic phase, not actual or whole-fixture consumption.
+Both traffic paths require the actual fetched Pod to declare that exact profile;
+optional CPU diagnostics cannot substitute for it. Traffic records/flushes,
+windows, the 8 MiB cap/near-full guard, product/collector resources and authority
+are unchanged. The old 100m failure remains underfilled and unqualified.
+
+One owned ordinary-HTTP probe on clean `15436479` passed (outer/Go/test 0,
+62.644s outer, 5.376s Go): 16 acknowledged batches, 65,536 records and 4 MiB in
+3.801s. Both actual declarations were 200m and effective quota was 20000/100000
+on the same container. All 3,398 source hashes matched; 35,990 tracked hashes
+matched after archiving generated reports and restoring them. Cleanup was empty
+and exact owned resources/scratch were independently absent.
+It used no collector/BPF or native artifact and supplies no 100m comparison,
+installed Gadget/native-transfer or causal performance result. See
+[ADR-258](decisions/258-slow-native-response-windows.md#explicit-native-paced-target-resource-profile-2026-10-29).
+
+The corrections are composed locally. Final combined repository gates and
+fresh CI/review remain pending; no hosted retry is queued. Full installed
+qualification and the accepted ongoing/source-save work remain unfinished.
+
 ## Installed recording correction results (2026-10-29)
 
 Fresh CI [40784874267](https://github.com/phihos/asservat/actions/runs/40784874267)
@@ -15,8 +59,10 @@ findings. Three guarded installed commands on that frozen candidate all failed:
   unqualified. Go/test returned 1 (524.703s package, policy child 65.81s). The
   later parent-test FailNow message is secondary. Test, upload and Complete-job
   steps finished by 23:30:18 UTC; GitHub's enclosing run/job still reported
-  in_progress at the independent evidence readback. That status discrepancy
-  remains separate from the finalized command failure and artifact evidence.
+  in_progress at the independent evidence readback. The delayed parent status
+  finalized failure at 23:41:11 UTC; actual job execution was 837s. The provider
+  reported 1,500s total including delayed finalization, separately from the
+  finalized command failure and artifact evidence.
 - [History 40786150168](https://github.com/phihos/asservat/actions/runs/40786150168)
   resolved initial AcquisitionNotStarted to accepted and retained the initial
   authenticated 2,060-byte PCAPNG. The browser loaded diagnostics (HTTP 200),
