@@ -53,14 +53,14 @@ the features that depend on them.
 | Bootstrap with Helm | Packaged native reference tests cover replay, managed setup cleanup, uninstall preservation and the protected runtime handover. The continuation now deploys the hub API/console/MCP, worker, federation, regional connector, key service and publisher with protected inputs. | Complete and qualify the supported installed developer workflow and operational lifecycle. The chart still rejects direct runtime enablement. |
 | Sign in through browser/MCP | Keycloak session/refresh/logout and browser/MCP components have real integration evidence. Installed tests sign in through the console, initialize processing, make authenticated MCP calls and perform configured reviewer step-up for an approved recording. | Broader installed session/identity-provider lifecycle, operator configuration and the internal-user alternative. |
 | Request and browse workload context | The bounded pod-status diagnostic, shared UI/MCP controls, SQL admission and encrypted publication have component/native evidence. Earlier regional fixtures complete collection, publication, case lookup, native download, Stop and revocation with synthetic authority inputs. Installed native107 completes browser and MCP capture, publication, approved inspection and native download in two workload clusters. | Reconnect import and Partial states listed below. The diagnostic remains limited to 4,096 native bytes and is not generic file/log/command collection. |
-| Download, Stop and deliberately retry | Real-service component tests cover ranges, interrupted original/new sessions, control negatives, exactly-one-winner admission and retention-observation expiry; authenticated ranges reconstruct a 352-byte artifact without budget refill. Installed native107 covers context transfer, Range resume, Stop, revocation and expiry. | Active-stream interruption on Stop, sustained availability and larger-artifact qualification remain pending. Component synthetic authority inputs and earlier failures remain explicit; the extended PR #103 native stream is not qualified. |
-| Download every evidence type for local tools | Native context download and bounded manual packet PCAPNG download have installed evidence; the current packet cap is 8 MiB. Persistent framed formats and decoders exist. The earlier 2 GiB feasibility lab remains separate prototype evidence. | Large cores/profiles/derivatives and their full publication/window/memory/local-tool qualification remain. PR #103 reached a valid near-full unpaced PCAPNG, but its paced stream, ranges and final completion are unqualified. |
-| Automatic suspicious-event collection | Restart, probe, Alertmanager, log and resource trigger implementations are merged. Focused installed log/resource and bounded recurring-sharing journeys passed ([PR #82](https://github.com/phihos/asservat/pull/82), [PR #79](https://github.com/phihos/asservat/pull/79)). Only bounded counts/metadata leave detector readers. | Ongoing source arming, complete storm/scale coverage and unsupported cgroup-only metrics/log-stream selectors remain. The finite policy-packet grant path in PR #103 is not installed-qualified. |
+| Download, Stop and deliberately retry | Real-service component tests cover ranges, interrupted original/new sessions, control negatives, exactly-one-winner admission and retention-observation expiry; authenticated ranges reconstruct a 352-byte artifact without budget refill. Installed native107 covers context transfer, Range resume, Stop, revocation and expiry. | Active-stream interruption on Stop, sustained availability and larger cores/profiles remain pending. PR #103 now passes its named near-8-MiB paced packet stream, ranges and renewal workflow; this remains unmerged and scoped to the reference profile. |
+| Download every evidence type for local tools | Native context download and bounded manual packet PCAPNG download have installed evidence; the current packet cap is 8 MiB. Persistent framed formats and decoders exist. The earlier 2 GiB feasibility lab remains separate prototype evidence. | Large cores/profiles/derivatives and their full publication/window/memory/local-tool qualification remain. PR #103 now passes its named near-full PCAPNG paced stream, ranges, renewal and final completion. Larger cores/profiles and other supported profiles remain unqualified. |
+| Automatic suspicious-event collection | Restart, probe, Alertmanager, log and resource trigger implementations are merged. Focused installed log/resource and bounded recurring-sharing journeys passed ([PR #82](https://github.com/phihos/asservat/pull/82), [PR #79](https://github.com/phihos/asservat/pull/79)). Only bounded counts/metadata leave detector readers. | Ongoing source arming, complete storm/scale coverage and unsupported cgroup-only metrics/log-stream selectors remain. The finite policy-packet grant path in PR #103 passed its named installed workflow; broader backing, maximum-shape and ongoing paths remain unfinished. |
 | Files, logs, processes and commands | Designed; pod-status is the implemented narrow exception. | Confined whole-pod adapters, bounded execution, partial/error handling, native output and platform qualification. |
-| Packet/syscall rings, save and live watch | Bounded manual header-only PCAPNG capture through the published Inspektor Gadget is merged and native-tested on the named disposable Linux/amd64 profile ([PR #95](https://github.com/phihos/asservat/pull/95)). Approved request continuation passed an installed workflow ([PR #100](https://github.com/phihos/asservat/pull/100)). Each capture is finite, has no prehistory and is capped at 8 MiB. | Ongoing packet/syscall sources, rings, dynamic peers, Save existing recordings and live delivery remain unfinished. The collector retains its disposable-test-host guard. PR #103 has separate incomplete policy, privacy and streaming qualifications. |
+| Packet/syscall rings, save and live watch | Bounded manual header-only PCAPNG capture through the published Inspektor Gadget is merged and native-tested on the named disposable Linux/amd64 profile ([PR #95](https://github.com/phihos/asservat/pull/95)). Approved request continuation passed an installed workflow ([PR #100](https://github.com/phihos/asservat/pull/100)). Each capture is finite, has no prehistory and is capped at 8 MiB. | Ongoing packet/syscall sources, rings, dynamic peers, Save existing recordings and live delivery remain unfinished. The collector retains its disposable-test-host guard. PR #103 passes its named finite policy/privacy and renewed-stream qualifications; browser recording history/repeat remains unqualified. |
 | Runtime profiles and offline analysis | Bounded Go pprof/trace HTTP acquisition preserves native bytes in encrypted frames. Acquisition and passive named-endpoint planning pass component tests, including a real Go CPU handler and synthetic Kubernetes API observations. Guard/node connections and catalog acceptance remain explicit fixture inputs. | Protected endpoint catalog acceptance, profile admission, qualified node dialing, custody/publication and native download; hostile-input-safe analysis, encrypted scratch/Jobs, bounded queries and derivatives. A required console flamegraph viewer has not been accepted or implemented. |
 | Core dumps and compatible debugger workflows | Disposable-VM helper/crash/local-debugger feasibility exists. | Product helper lifecycle, prepaid crash path, live/process selection, exact companions, large downloads and supported node/runtime qualification. |
-| Combined approval and evidence sharing | Independent ad hoc acquisition approval, configured Keycloak step-up and continuation of the original approved recording are merged. Sharing, recipient views, multiple manager teams, capture-time sharing and bounded recurring-policy sharing have merged implementations and focused tests. | Complete cross-feature qualification, remaining raw/result-access grant cases and upgrade role re-production remain. Policy-packet grants in PR #103 are unmerged; its latest privacy validator refusal is unresolved. |
+| Combined approval and evidence sharing | Independent ad hoc acquisition approval, configured Keycloak step-up and continuation of the original approved recording are merged. Sharing, recipient views, multiple manager teams, capture-time sharing and bounded recurring-policy sharing have merged implementations and focused tests. | Complete cross-feature qualification, remaining raw/result-access grant cases and upgrade role re-production remain. Policy-packet grants in PR #103 are unmerged. Its named creator/manager/grant and privacy workflow now passes; this does not establish complete cross-feature qualification. |
 | Capture profiles, guidance, history and repeat | Typed versioned packet/syscall planning and manual network-header execution are merged. Recent context captures, settings and Collect again passed an installed share workflow ([PR #76](https://github.com/phihos/asservat/pull/76)). | General catalog publication/composition/execution, guidance and source-save repetition remain. Encrypted parameterized recording history in PR #103 is not installed-qualified; context history success does not establish recording-history availability. |
 | Permission/privacy administration | Explicit and inherited permissions, access explanations, team/share controls and permission/retention impact previews are implemented. Installed context tests cover revocation, expiry, failed-cleanup charge retention and verified deletion; processing initialization and deletion supervision also exist. | Processing release, overdue/admin reporting, complete operational qualification, browser-session cleanup, managed-copy/backup lifetime closure and sustained availability remain. In-place upgrades have explicitly documented role-grant limitations. |
 | Incident notification and recurrence investigation | Designed, with narrow context case/navigation components. | Trigger-to-case grouping, notification delivery, timelines, findings and recurrence comparison. |
@@ -89,25 +89,30 @@ a verified operator installation procedure with matching build artifacts. It
 can precede the complete feature set without removing any accepted first-release
 requirements. No alpha scope or calendar date is established yet.
 
-The latest frozen PR #103 candidate, `fc0a4491`, passed CI and review but all
-three installed commands failed:
+The latest frozen PR #103 candidate, `c328a5af`, passed all fifteen CI jobs
+and fresh review. Its installed campaign produced two passes and one failure:
 
-- [Policy 40794684939](https://github.com/phihos/asservat/actions/runs/40794684939)
-  completed real creator-disable/readback, manager continuation, publication and
-  authenticated download checks, then failed the ACK/header validator. The
-  rejected rows/file were not retained, so this does not establish a payload leak
-  or the exact failed predicate.
-- [History 40794688705](https://github.com/phihos/asservat/actions/runs/40794688705)
-  stopped before collection: an exact full-thirty-second storage binding was
-  expired despite a current refresh demand. Demand handling remains unproven.
-- [Paced 40794692300](https://github.com/phihos/asservat/actions/runs/40794692300)
-  verified an 8,388,460-byte unpaced PCAPNG under the explicit 200m synthetic
-  target profile, then failed the paced HTTP/2 stream. Ranges, owner/key renewal
-  and final completion were not qualified.
+- [Policy 40842273194](https://github.com/phihos/asservat/actions/runs/40842273194)
+  passed creator disable/readback, sponsoring-manager continuation, grant
+  replacement/revocation, publication, authenticated download and actual
+  ACK/header/no-payload verification. The retained PCAPNG is 2,660 bytes with
+  24 packets. This qualifies the named finite workflow, not ongoing recording.
+- [Paced 40842297608](https://github.com/phihos/asservat/actions/runs/40842297608)
+  passed matching 8,388,476-byte whole bodies, a 6.518-second paced read, resumed
+  ranges, original owner/window, renewal, three key slots, final acknowledgement
+  and Complete under the explicit 200m synthetic target profile.
+- [History 40842283977](https://github.com/phihos/asservat/actions/runs/40842283977)
+  passed initial capture/native verification and storage acknowledgements, then
+  failed at the built React driver's history-list response: HTTP 200 with an
+  unclassifiable reply. Retrieval/parsing failure and malformed reply status are
+  not distinguished yet. Browser settings/repeat remains unqualified. Ten demand
+  refreshes succeeded in this attempt; earlier intermittent cold failures remain
+  unexplained.
 
-All three recorded test exit 1, matching source hashes and no cleanup failures.
-These failures remain release/trial blockers; local reproductions and fixes are
-tracked separately until installed verification passes. There is no dependable
+Root verified actual exits 0/0/1, all 3,405 canonical source hashes, unchanged
+sources, removed scratch and clean teardown. PR #103 remains draft. Earlier
+failures and local reproductions remain in the progress record. These named
+passes do not establish repeatable homelab readiness. There is no dependable
 calendar ETA or overall completion percentage. The next forecasting checkpoint
 is a stable, repeatable supported workflow rather than another component count.
 

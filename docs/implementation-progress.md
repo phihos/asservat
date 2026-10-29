@@ -1,5 +1,52 @@
 # Sustained implementation progress
 
+## Installed finite policy and renewed native transfer (2026-10-29)
+
+Frozen `c328a5af` passed all fifteen jobs in
+[CI 40841093762](https://github.com/phihos/asservat/actions/runs/40841093762),
+with fresh [review approval](https://github.com/phihos/asservat/pull/103#issuecomment-6491607029)
+and no findings. All thirteen comments and zero review threads were read.
+One three-command installed campaign then established two scoped passes:
+
+- [Policy 40842273194](https://github.com/phihos/asservat/actions/runs/40842273194)
+  passed the exact one-byte collector refusal, creator disablement/readback,
+  current sponsoring manager and original expiry, replacement attachment and
+  original-grant revocation, second restart/publication, authenticated retrieval
+  and actual tshark ACK/header/no-payload checks. The retained native PCAPNG is
+  2,660 bytes with 24 packets, SHA-256
+  `fa1071a85ae82c5371de48fb256e59b909e1dc31acc54d79cfcf70f88fb52076`.
+  Go/test returned 0 (573.017s package, 101.68s policy child). The 48 MiB + 1
+  input and 16 MiB output values are reservations, not measured produced bytes.
+- [Paced 40842297608](https://github.com/phihos/asservat/actions/runs/40842297608)
+  passed unpaced and 6.518-second paced retrieval of the same 8,388,476-byte
+  PCAPNG, SHA-256
+  `f85dca73d1fee208d4cdfe3d0cb3af40dbb6636bc7e22338dcb1f2b612853c99`.
+  Root independently matched both whole bodies, the two 4,194,238-byte ranges
+  and stale-If-Range whole result against retained bytes. Original owner/window,
+  at least one lease renewal, one key row/three consumed slots, final ACK and
+  joined closure passed; Complete is true. The actual target was the documented
+  200m reference profile. Go/test returned 0 (660.717s, 191.34s child). This is
+  not a 100m comparison, large-core qualification or an exact renewal-count trace.
+
+[History 40842283977](https://github.com/phihos/asservat/actions/runs/40842283977)
+failed after initial acceptance, native PCAP verification and four storage
+acknowledgements. Ten demand refreshes succeeded in 2.33–2.86 seconds; readiness
+did not fail in this attempt. The built React driver's history-list observation
+reported HTTP 200 with an unclassifiable reply. Its current diagnostic conflates
+body retrieval/JSON failure with an unrecognized status, so the response's cause
+is unresolved. Browser history, edited settings and repeated capture remain
+unqualified. Go/test returned 1 (612.786s, 151.32s child). The earlier intermittent
+cold-readiness failures are not explained or repaired by this attempt.
+
+Root independently verified every run's actual exits, all 3,405 canonical source
+hashes, unchanged sources, empty cleanup failures, removed build scratch and all
+35,997 frozen local tracked hashes. Each job stayed below twenty minutes. API
+timing reports zero Ubuntu billable milliseconds; actual job durations were
+935/987/1,005 seconds. The source freeze is released for isolated local browser
+reproduction; no automatic retry is queued. PR #103 remains draft. Full backing,
+maximum-shape, ongoing sources/rings/save and supported homelab readiness remain
+unfinished; the named passes do not complete S-04.
+
 ## Follow-up to the fc0a installed failures (2026-10-29)
 
 All three guarded installed commands on frozen `fc0a4491` failed, despite
