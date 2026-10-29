@@ -273,3 +273,63 @@ direct ring callbacks253.8–262.5ns and bridge callbacks258.8–269.2ns, both0B
 per callback. Both sample the same owner clock and process synthetic TCP with no
 filter. The sample means differ5.9ns and ranges overlap; this is not installed
 CPU, filter throughput, per-source closure allocation or source-health evidence.
+
+## Protected ongoing-resource projection (not source admission)
+
+`NodeDeployment.Ceilings` now carries aggregate active-source count, input bytes/s
+and input burst alongside the existing separate live-ring/frozen/upload limits.
+The chart renders development references 16 / 16 MiB/s / 16 MiB. All-zero old
+input remains valid for finite work and denies ongoing capacity; partial new node
+caps are invalid. Optional node/workload budget-policy values only lower the
+aggregate limits. `CapacitySource` decoding preserves them in an optional
+`BudgetPolicyObservation.SourceResources`, so complete accepted desired-state digests
+bind edits. Absent optional policy fields retain the original canonical bytes.
+`AcceptedCapacitySource.CurrentSourceResources` returns a value copy only while
+that original accepted source is valid; it is a resource observation, not a
+source permit, team entitlement or permission to read packets.
+
+The closed node decoder is strict. Nonzero new fields sent to an older node or
+connector decoder are rejected; no additive rolling compatibility is claimed.
+Existing finite projections with absent/zero source caps keep their old bytes.
+Use matched versions before relying on these caps; no compatibility fallback or
+new protocol negotiation is introduced. Actual mixed-version deployment behavior
+is not qualified by unit round trips.
+
+This slice adds three 64-bit values to node ceilings/reporting, and an optional
+80-byte pair of node/workload lowering values per decoded policy (plus its pointer
+and ordinary encoding/allocation costs). It adds no API/SQL/provider calls,
+watch, timer, goroutine, permission or source service. At the existing maximum 64 policies per compiled pool,
+the pair values occupy 5 KiB before object/map/encoding overhead; the
+accepted getter returns each optional pair by value. The 500m user-space collector limit
+and 20m request are unchanged. Kernel CPU/perf maps and the full source/snapshot
+memory envelope remain unqualified. Source ledger/current authority, aggregate
+rate/count reservations, lifecycle, quiet erasure and Save remain next.
+
+Proportionality gate: (1) required ordinary resource protection, no new observed
+Native cause; (2) no previously accepted risk reopened; (3) supports ordinary
+ongoing sources across all authorized replicas; (4) reuses existing Kubernetes
+resource/cgroup and protected budget mechanisms, no new registry; (5) zero new
+privileges/credentials/exposure; (6) only existing invalid/absent/current
+projection outcomes, no fallback; (7) three required resource quantities, not
+machinery tuning; (8) existing Kubernetes/Helm/strict codec dependencies only;
+(9) bounded scalars/optional policy pairs, zero extra backend I/O; (10) old absent
+caps preserve finite operation, nonzero strict-wire changes require matched
+versions; (11) extending the existing projection is smaller than a new impact
+profile CRD or pretending ring/upload caps authorize ongoing input. No feature
+completion or installed performance qualification follows from these fields.
+
+The accepted resource projection also retains the EXISTING optional node
+`maxRingBytes`/`maxFrozenBytes` lowering fields, using `collector.PolicyLimits`.
+They were previously discarded by the typed capacity decoder. Future ongoing
+admission must intersect these values with the collector ceilings as well as the
+new source quantities. This patch does not alter finite runtime admission or
+claim that the old finite path already enforces every declared node lowering
+field. Migration104 permits only the one-way same-original-spec lowering enrichment
+specified in [ADR-262](../decisions/262-protected-ongoing-resource-projection.md).
+No administrator source edit is required for the agent projection correction.
+Existing typed values cannot mutate/disappear at the same generation. Storage
+budgets/pool plans/selected-source canonical bytes remain exactly the old shapes;
+complete accepted-resource digests bind the new sibling. Old absent values retain
+the original nil/canonical representation. Actual SQL qualification is pending.
+No cached raw CRD bypass is
+needed to retrieve the limits.

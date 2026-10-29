@@ -388,7 +388,12 @@ def check_collector(directory):
     data = next(r for r in collector if r["kind"] == "ConfigMap")
     assert data["immutable"] is True
     node = json.loads(data["data"]["node.json"])
-    assert node["format"] == "asservat-node-deployment/v1" and node["ceilings"] == {"ringBytes": 268435456, "frozenBytes": 268435456, "uploadBytesPerSecond": 33554432, "uploadBurstBytes": 67108864}
+    assert node["format"] == "asservat-node-deployment/v1" and node["ceilings"] == {"maxActiveSources": 16, "inputBytesPerSecond": 16777216, "inputBurstBytes": 16777216, "ringBytes": 268435456, "frozenBytes": 268435456, "uploadBytesPerSecond": 33554432, "uploadBurstBytes": 67108864}
+    zero = json.loads(json.dumps(base))
+    zero["collector"]["ceilings"] = {"maxActiveSources": 0, "inputBytesPerSecond": 0, "inputBurstBytes": 0}
+    zero_docs = render(zero)
+    zero_node = json.loads(next(r for r in zero_docs if r["kind"] == "ConfigMap")["data"]["node.json"])
+    assert all(name not in zero_node["ceilings"] for name in ("maxActiveSources", "inputBytesPerSecond", "inputBurstBytes")), "zero source caps must preserve the canonical old absent-field representation"
     assert data["metadata"]["name"] == "asservat-node-input." + hashlib.sha256(data["data"]["node.json"].encode()).hexdigest()[:32]
     ds = next(r for r in collector if r["kind"] == "DaemonSet")
     pod = ds["spec"]["template"]["spec"]
@@ -399,6 +404,7 @@ def check_collector(directory):
     assert container["securityContext"] == {"privileged": False, "runAsUser": 0, "runAsNonRoot": False, "allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
                                              "capabilities": {"drop": ["ALL"], "add": ["BPF", "NET_ADMIN", "SYS_RESOURCE", "PERFMON", "SYS_ADMIN", "SYS_PTRACE"]},
                                              "seccompProfile": {"type": "RuntimeDefault"}}
+    assert container["resources"]["requests"]["cpu"] == "20m" and container["resources"]["limits"]["cpu"] == "500m"
     assert container["resources"]["limits"]["memory"] == str(268435456 * 2 + 134217728)
     volumes = {v["name"]: v for v in pod["volumes"]}
     assert volumes["disposable-host"]["hostPath"] == {"path": "/etc/asservat-disposable-host", "type": "File"}, "disposable-host guard missing"
@@ -419,6 +425,8 @@ def check_collector(directory):
                    {"collector": {"connector": {"endpoint": "http://connector:8444", "serverName": "x", "rootsPEM": roots}}},
                    {"collector": {"connector": {"endpoint": "https://connector:8444", "serverName": "x", "rootsPEM": ""}}},
                    {"collector": {"ceilings": {"ringBytes": 8589934592, "frozenBytes": 1, "uploadBytesPerSecond": 1, "uploadBurstBytes": 1}}},
+                   {"collector": {"ceilings": {"maxActiveSources": 0, "inputBytesPerSecond": 1, "inputBurstBytes": 1}}},
+                   {"collector": {"ceilings": {"maxActiveSources": 1, "inputBytesPerSecond": 0, "inputBurstBytes": 1}}},
                    {"collector": {"privileged": True}}]:
         v = json.loads(json.dumps(base))
         for key, value in change.items():

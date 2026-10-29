@@ -1060,7 +1060,10 @@
             "ringBytes",
             "frozenBytes",
             "uploadBytesPerSecond",
-            "uploadBurstBytes"
+            "uploadBurstBytes",
+            "maxActiveSources",
+            "inputBytesPerSecond",
+            "inputBurstBytes"
           ],
           "properties": {
             "ringBytes": {
@@ -1082,8 +1085,51 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 10737418240
+            },
+            "maxActiveSources": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1024
+            },
+            "inputBytesPerSecond": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10737418240
+            },
+            "inputBurstBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10737418240
             }
-          }
+          },
+          "anyOf": [
+            {
+              "properties": {
+                "maxActiveSources": {
+                  "const": 0
+                },
+                "inputBytesPerSecond": {
+                  "const": 0
+                },
+                "inputBurstBytes": {
+                  "const": 0
+                }
+              }
+            },
+            {
+              "properties": {
+                "maxActiveSources": {
+                  "minimum": 1
+                },
+                "inputBytesPerSecond": {
+                  "minimum": 1
+                },
+                "inputBurstBytes": {
+                  "minimum": 1
+                }
+              }
+            }
+          ]
         }
       }
     }

@@ -56,9 +56,10 @@ type capacityDesiredPool struct {
 	Budget                    *PoolBudgetInput
 }
 type capacityDesiredPolicy struct {
-	Pool   string
-	Scope  *BudgetScope
-	Budget *PolicyBudgetInput
+	SourceResources *SourceResourceLimits `json:",omitempty"`
+	Pool            string
+	Scope           *BudgetScope
+	Budget          *PolicyBudgetInput
 }
 type capacityDesiredVersion struct {
 	Version CapacitySourceVersion
@@ -80,7 +81,10 @@ func capacityDesiredBytes(format string, s CapacitySnapshot, versions []Capacity
 		} else {
 			for _, p := range s.Policies {
 				if p.Resource.UID == v.UID {
-					x.Policy = &capacityDesiredPolicy{p.Pool, p.Scope, p.Budget}
+					x.Policy = &capacityDesiredPolicy{Pool: p.Pool, Scope: p.Scope, Budget: p.Budget}
+					if format != CapacitySelectedSourceFormat {
+						x.Policy.SourceResources = p.SourceResources
+					}
 					break
 				}
 			}
@@ -156,6 +160,33 @@ type AcceptedCapacitySource struct {
 
 func (s AcceptedCapacitySource) Valid(now time.Time) bool {
 	return s.Format == CapacityAcceptedSourceFormat && authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && authorization.UUID(s.QualificationID) && s.Revision > 0 && s.Revision < 1<<60 && s.QualificationDigest != (artifact.Digest{}) && s.ProtectionDigest != (artifact.Digest{}) && s.Observation.Valid(now) && identity.Fresh(s.ObservedAt, s.FreshUntil, now, CapacitySourceInterval) && !s.ObservedAt.Before(s.Observation.Snapshot.ObservedAt) && !s.FreshUntil.After(s.Observation.Snapshot.FreshUntil)
+}
+
+// CurrentSourceResources exposes only a copy from this original accepted/current
+// source. It is an administrator resource observation, never an acquisition
+// permit; positive team observation credit and original authority ends remain
+// mandatory at the future source admission boundary.
+func (s AcceptedCapacitySource) CurrentSourceResources(now time.Time, policy string) (SourceResourceLimits, error) {
+	if !s.Valid(now) {
+		return SourceResourceLimits{}, cfg.ErrUnavailable
+	}
+	for _, p := range s.Observation.Snapshot.Policies {
+		if p.Resource.Name != policy {
+			continue
+		}
+		if p.Resource.Deleting || p.Budget == nil {
+			return SourceResourceLimits{}, cfg.ErrUnavailable
+		}
+		if p.SourceResources == nil {
+			return SourceResourceLimits{}, nil
+		}
+		limits := *p.SourceResources
+		if !limits.Node.Valid() || !limits.Workload.Valid() {
+			return SourceResourceLimits{}, cfg.ErrUnavailable
+		}
+		return limits, nil
+	}
+	return SourceResourceLimits{}, cfg.ErrUnavailable
 }
 
 type CapacitySourceAcceptance struct {

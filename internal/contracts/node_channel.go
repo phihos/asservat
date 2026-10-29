@@ -74,6 +74,9 @@ type NodeConnectorEndpoint struct {
 }
 
 type NodeCeilings struct {
+	MaxActiveSources     int64 `json:"maxActiveSources,omitempty"`
+	InputBytesPerSecond  int64 `json:"inputBytesPerSecond,omitempty"`
+	InputBurstBytes      int64 `json:"inputBurstBytes,omitempty"`
 	RingBytes            int64 `json:"ringBytes"`
 	FrozenBytes          int64 `json:"frozenBytes"`
 	UploadBytesPerSecond int64 `json:"uploadBytesPerSecond"`

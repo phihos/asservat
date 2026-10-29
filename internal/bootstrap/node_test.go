@@ -389,6 +389,11 @@ func TestNodeDeploymentValidation(t *testing.T) {
 	if _, err := validNodeDeployment(good); err != nil {
 		t.Fatal(err)
 	}
+	good.Ceilings.MaxActiveSources = 16
+	good.Ceilings.InputBytesPerSecond, good.Ceilings.InputBurstBytes = 16<<20, 16<<20
+	if _, err := validNodeDeployment(good); err != nil {
+		t.Fatal("complete development source ceilings", err)
+	}
 	for name, edit := range map[string]func(*contracts.NodeDeployment){
 		"format":       func(d *contracts.NodeDeployment) { d.Format = "other" },
 		"installation": func(d *contracts.NodeDeployment) { d.InstallationID = "x" },
@@ -400,8 +405,10 @@ func TestNodeDeploymentValidation(t *testing.T) {
 		"junk roots": func(d *contracts.NodeDeployment) {
 			d.Connector.RootsPEM = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n"
 		},
-		"ceiling":   func(d *contracts.NodeDeployment) { d.Ceilings.RingBytes = collector.MaxNodeRingBytes + 1 },
-		"rate only": func(d *contracts.NodeDeployment) { d.Ceilings.UploadBurstBytes = 0 },
+		"ceiling":               func(d *contracts.NodeDeployment) { d.Ceilings.RingBytes = collector.MaxNodeRingBytes + 1 },
+		"rate only":             func(d *contracts.NodeDeployment) { d.Ceilings.UploadBurstBytes = 0 },
+		"source partial":        func(d *contracts.NodeDeployment) { d.Ceilings.InputBurstBytes = 0 },
+		"source count overflow": func(d *contracts.NodeDeployment) { d.Ceilings.MaxActiveSources = collector.MaxActiveSources + 1 },
 	} {
 		d := good
 		edit(&d)

@@ -40,11 +40,11 @@ func WireStatus(epoch string, r collector.Report) contracts.NodeStatus {
 }
 
 func WireCeilings(c collector.Ceilings) contracts.NodeCeilings {
-	return contracts.NodeCeilings{RingBytes: c.RingBytes, FrozenBytes: c.FrozenBytes, UploadBytesPerSecond: c.UploadBytesPerSecond, UploadBurstBytes: c.UploadBurstBytes}
+	return contracts.NodeCeilings{MaxActiveSources: c.MaxActiveSources, InputBytesPerSecond: c.InputBytesPerSecond, InputBurstBytes: c.InputBurstBytes, RingBytes: c.RingBytes, FrozenBytes: c.FrozenBytes, UploadBytesPerSecond: c.UploadBytesPerSecond, UploadBurstBytes: c.UploadBurstBytes}
 }
 
 func DomainCeilings(c contracts.NodeCeilings) collector.Ceilings {
-	return collector.Ceilings{RingBytes: c.RingBytes, FrozenBytes: c.FrozenBytes, UploadBytesPerSecond: c.UploadBytesPerSecond, UploadBurstBytes: c.UploadBurstBytes}
+	return collector.Ceilings{SourceLimits: collector.SourceLimits{MaxActiveSources: c.MaxActiveSources, InputBytesPerSecond: c.InputBytesPerSecond, InputBurstBytes: c.InputBurstBytes}, RingBytes: c.RingBytes, FrozenBytes: c.FrozenBytes, UploadBytesPerSecond: c.UploadBytesPerSecond, UploadBurstBytes: c.UploadBurstBytes}
 }
 
 func text(s string, max int) bool {

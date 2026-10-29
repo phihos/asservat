@@ -169,6 +169,10 @@ collector:
   # budget policy's node limits can only lower them. The container memory
   # limit is ringBytes + frozenBytes + 128 MiB.
   ceilings:
+    # Development reference only; ongoing sources remain unqualified.
+    maxActiveSources: 16
+    inputBytesPerSecond: 16777216
+    inputBurstBytes: 16777216
     ringBytes: 268435456
     frozenBytes: 268435456
     uploadBytesPerSecond: 33554432

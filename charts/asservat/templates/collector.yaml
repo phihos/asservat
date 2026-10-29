@@ -19,7 +19,13 @@
 {{- $ready := and (hasPrefix "https://" $conn.endpoint) (ne $conn.serverName "") (contains "-----BEGIN CERTIFICATE-----" $conn.rootsPEM) }}
 {{- if and (not $ready) (not $published) }}{{ fail "collector.connector requires the connector's https endpoint, certificate server name and issuing roots (or leave all three empty with cluster.enabled)" }}{{ end }}
 {{- $name := printf "%s-node" .Release.Name }}
-{{- $input := dict "format" "asservat-node-deployment/v1" "installationID" $c.installationID "clusterID" $c.clusterID "connector" (dict "endpoint" $conn.endpoint "serverName" $conn.serverName "rootsPEM" $conn.rootsPEM) "ceilings" (dict "ringBytes" (int64 $c.ceilings.ringBytes) "frozenBytes" (int64 $c.ceilings.frozenBytes) "uploadBytesPerSecond" (int64 $c.ceilings.uploadBytesPerSecond) "uploadBurstBytes" (int64 $c.ceilings.uploadBurstBytes)) }}
+{{- $ceilings := dict "ringBytes" (int64 $c.ceilings.ringBytes) "frozenBytes" (int64 $c.ceilings.frozenBytes) "uploadBytesPerSecond" (int64 $c.ceilings.uploadBytesPerSecond) "uploadBurstBytes" (int64 $c.ceilings.uploadBurstBytes) }}
+{{- if gt (int64 $c.ceilings.maxActiveSources) 0 }}
+{{- $_ := set $ceilings "maxActiveSources" (int64 $c.ceilings.maxActiveSources) }}
+{{- $_ := set $ceilings "inputBytesPerSecond" (int64 $c.ceilings.inputBytesPerSecond) }}
+{{- $_ := set $ceilings "inputBurstBytes" (int64 $c.ceilings.inputBurstBytes) }}
+{{- end }}
+{{- $input := dict "format" "asservat-node-deployment/v1" "installationID" $c.installationID "clusterID" $c.clusterID "connector" (dict "endpoint" $conn.endpoint "serverName" $conn.serverName "rootsPEM" $conn.rootsPEM) "ceilings" $ceilings }}
 {{- $json := toJson $input }}
 {{- $digest := sha256sum $json }}
 # ADR-246: the collector namespace is the only namespace with the privileged

@@ -158,3 +158,50 @@ func TestCapacitySourcePreservesCallerDeadline(t *testing.T) {
 		t.Fatal("old observation renewed by another clock read")
 	}
 }
+
+func TestCapacitySourceRetainsOngoingLimitsInProtectedDesiredDigest(t *testing.T) {
+	pool, policy := capacityObjects(t)
+	spec := policy["spec"].(map[string]any)
+	node := spec["node"].(map[string]any)
+	workload := spec["workload"].(map[string]any)
+	node["maxActiveSources"], node["inputBytesPerSecond"], node["inputBurstBytes"] = 4, 2<<20, 1<<20
+	workload["maxActiveSources"] = 2
+	node["maxRingBytes"], node["maxFrozenBytes"] = 64<<20, 32<<20
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.HasSuffix(r.URL.Path, "/evidencestoragepools") {
+			permissionReply(w, permissionList("EvidenceStoragePool", "pool-list", "", pool))
+			return true
+		}
+		if strings.HasSuffix(r.URL.Path, "/evidencebudgetpolicies") {
+			permissionReply(w, permissionList("EvidenceBudgetPolicy", "policy-list", "", policy))
+			return true
+		}
+		return false
+	})
+	f.clock.Store(time.Now().UTC().UnixNano())
+	reader, err := NewCapacitySource(f.client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := reader.ReadCapacitySource(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := a.Snapshot.Policies[0].SourceResources
+	if got == nil || got.Node.MaxActiveSources != 4 || got.Node.InputBytesPerSecond != 2<<20 || got.Node.InputBurstBytes != 1<<20 || got.Workload.MaxActiveSources != 2 || got.Node.RingBytes != 64<<20 || got.Node.FrozenBytes != 32<<20 {
+		t.Fatal("protected decoder discarded source caps", got)
+	}
+	node["maxActiveSources"] = 3
+	b, err := reader.ReadCapacitySource(context.Background())
+	if err != nil || b.Digest == a.Digest {
+		t.Fatal("source cap edit did not change accepted desired digest", err)
+	}
+	node["maxActiveSources"] = -1
+	c, err := reader.ReadCapacitySource(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Snapshot.Policies[0].Budget != nil {
+		t.Fatal("invalid cap supplied typed budget")
+	}
+}

@@ -203,3 +203,37 @@ Recording saves spend the same policy/workload occurrence cooldown/rate and per-
 ## Live-view isolation
 
 [REQ-LIV-004](live-watch.md#req-liv-004--protect-collection-and-workload-resources) defines independent viewer slots, scan/CPU, replay memory and output/transfer counters within existing hierarchical accounts. A filter that returns few rows can still scan many events; enforce both. Charge retries and preserve counters through edits/pause/reconnect. Source rings, frozen snapshots and protected incident uploads are separate reservations; no per-view ring pin or optimistic resource refund. Apply workload and principal caps across tabs/clients, with node/installation aggregate limits. Slow clients drop/stop rather than block acquisition; retain explicit unknown/lost coverage. Operator metrics/capacity views report counts/bytes/reason enums without live content or high-cardinality row labels.
+
+### Ordinary ongoing source resource projection (ADR-262)
+
+The protected `EvidenceBudgetPolicy` node and workload limits may lower aggregate
+`maxActiveSources`, `inputBytesPerSecond` and `inputBurstBytes`. Zero/absent policy
+fields add no lowering; they never multiply a node or workload allowance by Pod,
+policy generation or incident `maxPods`. The source issuer must consume the
+original accepted/current complete budget projection, independently of current
+collection authority and positive cumulative automation `maxObservedBytes`.
+Zero cumulative observed credit denies acquisition; ordinary sanitized sources do
+not acquire a raw grant merely to fund these resource limits.
+
+The node's installation-owned ceilings are complete positive values or all zero.
+Absent older node ceilings deny ongoing resource capacity only; existing finite
+operations retain their behavior. Development reference defaults are sixteen
+active sources, 16 MiB/s aggregate input and a 16 MiB burst per node. Structural
+validation ceilings (1,024 sources and 10 GiB/s/10 GiB) are parser/arithmetic
+bounds, not qualified profiles. Sources must receive shared slices whose sums
+fit the aggregate ceilings, never one full allowance per source. This projection
+alone implements no reservation ledger, arming, observation permit or lease.
+
+The existing collector request of 20m and CPU limit of 500m remain unchanged.
+They bound its user-space cgroup, not kernel TC/BPF execution. Source count/rate,
+small-packet CPU, kernel maps/perf buffers and combined live/frozen memory require
+native performance qualification before ongoing collection is enabled. No
+per-source CPU cost, safe throughput, active lease duration or new approval step
+is established by these development defaults.
+
+The accepted policy resource observation is separate from the immutable storage
+budget. A one-way parser projection enrichment may add only validated lowering
+limits under the same original source identity/spec; it cannot change existing
+storage quantities, alter already typed caps at the same generation, renew
+collection authority or clear restrictive watermarks. Administrator configuration
+churn or a new approval is not required to repair that compiler projection.
