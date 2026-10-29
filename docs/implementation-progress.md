@@ -40,9 +40,14 @@ It used no collector/BPF or native artifact and supplies no 100m comparison,
 installed Gadget/native-transfer or causal performance result. See
 [ADR-258](decisions/258-slow-native-response-windows.md#explicit-native-paced-target-resource-profile-2026-10-29).
 
-The corrections are composed locally. Final combined repository gates and
-fresh CI/review remain pending; no hosted retry is queued. Full installed
-qualification and the accepted ongoing/source-save work remain unfinished.
+The corrections passed final combined checks on clean `9a9d5c0f`: canonical
+pre-push 0 (30.020s, including 231 console tests), maintained libpcap 0 (7.476s),
+browser no-outcome races 0 and all eight selected fixture/profile races 0.
+All 35,992 tracked hashes stayed unchanged; the tree was clean after checks.
+Independent review of all twelve changed files versus `c253525f` found no blocker.
+The subsequent measured-result updates are docs-only with code byte-identical.
+Fresh exact-head CI/review and installed qualification remain pending; no hosted
+retry is queued. The accepted ongoing/source-save work remains unfinished.
 
 ## Installed recording correction results (2026-10-29)
 
