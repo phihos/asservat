@@ -446,3 +446,47 @@ JSON alongside. This docs-only follow-up leaves tested code byte-identical.
 The old 100m failures remain retained; no performance improvement, causal fix,
 bootstrap/provider-operation, native artifact, owner-renewal or complete installed
 qualification follows from this normal-HTTP component pass.
+
+### Private completion across retained peer observations (2026-10-29)
+
+The installed `fc0a4491` paced run `40794692300` retained a valid authenticated
+8,388,460-byte PCAPNG and passed the unchanged near-full guard, then failed the
+paced body with HTTP/2 INTERNAL_ERROR. Its sampled closed diagnostics include
+`send-done/proof-lease` with at least two seconds of caller time left. They do
+not identify which lease predicate failed or uniquely correlate every sampled
+refusal, so the installed subcause remains unproven.
+
+A local regression through the actual HubAdmission, router, operation, regional
+worker and two-hop mTLS/H2 reproduces a concrete defect at that same closed step.
+The hub has separate inner operation and outer peer frame gates. The existing
+one-second frame observation reuse can retain outer response sequence 1 while
+the inner operation positively closes its exact SQL lease at sequence 2. The
+private bridge previously replaced only the gate pointer, then compared the
+inner lease to the older outer snapshot as though both were the same gate.
+
+The bridge now validates the exact live inner completion proof and live outer
+snapshot independently. Both must retain the same operation and certificate;
+a lagging outer sequence is allowed only for a response, never a newer outer
+sequence or a changed inner completion sequence. It maps the private proof to
+that exact outer snapshot solely for the zero-byte final marker. The existing
+server validator stays strict. The write remains bounded by the minimum of the
+original completion proof, retained inner and outer cutoffs, and caller context.
+Expired or closed gates, cancellation, changed identity and nonterminal frames
+still refuse. No data, metadata, key, additional SQL or new-work authority uses
+this mapping; positive SQL close remains once-only and refunds nothing.
+
+Complexity gate: (1) one observed installed failure plus a deterministic local
+protocol defect; installed causation is not yet established. (2) the accepted
+bounded observation reuse remains intact. (3) normal renewed response closure
+benefits. (4) reuse the existing private completion capability and Go context
+intersection; no novel protocol. (5) zero privileges, credentials or exposure
+added. (6) zero new runtime states or fallback modes. (7) zero configuration.
+(8) no new external dependency. (9) zero extra API/SQL/provider calls, watches,
+background goroutines; two existing gate snapshot locks and one bounded
+derived context per terminal send, with at most one scoped deadline timer when
+a retained cutoff is earlier than its parent, O(1) transient memory. (10) no wire,
+schema or persistent-state change; rollback restores the earlier refusal.
+(11) pointer-only relabelling is insufficient; synchronizing with a fresh full
+peer check would add blocking work after exact SQL closure. The local tests
+keep source, SQL outcomes and peer authority explicitly synthetic; they do not
+qualify installed paced completion, owner renewal, key slots or ranges.

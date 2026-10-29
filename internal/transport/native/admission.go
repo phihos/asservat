@@ -214,8 +214,25 @@ func (s *peerStream) sendCompleted(ctx context.Context, f contracts.NativeFrame,
 	if !ok || proof.gate == nil || proof.gate != s.inner {
 		return step("completion-proof", contracts.ErrNativeProtocol)
 	}
-	proof.gate = s.outer
-	return terminal.sendCompleted(ctx, f, proof)
+	// The peer gate can still hold its valid previous response observation
+	// while the inner operation has acknowledged closure at a newer sequence.
+	// This is only a zero-byte completion bridge, never a lease for new work.
+	inner, innerErr := s.inner.TerminalLease(ctx)
+	outer, outerErr := s.outer.TerminalLease(ctx)
+	if innerErr != nil || outerErr != nil || !proof.lease.Valid(time.Now()) ||
+		!inner.Operation.Equal(proof.lease.Operation) || inner.Certificate != proof.lease.Certificate || inner.Sequence != proof.lease.Sequence ||
+		!outer.Operation.Equal(proof.lease.Operation) || outer.Certificate != proof.lease.Certificate || outer.Sequence > proof.lease.Sequence ||
+		(outer.Sequence != proof.lease.Sequence && outer.Operation.Kind != value.NativeResponse) {
+		return step("completion-lease", contracts.ErrNativeProtocol)
+	}
+	// Retain all three original cutoffs and the caller's context. Mapping to
+	// the exact outer snapshot lets the server keep its strict comparison;
+	// it does not claim SQL closed under the older peer observation.
+	until := identity.Earlier(proof.lease.Until, identity.Earlier(inner.Until, outer.Until))
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	proof.gate, proof.lease = s.outer, outer
+	return terminal.sendCompleted(call, f, proof)
 }
 func (c *peerConversation) Close() error {
 	c.gate.Close()
