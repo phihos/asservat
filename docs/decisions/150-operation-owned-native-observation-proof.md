@@ -337,3 +337,40 @@ payload cost. At most four additional canonical digests of the existing 128 KiB
 maximum are computed per two-peer operation. Reuse avoids another partially
 duplicate security-sensitive comparison. No native availability success is
 claimed from these local results.
+
+### Owned real-API result for relevant Pod equivalence
+
+One existing `TestOwnerObservationOperationWithRealKubernetes` selection passed
+on frozen `ce643e545b8d630cc30c5416ae230fe3dcaaab6b`, using two fresh owned
+Kind clusters and the existing provider fixture. Outer, Go and selected-test
+exits were zero; the selected parent took 9.92 seconds and the Go command
+10.985 seconds. All eight required parent/child PASS markers were present:
+a cold pair, five immediately consecutive pairs using the same clients, and
+an actual administrator Pod-annotation mutation that suppresses final facts.
+Each successful pair used exactly 30 observer and six independent probe requests
+with four expected HTTP negative results: two denied dry-run updates and two
+absent legacy release-record GETs. The cold pair took 0.502 seconds; subsequent
+pairs took 1.499–1.500 seconds, retaining 3.499–3.501 seconds of the original
+five-second interval. No API count or authority bound was increased.
+
+All 3,408 retained source hashes matched the frozen candidate and remained
+unchanged. The two actual current output reports were archived before restoring
+only their two generated paths; all 36,001 tracked files then matched the tested
+head. Cleanup failures were empty. Independent checks against a healthy Docker
+daemon found the six owned containers, two networks, two Kind clusters, helper
+image tag/ID and owned temporary directory absent, with no new volumes remaining.
+The generic metadata mode reports neither a separate build-scratch field nor a
+provider-log exit; those are not silently represented as successful zero values.
+The worker binary SHA256 was
+`a744e97c3a8a1ba72ddf45334454aeef0ed4d7c4979b126683a98017efadf7e8`;
+the actual environment report SHA256 was
+`55d79e3734279cdf383eabcd6aafdbf208146e888c81d08da961535161a6d4b7`.
+The archived verification report SHA256 is
+`996e40d42857b8e1fac3e0ce111b35fe495369b2e39beb3b92df67819af940d0`.
+
+This qualifies the real Kubernetes native primitive. Installation pins and
+process identifiers remain synthetic; this test does not qualify the owner
+SQL/TLS/ordinal-four wire composition or an installed workflow. The exact
+within-bracket status overlap remains the separately proven synthetic HTTPS
+regression. No BPF, Gadget or node collector ran locally. Native 40849033981's
+combined final-native failure is still unattributed; no hosted retry followed.
