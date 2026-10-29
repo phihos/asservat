@@ -188,7 +188,10 @@ func TestOwnedResponseNoRoomKeepsSuccessfulWriteAndOriginalFence(t *testing.T) {
 				until = time.Now().Add(100 * time.Millisecond)
 				guard := &replyGuardFixture{}
 				if held {
-					guard.close = func(c context.Context) error { <-release; <-c.Done(); return c.Err() }
+					// No remote completion is acknowledged in this synthetic
+					// branch. Actual C14/SQL guards separately fence the effect
+					// instant; a late local return alone cannot prove failure.
+					guard.close = func(context.Context) error { <-release; return ErrOperationDelivery }
 				}
 				body := []byte(`{"status":"ok"}`)
 				reply, err := ownOperationReply(ctx, OperationReply{Body: body, ValidUntil: until}, guard, until, func(context.Context, audit.OperationOutcome) error { return nil })
@@ -224,7 +227,7 @@ func TestOwnedResponseNoRoomKeepsSuccessfulWriteAndOriginalFence(t *testing.T) {
 				}
 				close(release)
 				if err = <-closed; err == nil {
-					t.Fatal("expired cleanup fabricated success")
+					t.Fatal("unacknowledged close fabricated success")
 				}
 			} else if err != nil {
 				t.Fatal("immediate cleanup lost normal EOF", err)
