@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	planningapp "asservat.local/asservat/internal/application/planning"
+	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
@@ -26,25 +27,48 @@ import (
 // or policy occurrence row. Target/report/initial identity observations remain
 // explicitly synthetic component inputs, not installed authority qualification.
 func admitManualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.Pool, admissions *postgres.ContextAdmissions, accepted policySourceAcceptedFixture, original captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, maximumBytes int64, beforeAdmission ...func(*testing.T, capturevalue.Admission, capturevalue.ContextPreview)) policySourceSnapshotAdmissionFixture {
-	return manualRecordingSaveFixture(t, ctx, hub, admissions, accepted, original, fresh, maximumBytes, true, beforeAdmission...)
+	return manualRecordingSaveFixture(t, ctx, hub, admissions, accepted, original, fresh, maximumBytes, true, nil, beforeAdmission...)
 }
 
-func prepareManualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.Pool, accepted policySourceAcceptedFixture, original captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, maximumBytes int64) policySourceSnapshotAdmissionFixture {
-	return manualRecordingSaveFixture(t, ctx, hub, nil, accepted, original, fresh, maximumBytes, false)
+func prepareManualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.Pool, accepted policySourceAcceptedFixture, original captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, maximumBytes int64, readers ...*manualRecordingSaveReaders) policySourceSnapshotAdmissionFixture {
+	var prepared *manualRecordingSaveReaders
+	if len(readers) > 0 {
+		prepared = readers[0]
+	}
+	return manualRecordingSaveFixture(t, ctx, hub, nil, accepted, original, fresh, maximumBytes, false, prepared)
 }
 
-func manualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.Pool, admissions *postgres.ContextAdmissions, accepted policySourceAcceptedFixture, original captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, maximumBytes int64, commit bool, beforeAdmission ...func(*testing.T, capturevalue.Admission, capturevalue.ContextPreview)) policySourceSnapshotAdmissionFixture {
+// Long-lived real readers and one immutable source-list snapshot for a grouped
+// fixture request. Current per-target SQL rights/retention/storage are not cached.
+type manualRecordingSaveReaders struct {
+	Sources   []captureapp.PolicySourceState
+	Current   *postgres.AutomationAuthorities
+	Storage   *postgres.ContextStorageReader
+	Retention *privacyapp.AcceptedRetentionReader
+}
+
+func manualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.Pool, admissions *postgres.ContextAdmissions, accepted policySourceAcceptedFixture, original captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, maximumBytes int64, commit bool, prepared *manualRecordingSaveReaders, beforeAdmission ...func(*testing.T, capturevalue.Admission, capturevalue.ContextPreview)) policySourceSnapshotAdmissionFixture {
 	t.Helper()
 	var out policySourceSnapshotAdmissionFixture
 	s := accepted.Scenario
-	guards := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
-	ledger, err := postgres.NewPolicySources(ctx, hub, s.a.RootID, fresh.Recovery.InstallationID, guards)
-	if err != nil {
-		t.Fatal("snapshot source reader", err)
-	}
-	rows, err := ledger.ListSources(ctx, accepted.Authority.PolicyUID)
-	if err != nil {
-		t.Fatal("retained original source", err)
+	var rows []captureapp.PolicySourceState
+	var current *postgres.AutomationAuthorities
+	var storageReader *postgres.ContextStorageReader
+	var err error
+	if prepared != nil {
+		rows = prepared.Sources
+		current = prepared.Current
+		storageReader = prepared.Storage
+	} else {
+		guards := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
+		ledger, e := postgres.NewPolicySources(ctx, hub, s.a.RootID, fresh.Recovery.InstallationID, guards)
+		if e != nil {
+			t.Fatal("snapshot source reader", e)
+		}
+		rows, err = ledger.ListSources(ctx, accepted.Authority.PolicyUID)
+		if err != nil {
+			t.Fatal("retained original source", err)
+		}
 	}
 	var source *captureapp.PolicySourceState
 	for n := range rows {
@@ -68,21 +92,30 @@ func manualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.
 	defer end()
 	// The capture correlation identity is not a detector policy_occurrence.
 	occurrenceID := custodyID()
-	current, err := postgres.NewAutomationAuthorities(bound, hub, s.a.RootID, fresh.Recovery.InstallationID)
-	if err != nil {
-		t.Fatal(err)
+	if current == nil {
+		current, err = postgres.NewAutomationAuthorities(bound, hub, s.a.RootID, fresh.Recovery.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	projection, err := current.PolicyAutomationAuthority(bound, fresh.Authority, source.Target.Target())
 	if err != nil {
 		t.Fatal("current real policy eligibility projection", err)
 	}
-	retained, err := manualGroupRetentionPolicies(bound, s.retention, source.Target.Target())
+	var retained privacy.PolicySet
+	if prepared != nil && prepared.Retention != nil {
+		retained, err = prepared.Retention.RetentionPolicies(bound, source.Target.Target())
+	} else {
+		retained, err = manualGroupRetentionPolicies(bound, s.retention, source.Target.Target())
+	}
 	if err != nil {
 		t.Fatal("current accepted retention sources", err)
 	}
-	storageReader, err := postgres.NewContextStorageReader(bound, hub, s.a.RootID)
-	if err != nil {
-		t.Fatal(err)
+	if storageReader == nil {
+		storageReader, err = postgres.NewContextStorageReader(bound, hub, s.a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	storage, err := storageReader.ContextStorage(bound, source.Target.Target())
 	if err != nil {
@@ -152,9 +185,12 @@ func manualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.
 	if err != nil {
 		t.Fatal("real source snapshot accepted plan", err)
 	}
-	recovery, err := s.recovery.reader.RecoveryState(bound)
-	if err != nil {
-		t.Fatal(err)
+	recovery := fresh.Recovery
+	if prepared == nil {
+		recovery, err = s.recovery.reader.RecoveryState(bound)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	a := s.a
 	a.Plan, a.Eligibility, a.Storage, a.Recovery = plan, eligible, storage.Binding, recovery

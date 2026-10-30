@@ -59,6 +59,16 @@ around basis selection, timestamp sampling and persistence. Production fencing
 and original freshness bounds are unchanged. The failed run's source hashes,
 three archived artifacts, restored results and owned cleanup were independently
 verified, including preservation of all 16 pre-existing containers.
+The second sixteen-source run (`manual-group16-central-sql109-2`, `5ca61018`)
+reached source admission but exhausted the original five-second proof window:
+preparation took 3,306 ms, leaving 1,794 ms; admission stopped before the injected
+last-child failure. A positive preparation took 3,267 ms and also failed admission.
+Its actual exit was 1, with the same terminal source/result/cleanup verification.
+The fixture repeated 16 full controller-refresh cycles, reader constructors and
+source-list reads. Group preparation is being aligned with production's existing
+shared readers and source-set read, while retaining each target's real permission,
+retention and storage checks and one original proof interval. No timing bound is
+increased and no sixteen-source success is inferred from this failure.
 
 Failures are retained rather than counted as passes. Ordinary prefix 1 exposed
 the missing group table in the exact first-install inventory; a failing local

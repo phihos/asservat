@@ -235,14 +235,45 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 	}
 	t.Logf("group_sources=%d additional_source_arm_ms=%d metadata_controls_total=%d", count, time.Since(sourceStarted).Milliseconds(), 2*count+1)
 	maximumBytes := min(policy.Compiled.Recorder.Action.MaxBytes, int64(artifact.RecordingNativeLimit))
+	var preparedReaders *manualRecordingSaveReaders
+	if count > 2 {
+		setupStarted := time.Now()
+		current, e := postgres.NewAutomationAuthorities(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID, policy.Authority.InstallationID)
+		if e != nil {
+			t.Fatal(e)
+		}
+		storage, e := postgres.NewContextStorageReader(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID)
+		if e != nil {
+			t.Fatal(e)
+		}
+		retention := privacyapp.AcceptedRetentionReader{Topology: policy.Scenario.retention.topology, Sources: policy.Scenario.retention.reader, Now: time.Now}
+		preparedReaders = &manualRecordingSaveReaders{Current: current, Storage: storage, Retention: &retention}
+		t.Logf("group_sources=%d long_lived_reader_setup_ms=%d", count, time.Since(setupStarted).Milliseconds())
+	}
 	prepare := func() (value.RecordingSaveGroupAdmission, []policySourceSnapshotAdmissionFixture) {
 		began := time.Now()
+		var common captureapp.PolicySourceCheck
+		if preparedReaders != nil {
+			listed := time.Now()
+			preparedReaders.Sources, err = ledger.ListSources(ctx, policy.Authority.PolicyUID)
+			if err != nil || len(preparedReaders.Sources) != count {
+				t.Fatal("bounded grouped source snapshot", len(preparedReaders.Sources), err)
+			}
+			t.Logf("group_sources=%d one_source_list_ms=%d", count, time.Since(listed).Milliseconds())
+			refreshed := time.Now()
+			common = refresh(t)
+			t.Logf("group_sources=%d one_common_refresh_ms=%d", count, time.Since(refreshed).Milliseconds())
+		}
+		factsStarted := time.Now()
 		parts := make([]policySourceSnapshotAdmissionFixture, count)
 		for index, source := range sources {
 			if !time.Now().Before(source.Permit.LeafUntil) {
 				t.Fatal("source expired before group preparation", index)
 			}
-			current := refresh(t)
+			current := common
+			if preparedReaders == nil {
+				current = refresh(t)
+			}
 			current.SourceID, current.Fence = source.Permit.Binding.SourceID, source.Permit.Binding.Fence
 			current.Initial = false
 			current.ExpectedCredit = source.Permit.Credit
@@ -253,8 +284,9 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 			// Each preparation resolves its own accepted retention. An unused first-Pod
 			// proof must not accidentally become this sibling's authority.
 			current.Retention = privacy.Resolution{}
-			parts[index] = prepareManualRecordingSaveFixture(t, ctx, f.roles["hub-runtime"], policy, source, current, maximumBytes)
+			parts[index] = prepareManualRecordingSaveFixture(t, ctx, f.roles["hub-runtime"], policy, source, current, maximumBytes, preparedReaders)
 		}
+		t.Logf("group_sources=%d per_target_facts_ms=%d current_permission_reads=%d retention_reads=%d storage_reads=%d", count, time.Since(factsStarted).Milliseconds(), count, count, count)
 		group, parts := prepareManualRecordingSaveGroup(t, ctx, f, policy, parts)
 		previews, err := postgres.NewContextPreviews(ctx, f.roles["hub-runtime"], group.RootID)
 		if err != nil {
