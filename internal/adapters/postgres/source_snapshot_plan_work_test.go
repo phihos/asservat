@@ -61,6 +61,9 @@ func TestGeneratedSourceSnapshotPlanDecodesAcceptedAPIWork(t *testing.T) {
 	if err = e.Validate(); err != nil {
 		t.Fatal("full expected snapshot", err)
 	}
+	t.Run("reviewed-admission", func(t *testing.T) {
+		assertReviewedSnapshotPlan(t, plan, e, check)
+	})
 	row := facts.ContextCapture
 	row.ExpectationJson, _ = json.Marshal(e)
 	row.PodPinJson, _ = json.Marshal(original.Pin)
