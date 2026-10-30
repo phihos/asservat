@@ -61,6 +61,10 @@ func automationProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 // Shared fixed-purpose read. A nil authority is permitted only through the
 // typed workload activation port and excludes every per-Pod review.
 func automationProjectionFor(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, installation string, basis identity.Revision, target authorization.Target, authority *authorization.AcceptedPolicyAuthority) (authorization.AutomationProjection, error) {
+	return automationProjectionForWithPermissions(ctx, q, s, installation, basis, target, authority, nil)
+}
+
+func automationProjectionForWithPermissions(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, installation string, basis identity.Revision, target authorization.Target, authority *authorization.AcceptedPolicyAuthority, lockedPermissions *authorization.Projection) (authorization.AutomationProjection, error) {
 	var out authorization.AutomationProjection
 	now, err := q.CurrentTime(ctx)
 	if err != nil {
@@ -70,9 +74,17 @@ func automationProjectionFor(ctx context.Context, q *custodydb.Queries, s custod
 	if !workload.Valid() || !basis.Valid() || authority == nil && target.PodUID != "" || authority != nil && (!authority.Valid(now.Time) || authority.InstallationID != installation || !target.Valid() || target.ClusterID != authority.ClusterID || target.NamespaceUID != authority.NamespaceUID || target.WorkloadUID != authority.WorkloadUID) {
 		return out, cfg.ErrDenied
 	}
-	permissions, err := permissionProjection(ctx, q, s, target)
-	if err != nil {
-		return out, err
+	var permissions authorization.Projection
+	if lockedPermissions != nil {
+		if lockedPermissions.Target != target {
+			return out, cfg.ErrChanged
+		}
+		permissions = *lockedPermissions
+	} else {
+		permissions, err = permissionProjection(ctx, q, s, target)
+		if err != nil {
+			return out, err
+		}
 	}
 	rows, err := q.SelectAutomationBasis(ctx, custodydb.SelectAutomationBasisParams{StreamID: s.ID, Uid: basis.UID, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, Column5: target.WorkloadUID})
 	if err != nil {

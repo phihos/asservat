@@ -15,6 +15,10 @@ import (
 // (ADR-228) is evaluated through its current acknowledged acceptance and
 // current team delegation instead: it has no scopes or groups of its own.
 func contextEligibilityIn(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, root, installation string, i identity.Identity, p authorization.Projection, target authorization.Target, now time.Time) authorization.CaptureEligibility {
+	return contextEligibilityInWithPermissions(ctx, q, stream, trust, root, installation, i, p, target, now, false)
+}
+
+func contextEligibilityInWithPermissions(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, root, installation string, i identity.Identity, p authorization.Projection, target authorization.Target, now time.Time, reusePermissions bool) authorization.CaptureEligibility {
 	inst, policy, ok := authorization.PolicyExecutor(i.Principal)
 	if !ok {
 		return authorization.ContextEligibility(i, p, target, now)
@@ -31,7 +35,11 @@ func contextEligibilityIn(ctx context.Context, q *custodydb.Queries, stream cust
 	if err != nil {
 		return deny
 	}
-	current, err := automationProjection(ctx, q, stream, installation, snapshot.Authority, target)
+	var permissions *authorization.Projection
+	if reusePermissions {
+		permissions = &p
+	}
+	current, err := automationProjectionForWithPermissions(ctx, q, stream, installation, snapshot.Authority.Delegation, target, &snapshot.Authority, permissions)
 	if err != nil {
 		return deny
 	}

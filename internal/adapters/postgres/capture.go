@@ -180,7 +180,11 @@ func admittedRecord(row custodydb.ContextCapture) (value.Accepted, error) {
 // projection after locks. Freshness, deny precedence, group membership and the
 // complete default audience use the same domain evaluator as the caller.
 func (s *ContextAdmissions) currentCaptureEligibility(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, a value.Admission) (authorization.CaptureEligibility, error) {
-	p, err := permissionProjection(ctx, q, stream, a.Plan.Input.Target.Target())
+	return s.currentCaptureEligibilityWithPermissions(ctx, q, stream, trust, a, nil)
+}
+
+func (s *ContextAdmissions) currentCaptureEligibilityWithPermissions(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, a value.Admission, permissions *recordingGroupPermissions) (authorization.CaptureEligibility, error) {
+	p, err := permissions.read(ctx, q, stream, a.Plan.Input.Target.Target())
 	if err != nil {
 		return authorization.CaptureEligibility{}, value.ErrUnavailable
 	}
@@ -190,7 +194,7 @@ func (s *ContextAdmissions) currentCaptureEligibility(ctx context.Context, q *cu
 	}
 	// A policy executor re-checks its accepted policy and team delegation
 	// after these locks (ADR-228); a human is evaluated as before.
-	fresh := contextEligibilityIn(ctx, q, stream, trust, s.root, s.recovery.installationID(), a.Eligibility.VerifiedIdentity, p, a.Eligibility.Target, n.Time)
+	fresh := contextEligibilityInWithPermissions(ctx, q, stream, trust, s.root, s.recovery.installationID(), a.Eligibility.VerifiedIdentity, p, a.Eligibility.Target, n.Time, permissions != nil)
 	if !fresh.Eligible || !n.Time.Before(a.Eligibility.ValidUntil) {
 		return fresh, value.ErrDenied
 	}
@@ -266,6 +270,7 @@ type contextAdmissionGroupOptions struct {
 	Preview           value.ContextPreview
 	PolicyReservation *policyCaptureReservation
 	RequestBounds     *value.GroupRequestBounds
+	Permissions       *recordingGroupPermissions
 }
 
 func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *custodydb.Queries, previewID string, a value.Admission, topology privacyvalue.PolicyTopology, group *contextAdmissionGroupOptions) (value.Accepted, error) {
@@ -298,7 +303,11 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		// transaction. Current eligibility is still rechecked after waits.
 		var retainedSource *captureapp.PolicySourceState
 		currentEligibility := func() (authorization.CaptureEligibility, error) {
-			fresh, err := s.currentCaptureEligibility(ctx, q, stream, recovery, a)
+			var permissions *recordingGroupPermissions
+			if group != nil {
+				permissions = group.Permissions
+			}
+			fresh, err := s.currentCaptureEligibilityWithPermissions(ctx, q, stream, recovery, a, permissions)
 			if err != nil || a.Plan.Input.Snapshot == nil {
 				return fresh, err
 			}
