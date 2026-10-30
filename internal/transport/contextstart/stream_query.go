@@ -17,8 +17,9 @@ import (
 // answers while it still waits for work, so a query never consumes the
 // standby. Queries are not operations: no work is verified or executed.
 const (
-	queryResolveWorkload = "resolve-workload"
-	queryResolvePod      = "resolve-pod"
+	queryResolveWorkload         = "resolve-workload"
+	queryResolveWorkloadIdentity = "resolve-workload-identity"
+	queryResolvePod              = "resolve-pod"
 	// ADR-228: one bounded Pod LIST of a named workload's restart counters,
 	// plus one Event LIST of its namespace for a probe detector (ADR-230).
 	queryObserveRestarts = "observe-workload-restarts"
@@ -60,6 +61,12 @@ type OngoingTargetResolver interface {
 // region without it answers the query as unsupported.
 type RestartTargets interface {
 	ObserveWorkloadRestarts(context.Context, targets.RestartRequest) (targets.RestartObservation, error)
+}
+
+// WorkloadIdentityTargets is metadata-only and does not require a live Pod.
+// Older resolvers return unsupported; the caller must not select a replacement.
+type WorkloadIdentityTargets interface {
+	ResolveWorkloadIdentity(context.Context, targets.WorkloadRequest) (targets.WorkloadIdentityResolution, error)
 }
 
 // QueryTargets is the region's own cluster target resolver.
@@ -296,6 +303,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	var out any
 	resolved := time.Now()
 	switch q.Method {
+	case queryResolveWorkloadIdentity:
+		var r targets.WorkloadRequest
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(WorkloadIdentityTargets); ok {
+			out, e = resolver.ResolveWorkloadIdentity(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
 	case queryResolveWorkload:
 		var r targets.WorkloadRequest
 		if decodeOperationBody(q.Body, &r) != nil {

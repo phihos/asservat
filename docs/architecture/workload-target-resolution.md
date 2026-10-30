@@ -11,6 +11,30 @@ or credential. Bootstrap constructs `PodTargets` with an independently
 selected enrolled-cluster `PermissionClient`; another cluster ID is rejected
 before API I/O. No container selector or permission scope is introduced.
 
+## Recording inventory root identity
+
+Manual recording inventory uses a separate `ResolveWorkloadIdentity` observation.
+It reads the named namespace and Deployment/StatefulSet identities without a Pod
+LIST, Pod selection, node lookup or replacement Pod. This permits discovery of
+retained recordings when the workload still exists with no live replicas. A
+direct Pod reference still resolves that actual Pod's supported owner; a deleted
+named object cannot be replaced with fabricated historical identity.
+
+The typed result contains the exact input reference, current namespace/workload
+UIDs and the original first-read interval, bounded to five seconds. The existing
+private regional query channel carries it; unsupported resolvers return a closed
+unsupported result. Current workload eligibility must precede source lookup, and
+each original Pod still needs current collection eligibility before a row is
+returned. This result grants no source, capture or evidence authority. Existing
+`ResolveWorkload`/`ResolvePod` capture selection behavior is unchanged.
+
+Cost: two existing namespace/workload GETs for Deployment/StatefulSet discovery,
+one bounded private query and no new permission, credential, service, watch,
+timer or user setting. No selector compilation or Pod payload is needed on that
+path. Direct Pod references retain their existing Pod/owner reads. Synthetic
+HTTP/query tests do not establish installed Kubernetes or multi-cluster runtime
+qualification.
+
 ## Selecting one pod for the initial context profile
 
 `ResolveWorkload` observes the actual namespace and named workload. For a
