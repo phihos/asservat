@@ -234,18 +234,7 @@ func (f *capacitySQLFixture) keepFleetCurrent() func() error {
 	return keepFixtureFleetCurrent(f.ctx, f.observer, f.administration, &f.fleetRefreshMu)
 }
 
-// The dispatch qualifier replaces its fleet-only worker after the retained
-// source exists. One worker/ticker owns both real observation streams; readers
-// never refresh retention as a side effect of a child start or publication.
-func (f *capacitySQLFixture) keepFleetAndRetentionCurrent(retention *retentionEffectFixture) func() error {
-	return keepFixtureFleetAndRetentionCurrent(f.ctx, f.observer, f.administration, retention, &f.fleetRefreshMu)
-}
-
 func keepFixtureFleetCurrent(ctx context.Context, observer *postgres.FleetObservation, administration fleet.Administration, serialized ...*sync.Mutex) func() error {
-	return keepFixtureFleetAndRetentionCurrent(ctx, observer, administration, nil, serialized...)
-}
-
-func keepFixtureFleetAndRetentionCurrent(ctx context.Context, observer *postgres.FleetObservation, administration fleet.Administration, retention *retentionEffectFixture, serialized ...*sync.Mutex) func() error {
 	var refreshMu *sync.Mutex
 	if len(serialized) > 0 {
 		refreshMu = serialized[0]
@@ -276,15 +265,6 @@ func keepFixtureFleetAndRetentionCurrent(ctx context.Context, observer *postgres
 					a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
 					return observer.ObserveAdministration(ctx, b, a)
 				}()
-				if err == nil && retention != nil {
-					err = func() error {
-						call, cancel := context.WithTimeout(ctx, 5*time.Second)
-						defer cancel()
-						retention.mu.Lock()
-						defer retention.mu.Unlock()
-						return retention.observe(call)
-					}()
-				}
 				if err != nil {
 					done <- err
 					return
