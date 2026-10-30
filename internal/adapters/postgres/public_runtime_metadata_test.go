@@ -12,6 +12,8 @@ func TestPublicMetadataReadHasExactExistingReadPrivileges(t *testing.T) {
 		t.Fatal("missing consolidated metadata credential")
 	}
 	want := []publicRuntimeGrant{
+		// Row lock for a consistent child snapshot, no mutable metadata columns.
+		{"table", "recording_save_group", "id", "UPDATE"},
 		{"schema", "public", "", "USAGE"},
 		{"table", "fleet_current_trust", "installation_id", "UPDATE"},
 		{"table", "permission_stream", "id", "UPDATE"},
@@ -29,7 +31,7 @@ func TestPublicMetadataReadHasExactExistingReadPrivileges(t *testing.T) {
 		// ADR-245: read with the permission projection that joins them.
 		"permission_review_source", "permission_review_assignment", "permission_review_decision",
 		// ADR-255: bounded summary state/source cutoff, no custody-copy writes.
-		"capture_history_parameter",
+		"capture_history_parameter", "recording_save_group",
 	} {
 		want = append(want, publicRuntimeGrant{"table", table, "", "SELECT"})
 	}

@@ -32,6 +32,7 @@ type RecordingSaveScopeSource struct {
 	Original                         targets.SourceSnapshotTarget
 	ActionID, Kind                   string
 	DefinitionDigest, AudienceDigest artifact.Digest
+	CeilingDigest, RetentionDigest   artifact.Digest
 	ApprovedBefore, Before           time.Duration
 	MaxBytes                         int64
 }
@@ -51,6 +52,8 @@ type recordingSaveScopeSource struct {
 	Kind             string `json:"kind"`
 	DefinitionDigest string `json:"sourceDefinitionDigest"`
 	AudienceDigest   string `json:"retainedAudienceDigest"`
+	CeilingDigest    string `json:"collectionCeilingDigest,omitempty"`
+	RetentionDigest  string `json:"retentionDigest,omitempty"`
 	Before           string `json:"before"`
 	After            string `json:"after"`
 	MaxBytes         int64  `json:"maxBytes"`
@@ -106,7 +109,20 @@ func CompileRecordingSaveScope(in RecordingSaveScopeInput, now time.Time) ([]byt
 		seenSource[original.SourceID] = true
 		seenAction[original.Request.PodUID+"\x00"+source.ActionID] = true
 		pods[original.Request.PodUID] = true
-		sourceRows = append(sourceRows, recordingSaveScopeSource{original.SourceID, original.Request.PodUID, original.NodeUID, original.BootID, source.ActionID, source.Kind, hexDigest(source.DefinitionDigest), hexDigest(source.AudienceDigest), before, "0s", source.MaxBytes})
+		row := recordingSaveScopeSource{SourceID: original.SourceID, PodUID: original.Request.PodUID, NodeUID: original.NodeUID, BootID: original.BootID, ActionID: source.ActionID, Kind: source.Kind, DefinitionDigest: hexDigest(source.DefinitionDigest), AudienceDigest: hexDigest(source.AudienceDigest), Before: before, After: "0s", MaxBytes: source.MaxBytes}
+		if len(in.Sources) > 1 {
+			ceiling, retention := source.CeilingDigest, source.RetentionDigest
+			if ceiling == (artifact.Digest{}) {
+				ceiling = in.CeilingDigest
+			}
+			if retention == (artifact.Digest{}) {
+				retention = in.RetentionDigest
+			}
+			row.CeilingDigest, row.RetentionDigest = hexDigest(ceiling), hexDigest(retention)
+		} else if source.CeilingDigest != (artifact.Digest{}) && source.CeilingDigest != in.CeilingDigest || source.RetentionDigest != (artifact.Digest{}) && source.RetentionDigest != in.RetentionDigest {
+			return bad()
+		}
+		sourceRows = append(sourceRows, row)
 	}
 	if len(pods) > in.IncidentPodLimit {
 		return bad()
@@ -120,6 +136,9 @@ func CompileRecordingSaveScope(in RecordingSaveScopeInput, now time.Time) ([]byt
 		}
 		return 0
 	})
+	if len(sourceRows) > 1 {
+		in.CeilingDigest, in.RetentionDigest = recordingSaveGroupDependencyDigests(sourceRows)
+	}
 	requester, executor := in.Requester, a.Executor
 	scope := recordingSaveScope{Version: "recording-save/v1", Operation: "recordingSave", CaptureID: in.CaptureID, Requester: principal{requester.Issuer, requester.Subject, requester.ClientID, string(requester.Kind)}, Executor: principal{executor.Issuer, executor.Subject, executor.ClientID, string(executor.Kind)}, Policy: recordingSavePolicyRef{a.ClusterID, a.NamespaceUID, a.PolicyUID, hexDigest(a.ScopeDigest)}, WorkloadUID: a.WorkloadUID, Sources: sourceRows, IncidentPodLimit: in.IncidentPodLimit, FinalizeTimeout: timeout, Dependencies: []dependency{{"collectionCeiling", hexDigest(in.CeilingDigest)}, {"retention", hexDigest(in.RetentionDigest)}}}
 	raw, err := json.Marshal(scope)
@@ -148,7 +167,7 @@ func readRecordingSaveScopeIdentity(raw []byte, want artifact.Digest) (ContextSc
 	requester := identity.Principal{Issuer: s.Requester.Issuer, Subject: s.Requester.Subject, ClientID: s.Requester.ClientID, Kind: identity.Kind(s.Requester.Kind)}
 	executor := identity.Principal{Issuer: s.Executor.Issuer, Subject: s.Executor.Subject, ClientID: s.Executor.ClientID, Kind: identity.Kind(s.Executor.Kind)}
 	_, policy, isPolicy := authorization.PolicyExecutor(executor)
-	if err != nil || digest != want || !bytes.Equal(encoded, raw) || s.Version != "recording-save/v1" || s.Operation != "recordingSave" || !authorization.UUID(s.CaptureID) || !requester.Valid() || !isPolicy || policy != s.Policy.PolicyUID || len(s.Sources) != 1 {
+	if err != nil || digest != want || !bytes.Equal(encoded, raw) || s.Version != "recording-save/v1" || s.Operation != "recordingSave" || !authorization.UUID(s.CaptureID) || !requester.Valid() || !isPolicy || policy != s.Policy.PolicyUID || len(s.Sources) < 1 || len(s.Sources) > 16 {
 		return ContextScopeIdentity{}, value.ErrInvalid
 	}
 	if s.IncidentPodLimit < 1 || s.IncidentPodLimit > 100 || len(s.Dependencies) != 2 || s.Dependencies[0].Role != "collectionCeiling" || s.Dependencies[1].Role != "retention" || !saveScopeHash(s.Policy.ExecutionDigest) || !saveScopeHash(s.Dependencies[0].Digest) || !saveScopeHash(s.Dependencies[1].Digest) {
@@ -159,17 +178,41 @@ func readRecordingSaveScopeIdentity(raw []byte, want artifact.Digest) (ContextSc
 	if timeoutErr != nil || !timeoutValid || canonicalTimeout != s.FinalizeTimeout {
 		return ContextScopeIdentity{}, value.ErrInvalid
 	}
-	source := s.Sources[0]
-	before, beforeErr := time.ParseDuration(source.Before)
-	canonicalBefore, beforeValid := scopeDuration(before)
-	if !authorization.UUID(source.SourceID) || !identity.Text(source.PodUID, 64) || !identity.Text(source.NodeUID, 128) || !authorization.UUID(source.BootID) || !identity.Text(source.ActionID, 63) || source.Kind != "packetCapture" && source.Kind != "syscallTrace" || source.After != "0s" || beforeErr != nil || !beforeValid || canonicalBefore != source.Before || before > artifact.MaxLifecycleWindow || source.MaxBytes < 1 || source.MaxBytes > artifact.RecordingNativeLimit || !saveScopeHash(source.DefinitionDigest) || !saveScopeHash(source.AudienceDigest) {
+	targets := make([]authorization.Target, 0, len(s.Sources))
+	seenAction, pods := map[string]bool{}, map[string]bool{}
+	for index, source := range s.Sources {
+		if len(s.Sources) > 1 && (!saveScopeHash(source.CeilingDigest) || !saveScopeHash(source.RetentionDigest)) || len(s.Sources) == 1 && (source.CeilingDigest != "" || source.RetentionDigest != "") {
+			return ContextScopeIdentity{}, value.ErrInvalid
+		}
+		before, beforeErr := time.ParseDuration(source.Before)
+		canonicalBefore, beforeValid := scopeDuration(before)
+		if !authorization.UUID(source.SourceID) || !identity.Text(source.PodUID, 64) || !identity.Text(source.NodeUID, 128) || !authorization.UUID(source.BootID) || !identity.Text(source.ActionID, 63) || source.Kind != "packetCapture" && source.Kind != "syscallTrace" || source.After != "0s" || beforeErr != nil || !beforeValid || canonicalBefore != source.Before || before > artifact.MaxLifecycleWindow || source.MaxBytes < 1 || source.MaxBytes > artifact.RecordingNativeLimit || !saveScopeHash(source.DefinitionDigest) || !saveScopeHash(source.AudienceDigest) || index > 0 && s.Sources[index-1].SourceID >= source.SourceID || seenAction[source.PodUID+"\x00"+source.ActionID] {
+			return ContextScopeIdentity{}, value.ErrInvalid
+		}
+		target := authorization.Target{ClusterID: s.Policy.ClusterID, NamespaceUID: s.Policy.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: source.PodUID}
+		if !target.Valid() {
+			return ContextScopeIdentity{}, value.ErrInvalid
+		}
+		targets = append(targets, target)
+		seenAction[source.PodUID+"\x00"+source.ActionID] = true
+		pods[source.PodUID] = true
+	}
+	if len(s.Sources) > 1 {
+		ceiling, retention := recordingSaveGroupDependencyDigests(s.Sources)
+		if s.Dependencies[0].Digest != hexDigest(ceiling) || s.Dependencies[1].Digest != hexDigest(retention) {
+			return ContextScopeIdentity{}, value.ErrInvalid
+		}
+	}
+	if len(pods) > s.IncidentPodLimit {
 		return ContextScopeIdentity{}, value.ErrInvalid
 	}
-	target := authorization.Target{ClusterID: s.Policy.ClusterID, NamespaceUID: s.Policy.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.Sources[0].PodUID}
-	if !target.Valid() {
-		return ContextScopeIdentity{}, value.ErrInvalid
+	target := targets[0]
+	out := ContextScopeIdentity{Actor: executor, Requester: &requester, Target: target, CaptureID: s.CaptureID, ExecutionClass: artifact.ContextAPIExecution, ApprovedAcceptance: true}
+	if len(targets) > 1 {
+		out.Target.PodUID = ""
+		out.Targets = targets
 	}
-	return ContextScopeIdentity{Actor: executor, Requester: &requester, Target: target, CaptureID: s.CaptureID, ExecutionClass: artifact.ContextAPIExecution, ApprovedAcceptance: true}, nil
+	return out, nil
 }
 
 func saveScopeHash(s string) bool {
@@ -191,19 +234,34 @@ func saveScopeHash(s string) bool {
 // recordingSaveContextMatches joins the reviewed manual scope to independent
 // current compilation input. An opaque passive scope alone cannot choose work.
 func recordingSaveContextMatches(raw []byte, digest artifact.Digest, in value.ContextInput) bool {
-	identity, err := readRecordingSaveScopeIdentity(raw, digest)
 	saved := in.Snapshot
-	if err != nil || saved == nil || saved.SourceTarget == nil || identity.Actor != in.Executor || identity.Target != in.Target.Target() || identity.CaptureID != in.CaptureID {
+	if saved == nil || saved.SourceTarget == nil {
+		return false
+	}
+	var identity ContextScopeIdentity
+	var err error
+	index := 0
+	if saved.Group != nil {
+		identity, err = ReadRecordingSaveChildScopeIdentity(raw, digest, *saved.Group, in.CaptureID)
+		index = saved.Group.ChildIndex
+	} else {
+		identity, err = readRecordingSaveScopeIdentity(raw, digest)
+	}
+	if err != nil || identity.Actor != in.Executor || identity.Target != in.Target.Target() || identity.CaptureID != in.CaptureID {
 		return false
 	}
 	var s recordingSaveScope
-	if json.Unmarshal(raw, &s) != nil || len(s.Sources) != 1 {
+	if json.Unmarshal(raw, &s) != nil || saved.Group == nil && len(s.Sources) != 1 {
 		return false
 	}
-	source := s.Sources[0]
+	source := s.Sources[index]
 	before, _ := scopeDuration(saved.Request.Before)
 	original := saved.SourceTarget
-	return s.Policy.PolicyUID == saved.PolicyUID && s.Policy.ExecutionDigest == hexDigest(saved.ExecutionDigest) && source.SourceID == saved.Request.SourceID && source.PodUID == in.Target.Request.PodUID && source.NodeUID == original.NodeUID && source.BootID == original.BootID && source.ActionID == saved.ActionID && source.Kind == "packetCapture" && source.Before == before && source.After == "0s" && saved.Request.After == 0 && source.MaxBytes == saved.Request.MaxBytes && source.DefinitionDigest == hexDigest(saved.SourceDefinitionDigest) && source.AudienceDigest == hexDigest(saved.SourceAudienceDigest) && s.Dependencies[0].Digest == hexDigest(artifact.Digest(in.Capability.Revision.Digest)) && s.Dependencies[1].Digest == hexDigest(artifact.Digest(in.Retention.PolicyRevision.Digest))
+	ceiling, retention := s.Dependencies[0].Digest, s.Dependencies[1].Digest
+	if saved.Group != nil && len(s.Sources) > 1 {
+		ceiling, retention = source.CeilingDigest, source.RetentionDigest
+	}
+	return s.Policy.PolicyUID == saved.PolicyUID && s.Policy.ExecutionDigest == hexDigest(saved.ExecutionDigest) && source.SourceID == saved.Request.SourceID && source.PodUID == in.Target.Request.PodUID && source.NodeUID == original.NodeUID && source.BootID == original.BootID && source.ActionID == saved.ActionID && source.Kind == "packetCapture" && source.Before == before && source.After == "0s" && saved.Request.After == 0 && source.MaxBytes == saved.Request.MaxBytes && source.DefinitionDigest == hexDigest(saved.SourceDefinitionDigest) && source.AudienceDigest == hexDigest(saved.SourceAudienceDigest) && ceiling == hexDigest(artifact.Digest(in.Capability.Revision.Digest)) && retention == hexDigest(artifact.Digest(in.Retention.PolicyRevision.Digest))
 }
 
 // RecordingSaveFinalizeTimeout reads authored limits from the exact canonical

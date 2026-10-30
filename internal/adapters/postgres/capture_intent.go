@@ -119,6 +119,14 @@ func captureIntent(row custodydb.ContextCapture) (audit.CaptureIntent, error) {
 		}
 		initiator := *parsed.Requester
 		out.Initiator = &initiator
+		if row.GroupID.Valid {
+			if !row.GroupOrdinal.Valid || uid(row.GroupID) != parsed.CaptureID || len(parsed.Targets) < 2 || int(row.GroupOrdinal.Int16) >= len(parsed.Targets) || row.GroupOrdinal.Int16 < 0 || parsed.Targets[row.GroupOrdinal.Int16] != out.Target {
+				return audit.CaptureIntent{}, capture.ErrUnavailable
+			}
+			out.Group = &audit.CaptureGroupBinding{ParentCaptureID: uid(row.GroupID), SelectionDigest: out.ScopeDigest, ChildIndex: int(row.GroupOrdinal.Int16), ChildCount: len(parsed.Targets)}
+		} else if len(parsed.Targets) > 1 {
+			return audit.CaptureIntent{}, capture.ErrUnavailable
+		}
 	}
 	copy(out.IdentityRevision.Digest[:], row.IdentityPolicyDigest)
 	copy(out.ExpectationDigest[:], digest(e))

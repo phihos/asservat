@@ -11,11 +11,18 @@ import (
 const OperationCipherLimit = 64 << 10
 const OperationOutputLimit = 24 << 10
 
+// Sixteen source assessments retain up to64 policy digests per source.
+// Only this passive preview may prepare the bounded larger metadata result.
+const OperationRecordingSavePreviewOutputLimit = 128 << 10
+
 // Only the authenticated browser settings view has this larger prepared-byte
 // maximum. Audit stores the HMAC/count/refs, never the parameter response body.
 const OperationCaptureSettingsOutputLimit = 160 << 10
 
 func operationOutputLimit(name string) int64 {
+	if name == "preview_recording_save" {
+		return OperationRecordingSavePreviewOutputLimit
+	}
 	if name == "get_capture_settings" {
 		return OperationCaptureSettingsOutputLimit
 	}

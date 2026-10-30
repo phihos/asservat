@@ -17,8 +17,8 @@ function SaveAssessment({ preview }: { preview: SavePreview }) {
     <p>{preview.capture_assessment.combinedImpact.explanation}</p>
     <p>The continuing recorder has its own limits. This save adds snapshot copying, encryption and upload; its configured limits do not measure overhead.</p>
     <ul>{preview.windows.map(window => <li key={window.recording_handle}>Save the last {window.before} of {preview.selected_recordings.find(row => row.recording_handle === window.recording_handle)?.pod_name}, ending at the first successful acceptance. No future window is added.</li>)}</ul>
-    {preview.capture_assessment.actions.map(action => <div key={action.actionID}>
-      <h4>{action.actionID}</h4>
+    {preview.capture_assessment.actions.map(action => <div key={action.recording_handle ?? action.actionID}>
+      <h4>{action.actionID}{action.recording_handle && <> · {preview.selected_recordings.find(row => row.recording_handle === action.recording_handle)?.pod_name}</>}</h4>
       <p>Possible retained user data: {action.data.retainedPossible.map(value => value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()).join(', ') || 'See the current data assessment'}.</p>
       {action.data.transientOnly.length > 0 && <p>Processing may transiently expose {action.data.transientOnly.map(value => value.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()).join(', ')}.</p>}
       <dl className="facts"><dt>Evidence access</dt><dd>Up to {seconds(action.retention.accessAgeSeconds)} from original source acquisition.</dd><dt>Managed deletion</dt><dd>Within {seconds(action.retention.deleteAgeSeconds)} of original source acquisition.</dd></dl>

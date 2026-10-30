@@ -31,6 +31,8 @@ const (
 // RestartPolicy is the compiled, accepted subset. It contains configuration
 // intent only; executor, delegation and limits come from protected acceptance.
 type RestartPolicy struct {
+	// Zero preserves the historical one-Pod bound and serialized scope.
+	IncidentPods int `json:",omitzero"`
 	// Original accepted source context is private history input, excluded from policy intent equality.
 	HistoryAuthored                                  *HistoryAuthored `json:"-"`
 	ClusterID, Namespace, WorkloadKind, WorkloadName string
@@ -122,6 +124,9 @@ func (p RestartPolicy) Request() targets.RestartRequest {
 }
 
 func (p RestartPolicy) Valid() bool {
+	if p.IncidentPods < 0 || p.IncidentPods > 100 || p.IncidentPods > 1 && (!p.RecordingSaves || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing") {
+		return false
+	}
 	if p.RecordingSaves && (p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing") {
 		return false
 	}
@@ -318,6 +323,8 @@ type PolicyStatus struct {
 	Suspended, Deleted             bool
 	Creator                        *identity.Principal
 	ExecutionsSpent, MaxExecutions int64
+	// Optional server-computed grant source-start ceiling; zero is legacy/unknown.
+	MaxGrantStarts int64
 	// Shared accepted pools: conservative charges/reservations, not measured output.
 	CollectedBytesSpent, MaxCollectedBytes int64
 	ObservedBytesSpent, MaxObservedBytes   int64

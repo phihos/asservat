@@ -3504,15 +3504,6 @@ components:
               type: object
               additionalProperties: false
               properties:
-                attached_grant_id:
-                  type: string
-                  format: uuid
-                  description: Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection.
-                collection_kind:
-                  enum:
-                  - podStatus
-                  - packetCapture
-                  description: Accepted collection action; controls available approval commands, not acquisition authority.
                 policy_uid:
                   type: string
                   minLength: 1
@@ -3548,26 +3539,6 @@ components:
                   required:
                   - kind
                   - policy_uid
-                collected_bytes_spent:
-                  type: integer
-                  minimum: 0
-                  maximum: 1099511627776
-                  description: Conservative native-output reservations shared by this acceptance; uncertain spend remains charged. Not measured bytes.
-                max_collected_bytes:
-                  type: integer
-                  minimum: 0
-                  maximum: 1099511627776
-                  description: Original accepted cumulative native-output ceiling, shared across grant replacements and controls.
-                observed_bytes_spent:
-                  type: integer
-                  minimum: 0
-                  maximum: 1099511627776
-                  description: Conservative pre-filter observation charges shared by this acceptance, including uncertain legacy spend. Not collected output.
-                max_observed_bytes:
-                  type: integer
-                  minimum: 0
-                  maximum: 1099511627776
-                  description: Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition.
                 executions_spent:
                   type: integer
                   minimum: 0
@@ -3682,8 +3653,7 @@ components:
                 detector:
                   type: object
                   additionalProperties: false
-                  description: The current DebugPolicy's detector configuration (no observed
-                    content).
+                  description: The current DebugPolicy's detector configuration (no observed content).
                   properties:
                     kind:
                       enum:
@@ -3751,12 +3721,7 @@ components:
                 sharing:
                   type: object
                   additionalProperties: false
-                  description: 'Recurring sharing of the acceptance (ADR-239). stopped:
-                    a manager stopped future sharing (stop_future_sharing; already claimed
-                    captures still publish); policyChanged: the DebugPolicy changed after
-                    acceptance, activate the new revision to share again. Existing shares
-                    stay until they expire or are revoked (revoke_share with sharing_intent_id
-                    = acceptance_id and expected_revision = revision).'
+                  description: 'Recurring sharing of the acceptance (ADR-239). stopped: a manager stopped future sharing (stop_future_sharing; already claimed captures still publish); policyChanged: the DebugPolicy changed after acceptance, activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id and expected_revision = revision).'
                   properties:
                     state:
                       enum:
@@ -3798,6 +3763,40 @@ components:
                   - max_captures
                   - not_after
                   - revision
+                collected_bytes_spent:
+                  type: integer
+                  minimum: 0
+                  maximum: 1099511627776
+                  description: Conservative native-output reservations shared by this acceptance; uncertain spend remains charged. Not measured bytes.
+                max_collected_bytes:
+                  type: integer
+                  minimum: 0
+                  maximum: 1099511627776
+                  description: Original accepted cumulative native-output ceiling, shared across grant replacements and controls.
+                observed_bytes_spent:
+                  type: integer
+                  minimum: 0
+                  maximum: 1099511627776
+                  description: Conservative pre-filter observation charges shared by this acceptance, including uncertain legacy spend. Not collected output.
+                max_observed_bytes:
+                  type: integer
+                  minimum: 0
+                  maximum: 1099511627776
+                  description: Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition.
+                collection_kind:
+                  enum:
+                  - podStatus
+                  - packetCapture
+                  description: Accepted collection action; controls available approval commands, not acquisition authority.
+                attached_grant_id:
+                  type: string
+                  format: uuid
+                  description: Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection.
+                max_grant_starts:
+                  type: integer
+                  minimum: 1
+                  maximum: 10000
+                  description: Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter.
               required:
               - policy_uid
               - acceptance_id
@@ -11668,13 +11667,36 @@ components:
                         - TargetGone
                         - Unsupported
                         - Indeterminate
+                        - Cancelled
                       reason_code:
                         type: string
                         minLength: 1
                         maxLength: 64
+                      action_instance_id:
+                        type: string
+                        format: uuid
+                        description: Exact child identity within this parent save. It is not a separate navigation or retry target.
+                      pod_uid:
+                        type: string
+                        minLength: 1
+                        maxLength: 128
+                      pod_name:
+                        type: string
+                        minLength: 1
+                        maxLength: 253
                     required:
                     - action_id
                     - phase
+                    dependentRequired:
+                      action_instance_id:
+                      - pod_uid
+                      - pod_name
+                      pod_uid:
+                      - action_instance_id
+                      - pod_name
+                      pod_name:
+                      - action_instance_id
+                      - pod_uid
                   minItems: 0
                   maxItems: 16
                 case_id:
@@ -11738,10 +11760,7 @@ components:
                 sharing:
                   type: object
                   additionalProperties: false
-                  description: Capture-time sharing status, reported separately from collection
-                    progress. Present only when the request included sharing. Shared names
-                    the concrete share; SharingUnavailable means the result was not shared
-                    (collection outcome is unaffected).
+                  description: Capture-time sharing status, reported separately from collection progress. Present only when the request included sharing. Shared names the concrete share; SharingUnavailable means the result was not shared (collection outcome is unaffected).
                   properties:
                     state:
                       enum:

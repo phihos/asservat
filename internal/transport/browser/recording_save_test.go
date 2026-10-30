@@ -35,7 +35,7 @@ func TestRecordingSaveBrowserRoutesPreserveCSRFAndCancellationIdempotency(t *tes
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
 	defer server.Close()
 	ordinary := &investigationCalls{}
-	base, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, ordinary, ordinary)
+	base, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, CollectionEnabled: true, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, ordinary, browserGroupedProgress{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,4 +89,28 @@ func TestRecordingSaveBrowserRoutesPreserveCSRFAndCancellationIdempotency(t *tes
 			t.Fatal("invalid request reached cancellation", mode, response.StatusCode, f.calls)
 		}
 	}
+	req, _ := http.NewRequest("POST", server.URL+"/api/v1/operations/get_capture", strings.NewReader(`{"capture_id":"00000000-0000-4000-8000-000000000030"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", server.URL)
+	req.Header.Set("X-CSRF-Token", strings.Repeat("C", 43))
+	req.AddCookie(&http.Cookie{Name: SessionCookie, Value: strings.Repeat("A", 43)})
+	response, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(response.Body)
+	response.Body.Close()
+	if response.StatusCode != 200 || strings.Count(string(b), `"action_instance_id"`) != 2 || !strings.Contains(string(b), `"pod_name":"api-b"`) || !strings.Contains(string(b), `"phase":"Cancelled"`) {
+		t.Fatal("grouped browserprogress lostchild", response.StatusCode, string(b))
+	}
+
+}
+
+type browserGroupedProgress struct{}
+
+func (browserGroupedProgress) Get(_ context.Context, _ identities.CurrentIdentity, id string) (value.ContextProgress, error) {
+	return value.ContextProgress{CaptureID: id, Operation: "recordingSave", Revision: 3, Phase: "Partial", ValidUntil: time.Now().Add(time.Second), Actions: []value.ContextActionProgress{
+		{InstanceID: "00000000-0000-4000-8000-000000000101", PodUID: "pod-a", PodName: "api-a", ActionID: "traffic", Phase: "Succeeded"},
+		{InstanceID: "00000000-0000-4000-8000-000000000102", PodUID: "pod-b", PodName: "api-b", ActionID: "traffic", Phase: "Cancelled"},
+	}}, nil
 }

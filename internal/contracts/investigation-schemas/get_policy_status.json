@@ -476,6 +476,12 @@
                     "type": "string",
                     "format": "uuid",
                     "description": "Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection."
+                  },
+                  "max_grant_starts": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000,
+                    "description": "Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter."
                   }
                 },
                 "required": [

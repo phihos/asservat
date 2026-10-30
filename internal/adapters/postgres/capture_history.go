@@ -79,54 +79,17 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 			return value.ErrDenied
 		}
 		until := identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(scope.ValidUntil, q.Recovery.FreshUntil))
-		params := custodydb.ListCaptureHistoryParams{SelectorKey: q.SelectorKey[:], SnapshotBefore: ts(q.SnapshotBefore), RootID: id(s.root), ClusterID: id(q.Target.ClusterID), NamespaceUid: q.Target.NamespaceUID, WorkloadUid: q.Target.WorkloadUID, Origins: origins, NotBefore: ts(first.Time.Add(-value.HistoryLifetime)), PageLimit: value.HistoryScan}
+		params := custodydb.ListCaptureHistoryCandidatesParams{SelectorKey: q.SelectorKey[:], SnapshotBefore: ts(q.SnapshotBefore), RootID: id(s.root), ClusterID: id(q.Target.ClusterID), NamespaceUid: q.Target.NamespaceUID, WorkloadUid: q.Target.WorkloadUID, Origins: origins, NotBefore: ts(first.Time.Add(-value.HistoryLifetime)), PageLimit: value.HistoryScan}
 		if q.After != nil {
 			params.AfterAt, params.AfterID = ts(q.After.AcceptedAt), id(q.After.CaptureID)
 		}
-		rows, err := tx.ListCaptureHistory(ctx, params)
+		var visibleUntil time.Time
+		out.Entries, out.Next, visibleUntil, err = mergedHistoryEntries(ctx, tx, s.root, q, params, projection, n.Time)
 		if err != nil {
 			return err
 		}
-		var visible []custodydb.ContextCapture
-		actors := map[pgtype.UUID]identity.Principal{}
-		scanned := 0
-		for _, c := range rows {
-			scanned++
-			intent, err := captureIntent(c)
-			if err != nil {
-				return value.ErrUnavailable
-			}
-			accepted, err := admittedRecord(c)
-			if err != nil {
-				return value.ErrUnavailable
-			}
-			t := intent.Target
-			if t.ClusterID != q.Target.ClusterID || t.NamespaceUID != q.Target.NamespaceUID || t.WorkloadUID != q.Target.WorkloadUID {
-				return value.ErrUnavailable
-			}
-			// Assignments are selected by cluster, namespace and workload; only
-			// the row's own Pod differs from the currently resolved one.
-			p := projection
-			p.Target = t
-			e := authorization.CaptureHistoryEligibility(q.Identity, p, t, intent.Requester(), accepted.Expectation.Audience, n.Time)
-			if !e.Eligible {
-				continue
-			}
-			until = identity.Earlier(until, e.ValidUntil)
-			visible = append(visible, c)
-			actors[c.ID] = intent.Requester()
-			if len(visible) == q.Limit {
-				break
-			}
-		}
-		if scanned > 0 && (scanned < len(rows) || len(rows) == value.HistoryScan) {
-			last := rows[scanned-1]
-			out.Next = &value.HistoryCursor{AcceptedAt: last.CreatedAt.Time.UTC(), CaptureID: uid(last.ID)}
-		}
-		out.Entries, err = historyEntries(ctx, tx, s.root, visible, actors, n.Time)
-		if err != nil {
-			return err
-		}
+		until = identity.Earlier(until, visibleUntil)
+
 		out.Target = q.Target
 		out.SnapshotBefore = q.SnapshotBefore
 		out.AuthorizationRevision = projection.Revision

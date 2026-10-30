@@ -117,6 +117,7 @@ func (r ContextRetentionReview) Valid() bool {
 // runtime proof or five-second observation may be persisted in it. Each ID is
 // generated once by the service; expired previews cannot begin new collection.
 type ContextPreview struct {
+	Group                                                  *RecordingSaveGroupPreview     `json:",omitempty"`
 	ExecutionClass                                         artifact.ContextExecutionClass `json:",omitempty"`
 	ID, RootID, InstallationID, IssuerEpoch                string
 	CaptureID, CaseID, OccurrenceID, ArtifactID, AttemptID string
@@ -139,6 +140,9 @@ type ContextPreview struct {
 // existing-recording save. This routing identity is reauthorized at every
 // effect; deriving it here cannot transfer source authority to the initiator.
 func (p ContextPreview) Executor() identity.Principal {
+	if p.Group != nil {
+		return p.Group.Executor
+	}
 	if s := p.Intent.Snapshot; s != nil && s.TriggerKind == "recordingSave" {
 		return authorization.PolicyPrincipal(p.InstallationID, s.PolicyUID)
 	}
@@ -150,6 +154,9 @@ func previewTime(t time.Time) bool {
 }
 
 func (p ContextPreview) Valid() bool {
+	if p.Group != nil {
+		return p.Group.valid(p)
+	}
 	if p.Intent.Snapshot != nil && (!previewTime(p.SelectionUntil) || !p.SelectionUntil.After(p.CreatedAt) || p.SelectionUntil.After(p.CreatedAt.Add(time.Minute)) || !p.Intent.Snapshot.Request.ProcessingUntil.Equal(p.Deadline)) || p.Intent.Snapshot == nil && !p.SelectionUntil.IsZero() {
 		return false
 	}
@@ -204,6 +211,7 @@ func (p ContextPreview) Current(now time.Time) bool {
 }
 
 func (p ContextPreview) Clone() ContextPreview {
+	p.Group = p.Group.Clone()
 	p.CanonicalScope = slices.Clone(p.CanonicalScope)
 	p.Audience = slices.Clone(p.Audience)
 	p.Retention.Policies = slices.Clone(p.Retention.Policies)

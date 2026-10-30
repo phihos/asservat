@@ -24,6 +24,9 @@ const InvestigationInputLimit = 32 << 10
 // bound leaves room for both copies inside the 64 KiB transport response limit.
 const InvestigationOutputLimit = 24 << 10
 
+// Bounded disclosures for16 selected source snapshots with64 retention refs each.
+const InvestigationRecordingSavePreviewOutputLimit = 128 << 10
+
 // The sole browser settings budget; audit independently bounds its minimized
 // output byte count. Wire contracts do not import domain behavior.
 const InvestigationBrowserSettingsOutputLimit = 160 << 10
@@ -131,6 +134,9 @@ func (v *InvestigationContracts) validate(name string, b []byte, output bool) er
 	limit := InvestigationInputLimit
 	if output {
 		limit = InvestigationOutputLimit
+		if name == "preview_recording_save" {
+			limit = InvestigationRecordingSavePreviewOutputLimit
+		}
 	}
 	return v.validateBound(name, b, output, limit)
 }

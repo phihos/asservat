@@ -51,7 +51,11 @@ func TestManualRecordingSaveWithPolicyGrantRealServices(t *testing.T) {
 	qualifySourceSnapshotRealServices(t, true, false, true)
 }
 
-func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requireApproval bool) {
+func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requireApproval bool, groups ...int) {
+	groupCount := 0
+	if len(groups) > 0 {
+		groupCount = groups[0]
+	}
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		t.Run("empty-provenance-down-up", func(t *testing.T) {
 			provider, closeProvider := source107MigrationProvider(t, admin)
@@ -66,6 +70,9 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requi
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 			if manual {
 				configureManualSourceCapacity(f)
+			}
+			if groupCount > 0 {
+				configureManualGroupSourceCapacity(f, groupCount)
 			}
 		})
 		f.template.Policies[0].SourceResources = &capacity.SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}, Workload: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}
@@ -90,6 +97,12 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requi
 		}
 		seed, intents, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, OrdinaryGrant: requireApproval, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
+		if groupCount > 0 {
+			option.IncidentPods = groupCount
+		}
+		if groupCount > 0 && requireApproval {
+			option.PolicyExecutions = 1
+		}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
 			source107AddReader(t, ctx, f, "original-source-readers")
 			accepted.Scenario.batch = policyRecorderCloneBatch(f.batch)
@@ -213,6 +226,24 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requi
 			originalRows, err := ledger.ListSources(ctx, accepted.Authority.PolicyUID)
 			if err != nil || len(originalRows) != 1 || (manual && len(originalRows[0].Audience) < 3 || !manual && len(originalRows[0].Audience) != 2) {
 				t.Fatal("new readers adopted old source", err)
+			}
+			if groupCount > 0 {
+				qualifyManualRecordingSaveGroup(t, ctx, f, seed.s, accepted, ledger, renewal, fresh, intents, cancellation)
+				t.Run("populated-group-down-refusal", func(t *testing.T) {
+					provider, closeProvider := source107MigrationProvider(t, admin)
+					defer closeProvider()
+					if _, err := provider.DownTo(ctx, 108); capacitySQLState(err) != "P0001" {
+						t.Fatal("expected retained group downgrade refusal", err)
+					}
+					if version, err := provider.GetDBVersion(ctx); err != nil || version != 109 {
+						t.Fatal("refusal partially changed grouped schema", version, err)
+					}
+					var groups int
+					if err := f.roles["hub-runtime"].QueryRow(ctx, "SELECT count(*) FROM recording_save_group").Scan(&groups); err != nil || groups == 0 {
+						t.Fatal("retained group or runtime access lost after refusal", groups, err)
+					}
+				})
+				return
 			}
 			if manual {
 				if cancellation {

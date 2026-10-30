@@ -36,12 +36,16 @@ class SyntheticPolicies implements Operations {
   unknown = false;
   kind: Kind = 'exit';
   packet = false;
+  saveLimit?: number;
+  grantStartLimit?: number;
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), csrf });
     if (name === 'deactivate_policy') { this.state = 'deactivated'; return result({ policy_uid: 'policy-uid', acceptance_id: id(9), state: 'deactivated', replay: false }) as unknown as Output<N>; }
     if (name === 'activate_policy') return failure('PolicyDeactivated', 'This policy revision was deactivated and cannot be activated again.') as Output<N>;
     const reply = this.unknown ? failure('NotAvailable', 'Not available.') : status(this.state, this.kind);
     if (reply.status==='ok' && this.packet) (reply.data as {collection_kind:string}).collection_kind='packetCapture';
+    if(reply.status==='ok' && this.saveLimit!==undefined) Object.assign(reply.data,{max_executions:this.saveLimit,executions_spent:0});
+    if(reply.status==='ok' && this.grantStartLimit!==undefined) Object.assign(reply.data,{max_grant_starts:this.grantStartLimit});
     return reply as Output<N>;
   }
 }
@@ -234,13 +238,23 @@ it('policy approval retries pin the original finite selection and actor key afte
  fireEvent.change(screen.getByLabelText('Policy name'),{target:{value:'p'}});
  fireEvent.click(screen.getByRole('button',{name:'Show policy'}));
  await screen.findByText('No policy grant is attached.');
- fireEvent.change(screen.getByLabelText('Maximum executions'),{target:{value:'3'}});
+ expect((screen.getByLabelText('Action starts') as HTMLInputElement).max).toBe('10');
+ fireEvent.change(screen.getByLabelText('Action starts'),{target:{value:'3'}});
  fireEvent.click(screen.getByRole('button',{name:'Request policy approval'}));
  await screen.findByRole('button',{name:'Retry approval request'});
- expect(screen.getByLabelText('Maximum executions').matches(':disabled')).toBe(true);
+ expect(screen.getByLabelText('Action starts').matches(':disabled')).toBe(true);
  await act(async () => { await controller.requestGrant('p',{limits:{max_executions:1,max_collected_bytes:1,max_observed_bytes:0}}); });
  expect(calls).toHaveLength(2);expect(calls[1]).toEqual(calls[0]);
  expect(calls[0]).toEqual({policy_uid:'policy-uid',policy_name:'p',idempotency_key:id(20),limits:{max_executions:3,max_collected_bytes:65536,max_observed_bytes:0}});
  expect(await screen.findByRole('link',{name:'View policy approval'})).toBeTruthy();
  expect(screen.queryByRole('button',{name:'Continue approved capture'})).toBeNull();
+});
+
+it('uses the server source-start ceiling without autoenlarging the selected grant budget', async () => {
+ const calls:unknown[]=[];const grants:GrantOperations={call:async(_name,input)=>{calls.push(structuredClone(input));return result({grant_id:id(41),kind:'policy',approval_navigation_uri:'https://asservat.example.invalid/approvals/'+id(41)}) as unknown as GrantOutput<'request_policy_grant'> as never;}};
+ const {client}=mount(grants,true);client.saveLimit=1;client.grantStartLimit=2;
+ fireEvent.change(screen.getByLabelText('Policy name'),{target:{value:'p'}});fireEvent.click(screen.getByRole('button',{name:'Show policy'}));await screen.findByText('No policy grant is attached.');
+ const input=screen.getByLabelText(/Maximum executions|Action starts/) as HTMLInputElement;
+ expect(input.max).toBe('2');expect(input.value).toBe('1');fireEvent.change(input,{target:{value:'2'}});expect(input.validity.valid).toBe(true);
+ fireEvent.click(screen.getByRole('button',{name:'Request policy approval'}));await screen.findByRole('link',{name:'View policy approval'});expect(calls).toHaveLength(1);expect(calls[0]).toMatchObject({limits:{max_executions:2}});expect(screen.getByText('0 of 1 used')).toBeTruthy();
 });

@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 can be collected by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately. Collect again: pass history_capture_id from list_capture_history (optionally with sharing) to restore its target and requested retention into a fresh preview with every current check. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. A manual network-header capture (packet headers only, at most 8 MiB, recorded by the target node's collector) can be requested when that node's recorder is available; a plan that needs approval first has the ApprovalRequired blocker, and every plan no recorder can run has the RecorderUnavailable blocker.",
+  "description": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -2793,6 +2793,12 @@
                   },
                   "minItems": 0,
                   "maxItems": 4
+                },
+                "recording_handle": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "description": "For an existing-source save, identifies the selected source row whose incremental snapshot assessment this is. It conveys no acquisition authority."
                 }
               },
               "required": [

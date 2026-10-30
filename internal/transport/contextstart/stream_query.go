@@ -365,6 +365,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		} else {
 			e = targets.ErrUnsupported
 		}
+	case queryResolveSourceSnapshots:
+		var r []targets.SourceSnapshotTarget
+		if decodeOperationBody(q.Body, &r) != nil || !ValidSourceSnapshotBatch(r, SourceSnapshotQueryBatchLimit) {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(SourceSnapshotBatchResolver); ok {
+			out, e = resolver.ResolveSourceSnapshots(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
 	case queryResolveSourceSnapshot:
 		var r targets.SourceSnapshotTarget
 		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {

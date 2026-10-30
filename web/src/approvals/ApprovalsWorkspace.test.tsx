@@ -161,7 +161,7 @@ it('shows original team policy scope and budgets to a current manager without of
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)} newID={() => 'manager-revoke-key'}/>);
   expect(await screen.findByText('team-policy-uid')).toBeTruthy();
   expect(screen.getByText('installation-policy-executor')).toBeTruthy();
-  expect(screen.getByText(/4 of 10 executions/)).toBeTruthy();
+  expect(screen.getByText(/4 of 10 action starts/)).toBeTruthy();
   expect(screen.getByText(/recurring policy collection uses a separate finite approval and shared budgets/)).toBeTruthy();
   expect(screen.getByText(/16 MiB of 64 MiB output/)).toBeTruthy();
   expect(screen.getByText(/This approval grants no evidence access/)).toBeTruthy();

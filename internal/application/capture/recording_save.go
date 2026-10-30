@@ -90,26 +90,19 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 	if err != nil || !i.Valid(s.Inventory.Now()) || !slices.Contains(i.Scopes, "evidence:capture") {
 		return zero, value.ErrDenied
 	}
-	id, _, ok := value.ParseRecordingHandle(request.Handles[0])
-	if !ok {
-		return zero, value.ErrInvalid
-	}
-	set, err := s.Inventory.Selections.ReadRecordingSelection(call, i.Principal, id)
+	set, refs, err := s.recordingSelectionReferences(call, i.Principal, request.Handles)
 	if err != nil {
 		return zero, err
 	}
-	if _, _, err = s.Inventory.authorize(call, current, set.Target); err != nil {
-		return zero, err
-	}
-	refs, err := set.Select(i.Principal, request.Handles, s.Inventory.Now())
+	authorized, _, err := s.Inventory.authorize(call, current, set.Target)
 	if err != nil {
 		return zero, err
 	}
-	// The currently implemented policy compiler accepts one packet action and
-	// an incident Pod cap of1. The canonical builder retains the1..16 schema;
-	// this route cannot silently discard additional selected sources.
-	if len(refs) != 1 {
-		return zero, value.ErrCapacity
+	if authorized.Principal != i.Principal || authorized.Policy != i.Policy {
+		return zero, value.ErrDenied
+	}
+	if len(refs) > 1 {
+		return s.previewRecordingSaveGroup(call, current, i, set, refs, request)
 	}
 	candidates, err := s.Inventory.Candidates.RecordingSources(call, set.Target, []string{refs[0].SourceID})
 	if err != nil {
@@ -154,6 +147,14 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 			return zero, value.ErrInvalid
 		}
 		lineage = &value.HistoryLineage{CaptureID: settings.CaptureID, ExpiresAt: settings.ExpiresAt.UTC().Truncate(time.Microsecond)}
+		if request.Before == 0 {
+			for _, window := range settings.RecordingSave.Windows {
+				if window.ActionID == chosen.Source.Binding.ActionID {
+					request.Before = window.Before
+					break
+				}
+			}
+		}
 	}
 	until := identity.Earlier(i.ValidUntil, policy.Accepted.SourceUntil)
 	executor := newPolicyIdentity(call, s.Inventory.Accepted, policy.Accepted.Authority, until, s.Inventory.Now)
@@ -168,5 +169,9 @@ func (s RecordingSaves) Request(ctx context.Context, current identities.CurrentI
 	investigation := s.Investigation
 	investigation.RecordingPolicies = s.Inventory.Policies
 	investigation.PolicyAccepted = s.Inventory.Accepted
+	investigation.RecordingSources = s.Inventory.Candidates
+	if investigation.RecordingGroups == nil {
+		investigation.RecordingGroups, _ = investigation.Admission.(RecordingSaveGroupAdmissions)
+	}
 	return investigation.Request(ctx, current, preview, key)
 }

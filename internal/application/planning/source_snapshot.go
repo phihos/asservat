@@ -99,7 +99,7 @@ func compileSourceSnapshotContext(in value.ContextInput, now time.Time) (value.C
 		if err != nil || !bytes.Equal(raw, s.RecordingSaveScope) || !recordingSaveContextMatches(raw, digest, in) {
 			return bad()
 		}
-	} else if len(s.RecordingSaveScope) != 0 {
+	} else if len(s.RecordingSaveScope) != 0 || s.Group != nil {
 		return bad()
 	}
 	until := identity.Earlier(in.Deadline, identity.Earlier(targetUntil, identity.Earlier(in.Capability.FreshUntil, r.ValidUntil)))

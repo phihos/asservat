@@ -62,6 +62,12 @@ func (m *OperationMAC) BrowserSettingsResultDigest(b []byte) (artifact.Digest, e
 	return m.digest("mcp-result/v1", b, auditvalue.OperationCaptureSettingsOutputLimit)
 }
 
+// RecordingSavePreviewResultDigest keeps the existing result MAC domain/key.
+// Its larger input bound is consumed only by the named passive preview outcome.
+func (m *OperationMAC) RecordingSavePreviewResultDigest(b []byte) (artifact.Digest, error) {
+	return m.digest("mcp-result/v1", b, auditvalue.OperationRecordingSavePreviewOutputLimit)
+}
+
 func (m *OperationMAC) digest(domain string, b []byte, limit int) (artifact.Digest, error) {
 	if m == nil || len(b) > limit || (domain != "context-query-input/v1" && domain != "native-content-input/v1" && domain != "native-content-result/v1" && domain != "context-input/v1" && domain != "invalid-input/v1" && domain != "mcp-result/v1" && domain != "operation-error/v1" && domain != "principal/v1" && domain != "processing-input/v1" && domain != "processing-result/v1" && domain != "capture-intent/v2" && domain != "capture-intent-result/v1" && domain != "connector-retirement/v1" && domain != "connector-backing/v1" && domain != "connector-process/v1" && domain != "connector-credential/v1" && domain != "connector-result/v1") {
 		return artifact.Digest{}, ErrUnavailable

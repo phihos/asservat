@@ -92,6 +92,7 @@ func TestPublicContextDraftRolesHaveExactPurposeGrants(t *testing.T) {
 		// ADR-200: a refresh demand, no table grant.
 		publicRuntimeGrant{"function", "demand_capacity_refresh(uuid,uuid,text,text,text,text,text)", "", "EXECUTE"})
 	resolution := append(slices.Clone(common),
+		publicRuntimeGrant{"table", "recording_save_group", "", "SELECT"},
 		publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"},
 		publicRuntimeGrant{"table", "fleet_current_trust", "", "SELECT"},
 		publicRuntimeGrant{"table", "permission_stream", "", "SELECT"},

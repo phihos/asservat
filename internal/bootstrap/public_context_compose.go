@@ -427,6 +427,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// acquisition gate remains false until installed source/clock qualification.
 	recordingPolicies := captureapp.CurrentRecordingPolicies{Documents: out.hubPolicies, Accepted: out.policies, CompileRecorder: recordingSavePolicyCompiler(out.investigation.Filters), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}
 	out.investigation.RecordingPolicies, out.investigation.PolicyAccepted = recordingPolicies, out.policies
+	out.investigation.RecordingSources, out.investigation.RecordingGroups = previews, admissionsSQL
 	out.recordings = &captureapp.RecordingSaves{Targets: queries, Investigation: out.investigation, Inventory: captureapp.RecordingInventory{RootID: root, Permissions: out.permissions, Eligibility: eligibility, Candidates: previews, Policies: recordingPolicies, Selections: previews, Accepted: out.policies, Now: time.Now, NewID: ownerRandomID}}
 	out.cancellations = &captureapp.CaptureCancellation{RootID: root, InstallationID: installation, Ledger: executionSQL, Dispatcher: out.sourceDispatch, Recovery: out.recovery, Now: time.Now}
 

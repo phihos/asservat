@@ -47,10 +47,13 @@ func (p PolicyApprovalSettings) Clamp(issuedAt, current time.Time) time.Time {
 // lifetime. The immutable scope and review digest include this exact authority,
 // finite requested budgets and accepted approval settings reference.
 type PolicyGrantScope struct {
-	Authority         AcceptedPolicyAuthority
-	RecipeDigest      artifact.Digest
-	Limits            AutomationLimits
-	ApprovalPolicyRef identity.Revision
+	// Zero preserves legacy per-start policy units. A nonzero value is supplied
+	// only by the checked accepted-scope compiler, never by a grant requester.
+	MaxStartsPerExecution int `json:",omitzero"`
+	Authority             AcceptedPolicyAuthority
+	RecipeDigest          artifact.Digest
+	Limits                AutomationLimits
+	ApprovalPolicyRef     identity.Revision
 	// ApprovalMaxAge is the original reviewed ceiling, separate from later
 	// monotonic PolicyNotAfter overlays. It needs no settings history lookup.
 	ApprovalMaxAge time.Duration
@@ -76,5 +79,12 @@ func (p PolicyGrantScope) valid(issuedAt time.Time) bool {
 	if p.Observation == nil && p.Limits.MaxObservedBytes != 0 || p.Observation != nil && (!p.Observation.Valid() || p.Observation.MaxObservedBytes != p.Limits.MaxObservedBytes) {
 		return false
 	}
-	return p.RecipeDigest != (artifact.Digest{}) && p.ApprovalMaxAge >= time.Second && p.ApprovalMaxAge <= PolicyGrantMaximumLifetime && p.ApprovalMaxAge%time.Second == 0 && a.Valid(issuedAt) && p.Workload().Valid() && p.ApprovalPolicyRef.Valid() && p.Limits.MaxExecutions > 0 && p.Limits.MaxExecutions <= a.Limits.MaxExecutions && p.Limits.MaxBytes > 0 && p.Limits.MaxBytes <= a.Limits.MaxBytes && p.Limits.MaxObservedBytes >= 0 && p.Limits.MaxObservedBytes <= a.Limits.MaxObservedBytes
+	return p.RecipeDigest != (artifact.Digest{}) && p.ApprovalMaxAge >= time.Second && p.ApprovalMaxAge <= PolicyGrantMaximumLifetime && p.ApprovalMaxAge%time.Second == 0 && a.Valid(issuedAt) && p.Workload().Valid() && p.ApprovalPolicyRef.Valid() && p.Limits.MaxExecutions > 0 && p.MaxStartsPerExecution >= 0 && p.MaxStartsPerExecution <= 16 && p.Limits.MaxExecutions <= p.executionStartCeiling() && p.Limits.MaxBytes > 0 && p.Limits.MaxBytes <= a.Limits.MaxBytes && p.Limits.MaxObservedBytes >= 0 && p.Limits.MaxObservedBytes <= a.Limits.MaxObservedBytes
+}
+
+func (p PolicyGrantScope) executionStartCeiling() int64 {
+	if p.MaxStartsPerExecution == 0 {
+		return p.Authority.Limits.MaxExecutions
+	}
+	return min(int64(10000), p.Authority.Limits.MaxExecutions*int64(p.MaxStartsPerExecution))
 }

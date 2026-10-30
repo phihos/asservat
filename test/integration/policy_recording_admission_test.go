@@ -39,6 +39,8 @@ type policyRecorderProtectedCase struct {
 	RecordingSaves      bool
 	RecurringSharing    bool
 	OrdinaryGrant       bool
+	IncidentPods        int
+	PolicyExecutions    int64
 	Retention           string
 	SourceAccepted      func(*testing.T, policySourceAcceptedFixture)
 	Hub                 *pgxpool.Pool
@@ -201,6 +203,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if observed {
 				authority.Limits.MaxObservedBytes = 1 << 30
 			}
+			if len(protected) > 0 && protected[0].PolicyExecutions > 0 {
+				authority.Limits.MaxExecutions = protected[0].PolicyExecutions
+			}
 			authority.Executor = authorization.PolicyPrincipal(installation, authority.PolicyUID)
 			spec := publicPolicySpec(t, authority)
 			var authored map[string]any
@@ -229,6 +234,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				authored["retention"] = protected[0].Retention
 			}
 			selected := authored["target"].(map[string]any)
+			if len(protected) > 0 && protected[0].IncidentPods > 0 {
+				selected["maxPods"] = protected[0].IncidentPods
+			}
 			selected["namespace"] = s.a.Plan.Input.Target.Request.Namespace.Name
 			selected["workloadRef"].(map[string]any)["name"] = s.a.Plan.Input.Target.Request.Workload.Name
 			if companionSQL {

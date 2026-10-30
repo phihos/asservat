@@ -153,7 +153,7 @@ func (q *Queries) DemandCapacityRefresh(ctx context.Context, arg DemandCapacityR
 }
 
 const findContextPreview = `-- name: FindContextPreview :one
-SELECT id, root_id, capture_id, attempt_id, actor_key, principal_key, blueprint_json, blueprint_sha256, created_at, deadline, closed_at, closed_request_key, closed_submission_digest FROM context_preview WHERE root_id=$1 AND id=$2 AND actor_key=$3
+SELECT id, root_id, capture_id, attempt_id, actor_key, principal_key, blueprint_json, blueprint_sha256, created_at, deadline, closed_at, closed_request_key, closed_submission_digest, preview_kind FROM context_preview WHERE root_id=$1 AND id=$2 AND actor_key=$3
 `
 
 type FindContextPreviewParams struct {
@@ -179,6 +179,7 @@ func (q *Queries) FindContextPreview(ctx context.Context, arg FindContextPreview
 		&i.ClosedAt,
 		&i.ClosedRequestKey,
 		&i.ClosedSubmissionDigest,
+		&i.PreviewKind,
 	)
 	return i, err
 }

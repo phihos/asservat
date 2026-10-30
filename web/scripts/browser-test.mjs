@@ -236,7 +236,7 @@ try {
   await control('ready');
   await page.goto(origin + '/approvals/00000000-0000-4000-8000-000000000702');
   await expect(page.getByText('team-policy-uid', { exact: true })).toBeVisible();
-  await expect(page.getByText(/4 of 10 executions/)).toBeVisible();
+  await expect(page.getByText(/4 of 10 action starts/)).toBeVisible();
   await expect(page.getByText(/32 MiB of 64 MiB output/)).toBeVisible();
   await expect(page.getByText(/Team, workload and admission limits/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
@@ -270,10 +270,10 @@ try {
   await page.getByText(/budgets are shared across captures and grants/).waitFor();
   await page.getByRole('button', { name: 'Check status' }).click();
   await page.getByText('5 of 100 used', { exact: true }).waitFor();
-  await page.getByLabel('Maximum executions', { exact: true }).fill('3');
+  await page.getByLabel('Action starts', { exact: true }).fill('3');
   await page.getByRole('button', { name: 'Request policy approval', exact: true }).click();
   await page.getByRole('link', { name: 'View policy approval', exact: true }).click();
-  await expect(page.getByText(/3 executions/)).toBeVisible();
+  await expect(page.getByText(/0 of 3 action starts/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Continue approved capture' })).toHaveCount(0);
   await scan('policy-approval-request');

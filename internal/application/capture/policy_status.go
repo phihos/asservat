@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
+	authapp "asservat.local/asservat/internal/application/authorization"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
@@ -27,6 +29,9 @@ type PolicyStatusService struct {
 	Permissions            PolicyPermissions
 	Recovery               fleetapp.RecoveryReader
 	Now                    func() time.Time
+	CompileRecorder        PolicyRecorderCompiler
+	RecipeName             string
+	RecipeDigest           artifact.Digest
 }
 
 func (s PolicyStatusService) Get(ctx context.Context, current identities.CurrentIdentity, name string) (value.PolicyStatus, time.Time, error) {
@@ -74,11 +79,26 @@ func (s PolicyStatusService) Get(ctx context.Context, current identities.Current
 	if !r.Eligible {
 		return zero, time.Time{}, value.ErrDenied
 	}
+	status.MaxGrantStarts = 0
+	if s.CompileRecorder != nil && status.ActiveID != "" && status.AcceptedIntentVersion > 0 && source.Valid(s.Now()) && !source.Suspended && !source.Deleted && source.InstallationID == status.Authority.InstallationID && source.Revision.UID == status.PolicyUID && status.Authority.Valid(s.Now()) {
+		compiled, e := CompilePolicyWithRecorders(spec, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
+		if e == nil && compiled.Recorder != nil {
+			a := status.Authority
+			scope := RecorderPolicyScope(source.Revision.UID, status.AcceptedIntentVersion, source.CollectionDigest, compiled, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits)
+			starts, e := authapp.PolicyGrantStartsPerExecution(scope, a, compiled.Recorder.RecipeDigest)
+			if e == nil && starts > 0 && source.Valid(s.Now()) {
+				status.MaxGrantStarts = min(int64(10000), a.Limits.MaxExecutions*int64(starts))
+			}
+		}
+	}
 	fresh, err := current.ResolveIdentity(ctx)
 	if err != nil || fresh.Principal != i.Principal || fresh.Policy != i.Policy || !fresh.Valid(s.Now()) {
 		return zero, time.Time{}, value.ErrDenied
 	}
 	until := identity.Earlier(identity.Earlier(r.ValidUntil, fresh.ValidUntil), recovery.FreshUntil)
+	if status.MaxGrantStarts > 0 {
+		until = identity.Earlier(until, source.FreshUntil)
+	}
 	if !s.Now().Before(until) || ctx.Err() != nil {
 		return zero, time.Time{}, value.ErrUnavailable
 	}

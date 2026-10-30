@@ -146,19 +146,49 @@
                             "Failed",
                             "TargetGone",
                             "Unsupported",
-                            "Indeterminate"
+                            "Indeterminate",
+                            "Cancelled"
                           ]
                         },
                         "reason_code": {
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 64
+                        },
+                        "action_instance_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "Exact child identity within this parent save. It is not a separate navigation or retry target."
+                        },
+                        "pod_uid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "pod_name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 253
                         }
                       },
                       "required": [
                         "action_id",
                         "phase"
-                      ]
+                      ],
+                      "dependentRequired": {
+                        "action_instance_id": [
+                          "pod_uid",
+                          "pod_name"
+                        ],
+                        "pod_uid": [
+                          "action_instance_id",
+                          "pod_name"
+                        ],
+                        "pod_name": [
+                          "action_instance_id",
+                          "pod_uid"
+                        ]
+                      }
                     },
                     "minItems": 0,
                     "maxItems": 16
@@ -254,6 +284,9 @@
                       "available",
                       "unavailable"
                     ]
+                  },
+                  "cancellation_requested": {
+                    "type": "boolean"
                   }
                 },
                 "required": [

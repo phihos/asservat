@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { operations } from './http';
-import { inventoryResult, savePreviewResult } from './test-fixtures';
+import { inventoryResult, savePreviewResult, recording } from './test-fixtures';
 import { target } from '../capture/test-fixtures';
 import * as validators from '../generated/validate-recordings';
 afterEach(() => vi.unstubAllGlobals());
@@ -31,4 +31,15 @@ it('rejects oversized metadata and redirected or raw responses without exposing 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
     await expect(operations.call('list_recordings', { target_ref: target }, 'csrf', new AbortController().signal)).rejects.toThrow();
   }
+});
+
+it('reads all16 source disclosures within the dedicated preview bound and refuses one byte over', async () => {
+ const rows=Array.from({length:16},(_,i)=>({...recording(i+1),recording_handle:'h'.repeat(125)+String(i).padStart(3,'0'),pod_uid:'u'.repeat(125)+String(i).padStart(3,'0'),pod_name:'n'.repeat(60)+String(i).padStart(3,'0'),action_id:'a'.repeat(63),policy_uid:'p'.repeat(64),incident_pod_cap:16}));
+ const preview=savePreviewResult(rows);if(preview.status!=='ok')throw new Error();const base=preview.data.capture_assessment.actions[0];preview.data.incident_pod_cap=16;preview.data.capture_assessment.scope.incidentPods=16;
+ preview.data.capture_assessment.actions=rows.map(row=>({...structuredClone(base),recording_handle:row.recording_handle,actionID:row.action_id,retention:{...base.retention,policyDigests:Array.from({length:64},(_,n)=>(n+1).toString(16).padStart(64,'0'))}}));
+ const body=JSON.stringify(preview);expect(new TextEncoder().encode(body).length).toBeGreaterThan(64*1024);expect(validators.validOutput_preview_recording_save(preview)).toBe(true);
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue(json(preview)));const response=await operations.call('preview_recording_save',{recording_handles:rows.map(row=>row.recording_handle)},'csrf',new AbortController().signal);if(response.status!=='ok')throw new Error();expect(response.data.selected_recordings).toHaveLength(16);expect(response.data.capture_assessment.actions.every(row=>row.retention.policyDigests.length===64)).toBe(true);
+ const exact=body+' '.repeat(128*1024-new TextEncoder().encode(body).length);
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(exact+' ',{headers:{'Content-Type':'application/json'}})));await expect(operations.call('preview_recording_save',{recording_handles:rows.map(row=>row.recording_handle)},'csrf',new AbortController().signal)).rejects.toThrow();
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue(json(preview)));await expect(operations.call('list_recordings',{target_ref:target},'csrf',new AbortController().signal)).rejects.toThrow();
 });

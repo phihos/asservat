@@ -249,26 +249,23 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		result, operationErr = s.saves.Preview(bounded, current, app.RecordingSavePreviewRequest{Handles: append([]string(nil), in.Handles...), Before: before, Sharing: in.Sharing.intent(), RepeatedFromCaptureID: in.RepeatedFrom})
 		if operationErr == nil {
 			p, m := result.Preview, result.RecordingSave
-			if m == nil || p.Intent.Snapshot == nil || m.Before <= 0 || m.Before != p.Intent.Snapshot.Request.Before || len(m.Selected) != len(in.Handles) || len(m.Selected) == 0 || m.IncidentPodCap < 1 || p.ScopeDigest != result.Assessment.PlanDigest || !s.config.Now().Before(p.SelectionUntil) {
+			if m == nil || p.ScopeDigest != result.Assessment.PlanDigest || !s.config.Now().Before(p.SelectionUntil) {
 				return OperationReply{}, value.ErrUnavailable
 			}
-			until = identity.Earlier(until, result.ValidUntil)
-			rows := make([]RecordingRow, 0, len(m.Selected))
-			windows := make([]RecordingWindow, 0, len(m.Selected))
-			seen := map[string]bool{}
-			for _, r := range m.Selected {
-				if !slices.Contains(in.Handles, r.Handle) || seen[r.Handle] {
-					return OperationReply{}, value.ErrUnavailable
-				}
-				seen[r.Handle] = true
-				rows = append(rows, recordingRow(r, time.Time{}))
-				windows = append(windows, RecordingWindow{r.Handle, artifact.LifecycleDuration(m.Before), "0s"})
+			rows, windows, selectionErr := recordingPreviewSelection(result, in.Handles)
+			if selectionErr != nil {
+				return OperationReply{}, selectionErr
 			}
+			assessment, assessmentErr := recordingSaveAssessment(result)
+			if assessmentErr != nil {
+				return OperationReply{}, assessmentErr
+			}
+			until = identity.Earlier(until, result.ValidUntil)
 			blockers := []string{}
 			if !s.config.CollectionEnabled {
 				blockers = append(blockers, "CollectionDisabled")
 			}
-			out.Data = RecordingSavePreviewData{Kind: "recordingSavePreview", Operation: "recordingSave", PreviewID: p.ID, CaptureID: p.CaptureID, ExpiresAt: p.SelectionUntil.UTC(), ScopeDigest: hash(p.ScopeDigest), Selected: rows, Windows: windows, Assessment: ContextAssessment(result.Assessment), Blockers: blockers, NavigationURI: s.config.PublicOrigin + "/captures/new", CaptureEnabled: s.config.CollectionEnabled, IncidentPodCap: m.IncidentPodCap}
+			out.Data = RecordingSavePreviewData{Kind: "recordingSavePreview", Operation: "recordingSave", PreviewID: p.ID, CaptureID: p.CaptureID, ExpiresAt: p.SelectionUntil.UTC(), ScopeDigest: hash(p.ScopeDigest), Selected: rows, Windows: windows, Assessment: assessment, Blockers: blockers, NavigationURI: s.config.PublicOrigin + "/captures/new", CaptureEnabled: s.config.CollectionEnabled, IncidentPodCap: m.IncidentPodCap}
 		}
 	}
 	if operationErr != nil {
@@ -287,7 +284,11 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 	}
 	until = identity.Earlier(until, final.ValidUntil)
 	b, err := json.Marshal(out)
-	if err == nil && len(b) > contracts.InvestigationOutputLimit {
+	limit := contracts.InvestigationOutputLimit
+	if name == "preview_recording_save" {
+		limit = contracts.InvestigationRecordingSavePreviewOutputLimit
+	}
+	if err == nil && len(b) > limit {
 		out.Status, out.Data, out.NextCursor = "error", OperationFailure{"ReduceLimit", "Use a smaller inventory page or recording selection to fit the metadata response.", false}, nil
 		b, err = json.Marshal(out)
 	}
@@ -298,11 +299,11 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		clear(b)
 		return OperationReply{}, value.ErrUnavailable
 	}
-	return OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr)}, nil
+	return OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), recordingSavePreview: name == "preview_recording_save"}, nil
 }
 
 func acceptedRecordingOperation(accepted value.Accepted) string {
-	if accepted.Expectation.Snapshot != nil {
+	if accepted.Group != nil || accepted.Expectation.Snapshot != nil {
 		return "recordingSave"
 	}
 	return "collect"

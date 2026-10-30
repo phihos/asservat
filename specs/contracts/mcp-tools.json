@@ -9035,19 +9035,49 @@
                                 "Failed",
                                 "TargetGone",
                                 "Unsupported",
-                                "Indeterminate"
+                                "Indeterminate",
+                                "Cancelled"
                               ]
                             },
                             "reason_code": {
                               "type": "string",
                               "minLength": 1,
                               "maxLength": 64
+                            },
+                            "action_instance_id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "description": "Exact child identity within this parent save. It is not a separate navigation or retry target."
+                            },
+                            "pod_uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            },
+                            "pod_name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 253
                             }
                           },
                           "required": [
                             "action_id",
                             "phase"
-                          ]
+                          ],
+                          "dependentRequired": {
+                            "action_instance_id": [
+                              "pod_uid",
+                              "pod_name"
+                            ],
+                            "pod_uid": [
+                              "action_instance_id",
+                              "pod_name"
+                            ],
+                            "pod_name": [
+                              "action_instance_id",
+                              "pod_uid"
+                            ]
+                          }
                         },
                         "minItems": 0,
                         "maxItems": 16
@@ -13398,6 +13428,12 @@
                         "type": "string",
                         "format": "uuid",
                         "description": "Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection."
+                      },
+                      "max_grant_starts": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000,
+                        "description": "Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter."
                       }
                     },
                     "required": [
@@ -14773,7 +14809,7 @@
     },
     {
       "name": "request_policy_grant",
-      "description": "Request an independent finite approval for one currently accepted team policy. Uses its real workload, recipe, current requester rights and original policy authority; creates no capture or personal result access. Retry the same actor/client and idempotency key after an unknown reply; original expiry and budgets never reset. A different current human action-approver reviews through get_grant and decide_review.",
+      "description": "Request an independent finite approval for one currently accepted team policy. Uses its real workload, recipe, current requester rights and original policy authority; creates no capture or personal result access. Retry the same actor/client and idempotency key after an unknown reply; original expiry and budgets never reset. A different current human action-approver reviews through get_grant and decide_review. Grant limits.max_executions counts action starts; grouped Save admissions use the separate policy execution counter. get_policy_status.max_grant_starts supplies the current server-derived request ceiling when available.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,

@@ -138,7 +138,8 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	read("goose_db_version")
 	switch purpose {
 	case "hub-metadata-read":
-		read("capture_history_parameter")
+		read("capture_history_parameter", "recording_save_group")
+		add("recording_save_group", "UPDATE", "id")
 		// The hub's seven metadata facets share only their existing read and
 		// row-lock privileges. No evidence-object locators, credentials or effect writes.
 		read("authority_audit", "context_capture", "context_case_locator", "context_catalog", "context_control_account", "context_control_pool", "context_execution", "context_processing", "context_storage_binding", "context_verification", "custody_allocation", "custody_attempt", "custody_pool", "fleet_current_trust", "permission_assignment", "permission_basis", "permission_stream", "processing_root", "processing_rule", "retention_catchup", "retention_catchup_effect", "retention_checkpoint", "retention_decision", "retention_source")
@@ -151,6 +152,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// provenance. Root/qualification arguments are not a role boundary.
 		out = append(out, publicRuntimeGrant{"function", "read_capacity_audit_profiles(uuid,uuid,uuid,bytea,text,timestamptz,timestamptz)", "", "EXECUTE"})
 	case "capture-history":
+		read("recording_save_group")
 		// ADR-255: encrypted metadata shares ordinary hub SQL custody, without
 		// a new credential or evidence-key authority. Payloads stay regional.
 		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_capture", "capture_history_parameter", "capture_history_quota", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision", "policy_source", "policy_acceptance")
@@ -169,6 +171,8 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("capture_history_quota", "UPDATE", "used")
 		add("capture_history_parameter", "UPDATE", "capture_id", "visible", "state", "write_id", "write_digest", "write_started_at", "write_until", "write_executor_epoch", "writer_completion_json", "copies_digest", "delete_id", "delete_executor_epoch", "delete_started_at", "delete_until", "delete_fence", "purge_completion_json")
 	case "capture-admit":
+		read("recording_save_group")
+		add("recording_save_group", "INSERT")
 		read("recording_save_reservation", "policy_workload_window")
 		add("recording_save_reservation", "INSERT")
 		add("policy_workload_window", "INSERT")
@@ -293,6 +297,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// ADR-200: a refresh demand for an enrolled workload; no authority.
 		out = append(out, publicRuntimeGrant{"function", "demand_capacity_refresh(uuid,uuid,text,text,text,text,text)", "", "EXECUTE"})
 	case "capture-resolution":
+		read("recording_save_group")
 		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
 		// Current same-actor request resolution may only close a passive draft
 		// or fence its absent original ID. It cannot admit/cancel accepted work.

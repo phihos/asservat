@@ -55,7 +55,7 @@ func previewRecord(row custodydb.ContextPreview) (value.ContextPreview, error) {
 	}
 	d := json.NewDecoder(bytes.NewReader(row.BlueprintJson))
 	d.DisallowUnknownFields()
-	if d.Decode(&out) != nil || !app.ValidContextPreview(out) {
+	if d.Decode(&out) != nil || !app.ValidContextPreview(out) || (out.Group == nil && row.PreviewKind != "context") || (out.Group != nil && row.PreviewKind != "recordingSaveGroup") {
 		return value.ContextPreview{}, value.ErrUnavailable
 	}
 	canonical, err := json.Marshal(out)
@@ -137,7 +137,12 @@ func (s *ContextPreviews) CreateContextPreview(ctx context.Context, p value.Cont
 		if count >= value.MaxPreviewsPerPrincipal {
 			return value.ErrCapacity
 		}
-		if err = q.InsertContextPreview(ctx, custodydb.InsertContextPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), AttemptID: id(p.AttemptID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)}); err != nil {
+		if p.Group != nil {
+			err = q.InsertRecordingGroupPreview(ctx, custodydb.InsertRecordingGroupPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
+		} else {
+			err = q.InsertContextPreview(ctx, custodydb.InsertContextPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), AttemptID: id(p.AttemptID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
+		}
+		if err != nil {
 			return err
 		}
 		return currentPreview(ctx, q, p)
@@ -232,4 +237,24 @@ func checkContextPreviewFence(ctx context.Context, q *custodydb.Queries, root, p
 		return nil
 	}
 	return err
+}
+
+// Group previews use the same bounded journal and fences, with no parent
+// artifact/attempt. Separate entry points keep accidental single-route use closed.
+func (s *ContextPreviews) CreateRecordingGroupPreview(ctx context.Context, p value.ContextPreview) error {
+	if p.Group == nil {
+		return value.ErrInvalid
+	}
+	return s.CreateContextPreview(ctx, p)
+}
+
+func (s *ContextPreviews) ReadRecordingGroupPreview(ctx context.Context, root, preview string, actor identity.Principal) (value.ContextPreview, error) {
+	p, err := s.ReadContextPreview(ctx, root, preview, actor)
+	if err != nil {
+		return value.ContextPreview{}, err
+	}
+	if p.Group == nil {
+		return value.ContextPreview{}, value.ErrInvalid
+	}
+	return p, nil
 }

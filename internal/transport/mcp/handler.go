@@ -30,7 +30,9 @@ const (
 	MetadataPath     = "/.well-known/oauth-protected-resource/mcp"
 	MaxRequestBytes  = 32 << 10
 	MaxResponseBytes = 64 << 10
-	maxNesting       = 32
+	// Only the16-source preview has a larger SDK text+structured result frame.
+	MaxRecordingSavePreviewResponseBytes = presentation.OperationRecordingSavePreviewFrameLimit
+	maxNesting                           = 32
 	// toolsListBudget bounds the encoded tools of one tools/list page. The
 	// rest of MaxResponseBytes covers the JSON-RPC envelope, cursor and cache
 	// fields; every single descriptor must fit it (tested).
@@ -678,6 +680,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// The SDK owns revision-specific initialization, metadata and header/body
 	// agreement. Do not emulate future protocol fields or retain transport state.
 	response := newBoundedResponse()
+	if route.Method == "tools/call" && route.Name == "preview_recording_save" && h.operations != nil {
+		if _, ok := h.operations.Tool(route.Name); ok {
+			response.limit = MaxRecordingSavePreviewResponseBytes
+		}
+	}
 	defer func() { clear(response.body) }()
 	defer delivery.close(ctx)
 	r.Body = io.NopCloser(bytes.NewReader(body))
@@ -852,6 +859,7 @@ func rpcProblem(w http.ResponseWriter, code int, message string) {
 }
 
 type boundedResponse struct {
+	limit    int
 	header   http.Header
 	body     []byte
 	status   int
@@ -859,12 +867,12 @@ type boundedResponse struct {
 }
 
 func newBoundedResponse() *boundedResponse {
-	return &boundedResponse{header: make(http.Header), status: http.StatusOK}
+	return &boundedResponse{header: make(http.Header), status: http.StatusOK, limit: MaxResponseBytes}
 }
 func (r *boundedResponse) Header() http.Header    { return r.header }
 func (r *boundedResponse) WriteHeader(status int) { r.status = status }
 func (r *boundedResponse) Write(p []byte) (int, error) {
-	if r.overflow || len(p) > MaxResponseBytes-len(r.body) {
+	if r.overflow || len(p) > r.limit-len(r.body) {
 		r.overflow = true
 		return 0, errors.New("MCP response exceeds limit")
 	}

@@ -41,45 +41,6 @@ func NewHistoryParameters(ctx context.Context, pool *pgxpool.Pool, root string, 
 	return &HistoryParametersLedger{ledger: l, root: root, recovery: g.Recovery, retention: g.Retention}, nil
 }
 
-func historyAuthorizedCapture(ctx context.Context, q *custodydb.Queries, root, installation, capture string, i identity.Identity, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, write bool) (custodydb.ContextCapture, time.Time, error) {
-	c, e := q.ReadHistoryCapture(ctx, custodydb.ReadHistoryCaptureParams{RootID: id(root), ID: id(capture)})
-	if e != nil {
-		return c, time.Time{}, value.ErrDenied
-	}
-	a, e := admittedRecord(c)
-	if e != nil {
-		return c, time.Time{}, value.ErrUnavailable
-	}
-	intent, e := captureIntent(c)
-	if e != nil {
-		return c, time.Time{}, e
-	}
-	p, e := permissionProjection(ctx, q, stream, intent.Target)
-	if e != nil {
-		return c, time.Time{}, value.ErrDenied
-	}
-	now, e := q.CurrentTime(ctx)
-	if e != nil {
-		return c, time.Time{}, e
-	}
-	if !i.Valid(now.Time) {
-		return c, time.Time{}, value.ErrDenied
-	}
-	var result authorization.Result
-	if write {
-		if intent.Actor != i.Principal {
-			return c, time.Time{}, value.ErrDenied
-		}
-		result = contextEligibilityIn(ctx, q, stream, trust, root, installation, i, p, intent.Target, now.Time).Result
-	} else {
-		result = authorization.CaptureHistoryEligibility(i, p, intent.Target, intent.Actor, a.Expectation.Audience, now.Time)
-	}
-	if !result.Eligible {
-		return c, time.Time{}, value.ErrDenied
-	}
-	return c, identity.Earlier(result.ValidUntil, i.ValidUntil), nil
-}
-
 func decodeHistoryExpectation(h custodydb.CaptureHistoryParameter) (value.HistoryExpectation, error) {
 	var e value.HistoryExpectation
 	if len(h.ExpectationJson) > 8192 || json.Unmarshal(h.ExpectationJson, &e) != nil || !e.Valid() || id(e.RootID) != h.RootID || id(e.CaptureID) != h.CaptureID || id(e.Registration.Location.AttemptID) != h.AttemptID || !bytes.Equal(e.SelectorKey[:], h.SelectorKey) || !bytes.Equal(e.SettingsKey[:], h.SettingsKey) || e.MACVersion != h.MacVersion {
@@ -148,22 +109,14 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 		if err != nil {
 			return err
 		}
-		accepted, err := admittedRecord(c)
-		if err != nil {
-			return err
-		}
-		original := accepted.Expectation
-		if e.OriginalExecutionDigest != accepted.ScopeDigest || e.Registration.Location.ClusterID != original.Registration.Location.ClusterID || e.Registration.AllocationID != original.Registration.AllocationID || !e.Registration.AnchorAt.Equal(c.CreatedAt.Time) || in.SummaryExpiresAt.After(in.Retention.ExpiresAt) || e.Registration.ExpiresAt.After(in.SummaryExpiresAt) || !e.Registration.WriteUntil.After(c.CreatedAt.Time) {
+		original := c.Backing
+		if e.OriginalExecutionDigest != c.ScopeDigest || e.Registration.Location.ClusterID != original.ClusterID || e.Registration.AllocationID != original.AllocationID || !e.Registration.AnchorAt.Equal(c.CreatedAt.Time) || in.SummaryExpiresAt.After(in.Retention.ExpiresAt) || e.Registration.ExpiresAt.After(in.SummaryExpiresAt) || !e.Registration.WriteUntil.After(c.CreatedAt.Time) {
 			return value.ErrInvalid
 		}
-		intent, err := captureIntent(c)
-		if err != nil {
-			return err
-		}
-		if in.Retention.Target != intent.Target {
+		if in.Retention.Target != c.Target {
 			return value.ErrDenied
 		}
-		if err = s.retention.check(ctx, q, topology, in.Retention.Proof, intent.Target); err != nil {
+		if err = s.retention.check(ctx, q, topology, in.Retention.Proof, c.Target); err != nil {
 			return err
 		}
 		if existing, err := q.LockHistoryParameter(ctx, custodydb.LockHistoryParameterParams{RootID: id(s.root), CaptureID: id(e.CaptureID)}); err == nil {
@@ -181,7 +134,7 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 		if c.RepeatedFromCaptureID.Valid && (in.Source == nil || in.Source.CaptureID != uid(c.RepeatedFromCaptureID) || in.Source.ExpiresAt.After(c.RepeatedFromExpiresAt.Time)) {
 			return value.ErrDenied
 		}
-		retention := value.HistoryRetention{Input: privacy.Input{ControlKind: "case-metadata", Target: intent.Target, PrivacyClass: in.Retention.PrivacyClass, EvidenceType: "other", RequestedSeconds: in.Retention.RequestedSeconds, AnchorAt: e.Registration.AnchorAt}, Origins: in.Retention.Policies}
+		retention := value.HistoryRetention{Input: privacy.Input{ControlKind: "case-metadata", Target: c.Target, PrivacyClass: in.Retention.PrivacyClass, EvidenceType: "other", RequestedSeconds: in.Retention.RequestedSeconds, AnchorAt: e.Registration.AnchorAt}, Origins: in.Retention.Policies}
 		if in.Source != nil {
 			if !in.Source.Valid(in.Identity.VerifiedAt) || !c.RepeatedFromCaptureID.Valid || uid(c.RepeatedFromCaptureID) != in.Source.CaptureID || e.Registration.ExpiresAt.After(in.Source.ExpiresAt) {
 				return value.ErrDenied
@@ -303,8 +256,8 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 		if !now.Time.Before(until) || !in.Identity.Valid(now.Time) {
 			return value.ErrDenied
 		}
-		out = value.HistoryStorage{Expectation: e, State: "reserved", SummaryExpiresAt: in.SummaryExpiresAt, ObservedAt: now.Time, ValidUntil: identity.Earlier(until, in.Recovery.FreshUntil), Target: intent.Target, Retention: retention, Effective: privacy.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}}
-		return s.retention.check(ctx, q, topology, in.Retention.Proof, intent.Target)
+		out = value.HistoryStorage{Expectation: e, State: "reserved", SummaryExpiresAt: in.SummaryExpiresAt, ObservedAt: now.Time, ValidUntil: identity.Earlier(until, in.Recovery.FreshUntil), Target: c.Target, Retention: retention, Effective: privacy.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}}
+		return s.retention.check(ctx, q, topology, in.Retention.Proof, c.Target)
 	})
 	if err != nil {
 		return value.HistoryStorage{}, err

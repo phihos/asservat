@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
+	"time"
 )
 
 // HistoryDraftFromPreview copies original authored inputs and immutable version
@@ -13,6 +15,9 @@ import (
 // recorder settings from incidental plaintext SQL scope_json.
 func HistoryDraftFromPreview(p value.ContextPreview, a value.Accepted) (value.HistoryParameters, error) {
 	var out value.HistoryParameters
+	if p.Group != nil {
+		return recordingSaveGroupHistoryDraft(p, a)
+	}
 	if !p.Valid() || a.CaptureID != p.CaptureID || a.ScopeDigest != p.ScopeDigest || a.Expectation.Validate() != nil {
 		return out, value.ErrInvalid
 	}
@@ -116,4 +121,47 @@ func HistoryDraftFromPreview(p value.ContextPreview, a value.Accepted) (value.Hi
 		return value.HistoryParameters{}, err
 	}
 	return out, nil
+}
+
+func recordingSaveGroupHistoryDraft(p value.ContextPreview, a value.Accepted) (value.HistoryParameters, error) {
+	if !ValidContextPreview(p) || a.Group == nil || !acceptedContext(a, a.SubmissionDigest) || a.CaptureID != p.CaptureID || a.ScopeDigest != p.ScopeDigest || len(a.Group.Children) != len(p.Group.Children) {
+		return value.HistoryParameters{}, value.ErrInvalid
+	}
+	windows := map[string]time.Duration{}
+	requested, effective := int64(0), int64(0)
+	for n, c := range p.Group.Children {
+		child := a.Group.Children[n]
+		if child.CaptureID != c.CaptureID {
+			return value.HistoryParameters{}, value.ErrInvalid
+		}
+		if previous, ok := windows[c.Reference.ActionID]; ok && previous != c.Request.Before {
+			return value.HistoryParameters{}, value.ErrSettingsUnavailable
+		}
+		windows[c.Reference.ActionID] = c.Request.Before
+		if requested == 0 || c.Retention.RequestedSeconds < requested {
+			requested = c.Retention.RequestedSeconds
+		}
+		seconds := int64(child.Expectation.Registration.ExpiresAt.Sub(child.Expectation.Registration.AnchorAt).Seconds())
+		if effective == 0 || seconds < effective {
+			effective = seconds
+		}
+	}
+	prefs := make([]value.RecordingSavePreference, 0, len(windows))
+	for action, before := range windows {
+		prefs = append(prefs, value.RecordingSavePreference{ActionID: action, Before: before})
+	}
+	slices.SortFunc(prefs, func(a, b value.RecordingSavePreference) int {
+		if a.ActionID < b.ActionID {
+			return -1
+		}
+		if a.ActionID > b.ActionID {
+			return 1
+		}
+		return 0
+	})
+	out := value.HistoryParameters{Format: value.HistoryParametersFormat, Target: p.Intent.Target, NamespaceUID: p.Target.Namespace.UID, WorkloadUID: p.Target.Workload.UID, RequestedSeconds: requested, OriginalEffectiveSeconds: effective, OriginalExecutionDigest: a.ScopeDigest, Selection: "recordingSelectionRequired", SelectorIdentity: &value.HistorySelector{ClusterID: p.Target.ClusterID, NamespaceUID: p.Target.Namespace.UID, WorkloadKind: p.Target.Workload.Kind, WorkloadUID: p.Target.Workload.UID}, RecordingSave: &value.RecordingSaveSettings{PolicyUID: p.Group.PolicyUID, PolicyExecutionDigest: p.Group.ExecutionDigest, Windows: prefs}}
+	out.AuthoredTargetJSON, _ = json.Marshal(map[string]any{"namespace": p.Intent.Target.Namespace, "workloadRef": map[string]string{"apiVersion": "apps/v1", "kind": p.Intent.Target.Kind, "name": p.Intent.Target.Name, "uid": p.Target.Workload.UID}, "maxPods": len(p.Group.Children), "selection": "allWithinLimit", "adoption": "pinUID"})
+	raw, err := value.CanonicalHistoryParameters(out)
+	clear(raw)
+	return out, err
 }

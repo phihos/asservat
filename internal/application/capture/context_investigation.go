@@ -91,6 +91,8 @@ type ContextInvestigation struct {
 	RecordingSaveEnabled bool
 	// Manual existing-source composition only; nil leaves that route unavailable.
 	RecordingPolicies      RecordingPolicies
+	RecordingSources       RecordingCandidates
+	RecordingGroups        RecordingSaveGroupAdmissions
 	PolicyAccepted         authapp.AcceptedPolicyReader
 	RootID, InstallationID string
 	Previews               ContextPreviewStore
@@ -462,6 +464,23 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 }
 
 func acceptedContext(a value.Accepted, digest artifact.Digest) bool {
+	if a.Group != nil {
+		if (a.State != value.PendingAudit && a.State != value.IntentAudited) || !authorization.UUID(a.CaptureID) || a.SubmissionDigest != digest || a.ScopeDigest == (artifact.Digest{}) || !authorization.UUID(a.Group.CaseID) || len(a.Group.Children) < 2 || len(a.Group.Children) > value.MaxRecordingSaveGroupChildren || !reflect.DeepEqual(a.Expectation, artifact.ContextExpectation{}) || a.CreatedAt.IsZero() || !a.Deadline.After(a.CreatedAt) {
+			return false
+		}
+		seen := map[string]bool{a.CaptureID: true}
+		var deadline time.Time
+		for _, child := range a.Group.Children {
+			if child.Expectation.Snapshot == nil || child.Expectation.Lifecycle == nil || child.Expectation.Lifecycle.TriggerKind != "recordingSave" || child.Group != nil || !acceptedContext(child, child.SubmissionDigest) || seen[child.CaptureID] || child.ScopeDigest != a.ScopeDigest || child.Expectation.CaseID != a.Group.CaseID || !child.CreatedAt.Equal(a.CreatedAt) {
+				return false
+			}
+			seen[child.CaptureID] = true
+			if deadline.Before(child.Deadline) {
+				deadline = child.Deadline
+			}
+		}
+		return deadline.Equal(a.Deadline)
+	}
 	e := a.Expectation
 	return authorization.UUID(a.CaptureID) && a.CaptureID == e.CaptureUID && a.SubmissionDigest == digest && a.ScopeDigest == e.PlanDigest && e.Validate() == nil && !a.CreatedAt.IsZero() && a.Deadline.After(a.CreatedAt) && (a.State == value.PendingAudit || a.State == value.IntentAudited) && a.Pin.Namespace == e.Namespace && a.Pin.NamespaceUID == e.NamespaceUID && a.Pin.UID == e.PodUID
 }
@@ -515,8 +534,11 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if !ValidContextPreview(p) || p.ID != previewID || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.Actor != i.Principal {
 		return zero, value.ErrDenied
 	}
-	if p.Intent.Snapshot != nil && p.Intent.Snapshot.TriggerKind == "recordingSave" && !s.RecordingSaveEnabled {
+	if (p.Group != nil || p.Intent.Snapshot != nil && p.Intent.Snapshot.TriggerKind == "recordingSave") && !s.RecordingSaveEnabled {
 		return zero, value.ErrUnavailable
+	}
+	if p.Group != nil {
+		return s.requestRecordingSaveGroup(ctx, source, p, key, recovery)
 	}
 	executionSource, manualSave, err := s.manualSaveRequest(ctx, source, p)
 	if err != nil {

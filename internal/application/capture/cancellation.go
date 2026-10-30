@@ -13,7 +13,17 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
+type SnapshotCancellationTarget struct {
+	ClusterID string
+	Snapshot  collector.SourceSnapshot
+}
+type SnapshotCancellationGroup struct {
+	ParentCaptureID string
+	Targets         []SnapshotCancellationTarget
+}
+
 type SnapshotCancellationWork struct {
+	Group     *SnapshotCancellationGroup
 	Decision  value.Cancellation
 	ClusterID string
 	Snapshot  *collector.SourceSnapshot
@@ -74,6 +84,31 @@ func (s CaptureCancellation) Cancel(ctx context.Context, current identities.Curr
 	decision.ValidUntil = identity.Earlier(decision.ValidUntil, until)
 	if !decision.Valid(s.Now()) || decision.CaptureID != request.CaptureID || bounded.Err() != nil {
 		return zero, value.ErrChanged
+	}
+	if group := work.Group; group != nil {
+		if work.Snapshot != nil || group.ParentCaptureID != request.CaptureID || len(group.Targets) > value.MaxRecordingSaveGroupChildren {
+			return zero, value.ErrChanged
+		}
+		seen := map[string]bool{}
+		for _, target := range group.Targets {
+			x := target.Snapshot
+			if !decision.Requested || !authorization.UUID(target.ClusterID) || !x.Valid() || x.CaptureID == request.CaptureID || seen[x.CaptureID] || x.Binding.RootID != s.RootID {
+				return zero, value.ErrChanged
+			}
+			seen[x.CaptureID] = true
+		}
+		var firstError error
+		for _, target := range group.Targets {
+			if err := s.Dispatcher.CancelSourceSnapshot(bounded, target.ClusterID, target.Snapshot); err != nil && firstError == nil {
+				firstError = err
+			}
+			if bounded.Err() != nil {
+				break
+			}
+		}
+		if firstError != nil {
+			return decision, firstError
+		}
 	}
 	if snapshot := work.Snapshot; snapshot != nil {
 		if !decision.Requested || !authorization.UUID(work.ClusterID) || !snapshot.Valid() || snapshot.CaptureID != request.CaptureID || snapshot.Binding.RootID != s.RootID {

@@ -907,6 +907,8 @@ type ContextCapture struct {
 	SnapshotCancelJoinedAt    pgtype.Timestamptz
 	SnapshotCancelProof       []byte
 	SnapshotCancelProofDigest []byte
+	GroupID                   pgtype.UUID
+	GroupOrdinal              pgtype.Int2
 }
 
 type ContextCaseLocator struct {
@@ -1029,6 +1031,7 @@ type ContextPreview struct {
 	ClosedAt               pgtype.Timestamptz
 	ClosedRequestKey       []byte
 	ClosedSubmissionDigest []byte
+	PreviewKind            string
 }
 
 type ContextPreviewFence struct {
@@ -2290,6 +2293,25 @@ type ProcessingRule struct {
 	RetireBy        pgtype.Timestamptz
 	State           string
 	CurrentDecision pgtype.UUID
+}
+
+type RecordingSaveGroup struct {
+	ID                pgtype.UUID
+	RootID            pgtype.UUID
+	PreviewID         pgtype.UUID
+	RequestKey        []byte
+	SubmissionDigest  []byte
+	ScopeDigest       []byte
+	ScopeJson         []byte
+	PolicyUid         string
+	AcceptanceID      pgtype.UUID
+	AllocationID      pgtype.UUID
+	ChildIds          []pgtype.UUID
+	AcceptedAt        pgtype.Timestamptz
+	Deadline          pgtype.Timestamptz
+	ProgressRevision  int64
+	CancelRequestedAt pgtype.Timestamptz
+	CancelRequestKey  []byte
 }
 
 type RecordingSaveReservation struct {

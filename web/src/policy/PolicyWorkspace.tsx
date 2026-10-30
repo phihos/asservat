@@ -60,7 +60,8 @@ function occurrence(o: Status['recent'][number]): string {
 
 function PolicyGrantControls({ entry, controller }: { entry: Entry; controller: Policies }) {
   const s = entry.status!;
-  const [executions, setExecutions] = useState(Math.min(s.max_executions, 10));
+  const grantStarts = s.max_grant_starts || s.max_executions;
+  const [executions, setExecutions] = useState(Math.min(s.max_executions, grantStarts, 10));
   const [output, setOutput] = useState(Math.min(s.max_collected_bytes, 8 << 20));
   const [observed, setObserved] = useState(s.max_observed_bytes);
   const [days, setDays] = useState('');
@@ -79,7 +80,8 @@ function PolicyGrantControls({ entry, controller }: { entry: Entry; controller: 
     }); }}>
       <fieldset disabled={entry.busy || entry.requestPending}>
         <legend>Approval limits</legend>
-        <label>Maximum executions<input type="number" required min={1} max={s.max_executions} step={1} value={executions} onChange={e => setExecutions(Number(e.target.value))}/></label>
+        <p>A grouped Save uses one policy execution and one approval action start for each selected source. These are separate limits.</p>
+        <label>Action starts<input type="number" required min={1} max={grantStarts} step={1} value={executions} onChange={e => setExecutions(Number(e.target.value))}/></label>
         <label>Maximum output (bytes)<input type="number" required min={1} max={s.max_collected_bytes} step={1} value={output} onChange={e => setOutput(Number(e.target.value))}/></label>
         <label>Maximum observed input (bytes)<input type="number" required min={0} max={s.max_observed_bytes} step={1} value={observed} onChange={e => setObserved(Number(e.target.value))}/></label>
         <label>Approval period (days, optional)<input type="number" min={1} max={365} step={1} value={days} onChange={e => setDays(e.target.value)}/></label>

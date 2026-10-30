@@ -49,7 +49,7 @@ export function repeatedPreviewResult(from: string): Output<'preview_capture'> {
 }
 export class SyntheticOperations implements Operations {
   calls: { name: Operation; input: unknown; signal: AbortSignal; csrf: string }[] = [];
-  responder: (name: Operation) => unknown | Promise<unknown> = name => ({ list_diagnostics: catalogResult, preview_capture: previewResult, request_capture: acceptedResult, resolve_capture_request: resolvedClosedResult, get_capture: progressResult, list_capture_history: () => historyResult(), get_capture_settings: () => settingsResult() })[name]();
+  responder: (name: Operation) => unknown | Promise<unknown> = name => ({ list_diagnostics: catalogResult, preview_capture: previewResult, request_capture: acceptedResult, resolve_capture_request: resolvedClosedResult, get_capture: progressResult, cancel_capture: () => result<'cancel_capture'>({ capture_id: id(8), revision: 2, phase: 'Running', cancellation_requested: true, navigation_uri: 'https://asservat.invalid/captures/' + id(8) }), list_capture_history: () => historyResult(), get_capture_settings: () => settingsResult() })[name]();
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), signal, csrf });
     return await this.responder(name) as Output<N>;

@@ -18,6 +18,7 @@ import (
 // cannot silently change the collection approval or reissue its spend pool.
 // Field names/order and optional tags preserve existing unshared scope bytes.
 type recorderCollection struct {
+	IncidentPods                                     int `json:",omitzero"`
 	ClusterID, Namespace, WorkloadKind, WorkloadName string
 	Reasons                                          []string
 	ExitCodes                                        []int32
@@ -37,7 +38,7 @@ type recorderCollection struct {
 }
 
 func recorderCollectionOf(p value.RestartPolicy) recorderCollection {
-	return recorderCollection{ClusterID: p.ClusterID, Namespace: p.Namespace, WorkloadKind: p.WorkloadKind, WorkloadName: p.WorkloadName, Reasons: p.Reasons, ExitCodes: p.ExitCodes, Interval: p.Interval, Burst: p.Burst, RetentionSeconds: p.RetentionSeconds, ObservedPods: p.ObservedPods, Detector: p.Detector, ProbeType: p.ProbeType, MinimumFailures: p.MinimumFailures, ProbeWindow: p.ProbeWindow, AlertLabels: p.AlertLabels, Log: p.Log, Resource: p.Resource, Recorder: p.Recorder, RecordingSaves: p.RecordingSaves}
+	return recorderCollection{IncidentPods: p.IncidentPods, ClusterID: p.ClusterID, Namespace: p.Namespace, WorkloadKind: p.WorkloadKind, WorkloadName: p.WorkloadName, Reasons: p.Reasons, ExitCodes: p.ExitCodes, Interval: p.Interval, Burst: p.Burst, RetentionSeconds: p.RetentionSeconds, ObservedPods: p.ObservedPods, Detector: p.Detector, ProbeType: p.ProbeType, MinimumFailures: p.MinimumFailures, ProbeWindow: p.ProbeWindow, AlertLabels: p.AlertLabels, Log: p.Log, Resource: p.Resource, Recorder: p.Recorder, RecordingSaves: p.RecordingSaves}
 }
 
 // RecorderPolicyScope binds accepted collection intent rather than mutable

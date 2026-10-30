@@ -109,16 +109,6 @@ export interface components {
             /** @constant */
             status: "ok";
             data: {
-                /**
-                 * Format: uuid
-                 * @description Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection.
-                 */
-                attached_grant_id?: string;
-                /**
-                 * @description Accepted collection action; controls available approval commands, not acquisition authority.
-                 * @enum {unknown}
-                 */
-                collection_kind: "podStatus" | "packetCapture";
                 policy_uid: string;
                 /** Format: uuid */
                 acceptance_id: string;
@@ -132,14 +122,6 @@ export interface components {
                     kind: "policy";
                     policy_uid: string;
                 };
-                /** @description Conservative native-output reservations shared by this acceptance; uncertain spend remains charged. Not measured bytes. */
-                collected_bytes_spent: number;
-                /** @description Original accepted cumulative native-output ceiling, shared across grant replacements and controls. */
-                max_collected_bytes: number;
-                /** @description Conservative pre-filter observation charges shared by this acceptance, including uncertain legacy spend. Not collected output. */
-                observed_bytes_spent: number;
-                /** @description Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition. */
-                max_observed_bytes: number;
                 executions_spent: number;
                 max_executions: number;
                 watched_pods: number;
@@ -204,6 +186,26 @@ export interface components {
                     /** Format: date-time */
                     stopped_at?: string;
                 };
+                /** @description Conservative native-output reservations shared by this acceptance; uncertain spend remains charged. Not measured bytes. */
+                collected_bytes_spent: number;
+                /** @description Original accepted cumulative native-output ceiling, shared across grant replacements and controls. */
+                max_collected_bytes: number;
+                /** @description Conservative pre-filter observation charges shared by this acceptance, including uncertain legacy spend. Not collected output. */
+                observed_bytes_spent: number;
+                /** @description Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition. */
+                max_observed_bytes: number;
+                /**
+                 * @description Accepted collection action; controls available approval commands, not acquisition authority.
+                 * @enum {unknown}
+                 */
+                collection_kind: "podStatus" | "packetCapture";
+                /**
+                 * Format: uuid
+                 * @description Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection.
+                 */
+                attached_grant_id?: string;
+                /** @description Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter. */
+                max_grant_starts?: number;
             };
         } | {
             /** @constant */

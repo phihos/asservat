@@ -192,6 +192,14 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 		if !request.Valid(first.Time) {
 			return value.ErrDenied
 		}
+		group, groupErr := q.LockRecordingSaveGroup(ctx, custodydb.LockRecordingSaveGroupParams{RootID: id(s.root), ID: id(request.CaptureID)})
+		if groupErr == nil {
+			out, err = s.readRecordingGroupProgress(ctx, q, group, request, recovery, stream, first.Time)
+			return err
+		}
+		if !errors.Is(groupErr, pgx.ErrNoRows) {
+			return groupErr
+		}
 		// This routing-only lookup provides no outward fields. Existence and access
 		// denial have the same result; lifecycle joins happen only after eligibility.
 		c, err := q.ReadPublicationCapture(ctx, custodydb.ReadPublicationCaptureParams{ID: id(request.CaptureID), RootID: id(s.root)})
@@ -201,6 +209,61 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 		if err != nil {
 			return err
 		}
+		out, err = s.readContextProgressInTransaction(ctx, q, c, request, recovery, stream, first.Time)
+		return err
+	})
+	if err != nil {
+		return value.ContextProgressObservation{}, captureError(err)
+	}
+	return out, nil
+}
+
+// ContextDeadlines has a distinct column-scoped SQL role. The bounded observer
+// records uncertainty after an original deadline; no GET mutates history and no
+// marker cancels work, proves quiescence or returns storage/permit capacity.
+type ContextDeadlines struct {
+	ledger *Ledger
+	root   string
+}
+
+var _ app.ContextDeadlineObserver = (*ContextDeadlines)(nil)
+
+func NewContextDeadlineObserver(ctx context.Context, pool *pgxpool.Pool, root string) (*ContextDeadlines, error) {
+	if !authorization.UUID(root) {
+		return nil, value.ErrInvalid
+	}
+	l, err := New(ctx, pool)
+	if err != nil {
+		return nil, value.ErrUnavailable
+	}
+	return &ContextDeadlines{ledger: l, root: root}, nil
+}
+func (s *ContextDeadlines) ObserveOverdueContextCaptures(ctx context.Context, limit int) (int64, error) {
+	if s == nil || s.ledger == nil {
+		return 0, value.ErrUnavailable
+	}
+	if limit < 1 || limit > 16 {
+		return 0, value.ErrInvalid
+	}
+	var count int64
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		count = 0
+		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
+			return err
+		}
+		var err error
+		count, err = q.ObserveOverdueContextCaptures(ctx, custodydb.ObserveOverdueContextCapturesParams{RootID: id(s.root), PageLimit: int32(limit)})
+		return err
+	})
+	if err != nil {
+		return 0, captureError(err)
+	}
+	return count, nil
+}
+
+func (s *ContextProgressReads) readContextProgressInTransaction(ctx context.Context, q *custodydb.Queries, c custodydb.ContextCapture, request value.ProgressQuery, recovery custodydb.FleetCurrentTrust, stream custodydb.PermissionStream, observedAt time.Time) (value.ContextProgressObservation, error) {
+	var out value.ContextProgressObservation
+	err := func() error {
 		intent, err := captureIntent(c)
 		if err != nil {
 			return value.ErrDenied
@@ -259,8 +322,8 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 				out.HistoryState = "available"
 			}
 		}
-		out.ObservedAt = first.Time
-		out.ValidUntil = identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(eligible.ValidUntil, request.Recovery.FreshUntil))
+		out.ObservedAt = observedAt
+		out.ValidUntil = identity.Earlier(observedAt.Add(5*time.Second), identity.Earlier(eligible.ValidUntil, request.Recovery.FreshUntil))
 		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
 			return err
 		}
@@ -272,52 +335,6 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 			return value.ErrDenied
 		}
 		return ctx.Err()
-	})
-	if err != nil {
-		return value.ContextProgressObservation{}, captureError(err)
-	}
-	return out, nil
-}
-
-// ContextDeadlines has a distinct column-scoped SQL role. The bounded observer
-// records uncertainty after an original deadline; no GET mutates history and no
-// marker cancels work, proves quiescence or returns storage/permit capacity.
-type ContextDeadlines struct {
-	ledger *Ledger
-	root   string
-}
-
-var _ app.ContextDeadlineObserver = (*ContextDeadlines)(nil)
-
-func NewContextDeadlineObserver(ctx context.Context, pool *pgxpool.Pool, root string) (*ContextDeadlines, error) {
-	if !authorization.UUID(root) {
-		return nil, value.ErrInvalid
-	}
-	l, err := New(ctx, pool)
-	if err != nil {
-		return nil, value.ErrUnavailable
-	}
-	return &ContextDeadlines{ledger: l, root: root}, nil
-}
-func (s *ContextDeadlines) ObserveOverdueContextCaptures(ctx context.Context, limit int) (int64, error) {
-	if s == nil || s.ledger == nil {
-		return 0, value.ErrUnavailable
-	}
-	if limit < 1 || limit > 16 {
-		return 0, value.ErrInvalid
-	}
-	var count int64
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		count = 0
-		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
-			return err
-		}
-		var err error
-		count, err = q.ObserveOverdueContextCaptures(ctx, custodydb.ObserveOverdueContextCapturesParams{RootID: id(s.root), PageLimit: int32(limit)})
-		return err
-	})
-	if err != nil {
-		return 0, captureError(err)
-	}
-	return count, nil
+	}()
+	return out, err
 }

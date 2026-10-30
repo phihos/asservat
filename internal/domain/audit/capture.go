@@ -11,8 +11,15 @@ import (
 // CaptureIntent is minimized accepted-control provenance. The expectation
 // digest binds the complete audience/retention facts without copying evidence,
 // reason text, policy bodies, bearer tokens or source Kubernetes objects here.
+type CaptureGroupBinding struct {
+	ParentCaptureID        string
+	SelectionDigest        artifact.Digest
+	ChildIndex, ChildCount int
+}
+
 type CaptureIntent struct {
-	Initiator                                                      *identity.Principal `json:",omitempty"`
+	Group                                                          *CaptureGroupBinding `json:",omitempty"`
+	Initiator                                                      *identity.Principal  `json:",omitempty"`
 	RootID, CaptureID, CaseID, OccurrenceID, ArtifactID, AttemptID string
 	Actor                                                          identity.Principal
 	Target                                                         authorization.Target
@@ -25,6 +32,11 @@ type CaptureIntent struct {
 }
 
 func (r CaptureIntent) Valid() bool {
+	if g := r.Group; g != nil {
+		if r.Initiator == nil || !authorization.UUID(g.ParentCaptureID) || g.ParentCaptureID == r.CaptureID || g.SelectionDigest != r.ScopeDigest || g.ChildCount < 2 || g.ChildCount > 16 || g.ChildIndex < 0 || g.ChildIndex >= g.ChildCount {
+			return false
+		}
+	}
 	if r.Initiator != nil {
 		if !r.Initiator.Valid() {
 			return false

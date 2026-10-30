@@ -78,8 +78,9 @@ func (a Admission) Requester() identity.Principal {
 // Accepted intentionally contains no "start" method or flag. Intent audit,
 // current execution authority and local effect fencing precede dispatch.
 type Accepted struct {
-	HistoryRecorded bool            `json:"-"`
-	RepeatedFrom    *HistoryLineage `json:"-"`
+	Group           *RecordingSaveGroupAccepted `json:",omitempty"`
+	HistoryRecorded bool                        `json:"-"`
+	RepeatedFrom    *HistoryLineage             `json:"-"`
 	// Optional immutable history draft exists only for this admitted request.
 	HistoryParameters             *HistoryParameters `json:"-"`
 	HistorySource                 *HistoryLineage    `json:"-"`

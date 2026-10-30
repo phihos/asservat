@@ -90,7 +90,7 @@ async function operationBundle(names, bundle) {
     `export declare function ${name}(value: unknown): value is components['schemas']['${key}'];\n`).join('');
 
 }
-await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'resolve_capture_request', 'get_capture', 'list_capture_history', 'get_capture_settings'], 'capture');
+await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'resolve_capture_request', 'get_capture', 'cancel_capture', 'list_capture_history', 'get_capture_settings'], 'capture');
 await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
 await operationBundle(['get_file_excerpt', 'get_query_result'], 'projection');
 await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');

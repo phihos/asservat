@@ -604,6 +604,8 @@ export interface components {
                 data: components["schemas"]["Contract_capture_assessment_eca2bc02f01833c6"];
                 retention: components["schemas"]["Contract_capture_assessment_9d972ed356c3acb3"];
                 quantities: components["schemas"]["Contract_capture_assessment_35deb14ea19cdb7b"][];
+                /** @description For an existing-source save, identifies the selected source row whose incremental snapshot assessment this is. It conveys no acquisition authority. */
+                recording_handle?: string;
             }[];
             combinedQuantities: components["schemas"]["Contract_capture_assessment_35deb14ea19cdb7b"][];
             interactions: {
@@ -927,8 +929,15 @@ export interface components {
                 actions: {
                     action_id: string;
                     /** @enum {unknown} */
-                    phase: "Pending" | "WaitingApproval" | "Queued" | "Running" | "Finalizing" | "Succeeded" | "Partial" | "Skipped" | "Denied" | "TimedOut" | "Failed" | "TargetGone" | "Unsupported" | "Indeterminate";
+                    phase: "Pending" | "WaitingApproval" | "Queued" | "Running" | "Finalizing" | "Succeeded" | "Partial" | "Skipped" | "Denied" | "TimedOut" | "Failed" | "TargetGone" | "Unsupported" | "Indeterminate" | "Cancelled";
                     reason_code?: string;
+                    /**
+                     * Format: uuid
+                     * @description Exact child identity within this parent save. It is not a separate navigation or retry target.
+                     */
+                    action_instance_id?: string;
+                    pod_uid?: string;
+                    pod_name?: string;
                 }[];
                 /** Format: uuid */
                 case_id?: string;
@@ -962,6 +971,46 @@ export interface components {
                 /** @enum {unknown} */
                 history_state?: "available" | "unavailable";
                 cancellation_requested?: boolean;
+            };
+        } | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                retry_after_seconds: number;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
+        McpInput_cancel_capture: {
+            /** Format: uuid */
+            capture_id: string;
+            expected_revision: number;
+            idempotency_key: string;
+        };
+        McpOutput_cancel_capture: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: {
+                /** Format: uuid */
+                capture_id: string;
+                /** @enum {unknown} */
+                phase: "Pending" | "Validating" | "AwaitingApproval" | "Armed" | "Queued" | "Running" | "Finalizing" | "Succeeded" | "Partial" | "Failed" | "Cancelled" | "Indeterminate";
+                revision: number;
+                cancellation_requested: boolean;
+                /** Format: uri */
+                navigation_uri: string;
             };
         } | {
             /** @constant */

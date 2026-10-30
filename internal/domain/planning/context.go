@@ -49,8 +49,17 @@ type ContextInput struct {
 
 // SourceSnapshotContext binds a saved window to its original policy executor
 // and source definition. It cannot start or renew the separately owned source.
+// RecordingSaveGroupBinding is immutable membership supplied by the protected
+// parent preview/admission. It cannot select a replacement source or confer authority.
+type RecordingSaveGroupBinding struct {
+	ParentCaptureID        string
+	SelectionDigest        artifact.Digest
+	ChildIndex, ChildCount int
+}
+
 type SourceSnapshotContext struct {
-	PolicyName string `json:",omitempty"`
+	Group      *RecordingSaveGroupBinding `json:",omitzero"`
+	PolicyName string                     `json:",omitempty"`
 	// RecordingSaveScope is the immutable typed manual selection, independently
 	// constructed before acceptance. Policy snapshots leave it empty.
 	RecordingSaveScope               []byte          `json:",omitempty"`
@@ -69,6 +78,10 @@ func (s *SourceSnapshotContext) Clone() *SourceSnapshotContext {
 		return nil
 	}
 	out := *s
+	if s.Group != nil {
+		group := *s.Group
+		out.Group = &group
+	}
 	out.RecordingSaveScope = append(s.RecordingSaveScope[:0:0], s.RecordingSaveScope...)
 	out.SourceAudience = append(s.SourceAudience[:0:0], s.SourceAudience...)
 	if s.SourceTarget != nil {

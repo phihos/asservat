@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { Investigation } from '../capture/investigation';
 import { SyntheticOperations, id, session, target, result, progressResult } from '../capture/test-fixtures';
 
@@ -56,4 +56,28 @@ it('history repeat restores only preferences and requires fresh source selection
   expect(controller.snapshot()).toMatchObject({ stage: 'recordings', recordingRepeat: { policyUID: saved.data.settings.policy.policyUID, captureID: saved.data.capture_id } });
   expect(client.calls.map(call => call.name)).toEqual(['get_capture_settings']);
   expect(JSON.stringify(controller.snapshot().recordingRepeat)).not.toMatch(/recording_handle|sharing|grant/);
+});
+
+it('cancels the grouped parent with one stable retry receipt and preserves stored children', async () => {
+  const client = new SyntheticOperations(); let first = true; let requested = false; let joined = false;
+  client.responder = name => {
+    if (name === 'cancel_capture') { if (first) { first = false; throw new Error('lost reply'); } requested = true; return result<'cancel_capture'>({capture_id:id(8),revision:3,phase:'Running',cancellation_requested:true,navigation_uri:'https://asservat.invalid/captures/'+id(8)}); }
+    return result<'get_capture'>({capture_id:id(8),revision:requested ? 3 : 2,operation:'recordingSave',phase:joined ? 'Partial' : 'Running',can_cancel:!requested,cancellation_requested:requested,blockers:[],case_id:id(50),navigation_uri:'https://asservat.invalid/captures/'+id(8),actions:[
+      {action_id:'traffic',action_instance_id:id(101),pod_uid:'pod-a',pod_name:'api-a',phase:'Succeeded'},
+      {action_id:'traffic',action_instance_id:id(102),pod_uid:'pod-b',pod_name:'api-b',phase:joined ? 'Cancelled' : 'Running'},
+    ]});
+  };
+  const controller = new Investigation(client,()=>id(6)); controllers.push(controller); controller.attach(session,new AbortController().signal,id(8));
+  await vi.waitFor(()=>expect(controller.snapshot().progress?.revision).toBe(2));
+  await controller.cancelRecordingSave(); expect(controller.snapshot()).toMatchObject({cancellationStatus:'unconfirmed',progress:{phase:'Running'}});
+  await controller.cancelRecordingSave(); expect(controller.snapshot()).toMatchObject({cancellationStatus:'requested',progress:{phase:'Running',case_id:id(50),actions:[{phase:'Succeeded'},{phase:'Running'}]}});
+  const cancels=client.calls.filter(call=>call.name==='cancel_capture'); expect(cancels).toHaveLength(2);expect(cancels[0].input).toEqual({capture_id:id(8),expected_revision:2,idempotency_key:id(6)});expect(cancels[1].input).toEqual(cancels[0].input);
+  expect(client.calls.every(call=>call.name==='cancel_capture'||call.name==='get_capture')).toBe(true);expect(client.calls.every(call=>!!call.input && typeof call.input === 'object' && 'capture_id' in call.input && call.input.capture_id===id(8))).toBe(true);
+  joined=true;await controller.refreshProgress();expect(controller.snapshot()).toMatchObject({cancellationStatus:undefined,progress:{phase:'Partial',actions:[{phase:'Succeeded'},{phase:'Cancelled'}]}});
+});
+it('refuses duplicate child identities instead of collapsing grouped progress', async () => {
+ const client=new SyntheticOperations();client.responder=()=>result<'get_capture'>({capture_id:id(8),revision:1,operation:'recordingSave',phase:'Running',can_cancel:false,blockers:[],navigation_uri:'https://asservat.invalid/captures/'+id(8),actions:[
+ {action_id:'traffic',action_instance_id:id(101),pod_uid:'pod-a',pod_name:'api-a',phase:'Running'},
+ {action_id:'traffic',action_instance_id:id(101),pod_uid:'pod-b',pod_name:'api-b',phase:'Running'},
+ ]});const controller=new Investigation(client);controllers.push(controller);controller.attach(session,new AbortController().signal,id(8));await vi.waitFor(()=>expect(controller.snapshot().error).toMatch(/could not be verified/));expect(controller.snapshot().progress).toBeUndefined();
 });

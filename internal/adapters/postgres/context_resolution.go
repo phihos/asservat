@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	planvalue "asservat.local/asservat/internal/domain/planning"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -55,6 +56,12 @@ func requestRecordScope(row custodydb.ContextCapture) (planning.ContextScopeIden
 	}
 	copy(want[:], row.ScopeDigest)
 	s, err := planning.ReadContextScopeIdentity(row.ScopeJson, want)
+	if err == nil && row.GroupID.Valid {
+		if !row.GroupOrdinal.Valid {
+			return planning.ContextScopeIdentity{}, value.ErrUnavailable
+		}
+		s, err = planning.ReadRecordingSaveChildScopeIdentity(row.ScopeJson, want, planvalue.RecordingSaveGroupBinding{ParentCaptureID: uid(row.GroupID), SelectionDigest: want, ChildIndex: int(row.GroupOrdinal.Int16), ChildCount: len(s.Targets)}, uid(row.ID))
+	}
 	if err != nil {
 		return planning.ContextScopeIdentity{}, value.ErrUnavailable
 	}
@@ -166,13 +173,21 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 				if !eligible.Eligible {
 					return value.ErrDenied
 				}
-				permissionUntil = eligible.ValidUntil
+				if permissionUntil.IsZero() {
+					permissionUntil = eligible.ValidUntil
+				} else {
+					permissionUntil = identity.Earlier(permissionUntil, eligible.ValidUntil)
+				}
 			} else {
 				eligible := contextEligibilityIn(ctx, q, stream, recovery, root, guard.installationID(), in.Identity, p, target, n.Time)
 				if !eligible.Eligible {
 					return value.ErrDenied
 				}
-				permissionUntil = eligible.ValidUntil
+				if permissionUntil.IsZero() {
+					permissionUntil = eligible.ValidUntil
+				} else {
+					permissionUntil = identity.Earlier(permissionUntil, eligible.ValidUntil)
+				}
 			}
 			return check()
 		}
@@ -185,6 +200,37 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 		}
 		if err = check(); err != nil {
 			return err
+		}
+		group, groupFound, err := findRecordingGroupRequest(ctx, q, in)
+		if err != nil {
+			return err
+		}
+		if groupFound {
+			var digest artifact.Digest
+			copy(digest[:], group.ScopeDigest)
+			scope, err := planning.ReadContextScopeIdentity(group.ScopeJson, digest)
+			if err != nil || scope.Requester == nil || *scope.Requester != in.Identity.Principal || len(scope.Targets) < 2 {
+				return value.ErrDenied
+			}
+			for _, target := range scope.Targets {
+				if err := authorize(target); err != nil {
+					return err
+				}
+			}
+			if !bytes.Equal(group.SubmissionDigest, in.SubmissionDigest[:]) {
+				return value.ErrConflict
+			}
+			a, err := recordingGroupAccepted(ctx, q, group)
+			if err != nil {
+				return err
+			}
+			a.Replay, a.MetadataValidUntil = true, deadline()
+			for n := range a.Group.Children {
+				a.Group.Children[n].Replay = true
+				a.Group.Children[n].MetadataValidUntil = a.MetadataValidUntil
+			}
+			out = value.ContextRequestDisposition{State: value.RequestAccepted, Accepted: &a, ValidUntil: a.MetadataValidUntil}
+			return check()
 		}
 		row, found, err := findContextRequest(ctx, q, in)
 		if err != nil {

@@ -11,6 +11,10 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
+// OperationRecordingSavePreviewFrameLimit retains the SDK text and structured
+// copies of the one larger passive metadata preview. Other writers stay64KiB.
+const OperationRecordingSavePreviewFrameLimit = 256 << 10
+
 // WriteOperationResponse retains the original delivery deadline through a
 // bounded write and flush. sent forbids appending an error after partial output.
 // The caller owns/join-closes its reply after this function and serialization
@@ -27,6 +31,9 @@ func WriteBrowserOperationResponse(ctx context.Context, w http.ResponseWriter, s
 		return WriteOperationReplyResponse(ctx, w, status, reply.Body, reply, until, reply.CheckDisclosure)
 	}
 	limit := 64 << 10
+	if name == "preview_recording_save" && reply.recordingSavePreview {
+		limit = contracts.InvestigationRecordingSavePreviewOutputLimit
+	}
 	if browserSettingsView(ctx, name) && reply.browserSettings {
 		limit = contracts.InvestigationBrowserSettingsOutputLimit
 	}
@@ -74,6 +81,9 @@ func WriteOperationReplyResponse(ctx context.Context, w http.ResponseWriter, sta
 		return false, ErrOperationDelivery
 	}
 	if reply.owner == nil {
+		if reply.recordingSavePreview {
+			return writeOperationResponse(ctx, w, status, body, until, check, OperationRecordingSavePreviewFrameLimit)
+		}
 		return WriteOperationResponse(ctx, w, status, body, until, check)
 	}
 	if len(body) == 0 {

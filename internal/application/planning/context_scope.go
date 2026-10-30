@@ -16,6 +16,7 @@ import (
 type ContextScopeIdentity struct {
 	Requester          *identity.Principal
 	Actor              identity.Principal
+	Targets            []authorization.Target
 	Target             authorization.Target
 	CaptureID          string
 	ExecutionClass     artifact.ContextExecutionClass

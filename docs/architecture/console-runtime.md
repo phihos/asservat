@@ -42,6 +42,13 @@ the HttpOnly cookie; JavaScript never receives provider tokens. Automatic
 redirect following is disabled for these fetches. Responses have a ten-second
 deadline, a 32 KiB decoded-body ceiling and schema validation before display.
 
+Investigation operation responses retain their existing bounds. The passive
+`preview_recording_save` result has a dedicated 128 KiB decoded-body ceiling for
+16 complete source assessments; `get_capture_settings` retains its existing
+160 KiB browser view. The server validates these named result bounds, preserves
+original identity/deadline checks and buffers writes before disclosure. Inventory
+and other metadata requests keep their existing budgets.
+
 Session, CSRF and the five implemented investigation operation types/validators
 are generated from the existing canonical OpenAPI files. The build-only adapter
 resolves external schema identifiers and fragments against the closed local

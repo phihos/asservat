@@ -8,6 +8,7 @@ import (
 	capture "asservat.local/asservat/internal/domain/capture"
 	"bytes"
 	"context"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"time"
 )
@@ -44,7 +45,11 @@ func (s *CaptureOperationIntents) ReadCaptureOperationIntent(ctx context.Context
 		if e != nil {
 			return e
 		}
-		out, e = exactCaptureOperationIntent(custodydb.ContextCapture(row))
+		record, projectionErr := captureOperationIntentRecord(row)
+		if projectionErr != nil {
+			return projectionErr
+		}
+		out, e = exactCaptureOperationIntent(record)
 		return e
 	})
 	if e != nil || call.Err() != nil || !time.Now().Before(until) {
@@ -76,4 +81,62 @@ func exactCaptureOperationIntent(row custodydb.ContextCapture) (app.CaptureOpera
 	}
 	out.Receipt = &receipt
 	return out, nil
+}
+
+// The protected view exposes immutable intent fields only. Group position is
+// derived from that scope, with -1 for a legacy singleton; it is not a later
+// mutable completion observation or an additional table privilege.
+func captureOperationIntentRecord(row custodydb.ReadCaptureOperationIntentRow) (custodydb.ContextCapture, error) {
+	if row.GroupID.Valid && (row.GroupOrdinal < 0 || row.GroupOrdinal > 15) || !row.GroupID.Valid && row.GroupOrdinal != -1 {
+		return custodydb.ContextCapture{}, app.ErrUnavailable
+	}
+	return custodydb.ContextCapture{
+		ID:                        row.ID,
+		RootID:                    row.RootID,
+		RequestKey:                row.RequestKey,
+		SubmissionDigest:          row.SubmissionDigest,
+		ScopeDigest:               row.ScopeDigest,
+		ScopeJson:                 row.ScopeJson,
+		ExpectationJson:           row.ExpectationJson,
+		PodPinJson:                row.PodPinJson,
+		AttemptID:                 row.AttemptID,
+		PermissionEpoch:           row.PermissionEpoch,
+		PermissionSequence:        row.PermissionSequence,
+		IdentityPolicyUid:         row.IdentityPolicyUid,
+		IdentityPolicyGeneration:  row.IdentityPolicyGeneration,
+		IdentityPolicyDigest:      row.IdentityPolicyDigest,
+		CreatedAt:                 row.CreatedAt,
+		Deadline:                  row.Deadline,
+		State:                     row.State,
+		IntentAcknowledgedAt:      row.IntentAcknowledgedAt,
+		IntentDigest:              row.IntentDigest,
+		IntentObjectKey:           row.IntentObjectKey,
+		IntentObjectVersion:       row.IntentObjectVersion,
+		IntentObjectEtag:          row.IntentObjectEtag,
+		IntentObjectBytes:         row.IntentObjectBytes,
+		IntentObjectSha256:        row.IntentObjectSha256,
+		ProgressRevision:          row.ProgressRevision,
+		DeadlineObservedAt:        row.DeadlineObservedAt,
+		PreviewID:                 row.PreviewID,
+		IntentOperationID:         row.IntentOperationID,
+		ShareInstruction:          row.ShareInstruction,
+		HistoryClusterID:          row.HistoryClusterID,
+		HistoryNamespaceUid:       row.HistoryNamespaceUid,
+		HistoryWorkloadUid:        row.HistoryWorkloadUid,
+		HistoryOrigin:             row.HistoryOrigin,
+		HistoryParametersRequired: row.HistoryParametersRequired,
+		RepeatedFromCaptureID:     row.RepeatedFromCaptureID,
+		RepeatedFromExpiresAt:     row.RepeatedFromExpiresAt,
+		SnapshotCoverage:          row.SnapshotCoverage,
+		SnapshotCoverageDigest:    row.SnapshotCoverageDigest,
+		SnapshotExpectationDigest: row.SnapshotExpectationDigest,
+		SnapshotCancelKey:         row.SnapshotCancelKey,
+		SnapshotCancelActor:       row.SnapshotCancelActor,
+		SnapshotCancelRequestedAt: row.SnapshotCancelRequestedAt,
+		SnapshotCancelJoinedAt:    row.SnapshotCancelJoinedAt,
+		SnapshotCancelProof:       row.SnapshotCancelProof,
+		SnapshotCancelProofDigest: row.SnapshotCancelProofDigest,
+		GroupID:                   row.GroupID,
+		GroupOrdinal:              pgtype.Int2{Int16: row.GroupOrdinal, Valid: row.GroupID.Valid},
+	}, nil
 }

@@ -88,5 +88,9 @@ func (s PolicyGrantPlans) PolicyGrantPlan(ctx context.Context, policy, name stri
 	if ctx.Err() != nil || !s.Now().Before(until) {
 		return zero, authapp.ErrGrantUnavailable
 	}
-	return authapp.PolicyGrantPlan{Authority: a, RecipeDigest: compiled.Recorder.RecipeDigest, Scope: scope, Review: review, DataClass: "extract", Reasons: reasons, FreshUntil: until}, nil
+	starts, err := authapp.PolicyGrantStartsPerExecution(scope, a, compiled.Recorder.RecipeDigest)
+	if err != nil {
+		return zero, err
+	}
+	return authapp.PolicyGrantPlan{MaxStartsPerExecution: starts, Authority: a, RecipeDigest: compiled.Recorder.RecipeDigest, Scope: scope, Review: review, DataClass: "extract", Reasons: reasons, FreshUntil: until}, nil
 }

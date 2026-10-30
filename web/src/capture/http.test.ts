@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { operations, OperationFailure } from './http';
-import { id, previewResult, recordingPreviewResult, settingsResult, acceptedResult, progressResult, resolvedAcceptedResult, resolvedClosedResult, target } from './test-fixtures';
+import { id, result, previewResult, recordingPreviewResult, settingsResult, acceptedResult, progressResult, resolvedAcceptedResult, resolvedClosedResult, target } from './test-fixtures';
 import { validInput_preview_capture, validInput_request_capture, validOutput_preview_capture, validOutput_get_capture, validInput_resolve_capture_request, validOutput_resolve_capture_request } from '../generated/validate-capture';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -105,4 +105,19 @@ it('accepts a durable cancellation request without treating the capture as termi
   const response = await operations.call('get_capture', { capture_id: id(8) }, 'csrf', new AbortController().signal);
   expect(response).toEqual(progress);
   if (response.status === 'ok') expect(response.data.phase).toBe('Finalizing');
+});
+
+it('sends cancellation only to the parent with matching CSRF and stable request identity', async () => {
+ const response=result<'cancel_capture'>({capture_id:id(8),revision:3,phase:'Running',cancellation_requested:true,navigation_uri:'https://asservat.invalid/captures/'+id(8)});
+ const fetcher=vi.fn().mockResolvedValue(json(response));vi.stubGlobal('fetch',fetcher);
+ const input={capture_id:id(8),expected_revision:2,idempotency_key:id(9)};
+ expect(await operations.call('cancel_capture',input,'C'.repeat(43),new AbortController().signal)).toEqual(response);
+ expect(fetcher).toHaveBeenCalledOnce();expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/cancel_capture');
+ expect(fetcher.mock.calls[0][1]).toMatchObject({body:JSON.stringify(input),credentials:'same-origin',headers:{'X-CSRF-Token':'C'.repeat(43),'Idempotency-Key':id(9)}});
+});
+it('requires all grouped action identity fields without rejecting repeated configured action IDs', () => {
+ const response=progressResult('Finalizing');if(response.status!=='ok')throw new Error();response.data.operation='recordingSave';
+ response.data.actions=[{action_id:'traffic',action_instance_id:id(101),pod_uid:'pod-a',pod_name:'api-a',phase:'Succeeded'},{action_id:'traffic',action_instance_id:id(102),pod_uid:'pod-b',pod_name:'api-b',phase:'Cancelled'}];
+ expect(validOutput_get_capture(response)).toBe(true);
+ const missing=structuredClone(response);delete missing.data.actions[1].pod_uid;expect(validOutput_get_capture(missing)).toBe(false);
 });

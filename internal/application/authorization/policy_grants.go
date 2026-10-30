@@ -20,13 +20,14 @@ type PolicyGrantPlanReader interface {
 }
 
 type PolicyGrantPlan struct {
-	Authority    value.AcceptedPolicyAuthority
-	RecipeDigest artifact.Digest
-	Scope        []byte
-	Review       GrantReview
-	DataClass    string
-	Reasons      []value.SensitiveReason
-	FreshUntil   time.Time
+	MaxStartsPerExecution int
+	Authority             value.AcceptedPolicyAuthority
+	RecipeDigest          artifact.Digest
+	Scope                 []byte
+	Review                GrantReview
+	DataClass             string
+	Reasons               []value.SensitiveReason
+	FreshUntil            time.Time
 }
 
 type AcceptedPolicyApprovalSettings struct {
@@ -157,7 +158,7 @@ func (s GrantService) RequestPolicy(ctx context.Context, current identities.Curr
 	if lifetime < time.Second || lifetime > settings.Values.MaxAge || lifetime%time.Second != 0 {
 		return zero, false, value.ErrGrantInvalid
 	}
-	scopeValue := (value.PolicyGrantScope{Authority: plan.Authority, RecipeDigest: plan.RecipeDigest, Limits: in.Limits, ApprovalPolicyRef: settings.Revision, ApprovalMaxAge: settings.Values.MaxAge, Observation: in.Observation}).Clone()
+	scopeValue := (value.PolicyGrantScope{MaxStartsPerExecution: plan.MaxStartsPerExecution, Authority: plan.Authority, RecipeDigest: plan.RecipeDigest, Limits: in.Limits, ApprovalPolicyRef: settings.Revision, ApprovalMaxAge: settings.Values.MaxAge, Observation: in.Observation}).Clone()
 	scope := &scopeValue
 	eligible, err := s.workload(ctx, i, scope.Workload(), value.CollectContext)
 	if err != nil {
@@ -180,6 +181,10 @@ func (s GrantService) RequestPolicy(ctx context.Context, current identities.Curr
 	}
 	g := value.Grant{ID: s.NewID(), RootID: s.RootID, Kind: value.GrantPolicy, ExecutionDigest: plan.Authority.ScopeDigest, DataClass: plan.DataClass, Reasons: slices.Clone(plan.Reasons), Scope: slices.Clone(plan.Scope), Review: review, Requester: i.Principal, Lifetime: lifetime, Policy: scope, Revision: 1}
 	g.ReviewDigest = ReviewDigest(g, review)
+	g, err = BindReviewedPolicyGrantStarts(g)
+	if err != nil {
+		return zero, false, err
+	}
 	probe := g
 	probe.RequestedAt = s.Now()
 	probe.ReviewUntil = probe.RequestedAt.Add(value.GrantReviewWindow)

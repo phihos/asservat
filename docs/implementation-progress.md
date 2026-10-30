@@ -1,5 +1,33 @@
 # Sustained implementation progress
 
+## Grouped existing-recording Save: local candidate (2026-10-30)
+
+[ADR-266](decisions/266-grouped-recording-save-accounting.md) records the maintainer's
+counter decision: one policy execution per Save, with applicable grant starts
+charged per selected source. The candidate uses one protected parent preview,
+one SQL109 transaction and acceptance time, and genuine per-source child
+captures and artifacts. Parent progress, cancellation, history and fresh repeat
+retain those child identities. Source observation budgets are unchanged.
+
+The eight affected Go packages pass race tests, including PostgreSQL adapters,
+application capture/planning/authorization, domain authorization/capture/audit
+and the regional transport. Generated SQL (68 files), specification (13,362
+assertions), architecture, Go dependency boundaries and OpenAPI checks pass.
+These checks do not establish real SQL109 migration or transaction behavior.
+Grouped ordinary, grant-backed and mixed-cancellation provider fixtures are
+implemented but have not yet run. Sixteen-member serialization and query-bound
+checks are component evidence; sixteen-member SQL cost remains unqualified.
+
+The first coherent browser run failed because one assertion still expected
+“executions” after grant counters were relabeled “action starts”. Its actual
+failure and artifacts remain in the local `group-final-browser-1` archive; the
+prior result baseline was restored exactly. After correcting the assertion,
+`group-final-browser-2` passed console checks, build and both existing HTTPS
+browser tests (25 console journeys, 24 accessibility scans). Its command exited
+0 in 75.083 seconds and restored the prior result baseline. These existing
+synthetic journeys do not qualify the new grouped SQL backend. No runtime collection gate is enabled, and this candidate
+is neither installed qualification nor a supported homelab release.
+
 ## Existing-source Save: automatic SQL/storage component qualified (2026-10-30)
 
 [ADR-264](decisions/264-existing-source-packet-snapshots.md) adds a typed existing-source

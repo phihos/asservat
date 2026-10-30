@@ -86,14 +86,17 @@ func compilePolicy(spec []byte, recipeName string, recipeDigest artifact.Digest,
 		return reject(".target.workloadRef.kind", "name a Deployment or StatefulSet")
 	case target.WorkloadRef.UID != "":
 		return reject(".target.workloadRef.uid", "the hub resolves the workload UID")
-	case target.MaxPods != 1:
-		return reject(".target.maxPods", "must be 1: each occurrence captures its triggering Pod")
+	case target.MaxPods < 1 || target.MaxPods > 100:
+		return reject(".target.maxPods", "must be between 1 and 100")
 	case target.Selection != "triggeringPod":
 		return reject(".target.selection", "must be triggeringPod")
 	case target.Adoption != "pinUID":
 		return reject(".target.adoption", "must be pinUID")
 	}
 	out.ClusterID, out.Namespace, out.WorkloadKind, out.WorkloadName = target.Cluster, target.Namespace, target.WorkloadRef.Kind, target.WorkloadRef.Name
+	if target.MaxPods > 1 {
+		out.IncidentPods = target.MaxPods
+	}
 	// Detector: exactly one exit (ADR-228), probe (ADR-230), alert
 	// (ADR-231), log or resource (ADR-241) detector, referenced directly by
 	// when.
@@ -281,6 +284,9 @@ func compilePolicy(spec []byte, recipeName string, recipeDigest artifact.Digest,
 			return reject(".recordingSaves", "no ongoing recording exists for a context diagnostic")
 		}
 		out.RecordingSaves = saves.Enabled
+	}
+	if out.IncidentPods > 1 && !out.RecordingSaves {
+		return reject(".target.maxPods", "multiple incident Pods require an enabled existing-recording Save")
 	}
 	if raw, present := s["sharing"]; present {
 		sharing, err := compileSharing(raw)

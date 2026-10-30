@@ -22,6 +22,9 @@ func browserSettingsView(ctx context.Context, name string) bool {
 	return ok
 }
 func (r OperationReply) preparedOutputLimit(name string) int {
+	if name == "preview_recording_save" {
+		return contracts.InvestigationRecordingSavePreviewOutputLimit
+	}
 	if name == "get_capture_settings" && r.browserSettings {
 		return contracts.InvestigationBrowserSettingsOutputLimit
 	}

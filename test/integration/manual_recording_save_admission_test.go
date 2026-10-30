@@ -26,6 +26,14 @@ import (
 // or policy occurrence row. Target/report/initial identity observations remain
 // explicitly synthetic component inputs, not installed authority qualification.
 func admitManualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.Pool, admissions *postgres.ContextAdmissions, accepted policySourceAcceptedFixture, original captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, maximumBytes int64, beforeAdmission ...func(*testing.T, capturevalue.Admission, capturevalue.ContextPreview)) policySourceSnapshotAdmissionFixture {
+	return manualRecordingSaveFixture(t, ctx, hub, admissions, accepted, original, fresh, maximumBytes, true, beforeAdmission...)
+}
+
+func prepareManualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.Pool, accepted policySourceAcceptedFixture, original captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, maximumBytes int64) policySourceSnapshotAdmissionFixture {
+	return manualRecordingSaveFixture(t, ctx, hub, nil, accepted, original, fresh, maximumBytes, false)
+}
+
+func manualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgxpool.Pool, admissions *postgres.ContextAdmissions, accepted policySourceAcceptedFixture, original captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, maximumBytes int64, commit bool, beforeAdmission ...func(*testing.T, capturevalue.Admission, capturevalue.ContextPreview)) policySourceSnapshotAdmissionFixture {
 	t.Helper()
 	var out policySourceSnapshotAdmissionFixture
 	s := accepted.Scenario
@@ -68,7 +76,7 @@ func admitManualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgx
 	if err != nil {
 		t.Fatal("current real policy eligibility projection", err)
 	}
-	retained, err := s.retention.policies(bound)
+	retained, err := manualGroupRetentionPolicies(bound, s.retention, source.Target.Target())
 	if err != nil {
 		t.Fatal("current accepted retention sources", err)
 	}
@@ -158,6 +166,9 @@ func admitManualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgx
 		t.Fatal("protected snapshot preview structure")
 	}
 	a.SubmissionDigest = captureapp.ContextRequestDigest(p.ID)
+	if !commit {
+		return policySourceSnapshotAdmissionFixture{Admission: a, Preview: p, Source: *source}
+	}
 	previews, err := postgres.NewContextPreviews(bound, hub, a.RootID)
 	if err != nil {
 		t.Fatal(err)

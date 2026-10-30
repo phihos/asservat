@@ -9,7 +9,7 @@ export type Draft = { target: Target; retention: string; sharing?: Recipient[]; 
 export type State = {
   stage: 'target' | 'diagnostics' | 'recordings' | 'review' | 'reviewed' | 'uncertain' | 'closed' | 'progress' | 'approval';
   busy: boolean; draft: Draft; diagnostics?: Diagnostic[]; preview?: Preview;
-  progress?: Progress; captureID?: string; approvalURI?: string; error?: string; stale?: boolean; expired?: boolean; resolving?: boolean; canContinue?: boolean; continuing?: boolean;
+  cancellationStatus?: 'requested' | 'unconfirmed'; progress?: Progress; captureID?: string; approvalURI?: string; error?: string; stale?: boolean; expired?: boolean; resolving?: boolean; canContinue?: boolean; continuing?: boolean;
   // ADR-236: recent captures of the draft target and the capture a review repeats.
   history?: HistoryEntry[]; historyMessage?: string; repeatedFrom?: string;
   recordingRepeat?: { policyUID: string; captureID: string; before?: string };
@@ -35,6 +35,7 @@ export class Investigation {
   private timer?: ReturnType<typeof setTimeout>;
   private previewExpiry?: ReturnType<typeof setTimeout>;
   private receipt?: Receipt;
+  private cancellation?: Input<'cancel_capture'>;
   private reviewed?: ReviewedHandle;
   private selected?: Diagnostic;
   private selectedComposition?: NonNullable<Input<'preview_capture'>['profile_composition']>;
@@ -87,7 +88,7 @@ export class Investigation {
   reset = () => {
     this.invalidate(); this.identity = undefined; this.session = undefined; this.scope = undefined;
     clearTimeout(this.historyExpiry);
-    this.receipt = undefined; this.selected = undefined; this.selectedComposition = undefined; this.reviewed = undefined; this.repeatOf = undefined;
+    this.receipt = undefined; this.cancellation = undefined; this.selected = undefined; this.selectedComposition = undefined; this.reviewed = undefined; this.repeatOf = undefined;
     this.state = { stage: 'target', busy: false, draft: emptyDraft() };
     for (const listener of this.listeners) listener();
   };
@@ -155,6 +156,7 @@ export class Investigation {
     if (this.receipt || this.state.busy || this.state.stage !== 'recordings' || !this.session || !this.scope || this.scope.aborted) return;
     const expiry = Date.parse(expiresAt);
     if (!Number.isFinite(expiry) || expiry <= Date.now()) return;
+    this.cancellation = undefined;
     this.receipt = { operation: 'recordingSave', expectedCaptureID: captureID, preview_id: previewID, idempotency_key: this.newID() };
     await this.retrySubmission();
   };
@@ -162,7 +164,7 @@ export class Investigation {
     if (this.state.busy || settings.kind !== 'recordingSaveSettings' || Date.parse(settings.expires_at) <= Date.now()) return;
     const workload = settings.settings.target.workloadRef;
     if (!workload || this.receipt && this.receipt.captureID !== settings.capture_id) return;
-    this.invalidate(); this.receipt = undefined; this.reviewed = undefined;
+    this.invalidate(); this.receipt = undefined; this.cancellation = undefined; this.reviewed = undefined;
     this.publish({ stage: 'recordings', draft: { target: { cluster_id: settings.cluster_id, namespace: settings.settings.target.namespace, kind: workload.kind, name: workload.name }, retention: '' },
       recordingRepeat: { policyUID: settings.settings.policy.policyUID, captureID: settings.capture_id, ...(settings.settings.action_windows.length === 1 && { before: settings.settings.action_windows[0].before }) },
       captureID: undefined, progress: undefined, settings: undefined, preview: undefined, diagnostics: undefined, error: undefined });
@@ -411,17 +413,36 @@ export class Investigation {
     window.history.replaceState(null, '', '/captures/' + captureID);
     await this.refreshProgress();
   }
+  cancelRecordingSave = async () => {
+    const progress = this.state.progress;
+    if (!progress || progress.operation !== 'recordingSave' || !progress.can_cancel || progress.cancellation_requested || terminal.has(progress.phase) || this.state.busy || progress.capture_id !== this.receipt?.captureID) return;
+    this.cancellation ??= { capture_id: progress.capture_id, expected_revision: progress.revision, idempotency_key: this.newID() };
+    if (this.cancellation.capture_id !== progress.capture_id) return;
+    const scope = this.scope;
+    const decision = await this.run('cancel_capture', this.cancellation);
+    if (scope !== this.scope || scope?.aborted || !this.session || this.receipt?.captureID !== progress.capture_id) return;
+    if (!decision) { this.publish({ cancellationStatus: 'unconfirmed', error: 'Cancellation delivery is unconfirmed. Retry the same cancellation or check the parent save status.' }); return; }
+    if (decision.capture_id !== progress.capture_id || decision.revision < progress.revision) {
+      this.publish({ cancellationStatus: 'unconfirmed', error: 'The cancellation response could not be verified. Check the parent save status.' }); return;
+    }
+    if (this.receipt?.captureID === decision.capture_id) this.receipt.revision = Math.max(this.receipt.revision ?? 0, decision.revision);
+    this.publish({ cancellationStatus: decision.cancellation_requested ? 'requested' : undefined });
+    // Only current parent progress establishes joined cancellation or stored
+    // results. The acknowledgement never substitutes a terminal outcome.
+    await this.refreshProgress();
+  };
   refreshProgress = async () => {
     const id = this.receipt?.captureID;
     if (!id || this.state.busy) return;
     const data = await this.run('get_capture', { capture_id: id });
     if (!data) { this.publish({ progress: undefined }); return; }
-    if (data.capture_id !== id || this.receipt?.operation && data.operation !== this.receipt.operation || data.revision < (this.receipt?.revision ?? 0)) {
+    if (!validActionInstances(data) || data.capture_id !== id || this.receipt?.operation && data.operation !== this.receipt.operation || data.revision < (this.receipt?.revision ?? 0)) {
       this.publish({ progress: undefined, error: 'The collection status could not be verified. Try checking it again.' }); return;
     }
     if (this.receipt?.captureID !== id) return;
     this.receipt.revision = data.revision;
-    this.publish({ stage: 'progress', progress: data });
+    if (terminal.has(data.phase)) this.cancellation = undefined;
+    this.publish({ stage: 'progress', progress: data, cancellationStatus: data.cancellation_requested && !terminal.has(data.phase) ? 'requested' : this.state.cancellationStatus === 'unconfirmed' && !terminal.has(data.phase) ? 'unconfirmed' : undefined });
     if (!terminal.has(data.phase)) this.timer = setTimeout(() => void this.refreshProgress(), 1000 * (data.retry_after_seconds ?? 5));
   };
 }
@@ -429,4 +450,11 @@ export class Investigation {
 // Button eligibility only; current server authority decides every submission.
 export function requestablePreview(preview: Preview): boolean {
   return preview.approval_required ? preview.blockers.every(b => b.code === 'ApprovalRequired') : preview.capture_enabled && preview.blockers.length === 0;
+}
+
+function validActionInstances(progress: Progress): boolean {
+  if (!progress.actions.some(action => action.action_instance_id !== undefined)) return true;
+  return progress.operation === 'recordingSave' && progress.actions.length >= 1 && progress.actions.length <= 16 &&
+    progress.actions.every(action => !!action.action_instance_id && action.action_instance_id !== progress.capture_id && !!action.pod_uid && !!action.pod_name) &&
+    new Set(progress.actions.map(action => action.action_instance_id)).size === progress.actions.length;
 }

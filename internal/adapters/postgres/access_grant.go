@@ -124,6 +124,11 @@ func grantFromRow(r custodydb.AccessGrant) (authorization.Grant, error) {
 	if r.RevokedAt.Valid {
 		g.Revoker = identity.Principal{Issuer: r.RevokerIssuer.String, Subject: r.RevokerSubject.String, ClientID: r.RevokerClient.String, Kind: identity.Human}
 	}
+	var bindErr error
+	g, bindErr = authapp.BindReviewedPolicyGrantStarts(g)
+	if bindErr != nil {
+		return authorization.Grant{}, authapp.ErrGrantUnavailable
+	}
 	if !g.Valid() {
 		return authorization.Grant{}, authapp.ErrGrantUnavailable
 	}

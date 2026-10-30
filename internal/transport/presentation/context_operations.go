@@ -266,6 +266,9 @@ type ContextResolutionData struct {
 }
 
 type ContextActionData struct {
+	InstanceID string `json:"action_instance_id,omitempty"`
+	PodUID     string `json:"pod_uid,omitempty"`
+	PodName    string `json:"pod_name,omitempty"`
 	ActionID   string `json:"action_id"`
 	Phase      string `json:"phase"`
 	ReasonCode string `json:"reason_code,omitempty"`
@@ -371,8 +374,10 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 // OperationReply retains the earliest original metadata authority through final
 // transport checks and socket writes. ValidUntil is private, never a wire field.
 type OperationReply struct {
-	Body       []byte
-	ValidUntil time.Time
+	// Only the named passive source preview producer sets this delivery budget.
+	recordingSavePreview bool
+	Body                 []byte
+	ValidUntil           time.Time
 
 	// These closed private facts preserve decisions through the intentionally
 	// nondisclosing public error projection. They are never JSON fields and do
@@ -594,14 +599,15 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 		progress, operationErr = s.progress.Get(ctx, current, in.CaptureID)
 		if operationErr == nil {
 			until = identity.Earlier(until, progress.ValidUntil)
-			operation, actionID := progress.Operation, progress.ActionID
+			operation := progress.Operation
 			if operation == "" {
 				operation = "collect"
 			}
-			if actionID == "" {
-				actionID = "pod-status"
+			actions, actionErr := recordingProgressActions(progress)
+			if actionErr != nil {
+				return OperationReply{}, actionErr
 			}
-			data := ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: []ContextActionData{{ActionID: actionID, Phase: progress.ActionPhase, ReasonCode: progress.ReasonCode}}, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, RetryAfterSeconds: progress.RetryAfterSeconds, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: operation}
+			data := ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: actions, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, RetryAfterSeconds: progress.RetryAfterSeconds, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: operation}
 			data.CancellationRequested = progress.CancellationRequested
 			if operation == "recordingSave" {
 				data.CanCancel = data.CanCancel && s.recordingSaveCancellationEnabled

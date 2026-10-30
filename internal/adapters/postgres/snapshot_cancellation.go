@@ -38,6 +38,97 @@ func (s *APIContextExecutions) RequestCaptureCancellation(ctx context.Context, i
 		if err != nil {
 			return err
 		}
+		group, groupErr := q.LockRecordingSaveGroup(ctx, custodydb.LockRecordingSaveGroupParams{RootID: id(s.root), ID: id(in.Request.CaptureID)})
+		if groupErr == nil {
+			out, err = s.requestGroupCancellation(ctx, q, trust, stream, group, in)
+			return err
+		}
+		if !errors.Is(groupErr, pgx.ErrNoRows) {
+			return groupErr
+		}
+		out, err = s.requestSnapshotCancellationInTransaction(ctx, q, trust, stream, in)
+		return err
+	})
+	return out, captureError(err)
+}
+
+func (s *APIContextExecutions) RecordAPISnapshotCancellation(ctx context.Context, r execution.APIExecution, proof artifact.SourceSnapshotCancellation, process execution.APIProcessObservation, recovery artifact.RecoveryProof) (execution.APIExecution, error) {
+	var out execution.APIExecution
+	if s == nil || !r.Valid() || r.RootID != s.root || r.Phase != "cancelled" || !proof.Valid() || !r.CompletedAt.Equal(proof.JoinedAt) || process.Binding != r.Process {
+		return out, execution.ErrInvalid
+	}
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		trust, err := s.guards.Recovery.lock(ctx, q, s.root, recovery)
+		if err != nil {
+			return err
+		}
+		if _, err = q.LockPermissionStream(ctx, id(s.root)); err != nil {
+			return err
+		}
+		capture, err := q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{RootID: id(s.root), ID: id(r.Binding.CaptureID)})
+		if err != nil {
+			return err
+		}
+		accepted, err := admittedRecord(capture)
+		if err != nil {
+			return err
+		}
+		e := accepted.Expectation
+		if e.Snapshot == nil || !capture.SnapshotCancelRequestedAt.Valid || proof.CaptureID != accepted.CaptureID || proof.AttemptID != e.Registration.Location.AttemptID || !proof.Request.Equal(*e.Snapshot) || proof.AcceptedExpectationDigest != evidence.ContextExpectationDigest(e) {
+			return execution.ErrDenied
+		}
+		row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: capture.ID})
+		if err != nil {
+			return err
+		}
+		old, err := apiExecution(row)
+		if err != nil {
+			return err
+		}
+		if old.Binding != r.Binding || old.Process != r.Process || old.ExpectationDigest != r.ExpectationDigest || old.ObjectUID != r.ObjectUID || !old.StartedAt.Equal(r.StartedAt) {
+			return execution.ErrConflict
+		}
+		now, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if !process.Valid(now.Time) || proof.JoinedAt.Before(old.StartedAt) || proof.JoinedAt.After(now.Time) {
+			return execution.ErrDenied
+		}
+		raw, err := json.Marshal(proof)
+		if err != nil || len(raw) > 8192 {
+			return execution.ErrInvalid
+		}
+		if old.Phase == "cancelled" {
+			if !reflect.DeepEqual(old, r) || !bytes.Equal(capture.SnapshotCancelProofDigest, digest(proof)) {
+				return execution.ErrConflict
+			}
+			out = old
+			return ctx.Err()
+		}
+		// A positively stored completion wins; nil must never mean Cancelled.
+		if old.Phase != "started" {
+			return execution.ErrConflict
+		}
+		row, err = q.RecordAPIOutcome(ctx, custodydb.RecordAPIOutcomeParams{RootID: id(s.root), CaptureID: capture.ID, Phase: "cancelled", CompletedAt: ts(proof.JoinedAt)})
+		if err != nil {
+			return err
+		}
+		if _, err = q.RecordSnapshotCancellation(ctx, custodydb.RecordSnapshotCancellationParams{RootID: id(s.root), ID: capture.ID, SnapshotCancelJoinedAt: ts(proof.JoinedAt), SnapshotCancelProof: raw, SnapshotCancelProofDigest: digest(proof)}); err != nil {
+			return err
+		}
+		out, err = apiExecution(row)
+		if err != nil {
+			return err
+		}
+		return s.guards.Recovery.check(ctx, q, trust, s.root, recovery)
+	})
+	return out, captureError(err)
+}
+
+func (s *APIContextExecutions) requestSnapshotCancellationInTransaction(ctx context.Context, q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream, in value.CancellationCheck) (app.SnapshotCancellationWork, error) {
+	var out app.SnapshotCancellationWork
+	err := func() error {
 		row, err := q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{RootID: id(s.root), ID: id(in.Request.CaptureID)})
 		if err != nil {
 			return value.ErrDenied
@@ -140,80 +231,6 @@ func (s *APIContextExecutions) RequestCaptureCancellation(ctx context.Context, i
 		}
 		out.Decision = value.Cancellation{CaptureID: accepted.CaptureID, Phase: phase, Revision: row.ProgressRevision, Requested: row.SnapshotCancelRequestedAt.Valid, ObservedAt: now.Time.UTC(), ValidUntil: identity.Earlier(in.ValidUntil, identity.Earlier(rights.ValidUntil, now.Time.Add(5*time.Second)))}
 		return ctx.Err()
-	})
-	return out, captureError(err)
-}
-
-func (s *APIContextExecutions) RecordAPISnapshotCancellation(ctx context.Context, r execution.APIExecution, proof artifact.SourceSnapshotCancellation, process execution.APIProcessObservation, recovery artifact.RecoveryProof) (execution.APIExecution, error) {
-	var out execution.APIExecution
-	if s == nil || !r.Valid() || r.RootID != s.root || r.Phase != "cancelled" || !proof.Valid() || !r.CompletedAt.Equal(proof.JoinedAt) || process.Binding != r.Process {
-		return out, execution.ErrInvalid
-	}
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		trust, err := s.guards.Recovery.lock(ctx, q, s.root, recovery)
-		if err != nil {
-			return err
-		}
-		if _, err = q.LockPermissionStream(ctx, id(s.root)); err != nil {
-			return err
-		}
-		capture, err := q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{RootID: id(s.root), ID: id(r.Binding.CaptureID)})
-		if err != nil {
-			return err
-		}
-		accepted, err := admittedRecord(capture)
-		if err != nil {
-			return err
-		}
-		e := accepted.Expectation
-		if e.Snapshot == nil || !capture.SnapshotCancelRequestedAt.Valid || proof.CaptureID != accepted.CaptureID || proof.AttemptID != e.Registration.Location.AttemptID || !proof.Request.Equal(*e.Snapshot) || proof.AcceptedExpectationDigest != evidence.ContextExpectationDigest(e) {
-			return execution.ErrDenied
-		}
-		row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: capture.ID})
-		if err != nil {
-			return err
-		}
-		old, err := apiExecution(row)
-		if err != nil {
-			return err
-		}
-		if old.Binding != r.Binding || old.Process != r.Process || old.ExpectationDigest != r.ExpectationDigest || old.ObjectUID != r.ObjectUID || !old.StartedAt.Equal(r.StartedAt) {
-			return execution.ErrConflict
-		}
-		now, err := q.CurrentTime(ctx)
-		if err != nil {
-			return err
-		}
-		if !process.Valid(now.Time) || proof.JoinedAt.Before(old.StartedAt) || proof.JoinedAt.After(now.Time) {
-			return execution.ErrDenied
-		}
-		raw, err := json.Marshal(proof)
-		if err != nil || len(raw) > 8192 {
-			return execution.ErrInvalid
-		}
-		if old.Phase == "cancelled" {
-			if !reflect.DeepEqual(old, r) || !bytes.Equal(capture.SnapshotCancelProofDigest, digest(proof)) {
-				return execution.ErrConflict
-			}
-			out = old
-			return ctx.Err()
-		}
-		// A positively stored completion wins; nil must never mean Cancelled.
-		if old.Phase != "started" {
-			return execution.ErrConflict
-		}
-		row, err = q.RecordAPIOutcome(ctx, custodydb.RecordAPIOutcomeParams{RootID: id(s.root), CaptureID: capture.ID, Phase: "cancelled", CompletedAt: ts(proof.JoinedAt)})
-		if err != nil {
-			return err
-		}
-		if _, err = q.RecordSnapshotCancellation(ctx, custodydb.RecordSnapshotCancellationParams{RootID: id(s.root), ID: capture.ID, SnapshotCancelJoinedAt: ts(proof.JoinedAt), SnapshotCancelProof: raw, SnapshotCancelProofDigest: digest(proof)}); err != nil {
-			return err
-		}
-		out, err = apiExecution(row)
-		if err != nil {
-			return err
-		}
-		return s.guards.Recovery.check(ctx, q, trust, s.root, recovery)
-	})
-	return out, captureError(err)
+	}()
+	return out, err
 }

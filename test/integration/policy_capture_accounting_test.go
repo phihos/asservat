@@ -95,6 +95,20 @@ func attachPolicyAccountingGrantMode(t *testing.T, ctx context.Context, admin *p
 			g.Policy.Observation = &authorization.ObservationLimits{MaxSessionSeconds: int64(timeout / time.Second), MaxObservedBytes: a.Limits.MaxObservedBytes, MaxBytesPerSecond: planvalue.SensitiveMaxBytesPerSecond, MaxConcurrentSessions: 1}
 		}
 	}
+	if !observation && len(recorder) == 1 {
+		starts, e := app.PolicyGrantStartsPerExecution(scope, a, g.Policy.RecipeDigest)
+		if e != nil {
+			t.Fatal("actual accepted ordinary grant source-start units", e)
+		}
+		if starts > 0 {
+			g.Policy.MaxStartsPerExecution = starts
+			g.Policy.Limits.MaxExecutions = int64(starts)
+		}
+		g, e = app.BindReviewedPolicyGrantStarts(g)
+		if e != nil {
+			t.Fatal("bind actual accepted ordinary grant start review", e)
+		}
+	}
 	g.ReviewDigest = app.ReviewDigest(g, g.Review)
 	blueprint := g
 	blueprint.RequestedAt = now

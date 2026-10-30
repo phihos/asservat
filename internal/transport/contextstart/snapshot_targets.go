@@ -25,14 +25,22 @@ func (t Targets) ResolveSourceSnapshot(ctx context.Context, r targets.SourceSnap
 	if err != nil {
 		return targets.SourceSnapshotResolution{}, err
 	}
+	out, valid := validateSourceSnapshot(out, r, until, t.Now())
+	if call.Err() != nil || !valid {
+		return targets.SourceSnapshotResolution{}, targets.ErrUnavailable
+	}
+	return out, nil
+}
+
+func validateSourceSnapshot(out targets.SourceSnapshotResolution, r targets.SourceSnapshotTarget, until, now time.Time) (targets.SourceSnapshotResolution, bool) {
 	out.FreshUntil = identity.Earlier(out.FreshUntil, until)
 	out.Process.FreshUntil = identity.Earlier(out.Process.FreshUntil, until)
 	state := out.State
 	status := collector.SourceStatus{SourceID: state.SourceID, Fence: state.Fence, IssuedAt: state.IssuedAt, LeafUntil: state.LeafUntil, Credit: state.Credit, ObservedBytes: state.ObservedBytes, Closed: state.Closed, Stopped: state.Stopped, InputUnknown: state.InputUnknown, SourceStoppedAt: state.SourceStoppedAt, SnapshotUntil: state.SnapshotUntil}
-	if call.Err() != nil || out.Original != r || !out.Valid(t.Now()) || !identity.Fresh(out.ReportedAt, out.ReportFreshUntil, t.Now(), collector.StatusStaleAfter) || !status.Valid(out.ReportedAt) {
-		return targets.SourceSnapshotResolution{}, targets.ErrUnavailable
+	if out.Original != r || !out.Valid(now) || !identity.Fresh(out.ReportedAt, out.ReportFreshUntil, now, collector.StatusStaleAfter) || !status.Valid(out.ReportedAt) {
+		return targets.SourceSnapshotResolution{}, false
 	}
-	return out, nil
+	return out, true
 }
 
 const opResolveSourceSnapshot = "resolve-source-snapshot"

@@ -90,6 +90,15 @@ func lockManualPolicySave(ctx context.Context, q *custodydb.Queries, source cust
 }
 
 func (r *manualPolicyReservation) spend(ctx context.Context, q *custodydb.Queries, root, capture string, a value.Admission, grant pgtype.UUID, bytes int64) error {
+	if err := r.spendExecutionAndWindow(ctx, q, root, a); err != nil {
+		return err
+	}
+	return r.insertReservation(ctx, q, root, capture, a, grant, bytes)
+}
+
+// A group shares this incident debit; each real child still records its own
+// output/grant reservation. Both methods run only in the admission transaction.
+func (r *manualPolicyReservation) spendExecutionAndWindow(ctx context.Context, q *custodydb.Queries, root string, a value.Admission) error {
 	n, err := q.SpendPolicyExecution(ctx, custodydb.SpendPolicyExecutionParams{RootID: id(root), ID: r.acceptanceID})
 	if err != nil {
 		return err
@@ -106,6 +115,10 @@ func (r *manualPolicyReservation) spend(ctx context.Context, q *custodydb.Querie
 			return err
 		}
 	}
+	return ctx.Err()
+}
+
+func (r *manualPolicyReservation) insertReservation(ctx context.Context, q *custodydb.Queries, root, capture string, a value.Admission, grant pgtype.UUID, bytes int64) error {
 	return q.InsertRecordingSaveReservation(ctx, custodydb.InsertRecordingSaveReservationParams{CaptureID: id(capture), RootID: id(root), PolicyUid: r.policyUID, AcceptanceID: r.acceptanceID, GrantID: grant, ReservedBytes: bytes, AcceptedAt: ts(r.acceptedAt), ProcessingUntil: ts(a.Plan.Input.Deadline)})
 }
 

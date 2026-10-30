@@ -12,7 +12,7 @@ import (
 )
 
 const readAPIExecutionPublication = `-- name: ReadAPIExecutionPublication :one
-SELECT e.capture_id, e.root_id, e.attempt_id, e.binding_json, e.process_json, e.expectation_digest, e.created_at, e.not_before, e.not_after, e.object_uid, e.phase, e.started_at, e.acquired_at, e.completed_at, e.copies_json, e.copies_digest, e.writer_protocol,c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest FROM context_execution e
+SELECT e.capture_id, e.root_id, e.attempt_id, e.binding_json, e.process_json, e.expectation_digest, e.created_at, e.not_before, e.not_after, e.object_uid, e.phase, e.started_at, e.acquired_at, e.completed_at, e.copies_json, e.copies_digest, e.writer_protocol,c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal FROM context_execution e
 JOIN context_capture c ON c.root_id=e.root_id AND c.id=e.capture_id
 WHERE e.root_id=$1 AND e.capture_id=$2
 `
@@ -93,13 +93,15 @@ func (q *Queries) ReadAPIExecutionPublication(ctx context.Context, arg ReadAPIEx
 		&i.ContextCapture.SnapshotCancelJoinedAt,
 		&i.ContextCapture.SnapshotCancelProof,
 		&i.ContextCapture.SnapshotCancelProofDigest,
+		&i.ContextCapture.GroupID,
+		&i.ContextCapture.GroupOrdinal,
 	)
 	return i, err
 }
 
 const recordSourceSnapshotCompletion = `-- name: RecordSourceSnapshotCompletion :one
 UPDATE context_capture SET snapshot_coverage=$3,snapshot_coverage_digest=$4,snapshot_expectation_digest=$5
-WHERE root_id=$1 AND id=$2 AND snapshot_coverage IS NULL RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest
+WHERE root_id=$1 AND id=$2 AND snapshot_coverage IS NULL RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal
 `
 
 type RecordSourceSnapshotCompletionParams struct {
@@ -165,6 +167,8 @@ func (q *Queries) RecordSourceSnapshotCompletion(ctx context.Context, arg Record
 		&i.SnapshotCancelJoinedAt,
 		&i.SnapshotCancelProof,
 		&i.SnapshotCancelProofDigest,
+		&i.GroupID,
+		&i.GroupOrdinal,
 	)
 	return i, err
 }

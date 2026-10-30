@@ -78,7 +78,12 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 		if err != nil {
 			t.Fatal("retained source API work", err)
 		}
-		policies, err := s.retention.policies(ctx)
+		policies, err := func() (privacy.PolicySet, error) {
+			if admission.Plan.Input.Snapshot.Group != nil {
+				return manualGroupRetentionPolicies(ctx, s.retention, admission.Eligibility.Target)
+			}
+			return s.retention.policies(ctx)
+		}()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -271,7 +276,11 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 		return p
 	}
 	verify, audit, publish := publications("context-verify"), publications("context-verification-audit"), publications("context-publish")
-	gate, err := postgres.NewAPIContextPublicationGate(ctx, f.roles["publication-gate"], admission.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
+	retentionResolver := privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}
+	if admission.Plan.Input.Snapshot.Group != nil {
+		retentionResolver.RetainedPolicies = manualGroupRetainedPolicies{fixture: s.retention}
+	}
+	gate, err := postgres.NewAPIContextPublicationGate(ctx, f.roles["publication-gate"], admission.RootID, guards, retentionResolver, s.recovery.reader)
 	if err != nil {
 		t.Fatal(err)
 	}

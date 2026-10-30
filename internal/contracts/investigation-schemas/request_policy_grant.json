@@ -1,6 +1,6 @@
 {
   "name": "request_policy_grant",
-  "description": "Request an independent finite approval for one currently accepted team policy. Uses its real workload, recipe, current requester rights and original policy authority; creates no capture or personal result access. Retry the same actor/client and idempotency key after an unknown reply; original expiry and budgets never reset. A different current human action-approver reviews through get_grant and decide_review.",
+  "description": "Request an independent finite approval for one currently accepted team policy. Uses its real workload, recipe, current requester rights and original policy authority; creates no capture or personal result access. Retry the same actor/client and idempotency key after an unknown reply; original expiry and budgets never reset. A different current human action-approver reviews through get_grant and decide_review. Grant limits.max_executions counts action starts; grouped Save admissions use the separate policy execution counter. get_policy_status.max_grant_starts supplies the current server-derived request ceiling when available.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": false,

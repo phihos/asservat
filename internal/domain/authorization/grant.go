@@ -133,6 +133,7 @@ type GrantSpend struct {
 // target, data class, reasons and lifetime: it is what the reviewer
 // approves and every use recomputes.
 type Grant struct {
+	policyStartWitness                                *policyGrantStartWitness
 	ID, RootID, Kind                                  string
 	PreviewID, CaptureID                              string
 	Target                                            Target
@@ -398,7 +399,7 @@ func (g Grant) validKindScope() bool {
 		return g.Policy == nil && g.PolicyNotAfter.IsZero() && g.Requester.Kind == identity.Human && UUID(g.PreviewID) && UUID(g.CaptureID) && g.Target.Valid() && g.Lifetime >= time.Minute && g.Lifetime <= GrantMaxLifetime
 	case GrantPolicy:
 		_, _, executorRequester := PolicyExecutor(g.Requester)
-		return !executorRequester && g.Policy != nil && g.Policy.valid(g.RequestedAt) && g.PolicyNotAfter.After(g.RequestedAt) && !g.PolicyNotAfter.After(identity.Earlier(g.RequestedAt.Add(g.Lifetime), g.Policy.Authority.NotAfter)) && g.ExecutionDigest == g.Policy.Authority.ScopeDigest && g.PreviewID == "" && g.CaptureID == "" && g.Target == (Target{}) && g.ResultAccess == nil && g.ResultAccessDigest == (artifact.Digest{}) && g.Lifetime >= time.Second && g.Lifetime <= g.Policy.ApprovalMaxAge
+		return !executorRequester && g.Policy != nil && g.policyStartWitnessValid() && g.Policy.valid(g.RequestedAt) && g.PolicyNotAfter.After(g.RequestedAt) && !g.PolicyNotAfter.After(identity.Earlier(g.RequestedAt.Add(g.Lifetime), g.Policy.Authority.NotAfter)) && g.ExecutionDigest == g.Policy.Authority.ScopeDigest && g.PreviewID == "" && g.CaptureID == "" && g.Target == (Target{}) && g.ResultAccess == nil && g.ResultAccessDigest == (artifact.Digest{}) && g.Lifetime >= time.Second && g.Lifetime <= g.Policy.ApprovalMaxAge
 	default:
 		return false
 	}

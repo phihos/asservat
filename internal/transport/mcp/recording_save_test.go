@@ -31,7 +31,7 @@ func TestRecordingMCPRegistersPassiveToolsWithoutEnablingCollection(t *testing.T
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
 	defer server.Close()
 	ordinary := &mcpCaptureFixture{}
-	base, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, ordinary, ordinary)
+	base, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, ordinary, mcpGroupedProgress{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,26 +56,62 @@ func TestRecordingMCPRegistersPassiveToolsWithoutEnablingCollection(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	response, b := send(t, server, rpcRequest(t, server, "2025-11-25", "tools/list", nil))
-	if response.StatusCode != 200 {
-		t.Fatal(response.StatusCode, string(b))
-	}
-	var listed struct {
-		Result struct{ Tools []struct{ Name string } }
-	}
-	if json.Unmarshal(b, &listed) != nil {
-		t.Fatal(string(b))
-	}
 	names := map[string]bool{}
-	for _, tool := range listed.Result.Tools {
-		names[tool.Name] = true
+	var cursor string
+	var response *http.Response
+	var b []byte
+	for page := 0; ; page++ {
+		if page > len(composed.ToolNames()) {
+			t.Fatal("tool discovery did not finish")
+		}
+		var params any
+		if cursor != "" {
+			params = map[string]any{"cursor": cursor}
+		}
+		response, b = send(t, server, rpcRequest(t, server, "2025-11-25", "tools/list", params))
+		if response.StatusCode != 200 {
+			t.Fatal(response.StatusCode, string(b))
+		}
+		var listed struct {
+			Result struct {
+				Tools      []struct{ Name string }
+				NextCursor string `json:"nextCursor"`
+			}
+		}
+		if json.Unmarshal(b, &listed) != nil || strings.Contains(string(b), `"target_handle"`) {
+			t.Fatal("invalid discovery page", string(b))
+		}
+		for _, tool := range listed.Result.Tools {
+			if names[tool.Name] {
+				t.Fatal("duplicate discovery tool", tool.Name)
+			}
+			names[tool.Name] = true
+		}
+		if listed.Result.NextCursor == "" {
+			break
+		}
+		cursor = listed.Result.NextCursor
 	}
-	if !names["list_recordings"] || !names["preview_recording_save"] || names["request_capture"] || names["cancel_capture"] || strings.Contains(string(b), `"target_handle"`) {
-		t.Fatal("wrong source tool set", string(b))
+	if !names["list_recordings"] || !names["preview_recording_save"] || names["request_capture"] || names["cancel_capture"] {
+		t.Fatal("wrong source tool set", names)
 	}
 	args := map[string]any{"target_ref": map[string]any{"cluster_id": "00000000-0000-4000-8000-000000000010", "namespace": "apps", "kind": "Deployment", "name": "api"}}
 	response, b = send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": "list_recordings", "arguments": args}))
 	if response.StatusCode != 200 || !strings.Contains(string(b), `"capture_enabled":false`) || !strings.Contains(string(b), `"recordings":[]`) || f.calls != 1 {
 		t.Fatal(response.StatusCode, string(b), f.calls)
 	}
+	response, b = send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": "get_capture", "arguments": map[string]any{"capture_id": "00000000-0000-4000-8000-000000000030"}}))
+	if response.StatusCode != 200 || strings.Count(string(b), `"action_instance_id"`) < 2 || !strings.Contains(string(b), `"pod_name":"api-b"`) || !strings.Contains(string(b), `"phase":"Cancelled"`) {
+		t.Fatal("grouped MCP progress lostchild", response.StatusCode, string(b))
+	}
+
+}
+
+type mcpGroupedProgress struct{}
+
+func (mcpGroupedProgress) Get(_ context.Context, _ identities.CurrentIdentity, id string) (value.ContextProgress, error) {
+	return value.ContextProgress{CaptureID: id, Operation: "recordingSave", Revision: 3, Phase: "Partial", ValidUntil: time.Now().Add(time.Second), Actions: []value.ContextActionProgress{
+		{InstanceID: "00000000-0000-4000-8000-000000000101", PodUID: "pod-a", PodName: "api-a", ActionID: "traffic", Phase: "Succeeded"},
+		{InstanceID: "00000000-0000-4000-8000-000000000102", PodUID: "pod-b", PodName: "api-b", ActionID: "traffic", Phase: "Cancelled"},
+	}}, nil
 }

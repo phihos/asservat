@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"slices"
 	"time"
 
@@ -173,6 +174,14 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if a.Replay && !continuation {
 		return a, nil
 	}
+	if a.Group != nil {
+		if !s.RecordingSaveEnabled {
+			return a, value.ErrUnavailable
+		}
+		persistHistory()
+		err = s.dispatchRecordingSaveGroup(call, current, i, a, until, check)
+		return a, err
+	}
 	if e := a.Expectation; e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" && !s.RecordingSaveEnabled {
 		return a, value.ErrUnavailable
 	}
@@ -262,4 +271,58 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	}
 	fresh.Replay = a.Replay
 	return fresh, nil
+}
+
+// The parent owns navigation and admission only. Each real child consumes its
+// own acknowledged intent and accepted deadlines; sibling outcomes are separate.
+func (s ContextSubmission) dispatchRecordingSaveGroup(ctx context.Context, current identities.CurrentIdentity, i identity.Identity, a value.Accepted, until time.Time, check func() error) error {
+	if a.Group == nil || !acceptedContext(a, a.SubmissionDigest) || s.PolicyAccepted == nil {
+		return value.ErrUnavailable
+	}
+	intents := make([]audit.CaptureIntent, len(a.Group.Children))
+	// Validate the complete admitted cohort before the first dispatch.
+	for n, child := range a.Group.Children {
+		if err := check(); err != nil {
+			return err
+		}
+		r, err := s.Intents.AcknowledgedCaptureIntent(ctx, child.CaptureID)
+		raw, e := json.Marshal(child.Expectation)
+		if err != nil || e != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != child.CaptureID || r.Requester() != i.Principal || r.ScopeDigest != child.ScopeDigest || r.SubmissionDigest != child.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(raw)) || !r.Deadline.Equal(child.Deadline) || r.Group == nil || r.Group.ParentCaptureID != a.CaptureID || r.Group.ChildIndex != n || r.Group.ChildCount != len(a.Group.Children) || r.Group.SelectionDigest != a.ScopeDigest {
+			return value.ErrUnavailable
+		}
+		intents[n] = r
+	}
+	var failures []error
+	for n, child := range a.Group.Children {
+		if err := check(); err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		if !s.Now().Before(child.Deadline) || !s.Now().Before(child.Expectation.Registration.WriteUntil) {
+			failures = append(failures, value.ErrAcquisitionClosed)
+			continue
+		}
+		r := intents[n]
+		_, uid, ok := authorization.PolicyExecutor(r.Actor)
+		if !ok || r.Initiator == nil || child.Expectation.Lifecycle == nil || child.Expectation.Lifecycle.Origin == nil {
+			failures = append(failures, value.ErrDenied)
+			continue
+		}
+		policy, err := s.PolicyAccepted.AcceptedPolicyAuthority(ctx, uid)
+		if err != nil || policy.Authority.Executor != r.Actor || policy.Authority.ScopeDigest != child.Expectation.Lifecycle.Origin.PolicyExecutionDigest {
+			failures = append(failures, value.ErrDenied)
+			continue
+		}
+		end := identity.Earlier(until, identity.Earlier(policy.SourceUntil, identity.Earlier(child.Deadline, child.Expectation.Registration.WriteUntil)))
+		live := recordingSaveIdentity{policy: newPolicyIdentity(ctx, s.PolicyAccepted, policy.Authority, end, s.Now), initiator: current, original: i, until: end}
+		call, cancel := context.WithDeadline(ctx, end)
+		err = s.Start.StartContext(call, live, child.CaptureID)
+		cancel()
+		if err != nil {
+			failures = append(failures, err)
+		}
+	}
+	if err := check(); err != nil {
+		failures = append(failures, err)
+	}
+	return errors.Join(failures...)
 }

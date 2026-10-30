@@ -52,10 +52,21 @@ func (s HistoryParameterService) configured() bool {
 func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Accepted, i identity.Identity, p value.HistoryParameters, source *value.HistoryLineage) (failure error) {
 	stage := "input"
 	defer func() { s.reportFailure(ctx, "write", stage, failure) }()
-	if !s.configured() || ctx == nil || !p.Valid() || accepted.Expectation.Validate() != nil || accepted.CaptureID != accepted.Expectation.CaptureUID || p.OriginalExecutionDigest != accepted.ScopeDigest || accepted.Replay {
+	if !s.configured() || ctx == nil || !p.Valid() || !acceptedContext(accepted, accepted.SubmissionDigest) || p.OriginalExecutionDigest != accepted.ScopeDigest || accepted.Replay {
 		return value.ErrHistoryUnavailable
 	}
 	original := accepted.Expectation
+	if accepted.Group != nil {
+		// All children independently establish the same selected metadata pool. The
+		// new history object has its own genuine ID; the parent has no artifact.
+		original = accepted.Group.Children[0].Expectation
+		for _, child := range accepted.Group.Children {
+			e := child.Expectation
+			if e.Registration.Location.ClusterID != original.Registration.Location.ClusterID || e.NamespaceUID != original.NamespaceUID || e.WorkloadUID != original.WorkloadUID || e.Registration.StoreID != original.Registration.StoreID || e.Registration.AllocationID != original.Registration.AllocationID || e.Registration.PoolRevision != original.Registration.PoolRevision || e.Registration.AllocationRevision != original.Registration.AllocationRevision {
+				return value.ErrHistoryUnavailable
+			}
+		}
+	}
 	if p.Target.ClusterID != original.Registration.Location.ClusterID || p.NamespaceUID != original.NamespaceUID || p.WorkloadUID != original.WorkloadUID {
 		return value.ErrInvalid
 	}
@@ -78,6 +89,9 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 		return value.ErrHistoryUnavailable
 	}
 	target := authorization.Target{ClusterID: p.Target.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, PodUID: original.PodUID}
+	// The actual retained member is a metadata-selector witness only. Current
+	// retention selectors cover namespace/workload; all children independently
+	// establish that same workload and remain separately authorized below SQL.
 	stage = "retention"
 	retention, err := s.Retention.ResolveCaseMetadata(ctx, privacy.Input{ControlKind: "case-metadata", Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "other", AnchorAt: accepted.CreatedAt})
 	if err != nil {

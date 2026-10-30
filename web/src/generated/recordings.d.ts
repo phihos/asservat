@@ -244,6 +244,8 @@ export interface components {
                 data: components["schemas"]["Contract_capture_assessment_eca2bc02f01833c6"];
                 retention: components["schemas"]["Contract_capture_assessment_9d972ed356c3acb3"];
                 quantities: components["schemas"]["Contract_capture_assessment_35deb14ea19cdb7b"][];
+                /** @description For an existing-source save, identifies the selected source row whose incremental snapshot assessment this is. It conveys no acquisition authority. */
+                recording_handle?: string;
             }[];
             combinedQuantities: components["schemas"]["Contract_capture_assessment_35deb14ea19cdb7b"][];
             interactions: {

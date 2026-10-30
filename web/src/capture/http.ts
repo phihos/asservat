@@ -1,7 +1,7 @@
 import type { components } from '../generated/capture';
 import * as validators from '../generated/validate-capture';
 
-export type Operation = 'list_diagnostics' | 'preview_capture' | 'request_capture' | 'resolve_capture_request' | 'get_capture' | 'list_capture_history' | 'get_capture_settings';
+export type Operation = 'list_diagnostics' | 'preview_capture' | 'request_capture' | 'resolve_capture_request' | 'get_capture' | 'cancel_capture' | 'list_capture_history' | 'get_capture_settings';
 export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
 export type Data<N extends Operation> = Extract<Output<N>, { status: 'ok' }>['data'];
@@ -22,7 +22,7 @@ export interface Operations {
 // previews use the canonical extract class; native transfers remain separate.
 export const operations: Operations = {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
-    const key = name === 'request_capture' || name === 'resolve_capture_request' ? (input as Input<'request_capture'>).idempotency_key : undefined;
+    const key = name === 'request_capture' || name === 'resolve_capture_request' || name === 'cancel_capture' ? (input as Input<'request_capture'> | Input<'cancel_capture'>).idempotency_key : undefined;
     return postOperation(name, input, csrf, signal, validators[`validInput_${name}`], validators[`validOutput_${name}`], key, name === 'list_capture_history') as Promise<Output<N>>;
   },
 };
@@ -33,7 +33,7 @@ export const operations: Operations = {
 // Only a paged list (allowCursor) may return a next_cursor.
 export async function postOperation(name: string, input: unknown, csrf: string, signal: AbortSignal, validInput: (value: unknown) => boolean, validOutput: (value: unknown) => boolean, idempotencyKey?: string, allowCursor = false): Promise<unknown> {
   if (!validInput(input)) throw new OperationFailure(400);
-  const responseLimit = name === 'get_capture_settings' ? 160 * 1024 : 32_768;
+  const responseLimit = name === 'get_capture_settings' ? 160 * 1024 : name === 'preview_recording_save' ? 128 * 1024 : 32_768;
   const request = new AbortController();
   const abort = () => request.abort();
   signal.addEventListener('abort', abort, { once: true });

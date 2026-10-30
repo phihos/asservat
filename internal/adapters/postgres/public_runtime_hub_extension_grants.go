@@ -13,6 +13,10 @@ package postgres
 var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 	// ADR-217: exact union of the former read, prepare and record credentials.
 	"api-execution": {
+		{"table", "recording_save_group", "", "SELECT"},
+		{"table", "recording_save_group", "progress_revision", "UPDATE"},
+		{"table", "recording_save_group", "cancel_requested_at", "UPDATE"},
+		{"table", "recording_save_group", "cancel_request_key", "UPDATE"},
 		{"table", "context_capture", "snapshot_cancel_key", "UPDATE"},
 		{"table", "context_capture", "snapshot_cancel_actor", "UPDATE"},
 		{"table", "context_capture", "snapshot_cancel_requested_at", "UPDATE"},
