@@ -80,7 +80,7 @@ func newManualSnapshotWorkflow(t *testing.T, ctx context.Context, f *capacitySQL
 	if err != nil {
 		t.Fatal(err)
 	}
-	eligibility := authapp.CaptureEligibility{Human: authapp.Evaluator{Permissions: policy.Scenario.p, Now: workflowNow}, Accepted: policy.Sources, Current: current, Now: workflowNow}
+	eligibility := authapp.CaptureEligibility{Human: authapp.Evaluator{Permissions: policy.Scenario.p, Now: workflowNow}, Accepted: policy.Reader, Current: current, Now: workflowNow}
 	retention := privacyapp.RetentionResolver{Policies: manualWorkflowRetention{policy.Scenario.retention}, RetainedPolicies: manualGroupRetainedPolicies{policy.Scenario.retention}, Now: workflowNow}
 	w := &manualSnapshotWorkflow{Facts: facts, Executions: executions, Eligibility: eligibility, Retention: retention, t: t, f: f, policy: policy, nodes: map[manualSnapshotNodeKey]*manualSnapshotNode{}, stages: map[string]*sourceSnapshotCompletionState{}}
 	local := &manualWorkflowStarts{objects: map[string]value.PreparedStart{}, bindings: map[string]value.Binding{}, committed: map[string]value.Disposition{}}
