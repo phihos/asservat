@@ -38,6 +38,16 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 	t.Helper()
 	s, accepted, admission := policy.Scenario, snapshot.Accepted, snapshot.Admission
 	e := accepted.Expectation
+	// Policy observation is shared across sources. Preserve the actual total
+	// around completion; the group admission test separately checks its debit.
+	var observationBefore int64
+	if err := f.admin.QueryRow(ctx, `SELECT observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2`, admission.RootID, snapshot.Source.Binding.AcceptanceID).Scan(&observationBefore); err != nil {
+		t.Fatal("original policy observation spend", err)
+	}
+	grouped := admission.Plan.Input.Snapshot != nil && admission.Plan.Input.Snapshot.Group != nil
+	if !grouped && observationBefore != snapshot.Source.Credit {
+		t.Fatal("single-source observation differs from original source credit", observationBefore)
+	}
 	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 	if e.Snapshot == nil || e.Recording != nil {
 		t.Fatal("not an admitted existing-source snapshot")
@@ -330,7 +340,7 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 		t.Fatal("snapshot native bytes/final coverage")
 	}
 	var observedCredit int64
-	if err = f.admin.QueryRow(ctx, `SELECT observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2`, admission.RootID, snapshot.Source.Binding.AcceptanceID).Scan(&observedCredit); err != nil || observedCredit != snapshot.Source.Credit {
+	if err = f.admin.QueryRow(ctx, `SELECT observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2`, admission.RootID, snapshot.Source.Binding.AcceptanceID).Scan(&observedCredit); err != nil || observedCredit != observationBefore {
 		t.Fatal("save changed prepaid observation spend", observedCredit, err)
 	}
 	t.Logf("actual snapshot SQL/encrypted publication/native bytes=%d; original/final digests distinct, exact replay, unchanged source credit; source/process/packet/clock observations synthetic", len(native))

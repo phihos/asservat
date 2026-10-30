@@ -31,7 +31,17 @@ PostgreSQL diagnostic are preserved with the same independent hash, result and
 cleanup verification. A meaningful local regression now checks the compiled root, capture audit
 slots and processing backing against every source, parent and child record.
 The fixture declares the complete backing before initialization; a new exact
-frozen run remains pending. Sixteen-member serialization and query-bound
+frozen run remains pending.
+The third run (`manual-group-save-sql109-3`) reached genuine atomic admission,
+late-child rollback, shared-t0/replay accounting, encrypted parent history and
+populated downgrade refusal. Admission measured 253 ms with 4,472 ms remaining
+on the first original proof. Both native-child tests failed after their byte
+checks because the reused single-source assertion compared the shared policy
+observation total with one source's credit. The helper now compares the total
+before and after completion, retaining the original single-source expectation;
+the group admission test independently checks unchanged observation spend.
+The run remains failed, with artifacts and terminal cleanup verified; it is not
+a qualified grouped result. Sixteen-member serialization and query-bound
 checks are component evidence; sixteen-member SQL cost remains unqualified.
 
 The first coherent browser run failed because one assertion still expected
