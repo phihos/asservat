@@ -1,5 +1,38 @@
 # Sustained implementation progress
 
+## Installed ongoing packet + Save focus: blocked at regional start (2026-10-30)
+
+New native suite `continuation-ongoing-save` (GitHub runner, guarded disposable
+host) drives one accepted ordinary ongoing networkHeaders source and a manual
+Save through real MCP. Seventeen runs (41089216740 … 41129765380), each failing
+at a later step; none has passed. Results, not claims:
+
+- Reached on the installed product: policy acceptance, ongoing source arm
+  (SQL row, original fence), first-leaf renewal, `list_recordings`, Save
+  preview (after fix), Save acceptance with SQL T0.
+- Product defects found and fixed on this branch: (1) the workload's 30 s
+  context storage binding was only refreshed by discovery/manual demands, so
+  source admission/renewal failed with `admit-check-late-binding-expired`;
+  maintenance now records one ADR-200 refresh demand when <20 s remain;
+  (2) single and grouped Save impact explanations (≈330/282 chars) violated the
+  published 256-char `maxLength`, making every installed preview a 503.
+- Diagnostics added: bounded step labels for trigger ticks, source admission
+  (with earliest deadline/budget), dispatch and Save preview/presentation, plus
+  a value-free output-schema violation locator.
+- Focus corrections: no policy grant is consulted without required recording
+  approval (authority/envelope bounds the source); `list_recordings` polling
+  exhausted the caller's ten open selections; Save uses the journey
+  submit/recovery contract.
+- Current blocker (run 41129765380): the accepted Save ends `Failed`; regional
+  start refused at attach (unavailable), dispatch and ADR-212 headroom. Source
+  dispatch/renewal uses the same per-cluster standby (`RunSource` consumes the
+  attachment). Hypothesis, unverified: 15 s source renewals and the Save
+  compete for the single standby (ADR-209 one-standby decision). Changing
+  that reopens a maintainer decision.
+
+Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit
+stop. Candidate remains unmerged; no collection is enabled for users.
+
 ## Combined grouped Save local gates passed (2026-10-30)
 
 Frozen `3d645fc5` passed `make gofmt-check go-check go-architecture-check
