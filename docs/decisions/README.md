@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-268 — Grouped Save dispatch](268-grouped-save-dispatch-window.md) removes
+the all-sibling intent barrier and gives the composed request a prospective
+fifteen-second envelope while retaining every original child StartBy. Local
+control checks and installed qualification are tracked separately.
+
 [ADR-263 — Ordinary ongoing source active leases](263-ordinary-ongoing-source-leases.md)
 selects a distinct thirty-second source-purpose commitment under fresh issuance
 facts, cumulative credit and original hard ends. Contract only; runtime and

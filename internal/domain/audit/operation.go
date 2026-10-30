@@ -50,9 +50,12 @@ func OperationLane(name string) string {
 }
 
 // OperationRequestWindow is the maximum request interval of an operation:
-// identity.EvidenceReadRequestWindow for evidence reads, five seconds otherwise.
+// twenty seconds for evidence reads, fifteen for request_capture composition,
+// five seconds otherwise. Every contained authority retains its own bound.
 func OperationRequestWindow(name string) time.Duration {
 	switch name {
+	case "request_capture":
+		return identity.RecordingSaveRequestWindow
 	case "get_file_excerpt", "get_query_result", "prepare_artifact_download", "get_artifact_download":
 		return identity.EvidenceReadRequestWindow
 	default:
