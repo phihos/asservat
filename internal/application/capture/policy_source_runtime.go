@@ -32,6 +32,9 @@ type sourceStage struct {
 func (e sourceStage) Error() string { return e.stage + ": " + e.err.Error() }
 func (e sourceStage) Unwrap() error { return e.err }
 
+// FixedStep names this bounded step in the transport's refusal report.
+func (e sourceStage) FixedStep() string { return e.stage }
+
 func staged(stage string, err error) error {
 	if err == nil {
 		return nil

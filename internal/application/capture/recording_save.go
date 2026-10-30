@@ -74,7 +74,7 @@ func (s RecordingSaves) List(ctx context.Context, current identities.CurrentIden
 	return page, nil
 }
 
-func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentIdentity, request RecordingSavePreviewRequest) (ContextPreviewResult, error) {
+func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentIdentity, request RecordingSavePreviewRequest) (result ContextPreviewResult, err error) {
 	var zero ContextPreviewResult
 	if ctx == nil || current == nil || s.Inventory.Selections == nil || s.Inventory.Candidates == nil || s.Inventory.Policies == nil || s.Inventory.Accepted == nil || s.Inventory.Now == nil {
 		return zero, value.ErrUnavailable
@@ -87,14 +87,26 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 	}
 	call, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
+	// step names the bounded preview step in transport refusal reports.
+	step := "identity"
+	defer func() {
+		if err != nil && sourceStageOf(err) == "" {
+			if call.Err() != nil {
+				step += "-late"
+			}
+			err = staged("save-preview-"+step, err)
+		}
+	}()
 	i, err := current.ResolveIdentity(call)
 	if err != nil || !i.Valid(s.Inventory.Now()) || !slices.Contains(i.Scopes, "evidence:capture") {
 		return zero, value.ErrDenied
 	}
+	step = "selection"
 	set, refs, err := s.recordingSelectionReferences(call, i.Principal, request.Handles)
 	if err != nil {
 		return zero, err
 	}
+	step = "authorize"
 	authorized, _, err := s.Inventory.authorize(call, current, set.Target)
 	if err != nil {
 		return zero, err
@@ -105,6 +117,7 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 	if len(refs) > 1 {
 		return s.previewRecordingSaveGroup(call, current, i, set, refs, request)
 	}
+	step = "candidates"
 	candidates, err := s.Inventory.Candidates.RecordingSources(call, set.Target, []string{refs[0].SourceID})
 	if err != nil {
 		return zero, err
@@ -128,6 +141,7 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 	if chosen == nil {
 		return zero, value.ErrChanged
 	}
+	step = "policy"
 	policy, err := s.Inventory.Policies.RecordingPolicy(call, chosen.PolicyName, refs[0].PolicyUID)
 	if err != nil {
 		return zero, err
@@ -135,6 +149,7 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 	if policy.Accepted.Authority.ScopeDigest != refs[0].ExecutionDigest || !policy.Policy.RecordingSaves {
 		return zero, value.ErrDenied
 	}
+	step = "history"
 	var lineage *value.HistoryLineage
 	if request.RepeatedFromCaptureID != "" {
 		if s.History == nil {
@@ -157,9 +172,10 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 			}
 		}
 	}
+	step = "snapshot"
 	until := identity.Earlier(i.ValidUntil, policy.Accepted.SourceUntil)
 	executor := newPolicyIdentity(call, s.Inventory.Accepted, policy.Accepted.Authority, until, s.Inventory.Now)
-	result, err := s.Investigation.previewSourceSnapshot(call, executor, PolicySnapshotSelection{PolicyName: chosen.PolicyName, Policy: policy.Policy, Authority: policy.Accepted.Authority, Source: chosen.Source, Target: chosen.Source.Target.Request, TriggeredAt: s.Inventory.Now().UTC().Truncate(time.Microsecond)}, &manualSnapshotSelection{Current: current, Before: request.Before, Reason: request.Reason, Sharing: request.Sharing, RepeatedFrom: lineage})
+	result, err = s.Investigation.previewSourceSnapshot(call, executor, PolicySnapshotSelection{PolicyName: chosen.PolicyName, Policy: policy.Policy, Authority: policy.Accepted.Authority, Source: chosen.Source, Target: chosen.Source.Target.Request, TriggeredAt: s.Inventory.Now().UTC().Truncate(time.Microsecond)}, &manualSnapshotSelection{Current: current, Before: request.Before, Reason: request.Reason, Sharing: request.Sharing, RepeatedFrom: lineage})
 	if err == nil && result.RecordingSave != nil && len(result.RecordingSave.Selected) == 1 {
 		result.RecordingSave.Selected[0].Handle = request.Handles[0]
 	}
