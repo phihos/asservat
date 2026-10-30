@@ -79,3 +79,19 @@ func TestInitialInstallationInventoryIncludesOrdinarySourceRelation(t *testing.T
 		t.Errorf("first-install exact catalog inventory rejects ordinary source relation %q", table)
 	}
 }
+
+// A grouped parent is a permanent control relation. Missing it from the exact
+// inventory prevents activation before any group transaction can run.
+func TestInitialInstallationInventoryIncludesRecordingSaveGroupRelation(t *testing.T) {
+	sql, err := fs.ReadFile(migrations.Files(), "00109_recording_save_groups.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const table = "recording_save_group"
+	if !strings.Contains(string(sql), "CREATE TABLE "+table+" (") {
+		t.Fatal("group migration no longer defines expected relation")
+	}
+	if !slices.Contains(initialInstallationTables, table) {
+		t.Errorf("first-install exact inventory rejects group relation %q", table)
+	}
+}

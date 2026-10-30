@@ -15,7 +15,13 @@ and the regional transport. Generated SQL (68 files), specification (13,362
 assertions), architecture, Go dependency boundaries and OpenAPI checks pass.
 These checks do not establish real SQL109 migration or transaction behavior.
 Grouped ordinary, grant-backed and mixed-cancellation provider fixtures are
-implemented but have not yet run. Sixteen-member serialization and query-bound
+implemented. The first ordinary run (`manual-group-save-sql109-1`) exited 1
+before group admission: the new parent relation was absent from the exact
+first-install inventory. A local failing regression reproduces the omission;
+the inventory now includes that permanent relation without weakening its exact
+comparison. The failed run and PostgreSQL log are archived; root verified
+unchanged source hashes, restored prior results and exact owned cleanup, with
+all 16 pre-existing containers preserved. Grouped runtime results remain pending. Sixteen-member serialization and query-bound
 checks are component evidence; sixteen-member SQL cost remains unqualified.
 
 The first coherent browser run failed because one assertion still expected
