@@ -111,15 +111,15 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 		}
 		gates[p.Lane] = gate
 	}
-	previews, err := postgres.NewContextPreviews(ctx, f.roles["capture-preview"], policy.Scenario.a.RootID)
+	previews, err := postgres.NewContextPreviews(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	storage, err := postgres.NewContextStorageReader(ctx, f.roles["capture-preview"], policy.Scenario.a.RootID)
+	storage, err := postgres.NewContextStorageReader(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	processing, err := postgres.NewProcessingReads(ctx, f.roles["api-execution"], policy.Scenario.a.RootID, policy.Scenario.recovery.guard)
+	processing, err := postgres.NewProcessingReads(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID, policy.Scenario.recovery.guard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +248,7 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	// This is a new reviewed parent; no old preview/capture or first proof is renewed.
 	preparedAt := time.Now()
 	group, parts := prepare()
-	previews, err := postgres.NewContextPreviews(ctx, f.roles["capture-preview"], group.RootID)
+	previews, err := postgres.NewContextPreviews(ctx, f.roles["hub-runtime"], group.RootID)
 	if err != nil {
 		t.Fatal(err)
 	}

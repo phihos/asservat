@@ -72,11 +72,11 @@ func newManualSnapshotWorkflow(t *testing.T, ctx context.Context, f *capacitySQL
 	process := value.APIProcessBinding{InstallationID: policy.Authority.InstallationID, ClusterID: policy.Authority.ClusterID, IssuerEpoch: first.Admission.Recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: custodyID(), ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: first.Admission.Plan.Input.Capability.CollectorImageDigest}
 	facts := &manualSnapshotWorkflowFacts{parts: parts, process: process}
 	guards := postgres.EffectTransactionGuards{Recovery: policy.Scenario.recovery.guard, Retention: policy.Scenario.retention.guard}
-	executions, err := postgres.NewAPIContextExecutions(ctx, f.roles["api-execution"], first.Admission.RootID, guards)
+	executions, err := postgres.NewAPIContextExecutions(ctx, f.roles["hub-runtime"], first.Admission.RootID, guards)
 	if err != nil {
 		t.Fatal(err)
 	}
-	current, err := postgres.NewAutomationAuthorities(ctx, f.roles["api-execution"], first.Admission.RootID, policy.Authority.InstallationID)
+	current, err := postgres.NewAutomationAuthorities(ctx, f.roles["hub-runtime"], first.Admission.RootID, policy.Authority.InstallationID)
 	if err != nil {
 		t.Fatal(err)
 	}
