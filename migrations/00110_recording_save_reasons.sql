@@ -61,7 +61,7 @@ BEGIN
   IF convert_from(p.reason_envelope,'UTF8')::jsonb IS DISTINCT FROM e OR sha256(p.reason_envelope) IS DISTINCT FROM public.connector_digest(ref->'CiphertextDigest') THEN RETURN false;END IF;
  ELSIF NOT EXISTS(SELECT 1 FROM public.operation_audit a WHERE a.id=c.id AND a.root_id=c.root_id AND a.intent->'ReasonEnvelope'=e AND a.intent->'Capture'->'ReasonRef'=ref) THEN RETURN false;
  END IF;
- base:=jsonb_set(jsonb_set(i-'ReasonEnvelope','{InputFormat}','"capture-intent/v2"'::jsonb),'{Capture}',i->'Capture'-'ReasonRef');
+ base:=jsonb_set(jsonb_set(i-'ReasonEnvelope','{InputFormat}','"capture-intent/v2"'::jsonb),'{Capture}',(i->'Capture')-'ReasonRef');
  RETURN public.capture_audit_payload_matches_without_reason(c,base);
 END $$;
 -- +goose StatementEnd
