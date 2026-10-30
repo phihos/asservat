@@ -58,6 +58,7 @@ func (s ContextInvestigation) PreviewPolicySnapshot(ctx context.Context, current
 }
 
 type manualSnapshotSelection struct {
+	Reason            *string
 	Current           identities.CurrentIdentity
 	Before            time.Duration
 	Sharing           *value.ContextSharing
@@ -229,6 +230,11 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	coverage, err := s.processingCoverage(ctx, preview, f, recovery, i.ValidUntil)
 	if err != nil {
 		return zero, planning.ContextPlan{}, err
+	}
+	if manual != nil && persist {
+		if err = s.preparePreviewReason(ctx, &preview, manual.Reason); err != nil {
+			return zero, planning.ContextPlan{}, err
+		}
 	}
 	if !ValidContextPreview(preview) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) {
 		return zero, planning.ContextPlan{}, previewFailure("snapshot/before-store", value.ErrChanged)

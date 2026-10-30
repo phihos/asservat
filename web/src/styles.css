@@ -55,3 +55,5 @@ summary { cursor: pointer; min-height: 44px; padding: 8px 0; color: #126b54; }
 
 .recordings-panel input[type="checkbox"] { width: auto; margin-inline-end: .5rem; }
 .recordings-panel .diagnostic label { display: flex; align-items: baseline; gap: .5rem; }
+
+.capture-reason { white-space: pre-wrap; overflow-wrap: anywhere; }

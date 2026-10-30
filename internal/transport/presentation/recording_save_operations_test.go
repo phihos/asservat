@@ -108,7 +108,7 @@ func TestRecordingSavePreviewIsTypedAndKeepsMutationDisabled(t *testing.T) {
 	if !out.Data.ExpiresAt.Equal(f.result.Preview.SelectionUntil) || out.Data.ExpiresAt.Equal(f.result.Preview.Deadline) || len(gate.outcomes) != 1 || actor.requests != 0 {
 		t.Fatal("review expiry became processing authority or acquisition", out.Data)
 	}
-	for _, bad := range []string{`{"recording_handles":["opaque-recording-handle"],"after":"1s"}`, `{"recording_handles":["opaque-recording-handle"],"reason":"must not be ignored"}`, `{"recording_handles":["opaque-recording-handle"],"source_id":"forged"}`, `{"recording_handles":["opaque-recording-handle","opaque-recording-handle"]}`, `{"Recording_Handles":["opaque-recording-handle"]}`} {
+	for _, bad := range []string{`{"recording_handles":["opaque-recording-handle"],"after":"1s"}`, `{"recording_handles":["opaque-recording-handle"],"source_id":"forged"}`, `{"recording_handles":["opaque-recording-handle","opaque-recording-handle"]}`, `{"Recording_Handles":["opaque-recording-handle"]}`} {
 		if _, err = audited.Call(t.Context(), actor, "preview_recording_save", []byte(bad)); err == nil || f.previewCalls != 1 {
 			t.Fatal("unsupported input reached source use case", bad, err, f.previewCalls)
 		}

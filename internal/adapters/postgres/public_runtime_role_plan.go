@@ -276,7 +276,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("access_grant_child", "INSERT")
 		add("access_grant_use", "INSERT")
 	case "capture-journal":
-		for _, signature := range []string{"read_capture_operation(uuid,uuid)", "capture_audit_journal(uuid,jsonb,text,jsonb)", "claim_capture_reconciliation(uuid,jsonb,text)"} {
+		for _, signature := range []string{"read_capture_operation(uuid,uuid)", "read_capture_reason(uuid,uuid)", "capture_audit_journal(uuid,jsonb,text,jsonb)", "claim_capture_reconciliation(uuid,jsonb,text)"} {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
 		}
 	case "capture-ack":

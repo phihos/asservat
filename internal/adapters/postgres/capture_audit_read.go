@@ -91,6 +91,7 @@ func captureOperationIntentRecord(row custodydb.ReadCaptureOperationIntentRow) (
 		return custodydb.ContextCapture{}, app.ErrUnavailable
 	}
 	return custodydb.ContextCapture{
+		ReasonRef:                 row.ReasonRef,
 		ID:                        row.ID,
 		RootID:                    row.RootID,
 		RequestKey:                row.RequestKey,

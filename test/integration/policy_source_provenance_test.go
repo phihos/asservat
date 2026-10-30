@@ -52,6 +52,10 @@ func TestManualRecordingSaveWithPolicyGrantRealServices(t *testing.T) {
 }
 
 func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requireApproval bool, groups ...int) {
+	qualifySourceSnapshotServices(t, manual, cancellation, requireApproval, false, groups...)
+}
+
+func qualifySourceSnapshotServices(t *testing.T, manual, cancellation, requireApproval, reason bool, groups ...int) {
 	groupCount := 0
 	if len(groups) > 0 {
 		groupCount = groups[0]
@@ -70,6 +74,9 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requi
 		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 			if manual {
 				configureManualSourceCapacity(f)
+			}
+			if reason {
+				configureManualReasonCapacity(f)
 			}
 			if groupCount > 0 {
 				configureManualGroupSourceCapacity(f, groupCount)
@@ -231,6 +238,10 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requi
 			originalRows, err := ledger.ListSources(ctx, accepted.Authority.PolicyUID)
 			if err != nil || len(originalRows) != 1 || (manual && len(originalRows[0].Audience) < 3 || !manual && len(originalRows[0].Audience) != 2) {
 				t.Fatal("new readers adopted old source", err)
+			}
+			if reason {
+				qualifyManualRecordingSaveReason(t, ctx, f, seed.s, accepted, renewal, fresh(t), intents)
+				return
 			}
 			if groupCount > 0 {
 				qualifyManualRecordingSaveGroup(t, ctx, f, seed.s, accepted, ledger, renewal, fresh, intents, cancellation)

@@ -15,6 +15,7 @@ import (
 type RecordingSavePreviewRequest struct {
 	Handles               []string
 	Before                time.Duration
+	Reason                *string
 	Sharing               *value.ContextSharing
 	RepeatedFromCaptureID string
 }
@@ -78,7 +79,7 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 	if ctx == nil || current == nil || s.Inventory.Selections == nil || s.Inventory.Candidates == nil || s.Inventory.Policies == nil || s.Inventory.Accepted == nil || s.Inventory.Now == nil {
 		return zero, value.ErrUnavailable
 	}
-	if len(request.Handles) < 1 || len(request.Handles) > 16 || request.Before < 0 || request.Before > artifact.MaxLifecycleWindow || request.Before%time.Millisecond != 0 {
+	if len(request.Handles) < 1 || len(request.Handles) > 16 || request.Before < 0 || request.Before > artifact.MaxLifecycleWindow || request.Before%time.Millisecond != 0 || !validOptionalReason(request.Reason) {
 		return zero, value.ErrInvalid
 	}
 	if request.Sharing != nil && !request.Sharing.Valid() {
@@ -158,7 +159,7 @@ func (s RecordingSaves) Preview(ctx context.Context, current identities.CurrentI
 	}
 	until := identity.Earlier(i.ValidUntil, policy.Accepted.SourceUntil)
 	executor := newPolicyIdentity(call, s.Inventory.Accepted, policy.Accepted.Authority, until, s.Inventory.Now)
-	result, err := s.Investigation.previewSourceSnapshot(call, executor, PolicySnapshotSelection{PolicyName: chosen.PolicyName, Policy: policy.Policy, Authority: policy.Accepted.Authority, Source: chosen.Source, Target: chosen.Source.Target.Request, TriggeredAt: s.Inventory.Now().UTC().Truncate(time.Microsecond)}, &manualSnapshotSelection{Current: current, Before: request.Before, Sharing: request.Sharing, RepeatedFrom: lineage})
+	result, err := s.Investigation.previewSourceSnapshot(call, executor, PolicySnapshotSelection{PolicyName: chosen.PolicyName, Policy: policy.Policy, Authority: policy.Accepted.Authority, Source: chosen.Source, Target: chosen.Source.Target.Request, TriggeredAt: s.Inventory.Now().UTC().Truncate(time.Microsecond)}, &manualSnapshotSelection{Current: current, Before: request.Before, Reason: request.Reason, Sharing: request.Sharing, RepeatedFrom: lineage})
 	if err == nil && result.RecordingSave != nil && len(result.RecordingSave.Selected) == 1 {
 		result.RecordingSave.Selected[0].Handle = request.Handles[0]
 	}

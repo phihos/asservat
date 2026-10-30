@@ -971,7 +971,14 @@ export interface components {
                 /** @enum {unknown} */
                 history_state?: "available" | "unavailable";
                 cancellation_requested?: boolean;
-            };
+                /** @description Authorized parent Save reason, preserved verbatim; never restored on repeat. */
+                reason?: string;
+                /**
+                 * @description Omitted when no reason was supplied. Unavailable descriptive metadata does not block capture status.
+                 * @enum {unknown}
+                 */
+                reason_state?: "available" | "unavailable";
+            } & (unknown & unknown);
         } | {
             /** @constant */
             status: "pending";

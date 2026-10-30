@@ -15,6 +15,15 @@ import (
 // PrepareCaptureOperation is called inside admission after the exact original
 // CaptureIntent has been reconstructed. It reserves nothing and grants no I/O.
 func PrepareCaptureOperation(c value.CaptureIntent, a value.CaptureAuditAccount, mac *OperationMAC, requestUntil time.Time) (value.OperationIntent, error) {
+	return prepareCaptureOperation(c, a, mac, requestUntil, nil)
+}
+
+// PrepareCaptureReasonOperation carries the frozen preview envelope opaquely.
+// It performs no key opening or reason parsing during admission/publication.
+func PrepareCaptureReasonOperation(c value.CaptureIntent, a value.CaptureAuditAccount, mac *OperationMAC, requestUntil time.Time, envelope value.CaptureReasonEnvelope) (value.OperationIntent, error) {
+	return prepareCaptureOperation(c, a, mac, requestUntil, &envelope)
+}
+func prepareCaptureOperation(c value.CaptureIntent, a value.CaptureAuditAccount, mac *OperationMAC, requestUntil time.Time, envelope *value.CaptureReasonEnvelope) (value.OperationIntent, error) {
 	if !c.Valid() || !a.Valid() || c.RootID != a.RootID || mac == nil || mac.AccountVersion() != a.AccountVersion {
 		return value.OperationIntent{}, ErrUnavailable
 	}
@@ -27,7 +36,23 @@ func PrepareCaptureOperation(c value.CaptureIntent, a value.CaptureAuditAccount,
 		return value.OperationIntent{}, ErrUnavailable
 	}
 	defer clear(raw)
-	input, err := mac.Digest(value.CaptureOperationInputFormat, raw)
+	format := value.CaptureOperationInputFormat
+	if c.ReasonRef != nil {
+		if envelope == nil || !CaptureReasonEnvelopeMatches(*c.ReasonRef, *envelope) {
+			return value.OperationIntent{}, ErrUnavailable
+		}
+		format = value.CaptureReasonInputFormat
+		ref := *c.ReasonRef
+		c.ReasonRef = &ref
+		owned := *envelope
+		owned.KeyReference = append([]byte(nil), envelope.KeyReference...)
+		owned.WrappedKey = append([]byte(nil), envelope.WrappedKey...)
+		owned.Ciphertext = append([]byte(nil), envelope.Ciphertext...)
+		envelope = &owned
+	} else if envelope != nil {
+		return value.OperationIntent{}, ErrUnavailable
+	}
+	input, err := mac.Digest(format, raw)
 	if err != nil {
 		return value.OperationIntent{}, err
 	}
@@ -35,7 +60,7 @@ func PrepareCaptureOperation(c value.CaptureIntent, a value.CaptureAuditAccount,
 	// Only the live caller bound is reduced to SQL precision. Never round up
 	// an expiry or rewrite the already accepted capture's historical dates.
 	requestUntil = identity.Earlier(requestUntil, identity.Earlier(c.CreatedAt.Add(5*time.Second), until)).UTC().Truncate(time.Microsecond)
-	in := value.OperationIntent{ID: c.CaptureID, RootID: c.RootID, TraceID: c.OccurrenceID, Name: value.CaptureOperationName, InputFormat: value.CaptureOperationInputFormat, MACVersion: mac.Version(), AccountVersion: a.AccountVersion, Actor: c.Requester(), PrincipalDigest: account, InputDigest: input, CreatedAt: c.CreatedAt, RequestUntil: requestUntil, WriteUntil: until, RetainUntil: c.CreatedAt.Add(time.Duration(a.RetainedSeconds) * time.Second), Capture: &c}
+	in := value.OperationIntent{ID: c.CaptureID, RootID: c.RootID, TraceID: c.OccurrenceID, Name: value.CaptureOperationName, InputFormat: format, ReasonEnvelope: envelope, MACVersion: mac.Version(), AccountVersion: a.AccountVersion, Actor: c.Requester(), PrincipalDigest: account, InputDigest: input, CreatedAt: c.CreatedAt, RequestUntil: requestUntil, WriteUntil: until, RetainUntil: c.CreatedAt.Add(time.Duration(a.RetainedSeconds) * time.Second), Capture: &c}
 	return BindOperationLifecycle(in, a.Policy)
 }
 

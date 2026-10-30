@@ -35,7 +35,7 @@ func (q *Queries) ObserveOverdueContextCaptures(ctx context.Context, arg Observe
 }
 
 const readContextProgressFacts = `-- name: ReadContextProgressFacts :one
-SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal,a.state AS custody_state,a.request_digest,
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest, c.snapshot_cancel_key, c.snapshot_cancel_actor, c.snapshot_cancel_requested_at, c.snapshot_cancel_joined_at, c.snapshot_cancel_proof, c.snapshot_cancel_proof_digest, c.group_id, c.group_ordinal, c.reason_ref,a.state AS custody_state,a.request_digest,
  a.copies_digest,a.effective_expires_at,a.effective_delete_by,
  v.capture_id AS verified_capture_id,v.root_id AS verified_root_id,v.verified_at,
  v.expectation_digest,v.copies_digest AS verified_copies_digest,v.intent_digest AS verified_intent_digest,
@@ -134,6 +134,7 @@ func (q *Queries) ReadContextProgressFacts(ctx context.Context, arg ReadContextP
 		&i.ContextCapture.SnapshotCancelProofDigest,
 		&i.ContextCapture.GroupID,
 		&i.ContextCapture.GroupOrdinal,
+		&i.ContextCapture.ReasonRef,
 		&i.CustodyState,
 		&i.RequestDigest,
 		&i.CopiesDigest,

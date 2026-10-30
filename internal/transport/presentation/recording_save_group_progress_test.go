@@ -184,6 +184,8 @@ func TestRecordingSaveMaximumGroupedProgressFitsExistingEnvelope(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.Operation = "recordingSave"
+	reason := strings.Repeat("\x00", 512)
+	p.Reason, p.ReasonState = &reason, "available"
 	p.Actions = make([]value.ContextActionProgress, value.MaxRecordingSaveGroupChildren)
 	for i := range p.Actions {
 		p.Actions[i] = value.ContextActionProgress{InstanceID: fmt.Sprintf("00000000-0000-4000-8000-%012d", i+101), PodUID: strings.Repeat("u", 128), PodName: strings.Repeat("p", 253), ActionID: strings.Repeat("a", 63), Phase: "Finalizing", ReasonCode: strings.Repeat("R", 64)}
@@ -197,10 +199,19 @@ func TestRecordingSaveMaximumGroupedProgressFitsExistingEnvelope(t *testing.T) {
 		t.Fatal(err)
 	}
 	var envelope struct{ Data ContextProgressData }
-	if json.Unmarshal(reply.Body, &envelope) != nil || len(envelope.Data.Actions) != 16 || len(reply.Body) > 24<<10 {
+	if json.Unmarshal(reply.Body, &envelope) != nil || len(envelope.Data.Actions) != 16 || envelope.Data.Reason == nil || *envelope.Data.Reason != reason || envelope.Data.ReasonState != "available" || len(reply.Body) > 24<<10 {
 		t.Fatal("fullgroup response exceeded unchanged bound", len(reply.Body), err)
 	}
-	t.Logf("16 maximum ASCII child rows encode %d bytes", len(reply.Body))
+	frame, _ := json.Marshal(struct {
+		Result any `json:"result"`
+	}{struct {
+		Content           []map[string]string `json:"content"`
+		StructuredContent json.RawMessage     `json:"structuredContent"`
+	}{[]map[string]string{{"type": "text", "text": string(reply.Body)}}, reply.Body}})
+	if len(frame) > 64<<10 {
+		t.Fatal("duplicated MCP shape exceeds unchanged64KiB cap", len(frame))
+	}
+	t.Logf("16 maximum child rows +512 worst-escaped reason raw=%d duplicated-frame=%d bytes", len(reply.Body), len(frame))
 }
 
 func TestRecordingSaveAssessmentUsesActualSourceActionAndRetention(t *testing.T) {

@@ -360,6 +360,15 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	previewCleanup, err := postgres.NewContextPreviewCleanup(ctx, sql["capture-preview"], root)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.history.PreviewCleanup = previewCleanup
+	reasonCipher, err := objectstore.NewCaptureReasonCipher(a.seal, a.open)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
 	admissionsSQL, err := postgres.NewAuditedContextAdmissions(ctx, sql["capture-admit"], root, out.mac, shared.guards)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
@@ -421,6 +430,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	runner := executionapp.APIContextRunner{Read: executionSQL, Prepare: executionSQL, Record: executionSQL, Eligibility: eligibility, Retention: out.retention}
 	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
 	out.collect = RegionalRecordingCollect{Runner: executionapp.APIContextRunner{Record: executionSQL, Capabilities: capabilities, Recovery: out.recovery, Now: time.Now}, Recordings: executionSQL, Signer: signers, Router: router, Now: time.Now, Report: eventLog(os.Stderr, "recording collect refused")}
+	out.investigation.ReasonCipher = reasonCipher
 	// ADR-248: node recorder availability is a regional pre-work query.
 	out.investigation.Recorders = queries
 	// Passive existing-source services reuse current protected ports. The trusted
@@ -435,7 +445,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.progress = captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: progress, Reviews: out.reviews}
+	out.progress = captureapp.ContextProgressService{Reasons: captureapp.StoredCaptureReasons{Records: journal, Cipher: reasonCipher}, RootID: root, InstallationID: installation, Reader: progress, Reviews: out.reviews}
 	routes, err := postgres.NewContextCaseReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {
 		return nil, mounts.ErrUnavailable

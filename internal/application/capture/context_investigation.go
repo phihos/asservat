@@ -69,20 +69,6 @@ type ContextCapacityRefresh interface {
 	DemandCapacityRefresh(context.Context, targets.Request) error
 }
 
-// ContextReasonObservation belongs to a separate current protected control-data
-// reader. It checks exact ciphertext identity, actor/client, target and expiry;
-// a caller-supplied reference alone cannot establish those facts.
-type ContextReasonObservation struct {
-	Reference              value.ProtectedReasonRef
-	Actor                  identity.Principal
-	Target                 authorization.Target
-	ObservedAt, ValidUntil time.Time
-}
-
-type ContextReasonReader interface {
-	ContextReason(context.Context, identities.CurrentIdentity, authorization.Target, value.ProtectedReasonRef) (ContextReasonObservation, error)
-}
-
 // ContextInvestigation is the shared browser/MCP use case for the exact bounded
 // pod-status diagnostic. It does not dispatch work or publish/read evidence.
 type ContextInvestigation struct {
@@ -108,7 +94,7 @@ type ContextInvestigation struct {
 	Reviews                ContextAccessReviews   // optional (ADR-245)
 	Processing             ContextProcessingCoverageReader
 	Recovery               fleetapp.RecoveryReader
-	Reasons                ContextReasonReader
+	ReasonCipher           auditapp.CaptureReasonCipher
 	// Recorders answers node packet recorder availability (ADR-248). It is
 	// optional: without it every composition stays plan-only.
 	Recorders ContextRecorders
@@ -148,7 +134,6 @@ type contextFacts struct {
 	capability     planning.ContextCapability
 	retention      privacy.Resolution
 	storage        ContextStorageObservation
-	reasonUntil    time.Time
 }
 
 func (s ContextInvestigation) configured() bool {
@@ -256,19 +241,7 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 	if err != nil {
 		return f, err
 	}
-	if intent.Reason != nil {
-		if s.Reasons == nil {
-			return f, previewFailure("facts/reason", value.ErrUnavailable)
-		}
-		r, err := s.Reasons.ContextReason(ctx, source, t, *intent.Reason)
-		if err != nil {
-			return f, previewFailure("facts/reason", err)
-		}
-		if r.Reference != *intent.Reason || r.Actor != actor || r.Target != t || !identity.Fresh(r.ObservedAt, r.ValidUntil, s.Now(), 5*time.Second) || r.ValidUntil.After(r.Reference.ExpiresAt) {
-			return f, previewFailure("facts/reason", value.ErrDenied)
-		}
-		f.reasonUntil = r.ValidUntil
-	}
+
 	now := s.Now()
 	if !s.factsCurrent(f, now) || ctx.Err() != nil {
 		reason := s.nonStorageFactsFailure(f, now)
@@ -310,7 +283,6 @@ func (s ContextInvestigation) nonStorageFactsFailure(f contextFacts, now time.Ti
 		{!now.Before(f.retention.ValidUntil), "retention"},
 		{!now.Before(f.eligibility.ValidUntil), "eligibility"},
 		{!f.eligibility.VerifiedIdentity.Valid(now), "identity"},
-		{!f.reasonUntil.IsZero() && !now.Before(f.reasonUntil), "reason"},
 	} {
 		if check.failed {
 			return check.name
@@ -408,9 +380,6 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
 	}
 	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.ContextAssessmentRulesDigestForClass(target.ExecutionClass)
-	if intent.Reason != nil {
-		p.Deadline = identity.Earlier(p.Deadline, intent.Reason.ExpiresAt)
-	}
 	processingStarted := time.Now()
 	coverage, err := s.processingCoverage(ctx, p, f, recovery, i.ValidUntil)
 	auditapp.MarkStep(ctx, "p-processing", processingStarted)
@@ -454,9 +423,6 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 	until = identity.Earlier(until, assessment.ValidUntil)
 	until = identity.Earlier(until, f.storage.Binding.FreshUntil)
 	until = identity.Earlier(until, coverage.FreshUntil)
-	if !f.reasonUntil.IsZero() {
-		until = identity.Earlier(until, f.reasonUntil)
-	}
 	if !s.Now().Before(until) || ctx.Err() != nil {
 		return zero, previewFailure("response/current", value.ErrUnavailable)
 	}

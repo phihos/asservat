@@ -100,3 +100,13 @@ it('a changed handling disclosure stops immediate admission and leaves the new r
   expect(controller.snapshot().error).toMatch(/assessment changed/);
   expect(client.calls).toHaveLength(3);
 });
+
+it('preserves reason scalars verbatim, omits empty input and clears it on fresh repeat', async () => {
+ const {client,controller,scope}=await loaded();controller.select(recording(),true);
+ const reason='  \n'+ '🙂'.repeat(509);controller.setReason(reason);await controller.review();
+ expect(client.calls.at(-1)).toMatchObject({name:'preview_recording_save',input:{reason}});
+ controller.setReason('🙂'.repeat(513));const calls=client.calls.length;await controller.review();expect(client.calls).toHaveLength(calls);
+ controller.setReason('');await controller.review();expect(client.calls.at(-1)!.input).not.toHaveProperty('reason');
+ controller.setReason('old reason');controller.attach(session,scope.signal,target,{captureID:'old',policyUID:'policy'});
+ expect(controller.snapshot().reason).toBeUndefined();
+});

@@ -82,8 +82,8 @@ func TestContextPreviewCloneAndReasonDeadline(t *testing.T) {
 		t.Fatal("clone aliases mutable state")
 	}
 	p.Intent.Reason.ExpiresAt = p.CreatedAt.Add(time.Minute)
-	if p.Valid() {
-		t.Fatal("review exceeds protected reason lifetime")
+	if !p.Valid() {
+		t.Fatal("descriptive reason expiry changed capture review lifetime")
 	}
 }
 

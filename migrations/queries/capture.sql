@@ -26,8 +26,8 @@ SELECT * FROM context_capture WHERE id=$1 AND root_id=$2 FOR UPDATE;
 UPDATE context_capture SET state='intent_audited',intent_acknowledged_at=clock_timestamp(),intent_digest=$2,intent_object_key=$3,intent_object_version=$4,intent_object_etag=$5,intent_object_bytes=$6,intent_object_sha256=$7 WHERE id=$1 AND state='accepted_pending_audit';
 
 -- name: InsertContextCapture :one
-INSERT INTO context_capture(id,root_id,request_key,submission_digest,scope_digest,scope_json,expectation_json,pod_pin_json,attempt_id,permission_epoch,permission_sequence,identity_policy_uid,identity_policy_generation,identity_policy_digest,deadline,preview_id,intent_operation_id,share_instruction,repeated_from_capture_id,repeated_from_expires_at,created_at,group_id,group_ordinal)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,COALESCE(sqlc.narg(accepted_at)::timestamptz,clock_timestamp()),sqlc.narg(group_id)::uuid,sqlc.narg(group_ordinal)::smallint) RETURNING *;
+INSERT INTO context_capture(id,root_id,request_key,submission_digest,scope_digest,scope_json,expectation_json,pod_pin_json,attempt_id,permission_epoch,permission_sequence,identity_policy_uid,identity_policy_generation,identity_policy_digest,deadline,preview_id,intent_operation_id,share_instruction,repeated_from_capture_id,repeated_from_expires_at,created_at,group_id,group_ordinal,reason_ref)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,COALESCE(sqlc.narg(accepted_at)::timestamptz,clock_timestamp()),sqlc.narg(group_id)::uuid,sqlc.narg(group_ordinal)::smallint,sqlc.narg(reason_ref)::jsonb) RETURNING *;
 
 -- name: FindContextCaptureByPreview :one
 SELECT * FROM context_capture WHERE root_id=$1 AND preview_id=$2;

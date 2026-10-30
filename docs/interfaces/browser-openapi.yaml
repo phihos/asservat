@@ -11675,7 +11675,8 @@ components:
                       action_instance_id:
                         type: string
                         format: uuid
-                        description: Exact child identity within this parent save. It is not a separate navigation or retry target.
+                        description: Exact child identity within this parent save. It
+                          is not a separate navigation or retry target.
                       pod_uid:
                         type: string
                         minLength: 1
@@ -11760,7 +11761,10 @@ components:
                 sharing:
                   type: object
                   additionalProperties: false
-                  description: Capture-time sharing status, reported separately from collection progress. Present only when the request included sharing. Shared names the concrete share; SharingUnavailable means the result was not shared (collection outcome is unaffected).
+                  description: Capture-time sharing status, reported separately from collection
+                    progress. Present only when the request included sharing. Shared names
+                    the concrete share; SharingUnavailable means the result was not shared
+                    (collection outcome is unaffected).
                   properties:
                     state:
                       enum:
@@ -11778,6 +11782,18 @@ components:
                   - unavailable
                 cancellation_requested:
                   type: boolean
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 512
+                  description: Authorized parent Save reason, preserved verbatim; never
+                    restored on repeat.
+                reason_state:
+                  enum:
+                  - available
+                  - unavailable
+                  description: Omitted when no reason was supplied. Unavailable descriptive
+                    metadata does not block capture status.
               required:
               - capture_id
               - revision
@@ -11786,6 +11802,29 @@ components:
               - navigation_uri
               - can_cancel
               - blockers
+              dependentRequired:
+                reason:
+                - reason_state
+              allOf:
+              - if:
+                  properties:
+                    reason_state:
+                      const: available
+                  required:
+                  - reason_state
+                then:
+                  required:
+                  - reason
+              - if:
+                  properties:
+                    reason_state:
+                      const: unavailable
+                  required:
+                  - reason_state
+                then:
+                  not:
+                    required:
+                    - reason
           required:
           - status
           - data
@@ -13185,6 +13224,7 @@ components:
           type: string
           minLength: 1
           maxLength: 512
+          description: Optional Unicode scalars preserved verbatim; omit when absent. Empty is invalid. Repeat does not restore it.
         sharing:
           $ref: https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture
         repeated_from_capture_id:

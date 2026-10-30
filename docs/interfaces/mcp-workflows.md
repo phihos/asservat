@@ -57,3 +57,11 @@ Conformance must test both supported MCP protocol profiles, initialization and t
 
 
 **“Collect a core and let me inspect it locally or with my agent.”** Preview the bounded capture with optional result_access. Select the same human's current browser and, explicitly, a registered agent client; show selected output actions, access operations, shared disclosure budget and original expiry. Submit the protected preview and wait for one independent human review. get_capture distinguishes collection progress from result-access publication. After verified commit, resolve the exact child grant automatically for prepare_artifact_download or approved queries. An expired/missing client scope requests access to existing evidence, never another core. See [investigation approval](../../specs/investigation-approval.md).
+
+A `preview_recording_save` request may include a descriptive `reason` of 1–512
+Unicode scalars. Preserve its whitespace and line breaks; omit the field when
+absent. `get_capture` returns it once on the parent as `reason` with
+`reason_state: available`, or reports `reason_state: unavailable` without text
+when descriptive metadata cannot be read. Neither outcome changes capture
+status or source authority. Repeating a Save requires a fresh selection and does
+not restore its reason.

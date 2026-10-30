@@ -72,3 +72,28 @@ The failed full regression and its exact SQL errors are retained in
 passes both healthy-retirement paths, restricted-role checks and the shared
 stranded-retirement rejection, with unchanged sources and verified cleanup.
 This is native component qualification; no installed workflow is enabled.
+
+## Descriptive recording-save reason variant (ADR-267)
+
+SQL110 adds one immutable nullable capture reason reference and a separately
+erasable preview ciphertext column. The encrypted envelope is copied into the
+existing mandatory operation journal and both audit objects; no plaintext reason
+or its hash enters SQL. The legacy minimized CaptureIntent limit stays 8 KiB.
+Only `capture-intent-reason/v1` selects the new 32 KiB intent/outcome format, with
+byte-key outer envelopes and the same existing8192-byte capture-provider wrap
+bound. Generic16384-byte SealedKey limits and legacy16/24KiB encodings remain
+unchanged. Object/pair limits remain64/128KiB. Existing joined completions,
+phase-specific opaque record digests and bounded reconciliation remain required.
+After all child journals own the exact body, a deferred constraint trigger
+erases the preview copy at commit; later validation does not require that
+preview. Existing expiry cleanup covers abandoned previews. Actual SQL/WAL and
+provider/runtime qualification for this variant is pending.
+
+Historical reason display uses `read_capture_reason(uuid,uuid)` on the existing
+capture-journal role with one additional fixed EXECUTE grant and no new table
+SELECT. It returns only the original capture/ref, opaque envelope and the
+original at-most-five-second current trust/incarnation/OriginalPurgeAt interval.
+That interval also bounds the unwrap. It never extends the original writer or
+reconciliation WriteUntil, whose existing lookup is deliberately unsuitable for
+post-completion descriptive metadata. All real children are authorized by the
+existing progress reader before this projection is called.

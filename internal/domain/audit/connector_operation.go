@@ -81,7 +81,7 @@ func humanOperationInputValid(name, format string) bool {
 	case "download_artifact_content":
 		return format == "native-content-input/v1"
 	case "persist_capture_intent":
-		return format == CaptureOperationInputFormat
+		return format == CaptureOperationInputFormat || format == CaptureReasonInputFormat
 	case "initialize_processing", "restrict_processing", "release_processing":
 		return format == "processing-input/v1"
 	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "resolve_capture_request", "invalid_operation", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant":

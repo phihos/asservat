@@ -65,6 +65,11 @@ func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q
 			return zero, err
 		}
 		if n == 0 {
+			out.ReasonMetadata = child.ReasonMetadata
+		} else if (out.ReasonMetadata == nil) != (child.ReasonMetadata == nil) || out.ReasonMetadata != nil && (child.ReasonMetadata.Reference != out.ReasonMetadata.Reference || child.ReasonMetadata.CaptureID != out.ReasonMetadata.CaptureID || child.ReasonMetadata.Requester != out.ReasonMetadata.Requester || child.ReasonMetadata.ScopeDigest != out.ReasonMetadata.ScopeDigest) {
+			return zero, value.ErrUnavailable
+		}
+		if n == 0 {
 			out.Target = child.Target
 			out.Target.PodUID = ""
 		}

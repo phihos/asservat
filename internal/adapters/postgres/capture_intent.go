@@ -130,6 +130,15 @@ func captureIntent(row custodydb.ContextCapture) (audit.CaptureIntent, error) {
 	}
 	copy(out.IdentityRevision.Digest[:], row.IdentityPolicyDigest)
 	copy(out.ExpectationDigest[:], digest(e))
+	if row.ReasonRef != nil {
+		var ref audit.CaptureReasonRef
+		d := json.NewDecoder(bytes.NewReader(row.ReasonRef))
+		d.DisallowUnknownFields()
+		if d.Decode(&ref) != nil || !ref.Valid() {
+			return out, capture.ErrUnavailable
+		}
+		out.ReasonRef = &ref
+	}
 	if !out.Valid() {
 		return audit.CaptureIntent{}, capture.ErrUnavailable
 	}

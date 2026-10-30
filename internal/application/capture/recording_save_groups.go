@@ -204,6 +204,9 @@ func (s RecordingSaves) previewRecordingSaveGroup(ctx context.Context, current i
 		metadata.Windows = append(metadata.Windows, RecordingSaveWindow{Handle: row.Handle, Before: input.Snapshot.Request.Before})
 		metadata.Assessments = append(metadata.Assessments, RecordingSaveActionAssessment{ActionID: input.Snapshot.ActionID, PodUID: row.PodUID, Assessment: assessment})
 	}
+	if err = s.Investigation.preparePreviewReason(ctx, &parent, request.Reason); err != nil {
+		return zero, err
+	}
 	if !ValidContextPreview(parent) || !s.Inventory.Now().Before(until) {
 		return zero, value.ErrChanged
 	}

@@ -68,3 +68,13 @@ it('opens recordings from the real target form and hands immediate save into cap
   expect(fetcher.mock.calls.map(call => call[0])).toEqual(['/api/v1/operations/list_recordings', '/api/v1/operations/preview_recording_save', '/api/v1/operations/preview_recording_save']);
   view.unmount(); investigation.reset();
 });
+
+it('allows 512 supplementary Unicode characters without a UTF16 maxlength',async()=>{
+ const client=new SyntheticRecordings();const controller=new Recordings(client);controllers.push(controller);
+ render(<RecordingsPanel session={session} scope={new AbortController().signal} target={target} submit={vi.fn()} controller={controller}/>);
+ fireEvent.click(await screen.findByRole('checkbox',{name:'api-1 · traffic'}));await screen.findByRole('heading',{name:'Save the selected history'});
+ const input=screen.getByLabelText('Reason (optional)');expect(input.getAttribute('maxlength')).toBeNull();
+ const reason='🙂'.repeat(512);fireEvent.change(input,{target:{value:reason}});
+ expect(screen.getByText(/512 of 512 characters/)).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'Review save'}));await vi.waitFor(()=>expect(client.calls.at(-1)).toMatchObject({name:'preview_recording_save',input:{reason}}));
+});

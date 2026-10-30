@@ -1,6 +1,6 @@
 -- name: InsertContextPreview :exec
-INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);
+INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline,reason_envelope)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,sqlc.narg(reason_envelope)::bytea);
 
 -- name: FindContextPreview :one
 SELECT * FROM context_preview WHERE root_id=$1 AND id=$2 AND actor_key=$3;

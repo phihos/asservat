@@ -13,7 +13,7 @@ import (
 // ValidContextPreview adds serialized bounds and integrity to domain structural
 // validation. It does not restore current authority from a persisted preview.
 func ValidContextPreview(p value.ContextPreview) bool {
-	if !p.Valid() || !json.Valid(p.CanonicalScope) || artifact.Digest(sha256.Sum256(p.CanonicalScope)) != p.ScopeDigest {
+	if !p.Valid() || !validPreviewReason(p) || !json.Valid(p.CanonicalScope) || artifact.Digest(sha256.Sum256(p.CanonicalScope)) != p.ScopeDigest {
 		return false
 	}
 	b, err := json.Marshal(p)

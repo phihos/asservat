@@ -24,6 +24,12 @@
       "before": {
         "$ref": "#/$defs/d0"
       },
+      "reason": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "description": "Optional 1\u2013512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
+      },
       "sharing": {
         "type": "object",
         "additionalProperties": false,

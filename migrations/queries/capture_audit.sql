@@ -29,3 +29,6 @@ SELECT v.*,NULL::bytea AS snapshot_coverage,NULL::bytea AS snapshot_coverage_dig
  CASE WHEN convert_from(v.scope_json,'UTF8')::jsonb->>'schemaVersion'='recording-save/v1' AND jsonb_array_length(convert_from(v.scope_json,'UTF8')::jsonb->'sources')>1
  THEN (SELECT (m.ordinality-1)::smallint FROM jsonb_array_elements(convert_from(v.scope_json,'UTF8')::jsonb->'sources') WITH ORDINALITY m(value,ordinality)
  WHERE m.value->>'sourceSessionID'=convert_from(v.expectation_json,'UTF8')::jsonb#>>'{Snapshot,SourceID}') ELSE (-1)::smallint END AS group_ordinal) g ON true WHERE v.root_id=$1 AND v.id=$2;
+
+-- name: ReadCaptureReason :one
+SELECT read_capture_reason(sqlc.arg(root_id)::uuid,sqlc.arg(capture_id)::uuid)::jsonb;

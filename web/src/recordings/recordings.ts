@@ -5,7 +5,7 @@ import { operations, type Operations, type Operation, type Input, type Output, t
 export type Repeat = { policyUID: string; captureID: string; before?: string };
 export type State = {
   busy: boolean; rows?: Recording[]; selected: Recording[]; cursor?: string; expiresAt?: string;
-  captureEnabled: boolean; before: string; preview?: SavePreview; expired?: boolean; error?: string;
+  captureEnabled: boolean; before: string; reason?: string; preview?: SavePreview; expired?: boolean; error?: string;
 };
 export function durationMilliseconds(value: string): number | undefined {
   const match = /^([1-9][0-9]*)(ms|s|m|h|d)$/.exec(value);
@@ -98,18 +98,21 @@ export class Recordings {
     }
     this.publish({ selected, preview: undefined, error: undefined });
   };
-  clear = () => { if (!this.state.busy) this.publish({ selected: [], preview: undefined, error: undefined }); };
+  clear = () => { if (!this.state.busy) this.publish({ selected: [], preview: undefined, reason: undefined, error: undefined }); };
+  setReason = (reason: string) => { if (!this.state.busy) this.publish({ reason, preview: undefined, error: undefined }); };
   setBefore = (before: string) => { if (!this.state.busy) this.publish({ before, preview: undefined, error: undefined }); };
   review = async () => {
     const selected = this.state.selected;
     if (this.state.busy || selected.length < 1 || this.state.expired || !this.state.captureEnabled) return;
+    const reason = this.state.reason ?? '';
+    if (Array.from(reason).length > 512 || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(reason)) { this.publish({ error: 'Reason must contain at most 512 Unicode characters.' }); return; }
     const before = this.state.before.trim();
     if (before !== '') {
       const milliseconds = durationMilliseconds(before);
       if (!milliseconds || selected.some(row => milliseconds > (durationMilliseconds(row.maximum_before) ?? 0))) { this.publish({ error: 'Lookback must be positive and no longer than each selected recording’s configured maximum, such as 10s.' }); return; }
     }
     this.publish({ preview: undefined });
-    const response = await this.run('preview_recording_save', { recording_handles: selected.map(row => row.recording_handle!), ...(before && { before }), ...(this.repeat && { repeated_from_capture_id: this.repeat.captureID }) });
+    const response = await this.run('preview_recording_save', { recording_handles: selected.map(row => row.recording_handle!), ...(before && { before }), ...(reason !== '' && { reason }), ...(this.repeat && { repeated_from_capture_id: this.repeat.captureID }) });
     if (!response || response.status !== 'ok') return;
     const preview = response.data;
     const handles = selected.map(row => row.recording_handle!);
