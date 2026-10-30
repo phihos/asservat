@@ -1,5 +1,38 @@
 # Sustained implementation progress
 
+## Grouped Save through the real runner: two-source local workflow passed (2026-10-30)
+
+`manual-group-real-workflow-sql111-3` on frozen `f10b5754` passed all twelve
+required names (thirteen actual): supervisor exit 0 in 46.979 seconds, Go package
+11.584 seconds. This composes actual `HealthyAuditedOperations`,
+`ContextSubmission.Continue`, SQL execution Read/Prepare/Bind/Record,
+`APIContextRunner`, encrypted producer, connector holder, node queue,
+`CollectRecording`, independent publication and native reading. Both children
+produced 4,592 exact PCAPNG bytes. The test does not substitute successful start
+or stored replies. Process/source/capability/local-start/packet and clock inputs
+remain explicit synthetic observations; regional RPC, installed collectors,
+remote key providers and download-session transport are not qualified here.
+
+The genuine five-second public audit and compatible SQL111 downgrade passed
+before target admission. The real fifteen-second Continue journal and restrictive
+populated downgrade check passed afterwards. Admission measured 322 ms, with
+4,719 ms remaining on the original start deadline; normal audit plus Continue
+measured 856 ms, leaving 3,862 ms after both queues. Original SQL t0, child start,
+processing and retention dates were preserved. Passive public replay changed no
+execution or spend, and one encrypted parent history entry retained fresh-source
+repeat settings. The normal request window does not extend child authority.
+
+Root verified 3,599 canonical and 36,256 tracked hashes, two archived artifacts,
+the restored 31,495-file result baseline and exact owned cleanup, preserving all
+sixteen prior containers. Failed prefixes 1–2 remain archived: the new fixture
+first indexed provisioned pools by duty names, then wired accepted-policy reads
+to a source-writer credential. Both corrections reuse existing appropriate pools;
+no SQL privileges, capacities or deadlines were increased.
+
+Next is a fresh sixteen-source run through the same composed workflow. The
+previous sixteen-source SQL-only result is not that qualification. Collection
+remains disabled and this is not a supported homelab release.
+
 ## Recording Save reasons: local SQL/storage qualification passed (2026-10-30)
 
 [ADR-267](decisions/267-encrypted-recording-save-reasons.md) adds an optional,
