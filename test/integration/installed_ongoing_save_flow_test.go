@@ -182,8 +182,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		var g grant
 		must("request_policy_grant", map[string]any{
 			"policy_name": installedOngoingSaveName, "policy_uid": active.PolicyUID, "idempotency_key": key, "lifetime_seconds": ongoingSaveGrantLifetime,
-			"limits":             map[string]any{"max_executions": 4, "max_collected_bytes": 64 << 20, "max_observed_bytes": 64 << 20},
-			"observation_limits": map[string]any{"max_session_seconds": 3600, "max_observed_bytes": 64 << 20, "max_bytes_per_second": 1 << 20, "max_concurrent_sessions": 1},
+			"limits": map[string]any{"max_executions": 4, "max_collected_bytes": 64 << 20, "max_observed_bytes": 64 << 20},
 		}, &g)
 		if g.ID == "" || g.NotAfter == nil {
 			t.Fatal("ongoing grant request lost finite scope", g)
