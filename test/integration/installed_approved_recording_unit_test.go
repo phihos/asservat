@@ -35,7 +35,7 @@ func TestInstalledApprovedRecordingFixtureShape(t *testing.T) {
 		clusters int
 		fast     bool
 	}{
-		{"approved-recording", 2, true}, {"policy-recording", 2, true}, {"native-paced", 2, true}, {"journey", 2, true}, {"browser", 2, true},
+		{"approved-recording", 2, true}, {"policy-recording", 2, true}, {"ongoing-save", 2, true}, {"native-paced", 2, true}, {"journey", 2, true}, {"browser", 2, true},
 		{"policy", 2, true}, {"alert", 2, true}, {"logresource", 2, true},
 		{"restart", 2, true}, {"upgrade", 2, true}, {"share", 2, true},
 		{"chain", 2, false}, {"clusters", 3, true}, {"", 3, false}, {"unknown", 3, false},
@@ -48,7 +48,7 @@ func TestInstalledApprovedRecordingFixtureShape(t *testing.T) {
 			if got := installedFastFixture(); got != tc.fast {
 				t.Fatalf("fast feature fixture=%v; want %v", got, tc.fast)
 			}
-			wantRecording := tc.focus == "approved-recording" || tc.focus == "native-paced" || tc.focus == "policy-recording"
+			wantRecording := tc.focus == "approved-recording" || tc.focus == "native-paced" || tc.focus == "policy-recording" || tc.focus == "ongoing-save"
 			if got := installedRecordingFocus(); got != wantRecording {
 				t.Fatalf("recording focus parent-return guard=%v; want %v", got, wantRecording)
 			}

@@ -37,6 +37,7 @@ declare -A suites=(
   [continuation-journey]="env ASSERVAT_JOURNEY_FOCUS=journey $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-approved-recording]="env ASSERVAT_JOURNEY_FOCUS=approved-recording $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-policy-recording]="env ASSERVAT_JOURNEY_FOCUS=policy-recording $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  [continuation-ongoing-save]="env ASSERVAT_JOURNEY_FOCUS=ongoing-save $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-native-paced]="env ASSERVAT_JOURNEY_FOCUS=native-paced $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   # The console checks of the first cluster's journey (browser submission,
   # console/MCP preview, case, approved extract and native download agreement),

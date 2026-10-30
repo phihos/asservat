@@ -365,7 +365,7 @@ def qualify_direct_helper_issuer(env, report):
 
 def qualification_cluster_count(default_count, installer_continuation=False):
     """Owned topology: one hub plus one workload cluster for these focuses."""
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording", "native-paced", "policy-recording"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording", "native-paced", "policy-recording", "ongoing-save"):
         return 2
     return default_count
 
@@ -373,7 +373,7 @@ def qualification_cluster_count(default_count, installer_continuation=False):
 def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False, native_traffic_probe=False):
     if native_traffic_probe:
         return "2m"
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "native-paced", "policy-recording"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "native-paced", "policy-recording", "ongoing-save"):
         return "18m"
     if installer_continuation:
         # The installed journey waits for its capture's ten-minute expiry; the
@@ -386,7 +386,7 @@ def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False,
 
 def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False):
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
-    collector_qualification = installer_continuation and focus in ("approved-recording", "native-paced", "policy-recording")
+    collector_qualification = installer_continuation and focus in ("approved-recording", "native-paced", "policy-recording", "ongoing-save")
     native_paced = installer_continuation and focus == "native-paced"
     native_traffic_probe = test_pattern == NATIVE_TRAFFIC_PROBE
     guard = Path("/etc/asservat-disposable-host")
