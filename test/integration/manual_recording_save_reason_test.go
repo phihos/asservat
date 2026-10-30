@@ -154,8 +154,8 @@ func qualifyManualRecordingSaveReason(t *testing.T, ctx context.Context, f *capa
 	}
 	p.Intent.Reason = &value.ProtectedReasonRef{ID: p.ID, CiphertextDigest: sha256.Sum256(opaque)}
 	p.ReasonEnvelope = opaque
-	// A tighter passive review lifetime permits real expiry cleanup before the
-	// mandatory audit, while acquisition keeps its original accepted cutoffs.
+	// A tighter selection lifetime proves accepted work survives selection expiry.
+	// Passive-row cleanup still waits for its separate persisted read deadline.
 	p.SelectionUntil = p.CreatedAt.Add(time.Second)
 	if !captureapp.ValidContextPreview(p) || !bytes.Equal(p.CanonicalScope, scope) || p.ScopeDigest != scopeDigest {
 		t.Fatal("reason changed reviewed collection scope")
@@ -231,7 +231,8 @@ func qualifyManualRecordingSaveReason(t *testing.T, ctx context.Context, f *capa
 	if err != nil || bytes.Contains(draftBytes, []byte("Reason")) || bytes.Contains(draftBytes, []byte(reason)) || bytes.Contains(draftBytes, opaque) {
 		t.Fatal("repeat restored reason or opaque envelope", err)
 	}
-	// Independent record owns the envelope before the expired passive row is deleted.
+	// Admission already copied the envelope and erased the passive preview body.
+	// Expire selection before audit/native start without changing acquisition dates.
 	wait := time.Until(p.SelectionUntil.Add(time.Millisecond))
 	if wait > 0 {
 		timer := time.NewTimer(wait)
@@ -241,17 +242,6 @@ func qualifyManualRecordingSaveReason(t *testing.T, ctx context.Context, f *capa
 			t.Fatal(ctx.Err())
 		case <-timer.C:
 		}
-	}
-	cleanup, err := postgres.NewContextPreviewCleanup(ctx, f.roles["hub-runtime"], a.RootID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = cleanup.DeleteExpiredContextPreviews(ctx); err != nil {
-		t.Fatal("real expired preview deletion", err)
-	}
-	var left int
-	if err = f.admin.QueryRow(ctx, `SELECT count(*) FROM context_preview WHERE root_id=$1 AND id=$2`, a.RootID, p.ID).Scan(&left); err != nil || left != 0 {
-		t.Fatal("expired preview retained", left, err)
 	}
 	pending, err := intents.Journal.ReadCaptureOperation(ctx, accepted.CaptureID)
 	if err != nil || pending.Intent.Lifecycle == nil {
@@ -269,7 +259,7 @@ func qualifyManualRecordingSaveReason(t *testing.T, ctx context.Context, f *capa
 	}
 	auditBegan := time.Now()
 	if _, err = intents.AcknowledgedCaptureIntent(ctx, accepted.CaptureID); err != nil {
-		t.Fatal("joined reason pair after expired preview DELETE", err)
+		t.Fatal("joined reason pair after selection expiry", err)
 	}
 	if err = f.admin.QueryRow(ctx, `SELECT pg_current_wal_insert_lsn()::text`).Scan(&auditWALAfter); err != nil {
 		t.Fatal(err)
@@ -278,7 +268,7 @@ func qualifyManualRecordingSaveReason(t *testing.T, ctx context.Context, f *capa
 		t.Fatal(err)
 	}
 	t.Logf("mandatory reason audit pair actual_ms=%d global_fixture_wal_delta=%d; existing fleet observations may contribute", time.Since(auditBegan).Milliseconds(), wal)
-	t.Run("opaque-pair-native-after-preview-deletion", func(t *testing.T) { qualifySourceSnapshotCompletion(t, ctx, f, policy, snapshot, intents) })
+	t.Run("opaque-pair-native-after-selection-expiry", func(t *testing.T) { qualifySourceSnapshotCompletion(t, ctx, f, policy, snapshot, intents) })
 	snap, err := intents.Journal.ReadCaptureOperation(ctx, accepted.CaptureID)
 	if err != nil || snap.Outcome == nil || snap.Intent.ReasonEnvelope == nil || snap.Outcome.Intent.ReasonEnvelope == nil || snap.IntentReceipt == nil || snap.OutcomeReceipt == nil {
 		t.Fatal("mandatory opaque pair incomplete", err)
@@ -306,6 +296,28 @@ func qualifyManualRecordingSaveReason(t *testing.T, ctx context.Context, f *capa
 	t.Logf("reason joined pair actual operation_row_pg_column_size=%d intent_jsonb_text=%d outcome_jsonb_text=%d full_relation_bytes=%d; original fullrow backing128KiB/WAL256KiB are configuredlimits, not per-row attribution", tuple, intentBytes, outcomeBytes, relation)
 	if intentBytes > 32<<10 || outcomeBytes > 32<<10 || snap.IntentReceipt.Bytes > 64<<10 || snap.OutcomeReceipt.Bytes > 64<<10 {
 		t.Fatal("reason pair exceeded unchanged serialized/object bounds")
+	}
+	// Selection expiry does not expire the persisted review row. Observe its
+	// actual SQL cutoff and wait without aging state or changing cleanup rules.
+	if !t.Run("actual-expired-preview-row-deletion", func(t *testing.T) {
+		var readUntil time.Time
+		if err := f.admin.QueryRow(ctx, `SELECT context_preview_read_until($1,$2)`, a.RootID, p.ID).Scan(&readUntil); err != nil {
+			t.Fatal("actual preview read cutoff", err)
+		}
+		waitReasonFixtureUntil(t, ctx, f, readUntil.Add(time.Millisecond))
+		cleanup, err := postgres.NewContextPreviewCleanup(ctx, f.roles["hub-runtime"], a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = cleanup.DeleteExpiredContextPreviews(ctx); err != nil {
+			t.Fatal("real expired preview deletion", err)
+		}
+		var left int
+		if err = f.admin.QueryRow(ctx, `SELECT count(*) FROM context_preview WHERE root_id=$1 AND id=$2`, a.RootID, p.ID).Scan(&left); err != nil || left != 0 {
+			t.Fatal("expired preview retained", left, err)
+		}
+	}) {
+		return
 	}
 	f.refreshBase(t)
 	replayIdentity := snapshot.Admission.RecordingSave.Initiator.VerifiedIdentity
