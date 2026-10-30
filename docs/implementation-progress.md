@@ -48,7 +48,10 @@ boundaries (67 packages / 416 edges) and OpenAPI checks pass. Console checks,
 build and both existing HTTPS browser tests pass (25 console journeys and 24
 accessibility scans). Those synthetic browser journeys exercise existing flows;
 they do not qualify a grouped installed backend. The full final Go gate remains
-pending for the grouped candidate.
+pending for the grouped candidate. Its first attempt stopped before Go tests
+on a stale embedded policy copy of `capture-assessment.schema.json`. Regeneration
+adds only the reviewed canonical `recording_handle` property; the bundle is now
+byte-identical. The failed gate exited 2 with source/results unchanged.
 
 The dedicated sixteen-source central fixture is implemented but unqualified.
 Its first run (`manual-group16-central-sql109-1`, frozen `e3fd6e61`) exited 1
