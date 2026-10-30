@@ -71,7 +71,18 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 	if s == nil || ctx == nil || ctx.Err() != nil || !sourceCheckCurrent(in, time.Now()) || in.Authority.InstallationID != s.installation {
 		return out, value.ErrInvalid
 	}
-	until := identity.Earlier(in.ValidUntil, identity.Earlier(in.Target.FreshUntil, identity.Earlier(in.Node.FreshUntil, identity.Earlier(in.Recovery.FreshUntil, identity.Earlier(in.Retention.ValidUntil, in.Settings.FreshUntil)))))
+	// bound names the earliest deadline for failure counters only.
+	entered, until, bound := time.Now(), in.ValidUntil, "cohort"
+	narrow := func(name string, t time.Time) {
+		if t.Before(until) {
+			until, bound = t, name
+		}
+	}
+	narrow("target", in.Target.FreshUntil)
+	narrow("node", in.Node.FreshUntil)
+	narrow("recovery", in.Recovery.FreshUntil)
+	narrow("retention", in.Retention.ValidUntil)
+	narrow("settings", in.Settings.FreshUntil)
 	call, end := context.WithDeadline(ctx, until)
 	defer end()
 	var cutoff *time.Timer
@@ -133,7 +144,8 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		if !eligible.Eligible {
 			return value.ErrDenied
 		}
-		until = identity.Earlier(until, identity.Earlier(accepted.FreshUntil, eligible.ValidUntil))
+		narrow("accepted", accepted.FreshUntil)
+		narrow("eligibility", eligible.ValidUntil)
 		var originalAudience []artifact.AudienceAssignment
 		var originalAudienceDigest artifact.Digest
 		audienceReason := ""
@@ -146,7 +158,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 				if digestErr != nil {
 					audienceReason = "AudienceUnavailable"
 				} else {
-					until = identity.Earlier(until, audienceUntil)
+					narrow("audience", audienceUntil)
 				}
 			}
 		}
@@ -233,9 +245,10 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			return value.ErrCapacity
 		}
 
-		until = identity.Earlier(until, identity.Earlier(binding.FreshUntil.Time, resource.FreshUntil.Time))
+		narrow("binding", binding.FreshUntil.Time)
+		narrow("resources", resource.FreshUntil.Time)
 		coverageUntil := identity.Earlier(pool.ValidUntil.Time, identity.Earlier(allocation.ValidUntil.Time, identity.Earlier(controlPool.ValidUntil.Time, account.ValidUntil.Time)))
-		until = identity.Earlier(until, coverageUntil)
+		narrow("coverage", coverageUntil)
 		// Commit uses the same narrowed original authority as the final
 		// checks. No slow COMMIT can outlive a shorter accepted observation.
 		cutoffDone = make(chan struct{})
@@ -403,7 +416,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 	})
 	if err != nil {
 		if call.Err() != nil {
-			step += "-late"
+			step += "-late-" + bound + "-" + sourceBudgetBucket(until.Sub(entered))
 		}
 		return app.PolicySourceAdmission{}, app.StagedSourceError("admit-"+step, captureError(err))
 	}
@@ -524,4 +537,17 @@ func (s *PolicySources) SweepSources(ctx context.Context) ([]app.PolicySourceSta
 		return err
 	})
 	return out, captureError(err)
+}
+
+// sourceBudgetBucket is a bounded label for the admission time budget.
+func sourceBudgetBucket(d time.Duration) string {
+	switch {
+	case d <= 0:
+		return "expired"
+	case d < time.Second:
+		return "lt1s"
+	case d < 3*time.Second:
+		return "lt3s"
+	}
+	return "ge3s"
 }
