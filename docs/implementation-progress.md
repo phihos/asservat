@@ -47,11 +47,23 @@ SQL (68 files), specification (13,363 assertions), architecture, Go dependency
 boundaries (67 packages / 416 edges) and OpenAPI checks pass. Console checks,
 build and both existing HTTPS browser tests pass (25 console journeys and 24
 accessibility scans). Those synthetic browser journeys exercise existing flows;
-they do not qualify a grouped installed backend. The full final Go gate remains
-pending for the grouped candidate. Its first attempt stopped before Go tests
-on a stale embedded policy copy of `capture-assessment.schema.json`. Regeneration
-adds only the reviewed canonical `recording_handle` property; the bundle is now
-byte-identical. The failed gate exited 2 with source/results unchanged.
+they do not qualify a grouped installed backend. The full repository gate on frozen `2ada9ecf` exited 0 in 2,751.387 seconds:
+Go/race packages, 670 exact Kubernetes selections in 17 groups, SQL generation,
+Go architecture, specifications and architecture validation. Of those Kubernetes
+selections, 669 passed and `TestInitialRuntimeObjectRoundTripWithRealKubernetes`
+skipped because it requires the separate owned native harness; this is not passed
+native evidence. Root independently verified all 36,221 tracked hashes, the
+31,495-file prior-result baseline and a clean tree. Evidence is in local
+`group-final-go-gates-2`, including the root terminal receipt. The first full gate
+attempt exited 2 before Go tests on a stale embedded policy assessment schema;
+regeneration copied only the reviewed canonical `recording_handle` property.
+
+Public grouped submission remains a separate gap. Production-shaped review found
+optional history could consume the original request window before child starts,
+intent acknowledgements and starts were serialized, and execution reconstruction
+dropped the group binding. Those fixes and optional encrypted reason handling
+are being implemented in separate worktrees. Their component checks are not yet
+merged or provider-qualified here. Collection remains disabled.
 
 The dedicated sixteen-source central fixture is implemented but unqualified.
 Its first run (`manual-group16-central-sql109-1`, frozen `e3fd6e61`) exited 1
