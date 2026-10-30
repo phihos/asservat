@@ -65,8 +65,8 @@ func qualifyManualRecordingProjectionLock(t *testing.T, ctx context.Context, f *
 	}
 	for n := range probe.Children {
 		child := &probe.Children[n]
-		child.Eligibility.ValidUntil = until
-		child.Eligibility.VerifiedIdentity.ValidUntil = identity.Earlier(child.Eligibility.VerifiedIdentity.ValidUntil, until)
+		// Expire only the actual human initiator. Keep the executor's original
+		// coverage interval so the later cached-projection decision is reached.
 		child.RecordingSave.Initiator.ValidUntil = until
 		child.RecordingSave.Initiator.VerifiedIdentity.ValidUntil = identity.Earlier(child.RecordingSave.Initiator.VerifiedIdentity.ValidUntil, until)
 	}
@@ -165,7 +165,7 @@ func qualifyManualRecordingProjectionLock(t *testing.T, ctx context.Context, f *
 	mutation := <-mutationDone
 	mutationJoined = true
 	if !errors.Is(admissionErr, value.ErrDenied) {
-		t.Fatal("expired original group authority crossed blocking pool lock", admissionErr)
+		t.Fatal("expired original human initiator crossed blocking pool lock", admissionErr)
 	}
 	if mutation.err != nil || mutation.returnedAt.Before(releasedAt) {
 		t.Fatal("actual permission refresh escaped root lock or failed after rollback", mutation.err)
@@ -180,5 +180,5 @@ func qualifyManualRecordingProjectionLock(t *testing.T, ctx context.Context, f *
 	if err = f.admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM recording_save_group WHERE id=$1)+(SELECT count(*) FROM context_capture WHERE group_id=$1)`, group.Preview.CaptureID).Scan(&rows); err != nil || rows != 0 {
 		t.Fatal("refused cached group retained parent/child rows", rows, err)
 	}
-	t.Logf("actual_projection_root_lock admission_pid=%d blocker_pid=%d original_until=%s release_dbtime=%s permission_writer_after_release=true parent_children=0 owned_spend_delta=0", admissionPID, blockerPID, until.Format(time.RFC3339Nano), releasedDBTime.Format(time.RFC3339Nano))
+	t.Logf("actual_projection_root_lock admission_pid=%d blocker_pid=%d original_initiator_until=%s release_dbtime=%s permission_writer_after_release=true parent_children=0 owned_spend_delta=0", admissionPID, blockerPID, until.Format(time.RFC3339Nano), releasedDBTime.Format(time.RFC3339Nano))
 }
