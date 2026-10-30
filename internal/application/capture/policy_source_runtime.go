@@ -63,8 +63,31 @@ type PolicySourceRuntime struct {
 	Recovery   fleetapp.RecoveryReader
 	Retention  ContextRetentionResolver
 	Settings   ApprovalSettings
-	Now        func() time.Time
-	NewID      func() string
+	// Storage and Refresh keep the workload's 30-second storage binding fresh
+	// through the existing ADR-200 demand lane; nil leaves refresh to discovery.
+	Storage ContextStorageReader
+	Refresh ContextCapacityRefresh
+	Now     func() time.Time
+	NewID   func() string
+}
+
+// sourceStorageMargin asks for a binding refresh before the next 15-second
+// maintenance tick (plus its five-second cohort) could find it expired.
+const sourceStorageMargin = 20 * time.Second
+
+// demandStorage records at most one refresh demand per tick when the binding
+// is missing or about to expire. It waits for nothing and grants nothing;
+// admission still checks the refreshed binding itself.
+func (s *PolicySourceRuntime) demandStorage(ctx context.Context, o targets.RestartObservation) {
+	if s.Storage == nil || s.Refresh == nil || len(o.Pods) == 0 {
+		return
+	}
+	r := targets.Request{ClusterID: o.ClusterID, Namespace: o.Namespace, Workload: o.Workload, PodName: o.Pods[0].Name, PodUID: o.Pods[0].UID}
+	v, err := s.Storage.ContextStorage(ctx, targets.PodResolution{Request: r}.Target())
+	if err == nil && !v.Binding.FreshUntil.Before(s.Now().Add(sourceStorageMargin)) {
+		return
+	}
+	_ = s.Refresh.DemandCapacityRefresh(ctx, r)
 }
 
 func (s *PolicySourceRuntime) configured() bool {
@@ -126,6 +149,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 	cohort, finish := context.WithDeadline(ctx, cohortUntil)
 	defer finish()
 	ctx = cohort
+	s.demandStorage(ctx, o)
 	rows, err := s.Ledger.ListSources(ctx, a.PolicyUID)
 	if err != nil {
 		return staged("list", err)

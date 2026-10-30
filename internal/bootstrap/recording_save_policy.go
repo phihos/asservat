@@ -57,5 +57,5 @@ func (p *publicContext) packetSourceRuntime(now func() time.Time, newID func() s
 	if !ok {
 		return nil
 	}
-	return &captureapp.PolicySourceRuntime{Ledger: p.policySources, Dispatcher: p.sourceDispatch, Observer: observer, Recovery: p.investigation.Recovery, Retention: p.investigation.Retention, Settings: p.investigation.Approvals, Now: now, NewID: newID}
+	return &captureapp.PolicySourceRuntime{Ledger: p.policySources, Dispatcher: p.sourceDispatch, Observer: observer, Recovery: p.investigation.Recovery, Retention: p.investigation.Retention, Settings: p.investigation.Approvals, Storage: p.investigation.Storage, Refresh: p.investigation.Refresh, Now: now, NewID: newID}
 }
