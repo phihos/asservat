@@ -263,14 +263,33 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 		t.Fatal("publication skipped independent headers-only privacy check")
 	}
 	unwraps.afterPublication(ctx, accepted.CaptureID)
-	reader, err := objectstore.NewContextNativeReader(bound, f.keys)
+	// PCAPNG uses the existing bounded framed native source. ReadContext is
+	// deliberately the historical pod-status-only small-buffer reader.
+	source, err := verifier.OpenNative(ctx, published.Expectation, published.Copies, time.Now().Add(4*time.Second))
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("snapshot native open", err)
 	}
-	got, err := reader.ReadContext(ctx, published.Expectation, published.Copies, time.Now().Add(4*time.Second))
-	defer clear(got)
-	if err != nil || !bytes.Equal(got, native) || evidence.ContextExpectationDigest(published.Expectation) != finalDigest || published.Expectation.Lifecycle.WindowCoverage != "partial" {
-		t.Fatal("snapshot native bytes/final coverage", err)
+	defer source.Close()
+	metadata := source.Metadata()
+	if metadata.Size < 1 || metadata.Size > e.Snapshot.MaxBytes || metadata.Size > published.Expectation.Type().DownloadLimit() || metadata.Filename != published.Expectation.Type().Filename(published.Expectation.Registration.Location.ArtifactID) || metadata.Format != artifact.PCAPNGFormat || metadata.SHA256 != artifact.Digest(sha256.Sum256(native)) || metadata.Coverage != published.Expectation.Type().CoverageFor(published.Expectation.Lifecycle) || !metadata.ReadUntil.Equal(published.Expectation.Registration.ExpiresAt) || !metadata.DeleteBy.Equal(published.Expectation.Registration.DeleteBy) {
+		t.Fatal("snapshot native metadata", metadata)
+	}
+	got := make([]byte, 0, int(metadata.Size))
+	defer func() { clear(got) }()
+	finalVerified := false
+	for offset := int64(0); offset < metadata.Size; {
+		chunk, verified, readErr := source.ReadNext(ctx, offset, min(artifact.DeliveryBytes, metadata.Size-offset))
+		if readErr != nil || len(chunk) == 0 {
+			clear(chunk)
+			t.Fatal("snapshot native read", readErr)
+		}
+		got = append(got, chunk...)
+		offset += int64(len(chunk))
+		clear(chunk)
+		finalVerified = verified
+	}
+	if !finalVerified || artifact.Digest(sha256.Sum256(got)) != metadata.SHA256 || !bytes.Equal(got, native) || evidence.ContextExpectationDigest(published.Expectation) != finalDigest || initialDigest == finalDigest || published.Expectation.Lifecycle.WindowCoverage != "partial" {
+		t.Fatal("snapshot native bytes/final coverage")
 	}
 	var observedCredit int64
 	if err = f.admin.QueryRow(ctx, `SELECT observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2`, admission.RootID, snapshot.Source.Binding.AcceptanceID).Scan(&observedCredit); err != nil || observedCredit != snapshot.Source.Credit {
