@@ -268,21 +268,21 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 		return recording{}, false
 	}
-	// A bounded retry absorbs one transient answer; five seconds keeps the
-	// retained marker well inside the requested window.
+	// At most three selections (each counts toward the caller's open
+	// selections) within about three seconds, inside the 15 s window.
 	selectNow := func(what string) recording {
 		t.Helper()
-		call, stop := context.WithTimeout(ctx, 5*time.Second)
-		defer stop()
-		for {
-			if r, ok := selection(call); ok {
+		for range 3 {
+			if r, ok := selection(ctx); ok {
 				return r
 			}
-			if installedJourneyPause(call, 500*time.Millisecond) != nil {
-				diagnose()
-				t.Fatal(what, "selection unavailable:", lastSelection)
+			if installedJourneyPause(ctx, time.Second) != nil {
+				break
 			}
 		}
+		diagnose()
+		t.Fatal(what, "selection unavailable:", lastSelection)
+		return recording{}
 	}
 	type preview struct {
 		ID string `json:"preview_id"`
@@ -334,9 +334,11 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	if src.HardUntil.Sub(src.StartedAt) > ongoingSaveLifetime*time.Second {
 		t.Fatal("source hard bound outlives its accepted authority", src.StartedAt, src.HardUntil)
 	}
-	wait("Save-eligible source past its first leaf", 2*time.Minute, func(call context.Context) bool {
-		_, ok := selection(call)
-		return ok && time.Now().After(src.Leaf.Add(time.Second))
+	// Wait on SQL facts: every list_recordings opens a selection that counts
+	// toward the caller's ten open previews/selections.
+	wait("source still live past its first leaf", 2*time.Minute, func(call context.Context) bool {
+		s, _, ok := current(call)
+		return ok && s.ID == src.ID && time.Now().After(src.Leaf.Add(time.Second))
 	})
 	outsideSent := marker(ongoingSaveOutsidePort)
 	if err = installedJourneyPause(ctx, ongoingSaveBefore+7*time.Second); err != nil {
