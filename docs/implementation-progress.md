@@ -1,58 +1,68 @@
 # Sustained implementation progress
 
-## Grouped existing-recording Save: local candidate (2026-10-30)
+## Grouped existing-recording Save: SQL/storage components qualified (2026-10-30)
 
 [ADR-266](decisions/266-grouped-recording-save-accounting.md) records the maintainer's
-counter decision: one policy execution per Save, with applicable grant starts
-charged per selected source. The candidate uses one protected parent preview,
-one SQL109 transaction and acceptance time, and genuine per-source child
-captures and artifacts. Parent progress, cancellation, history and fresh repeat
-retain those child identities. Source observation budgets are unchanged.
+counter decision: one policy execution per Save, applicable grant starts per
+selected source. One protected parent preview and SQL109 transaction fix one
+acceptance time, with genuine per-source child captures/artifacts. Progress,
+cancellation and history retain those identities; repeat selects fresh sources.
+Source observation spend and existing collection gates are unchanged.
 
-The thirteen affected Go packages pass race tests, including PostgreSQL adapters,
-application capture/planning/authorization, domain authorization/capture/audit
-and the regional transport, presentation, browser/MCP boundaries, operation audit
-and bootstrap. Generated SQL (68 files), specification (13,362
-assertions), architecture, Go dependency boundaries and OpenAPI checks pass.
-These checks do not establish real SQL109 migration or transaction behavior.
-Grouped ordinary, grant-backed and mixed-cancellation provider fixtures are
-implemented. The first ordinary run (`manual-group-save-sql109-1`) exited 1
-before group admission: the new parent relation was absent from the exact
-first-install inventory. A local failing regression reproduces the omission;
-the inventory now includes that permanent relation without weakening its exact
-comparison. The failed run and PostgreSQL log are archived; root verified
-unchanged source hashes, restored prior results and exact owned cleanup, with
-all 16 pre-existing containers preserved. Grouped runtime results remain pending.
-A second fresh run (`manual-group-save-sql109-2`) passed initial activation and
-empty migration replay, then SQL refused workload enrollment: the fixture's
-five-record workload exceeded its prepaid three-record root account. This is a
-fixture funding mismatch, not successful group admission. Its failed log and
-PostgreSQL diagnostic are preserved with the same independent hash, result and
-cleanup verification. A meaningful local regression now checks the compiled root, capture audit
-slots and processing backing against every source, parent and child record.
-The fixture declares the complete backing before initialization; a new exact
-frozen run remains pending.
-The third run (`manual-group-save-sql109-3`) reached genuine atomic admission,
-late-child rollback, shared-t0/replay accounting, encrypted parent history and
-populated downgrade refusal. Admission measured 253 ms with 4,472 ms remaining
-on the first original proof. Both native-child tests failed after their byte
-checks because the reused single-source assertion compared the shared policy
-observation total with one source's credit. The helper now compares the total
-before and after completion, retaining the original single-source expectation;
-the group admission test independently checks unchanged observation spend.
-The run remains failed, with artifacts and terminal cleanup verified; it is not
-a qualified grouped result. Sixteen-member serialization and query-bound
-checks are component evidence; sixteen-member SQL cost remains unqualified.
+Three separate fresh PostgreSQL/S3/OpenBao fixtures passed on frozen `93a62630`:
 
-The first coherent browser run failed because one assertion still expected
-“executions” after grant counters were relabeled “action starts”. Its actual
-failure and artifacts remain in the local `group-final-browser-1` archive; the
-prior result baseline was restored exactly. After correcting the assertion,
-`group-final-browser-2` passed console checks, build and both existing HTTPS
-browser tests (25 console journeys, 24 accessibility scans). Its command exited
-0 in 75.083 seconds and restored the prior result baseline. These existing
-synthetic journeys do not qualify the new grouped SQL backend. No runtime collection gate is enabled, and this candidate
-is neither installed qualification nor a supported homelab release.
+| Fixture prefix | Required / actual PASS names | Supervisor / Go package seconds | Native output |
+| --- | --- | --- | --- |
+| `manual-group-save-sql109-4` | 11 / 12 | 46.937 / 11.181 | Both children: 4,592 exact PCAPNG bytes each |
+| `manual-group-grant-sql109-1` | 13 / 14 | 21.603 / 13.355 | Both children: 4,592 bytes each |
+| `manual-group-cancel-sql109-1` | 10 / 11 | 18.340 / 10.164 | Stored first child: 4,592 bytes; second cancelled before execution |
+
+All supervisor and fixture exits were 0. Root independently verified each
+run's 3,568 canonical and 36,221 tracked hashes, two archived artifacts, restored
+31,495-file result baseline and exact owned container/network/scratch cleanup.
+All 16 pre-existing containers were preserved. Evidence is archived under
+`/home/phil/.cache/asservat-build/codex-bf86-resume/` with the prefixes above.
+
+Coverage includes refusal at the last child with complete transaction rollback,
+one shared t0, replay without another debit, separate encrypted publication/native
+verification, one encrypted parent history entry and populated downgrade refusal.
+The grant case has a reviewed policy limit of one Save and grant limit of two
+starts: admission spends one policy execution, two grant starts and 16 MiB bounded
+output, without observation refill. Mixed cancellation preserves the stored
+sibling, cancels only the unstarted child, reports Partial and changes neither
+source rows nor spend. It does not establish joined cancellation of two already
+running children. Ordinary/grant/cancellation admission measured 254/262/255 ms,
+with 4,490/4,459/4,457 ms remaining on the first original proof. These local
+fixture measurements are not installed latency or aggregate overhead guarantees.
+
+Initial identity, target, process, packet and clock facts, plus regional history
+routing, remain synthetic. Real SQL/storage/crypto/native-reader composition is
+qualified; installed collectors, remote key-opening/download-session transport,
+syscall sources, optional reasons and sixteen-source SQL cost remain unqualified.
+Sixteen-member preview/response serialization and query-bound checks are local
+component evidence only. The supported homelab release remains unfinished.
+
+The thirteen affected Go packages pass race tests; whole-repository vet, generated
+SQL (68 files), specification (13,363 assertions), architecture, Go dependency
+boundaries (67 packages / 416 edges) and OpenAPI checks pass. Console checks,
+build and both existing HTTPS browser tests pass (25 console journeys and 24
+accessibility scans). Those synthetic browser journeys exercise existing flows;
+they do not qualify a grouped installed backend. The full final Go gate remains
+pending for the grouped candidate.
+
+Failures are retained rather than counted as passes. Ordinary prefix 1 exposed
+the missing group table in the exact first-install inventory; a failing local
+regression now covers the corrected inventory. Prefix 2 exposed fixture workload
+funding of five records against a prepaid root of three; pre-initialization
+root/capture/processing backing now covers every source, parent and child, with
+an actual compiled-backing RED→GREEN regression for 2 and 16 sources. Prefix 3
+passed admission/history but failed a reused single-source observation assertion
+after native byte checks; completion now compares the shared policy total before
+and after, retaining the original singleton credit assertion and independent
+group-admission counter checks. All three failed runs have verified immutable
+source, archived logs, restored results and owned cleanup. The first coherent
+browser run likewise failed one stale “executions” selector; the corrected
+`group-final-browser-2` run exited 0 in 75.083 seconds and restored prior results.
 
 ## Existing-source Save: automatic SQL/storage component qualified (2026-10-30)
 

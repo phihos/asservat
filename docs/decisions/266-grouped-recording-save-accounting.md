@@ -1,6 +1,7 @@
 # Grouped existing-recording Save accounting
 
-Status: accepted maintainer decision (2026-10-30); grouped implementation in progress.
+Status: accepted maintainer decision (2026-10-30); two-source packet SQL/storage
+components qualified; installed and sixteen-source workflow qualification pending.
 
 A Save may select 1–16 existing sources under [REQ-SAV-002/003](../../specs/recording-saves.md).
 The maintainer explicitly selected one policy-authority `maxExecutions` debit per

@@ -1,8 +1,9 @@
 # Grouped manual Save: implementation proposal
 
 This proposal began at `850684b3`. The grouped implementation now has local
-application, SQL-adapter, transport and console component checks; real grouped
-PostgreSQL/S3/OpenBao and installed workflow qualification remain pending. The existing single-source Save, cancellation and grant-backed
+application, transport and console component checks, plus qualified two-source
+PostgreSQL/S3/OpenBao ordinary, grant-backed and mixed-cancellation cases.
+Installed workflow and sixteen-source SQL qualification remain pending. The existing single-source Save, cancellation and grant-backed
 SQL/storage component results are recorded in [implementation progress](../implementation-progress.md).
 Installed collector, syscall, optional reason and full end-to-end qualification
 remain separate unfinished work.
