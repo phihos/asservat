@@ -36,18 +36,22 @@ import (
 // administrator, target, node report and packet observations are synthetic;
 // this neither starts a collector nor establishes installed/native readiness.
 func TestPolicySourceSnapshotWithRealServices(t *testing.T) {
-	qualifySourceSnapshotRealServices(t, false, false)
+	qualifySourceSnapshotRealServices(t, false, false, false)
 }
 
 func TestManualRecordingSaveWithRealServices(t *testing.T) {
-	qualifySourceSnapshotRealServices(t, true, false)
+	qualifySourceSnapshotRealServices(t, true, false, false)
 }
 
 func TestManualRecordingSaveCancellationWithRealServices(t *testing.T) {
-	qualifySourceSnapshotRealServices(t, true, true)
+	qualifySourceSnapshotRealServices(t, true, true, false)
 }
 
-func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation bool) {
+func TestManualRecordingSaveWithPolicyGrantRealServices(t *testing.T) {
+	qualifySourceSnapshotRealServices(t, true, false, true)
+}
+
+func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requireApproval bool) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		t.Run("empty-provenance-down-up", func(t *testing.T) {
 			provider, closeProvider := source107MigrationProvider(t, admin)
@@ -85,7 +89,7 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation bool) 
 			t.Fatal(err)
 		}
 		seed, intents, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
-		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
+		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, OrdinaryGrant: requireApproval, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
 			source107AddReader(t, ctx, f, "original-source-readers")
 			accepted.Scenario.batch = policyRecorderCloneBatch(f.batch)
@@ -123,7 +127,7 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation bool) 
 				if err != nil {
 					t.Fatal(err)
 				}
-				policy := identity.Policy{Revision: identity.Revision{UID: "synthetic-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: accepted.Authority.Creator.Issuer, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []identity.Client{{ID: accepted.Authority.Creator.ClientID, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"maintainers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
+				policy := identity.Policy{Revision: identity.Revision{UID: "synthetic-settings", Generation: 1, Digest: [32]byte{1}}, Issuer: accepted.Authority.Creator.Issuer, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), Clients: []identity.Client{{ID: accepted.Authority.Creator.ClientID, Kind: identity.Human, ClassQualified: true}}, RequireRecordingApproval: requireApproval, EligibleGroups: []string{"maintainers"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
 				node := targets.PacketSourceObservation{PodUID: target.Pin.UID, NodeUID: custodyID(), BootID: custodyID(), CollectorPodUID: custodyID(), CollectorEpoch: custodyID(), ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}
 				if old.Permit.Binding.SourceID != "" {
 					node.NodeUID = old.Permit.Binding.NodeUID
@@ -133,12 +137,28 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation bool) 
 				}
 				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Recovery: recovery, Retention: resolution, Settings: policy, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
 			}
+			var originalGrant manualPolicyGrantSpend
+			if requireApproval {
+				t.Run("ordinary-grant-before-source", func(t *testing.T) {
+					originalGrant = readManualPolicyGrantSpend(t, ctx, f, accepted.GrantID)
+					if originalGrant.Executions != 0 || originalGrant.Bytes != 0 || originalGrant.Observed != 0 || !originalGrant.Ordinary || originalGrant.AttachmentGrant != accepted.GrantID {
+						t.Fatal("ordinary approved grant was not attached before arm", originalGrant)
+					}
+				})
+			}
 			initial := fresh(t)
 			initial.Initial = true
 			initial.InitialCredit = 1 << 20
 			old, err = ledger.AdmitSource(ctx, initial)
 			if err != nil {
 				t.Fatal("real107 original source", err)
+			}
+			if requireApproval {
+				t.Run("source-does-not-spend-grant-observation", func(t *testing.T) {
+					if got := readManualPolicyGrantSpend(t, ctx, f, accepted.GrantID); got != originalGrant {
+						t.Fatal("ordinary source arm changed grant pools or attachment", got, originalGrant)
+					}
+				})
 			}
 			t.Run("full-original-provenance", func(t *testing.T) {
 				rows, err := ledger.ListSources(ctx, accepted.Authority.PolicyUID)

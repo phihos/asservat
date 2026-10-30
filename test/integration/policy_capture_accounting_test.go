@@ -22,6 +22,19 @@ import (
 // representation are synthetic. It does not supply public review authority.
 func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte, key string, recorder ...planvalue.PolicyRecorderConfiguration) string {
 	t.Helper()
+	return attachPolicyAccountingGrantMode(t, ctx, admin, poolFor, s, a, scope, key, true, recorder...)
+}
+
+// Ordinary require-all approval covers saves, without a raw observation pool.
+// Request, independent SQL decision and attachment remain component fixtures
+// below the public audited grant workflow, as in the legacy wrapper above.
+func attachOrdinaryPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte, key string, recorder planvalue.PolicyRecorderConfiguration) string {
+	t.Helper()
+	return attachPolicyAccountingGrantMode(t, ctx, admin, poolFor, s, a, scope, key, false, recorder)
+}
+
+func attachPolicyAccountingGrantMode(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte, key string, observation bool, recorder ...planvalue.PolicyRecorderConfiguration) string {
+	t.Helper()
 	// Role labels may repeat, but reviewed operations for distinct policies must
 	// use distinct original request keys under the same root and human actor.
 	requestKey := key + ":" + a.PolicyUID
@@ -73,7 +86,7 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 		g.Policy.Limits.MaxBytes = 4 * artifact.RecordingNativeLimit
 		// Only the explicit SQL observation component case provisions this
 		// synthetic reviewed pool; ordinary recorder fixtures remain unchanged.
-		if a.Limits.MaxObservedBytes > 0 {
+		if observation && a.Limits.MaxObservedBytes > 0 {
 			timeout, err := time.ParseDuration(recorder[0].Action.Timeout)
 			if err != nil {
 				t.Fatal(err)
@@ -101,6 +114,9 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 	g, _, err = store.DecideGrant(ctx, app.GrantDecisionInput{GrantID: g.ID, Approver: identity.Principal{Issuer: a.Creator.Issuer, Subject: "independent-component-reviewer", ClientID: "review-console", Kind: identity.Human}, Approve: true, Reason: "synthetic SQL review", ACR: "fixture-step-up", AuthTime: now, IdempotencyKey: requestKey + "-approval"}, recovery)
 	if err != nil {
 		t.Fatal("independent component decision", err)
+	}
+	if !observation && (g.Policy == nil || g.Policy.Observation != nil || g.Policy.Authority.ScopeDigest != a.ScopeDigest || g.Policy.Authority.Limits != a.Limits) {
+		t.Fatal("ordinary grant changed actual authority or acquired raw observation credit")
 	}
 	actor := identity.Identity{Principal: a.Creator, Scopes: []string{"evidence:read", "evidence:capture"}, Groups: []string{"maintainers"}, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
 	if _, _, err = policies.AttachPolicyGrant(ctx, app.PolicyGrantAttachmentInput{ID: custodyID(), PolicyUID: a.PolicyUID, GrantID: g.ID, IdempotencyKey: requestKey + "-attachment", Actor: actor, Recovery: recovery}); err != nil {

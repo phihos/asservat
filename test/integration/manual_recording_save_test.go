@@ -44,6 +44,13 @@ func readManualSaveCounters(t *testing.T, ctx context.Context, f *capacitySQLFix
 func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, source captureapp.PolicySourceAdmission, fresh captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication) {
 	t.Helper()
 	before := readManualSaveCounters(t, ctx, f, policy)
+	var beforeGrant manualPolicyGrantSpend
+	if policy.GrantID != "" {
+		beforeGrant = readManualPolicyGrantSpend(t, ctx, f, policy.GrantID)
+		if beforeGrant.Executions != 0 || beforeGrant.Bytes != 0 || beforeGrant.Observed != 0 || !beforeGrant.Ordinary {
+			t.Fatal("source replay/renewal changed ordinary grant pools before manual save", beforeGrant)
+		}
+	}
 	if !before.SharingEligible || before.Occurrences != 0 {
 		t.Fatal("fixture needs genuinely accepted live recurring sharing and no detector occurrence", before)
 	}
@@ -95,6 +102,18 @@ func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQ
 	}
 	if after.Executions != before.Executions+1 || after.Collected != before.Collected+reserved || after.Observed != before.Observed || after.Reservations != before.Reservations+1 || after.Occurrences != 0 || after.Shares != before.Shares {
 		t.Fatal("manual admission/replay did not use existing shared pools exactly once", before, after, reserved)
+	}
+	var spentGrant manualPolicyGrantSpend
+	if policy.GrantID != "" {
+		t.Run("manual-policy-grant-spend-and-replay", func(t *testing.T) {
+			spentGrant = readManualPolicyGrantSpend(t, ctx, f, policy.GrantID)
+			want := beforeGrant
+			want.Executions++
+			want.Bytes += reserved
+			if grant != policy.GrantID || spentGrant != want {
+				t.Fatal("manual admission/replay changed original grant or charged wrong pools", grant, spentGrant, want)
+			}
+		})
 	}
 	t.Run("manual-history-and-no-inherited-sharing", func(t *testing.T) {
 		var origin string
@@ -160,6 +179,11 @@ func qualifyManualRecordingSave(t *testing.T, ctx context.Context, f *capacitySQ
 	if final := readManualSaveCounters(t, ctx, f, policy); final != after {
 		t.Fatal("publication changed policy/shared spend", after, final)
 	}
+	if policy.GrantID != "" {
+		if final := readManualPolicyGrantSpend(t, ctx, f, policy.GrantID); final != spentGrant {
+			t.Fatal("completion/publication/cancellation changed original grant spend", spentGrant, final)
+		}
+	}
 	t.Logf("manual existing source: one policy execution, reserved output=%d; no detector occurrence, no observation refill or inherited sharing; policy grant present=%t; identity/target/packet/clock facts synthetic", reserved, grant != "")
 }
 
@@ -193,4 +217,31 @@ func TestManualRecordingSaveFixtureFundsActualOutputCeiling(t *testing.T) {
 	if f.template.Policies[0].Budget.Protected.Bytes != 3*unit || f.template.Policies[0].Budget.Hard.Bytes != 3*unit || f.template.Policies[0].Budget.Context.Bytes != 3*unit {
 		t.Fatal("fixture changed record count or underfunded output")
 	}
+}
+
+// Real SQL accounting and the real current policy attachment, not a source-row
+// grant field or a fabricated occurrence. Review authority is fixture-supplied.
+type manualPolicyGrantSpend struct {
+	Executions, Bytes, Observed, Revision int64
+	PolicyNotAfter                        time.Time
+	Ordinary                              bool
+	AttachmentGrant                       string
+}
+
+func readManualPolicyGrantSpend(t *testing.T, ctx context.Context, f *capacitySQLFixture, grantID string) manualPolicyGrantSpend {
+	t.Helper()
+	var out manualPolicyGrantSpend
+	if grantID == "" {
+		t.Fatal("expected a genuine attached grant")
+	}
+	err := f.admin.QueryRow(ctx, `SELECT g.policy_executions_spent,g.policy_bytes_spent,g.policy_observed_bytes_spent,g.revision,g.policy_not_after,
+ COALESCE(g.policy_scope->'Observation'='null'::jsonb,true) AND g.policy_max_observed_bytes=0,
+ a.grant_id::text FROM access_grant g JOIN policy_source p ON p.root_id=g.root_id AND p.policy_uid=g.policy_uid
+ JOIN policy_grant_attachment a ON a.root_id=p.root_id AND a.id=p.grant_attachment_id AND a.acceptance_id=p.active_id
+ WHERE g.id=$1 AND g.decision='approved' AND g.revoked_at IS NULL AND a.grant_id=g.id`, grantID).Scan(&out.Executions, &out.Bytes, &out.Observed, &out.Revision, &out.PolicyNotAfter, &out.Ordinary, &out.AttachmentGrant)
+	if err != nil {
+		t.Fatal("actual policy grant counters/current attachment", err)
+	}
+	out.PolicyNotAfter = out.PolicyNotAfter.UTC()
+	return out
 }

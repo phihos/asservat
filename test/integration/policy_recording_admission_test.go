@@ -38,6 +38,7 @@ type policyRecorderProtectedCase struct {
 	Ongoing             bool
 	RecordingSaves      bool
 	RecurringSharing    bool
+	OrdinaryGrant       bool
 	Retention           string
 	SourceAccepted      func(*testing.T, policySourceAcceptedFixture)
 	Hub                 *pgxpool.Pool
@@ -51,6 +52,7 @@ type policyRecorderProtectedCase struct {
 }
 
 type policySourceAcceptedFixture struct {
+	GrantID   string
 	Scenario  captureAdmissionScenario
 	Compiled  capture.RestartPolicy
 	Authority authorization.AcceptedPolicyAuthority
@@ -307,7 +309,11 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal("accepted recurring sharing missing")
 			}
 			if len(protected) > 0 && protected[0].SourceAccepted != nil {
-				protected[0].SourceAccepted(t, policySourceAcceptedFixture{Scenario: s, Compiled: compiled, Authority: authority, Source: source, Sources: sources, Reader: reader, Record: record})
+				var grant string
+				if protected[0].OrdinaryGrant {
+					grant = attachOrdinaryPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "ordinary-source", *compiled.Recorder)
+				}
+				protected[0].SourceAccepted(t, policySourceAcceptedFixture{GrantID: grant, Scenario: s, Compiled: compiled, Authority: authority, Source: source, Sources: sources, Reader: reader, Record: record})
 				return
 			}
 			var grant string
