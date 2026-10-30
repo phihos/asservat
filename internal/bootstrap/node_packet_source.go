@@ -17,6 +17,8 @@ import (
 // constructor is not authority: its caller must verify source-purpose delivery
 // and current committed policy/resource credit before calling it. No public or
 // node work kind is enabled by this local lifecycle composition.
+const packetSourceStopGrace = 30 * time.Second
+
 type packetSource struct {
 	mu                             sync.Mutex
 	ctx                            context.Context
@@ -148,7 +150,15 @@ func (s *packetSource) stopLocked(err error) {
 		if s.timer != nil {
 			s.timer.Stop()
 		}
-		_ = s.ring.Close()
+		closedAt := s.now()
+		p := s.meter.Permit()
+		if p.LeafUntil.Before(closedAt) {
+			closedAt = p.LeafUntil
+		}
+		if p.HardUntil.Before(closedAt) {
+			closedAt = p.HardUntil
+		}
+		_ = s.ring.CloseAt(closedAt)
 	}
 	s.finishLocked()
 }
@@ -166,6 +176,12 @@ func (s *packetSource) add(f gadget.Frame) {
 		s.stopLocked(err)
 		return
 	}
+	if f.TimestampUnknown {
+		s.inputUnknown = true
+		_ = s.ring.Gap(now)
+		s.stopLocked(ErrObservationClosed)
+		return
+	}
 	if err := s.ring.Add(f.Data, f.Wire, f.At, now); err != nil {
 		s.inputUnknown = true
 		s.stopLocked(err)
@@ -177,6 +193,7 @@ func (s *packetSource) notice(gadget.InputNotice) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.inputUnknown = true
+	_ = s.ring.Gap(s.now())
 	s.stopLocked(ErrObservationClosed)
 }
 
@@ -197,6 +214,7 @@ func (s *packetSource) run(engine observedPacketEngine, pod string) {
 	s.engineExited = true
 	if stats.LostSamples > 0 {
 		s.inputUnknown = true
+		_ = s.ring.Gap(s.now())
 		err = errors.Join(err, ErrObservationClosed)
 	}
 	if s.closed {
@@ -215,7 +233,7 @@ func (s *packetSource) run(engine observedPacketEngine, pod string) {
 		s.stopLocked(err)
 		return
 	}
-	s.stoppedUntil = now.Add(30 * time.Second)
+	s.stoppedUntil = now.Add(packetSourceStopGrace)
 	s.scheduleLocked()
 }
 
@@ -285,3 +303,6 @@ func (s *packetSourceSnapshot) Close() error {
 func (s *packetSourceSnapshot) Complete(now time.Time) error     { return s.copy.Complete(now) }
 func (s *packetSourceSnapshot) Next(p *packets.RingPacket) error { return s.copy.Next(p) }
 func (s *packetSourceSnapshot) Coverage() packets.RingCoverage   { return s.copy.Coverage() }
+func (s *packetSourceSnapshot) HistoryCoverage() packets.RingCoverage {
+	return s.copy.HistoryCoverage()
+}

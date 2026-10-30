@@ -132,12 +132,13 @@ type ContextPreviewResult struct {
 }
 
 type contextFacts struct {
-	target      targets.PodResolution
-	eligibility authorization.CaptureEligibility
-	capability  planning.ContextCapability
-	retention   privacy.Resolution
-	storage     ContextStorageObservation
-	reasonUntil time.Time
+	snapshotSource *targets.SourceSnapshotResolution
+	target         targets.PodResolution
+	eligibility    authorization.CaptureEligibility
+	capability     planning.ContextCapability
+	retention      privacy.Resolution
+	storage        ContextStorageObservation
+	reasonUntil    time.Time
 }
 
 func (s ContextInvestigation) configured() bool {
@@ -194,9 +195,13 @@ func (s ContextInvestigation) facts(ctx context.Context, source identities.Curre
 	return s.factsWithStorageWait(ctx, source, actor, intent, target, anchor, wait)
 }
 
-func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, intent value.ContextIntent, target targets.PodResolution, anchor time.Time, storageWait *contextStorageWait) (contextFacts, error) {
+func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, intent value.ContextIntent, target targets.PodResolution, anchor time.Time, storageWait *contextStorageWait, snapshot ...targets.SourceSnapshotResolution) (contextFacts, error) {
 	f := contextFacts{target: target}
-	if !target.Valid(s.Now()) {
+	if len(snapshot) > 0 {
+		observed := snapshot[0]
+		f.snapshotSource = &observed
+	}
+	if !snapshotFactsTargetValid(f, s.Now()) {
 		return f, previewFailure("facts/target", value.ErrChanged)
 	}
 	t := target.Target()
@@ -207,6 +212,10 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 		return f, previewFailure(previewEligibilityFailure(f.eligibility.Reason), value.ErrDenied)
 	}
 	var err error
+	f.eligibility.DefaultAudience, err = SnapshotAudience(intent.Snapshot, f.eligibility.DefaultAudience)
+	if err != nil {
+		return f, err
+	}
 	mark = time.Now()
 	f.capability, err = s.Capabilities.ContextCapability(ctx, t)
 	auditapp.MarkStep(ctx, "p-capability", mark)
@@ -220,6 +229,9 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 		if evidence, err = compiler.RecorderEvidenceType(*intent.Composition); err != nil {
 			return f, previewFailure("facts/composition", err)
 		}
+	}
+	if intent.Snapshot != nil {
+		evidence = "packetCapture"
 	}
 	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: evidence, RequestedSeconds: intent.RequestedSeconds, AnchorAt: anchor})
 	auditapp.MarkStep(ctx, "p-retention", mark)
@@ -277,7 +289,7 @@ func (s ContextInvestigation) nonStorageFactsFailure(f contextFacts, now time.Ti
 		failed bool
 		name   string
 	}{
-		{!f.target.Valid(now), "target"},
+		{!snapshotFactsTargetValid(f, now), "target"},
 		{!f.capability.Valid(now), "capability"},
 		{f.target.ExecutionClass != f.capability.ExecutionClass, "capability-class"},
 		{f.capability.ProjectionDigest != compiler.ProjectionDigest(), "capability-projection"},
@@ -317,7 +329,7 @@ func retentionReview(r privacy.Resolution) value.ContextRetentionReview {
 }
 
 func (s ContextInvestigation) plan(p value.ContextPreview, f contextFacts) (planning.ContextPlan, error) {
-	return compiler.CompileContext(planning.ContextInput{CaptureID: p.CaptureID, CaseID: p.CaseID, Executor: p.Actor, Deadline: p.Deadline, Target: f.target, Retention: f.retention, Capability: f.capability}, s.Now())
+	return compiler.CompileContext(planning.ContextInput{CaptureID: p.CaptureID, CaseID: p.CaseID, Executor: p.Actor, Deadline: p.Deadline, Target: f.target, Retention: f.retention, Capability: f.capability, Snapshot: p.Intent.Snapshot, SnapshotSource: f.snapshotSource}, s.Now())
 }
 
 // Preview observes authorized metadata and writes only a bounded draft. It does
@@ -526,6 +538,9 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	// status.
 	recording := p.Intent.Composition != nil
 	rules := compiler.ContextAssessmentRulesDigestForClass(p.ExecutionClass)
+	if p.Intent.Snapshot != nil {
+		rules = compiler.SourceSnapshotAssessmentRulesDigest()
+	}
 	if recording {
 		rules = compiler.RecorderAssessmentRulesDigest()
 	}
@@ -577,7 +592,10 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	}
 	resolveStarted := time.Now()
 	var target targets.PodResolution
-	if recording && s.Recorders != nil {
+	var snapshotObserved *targets.SourceSnapshotResolution
+	if p.Intent.Snapshot != nil {
+		target, snapshotObserved, err = s.resolveSourceSnapshot(ctx, p.Intent.Snapshot)
+	} else if recording && s.Recorders != nil {
 		target, err = s.Recorders.ResolvePacketRecorder(ctx, p.Target)
 	} else {
 		target, err = s.Targets.ResolvePod(ctx, p.Target)
@@ -598,9 +616,23 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if recording && s.Recorders == nil {
 		return zero, value.ErrRecorderUnavailable
 	}
-	s.reviewTarget(ctx, source, i.Principal, target)
+	if p.Intent.Snapshot == nil {
+		s.reviewTarget(ctx, source, i.Principal, target)
+	}
 	anchor := s.Now().UTC().Truncate(time.Microsecond)
-	f, err := s.factsWithStorageWait(ctx, source, i.Principal, p.Intent, target, anchor, storageWait)
+	if saved := p.Intent.Snapshot; saved != nil {
+		saved.Request.IssuedAt = anchor
+		saved.Request.StartBy = identity.Earlier(anchor.Add(5*time.Second), identity.Earlier(saved.Request.SourceHardUntil, saved.Request.ProcessingUntil.Add(-time.Microsecond)))
+		if d, ok := ctx.Deadline(); ok {
+			saved.Request.StartBy = identity.Earlier(saved.Request.StartBy, d.UTC().Truncate(time.Microsecond))
+		}
+		anchor = artifact.SourceSnapshotAnchor(saved.Request)
+	}
+	var snapshotFacts []targets.SourceSnapshotResolution
+	if snapshotObserved != nil {
+		snapshotFacts = append(snapshotFacts, *snapshotObserved)
+	}
+	f, err := s.factsWithStorageWait(ctx, source, i.Principal, p.Intent, target, anchor, storageWait, snapshotFacts...)
 	if err != nil {
 		var changed contextStorageSelectionChange
 		if errors.As(err, &changed) {
@@ -646,6 +678,9 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	// A concurrent request can win with another anchor; SQL replay returns its
 	// original immutable registration and never creates a second reservation.
 	r := artifact.Registration{Location: artifact.Location{ClusterID: p.Target.ClusterID, ArtifactID: p.ArtifactID, AttemptID: p.AttemptID}, StoreID: p.Storage.StoreID, AllocationID: p.Storage.AllocationID, PoolRevision: p.Storage.PoolRevision, AllocationRevision: p.Storage.AllocationRevision, NativeLimit: nativeLimit(recording), AnchorAt: f.retention.AnchorAt, WriteUntil: identity.Earlier(p.Deadline, f.retention.ExpiresAt), ExpiresAt: f.retention.ExpiresAt, DeleteBy: f.retention.DeleteBy}
+	if p.Intent.Snapshot != nil {
+		r.NativeLimit = p.Intent.Snapshot.Request.MaxBytes
+	}
 	if r.Validate() != nil {
 		return zero, value.ErrInvalid
 	}
@@ -661,6 +696,10 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 		}
 	}
 	final := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
+	final.DefaultAudience, err = SnapshotAudience(p.Intent.Snapshot, final.DefaultAudience)
+	if err != nil {
+		return zero, err
+	}
 	final.ValidUntil = identity.Earlier(final.ValidUntil, f.eligibility.ValidUntil)
 	final.VerifiedIdentity.ValidUntil = identity.Earlier(final.VerifiedIdentity.ValidUntil, i.ValidUntil)
 	// One label per failed condition; the outcome is the same ReviewChanged.

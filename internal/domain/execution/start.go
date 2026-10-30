@@ -45,10 +45,11 @@ func (b Binding) Valid() bool {
 		}
 	}
 	if b.ExecutionClass == artifact.ContextAPIExecution {
-		// Pod status, or (ADR-248) a manual networkHeaders recording: its
-		// generated action ID and the 8 MiB per-capture cap.
+		// Pod status has exact bytes. A recorder binding carries the admitted
+		// output ceiling: finite expectations still require their original 8 MiB
+		// registration; typed snapshots may admit a smaller bounded output.
 		podStatus := b.ActionID == "pod-status" && b.NativeBytes == artifact.MaxContextBytes
-		recording := recorderAction(b.ActionID) && b.NativeBytes == artifact.RecordingNativeLimit
+		recording := recorderAction(b.ActionID) && b.NativeBytes > 0 && b.NativeBytes <= artifact.RecordingNativeLimit
 		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || !podStatus && !recording || b.NotAfter.After(b.NotBefore.Add(5*time.Second)) {
 			return false
 		}

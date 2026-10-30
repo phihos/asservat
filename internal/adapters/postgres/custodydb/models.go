@@ -898,6 +898,9 @@ type ContextCapture struct {
 	HistoryParametersRequired bool
 	RepeatedFromCaptureID     pgtype.UUID
 	RepeatedFromExpiresAt     pgtype.Timestamptz
+	SnapshotCoverage          []byte
+	SnapshotCoverageDigest    []byte
+	SnapshotExpectationDigest []byte
 }
 
 type ContextCaseLocator struct {
@@ -2159,27 +2162,30 @@ type PolicyPodWatermark struct {
 }
 
 type PolicyRecordingSource struct {
-	RootID           pgtype.UUID
-	ID               pgtype.UUID
-	Fence            pgtype.UUID
-	PolicyUid        string
-	AcceptanceID     pgtype.UUID
-	ActionID         string
-	ClusterID        pgtype.UUID
-	NamespaceUid     string
-	WorkloadUid      string
-	PodUid           string
-	AllocationID     pgtype.UUID
-	BindingJson      []byte
-	StartedAt        pgtype.Timestamptz
-	HardUntil        pgtype.Timestamptz
-	StartBy          pgtype.Timestamptz
-	InitialLeafUntil pgtype.Timestamptz
-	InitialCredit    int64
-	Credit           int64
-	BytesPerSecond   int64
-	EndedAt          pgtype.Timestamptz
-	SlotReleasedAt   pgtype.Timestamptz
+	RootID               pgtype.UUID
+	ID                   pgtype.UUID
+	Fence                pgtype.UUID
+	PolicyUid            string
+	AcceptanceID         pgtype.UUID
+	ActionID             string
+	ClusterID            pgtype.UUID
+	NamespaceUid         string
+	WorkloadUid          string
+	PodUid               string
+	AllocationID         pgtype.UUID
+	BindingJson          []byte
+	StartedAt            pgtype.Timestamptz
+	HardUntil            pgtype.Timestamptz
+	StartBy              pgtype.Timestamptz
+	InitialLeafUntil     pgtype.Timestamptz
+	InitialCredit        int64
+	Credit               int64
+	BytesPerSecond       int64
+	EndedAt              pgtype.Timestamptz
+	SlotReleasedAt       pgtype.Timestamptz
+	SourceAudienceJson   []byte
+	SourceAudienceDigest []byte
+	SourceTargetJson     []byte
 }
 
 type PolicySource struct {

@@ -36,6 +36,7 @@ type policyRecorderProtectedCase struct {
 	// SourceAccepted stops before any occurrence/capture: a real audited policy
 	// acceptance can qualify the separate ordinary source ledger in this fixture.
 	Ongoing             bool
+	Retention           string
 	SourceAccepted      func(*testing.T, policySourceAcceptedFixture)
 	Hub                 *pgxpool.Pool
 	Admissions          *postgres.ContextAdmissions
@@ -53,6 +54,7 @@ type policySourceAcceptedFixture struct {
 	Authority authorization.AcceptedPolicyAuthority
 	Source    capture.PolicySource
 	Sources   *postgres.Policies
+	Reader    *postgres.Policies
 	Record    capture.AcceptedPolicy
 }
 
@@ -198,6 +200,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if json.Unmarshal(spec, &authored) != nil {
 				t.Fatal("policy spec")
 			}
+			if len(protected) > 0 && protected[0].Retention != "" {
+				authored["retention"] = protected[0].Retention
+			}
 			selected := authored["target"].(map[string]any)
 			selected["namespace"] = s.a.Plan.Input.Target.Request.Namespace.Name
 			selected["workloadRef"].(map[string]any)["name"] = s.a.Plan.Input.Target.Request.Workload.Name
@@ -262,7 +267,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal(err)
 			}
 			if len(protected) > 0 && protected[0].SourceAccepted != nil {
-				protected[0].SourceAccepted(t, policySourceAcceptedFixture{Scenario: s, Compiled: compiled, Authority: authority, Source: source, Sources: sources, Record: record})
+				protected[0].SourceAccepted(t, policySourceAcceptedFixture{Scenario: s, Compiled: compiled, Authority: authority, Source: source, Sources: sources, Reader: reader, Record: record})
 				return
 			}
 			var grant string

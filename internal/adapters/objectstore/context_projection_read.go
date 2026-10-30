@@ -42,6 +42,7 @@ func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, sour
 	// Retain the exact expected audience/retention values across provider waits.
 	source.Expectation.Audience = slices.Clone(source.Expectation.Audience)
 	source.Expectation.RetentionRules = slices.Clone(source.Expectation.RetentionRules)
+	source.Expectation.SourceSnapshotManifest = source.Expectation.SourceSnapshotManifest.Clone()
 	// Worker read timing: each key unwrap, then the remaining object reads and
 	// decryption, then parsing. Fixed step names and buckets only.
 	timed := &timedKeyOpener{inner: keys}

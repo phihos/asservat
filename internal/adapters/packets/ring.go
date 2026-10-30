@@ -25,9 +25,9 @@ type RingLimits struct {
 type RingBounds struct{ StartedAt, Until time.Time }
 type RingWindow struct{ From, Until time.Time }
 type RingCoverage struct {
-	Requested                                     RingWindow
-	AvailableFrom, ObservedUntil, SourceStoppedAt time.Time
-	Complete, HistoryEvicted, InputUnknown        bool
+	Requested                                                     RingWindow
+	AvailableFrom, ObservedUntil, SourceStoppedAt, SourceClosedAt time.Time
+	Complete, HistoryEvicted, InputUnknown                        bool
 }
 type RingState struct {
 	LiveBytes, FrozenBytes    int64
@@ -51,6 +51,7 @@ type Ring struct {
 	arena                                                   []byte
 	write                                                   int
 	now, through, floor, cleanSince, stopped, evictedBefore time.Time
+	closedAt                                                time.Time
 	nextExpiry                                              time.Time
 	state                                                   RingState
 	evictedRetainedThrough                                  uint64
@@ -290,7 +291,19 @@ func (r *Ring) Add(frame []byte, wire uint32, at, observedAt time.Time) error {
 	return nil
 }
 func (r *Ring) State() RingState { r.mu.Lock(); defer r.mu.Unlock(); return r.state }
-func (r *Ring) Close() error     { r.mu.Lock(); defer r.mu.Unlock(); r.closeLive(); return nil }
+
+// CloseAt records the locally known observation end without claiming a natural
+// target stop. Already copied windows keep this timestamp after live erasure.
+func (r *Ring) CloseAt(at time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closedAt.IsZero() {
+		r.closedAt = at
+	}
+	r.closeLive()
+	return nil
+}
+func (r *Ring) Close() error { r.mu.Lock(); defer r.mu.Unlock(); r.closeLive(); return nil }
 
 // RingPacket is a caller-owned copy; callers cannot borrow snapshot storage across
 // Close or mutate the ring. Length selects the valid header prefix.
@@ -498,6 +511,7 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 	}
 	w.finished = true
 	w.final.SourceStoppedAt = r.stopped
+	w.final.SourceClosedAt = r.closedAt
 	// A frozen pre-copy survives eviction, not newly known unknown input.
 	w.final.InputUnknown = w.pre.InputUnknown || r.coverage(w.final.Requested).InputUnknown
 	if err := r.advance(now); err != nil {
@@ -505,6 +519,7 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 			w.final = w.pre
 		}
 		w.final.SourceStoppedAt = r.stopped
+		w.final.SourceClosedAt = r.closedAt
 		return nil
 	}
 	window := w.final.Requested
@@ -553,6 +568,7 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 	w.final.Complete = w.pre.Complete && (w.t0.Equal(window.Until) || post.Complete) && !unknown
 	w.final.ObservedUntil = post.ObservedUntil
 	w.final.SourceStoppedAt = r.stopped
+	w.final.SourceClosedAt = r.closedAt
 	w.final.HistoryEvicted = w.pre.HistoryEvicted || post.HistoryEvicted
 	w.final.InputUnknown = unknown
 	return nil
@@ -574,3 +590,11 @@ func (w *WindowSnapshot) Next(p *RingPacket) error {
 	return w.snapshot.nextLocked(p)
 }
 func (w *WindowSnapshot) Close() error { return w.snapshot.Close() }
+
+// HistoryCoverage is the original pre-copy coverage. Later post-window progress
+// cannot backfill a prehistory gap or alter this admission observation.
+func (w *WindowSnapshot) HistoryCoverage() RingCoverage {
+	w.snapshot.mu.Lock()
+	defer w.snapshot.mu.Unlock()
+	return w.pre
+}

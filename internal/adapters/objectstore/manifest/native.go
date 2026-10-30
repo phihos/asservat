@@ -6,6 +6,7 @@ import (
 	"encoding/json/jsontext"
 	"time"
 
+	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 )
 
@@ -28,7 +29,7 @@ const (
 // NativeCheck returns the type's validator. The manifest supplies the
 // acquisition interval that record times must fall within.
 func (v *Validator) NativeCheck(e artifact.ContextExpectation, m ContextManifest) (NativeCheck, error) {
-	if v == nil || e.Validate() != nil {
+	if v == nil || e.Validate() != nil || !evidence.ValidSourceSnapshotManifest(e) {
 		return nil, artifact.ErrInvalid
 	}
 	switch e.NativeType {
@@ -37,6 +38,9 @@ func (v *Validator) NativeCheck(e artifact.ContextExpectation, m ContextManifest
 	case artifact.HTTPHeadersArtifact:
 		return &documentCheck{limit: artifact.HTTPHeadersNativeLimit, final: jsonObject}, nil
 	case artifact.PCAPNGArtifact:
+		if e.Snapshot != nil {
+			return &pcapngCheck{window: e.Snapshot, from: m.StartedAt, until: m.CompletedAt}, nil
+		}
 		return &pcapngCheck{}, nil
 	case artifact.SyscallRecordsArtifact:
 		return &syscallCheck{v: v, pod: e.PodUID, from: m.StartedAt, until: m.CompletedAt}, nil
@@ -96,6 +100,9 @@ func jsonObject(b []byte) error {
 // interface statistics blocks are accepted: the metadata profile carries no
 // name resolution, decryption secrets or custom blocks.
 type pcapngCheck struct {
+	packets     uint64
+	window      *artifact.SourceSnapshotRequest
+	from, until time.Time
 	failure
 	pending  []byte
 	order    binary.ByteOrder
@@ -168,6 +175,42 @@ func (c *pcapngCheck) block(typ uint32, body []byte) error {
 		if len(body) < 8 {
 			return artifact.ErrIntegrity
 		}
+		if c.window != nil {
+			if c.order.Uint16(body) != 1 || c.order.Uint32(body[4:]) == 0 || c.order.Uint32(body[4:]) > artifact.RecordingSnaplen {
+				return artifact.ErrIntegrity
+			}
+			resolution := false
+			for options := body[8:]; len(options) > 0; {
+				if len(options) < 4 {
+					return artifact.ErrIntegrity
+				}
+				code, size := c.order.Uint16(options), int(c.order.Uint16(options[2:]))
+				options = options[4:]
+				if code == 0 {
+					if size != 0 {
+						return artifact.ErrIntegrity
+					}
+					break
+				}
+				padded := (size + 3) &^ 3
+				if padded > len(options) {
+					return artifact.ErrIntegrity
+				}
+				if code == 9 {
+					if resolution || size != 1 || options[0] != 9 {
+						return artifact.ErrIntegrity
+					}
+					resolution = true
+				}
+				if code == 14 {
+					return artifact.ErrIntegrity
+				}
+				options = options[padded:]
+			}
+			if !resolution {
+				return artifact.ErrIntegrity
+			}
+		}
 		c.snaplens = append(c.snaplens, c.order.Uint32(body[4:]))
 		if len(c.snaplens) > 4096 {
 			return artifact.ErrLimit
@@ -180,6 +223,14 @@ func (c *pcapngCheck) block(typ uint32, body []byte) error {
 		if iface >= uint32(len(c.snaplens)) || captured > original || (int64(captured)+3)/4*4 > int64(len(body)-20) || c.snaplens[iface] != 0 && captured > c.snaplens[iface] {
 			return artifact.ErrIntegrity
 		}
+		if c.window != nil {
+			stamp := uint64(c.order.Uint32(body[4:]))<<32 | uint64(c.order.Uint32(body[8:]))
+			at := time.Unix(int64(stamp/1e9), int64(stamp%1e9))
+			if at.Before(artifact.SourceSnapshotAnchor(*c.window)) || at.After(c.window.T0.Add(c.window.After)) || !c.from.IsZero() && at.Before(c.from) || !c.until.IsZero() && at.After(c.until) {
+				return artifact.ErrIntegrity
+			}
+		}
+		c.packets++
 	case pcapngISB:
 		if len(body) < 12 || c.order.Uint32(body) >= uint32(len(c.snaplens)) {
 			return artifact.ErrIntegrity
@@ -265,3 +316,6 @@ func (c *syscallCheck) Close() error {
 	}
 	return nil
 }
+
+// PacketCount is the structurally validated native packet count.
+func (c *pcapngCheck) PacketCount() uint64 { return c.packets }

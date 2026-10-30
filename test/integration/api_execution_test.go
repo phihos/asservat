@@ -281,6 +281,16 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				if _, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, c.Process, currentRecovery); err != nil {
 					t.Fatal("immutable outcome replay", err)
 				}
+				// Schema106's narrowly granted completion columns cannot turn a
+				// finite capture into a source snapshot or replace acceptance.
+				_, forgedErr := sharedPool.Exec(ctx, `UPDATE context_capture SET snapshot_coverage=$3,snapshot_coverage_digest=$4,snapshot_expectation_digest=$5 WHERE root_id=$1 AND id=$2`, s.a.RootID, execution.Binding.CaptureID, []byte("{}"), make([]byte, 32), completion.ExpectationDigest[:])
+				if capacitySQLState(forgedErr) != "23514" {
+					t.Fatal("finite execution accepted snapshot projection", forgedErr)
+				}
+				var retainedCompletion bool
+				if err = sharedPool.QueryRow(ctx, `SELECT snapshot_coverage IS NULL AND snapshot_coverage_digest IS NULL AND snapshot_expectation_digest IS NULL FROM context_capture WHERE root_id=$1 AND id=$2`, s.a.RootID, execution.Binding.CaptureID).Scan(&retainedCompletion); err != nil || !retainedCompletion {
+					t.Fatal("failed projection changed finite completion", err)
+				}
 				expiredProcess := c.Process
 				expiredProcess.CheckedAt = time.Now().Add(-time.Second).UTC().Truncate(time.Microsecond)
 				expiredProcess.ValidUntil = expiredProcess.CheckedAt.Add(time.Millisecond)

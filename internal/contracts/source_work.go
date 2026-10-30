@@ -26,6 +26,7 @@ type SourceWork struct {
 	NotAfter     time.Time         `json:"notAfter"`
 	Stop         bool              `json:"stop"`
 	StopIssuedAt time.Time         `json:"stopIssuedAt"`
+	StopSnapshot json.RawMessage   `json:"stopSnapshot,omitempty"`
 }
 
 func EncodeSourceWork(w SourceWork) ([]byte, error) { return canonicalAPIContext(w, SourceWorkBytes) }
@@ -40,10 +41,12 @@ func DecodeSourceWork(b []byte) (SourceWork, error) {
 // Source replies reuse only the existing finite result/receipt frame ordering.
 // The semantic payload stays distinct and never invents a capture identifier.
 type SourceReply struct {
-	Format   string `json:"format"`
-	SourceID string `json:"sourceID"`
-	Fence    string `json:"fence"`
-	State    string `json:"state"`
+	CaptureID  string `json:"captureID,omitempty"`
+	SnapshotID string `json:"snapshotID,omitempty"`
+	Format     string `json:"format"`
+	SourceID   string `json:"sourceID"`
+	Fence      string `json:"fence"`
+	State      string `json:"state"`
 }
 
 func EncodeSourceReply(w SourceReply) ([]byte, error) { return canonicalAPIContext(w, 1024) }

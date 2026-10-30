@@ -152,7 +152,7 @@ func (q *Queries) ReadCaptureOperation(ctx context.Context, arg ReadCaptureOpera
 }
 
 const readCaptureOperationIntent = `-- name: ReadCaptureOperationIntent :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at FROM capture_operation_intents WHERE root_id=$1 AND id=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at,NULL::bytea AS snapshot_coverage,NULL::bytea AS snapshot_coverage_digest,NULL::bytea AS snapshot_expectation_digest FROM capture_operation_intents WHERE root_id=$1 AND id=$2
 `
 
 type ReadCaptureOperationIntentParams struct {
@@ -160,9 +160,52 @@ type ReadCaptureOperationIntentParams struct {
 	ID     pgtype.UUID
 }
 
-func (q *Queries) ReadCaptureOperationIntent(ctx context.Context, arg ReadCaptureOperationIntentParams) (CaptureOperationIntent, error) {
+type ReadCaptureOperationIntentRow struct {
+	ID                        pgtype.UUID
+	RootID                    pgtype.UUID
+	RequestKey                []byte
+	SubmissionDigest          []byte
+	ScopeDigest               []byte
+	ScopeJson                 []byte
+	ExpectationJson           []byte
+	PodPinJson                []byte
+	AttemptID                 pgtype.UUID
+	PermissionEpoch           pgtype.UUID
+	PermissionSequence        int64
+	IdentityPolicyUid         string
+	IdentityPolicyGeneration  int64
+	IdentityPolicyDigest      []byte
+	CreatedAt                 pgtype.Timestamptz
+	Deadline                  pgtype.Timestamptz
+	State                     string
+	IntentAcknowledgedAt      pgtype.Timestamptz
+	IntentDigest              []byte
+	IntentObjectKey           pgtype.Text
+	IntentObjectVersion       pgtype.Text
+	IntentObjectEtag          pgtype.Text
+	IntentObjectBytes         pgtype.Int8
+	IntentObjectSha256        []byte
+	ProgressRevision          int64
+	DeadlineObservedAt        pgtype.Timestamptz
+	PreviewID                 pgtype.UUID
+	IntentOperationID         pgtype.UUID
+	ShareInstruction          []byte
+	HistoryClusterID          pgtype.UUID
+	HistoryNamespaceUid       pgtype.Text
+	HistoryWorkloadUid        pgtype.Text
+	HistoryOrigin             pgtype.Text
+	HistoryParametersRequired bool
+	RepeatedFromCaptureID     pgtype.UUID
+	RepeatedFromExpiresAt     pgtype.Timestamptz
+	SnapshotCoverage          []byte
+	SnapshotCoverageDigest    []byte
+	SnapshotExpectationDigest []byte
+}
+
+// Original intent view deliberately excludes later completion observations.
+func (q *Queries) ReadCaptureOperationIntent(ctx context.Context, arg ReadCaptureOperationIntentParams) (ReadCaptureOperationIntentRow, error) {
 	row := q.db.QueryRow(ctx, readCaptureOperationIntent, arg.RootID, arg.ID)
-	var i CaptureOperationIntent
+	var i ReadCaptureOperationIntentRow
 	err := row.Scan(
 		&i.ID,
 		&i.RootID,
@@ -200,6 +243,9 @@ func (q *Queries) ReadCaptureOperationIntent(ctx context.Context, arg ReadCaptur
 		&i.HistoryParametersRequired,
 		&i.RepeatedFromCaptureID,
 		&i.RepeatedFromExpiresAt,
+		&i.SnapshotCoverage,
+		&i.SnapshotCoverageDigest,
+		&i.SnapshotExpectationDigest,
 	)
 	return i, err
 }

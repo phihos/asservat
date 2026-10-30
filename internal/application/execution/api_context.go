@@ -33,10 +33,13 @@ type APIContextRetention interface {
 }
 
 type APIContextWork struct {
-	Accepted     capture.Accepted
-	Target       targets.Request
-	Actor        identity.Principal
-	IntentDigest artifact.Digest
+	SourceBinding  *collector.SourceBinding `json:",omitempty"`
+	Accepted       capture.Accepted
+	Target         targets.Request
+	Actor          identity.Principal
+	IntentDigest   artifact.Digest
+	SourceAudience []artifact.AudienceAssignment `json:",omitempty"`
+	SourceTarget   *targets.SourceSnapshotTarget `json:",omitempty"`
 }
 type APIExecutionCheck struct {
 	Work                  APIContextWork
@@ -79,6 +82,20 @@ type APIExecutionRecorder interface {
 type APIStoredCompletionRecorder interface {
 	RecordAPIStoredCompletion(context.Context, value.APIExecution, artifact.ContextWriterCompletion, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
 }
+
+// APIStoredSnapshotCompletionRecorder commits authenticated final coverage
+// separately from the original accepted execution digest. Finite completion is
+// intentionally a different port and cannot accept source-window metadata.
+type APIStoredSnapshotCompletionRecorder interface {
+	RecordAPIStoredSnapshotCompletion(context.Context, value.APIExecution, artifact.ContextWriterCompletion, artifact.SourceSnapshotCoverage, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+}
+
+// APISnapshotCancellationRecorder records joined snapshot/writer ownership;
+// enqueueing a cancellation is not sufficient for this terminal outcome.
+type APISnapshotCancellationRecorder interface {
+	RecordAPISnapshotCancellation(context.Context, value.APIExecution, artifact.SourceSnapshotCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+}
+
 type APIProcessReader interface {
 	ReadAPIProcess(context.Context) (value.APIProcessObservation, error)
 }
@@ -126,7 +143,25 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	var t targets.PodResolution
 	var err error
 	resolveStep := "ResolvePod"
-	if policyRawRecording(w) {
+	var snapshotObserved *targets.SourceSnapshotResolution
+	if w.Accepted.Expectation.Snapshot != nil && w.SourceTarget != nil {
+		resolveStep = "ResolveSourceSnapshot"
+		resolver, ok := s.Targets.(interface {
+			ResolveSourceSnapshot(context.Context, targets.SourceSnapshotTarget) (targets.SourceSnapshotResolution, error)
+		})
+		if !ok {
+			return out, nil, apiCheckStep{resolveStep, value.ErrUnavailable}
+		}
+		observed, e := resolver.ResolveSourceSnapshot(ctx, *w.SourceTarget)
+		if e != nil {
+			return out, nil, apiCheckStep{resolveStep, e}
+		}
+		if !observed.Valid(s.Now()) || observed.Original != *w.SourceTarget {
+			return out, nil, apiCheckStep{resolveStep, value.ErrDenied}
+		}
+		snapshotObserved = &observed
+		t = targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: observed.Original.Request, Pin: observed.Original.Pin}
+	} else if policyRawRecording(w) {
 		resolveStep = "ResolvePacketSource"
 		resolver, ok := s.Targets.(interface {
 			ResolvePacketSource(context.Context, targets.Request) (targets.RecorderResolution, error)
@@ -175,6 +210,13 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		}
 		evidenceType = e.Type().EvidenceType
 	}
+	snapshot, err := snapshotContext(w)
+	if err != nil {
+		return out, nil, apiCheckStep{"Snapshot", err}
+	}
+	if snapshot != nil {
+		evidenceType = e.Type().EvidenceType
+	}
 	retention, err := s.Retention.Resolve(ctx, privacy.Input{Target: t.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: evidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt})
 	if err != nil {
 		return out, nil, apiCheckStep{"Retention", err}
@@ -183,7 +225,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	if recorder != nil {
 		caseID = "" // a recorder scope carries no case (ADR-243)
 	}
-	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: caseID, Executor: w.Actor, Deadline: w.Accepted.Deadline, Target: t, Capability: cap, Retention: retention, Recorder: recorder}, s.Now())
+	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: caseID, Executor: w.Actor, Deadline: w.Accepted.Deadline, Target: t, Capability: cap, Retention: retention, Recorder: recorder, Snapshot: snapshot, SnapshotSource: snapshotObserved}, s.Now())
 	if err != nil {
 		return out, nil, apiCheckStep{"Compile", err}
 	}
@@ -387,6 +429,22 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 		return ContextResult{State: "Indeterminate"}, value.ErrExpired
 	}
 	result := r
+	if e := w.Accepted.Expectation; e.Snapshot != nil {
+		snapshot, ok := prepared.(evidence.SourceSnapshotRecorder)
+		if !ok || w.SourceBinding == nil {
+			return zero, executeStep{"StartSourceSnapshot", value.ErrUnavailable}
+		}
+		request := collector.SourceSnapshot{Binding: *w.SourceBinding, CaptureID: e.CaptureUID, AttemptID: e.Registration.Location.AttemptID, WriterPodUID: r.Process.PodUID, WriterEpoch: r.Process.ProcessEpoch, ExpectationDigest: [32]byte(evidence.ContextExpectationDigest(e)), Request: *e.Snapshot}
+		queued, startErr := snapshot.StartSourceSnapshot(startCtx, request)
+		if startErr == nil && !queued.IsZero() && queued.Before(d.ValidUntil) && !queued.Before(r.StartedAt) {
+			return ContextResult{State: "Recording"}, nil
+		}
+		result.CompletedAt, result.Phase = s.Now().UTC().Truncate(time.Microsecond), "captureFailed"
+		if startErr == nil {
+			startErr = value.ErrUnavailable
+		}
+		return s.finishAcquisition(ctx, w, prepared, closer, completionRecorder, result, startErr)
+	}
 	if w.Accepted.Expectation.Recording != nil {
 		// ADR-248: the node records for the accepted duration; the SQL
 		// execution stays started until a later collect exchange records

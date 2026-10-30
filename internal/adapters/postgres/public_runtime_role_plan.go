@@ -169,6 +169,8 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("capture_history_quota", "UPDATE", "used")
 		add("capture_history_parameter", "UPDATE", "capture_id", "visible", "state", "write_id", "write_digest", "write_started_at", "write_until", "write_executor_epoch", "writer_completion_json", "copies_digest", "delete_id", "delete_executor_epoch", "delete_started_at", "delete_until", "delete_fence", "purge_completion_json")
 	case "capture-admit":
+		read("policy_recording_source")
+		add("policy_recording_source", "UPDATE", "root_id") // retained source row lock only
 		read("capture_history_parameter", "custody_copy")
 		out = append(out, publicRuntimeGrant{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"})
 		// Original publication coverage only; no processing initialization,
@@ -382,7 +384,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("context_execution", "SELECT", "capture_id", "root_id", "attempt_id", "expectation_digest", "phase")
 		add("context_execution", "UPDATE", "capture_id")
-		add("context_capture", "SELECT", "id", "root_id", "expectation_json")
+		add("context_capture", "SELECT", "id", "root_id", "expectation_json", "snapshot_coverage", "snapshot_coverage_digest", "snapshot_expectation_digest")
 		add("context_catalog", "SELECT", "capture_id")
 		add("context_key_unwrap", "INSERT", "attempt_id", "root_id", "last_certificate_sha256", "unwraps")
 		add("context_key_unwrap", "UPDATE", "unwraps", "last_certificate_sha256")

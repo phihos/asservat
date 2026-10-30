@@ -113,6 +113,9 @@ func ProjectionDigest() artifact.Digest {
 // as reason, sharing, approval references and idempotency keys cannot enter this
 // execution digest. The capture identity and original deadline always do.
 func CompileContext(in value.ContextInput, now time.Time) (value.ContextPlan, error) {
+	if in.Snapshot != nil {
+		return compileSourceSnapshotContext(in, now)
+	}
 	if in.Recorder != nil {
 		return compileRecorderContext(in, now)
 	}

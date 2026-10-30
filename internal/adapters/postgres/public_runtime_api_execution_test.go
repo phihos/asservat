@@ -15,6 +15,8 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		t.Fatal("missing consolidated execution credential")
 	}
 	want := []publicRuntimeGrant{
+		{"table", "policy_recording_source", "", "SELECT"},
+		{"table", "policy_recording_source", "root_id", "UPDATE"},
 		{"table", "policy_occurrence", "", "SELECT"},
 		{"table", "policy_acceptance", "", "SELECT"},
 		{"table", "policy_source", "", "SELECT"},
@@ -29,6 +31,9 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_capture", "id", "UPDATE"},
+		{"table", "context_capture", "snapshot_coverage", "UPDATE"},
+		{"table", "context_capture", "snapshot_coverage_digest", "UPDATE"},
+		{"table", "context_capture", "snapshot_expectation_digest", "UPDATE"},
 		{"table", "context_execution", "", "SELECT"},
 		{"table", "context_execution", "acquired_at", "UPDATE"},
 		{"table", "context_execution", "attempt_id", "INSERT"},

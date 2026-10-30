@@ -138,7 +138,7 @@ func validAdmission(a value.Admission) bool {
 	p := a.Plan.Input
 	t := p.Target.Target()
 	e := a.Eligibility
-	return authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && (p.Recorder == nil && r.NativeLimit == artifact.MaxContextBytes || p.Recorder != nil && r.NativeLimit == artifact.RecordingNativeLimit) && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
+	return authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && (p.Recorder == nil && p.Snapshot == nil && r.NativeLimit == artifact.MaxContextBytes || p.Recorder != nil && p.Snapshot == nil && r.NativeLimit == artifact.RecordingNativeLimit || p.Recorder == nil && p.Snapshot != nil && r.NativeLimit == p.Snapshot.Request.MaxBytes) && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
 }
 
 func requestKey(a value.Admission) []byte {
@@ -247,7 +247,35 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 		if err != nil {
 			return err
 		}
-		fresh, err := s.currentCaptureEligibility(ctx, q, stream, recovery, a)
+
+		// Retained acquisition provenance is immutable and read once in this
+		// transaction. Current eligibility is still rechecked after waits.
+		var retainedSource *captureapp.PolicySourceState
+		currentEligibility := func() (authorization.CaptureEligibility, error) {
+			fresh, err := s.currentCaptureEligibility(ctx, q, stream, recovery, a)
+			if err != nil || a.Plan.Input.Snapshot == nil {
+				return fresh, err
+			}
+			selected := a.Plan.Input.Snapshot
+			if retainedSource == nil {
+				row, readErr := q.ReadPolicyRecordingSource(ctx, custodydb.ReadPolicyRecordingSourceParams{RootID: id(s.root), ID: id(selected.Request.SourceID)})
+				if readErr != nil {
+					return fresh, readErr
+				}
+				source, decodeErr := policySourceState(row)
+				if decodeErr != nil {
+					return fresh, decodeErr
+				}
+				retainedSource = &source
+			}
+			audience, err := sourceSnapshotAudience(*retainedSource, selected, fresh.DefaultAudience)
+			if err != nil {
+				return fresh, err
+			}
+			fresh.DefaultAudience = audience
+			return fresh, nil
+		}
+		fresh, err := currentEligibility()
 		if err != nil {
 			return err
 		}
@@ -260,7 +288,7 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 			if err != nil {
 				return err
 			}
-			fresh, err = s.currentCaptureEligibility(ctx, q, stream, recovery, a)
+			fresh, err = currentEligibility()
 			if err != nil {
 				return err
 			}
@@ -295,7 +323,7 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 					return err
 				}
 				out.Replay = true
-				fresh, err = s.currentCaptureEligibility(ctx, q, stream, recovery, a)
+				fresh, err = currentEligibility()
 				if err != nil {
 					return err
 				}
@@ -400,7 +428,7 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 				return err
 			}
 			var err error
-			fresh, err = s.currentCaptureEligibility(ctx, q, stream, recovery, a)
+			fresh, err = currentEligibility()
 			if err != nil {
 				return err
 			}
@@ -481,6 +509,21 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 				return value.ErrInvalid
 			}
 			expected.NativeType, expected.ActionID, expected.Recording = artifact.PCAPNGArtifact, actionID, &recording
+		}
+		if in.Snapshot != nil {
+			lifecycle, err := planning.SourceSnapshotLifecycle(in.Snapshot)
+			if err != nil {
+				return value.ErrInvalid
+			}
+			expected.NativeType, expected.ActionID, expected.Snapshot, expected.Lifecycle, expected.TriggeredAt = artifact.PCAPNGArtifact, in.Snapshot.ActionID, in.Snapshot.Request.Clone(), lifecycle, in.Snapshot.Request.T0
+			if retainedSource == nil {
+				return value.ErrInvalid
+			}
+			bindingJSON, err := json.Marshal(retainedSource.Binding)
+			if err != nil {
+				return value.ErrInvalid
+			}
+			expected.SourceSnapshotManifest = &artifact.SourceSnapshotManifest{CanonicalScope: append(json.RawMessage(nil), a.Plan.CanonicalScope...), Binding: bindingJSON}
 		}
 		if expected.Validate() != nil {
 			return value.ErrInvalid

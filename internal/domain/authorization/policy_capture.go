@@ -72,7 +72,7 @@ func PolicyContextEligibility(i identity.Identity, a AcceptedPolicyAuthority, p 
 	if !r.Eligible {
 		return deny(r.Reason)
 	}
-	audience, until, reason := defaultAudience(p.Permissions, nil, now)
+	audience, until, reason := PolicyDefaultAudience(p.Permissions, now)
 	if reason != "" {
 		return deny(reason)
 	}

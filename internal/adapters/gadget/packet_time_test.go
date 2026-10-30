@@ -139,3 +139,12 @@ func BenchmarkPacketClockConvert(b *testing.B) {
 		}
 	}
 }
+
+func TestPacketClockArrivalFallbackIsExplicitWithoutChangingFiniteFrame(t *testing.T) {
+	c, _, _, wall := packetClockFixture(t)
+	var frames []Frame
+	c.deliver([]byte{1, 2}, 2, 0, nil, func(f Frame) { frames = append(frames, f) })
+	if len(frames) != 1 || !frames[0].TimestampUnknown || !frames[0].At.Equal(wall.Add(time.Second)) || frames[0].Wire != 2 || len(frames[0].Data) != 2 {
+		t.Fatal("legacy finite arrival bytes/timestamp changed", frames)
+	}
+}

@@ -277,9 +277,10 @@ func compilePolicy(spec []byte, recipeName string, recipeDigest artifact.Digest,
 	}
 	if raw, present := s["recordingSaves"]; present {
 		var saves struct{ Enabled bool }
-		if json.Unmarshal(raw, &saves) != nil || saves.Enabled {
+		if json.Unmarshal(raw, &saves) != nil || saves.Enabled && (out.Recorder == nil || out.Recorder.Action.ExecutionMode != "ongoing") {
 			return reject(".recordingSaves", "no ongoing recording exists for a context diagnostic")
 		}
+		out.RecordingSaves = saves.Enabled
 	}
 	if raw, present := s["sharing"]; present {
 		sharing, err := compileSharing(raw)

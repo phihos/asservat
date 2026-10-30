@@ -97,7 +97,7 @@ func (q *Queries) LockContextKeyUnwrap(ctx context.Context, arg LockContextKeyUn
 }
 
 const shareContextKeyUnwrapExecution = `-- name: ShareContextKeyUnwrapExecution :one
-SELECT e.capture_id, e.root_id, e.attempt_id, e.expectation_digest, e.phase, c.expectation_json,
+SELECT e.capture_id, e.root_id, e.attempt_id, e.expectation_digest, e.phase, c.expectation_json, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest,
  EXISTS(SELECT 1 FROM context_catalog k WHERE k.capture_id=e.capture_id) AS published
 FROM context_execution e
 JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id
@@ -111,13 +111,16 @@ type ShareContextKeyUnwrapExecutionParams struct {
 }
 
 type ShareContextKeyUnwrapExecutionRow struct {
-	CaptureID         pgtype.UUID
-	RootID            pgtype.UUID
-	AttemptID         pgtype.UUID
-	ExpectationDigest []byte
-	Phase             string
-	ExpectationJson   []byte
-	Published         bool
+	CaptureID                 pgtype.UUID
+	RootID                    pgtype.UUID
+	AttemptID                 pgtype.UUID
+	ExpectationDigest         []byte
+	Phase                     string
+	ExpectationJson           []byte
+	SnapshotCoverage          []byte
+	SnapshotCoverageDigest    []byte
+	SnapshotExpectationDigest []byte
+	Published                 bool
 }
 
 // ADR-181: the stored execution, its accepted expectation and whether its
@@ -132,6 +135,9 @@ func (q *Queries) ShareContextKeyUnwrapExecution(ctx context.Context, arg ShareC
 		&i.ExpectationDigest,
 		&i.Phase,
 		&i.ExpectationJson,
+		&i.SnapshotCoverage,
+		&i.SnapshotCoverageDigest,
+		&i.SnapshotExpectationDigest,
 		&i.Published,
 	)
 	return i, err

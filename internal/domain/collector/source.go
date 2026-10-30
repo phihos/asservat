@@ -10,6 +10,7 @@ import (
 // These values need committed producer authority and authenticated delivery;
 // structural validity does not confer either.
 type SourceBinding struct {
+	AudienceDigest                                                     [32]byte `json:",omitzero"`
 	RootID, PolicyUID, AcceptanceID, SourceID, Fence                   string
 	ActionID, PodUID, NodeUID, BootID, CollectorPodUID, CollectorEpoch string
 	Scope, ExpectationDigest, ProgramDigest, ResourceDigest            [32]byte
@@ -66,6 +67,8 @@ func (r SourceResources) Valid() bool {
 // SourceStatus is bounded, content-free cumulative local accounting. It is
 // not a permit or a proof that an unknown input loss observed zero bytes.
 type SourceStatus struct {
+	SourceStoppedAt               time.Time `json:",omitzero"`
+	SnapshotUntil                 time.Time `json:",omitzero"`
 	SourceID, Fence               string
 	IssuedAt, LeafUntil           time.Time
 	Credit, ObservedBytes         int64
@@ -73,6 +76,11 @@ type SourceStatus struct {
 }
 
 func (s SourceStatus) Valid(observedAt time.Time) bool {
+	// The source-set timestamp precedes enumeration: a concurrent natural
+	// stop can have a later original timestamp without renewing the set proof.
+	if !s.SourceStoppedAt.IsZero() && !s.Stopped || !s.SnapshotUntil.IsZero() && s.SnapshotUntil.After(s.LeafUntil) {
+		return false
+	}
 	return validUUID(s.SourceID) && validUUID(s.Fence) && !s.IssuedAt.IsZero() && !s.IssuedAt.After(observedAt) && s.LeafUntil.After(s.IssuedAt) && !s.LeafUntil.After(s.IssuedAt.Add(SourceLeafLifetime)) && s.Credit > 0 && s.ObservedBytes >= 0 && s.ObservedBytes <= s.Credit
 }
 

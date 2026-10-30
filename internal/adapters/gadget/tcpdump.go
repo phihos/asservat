@@ -39,7 +39,11 @@ var (
 type Frame struct {
 	Data []byte
 	Wire uint32
-	At   time.Time
+	// TimestampUnknown marks legacy arrival fallback. False alone does not
+	// qualify hub/node clock placement or continuous event-time coverage.
+	// This bit fits the existing padding before At on supported 64-bit nodes.
+	TimestampUnknown bool
+	At               time.Time
 }
 
 // CaptureStats are the engine's own counters for one capture.

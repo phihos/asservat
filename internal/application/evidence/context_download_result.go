@@ -62,6 +62,7 @@ func NewContextDownloadResultOwner(parent context.Context, c ContextDownloadResu
 	// Caller-owned slices cannot retarget verification after construction.
 	c.Request.Expectation.Audience = slices.Clone(c.Request.Expectation.Audience)
 	c.Request.Expectation.RetentionRules = slices.Clone(c.Request.Expectation.RetentionRules)
+	c.Request.Expectation.SourceSnapshotManifest = c.Request.Expectation.SourceSnapshotManifest.Clone()
 	ctx, cancel := context.WithDeadline(parent, until)
 	o := &ContextDownloadResultOwner{ctx: ctx, cancel: cancel, config: c, until: until, done: make(chan struct{})}
 	context.AfterFunc(ctx, o.Close)

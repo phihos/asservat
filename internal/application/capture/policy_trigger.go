@@ -10,6 +10,7 @@ import (
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
+	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
@@ -39,6 +40,13 @@ const occurrenceSettleAge = 2 * time.Minute
 // one Alertmanager GET for an alert policy.
 // The executor is the policy principal; every check a human capture passes
 // still runs, with team authority replacing the human's personal rights.
+// PolicySourceSnapshotCaptures is the same admitted capture service with a
+// distinct existing-window preview. Nil keeps source-save execution unavailable.
+type PolicySourceSnapshotCaptures interface {
+	PreviewPolicySnapshot(context.Context, identities.CurrentIdentity, PolicySnapshotSelection) (ContextPreviewResult, error)
+	Request(context.Context, identities.CurrentIdentity, string, string) (value.Accepted, error)
+}
+
 type PolicyTrigger struct {
 	// OngoingSources uses this same poll; nil keeps source execution unavailable.
 	OngoingSources         *PolicySourceRuntime
@@ -56,7 +64,8 @@ type PolicyTrigger struct {
 	Now                    func() time.Time
 	// Report receives a fixed outcome label and producer-owned step timings;
 	// diagnostics, never authority.
-	Report func(event, timing string)
+	Report          func(event, timing string)
+	SourceSnapshots PolicySourceSnapshotCaptures
 }
 
 func (t PolicyTrigger) configured() bool {
@@ -237,9 +246,15 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 		if err := t.OngoingSources.Maintain(tick, compiled, a, observation); err != nil {
 			return err
 		}
-		// Source arming is not an incident. Until source-window Save is
-		// composed, do not spend an occurrence or substitute finite capture.
-		return value.ErrRecorderUnavailable
+		// Arming remains independent of occurrence admission. Only an explicitly
+		// composed snapshot service can spend an incident; it cannot rerun
+		// the policy's finite recipe or construct a replacement source.
+		if t.SourceSnapshots == nil {
+			return value.ErrRecorderUnavailable
+		}
+		if r != nil && r.running(p.PolicyUID) {
+			return nil
+		}
 	}
 	occurrences, err := t.Ledger.Tick(tick, value.PolicyTick{Policy: compiled, Authority: a, Observation: observation})
 	if err != nil {
@@ -301,6 +316,9 @@ func (t PolicyTrigger) capture(ctx context.Context, a authorization.AcceptedPoli
 	call, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	current := newPolicyIdentity(call, t.Accepted, a, t.Now().Add(45*time.Second), t.Now)
+	if p.Recorder != nil && p.Recorder.Action.ExecutionMode == "ongoing" {
+		return t.captureSourceSnapshot(call, current, a, p, o, pod, occurrence)
+	}
 	intent := value.ContextIntent{HistoryAuthored: p.HistoryAuthored.Clone(), Diagnostic: value.ContextDiagnosticName, Target: targets.WorkloadRequest{ClusterID: o.ClusterID, Namespace: o.Namespace.Name, Kind: "Pod", Name: pod}, RequestedSeconds: p.RetentionSeconds}
 	if p.Recorder != nil {
 		intent.Diagnostic = ""

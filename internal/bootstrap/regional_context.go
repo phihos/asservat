@@ -267,7 +267,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
 		if queue, ok := r.output.recordings.nodes.(contextstart.SourceQueue); ok {
-			local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Queue: queue}
+			local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Queue: queue, Snapshots: r.output.recordings}
 		}
 	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
@@ -292,7 +292,7 @@ func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.C
 	if err != nil {
 		return nil, err
 	}
-	if e.Recording != nil {
+	if e.Recording != nil || e.Snapshot != nil {
 		// ADR-248: one frame at most, so the artifact producer never needs
 		// the SQL streaming journal the connector does not hold.
 		if o.recordings == nil {

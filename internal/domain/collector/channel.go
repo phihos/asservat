@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"asservat.local/asservat/internal/domain/artifact"
 	"time"
 
 	"asservat.local/asservat/internal/domain/planning"
@@ -62,13 +63,15 @@ const (
 	WorkPeerGeneration WorkKind = "peerGeneration"
 	// WorkPacketCapture is one finite manual networkHeaders capture
 	// (ADR-248). It is the only kind with a typed payload in this version.
-	WorkPacketCapture    WorkKind = "packetCapture"
-	WorkPacketSource     WorkKind = "packetSource"
-	WorkStopPacketSource WorkKind = "stopPacketSource"
+	WorkPacketCapture        WorkKind = "packetCapture"
+	WorkCancelSourceSnapshot WorkKind = "cancelSourceSnapshot"
+	WorkPacketSourceSnapshot WorkKind = "packetSourceSnapshot"
+	WorkPacketSource         WorkKind = "packetSource"
+	WorkStopPacketSource     WorkKind = "stopPacketSource"
 )
 
 func (k WorkKind) Valid() bool {
-	return k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource
+	return k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource
 }
 
 // Work is one item the connector queued for one node process. Sequence is
@@ -80,9 +83,11 @@ type Work struct {
 	Kind     WorkKind
 	NotAfter time.Time
 	// Packet is the payload of exactly the packetCapture kind.
-	Packet     *PacketCapture
-	Source     *PacketSource
-	StopSource *SourceBinding
+	Packet         *PacketCapture
+	Source         *PacketSource
+	StopSource     *SourceBinding
+	Snapshot       *SourceSnapshot
+	CancelSnapshot *SourceSnapshot
 }
 
 // Packet capture bounds (ADR-248). The output cap is the interim 8 MiB per
@@ -141,6 +146,7 @@ func validUUID(s string) bool {
 // PacketResult is the node's account of one finished capture; the PCAPNG
 // travels with it. Counters cover every frame the engine delivered.
 type PacketResult struct {
+	Snapshot      *artifact.SourceSnapshotOutcome `json:",omitempty"`
 	WorkID        string
 	CaptureID     string
 	StartedAt     time.Time
@@ -167,6 +173,9 @@ type PacketResult struct {
 
 // Valid checks the result's internal consistency.
 func (r PacketResult) Valid() bool {
+	if o := r.Snapshot; o != nil && (!o.Request.Valid() || o.NativeBytes != r.CapturedBytes || o.Retained != r.Retained || o.OutputFull != r.OutputFull || o.AcceptedExpectationDigest == (artifact.Digest{}) || o.NativeSHA256 == (artifact.Digest{})) {
+		return false
+	}
 	dropped := r.Filtered + r.Unsupported + r.Fragment + r.Extension + r.Malformed + r.OutputFull
 	failure := r.Failure == "" || r.Failure == ReasonTargetNotFound || r.Failure == ReasonTargetHostNet || r.Failure == ReasonCaptureFailed
 	return validUUID(r.WorkID) && validUUID(r.CaptureID) && !r.StartedAt.IsZero() && !r.EndedAt.Before(r.StartedAt) && r.Retained+dropped == r.Seen &&
@@ -196,6 +205,8 @@ func Decide(w Work, now time.Time) Receipt {
 	switch {
 	case !w.Kind.Valid() || (w.Kind == WorkPacketCapture) != (w.Packet != nil) || w.Packet != nil && !w.Packet.Valid() ||
 		(w.Kind == WorkPacketSource) != (w.Source != nil) || w.Source != nil && (!w.Source.Valid() || w.NotAfter.After(w.Source.Permit.DispatchUntil)) ||
+		(w.Kind == WorkCancelSourceSnapshot) != (w.CancelSnapshot != nil) || w.CancelSnapshot != nil && !w.CancelSnapshot.Valid() ||
+		(w.Kind == WorkPacketSourceSnapshot) != (w.Snapshot != nil) || w.Snapshot != nil && (!w.Snapshot.Valid() || w.NotAfter.After(w.Snapshot.Request.StartBy)) ||
 		(w.Kind == WorkStopPacketSource) != (w.StopSource != nil) || w.StopSource != nil && !w.StopSource.Valid():
 		r.Reason = ReasonWorkUnknown
 	case !now.Before(w.NotAfter):

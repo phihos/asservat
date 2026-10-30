@@ -178,9 +178,9 @@ func (q *Queries) FindPolicyOccurrence(ctx context.Context, arg FindPolicyOccurr
 	return id, err
 }
 
-const insertPolicyOccurrence = `-- name: InsertPolicyOccurrence :execrows
+const insertPolicyOccurrence = `-- name: InsertPolicyOccurrence :one
 INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts,detector)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(root_id,policy_uid,pod_uid,restarts) DO NOTHING
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(root_id,policy_uid,pod_uid,restarts) DO NOTHING RETURNING created_at
 `
 
 type InsertPolicyOccurrenceParams struct {
@@ -195,8 +195,8 @@ type InsertPolicyOccurrenceParams struct {
 	Detector     string
 }
 
-func (q *Queries) InsertPolicyOccurrence(ctx context.Context, arg InsertPolicyOccurrenceParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertPolicyOccurrence,
+func (q *Queries) InsertPolicyOccurrence(ctx context.Context, arg InsertPolicyOccurrenceParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, insertPolicyOccurrence,
 		arg.ID,
 		arg.RootID,
 		arg.PolicyUid,
@@ -207,10 +207,9 @@ func (q *Queries) InsertPolicyOccurrence(ctx context.Context, arg InsertPolicyOc
 		arg.Restarts,
 		arg.Detector,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	var created_at pgtype.Timestamptz
+	err := row.Scan(&created_at)
+	return created_at, err
 }
 
 const latestPolicyAcceptance = `-- name: LatestPolicyAcceptance :one

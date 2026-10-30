@@ -61,8 +61,9 @@ type RestartPolicy struct {
 	Resource *targets.ResourceCondition `json:",omitempty"`
 	// Sharing is the optional spec.sharing block (ADR-239). It is nil for a
 	// policy without one, so such a policy's scope digest is unchanged.
-	Sharing  *PolicySharing                        `json:",omitempty"`
-	Recorder *planning.PolicyRecorderConfiguration `json:",omitempty"`
+	Sharing        *PolicySharing                        `json:",omitempty"`
+	Recorder       *planning.PolicyRecorderConfiguration `json:",omitempty"`
+	RecordingSaves bool                                  `json:",omitempty"`
 	// GrantRef is explicit control outside collection identity; it never resets spend.
 	GrantRef string `json:"-"`
 }
@@ -121,6 +122,9 @@ func (p RestartPolicy) Request() targets.RestartRequest {
 }
 
 func (p RestartPolicy) Valid() bool {
+	if p.RecordingSaves && (p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing") {
+		return false
+	}
 	if p.Recorder != nil && !p.Recorder.Valid() || p.GrantRef != "" && !authorization.UUID(p.GrantRef) {
 		return false
 	}
@@ -290,6 +294,8 @@ type PolicyTick struct {
 // PolicyOccurrence is one admitted trigger occurrence. Its ID is the capture
 // request's idempotency key; it is never re-admitted or retried.
 type PolicyOccurrence struct {
+	// TriggeredAt is the original persisted occurrence clock, never dispatch time.
+	TriggeredAt           time.Time `json:",omitzero"`
 	ID, PolicyUID, PodUID string
 	Restarts              int64
 }

@@ -133,6 +133,7 @@ var initialInstallationTables = []string{
 	"policy_observation_session",
 	"policy_occurrence",
 	"policy_pod_watermark",
+	"policy_recording_source",
 	"policy_source",
 	"policy_suppression",
 	"policy_workload_window",

@@ -1,5 +1,62 @@
 # Sustained implementation progress
 
+## Existing-source Save composition: local work in progress (2026-10-30)
+
+[ADR-264](decisions/264-existing-source-packet-snapshots.md) adds a typed existing-source
+window, separate from finite recording and source observation authority. Local
+node/transport/producer/application tests cover one frozen copy/upload on replay,
+original trigger time and processing cutoff, exact source/process selection,
+original audience intersection, partial unknown-loss output and stopped sources
+within their remaining original authority. They are synthetic service-boundary
+and component evidence, not installed Save qualification.
+
+Schema 106 keeps bounded authenticated completion coverage separately from the
+immutable accepted expectation. Publication and native readers derive the final
+manifest expectation while retaining the original execution digest. PostgreSQL
+unit/race checks pass for projection tampering and distinct original/final audit
+bindings; actual SQL trigger, key-role and end-to-end qualification remain pending.
+Schema 107 now retains the full original source audience and minimal target,
+binds their canonical audience digest before first arm, and returns the existing
+occurrence creation time for automatic Save. SQL admission and execution share
+the original/current audience intersection check; legacy sources cannot Save.
+Full PostgreSQL and authorization package races pass locally, as do the tagged
+fixture storage-contract check and compilation of the genuine source-to-snapshot
+completion outer. Migration, real role and end-to-end qualification remain pending.
+The public ongoing compiler remains disabled. Manual Save
+inventory/submission and browser/MCP composition are in progress; the current
+one-Pod incident backend is not qualification of the accepted larger grouped
+Save contract. These foundations do not complete S-04 or the platform goal.
+
+
+## Ordinary ongoing source ledger: SQL component qualified (2026-10-30)
+
+The owned PostgreSQL/S3/OpenBao run on frozen `e8f26396` passed the selected
+source-ledger top-level test and all seven required descendants (nine actual
+PASS names including a type-alias control). Actual supervisor/fixture/suite exits
+were 0, with 80.628 seconds outer runtime and a real 30.01-second terminal
+quarantine check. Root independently verified all 3,409 canonical and 36,047
+tracked source hashes, restored result baseline, exact artifacts and owned
+container/network/scratch cleanup. Target and native-guard inputs remain synthetic;
+this qualifies the SQL source component, not collectors, installed sources or Save.
+
+It covers one real initial control debit without a capture, exact initial replay,
+quiet renewal without a source-row UPDATE, positive credit exactly once, exhausted
+parent behavior, expired/other-process refusal, and terminal quarantine without
+refund. Eight quiet transactions totaled 184.435555 ms (23.054444 ms mean). The
+whole-fixture WAL delta was 5,720 bytes, including concurrent fleet maintenance;
+it is not per-source WAL attribution or full-lifetime/backup-budget proof. The
+one-source tuple was 1,080 bytes; whole relation heap/index sizes were 8,192 and
+57,344 bytes. Configured record-row/WAL allowances remain bounds, not measurements.
+
+The run exposed and fixed a concrete migration-73 contract mismatch: current
+accepted SQL capacity rows live for 30 seconds while original caller receipts
+remain five seconds. The source adapter had applied the raw five-second rule to
+the retained row. Initial/final checks now reuse its existing 30-second lifetime
+and validate the immutable original snapshot at its own observation instant.
+A regression failed before the fix at 0, 15 and 29.999999 seconds; expiry,
+overlong, suspended, changed-digest and malformed-original cases still refuse.
+No clock, query, role, configuration or caller-proof interval was added.
+
 ## Protected ongoing resource projection: SQL component qualified (2026-10-29)
 
 [ADR-262](decisions/262-protected-ongoing-resource-projection.md) records the

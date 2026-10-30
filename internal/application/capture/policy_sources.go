@@ -41,6 +41,7 @@ type PolicySourceAdmission struct {
 }
 
 type PolicySourceState struct {
+	Audience                             []artifact.AudienceAssignment
 	Binding                              collector.SourceBinding
 	ClusterID, NamespaceUID, WorkloadUID string
 	StartedAt, HardUntil, StartBy        time.Time
@@ -48,6 +49,7 @@ type PolicySourceState struct {
 	InitialCredit                        int64
 	Credit, BytesPerSecond               int64
 	EndedAt                              time.Time
+	Target                               *targets.SourceSnapshotTarget
 }
 
 type PolicySourceLedger interface {

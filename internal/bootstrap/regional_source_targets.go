@@ -33,7 +33,7 @@ func (t reportedTargets) ResolveOngoingRecorder(ctx context.Context, r targets.O
 	if r.SourceID != "" {
 		for _, state := range v.Report.Sources {
 			if state.SourceID == r.SourceID && state.Fence == r.Fence {
-				out.State = &targets.RecorderSourceState{SourceID: state.SourceID, Fence: state.Fence, IssuedAt: state.IssuedAt, LeafUntil: state.LeafUntil, Credit: state.Credit, ObservedBytes: state.ObservedBytes, Closed: state.Closed, Stopped: state.Stopped, InputUnknown: state.InputUnknown, ObservedAt: v.Report.ObservedAt, FreshUntil: v.Report.ObservedAt.Add(collector.StatusStaleAfter)}
+				out.State = &targets.RecorderSourceState{SourceStoppedAt: state.SourceStoppedAt, SnapshotUntil: state.SnapshotUntil, SourceID: state.SourceID, Fence: state.Fence, IssuedAt: state.IssuedAt, LeafUntil: state.LeafUntil, Credit: state.Credit, ObservedBytes: state.ObservedBytes, Closed: state.Closed, Stopped: state.Stopped, InputUnknown: state.InputUnknown, ObservedAt: v.Report.ObservedAt, FreshUntil: v.Report.ObservedAt.Add(collector.StatusStaleAfter)}
 				break
 			}
 		}

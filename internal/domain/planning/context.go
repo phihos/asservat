@@ -41,6 +41,35 @@ type ContextInput struct {
 	// pod status: the authored composition with its filters frozen at
 	// preview, so the plan never depends on a compiler being present later.
 	Recorder *RecorderContext `json:",omitempty"`
+	// Snapshot selects one existing-source window, independently of finite recording.
+	Snapshot *SourceSnapshotContext `json:",omitempty"`
+	// SnapshotSource is a current exact-source observation, never persisted in passive preview.
+	SnapshotSource *targets.SourceSnapshotResolution `json:",omitempty"`
+}
+
+// SourceSnapshotContext binds a saved window to its original policy executor
+// and source definition. It cannot start or renew the separately owned source.
+type SourceSnapshotContext struct {
+	Request                          artifact.SourceSnapshotRequest
+	ActionID, PolicyUID, TriggerKind string
+	ExecutionDigest                  artifact.Digest
+	RecipeDigest                     artifact.Digest
+	SourceAudience                   []artifact.AudienceAssignment
+	SourceAudienceDigest             artifact.Digest
+	SourceTarget                     *targets.SourceSnapshotTarget
+}
+
+func (s *SourceSnapshotContext) Clone() *SourceSnapshotContext {
+	if s == nil {
+		return nil
+	}
+	out := *s
+	out.SourceAudience = append(s.SourceAudience[:0:0], s.SourceAudience...)
+	if s.SourceTarget != nil {
+		target := *s.SourceTarget
+		out.SourceTarget = &target
+	}
+	return &out
 }
 
 // RecorderContext is the authored composition of a recorder capture and the

@@ -370,8 +370,9 @@ func (l RegionalLocal) valid() bool {
 // operation is bound to that work's capture, attempt, target and digests;
 // acquisition requires the committed start and the exact resolved pin.
 type regionalSession struct {
-	local RegionalLocal
-	work  fleet.APIContextWork
+	snapshotTarget *targets.SourceSnapshotResolution
+	local          RegionalLocal
+	work           fleet.APIContextWork
 	// process is this work's one complete process observation (ADR-173). Later
 	// operations reuse it until its original deadline; it is never renewed.
 	process      *value.APIProcessObservation
@@ -429,8 +430,10 @@ func decodeOperationBody(body []byte, out any) error {
 func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOperation) (any, error) {
 	l := s.local
 	switch q.Method {
+	case opResolveSourceSnapshot:
+		return s.resolveSourceSnapshot(ctx, q.Body)
 	case opResolvePod:
-		if s.packetSource != nil {
+		if s.packetSource != nil || s.snapshotTarget != nil {
 			return nil, value.ErrDenied
 		}
 		var r targets.Request
@@ -552,6 +555,8 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 			return nil, err
 		}
 		return recordingReply{Queued: queued}, nil
+	case opStartSourceSnapshot:
+		return s.startSourceSnapshot(ctx, q.Body)
 	case opStartPolicyRecording:
 		var r policyRecordingRequest
 		if err := decodeOperationBody(q.Body, &r); err != nil {

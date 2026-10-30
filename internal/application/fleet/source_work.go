@@ -26,10 +26,18 @@ type SourceWork struct {
 	NotAfter     time.Time
 	Stop         bool
 	StopIssuedAt time.Time
+	StopSnapshot *collector.SourceSnapshot `json:",omitempty"`
 }
 
 func (w SourceWork) Valid(now time.Time) bool {
 	p, b := w.Source.Permit, w.Source.Permit.Binding
+	if w.StopSnapshot != nil {
+		x := w.StopSnapshot
+		return !w.Stop && x.Valid() && w.Channel.Valid() && x.Binding.RootID == w.Channel.RootID && w.Source.Permit == (collector.SourcePermit{}) && len(w.Source.Program) == 0 && w.Source.Ring == (collector.SourceRingLimits{}) && w.Source.Resources == (collector.SourceResources{}) && w.Target == (targets.PodResolution{}) && w.Node == (targets.PacketSourceObservation{}) &&
+			(x.WriterPodUID == "" || x.WriterPodUID == w.Channel.Executor.PodUID && x.WriterEpoch == w.Channel.Executor.ProcessEpoch) &&
+			!w.StopIssuedAt.IsZero() && !now.Before(w.StopIssuedAt) && now.Before(w.NotAfter) && !w.NotAfter.After(w.StopIssuedAt.Add(5*time.Second))
+	}
+
 	if w.Stop {
 		p.Binding = collector.SourceBinding{}
 		return w.Channel.Valid() && b.Valid() && b.RootID == w.Channel.RootID && p == (collector.SourcePermit{}) && len(w.Source.Program) == 0 && w.Source.Ring == (collector.SourceRingLimits{}) && w.Source.Resources == (collector.SourceResources{}) && w.Target == (targets.PodResolution{}) && w.Node == (targets.PacketSourceObservation{}) &&
@@ -44,7 +52,7 @@ func (w SourceWork) Valid(now time.Time) bool {
 		now.Before(w.NotAfter) && !w.NotAfter.After(p.DispatchUntil) && !w.NotAfter.After(w.Target.FreshUntil) && !w.NotAfter.After(w.Node.FreshUntil)
 }
 func (w SourceWork) IssuedAt() time.Time {
-	if w.Stop {
+	if w.Stop || w.StopSnapshot != nil {
 		return w.StopIssuedAt
 	}
 	return w.Source.Permit.IssuedAt
@@ -62,4 +70,17 @@ type AuthenticatedSourceWork struct {
 
 func (w AuthenticatedSourceWork) Valid(now time.Time) bool {
 	return w.Work.Valid(now) && identity.Text(w.KeyID, 128) && w.TrustRevision.Valid() && identity.Fresh(w.VerifiedAt, w.ValidUntil, now, 5*time.Second) && !w.ValidUntil.After(w.Work.NotAfter)
+}
+
+func (w SourceWork) Binding() collector.SourceBinding {
+	if w.StopSnapshot != nil {
+		return w.StopSnapshot.Binding
+	}
+	return w.Source.Permit.Binding
+}
+func (w SourceWork) RouteID() string {
+	if w.StopSnapshot != nil {
+		return w.StopSnapshot.CaptureID
+	}
+	return w.Source.Permit.Binding.SourceID
 }

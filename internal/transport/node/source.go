@@ -11,15 +11,22 @@ import (
 )
 
 func WireSourceBinding(b collector.SourceBinding) contracts.NodeSourceBinding {
+	audience := ""
+	if b.AudienceDigest != ([32]byte{}) {
+		audience = hex.EncodeToString(b.AudienceDigest[:])
+	}
 	program := ""
 	if b.ProgramDigest != [32]byte{} {
 		program = hex.EncodeToString(b.ProgramDigest[:])
 	}
-	return contracts.NodeSourceBinding{RootID: b.RootID, PolicyUID: b.PolicyUID, AcceptanceID: b.AcceptanceID, SourceID: b.SourceID, Fence: b.Fence, ActionID: b.ActionID, PodUID: b.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, Scope: hex.EncodeToString(b.Scope[:]), ExpectationDigest: hex.EncodeToString(b.ExpectationDigest[:]), ProgramDigest: program, ResourceDigest: hex.EncodeToString(b.ResourceDigest[:])}
+	return contracts.NodeSourceBinding{AudienceDigest: audience, RootID: b.RootID, PolicyUID: b.PolicyUID, AcceptanceID: b.AcceptanceID, SourceID: b.SourceID, Fence: b.Fence, ActionID: b.ActionID, PodUID: b.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, Scope: hex.EncodeToString(b.Scope[:]), ExpectationDigest: hex.EncodeToString(b.ExpectationDigest[:]), ProgramDigest: program, ResourceDigest: hex.EncodeToString(b.ResourceDigest[:])}
 }
 func DomainSourceBinding(w contracts.NodeSourceBinding) (collector.SourceBinding, bool) {
 	b := collector.SourceBinding{RootID: w.RootID, PolicyUID: w.PolicyUID, AcceptanceID: w.AcceptanceID, SourceID: w.SourceID, Fence: w.Fence, ActionID: w.ActionID, PodUID: w.PodUID, NodeUID: w.NodeUID, BootID: w.BootID, CollectorPodUID: w.CollectorPodUID, CollectorEpoch: w.CollectorEpoch}
 	var ok bool
+	if b.AudienceDigest, ok = digestHex(w.AudienceDigest); !ok {
+		return b, false
+	}
 	if b.Scope, ok = digestHex(w.Scope); !ok {
 		return b, false
 	}

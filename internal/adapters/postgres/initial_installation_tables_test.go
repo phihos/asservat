@@ -62,3 +62,20 @@ func TestInitialInstallationInventoryIncludesPolicyGrantRelations(t *testing.T) 
 		}
 	}
 }
+
+// Every permanent ordinary-source relation must participate in the exact
+// catalog inventory used by lockInitialTables before first activation. An
+// ordinary migration replay alone cannot exercise that prerequisite.
+func TestInitialInstallationInventoryIncludesOrdinarySourceRelation(t *testing.T) {
+	sql, err := fs.ReadFile(migrations.Files(), "00105_policy_recording_sources.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const table = "policy_recording_source"
+	if !strings.Contains(string(sql), "CREATE TABLE "+table+" (") {
+		t.Fatal("source migration no longer defines expected permanent relation", table)
+	}
+	if !slices.Contains(initialInstallationTables, table) {
+		t.Errorf("first-install exact catalog inventory rejects ordinary source relation %q", table)
+	}
+}

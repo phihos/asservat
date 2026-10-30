@@ -13,6 +13,10 @@ import (
 // A change to its effects, exposure or interpretation requires a new rule digest.
 const contextAssessmentRule = `{"rule":"pod-status-assessment/v2","retentionAnchorRule":"submissionPreparation","recipe":"builtin-pod-status-v1","impact":"unknown","effects":["nodeCPU","collectorMemory","storageIO","uploadContention"],"retained":["personalIdentifiers","networkAddresses","paths"],"transient":["userContent","credentials","unknownApplicationData"],"metrics":"unavailable","limit":{"nativeOutputBytes":4096,"excludes":"API response, framing, encryption and total collector memory"}}`
 
+func SourceSnapshotAssessmentRulesDigest() artifact.Digest {
+	return artifact.Digest(sha256.Sum256([]byte("source-window-assessment/v1;retention=original-source-acquisition;incremental=freeze,copy,encode,encrypt,upload;baseline=separate;overhead=unknown")))
+}
+
 func ContextAssessmentRulesDigest() artifact.Digest {
 	return ContextAssessmentRulesDigestForClass(artifact.ContextNodeExecution)
 }
@@ -54,9 +58,14 @@ func AssessContext(plan value.ContextPlan, assessmentID string, now time.Time) (
 	if plan.Input.Target.ExecutionClass == artifact.ContextAPIExecution {
 		explanation = "Uses the Kubernetes API and a regional collector for CPU, memory, encryption and upload work. It does not access the observed Pod's node or attach to an application process. Shared infrastructure pressure and combined overhead are unmeasured."
 	}
+	rules, output := ContextAssessmentRulesDigestForClass(plan.Input.Target.ExecutionClass), int64(artifact.MaxContextBytes)
+	if saved := plan.Input.Snapshot; saved != nil {
+		rules, output = SourceSnapshotAssessmentRulesDigest(), saved.Request.MaxBytes
+		explanation = "Copies an existing recording window, then encodes, encrypts and uploads it. No new source or application attach is started. The live recorder baseline continues independently; incremental CPU, memory, storage and upload overhead is unmeasured. Preview reserves no history; eviction or source loss can produce explicit partial evidence."
+	}
 	return value.ContextAssessment{
 		ID: assessmentID, PlanDigest: plan.ScopeDigest,
-		RulesDigest: ContextAssessmentRulesDigestForClass(plan.Input.Target.ExecutionClass), CapabilityDigest: artifact.Digest(plan.Input.Capability.Revision.Digest),
+		RulesDigest: rules, CapabilityDigest: artifact.Digest(plan.Input.Capability.Revision.Digest),
 		GeneratedAt: now, ValidUntil: plan.ValidUntil,
 		Impact: value.AssessmentImpact{
 			Level: "unknown", HasUnknowns: true,
@@ -75,6 +84,6 @@ func AssessContext(plan value.ContextPlan, assessmentID string, now time.Time) (
 			MaximumAgeSeconds: r.MaximumSeconds, DeletionBudgetSeconds: r.DeletionBudgetSeconds,
 			PolicyDigests: digests,
 		},
-		OutputLimit: artifact.MaxContextBytes,
+		OutputLimit: output,
 	}, nil
 }

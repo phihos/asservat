@@ -26,8 +26,13 @@ type PacketSink interface {
 }
 
 type pendingCapture struct {
-	captureID string
-	until     time.Time
+	cancelOnly     bool
+	cancelID       string
+	cancelSeq      uint64
+	cancelJoinedAt time.Time
+	snapshot       *collector.SourceSnapshot
+	captureID      string
+	until          time.Time
 }
 
 // SetPacketSink installs the receiver of capture results. It is set once
@@ -111,11 +116,28 @@ func (c *NodeChannel) DeliverPacket(ctx context.Context, p NodePeer, epoch strin
 		return err
 	}
 	pending, ok := e.captures[r.WorkID]
-	if !ok || pending.captureID != r.CaptureID || !c.now().Before(pending.until) || c.sink == nil {
+	if !ok || pending.cancelOnly || pending.captureID != r.CaptureID || !c.now().Before(pending.until) || c.sink == nil {
+		c.mu.Unlock()
+		return ErrNodeConflict
+	}
+	if expected := pending.snapshot; expected != nil {
+		if !c.now().Before(expected.Request.ProcessingUntil) || !pending.cancelJoinedAt.IsZero() {
+			c.mu.Unlock()
+			return ErrNodeConflict
+		}
+		if r.Snapshot == nil || !r.Snapshot.Request.Equal(expected.Request) || r.Snapshot.AcceptedExpectationDigest != expected.ExpectationDigest || r.ProgramDigest != expected.Binding.ProgramDigest {
+			c.mu.Unlock()
+			return ErrNodeConflict
+		}
+	} else if r.Snapshot != nil {
 		c.mu.Unlock()
 		return ErrNodeConflict
 	}
 	delete(e.captures, r.WorkID)
+	if pending.cancelID != "" {
+		pending.cancelOnly = true
+		e.captures[pending.cancelID] = pending
+	}
 	id, sink := e.id, c.sink
 	c.mu.Unlock()
 	if err := sink.DeliverPacket(ctx, id, r, io.LimitReader(body, r.CapturedBytes)); err != nil {

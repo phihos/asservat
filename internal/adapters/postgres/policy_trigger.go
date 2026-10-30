@@ -153,11 +153,12 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 			occurrence := value.PolicyOccurrence{ID: uid(newID), PolicyUID: a.PolicyUID, PodUID: c.PodUID, Restarts: c.Restarts}
 			inserted, err := q.InsertPolicyOccurrence(ctx, custodydb.InsertPolicyOccurrenceParams{ID: newID, RootID: id(s.root), PolicyUid: a.PolicyUID, AcceptanceID: row.ActiveID, ClusterID: id(a.ClusterID), WorkloadUid: a.WorkloadUID, PodUid: c.PodUID, Restarts: c.Restarts, Detector: detector})
 			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return value.ErrConflict
+				}
 				return err
 			}
-			if inserted != 1 {
-				return value.ErrConflict
-			}
+			occurrence.TriggeredAt = inserted.Time
 			for _, w := range []struct {
 				policy   string
 				tat      time.Time

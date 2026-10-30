@@ -35,7 +35,7 @@ func (q *Queries) CountPolicyRecordingSources(ctx context.Context, arg CountPoli
 const endInactivePolicyRecordingSources = `-- name: EndInactivePolicyRecordingSources :many
 UPDATE policy_recording_source dst SET ended_at=clock_timestamp() WHERE (dst.root_id,dst.id) IN (
  SELECT s.root_id,s.id FROM policy_recording_source s WHERE s.root_id=$1 AND s.ended_at IS NULL AND (s.hard_until<=clock_timestamp() OR NOT EXISTS (
- SELECT 1 FROM policy_source p WHERE p.root_id=s.root_id AND p.policy_uid=s.policy_uid AND p.active_id=s.acceptance_id AND NOT p.deleted AND NOT p.suspended)) ORDER BY s.id LIMIT 64) RETURNING root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at
+ SELECT 1 FROM policy_source p WHERE p.root_id=s.root_id AND p.policy_uid=s.policy_uid AND p.active_id=s.acceptance_id AND NOT p.deleted AND NOT p.suspended)) ORDER BY s.id LIMIT 64) RETURNING root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at, source_audience_json, source_audience_digest, source_target_json
 `
 
 func (q *Queries) EndInactivePolicyRecordingSources(ctx context.Context, rootID pgtype.UUID) ([]PolicyRecordingSource, error) {
@@ -69,6 +69,9 @@ func (q *Queries) EndInactivePolicyRecordingSources(ctx context.Context, rootID 
 			&i.BytesPerSecond,
 			&i.EndedAt,
 			&i.SlotReleasedAt,
+			&i.SourceAudienceJson,
+			&i.SourceAudienceDigest,
+			&i.SourceTargetJson,
 		); err != nil {
 			return nil, err
 		}
@@ -98,7 +101,7 @@ func (q *Queries) EndPolicyRecordingSource(ctx context.Context, arg EndPolicyRec
 }
 
 const findPolicyRecordingSource = `-- name: FindPolicyRecordingSource :one
-SELECT root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at FROM policy_recording_source WHERE root_id=$1 AND policy_uid=$2 AND action_id=$3 AND pod_uid=$4 AND slot_released_at IS NULL FOR SHARE
+SELECT root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at, source_audience_json, source_audience_digest, source_target_json FROM policy_recording_source WHERE root_id=$1 AND policy_uid=$2 AND action_id=$3 AND pod_uid=$4 AND slot_released_at IS NULL FOR SHARE
 `
 
 type FindPolicyRecordingSourceParams struct {
@@ -138,12 +141,15 @@ func (q *Queries) FindPolicyRecordingSource(ctx context.Context, arg FindPolicyR
 		&i.BytesPerSecond,
 		&i.EndedAt,
 		&i.SlotReleasedAt,
+		&i.SourceAudienceJson,
+		&i.SourceAudienceDigest,
+		&i.SourceTargetJson,
 	)
 	return i, err
 }
 
 const increasePolicyRecordingSourceCredit = `-- name: IncreasePolicyRecordingSourceCredit :one
-UPDATE policy_recording_source SET credit=credit+$3::bigint WHERE root_id=$1 AND id=$2 AND credit=$4 AND ended_at IS NULL AND hard_until>clock_timestamp() AND $3::bigint>0 AND credit<=9223372036854775807-$3::bigint RETURNING root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at
+UPDATE policy_recording_source SET credit=credit+$3::bigint WHERE root_id=$1 AND id=$2 AND credit=$4 AND ended_at IS NULL AND hard_until>clock_timestamp() AND $3::bigint>0 AND credit<=9223372036854775807-$3::bigint RETURNING root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at, source_audience_json, source_audience_digest, source_target_json
 `
 
 type IncreasePolicyRecordingSourceCreditParams struct {
@@ -183,35 +189,41 @@ func (q *Queries) IncreasePolicyRecordingSourceCredit(ctx context.Context, arg I
 		&i.BytesPerSecond,
 		&i.EndedAt,
 		&i.SlotReleasedAt,
+		&i.SourceAudienceJson,
+		&i.SourceAudienceDigest,
+		&i.SourceTargetJson,
 	)
 	return i, err
 }
 
 const insertPolicyRecordingSource = `-- name: InsertPolicyRecordingSource :one
-INSERT INTO policy_recording_source(root_id,id,fence,policy_uid,acceptance_id,action_id,cluster_id,namespace_uid,workload_uid,pod_uid,allocation_id,binding_json,started_at,hard_until,start_by,initial_leaf_until,initial_credit,credit,bytes_per_second)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at
+INSERT INTO policy_recording_source(root_id,id,fence,policy_uid,acceptance_id,action_id,cluster_id,namespace_uid,workload_uid,pod_uid,allocation_id,binding_json,started_at,hard_until,start_by,initial_leaf_until,initial_credit,credit,bytes_per_second,source_audience_json,source_audience_digest,source_target_json)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at, source_audience_json, source_audience_digest, source_target_json
 `
 
 type InsertPolicyRecordingSourceParams struct {
-	RootID           pgtype.UUID
-	ID               pgtype.UUID
-	Fence            pgtype.UUID
-	PolicyUid        string
-	AcceptanceID     pgtype.UUID
-	ActionID         string
-	ClusterID        pgtype.UUID
-	NamespaceUid     string
-	WorkloadUid      string
-	PodUid           string
-	AllocationID     pgtype.UUID
-	BindingJson      []byte
-	StartedAt        pgtype.Timestamptz
-	HardUntil        pgtype.Timestamptz
-	StartBy          pgtype.Timestamptz
-	InitialLeafUntil pgtype.Timestamptz
-	InitialCredit    int64
-	Credit           int64
-	BytesPerSecond   int64
+	RootID               pgtype.UUID
+	ID                   pgtype.UUID
+	Fence                pgtype.UUID
+	PolicyUid            string
+	AcceptanceID         pgtype.UUID
+	ActionID             string
+	ClusterID            pgtype.UUID
+	NamespaceUid         string
+	WorkloadUid          string
+	PodUid               string
+	AllocationID         pgtype.UUID
+	BindingJson          []byte
+	StartedAt            pgtype.Timestamptz
+	HardUntil            pgtype.Timestamptz
+	StartBy              pgtype.Timestamptz
+	InitialLeafUntil     pgtype.Timestamptz
+	InitialCredit        int64
+	Credit               int64
+	BytesPerSecond       int64
+	SourceAudienceJson   []byte
+	SourceAudienceDigest []byte
+	SourceTargetJson     []byte
 }
 
 func (q *Queries) InsertPolicyRecordingSource(ctx context.Context, arg InsertPolicyRecordingSourceParams) (PolicyRecordingSource, error) {
@@ -235,6 +247,9 @@ func (q *Queries) InsertPolicyRecordingSource(ctx context.Context, arg InsertPol
 		arg.InitialCredit,
 		arg.Credit,
 		arg.BytesPerSecond,
+		arg.SourceAudienceJson,
+		arg.SourceAudienceDigest,
+		arg.SourceTargetJson,
 	)
 	var i PolicyRecordingSource
 	err := row.Scan(
@@ -259,12 +274,15 @@ func (q *Queries) InsertPolicyRecordingSource(ctx context.Context, arg InsertPol
 		&i.BytesPerSecond,
 		&i.EndedAt,
 		&i.SlotReleasedAt,
+		&i.SourceAudienceJson,
+		&i.SourceAudienceDigest,
+		&i.SourceTargetJson,
 	)
 	return i, err
 }
 
 const listPolicyRecordingSources = `-- name: ListPolicyRecordingSources :many
-SELECT root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at FROM policy_recording_source WHERE root_id=$1 AND policy_uid=$2 AND slot_released_at IS NULL ORDER BY action_id,pod_uid LIMIT 1025
+SELECT root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at, source_audience_json, source_audience_digest, source_target_json FROM policy_recording_source WHERE root_id=$1 AND policy_uid=$2 AND slot_released_at IS NULL ORDER BY action_id,pod_uid LIMIT 1025
 `
 
 type ListPolicyRecordingSourcesParams struct {
@@ -303,6 +321,9 @@ func (q *Queries) ListPolicyRecordingSources(ctx context.Context, arg ListPolicy
 			&i.BytesPerSecond,
 			&i.EndedAt,
 			&i.SlotReleasedAt,
+			&i.SourceAudienceJson,
+			&i.SourceAudienceDigest,
+			&i.SourceTargetJson,
 		); err != nil {
 			return nil, err
 		}
@@ -315,7 +336,7 @@ func (q *Queries) ListPolicyRecordingSources(ctx context.Context, arg ListPolicy
 }
 
 const readPolicyRecordingSource = `-- name: ReadPolicyRecordingSource :one
-SELECT root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at FROM policy_recording_source WHERE root_id=$1 AND id=$2 FOR SHARE
+SELECT root_id, id, fence, policy_uid, acceptance_id, action_id, cluster_id, namespace_uid, workload_uid, pod_uid, allocation_id, binding_json, started_at, hard_until, start_by, initial_leaf_until, initial_credit, credit, bytes_per_second, ended_at, slot_released_at, source_audience_json, source_audience_digest, source_target_json FROM policy_recording_source WHERE root_id=$1 AND id=$2 FOR SHARE
 `
 
 type ReadPolicyRecordingSourceParams struct {
@@ -348,6 +369,9 @@ func (q *Queries) ReadPolicyRecordingSource(ctx context.Context, arg ReadPolicyR
 		&i.BytesPerSecond,
 		&i.EndedAt,
 		&i.SlotReleasedAt,
+		&i.SourceAudienceJson,
+		&i.SourceAudienceDigest,
+		&i.SourceTargetJson,
 	)
 	return i, err
 }

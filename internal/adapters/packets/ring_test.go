@@ -1045,3 +1045,31 @@ func TestRingAfterZeroRetainsKnownStop(t *testing.T) {
 		})
 	}
 }
+
+func TestRingWindowRetainsKnownCloseWithoutNaturalStop(t *testing.T) {
+	r, now := ringFixture(t, nil)
+	ringAdd(t, r, now, now)
+	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+	defer cancel()
+	end := now.Add(time.Second)
+	w, err := r.BeginWindowSnapshot(ctx, RingWindow{now, end}, now, now, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	closed := now.Add(time.Millisecond)
+	if err = r.CloseAt(closed); err != nil {
+		t.Fatal(err)
+	}
+	if err = w.Complete(end); err != nil {
+		t.Fatal(err)
+	}
+	c := w.Coverage()
+	if !c.SourceClosedAt.Equal(closed) || !c.SourceStoppedAt.IsZero() || c.Complete {
+		t.Fatal("lost close or invented natural stop/full interval", c)
+	}
+	var p RingPacket
+	if err = w.Next(&p); err != nil || !p.At.Equal(now) {
+		t.Fatal("lost preadmitted packet", p, err)
+	}
+}

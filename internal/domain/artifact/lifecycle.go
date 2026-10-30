@@ -20,6 +20,7 @@ type OngoingLifecycle struct {
 	After           time.Duration
 	HistoryCoverage string
 	GapReasons      []string
+	SourceClosedAt  time.Time `json:",omitzero"`
 	SourceStoppedAt time.Time `json:",omitzero"`
 	WindowCoverage  string
 	Origin          *RecordingSaveOrigin `json:",omitempty"`
@@ -61,14 +62,17 @@ func (l OngoingLifecycle) Validate(t0 time.Time) error {
 			return ErrInvalid
 		}
 	}
-	if !l.SourceStoppedAt.IsZero() && (!lifecycleTime(l.SourceStoppedAt) || l.SourceStoppedAt.Before(l.SourceStartedAt)) {
+	if !l.SourceClosedAt.IsZero() && l.SourceClosedAt.Before(l.SourceStartedAt) {
+		return ErrInvalid
+	}
+	if !l.SourceStoppedAt.IsZero() && l.SourceStoppedAt.Before(l.SourceStartedAt) {
 		return ErrInvalid
 	}
 	if l.HistoryCoverage == "full" && l.SourceStartedAt.After(t0.Add(-l.RequestedBefore)) || l.HistoryCoverage != "full" && len(l.GapReasons) == 0 {
 		return ErrInvalid
 	}
 	windowEnd := t0.Add(l.After)
-	if l.WindowCoverage == "full" && (l.HistoryCoverage != "full" || len(l.GapReasons) != 0 || !l.SourceStoppedAt.IsZero() && l.SourceStoppedAt.Before(windowEnd)) {
+	if l.WindowCoverage == "full" && (!l.SourceClosedAt.IsZero() && l.SourceClosedAt.Before(windowEnd) || l.HistoryCoverage != "full" || len(l.GapReasons) != 0 || !l.SourceStoppedAt.IsZero() && l.SourceStoppedAt.Before(windowEnd)) {
 		return ErrInvalid
 	}
 	if l.TriggerKind == "recordingSave" {

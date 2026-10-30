@@ -547,6 +547,24 @@
         "data",
         "index"
       ]
+    },
+    "sourceSnapshotManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalScope",
+        "binding"
+      ],
+      "properties": {
+        "canonicalScope": {
+          "type": "object",
+          "maxProperties": 64
+        },
+        "binding": {
+          "type": "object",
+          "maxProperties": 32
+        }
+      }
     }
   },
   "required": [

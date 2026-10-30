@@ -23,4 +23,5 @@ SELECT acknowledge_capture_pair(sqlc.arg(root_id)::uuid,sqlc.arg(intent_value)::
 SELECT configure_capture_audit_backing(sqlc.arg(root_id)::uuid,sqlc.arg(pool_value)::jsonb,sqlc.arg(account_value)::jsonb,sqlc.arg(observed_at)::timestamptz,sqlc.arg(fresh_until)::timestamptz);
 
 -- name: ReadCaptureOperationIntent :one
-SELECT * FROM capture_operation_intents WHERE root_id=$1 AND id=$2;
+-- Original intent view deliberately excludes later completion observations.
+SELECT *,NULL::bytea AS snapshot_coverage,NULL::bytea AS snapshot_coverage_digest,NULL::bytea AS snapshot_expectation_digest FROM capture_operation_intents WHERE root_id=$1 AND id=$2;

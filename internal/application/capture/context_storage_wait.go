@@ -145,7 +145,7 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 		at   time.Time
 		name string
 	}{
-		{f.target.FreshUntil, "target"}, {f.eligibility.ValidUntil, "eligibility"}, {f.eligibility.VerifiedIdentity.ValidUntil, "identity"},
+		{snapshotFactsTargetUntil(f), "target"}, {f.eligibility.ValidUntil, "eligibility"}, {f.eligibility.VerifiedIdentity.ValidUntil, "identity"},
 		{f.capability.FreshUntil, "capability"}, {f.retention.Proof.ValidUntil, "retention-proof"}, {f.retention.ValidUntil, "retention"}, {f.retention.ExpiresAt, "retention-expiry"},
 	} {
 		if bound.at.Before(until) {

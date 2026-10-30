@@ -45,7 +45,7 @@ func (c *packetClock) deliver(data []byte, wire uint32, raw uint64, notice func(
 		}
 		return
 	}
-	deliver(Frame{Data: data, Wire: wire, At: at})
+	deliver(Frame{Data: data, Wire: wire, At: at, TimestampUnknown: raw == 0})
 }
 
 func packetMonotonicNanos(sec, nsec int64) (int64, error) {

@@ -16,17 +16,22 @@ import (
 // collection authority. Initial replay tombstones survive their original start
 // cutoff; a later renewal cannot construct a replacement engine.
 type nodeSources struct {
-	mu        sync.Mutex
-	closed    bool
-	sources   map[string]*packetSource
-	plans     map[string]collector.SourceRingLimits
-	stops     map[string]sourceStop
-	engine    observedPacketEngine
-	identity  func() collector.Identity
-	now       func() time.Time
-	budget    *collector.Budget
-	budgetMu  *sync.Mutex
-	available bool
+	snapshots  map[string]*nodeSourceSnapshot
+	snapshotWG sync.WaitGroup
+	upload     packetUploader
+	takeUpload func(context.Context, int64) bool
+	version    string
+	mu         sync.Mutex
+	closed     bool
+	sources    map[string]*packetSource
+	plans      map[string]collector.SourceRingLimits
+	stops      map[string]sourceStop
+	engine     observedPacketEngine
+	identity   func() collector.Identity
+	now        func() time.Time
+	budget     *collector.Budget
+	budgetMu   *sync.Mutex
+	available  bool
 }
 
 type sourceStop struct {
@@ -39,6 +44,9 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 	if r.Reason == collector.ReasonWorkUnknown || r.Reason == collector.ReasonWorkExpired {
 		return r
 	}
+	if w.CancelSnapshot != nil {
+		return n.cancelSnapshot(parent, epoch, w, r)
+	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.closed || parent == nil || parent.Err() != nil || n.identity == nil {
@@ -47,12 +55,18 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 	}
 	id := n.identity()
 	b := w.StopSource
+	if w.Snapshot != nil {
+		b = &w.Snapshot.Binding
+	}
 	if w.Source != nil {
 		b = &w.Source.Permit.Binding
 	}
 	if b == nil || b.NodeUID != id.NodeUID || b.BootID != id.BootID || b.CollectorPodUID != id.PodUID || b.CollectorEpoch != id.Epoch || id.Epoch != epoch {
 		r.Reason = collector.ReasonWorkUnknown
 		return r
+	}
+	if w.Snapshot != nil {
+		return n.snapshotLocked(parent, epoch, w, r)
 	}
 	if w.StopSource != nil {
 		if s := n.sources[b.SourceID]; s != nil {
@@ -150,6 +164,9 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 func (n *nodeSources) Close() {
 	n.mu.Lock()
 	n.closed = true
+	for _, snapshot := range n.snapshots {
+		snapshot.cancel()
+	}
 	owned := make([]*packetSource, 0, len(n.sources))
 	for _, s := range n.sources {
 		owned = append(owned, s)
@@ -161,6 +178,7 @@ func (n *nodeSources) Close() {
 	for _, s := range owned {
 		_ = s.Close()
 	}
+	n.snapshotWG.Wait()
 }
 
 func (n *nodeSources) Status() ([]collector.SourceStatus, time.Time) {
@@ -171,7 +189,15 @@ func (n *nodeSources) Status() ([]collector.SourceStatus, time.Time) {
 	for _, s := range n.sources {
 		s.mu.Lock()
 		p := s.meter.Permit()
-		out = append(out, collector.SourceStatus{SourceID: p.Binding.SourceID, Fence: p.Binding.Fence, IssuedAt: p.IssuedAt, LeafUntil: p.LeafUntil, Credit: p.Credit, ObservedBytes: s.meter.ObservedBytes(), Closed: s.closed || !n.now().Before(p.LeafUntil), Stopped: !s.stoppedUntil.IsZero(), InputUnknown: s.inputUnknown})
+		until := p.LeafUntil
+		stoppedAt := time.Time{}
+		if !s.stoppedUntil.IsZero() {
+			stoppedAt = s.stoppedUntil.Add(-packetSourceStopGrace)
+		}
+		if !s.stoppedUntil.IsZero() && s.stoppedUntil.Before(until) {
+			until = s.stoppedUntil
+		}
+		out = append(out, collector.SourceStatus{SourceStoppedAt: stoppedAt, SnapshotUntil: until, SourceID: p.Binding.SourceID, Fence: p.Binding.Fence, IssuedAt: p.IssuedAt, LeafUntil: p.LeafUntil, Credit: p.Credit, ObservedBytes: s.meter.ObservedBytes(), Closed: s.closed || !n.now().Before(p.LeafUntil), Stopped: !s.stoppedUntil.IsZero(), InputUnknown: s.inputUnknown})
 		s.mu.Unlock()
 	}
 	return out, asOf

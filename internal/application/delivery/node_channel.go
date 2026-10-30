@@ -420,6 +420,15 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 	answered := map[answer]bool{}
 	for _, rc := range r.Receipts {
 		answered[answer{rc.Sequence, rc.WorkID}] = true
+		if rc.Outcome == collector.OutcomeAccepted {
+			for key, pending := range e.captures {
+				if pending.cancelID == rc.WorkID && pending.cancelSeq == rc.Sequence {
+					pending.cancelJoinedAt = now.UTC().Truncate(time.Microsecond)
+					e.captures[key] = pending
+				}
+			}
+		}
+
 	}
 	kept := e.work[:0]
 	for _, w := range e.work {

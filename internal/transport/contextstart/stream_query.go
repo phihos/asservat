@@ -348,6 +348,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		} else {
 			e = targets.ErrUnsupported
 		}
+	case queryResolveSourceSnapshot:
+		var r targets.SourceSnapshotTarget
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(SourceSnapshotTargetResolver); ok {
+			out, e = resolver.ResolveSourceSnapshot(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
 	case queryResolveOngoingRecorders:
 		var r []targets.OngoingRecorderRequest
 		if decodeOperationBody(q.Body, &r) != nil || !targets.ValidOngoingRecorderBatch(r) {

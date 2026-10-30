@@ -33,10 +33,11 @@ type recorderCollection struct {
 	Log                                              *targets.LogMatch                     `json:",omitempty"`
 	Resource                                         *targets.ResourceCondition            `json:",omitempty"`
 	Recorder                                         *planning.PolicyRecorderConfiguration `json:",omitempty"`
+	RecordingSaves                                   bool                                  `json:",omitempty"`
 }
 
 func recorderCollectionOf(p value.RestartPolicy) recorderCollection {
-	return recorderCollection{ClusterID: p.ClusterID, Namespace: p.Namespace, WorkloadKind: p.WorkloadKind, WorkloadName: p.WorkloadName, Reasons: p.Reasons, ExitCodes: p.ExitCodes, Interval: p.Interval, Burst: p.Burst, RetentionSeconds: p.RetentionSeconds, ObservedPods: p.ObservedPods, Detector: p.Detector, ProbeType: p.ProbeType, MinimumFailures: p.MinimumFailures, ProbeWindow: p.ProbeWindow, AlertLabels: p.AlertLabels, Log: p.Log, Resource: p.Resource, Recorder: p.Recorder}
+	return recorderCollection{ClusterID: p.ClusterID, Namespace: p.Namespace, WorkloadKind: p.WorkloadKind, WorkloadName: p.WorkloadName, Reasons: p.Reasons, ExitCodes: p.ExitCodes, Interval: p.Interval, Burst: p.Burst, RetentionSeconds: p.RetentionSeconds, ObservedPods: p.ObservedPods, Detector: p.Detector, ProbeType: p.ProbeType, MinimumFailures: p.MinimumFailures, ProbeWindow: p.ProbeWindow, AlertLabels: p.AlertLabels, Log: p.Log, Resource: p.Resource, Recorder: p.Recorder, RecordingSaves: p.RecordingSaves}
 }
 
 // RecorderPolicyScope binds accepted collection intent rather than mutable

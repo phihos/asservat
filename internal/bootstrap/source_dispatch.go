@@ -89,3 +89,41 @@ func (d RegionalSourceDispatch) StopSource(ctx context.Context, cluster string, 
 	}
 	return a.RunSource(bounded, w, signed)
 }
+
+// CancelSourceSnapshot is restrictive control of an already admitted copy. It
+// never refreshes source authority or requires a still-renewable source leaf.
+func (d RegionalSourceDispatch) CancelSourceSnapshot(ctx context.Context, cluster string, snapshot collector.SourceSnapshot) error {
+	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil || !snapshot.Valid() {
+		return fleet.ErrUnavailable
+	}
+	issued := d.Now().UTC()
+	call, cancel := context.WithDeadline(ctx, issued.Add(5*time.Second))
+	defer cancel()
+	a, err := d.Router.Attach(call, cluster, snapshot.CaptureID)
+	if err != nil {
+		return err
+	}
+	defer a.Close()
+	receiver, err := a.Receiver(call)
+	if err != nil {
+		return err
+	}
+	work := fleetapp.SourceWork{Channel: receiver.Channel, StopSnapshot: &snapshot, StopIssuedAt: issued, NotAfter: identity.Earlier(issued.Add(5*time.Second), receiver.ValidUntil)}
+	if end, ok := call.Deadline(); ok {
+		work.NotAfter = identity.Earlier(work.NotAfter, end)
+	}
+	if !work.Valid(d.Now()) {
+		return fleet.ErrUnavailable
+	}
+	bounded, end := context.WithDeadline(call, work.NotAfter)
+	defer end()
+	signed, err := d.Signer.SignSourceWork(bounded, work)
+	if err != nil {
+		return err
+	}
+	defer clear(signed)
+	if bounded.Err() != nil || !work.Valid(d.Now()) {
+		return fleet.ErrUnavailable
+	}
+	return a.RunSource(bounded, work, signed)
+}

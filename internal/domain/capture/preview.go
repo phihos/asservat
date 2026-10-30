@@ -49,7 +49,9 @@ func (r ProtectedReasonRef) Valid() bool {
 // its diagnostic handle and protect any free-text reason before constructing
 // this value. It cannot substitute the broader incident-context preset.
 type ContextIntent struct {
-	HistoryAuthored *HistoryAuthored `json:",omitempty"`
+	// Snapshot is service-owned existing-source selection, never decoded by ordinary recipe routes.
+	Snapshot        *planning.SourceSnapshotContext `json:",omitempty"`
+	HistoryAuthored *HistoryAuthored                `json:",omitempty"`
 	// RepeatedFrom is independently expiring provenance, never a read grant.
 	RepeatedFrom     *HistoryLineage `json:",omitempty"`
 	Target           targets.WorkloadRequest
@@ -66,6 +68,9 @@ type ContextIntent struct {
 func (i ContextIntent) Valid() bool {
 	if (i.HistoryAuthored != nil && (!i.HistoryAuthored.Valid() || i.HistoryAuthored.Target.ClusterID != i.Target.ClusterID)) || (i.RepeatedFrom != nil && (!authorization.UUID(i.RepeatedFrom.CaptureID) || i.RepeatedFrom.ExpiresAt.IsZero())) || !i.Target.Valid() || i.RequestedSeconds < 0 || i.RequestedSeconds > privacy.MaxAgeSeconds || (i.Reason != nil && !i.Reason.Valid()) || (i.Sharing != nil && !i.Sharing.Valid()) {
 		return false
+	}
+	if i.Snapshot != nil {
+		return i.Diagnostic == "" && i.Composition == nil && i.Snapshot.Request.Valid()
 	}
 	if i.Composition != nil {
 		return i.Diagnostic == "" && i.Sharing == nil && i.Composition.Valid()
@@ -127,6 +132,7 @@ type ContextPreview struct {
 	CanonicalScope                                         []byte
 	ScopeDigest                                            artifact.Digest
 	CreatedAt, Deadline                                    time.Time
+	SelectionUntil                                         time.Time `json:",omitzero"`
 }
 
 func previewTime(t time.Time) bool {
@@ -134,7 +140,10 @@ func previewTime(t time.Time) bool {
 }
 
 func (p ContextPreview) Valid() bool {
-	if (p.Intent.RepeatedFrom != nil && p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) || !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.IssuerEpoch) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || p.Deadline.After(p.CreatedAt.Add(5*time.Minute)) || p.Intent.Reason != nil && p.Deadline.After(p.Intent.Reason.ExpiresAt) {
+	if p.Intent.Snapshot != nil && (!previewTime(p.SelectionUntil) || !p.SelectionUntil.After(p.CreatedAt) || p.SelectionUntil.After(p.CreatedAt.Add(time.Minute)) || !p.Intent.Snapshot.Request.ProcessingUntil.Equal(p.Deadline)) || p.Intent.Snapshot == nil && !p.SelectionUntil.IsZero() {
+		return false
+	}
+	if (p.Intent.RepeatedFrom != nil && p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) || !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.IssuerEpoch) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || (p.Intent.Snapshot == nil && p.Deadline.After(p.CreatedAt.Add(5*time.Minute))) || p.Intent.Reason != nil && p.Deadline.After(p.Intent.Reason.ExpiresAt) {
 		return false
 	}
 	seen := map[string]bool{}
@@ -144,7 +153,7 @@ func (p ContextPreview) Valid() bool {
 		}
 		seen[id] = true
 	}
-	if !p.ExecutionClass.Valid() || (p.ExecutionClass == artifact.ContextAPIExecution && p.Pin.NodeName != "") || (p.ExecutionClass == artifact.ContextNodeExecution && !identity.Text(p.Pin.NodeName, 253)) {
+	if !p.ExecutionClass.Valid() || (p.ExecutionClass == artifact.ContextAPIExecution && p.Intent.Snapshot == nil && p.Pin.NodeName != "") || (p.ExecutionClass == artifact.ContextNodeExecution && !identity.Text(p.Pin.NodeName, 253)) {
 		return false
 	}
 	if p.Intent.Target.ClusterID != p.Target.ClusterID || p.Intent.Target.Namespace != p.Target.Namespace.Name || p.Pin.Namespace != p.Target.Namespace.Name || p.Pin.NamespaceUID != p.Target.Namespace.UID || p.Pin.Name != p.Target.PodName || p.Pin.UID != p.Target.PodUID || !identity.Text(p.Pin.ControllerUID, 64) && p.Target.Workload.Kind != "Pod" {
@@ -181,7 +190,7 @@ func (p ContextPreview) storageValid() bool {
 }
 
 func (p ContextPreview) Current(now time.Time) bool {
-	return p.Valid() && !now.Before(p.CreatedAt) && now.Before(p.Deadline)
+	return p.Valid() && !now.Before(p.CreatedAt) && now.Before(p.Deadline) && (p.SelectionUntil.IsZero() || now.Before(p.SelectionUntil))
 }
 
 func (p ContextPreview) Clone() ContextPreview {
@@ -194,6 +203,7 @@ func (p ContextPreview) Clone() ContextPreview {
 	}
 	p.Intent.Sharing = p.Intent.Sharing.clone()
 	p.Intent.Composition = p.Intent.Composition.Clone()
+	p.Intent.Snapshot = p.Intent.Snapshot.Clone()
 	p.Intent.HistoryAuthored = p.Intent.HistoryAuthored.Clone()
 	if p.Intent.RepeatedFrom != nil {
 		l := *p.Intent.RepeatedFrom

@@ -77,7 +77,7 @@ func TestSourceStatusMaximumAndUnknownCounterValidation(t *testing.T) {
 	}
 	for i := 0; i < int(collector.SourceStatusLimit); i++ {
 		id := fmt.Sprintf("11111111-1111-4111-8111-%012x", i)
-		r.Sources = append(r.Sources, collector.SourceStatus{SourceID: id, Fence: id, IssuedAt: r.ObservedAt, LeafUntil: r.ObservedAt.Add(30 * time.Second), Credit: 1<<63 - 1, ObservedBytes: 1<<63 - 2})
+		r.Sources = append(r.Sources, collector.SourceStatus{SourceStoppedAt: r.ObservedAt, SnapshotUntil: r.ObservedAt.Add(30 * time.Second), Stopped: true, SourceID: id, Fence: id, IssuedAt: r.ObservedAt, LeafUntil: r.ObservedAt.Add(30 * time.Second), Credit: 1<<63 - 1, ObservedBytes: 1<<63 - 2})
 		if i == 15 || i == 1023 || i == int(collector.SourceStatusLimit)-1 {
 			raw, err := json.Marshal(WireStatus("epoch", r))
 			if err != nil || len(raw) > contracts.NodeStatusMaxRequest {

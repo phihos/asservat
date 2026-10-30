@@ -70,3 +70,35 @@ func TestNodeSourceReportPreservesSnapshotTimeAcrossBlockingMetadata(t *testing.
 		t.Fatal("blocking metadata freshened original source-set snapshot", report.ObservedAt, now)
 	}
 }
+
+func TestNodeSourceReportKeepsNaturalStopAfterSourceSetAsOf(t *testing.T) {
+	start := time.Now().UTC().Truncate(time.Microsecond)
+	clock := &packetRingClock{at: start}
+	permit := sourceOwnerPermit(start)
+	meter, err := collector.NewSourceMeter(permit, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := &packetSource{meter: meter}
+	source.mu.Lock()
+	sampled := make(chan struct{})
+	var once sync.Once
+	n := &nodeSources{sources: map[string]*packetSource{permit.Binding.SourceID: source}, now: func() time.Time { at := clock.now(); once.Do(func() { close(sampled) }); return at }}
+	type report struct {
+		sources []collector.SourceStatus
+		asOf    time.Time
+	}
+	done := make(chan report, 1)
+	go func() { s, at := n.Status(); done <- report{s, at} }()
+	<-sampled
+	// Natural engine stop owns s.mu independently of n.mu. It can occur after
+	// the conservative source-set timestamp but before this source is copied.
+	stop := start.Add(time.Second)
+	clock.set(stop)
+	source.stoppedUntil = stop.Add(packetSourceStopGrace)
+	source.mu.Unlock()
+	got := <-done
+	if len(got.sources) != 1 || !got.asOf.Equal(start) || !got.sources[0].SourceStoppedAt.Equal(stop) || !got.sources[0].Valid(got.asOf) {
+		t.Fatal("actual stop was rejected or restamped to set timestamp", got)
+	}
+}

@@ -120,13 +120,15 @@ type NodePollResponse struct {
 // peerGeneration or packetCapture. Only packetCapture (ADR-248) carries a
 // typed payload in this version; the others carry only their identity.
 type NodeWork struct {
-	ID               string             `json:"id"`
-	Sequence         uint64             `json:"sequence"`
-	Kind             string             `json:"kind"`
-	NotAfter         time.Time          `json:"notAfter"`
-	PacketCapture    *NodePacketCapture `json:"packetCapture,omitempty"`
-	PacketSource     *NodePacketSource  `json:"packetSource,omitempty"`
-	StopPacketSource *NodeSourceBinding `json:"stopPacketSource,omitempty"`
+	ID                   string              `json:"id"`
+	Sequence             uint64              `json:"sequence"`
+	Kind                 string              `json:"kind"`
+	NotAfter             time.Time           `json:"notAfter"`
+	PacketCapture        *NodePacketCapture  `json:"packetCapture,omitempty"`
+	PacketSource         *NodePacketSource   `json:"packetSource,omitempty"`
+	CancelSourceSnapshot *NodeSourceSnapshot `json:"cancelSourceSnapshot,omitempty"`
+	SourceSnapshot       *NodeSourceSnapshot `json:"sourceSnapshot,omitempty"`
+	StopPacketSource     *NodeSourceBinding  `json:"stopPacketSource,omitempty"`
 }
 
 // NodePacketSource is a distinct ordinary ongoing work purpose. Older nodes
@@ -156,6 +158,7 @@ type NodeSourcePermit struct {
 	BytesPerSecond int64             `json:"bytesPerSecond"`
 }
 type NodeSourceBinding struct {
+	AudienceDigest    string `json:"audienceDigest,omitempty"`
 	RootID            string `json:"rootID"`
 	PolicyUID         string `json:"policyUID"`
 	AcceptanceID      string `json:"acceptanceID"`
@@ -234,27 +237,28 @@ type NodeBPFInstruction struct {
 
 // NodePacketResult heads one finished capture upload.
 type NodePacketResult struct {
-	Format        string    `json:"format"`
-	Epoch         string    `json:"epoch"`
-	WorkID        string    `json:"workID"`
-	CaptureID     string    `json:"captureID"`
-	StartedAt     time.Time `json:"startedAt"`
-	EndedAt       time.Time `json:"endedAt"`
-	Seen          uint64    `json:"seen"`
-	Retained      uint64    `json:"retained"`
-	Filtered      uint64    `json:"filtered"`
-	Unsupported   uint64    `json:"unsupported"`
-	Fragment      uint64    `json:"fragment"`
-	Extension     uint64    `json:"extension"`
-	Malformed     uint64    `json:"malformed"`
-	OutputFull    uint64    `json:"outputFull"`
-	LostSamples   uint64    `json:"lostSamples"`
-	WireBytes     uint64    `json:"wireBytes"`
-	CapturedBytes int64     `json:"capturedBytes"`
-	Snaplen       int       `json:"snaplen"`
-	EngineVersion string    `json:"engineVersion"`
-	ProgramDigest string    `json:"programDigest"`
-	Failure       string    `json:"failure"`
+	Snapshot      *NodeSnapshotOutcome `json:"snapshot,omitempty"`
+	Format        string               `json:"format"`
+	Epoch         string               `json:"epoch"`
+	WorkID        string               `json:"workID"`
+	CaptureID     string               `json:"captureID"`
+	StartedAt     time.Time            `json:"startedAt"`
+	EndedAt       time.Time            `json:"endedAt"`
+	Seen          uint64               `json:"seen"`
+	Retained      uint64               `json:"retained"`
+	Filtered      uint64               `json:"filtered"`
+	Unsupported   uint64               `json:"unsupported"`
+	Fragment      uint64               `json:"fragment"`
+	Extension     uint64               `json:"extension"`
+	Malformed     uint64               `json:"malformed"`
+	OutputFull    uint64               `json:"outputFull"`
+	LostSamples   uint64               `json:"lostSamples"`
+	WireBytes     uint64               `json:"wireBytes"`
+	CapturedBytes int64                `json:"capturedBytes"`
+	Snaplen       int                  `json:"snaplen"`
+	EngineVersion string               `json:"engineVersion"`
+	ProgramDigest string               `json:"programDigest"`
+	Failure       string               `json:"failure"`
 }
 
 // NodeStatus is one batched report: probed facts, mechanism assessment, node
@@ -272,15 +276,17 @@ type NodeStatus struct {
 }
 
 type NodeSourceStatus struct {
-	SourceID      string    `json:"sourceID"`
-	Fence         string    `json:"fence"`
-	IssuedAt      time.Time `json:"issuedAt"`
-	LeafUntil     time.Time `json:"leafUntil"`
-	Credit        int64     `json:"credit"`
-	ObservedBytes int64     `json:"observedBytes"`
-	Closed        bool      `json:"closed"`
-	Stopped       bool      `json:"stopped"`
-	InputUnknown  bool      `json:"inputUnknown"`
+	SourceStoppedAt time.Time `json:"sourceStoppedAt,omitzero"`
+	SnapshotUntil   time.Time `json:"snapshotUntil,omitzero"`
+	SourceID        string    `json:"sourceID"`
+	Fence           string    `json:"fence"`
+	IssuedAt        time.Time `json:"issuedAt"`
+	LeafUntil       time.Time `json:"leafUntil"`
+	Credit          int64     `json:"credit"`
+	ObservedBytes   int64     `json:"observedBytes"`
+	Closed          bool      `json:"closed"`
+	Stopped         bool      `json:"stopped"`
+	InputUnknown    bool      `json:"inputUnknown"`
 }
 
 type NodeProbe struct {

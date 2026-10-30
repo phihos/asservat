@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"asservat.local/asservat/internal/application/evidence"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"
@@ -17,15 +18,21 @@ type SourceQueue interface {
 	EnqueueSourceStop(context.Context, collector.SourceBinding, time.Time) (collector.Work, error)
 }
 type SourceLocal struct {
-	Verifier app.SourceWorkVerifier
-	Queue    SourceQueue
+	Snapshots evidence.SourceSnapshotCanceller
+	Verifier  app.SourceWorkVerifier
+	Queue     SourceQueue
 }
 
 func sourceReply(w app.SourceWork, state string) contracts.SourceReply {
-	return contracts.SourceReply{Format: contracts.SourceWorkFormat, SourceID: w.Source.Permit.Binding.SourceID, Fence: w.Source.Permit.Binding.Fence, State: state}
+	reply := contracts.SourceReply{Format: contracts.SourceWorkFormat, SourceID: w.Binding().SourceID, Fence: w.Binding().Fence, State: state}
+	if w.StopSnapshot != nil {
+		reply.CaptureID = w.StopSnapshot.CaptureID
+		reply.SnapshotID = w.StopSnapshot.Request.SnapshotID
+	}
+	return reply
 }
 func matchingSourceReply(w app.SourceWork, r contracts.SourceReply) bool {
-	return r.SourceID == w.Source.Permit.Binding.SourceID && r.Fence == w.Source.Permit.Binding.Fence
+	return r.SourceID == w.Binding().SourceID && r.Fence == w.Binding().Fence && (w.StopSnapshot == nil && r.CaptureID == "" && r.SnapshotID == "" || w.StopSnapshot != nil && r.CaptureID == w.StopSnapshot.CaptureID && r.SnapshotID == w.StopSnapshot.Request.SnapshotID)
 }
 
 func serveRegionalSource(ctx context.Context, s Stream, r fleet.APIContextReceiver, signed []byte, local *SourceLocal, now func() time.Time) error {
@@ -50,7 +57,13 @@ func serveRegionalSource(ctx context.Context, s Stream, r fleet.APIContextReceiv
 		return fleet.ErrUnavailable
 	}
 	var effectErr error
-	if w.Stop {
+	if w.StopSnapshot != nil {
+		if local.Snapshots == nil {
+			effectErr = fleet.ErrUnavailable
+		} else {
+			effectErr = local.Snapshots.CancelSourceSnapshot(call, *w.StopSnapshot)
+		}
+	} else if w.Stop {
 		_, effectErr = local.Queue.EnqueueSourceStop(call, w.Source.Permit.Binding, w.NotAfter)
 	} else {
 		_, effectErr = local.Queue.EnqueueSourceExpected(call, w.Node, w.Source)
@@ -120,7 +133,7 @@ func serveHubSource(ctx context.Context, s Stream, w app.SourceWork, signed []by
 // RunSource uses the existing owned finite attachment slot and joined cleanup;
 // it creates no capture/attempt or per-source encrypted intent/outcome objects.
 func (a *Attachment) RunSource(ctx context.Context, w app.SourceWork, signed []byte) error {
-	if a == nil || ctx == nil || ctx.Err() != nil || !w.Valid(time.Now()) || w.Channel != a.standby.channel || w.Source.Permit.Binding.SourceID != a.capture || len(signed) == 0 {
+	if a == nil || ctx == nil || ctx.Err() != nil || !w.Valid(time.Now()) || w.Channel != a.standby.channel || w.RouteID() != a.capture || len(signed) == 0 {
 		return fleet.ErrInvalid
 	}
 	a.mu.Lock()

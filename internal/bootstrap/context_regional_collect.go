@@ -106,10 +106,16 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 		return "", err
 	}
 	a := w.Accepted
-	if a.CaptureID != captureID || a.State != capturevalue.IntentAudited || a.Expectation.Recording == nil {
+	if a.CaptureID != captureID || a.State != capturevalue.IntentAudited || a.Expectation.Recording == nil && a.Expectation.Snapshot == nil {
 		return "", execution.ErrDenied
 	}
-	if s.Now().Before(exec.StartedAt.Add(time.Duration(a.Expectation.Recording.DurationMillis) * time.Millisecond)) {
+	readyAt := time.Time{}
+	if a.Expectation.Snapshot != nil {
+		readyAt = a.Expectation.Snapshot.T0.Add(a.Expectation.Snapshot.After)
+	} else {
+		readyAt = exec.StartedAt.Add(time.Duration(a.Expectation.Recording.DurationMillis) * time.Millisecond)
+	}
+	if s.Now().Before(readyAt) {
 		return "Recording", nil
 	}
 	until := identity.Earlier(started.Add(5*time.Second), recovery.FreshUntil)

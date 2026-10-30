@@ -13,6 +13,8 @@ package postgres
 var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 	// ADR-217: exact union of the former read, prepare and record credentials.
 	"api-execution": {
+		{"table", "policy_recording_source", "", "SELECT"},
+		{"table", "policy_recording_source", "root_id", "UPDATE"}, // retained source row lock only
 		// Original policy reservation and grant are rechecked before effects.
 		{"table", "policy_occurrence", "", "SELECT"},
 		{"table", "policy_acceptance", "", "SELECT"},
@@ -29,6 +31,9 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_capture", "id", "UPDATE"},
+		{"table", "context_capture", "snapshot_coverage", "UPDATE"},
+		{"table", "context_capture", "snapshot_coverage_digest", "UPDATE"},
+		{"table", "context_capture", "snapshot_expectation_digest", "UPDATE"},
 		{"table", "context_execution", "", "SELECT"},
 		{"table", "context_execution", "acquired_at", "UPDATE"},
 		{"table", "context_execution", "attempt_id", "INSERT"},

@@ -34,7 +34,11 @@ func (s NativeContextSource) podStatus() bool {
 }
 func cloneNativeSource(s NativeContextSource) NativeContextSource {
 	s.Expectation.Audience = slices.Clone(s.Expectation.Audience)
+	s.Expectation.SourceSnapshotManifest = s.Expectation.SourceSnapshotManifest.Clone()
 	s.Expectation.RetentionRules = slices.Clone(s.Expectation.RetentionRules)
+	if s.Expectation.Snapshot != nil {
+		s.Expectation.Snapshot = s.Expectation.Snapshot.Clone()
+	}
 	if s.Expectation.Lifecycle != nil {
 		l := *s.Expectation.Lifecycle
 		l.GapReasons = slices.Clone(l.GapReasons)

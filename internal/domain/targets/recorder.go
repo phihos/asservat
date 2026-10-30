@@ -98,6 +98,8 @@ func (r OngoingRecorderRequest) Valid() bool {
 }
 
 type RecorderSourceState struct {
+	SourceStoppedAt                             time.Time `json:",omitzero"`
+	SnapshotUntil                               time.Time `json:",omitzero"`
 	SourceID, Fence                             string
 	IssuedAt, LeafUntil, ObservedAt, FreshUntil time.Time
 	Credit, ObservedBytes                       int64

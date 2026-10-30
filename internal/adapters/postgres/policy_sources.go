@@ -19,6 +19,7 @@ import (
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -126,6 +127,23 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			return value.ErrDenied
 		}
 		until = identity.Earlier(until, identity.Earlier(accepted.FreshUntil, eligible.ValidUntil))
+		var originalAudience []artifact.AudienceAssignment
+		var originalAudienceDigest artifact.Digest
+		audienceReason := ""
+		if in.Initial {
+			var audienceUntil time.Time
+			originalAudience, audienceUntil, audienceReason = authorization.PolicyDefaultAudience(projection.Permissions, now.Time)
+			if audienceReason == "" {
+				var digestErr error
+				originalAudienceDigest, digestErr = compiler.SourceAudienceDigest(originalAudience)
+				if digestErr != nil {
+					audienceReason = "AudienceUnavailable"
+				} else {
+					until = identity.Earlier(until, audienceUntil)
+				}
+			}
+		}
+
 		hard := a.NotAfter
 		// An ordinary require-all review is checked without consuming a raw-byte
 		// grant pool. A changed attachment cannot refill this source's input credit.
@@ -218,7 +236,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			if err != nil {
 				return err
 			}
-			if call.Err() != nil || !sourceCheckCurrent(in, n.Time) || !n.Time.Before(until) || !n.Time.Before(hard) || resource.Suspended || !identity.Fresh(resource.ObservedAt.Time, resource.FreshUntil.Time, n.Time, capacity.CapacitySourceInterval) || !identity.Fresh(binding.ObservedAt.Time, binding.FreshUntil.Time, n.Time, 30*time.Second) ||
+			if call.Err() != nil || !sourceCheckCurrent(in, n.Time) || !n.Time.Before(until) || !n.Time.Before(hard) || !sourceResourceCurrent(resource, n.Time) || !identity.Fresh(binding.ObservedAt.Time, binding.FreshUntil.Time, n.Time, 30*time.Second) ||
 				binding.ClusterID != id(a.ClusterID) || binding.NamespaceUid != a.NamespaceUID || binding.WorkloadUid != a.WorkloadUID || binding.AllocationID != allocation.ID || allocation.ServiceClass != "context" || allocation.Paused || pool.Paused || !n.Time.Before(storage.CapacityUntil.Time) || !controlPool.Configured || !account.Configured || controlPool.Paused || account.Paused || account.ChargedFull > account.FullLimit || account.ChargedReplay > account.ReplayLimit {
 				return value.ErrChanged
 			}
@@ -257,6 +275,9 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			if err != nil {
 				return err
 			}
+			if audienceReason != "" || len(originalAudience) == 0 {
+				return value.ErrDenied
+			}
 			initialCredit := min(in.InitialCredit, a.Limits.MaxObservedBytes-budget.ObservedBytesSpent)
 			if initialCredit < 1 {
 				return value.ErrCapacity
@@ -272,7 +293,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			if err != nil {
 				return err
 			}
-			b := collector.SourceBinding{RootID: s.root, PolicyUID: a.PolicyUID, AcceptanceID: record.ID, SourceID: in.SourceID, Fence: in.Fence, ActionID: in.Policy.Recorder.Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(a.ScopeDigest), ExpectationDigest: [32]byte(in.Policy.Recorder.Digest), ResourceDigest: resourceDigest}
+			b := collector.SourceBinding{RootID: s.root, PolicyUID: a.PolicyUID, AcceptanceID: record.ID, SourceID: in.SourceID, Fence: in.Fence, ActionID: in.Policy.Recorder.Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(a.ScopeDigest), ExpectationDigest: [32]byte(in.Policy.Recorder.Digest), ResourceDigest: resourceDigest, AudienceDigest: [32]byte(originalAudienceDigest)}
 			if in.Policy.Recorder.Filter != nil {
 				b.ProgramDigest = [32]byte(compiler.FilterProgramDigest(in.Policy.Recorder.Filter.Program))
 			}
@@ -280,7 +301,17 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 				return value.ErrInvalid
 			}
 			raw, _ := json.Marshal(b)
-			row, err = q.InsertPolicyRecordingSource(call, custodydb.InsertPolicyRecordingSourceParams{RootID: id(s.root), ID: id(in.SourceID), Fence: id(in.Fence), PolicyUid: a.PolicyUID, AcceptanceID: policy.ActiveID, ActionID: b.ActionID, ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUid: a.WorkloadUID, PodUid: b.PodUID, AllocationID: allocation.ID, BindingJson: raw, StartedAt: ts(now.Time), HardUntil: ts(hard), StartBy: ts(identity.Earlier(until, now.Time.Add(5*time.Second))), InitialLeafUntil: ts(identity.Earlier(hard, identity.Earlier(coverageUntil, now.Time.Add(collector.SourceLeafLifetime)))), InitialCredit: initialCredit, Credit: initialCredit, BytesPerSecond: rate})
+			originalTarget := targets.SourceSnapshotTarget{Request: in.Target.Request, Pin: in.Target.Pin, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, SourceID: b.SourceID, Fence: b.Fence, BindingDigest: deliveryapp.SourceBindingDigest(b)}
+			if !originalTarget.Valid() {
+				return value.ErrInvalid
+			}
+			rawAudience, audienceErr := json.Marshal(originalAudience)
+			rawTarget, targetErr := json.Marshal(originalTarget)
+			if audienceErr != nil || targetErr != nil {
+				return value.ErrInvalid
+			}
+
+			row, err = q.InsertPolicyRecordingSource(call, custodydb.InsertPolicyRecordingSourceParams{RootID: id(s.root), ID: id(in.SourceID), Fence: id(in.Fence), PolicyUid: a.PolicyUID, AcceptanceID: policy.ActiveID, ActionID: b.ActionID, ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUid: a.WorkloadUID, PodUid: b.PodUID, AllocationID: allocation.ID, BindingJson: raw, StartedAt: ts(now.Time), HardUntil: ts(hard), StartBy: ts(identity.Earlier(until, now.Time.Add(5*time.Second))), InitialLeafUntil: ts(identity.Earlier(hard, identity.Earlier(coverageUntil, now.Time.Add(collector.SourceLeafLifetime)))), InitialCredit: initialCredit, Credit: initialCredit, BytesPerSecond: rate, SourceAudienceJson: rawAudience, SourceAudienceDigest: originalAudienceDigest[:], SourceTargetJson: rawTarget})
 			if err != nil {
 				return err
 			}
@@ -365,10 +396,17 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 	return out, nil
 }
 
+// Migration 73/ADR-200 gives the protected accepted SQL row a 30s lifetime.
+// Its original five-second acceptance payload is validated at its original
+// observation instant; it is not a fresh caller receipt or a renewed proof.
+func sourceResourceCurrent(row custodydb.ReadPolicySourceResourceSelectionRow, now time.Time) bool {
+	return !row.Suspended && identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, 30*time.Second)
+}
+
 func sourceResources(row custodydb.ReadPolicySourceResourceSelectionRow, cluster string, now time.Time) (collector.SourceResources, [32]byte, error) {
 	var zero collector.SourceResources
 	var observation capacity.CapacitySourceObservation
-	if row.Suspended || row.AcceptedRevision < 1 || len(row.AcceptedDigest) != 32 || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now, capacity.CapacitySourceInterval) || json.Unmarshal(row.AcceptedSnapshot, &observation) != nil || !observation.Valid(now) || !bytes.Equal(observation.Digest[:], row.AcceptedDigest) {
+	if !sourceResourceCurrent(row, now) || row.AcceptedRevision < 1 || len(row.AcceptedDigest) != 32 || json.Unmarshal(row.AcceptedSnapshot, &observation) != nil || !observation.Valid(observation.Snapshot.ObservedAt) || !bytes.Equal(observation.Digest[:], row.AcceptedDigest) {
 		return zero, [32]byte{}, value.ErrChanged
 	}
 	for _, policy := range observation.Snapshot.Policies {
@@ -393,7 +431,11 @@ func policySourceState(row custodydb.PolicyRecordingSource) (app.PolicySourceSta
 	if len(row.BindingJson) > 8192 || json.Unmarshal(row.BindingJson, &b) != nil || !b.Valid() || b.RootID != uid(row.RootID) || b.SourceID != uid(row.ID) || b.Fence != uid(row.Fence) || b.AcceptanceID != uid(row.AcceptanceID) || b.PolicyUID != row.PolicyUid || b.ActionID != row.ActionID || b.PodUID != row.PodUid {
 		return app.PolicySourceState{}, value.ErrChanged
 	}
-	return app.PolicySourceState{Binding: b, ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, StartedAt: row.StartedAt.Time, HardUntil: row.HardUntil.Time, StartBy: row.StartBy.Time, InitialLeafUntil: row.InitialLeafUntil.Time, InitialCredit: row.InitialCredit, Credit: row.Credit, BytesPerSecond: row.BytesPerSecond, EndedAt: row.EndedAt.Time}, nil
+	source := app.PolicySourceState{Binding: b, ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, StartedAt: row.StartedAt.Time, HardUntil: row.HardUntil.Time, StartBy: row.StartBy.Time, InitialLeafUntil: row.InitialLeafUntil.Time, InitialCredit: row.InitialCredit, Credit: row.Credit, BytesPerSecond: row.BytesPerSecond, EndedAt: row.EndedAt.Time}
+	if err := sourceOriginalProvenance(row, &source); err != nil {
+		return app.PolicySourceState{}, err
+	}
+	return source, nil
 }
 
 func (s *PolicySources) ListSources(ctx context.Context, policy string) ([]app.PolicySourceState, error) {

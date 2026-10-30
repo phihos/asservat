@@ -1044,3 +1044,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [258 — Native response windows under slow delivery](258-slow-native-response-windows.md): retain one fixed response owner and cursor across fresh short leases, preserve actual credential expiry, and reuse the existing native-owner renewal. Selected SQL/S3/TLS qualification passes; installed aggregate-cost and slower-link qualification remain pending.
 
 - [ADR-260: API target observations after completed authenticated queries](260-api-target-observation-freshness.md)
+
+- [ADR-264: existing-source packet snapshots](264-existing-source-packet-snapshots.md): distinct immutable window admission, bounded owned copy/output and independently validated authenticated coverage; automatic/manual runtime composition and installed qualification remain in progress.

@@ -37,7 +37,7 @@ func WireStatus(epoch string, r collector.Report) contracts.NodeStatus {
 		out.Receipts = append(out.Receipts, contracts.NodeReceipt{WorkID: rc.WorkID, Sequence: rc.Sequence, Outcome: string(rc.Outcome), Reason: string(rc.Reason)})
 	}
 	for _, s := range r.Sources {
-		out.Sources = append(out.Sources, contracts.NodeSourceStatus{SourceID: s.SourceID, Fence: s.Fence, IssuedAt: s.IssuedAt.UTC(), LeafUntil: s.LeafUntil.UTC(), Credit: s.Credit, ObservedBytes: s.ObservedBytes, Closed: s.Closed, Stopped: s.Stopped, InputUnknown: s.InputUnknown})
+		out.Sources = append(out.Sources, contracts.NodeSourceStatus{SourceStoppedAt: s.SourceStoppedAt.UTC(), SnapshotUntil: s.SnapshotUntil.UTC(), SourceID: s.SourceID, Fence: s.Fence, IssuedAt: s.IssuedAt.UTC(), LeafUntil: s.LeafUntil.UTC(), Credit: s.Credit, ObservedBytes: s.ObservedBytes, Closed: s.Closed, Stopped: s.Stopped, InputUnknown: s.InputUnknown})
 	}
 	return out
 }
@@ -123,7 +123,7 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 	}
 	seen := make(map[string]bool, len(s.Sources))
 	for _, s := range s.Sources {
-		state := collector.SourceStatus{SourceID: s.SourceID, Fence: s.Fence, IssuedAt: s.IssuedAt.UTC(), LeafUntil: s.LeafUntil.UTC(), Credit: s.Credit, ObservedBytes: s.ObservedBytes, Closed: s.Closed, Stopped: s.Stopped, InputUnknown: s.InputUnknown}
+		state := collector.SourceStatus{SourceStoppedAt: s.SourceStoppedAt.UTC(), SnapshotUntil: s.SnapshotUntil.UTC(), SourceID: s.SourceID, Fence: s.Fence, IssuedAt: s.IssuedAt.UTC(), LeafUntil: s.LeafUntil.UTC(), Credit: s.Credit, ObservedBytes: s.ObservedBytes, Closed: s.Closed, Stopped: s.Stopped, InputUnknown: s.InputUnknown}
 		if !state.Valid(r.ObservedAt) || seen[state.SourceID] {
 			return collector.Report{}, false
 		}
@@ -135,6 +135,14 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 
 func WireWork(w collector.Work) contracts.NodeWork {
 	out := contracts.NodeWork{ID: w.ID, Sequence: w.Sequence, Kind: string(w.Kind), NotAfter: w.NotAfter.UTC()}
+	if w.CancelSnapshot != nil {
+		snapshot := WireSourceSnapshot(*w.CancelSnapshot)
+		out.CancelSourceSnapshot = &snapshot
+	}
+	if w.Snapshot != nil {
+		snapshot := WireSourceSnapshot(*w.Snapshot)
+		out.SourceSnapshot = &snapshot
+	}
 	if w.Source != nil {
 		source := WirePacketSource(*w.Source)
 		out.PacketSource = &source
@@ -181,6 +189,22 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 		return collector.Work{}, false
 	}
 	out := collector.Work{ID: w.ID, Sequence: w.Sequence, Kind: collector.WorkKind(w.Kind), NotAfter: w.NotAfter.UTC().Truncate(time.Microsecond)}
+	if w.CancelSourceSnapshot != nil {
+		snapshot, valid := DomainSourceSnapshot(*w.CancelSourceSnapshot)
+		if !valid {
+			snapshot = collector.SourceSnapshot{}
+		}
+		out.CancelSnapshot = &snapshot
+		out.NotAfter = w.NotAfter.UTC()
+	}
+	if w.SourceSnapshot != nil {
+		snapshot, valid := DomainSourceSnapshot(*w.SourceSnapshot)
+		if !valid {
+			snapshot = collector.SourceSnapshot{}
+		}
+		out.Snapshot = &snapshot
+		out.NotAfter = w.NotAfter.UTC()
+	}
 	if w.PacketSource != nil {
 		source, valid := DomainPacketSource(*w.PacketSource)
 		if !valid {
@@ -236,6 +260,10 @@ func WirePacketResult(epoch string, r collector.PacketResult) contracts.NodePack
 	if r.ProgramDigest != ([32]byte{}) {
 		out.ProgramDigest = hex.EncodeToString(r.ProgramDigest[:])
 	}
+	if r.Snapshot != nil {
+		o := WireSnapshotOutcome(*r.Snapshot)
+		out.Snapshot = &o
+	}
 	return out
 }
 
@@ -248,5 +276,12 @@ func DomainPacketResult(w contracts.NodePacketResult) (collector.PacketResult, b
 	r := collector.PacketResult{WorkID: w.WorkID, CaptureID: w.CaptureID, StartedAt: w.StartedAt.UTC().Truncate(time.Microsecond), EndedAt: w.EndedAt.UTC().Truncate(time.Microsecond),
 		Seen: w.Seen, Retained: w.Retained, Filtered: w.Filtered, Unsupported: w.Unsupported, Fragment: w.Fragment, Extension: w.Extension, Malformed: w.Malformed,
 		OutputFull: w.OutputFull, LostSamples: w.LostSamples, WireBytes: w.WireBytes, CapturedBytes: w.CapturedBytes, Snaplen: w.Snaplen, EngineVersion: w.EngineVersion, ProgramDigest: d, Failure: collector.Reason(w.Failure)}
+	if w.Snapshot != nil {
+		o, valid := DomainSnapshotOutcome(*w.Snapshot)
+		if !valid {
+			return collector.PacketResult{}, false
+		}
+		r.Snapshot = &o
+	}
 	return r, r.Valid()
 }

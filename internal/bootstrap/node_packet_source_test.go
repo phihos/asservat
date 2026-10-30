@@ -242,3 +242,78 @@ func TestPacketSourceCopiedWindowKeepsIndependentFrozenReservation(t *testing.T)
 		t.Fatal("closed copy leaked global frozen reservation")
 	}
 }
+
+func TestPacketSourceRejectsUnknownTimestampAfterWireDebit(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	p := sourceOwnerPermit(now)
+	b, bmu := sourceOwnerBudget(t, now)
+	ready := make(chan struct{})
+	emitUnknown := make(chan struct{})
+	engine := func(ctx context.Context, _ string, _ int, deliver func(gadget.Frame), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
+		close(ready)
+		<-emitUnknown
+		deliver(gadget.Frame{TimestampUnknown: true, Data: []byte{1, 2}, Wire: 100, At: now})
+		<-ctx.Done()
+		return gadget.CaptureStats{}, ctx.Err()
+	}
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, engine, func() time.Time { return now }, b, bmu)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	<-ready
+	close(emitUnknown)
+	select {
+	case <-s.done:
+	case <-time.After(time.Second):
+		t.Fatal("unknown timestamp did not stop source")
+	}
+	s.mu.Lock()
+	observed := s.meter.ObservedBytes()
+	unknown := s.inputUnknown
+	closed := s.closed
+	s.mu.Unlock()
+	if observed != 100 || !unknown || !closed || s.ring.State().LiveBytes != 0 {
+		t.Fatal("unknown frame retained or observation refunded", observed, unknown, closed, s.ring.State())
+	}
+}
+
+func TestPacketSourceUnknownNoticeInvalidatesAdmittedSnapshotCoverage(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	p := sourceOwnerPermit(now)
+	b, bmu := sourceOwnerBudget(t, now)
+	ready := make(chan struct{})
+	engine := func(ctx context.Context, _ string, _ int, _ func(gadget.Frame), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
+		close(ready)
+		<-ctx.Done()
+		return gadget.CaptureStats{}, ctx.Err()
+	}
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, engine, func() time.Time { return now }, b, bmu)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	<-ready
+	// Explicit synthetic attachment observation; production owner does not assert
+	// qualified quiet coverage. Exercise existing Ring semantics independently.
+	if err = s.ring.ObservedThrough(now); err != nil {
+		t.Fatal(err)
+	}
+	processing, cancel := context.WithDeadline(t.Context(), now.Add(time.Minute))
+	defer cancel()
+	snapshot, err := s.BeginWindow(processing, packets.RingWindow{From: now, Until: now}, now, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer snapshot.Close()
+	if !snapshot.HistoryCoverage().Complete {
+		t.Fatal("baseline did not establish synthetic quiet precopy")
+	}
+	s.notice(gadget.InputNotice{})
+	if err = snapshot.Complete(now); err != nil {
+		t.Fatal(err)
+	}
+	if c := snapshot.Coverage(); c.Complete || !c.InputUnknown {
+		t.Fatal("unknown input became complete saved evidence", c)
+	}
+}

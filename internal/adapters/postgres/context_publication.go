@@ -68,7 +68,7 @@ func historicalPublication(row custodydb.ContextCapture) (artifact.ContextExpect
 	if err != nil || row.State != capture.IntentAudited || !row.IntentAcknowledgedAt.Valid || !bytes.Equal(row.IntentDigest, digest(intent)) || accepted.Expectation.DataClass != "metadata" {
 		return artifact.ContextExpectation{}, privacy.ErrFence
 	}
-	return accepted.Expectation, nil
+	return storedSnapshotProjection(accepted.Expectation, row.SnapshotCoverage, row.SnapshotCoverageDigest, row.SnapshotExpectationDigest)
 }
 func (s *ContextPublications) AcceptedContextForPublication(ctx context.Context, captureID string) (artifact.ContextExpectation, error) {
 	var out artifact.ContextExpectation
@@ -145,7 +145,7 @@ func (s *ContextPublications) publicationLocks(ctx context.Context, q *custodydb
 			err = privacy.ErrFence
 		} else {
 			x, decodeErr := apiExecution(row)
-			if decodeErr != nil || !validCompletedAPI(x, e) || !reflect.DeepEqual(x.Copies, c) || executionapp.APIExecutionDigest(x) != a.AuthorityDigest {
+			if decodeErr != nil || !validCompletedAPICapture(x, e, accepted) || !reflect.DeepEqual(x.Copies, c) || executionapp.APIExecutionDigest(x) != a.AuthorityDigest {
 				err = privacy.ErrFence
 			}
 		}
@@ -174,7 +174,7 @@ func verificationRecord(c custodydb.ContextCapture, v custodydb.ContextVerificat
 		copy(pair.dst[:], pair.src)
 	}
 	if e.ExecutionClass == artifact.ContextAPIExecution {
-		if len(executions) != 1 || !validCompletedAPI(executions[0], e) || executions[0].ExpectationDigest != r.ExpectationDigest || executionapp.APIExecutionDigest(executions[0]) != r.AuthorityDigest || evidence.ContextCopiesDigest(executions[0].Copies) != r.CopiesDigest {
+		if len(executions) != 1 || !validCompletedAPICapture(executions[0], e, c) || executionapp.APIExecutionDigest(executions[0]) != r.AuthorityDigest || evidence.ContextCopiesDigest(executions[0].Copies) != r.CopiesDigest {
 			return audit.ContextVerification{}, privacy.ErrFence
 		}
 		x := executions[0]

@@ -26,7 +26,7 @@ var _ app.SourceWorkSigner = (*APIContextWorkSignatures)(nil)
 var _ app.SourceWorkVerifier = (*APIContextWorkSignatures)(nil)
 
 func sourceWorkBytes(w app.SourceWork) ([]byte, error) {
-	if !w.Stop && deliveryapp.SourceResourcesDigest(w.Source.Resources) != w.Source.Permit.Binding.ResourceDigest {
+	if !w.Stop && w.StopSnapshot == nil && deliveryapp.SourceResourcesDigest(w.Source.Resources) != w.Source.Permit.Binding.ResourceDigest {
 		return nil, value.ErrInvalid
 	}
 	program := make([]byte, 8*len(w.Source.Program))
@@ -44,7 +44,11 @@ func sourceWorkBytes(w app.SourceWork) ([]byte, error) {
 	metadata := w.Source
 	metadata.Program = nil
 	source, _ := json.Marshal(metadata)
-	return wire.EncodeSourceWork(wire.SourceWork{Format: wire.SourceWorkFormat, Channel: historyChannelWire(w.Channel), Target: target, Node: node, Source: source, ProgramLE: program, NotAfter: w.NotAfter, Stop: w.Stop, StopIssuedAt: w.StopIssuedAt})
+	var cancelled json.RawMessage
+	if w.StopSnapshot != nil {
+		cancelled, _ = json.Marshal(w.StopSnapshot)
+	}
+	return wire.EncodeSourceWork(wire.SourceWork{Format: wire.SourceWorkFormat, Channel: historyChannelWire(w.Channel), Target: target, Node: node, Source: source, ProgramLE: program, NotAfter: w.NotAfter, Stop: w.Stop, StopIssuedAt: w.StopIssuedAt, StopSnapshot: cancelled})
 }
 func sourceWorkValue(b []byte) (app.SourceWork, error) {
 	d, e := wire.DecodeSourceWork(b)
@@ -76,6 +80,15 @@ func sourceWorkValue(b []byte) (app.SourceWork, error) {
 		source.Program[i] = planning.BPFInstruction{Code: binary.LittleEndian.Uint16(at), Jt: at[2], Jf: at[3], K: binary.LittleEndian.Uint32(at[4:])}
 	}
 	w := app.SourceWork{Channel: historyChannelValue(d.Channel), Target: target, Node: node, Source: source, NotAfter: d.NotAfter, Stop: d.Stop, StopIssuedAt: d.StopIssuedAt}
+	if len(d.StopSnapshot) > 0 {
+		var x collector.SourceSnapshot
+		decoder := json.NewDecoder(bytes.NewReader(d.StopSnapshot))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&x) != nil {
+			return app.SourceWork{}, value.ErrInvalid
+		}
+		w.StopSnapshot = &x
+	}
 	canonical, e := sourceWorkBytes(w)
 	if e != nil || !bytes.Equal(canonical, b) {
 		return app.SourceWork{}, value.ErrInvalid

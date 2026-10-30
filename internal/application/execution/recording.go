@@ -24,11 +24,11 @@ type RecordingExecutions interface {
 // recording records captureFailed or storeUnconfirmed.
 func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork, r value.APIExecution, collector evidence.RecordingCollector) (ContextResult, error) {
 	e := w.Accepted.Expectation
-	if ctx == nil || collector == nil || s.Process == nil || s.Record == nil || s.Recovery == nil || s.Now == nil || e.Recording == nil || r.Phase != "started" || r.ExpectationDigest != evidence.ContextExpectationDigest(e) {
+	if ctx == nil || collector == nil || s.Process == nil || s.Record == nil || s.Recovery == nil || s.Now == nil || (e.Recording == nil && e.Snapshot == nil) || r.Phase != "started" || r.ExpectationDigest != evidence.ContextExpectationDigest(e) {
 		return ContextResult{}, executeStep{"collect", value.ErrInvalid}
 	}
 	completionRecorder, ok := s.Record.(APIStoredCompletionRecorder)
-	if !ok {
+	if !ok && e.Snapshot == nil {
 		return ContextResult{}, executeStep{"collect", value.ErrUnavailable}
 	}
 	c, err := collector.CollectRecording(ctx)
@@ -46,11 +46,48 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 		return ContextResult{State: "Indeterminate"}, executeStep{"ReadAPIProcess", err}
 	}
 	result := r
+	if c.State == evidence.RecordingCancelled {
+		joined := c.SnapshotCancellation
+		if e.Snapshot == nil || joined == nil || joined.CaptureID != e.CaptureUID || joined.AttemptID != e.Registration.Location.AttemptID || !joined.Request.Equal(*e.Snapshot) || joined.AcceptedExpectationDigest != evidence.ContextExpectationDigest(e) || joined.JoinedAt.Before(r.StartedAt) || joined.JoinedAt.After(s.Now()) {
+			return ContextResult{State: "Indeterminate"}, executeStep{"SnapshotCancellation", value.ErrInvalid}
+		}
+		recorder, ok := s.Record.(APISnapshotCancellationRecorder)
+		if !ok {
+			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPISnapshotCancellation", value.ErrUnavailable}
+		}
+		recovery, err := s.Recovery.RecoveryState(ctx)
+		if err != nil {
+			return ContextResult{State: "Indeterminate"}, executeStep{"RecoveryState", err}
+		}
+		result.Phase, result.CompletedAt = "cancelled", joined.JoinedAt.UTC()
+		result.AcquiredAt, result.Copies = time.Time{}, artifact.Copies{}
+		if _, err = recorder.RecordAPISnapshotCancellation(ctx, result, *joined, process, recovery); err != nil {
+			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPISnapshotCancellation", err}
+		}
+		return ContextResult{State: "Cancelled"}, nil
+	}
 	if c.State == evidence.RecordingStored {
 		result.AcquiredAt, result.Copies, result.CompletedAt, result.Phase = c.Acquired.UTC(), c.Completion.Copies, c.Completion.StoredAt, "stored"
 		recovery, err := s.Recovery.RecoveryState(ctx)
 		if err != nil {
 			return ContextResult{State: "Indeterminate"}, executeStep{"RecoveryState", err}
+		}
+		if e.Snapshot != nil {
+			recorder, ok := s.Record.(APIStoredSnapshotCompletionRecorder)
+			if !ok || c.SnapshotCoverage == nil {
+				return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIStoredSnapshotCompletion", value.ErrUnavailable}
+			}
+			projected, projectionErr := artifact.ProjectSourceSnapshotCoverage(e, evidence.ContextExpectationDigest(e), *c.SnapshotCoverage)
+			if projectionErr != nil || c.Completion.ExpectationDigest != evidence.ContextExpectationDigest(projected) {
+				return ContextResult{State: "Indeterminate"}, executeStep{"SnapshotCoverage", value.ErrInvalid}
+			}
+			if _, err = recorder.RecordAPIStoredSnapshotCompletion(ctx, result, c.Completion, *c.SnapshotCoverage, process, recovery); err != nil {
+				return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIStoredSnapshotCompletion", err}
+			}
+			return ContextResult{State: "StoredPendingVerification", Copies: result.Copies}, nil
+		}
+		if c.SnapshotCoverage != nil {
+			return ContextResult{State: "Indeterminate"}, executeStep{"SnapshotCoverage", value.ErrInvalid}
 		}
 		if _, err = completionRecorder.RecordAPIStoredCompletion(ctx, result, c.Completion, process, recovery); err != nil {
 			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIStoredCompletion", err}

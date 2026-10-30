@@ -62,7 +62,7 @@ func validateOngoingRecorder(out targets.OngoingRecorderResolution, r targets.On
 		return targets.OngoingRecorderResolution{}, false
 	}
 	if state := out.State; state != nil {
-		status := collector.SourceStatus{SourceID: state.SourceID, Fence: state.Fence, IssuedAt: state.IssuedAt, LeafUntil: state.LeafUntil, Credit: state.Credit, ObservedBytes: state.ObservedBytes, Closed: state.Closed, Stopped: state.Stopped, InputUnknown: state.InputUnknown}
+		status := collector.SourceStatus{SourceStoppedAt: state.SourceStoppedAt, SnapshotUntil: state.SnapshotUntil, SourceID: state.SourceID, Fence: state.Fence, IssuedAt: state.IssuedAt, LeafUntil: state.LeafUntil, Credit: state.Credit, ObservedBytes: state.ObservedBytes, Closed: state.Closed, Stopped: state.Stopped, InputUnknown: state.InputUnknown}
 		if state.SourceID != r.SourceID || state.Fence != r.Fence || !status.Valid(state.ObservedAt) || !identity.Fresh(state.ObservedAt, state.FreshUntil, now, collector.StatusStaleAfter) {
 			return targets.OngoingRecorderResolution{}, false
 		}

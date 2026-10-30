@@ -52,7 +52,7 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 	// Generic preflight eligibility does not authorize a different action.
 	// Bind the actual immutable plan before reserving either pool.
 	action := authorization.PolicyContextAction
-	if a.Plan.Input.Recorder != nil {
+	if a.Plan.Input.Recorder != nil || a.Plan.Input.Snapshot != nil {
 		action = "packetCapture"
 	}
 	if !slices.Contains(record.Authority.Actions, action) {
@@ -67,6 +67,12 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 		}
 		output, required = recording.MaxBytes, policyRecordingNeedsGrant(&recording)
 		raw = recording.Filter != nil && planning.RawBytePredicate(recording.Filter.Expression)
+	}
+	if saved := a.Plan.Input.Snapshot; saved != nil {
+		if saved.PolicyUID != policy || saved.ExecutionDigest != record.Authority.ScopeDigest || saved.TriggerKind != "policy" || !saved.Request.T0.Equal(occurrence.CreatedAt.Time) {
+			return nil, value.ErrChanged
+		}
+		output, required = saved.Request.MaxBytes, saved.Request.RequireApproval
 	}
 	r := &policyCaptureReservation{occurrence: occurrence, bytes: output, until: snapshot.FreshUntil}
 	if source.GrantAttachmentID.Valid {

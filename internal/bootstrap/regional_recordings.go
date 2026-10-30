@@ -53,14 +53,19 @@ type recordingNodes interface {
 }
 
 type heldRecording struct {
-	expectation artifact.ContextExpectation
-	digest      artifact.Digest
-	prepared    *objectstore.PreparedArtifact
-	nodeUID     string
-	workID      string
-	queued      time.Time
-	expires     time.Time
-	outcome     evidence.RecordingCollection
+	storing         bool
+	cancelID        string
+	cancelRequested bool
+	cancelOnly      bool
+	expectation     artifact.ContextExpectation
+	digest          artifact.Digest
+	prepared        *objectstore.PreparedArtifact
+	nodeUID         string
+	workID          string
+	queued          time.Time
+	expires         time.Time
+	snapshot        *collector.SourceSnapshot
+	outcome         evidence.RecordingCollection
 }
 
 type ConnectorRecordings struct {
@@ -83,7 +88,7 @@ func NewConnectorRecordings(nodes recordingNodes, pods podNodes, now func() time
 // dropped unused (the attempt stays charged until custody cleanup).
 func (h *ConnectorRecordings) expireLocked(now time.Time) {
 	for id, r := range h.held {
-		if !now.Before(r.expires) {
+		if !r.storing && !now.Before(r.expires) {
 			delete(h.held, id)
 		}
 	}
@@ -166,6 +171,18 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		_, _ = io.Copy(io.Discard, pcapng)
 		return value.ErrConflict
 	}
+	if held.snapshot != nil {
+		x := held.snapshot
+		if r.Snapshot == nil || node.BootID != x.Binding.BootID || node.PodUID != x.Binding.CollectorPodUID || node.Epoch != x.Binding.CollectorEpoch || r.ProgramDigest != x.Binding.ProgramDigest || !r.Snapshot.Request.Equal(x.Request) || r.Snapshot.AcceptedExpectationDigest != artifact.Digest(x.ExpectationDigest) {
+			h.mu.Unlock()
+			_, _ = io.Copy(io.Discard, pcapng)
+			return value.ErrDenied
+		}
+	} else if r.Snapshot != nil {
+		h.mu.Unlock()
+		_, _ = io.Copy(io.Discard, pcapng)
+		return value.ErrDenied
+	}
 	if r.Failure != "" {
 		held.prepared, held.outcome = nil, evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "captureFailed"}
 		h.mu.Unlock()
@@ -179,28 +196,46 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		return value.ErrUnavailable
 	}
 	h.storing += r.CapturedBytes
+	held.storing = true
 	prepared, e := held.prepared, held.expectation
 	held.prepared = nil // single use, also after a failed store
 	h.mu.Unlock()
 	defer func() {
 		h.mu.Lock()
 		h.storing -= r.CapturedBytes
+		held.storing = false
 		h.mu.Unlock()
 	}()
-	// The manifest's acquisition interval is the node's recording interval,
-	// never before the queue instant.
+	// Finite recordings cannot predate queueing. An independently admitted
+	// source snapshot retains its original acquisition window instead.
 	started := r.StartedAt.UTC().Truncate(time.Microsecond)
-	if started.Before(held.queued) {
+	if held.snapshot == nil && started.Before(held.queued) {
 		started = held.queued
 	}
 	completed := r.EndedAt.UTC().Truncate(time.Microsecond)
 	if completed.Before(started) {
 		completed = started
 	}
-	copies, err := prepared.Store(ctx, pcapng, started, completed)
+	var copies artifact.Copies
+	var err error
+	if held.snapshot != nil {
+		copies, err = prepared.StoreSnapshot(ctx, pcapng, started, completed, *r.Snapshot)
+	} else {
+		copies, err = prepared.Store(ctx, pcapng, started, completed)
+	}
 	stored := h.now().UTC().Truncate(time.Microsecond)
 	outcome := evidence.RecordingCollection{State: evidence.RecordingStored, Acquired: held.queued,
 		Completion: artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: held.digest, Copies: copies, StoredAt: stored, ClosedAt: stored}}
+	if held.snapshot != nil && err == nil {
+		coverage := r.Snapshot.SourceSnapshotCoverage
+		outcome.SnapshotCoverage = &coverage
+		final, projectionErr := artifact.ProjectSourceSnapshotCoverage(e, held.digest, coverage)
+		if projectionErr != nil {
+			err = projectionErr
+		} else {
+			outcome.Completion.ExpectationDigest = evidence.ContextExpectationDigest(final)
+		}
+	}
 	if err != nil || !outcome.Valid(e.Registration) {
 		outcome = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
 		h.log("connector recording " + r.CaptureID + " store unconfirmed")
@@ -224,6 +259,15 @@ func (h *ConnectorRecordings) Collect(w fleet.APIContextWork) (evidence.Recordin
 	held := h.held[w.CaptureID]
 	if held == nil || held.expectation.Registration.Location.AttemptID != w.AttemptID || held.digest != w.ExpectationDigest {
 		return evidence.RecordingCollection{}, value.ErrUnavailable
+	}
+	if held.cancelRequested && held.outcome.State != evidence.RecordingStored {
+		if !held.storing {
+			if receipt, ok := h.snapshotCancellation(held); ok {
+				held.outcome = evidence.RecordingCollection{State: evidence.RecordingCancelled, SnapshotCancellation: &receipt}
+				return held.outcome, nil
+			}
+		}
+		return evidence.RecordingCollection{State: evidence.RecordingPending}, nil
 	}
 	return held.outcome, nil
 }
