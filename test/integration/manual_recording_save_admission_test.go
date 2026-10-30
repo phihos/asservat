@@ -86,11 +86,15 @@ func admitManualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgx
 	if !eligible.Eligible {
 		t.Fatal("real snapshot team eligibility", eligible.Reason)
 	}
-	initiatorIdentity := s.a.Eligibility.VerifiedIdentity
+	initiatorIdentity := manualRecordingSaveInitiator(s.a.Eligibility.VerifiedIdentity)
 	initiatorIdentity.VerifiedAt, initiatorIdentity.ValidUntil = now, fresh.ValidUntil
 	initiator := authorization.ContextEligibility(initiatorIdentity, projection.Permissions, source.Target.Target(), now)
 	if !initiator.Eligible || !initiator.VerifiedIdentity.Valid(now) || initiator.Principal == eligible.Principal {
 		t.Fatal("real independent ordinary initiator eligibility", initiator.Reason)
+	}
+	progress := authorization.CaptureProgressEligibility(initiatorIdentity, projection.Permissions, source.Target.Target(), initiatorIdentity.Principal, now)
+	if !progress.Eligible {
+		t.Fatal("real current manual initiator progress rights", progress.Reason)
 	}
 	before, e1 := time.ParseDuration(accepted.Compiled.Recorder.Action.Before)
 	_, e2 := time.ParseDuration(accepted.Compiled.Recorder.Action.After)
@@ -191,4 +195,48 @@ func admitManualRecordingSaveFixture(t *testing.T, ctx context.Context, hub *pgx
 	a.Plan, a.Registration = acceptedPlan, acceptedRegistration
 	out = policySourceSnapshotAdmissionFixture{Accepted: output, Admission: a, Preview: p, Source: *source}
 	return out
+}
+
+// Manual fixture principals can collect and inspect their operation progress.
+// This does not replace current target permissions or extend identity clocks.
+func manualRecordingSaveInitiator(i identity.Identity) identity.Identity {
+	if !slices.Contains(i.Scopes, "evidence:read") {
+		i.Scopes = append(slices.Clone(i.Scopes), "evidence:read")
+	}
+	return i
+}
+
+func TestManualRecordingSaveInitiatorHasCurrentProgressRights(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	a := policyRecorderOfflineAdmission(t, now)
+	owner := a.Eligibility.DefaultAudience[0]
+	original := a.Eligibility.VerifiedIdentity
+	original.Principal = identity.Principal{Issuer: owner.Issuer, Subject: "developer", ClientID: "browser", Kind: identity.Human}
+	original.Groups = []string{owner.SubjectID}
+	original.Scopes = []string{"evidence:capture"}
+	target := a.Plan.Input.Target.Target()
+	p := authorization.Projection{Target: target, Revision: identity.Revision{UID: "permissions", Generation: 1, Digest: artifact.Digest{1}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), DeniesComplete: true, DeniesObservedAt: now, DeniesFreshUntil: now.Add(5 * time.Second), Allows: []authorization.CurrentAssignment{{Audience: owner, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}}}
+	if r := authorization.ContextEligibility(original, p, target, now); !r.Eligible {
+		t.Fatal("capture-only control cannot collect", r.Reason)
+	}
+	if r := authorization.CaptureProgressEligibility(original, p, target, original.Principal, now); r.Eligible || r.Reason != "InsufficientScope" {
+		t.Fatal("capture-only identity did not reproduce progress denial", r)
+	}
+	corrected := manualRecordingSaveInitiator(original)
+	if corrected.Principal != original.Principal || !corrected.VerifiedAt.Equal(original.VerifiedAt) || !corrected.ValidUntil.Equal(original.ValidUntil) {
+		t.Fatal("fixture scope correction changed identity or original clock")
+	}
+	if r := authorization.CaptureProgressEligibility(corrected, p, target, original.Principal, now); !r.Eligible {
+		t.Fatal("manual fixture initiator cannot read its current operation", r.Reason)
+	}
+	missing := p
+	missing.Allows = nil
+	if r := authorization.CaptureProgressEligibility(corrected, missing, target, original.Principal, now); r.Eligible {
+		t.Fatal("scope correction invented target permission")
+	}
+	denied := p
+	denied.Denies = slices.Clone(p.Allows)
+	if r := authorization.CaptureProgressEligibility(corrected, denied, target, original.Principal, now); r.Eligible || r.Reason != "ExplicitDeny" {
+		t.Fatal("scope correction bypassed current deny", r)
+	}
 }
