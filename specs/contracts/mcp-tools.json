@@ -9188,6 +9188,19 @@
                       },
                       "cancellation_requested": {
                         "type": "boolean"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 512,
+                        "description": "Authorized parent Save reason, preserved verbatim; never restored on repeat."
+                      },
+                      "reason_state": {
+                        "enum": [
+                          "available",
+                          "unavailable"
+                        ],
+                        "description": "Omitted when no reason was supplied. Unavailable descriptive metadata does not block capture status."
                       }
                     },
                     "required": [
@@ -9198,6 +9211,49 @@
                       "navigation_uri",
                       "can_cancel",
                       "blockers"
+                    ],
+                    "dependentRequired": {
+                      "reason": [
+                        "reason_state"
+                      ]
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "reason_state": {
+                              "const": "available"
+                            }
+                          },
+                          "required": [
+                            "reason_state"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "reason"
+                          ]
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "reason_state": {
+                              "const": "unavailable"
+                            }
+                          },
+                          "required": [
+                            "reason_state"
+                          ]
+                        },
+                        "then": {
+                          "not": {
+                            "required": [
+                              "reason"
+                            ]
+                          }
+                        }
+                      }
                     ]
                   }
                 },
@@ -11369,7 +11425,8 @@
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 512
+            "maxLength": 512,
+            "description": "Optional 1\u2013512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
           },
           "sharing": {
             "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"

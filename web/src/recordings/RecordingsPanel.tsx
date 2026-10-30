@@ -68,8 +68,10 @@ export function RecordingsPanel({ session, scope, target, repeat, submit, contro
     {state.selected.length > 0 && <form onSubmit={event => { event.preventDefault(); void controller.review(); }}>
       <fieldset disabled={state.busy}><legend>Save window</legend>
         <label>Shorter lookback (optional)<input value={state.before} maxLength={16} placeholder="Policy-configured maximum" onChange={event => controller.setBefore(event.currentTarget.value)}/></label>
+        <label>Reason (optional)<textarea value={state.reason ?? ''} aria-describedby="recording-reason-help" onChange={event => controller.setReason(event.currentTarget.value)}/></label>
+        <p id="recording-reason-help" className="field-help">{Array.from(state.reason ?? '').length} of 512 characters. This reason describes this save; repeating a save starts with an empty reason.</p>
         <p className="field-help">For example, 10s. Leave empty to use each source’s configured lookback. Only a shorter positive window is allowed.</p>
-        {(!state.preview || state.before !== '') && <Button className="button" type="submit" isDisabled={state.busy || !state.captureEnabled || state.expired}>Review save</Button>}
+        {(!state.preview || state.before !== '' || !!state.reason) && <Button className="button" type="submit" isDisabled={state.busy || !state.captureEnabled || state.expired}>Review save</Button>}
         <Button className="button secondary" onPress={controller.clear}>Clear selection</Button>
       </fieldset>
     </form>}

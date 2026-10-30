@@ -58,6 +58,13 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		return out, value.ErrUnavailable
 	}
 	out = value.ContextProgressObservation{CaptureID: accepted.CaptureID, CandidateCaseID: accepted.Expectation.CaseID, CandidateArtifactID: accepted.Expectation.Registration.Location.ArtifactID, Target: intent.Target, Revision: c.ProgressRevision, CreatedAt: accepted.CreatedAt, Deadline: accepted.Deadline, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "IntentAuditPending"}
+	if intent.ReasonRef != nil {
+		parent := intent.CaptureID
+		if intent.Group != nil {
+			parent = intent.Group.ParentCaptureID
+		}
+		out.ReasonMetadata = &value.CaptureReasonMetadata{RootID: intent.RootID, CaptureID: parent, AuditCaptureID: intent.CaptureID, Reference: value.ProtectedReasonRef{ID: intent.ReasonRef.ID, CiphertextDigest: intent.ReasonRef.CiphertextDigest, ExpiresAt: intent.ReasonRef.ExpiresAt}, Requester: intent.Requester(), ScopeDigest: intent.ScopeDigest}
+	}
 	out.Operation, out.ActionID = "collect", accepted.Expectation.ActionID
 	if e := accepted.Expectation; e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" {
 		out.Operation = "recordingSave"

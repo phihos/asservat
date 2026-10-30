@@ -1,6 +1,6 @@
 -- name: InsertRecordingGroupPreview :exec
-INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline,preview_kind)
-VALUES($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,'recordingSaveGroup');
+INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline,preview_kind,reason_envelope)
+VALUES($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,'recordingSaveGroup',sqlc.narg(reason_envelope)::bytea);
 
 -- name: InsertRecordingSaveGroup :one
 INSERT INTO recording_save_group(id,root_id,preview_id,request_key,submission_digest,scope_digest,scope_json,policy_uid,acceptance_id,allocation_id,child_ids,accepted_at,deadline)

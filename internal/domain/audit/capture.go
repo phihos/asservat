@@ -18,6 +18,7 @@ type CaptureGroupBinding struct {
 }
 
 type CaptureIntent struct {
+	ReasonRef                                                      *CaptureReasonRef    `json:",omitempty"`
 	Group                                                          *CaptureGroupBinding `json:",omitempty"`
 	Initiator                                                      *identity.Principal  `json:",omitempty"`
 	RootID, CaptureID, CaseID, OccurrenceID, ArtifactID, AttemptID string
@@ -32,6 +33,9 @@ type CaptureIntent struct {
 }
 
 func (r CaptureIntent) Valid() bool {
+	if r.ReasonRef != nil && (!r.ReasonRef.Valid() || r.Initiator == nil) {
+		return false
+	}
 	if g := r.Group; g != nil {
 		if r.Initiator == nil || !authorization.UUID(g.ParentCaptureID) || g.ParentCaptureID == r.CaptureID || g.SelectionDigest != r.ScopeDigest || g.ChildCount < 2 || g.ChildCount > 16 || g.ChildIndex < 0 || g.ChildIndex >= g.ChildCount {
 			return false

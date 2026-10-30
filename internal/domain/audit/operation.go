@@ -63,6 +63,7 @@ func OperationRequestWindow(name string) time.Duration {
 // OperationIntent contains only bounded audit facts. It is not a permit, and
 // persisted identity/deadline fields never become current caller authority.
 type OperationIntent struct {
+	ReasonEnvelope                                                     *CaptureReasonEnvelope `json:",omitempty"`
 	ID, RootID, TraceID, Name, InputFormat, MACVersion, AccountVersion string
 	Actor                                                              identity.Principal              `json:",omitzero"`
 	Peer                                                               *OperationPeerActor             `json:",omitempty"`

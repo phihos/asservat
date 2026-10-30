@@ -1050,3 +1050,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-265: manual existing-recording saves](265-manual-existing-recording-saves.md): passive bounded discovery, first-admission t0, distinct initiator/executor, shared budgets and joined cancellation; manual SQL108 and installed qualification pending.
 
 - [ADR-266: grouped recording-save accounting](266-grouped-recording-save-accounting.md): one policy execution per Save, applicable grant starts per source, one shared acceptance time and independently funded child outputs; two-source SQL/storage component qualification passes, installed workflow pending.
+
+- [ADR-267: encrypted recording-save reasons](267-encrypted-recording-save-reasons.md): immutable reason reference, opaque encrypted body in existing preview/audit lifecycle, reason-only32KiB format and authorized parent metadata; SQL/provider qualification pending.

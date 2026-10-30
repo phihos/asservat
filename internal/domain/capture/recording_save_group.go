@@ -46,7 +46,7 @@ func (g *RecordingSaveGroupPreview) Clone() *RecordingSaveGroupPreview {
 	return &out
 }
 func (g *RecordingSaveGroupPreview) valid(p ContextPreview) bool {
-	if g == nil || len(g.Children) < 2 || len(g.Children) > MaxRecordingSaveGroupChildren || !g.Executor.Valid() || g.Executor != authorization.PolicyPrincipal(p.InstallationID, g.PolicyUID) || !identity.Text(g.PolicyName, 63) || !identity.Text(g.PolicyUID, 64) || g.ExecutionDigest == (artifact.Digest{}) {
+	if len(p.ReasonEnvelope) > 16<<10 || (p.Intent.Reason != nil && !p.Intent.Reason.Valid()) || g == nil || len(g.Children) < 2 || len(g.Children) > MaxRecordingSaveGroupChildren || !g.Executor.Valid() || g.Executor != authorization.PolicyPrincipal(p.InstallationID, g.PolicyUID) || !identity.Text(g.PolicyName, 63) || !identity.Text(g.PolicyUID, 64) || g.ExecutionDigest == (artifact.Digest{}) {
 		return false
 	}
 	if p.ArtifactID != "" || p.AttemptID != "" || p.OccurrenceID != "" || p.Pin != (artifact.PinnedPod{}) || len(p.Audience) != 0 || p.Intent.Snapshot != nil || p.Intent.Diagnostic != "" || p.Intent.Composition != nil || !p.Intent.Target.Valid() {
@@ -55,7 +55,7 @@ func (g *RecordingSaveGroupPreview) valid(p ContextPreview) bool {
 	if !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.IssuerEpoch) || !p.Actor.Valid() || !p.Storage.Valid() || p.ScopeDigest == (artifact.Digest{}) || len(p.CanonicalScope) == 0 || len(p.CanonicalScope) > MaxContextPreviewScope || p.AssessmentRulesDigest == (artifact.Digest{}) || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || !previewTime(p.SelectionUntil) || !p.SelectionUntil.After(p.CreatedAt) || p.SelectionUntil.After(p.CreatedAt.Add(time.Minute)) || p.SelectionUntil.After(p.Deadline) {
 		return false
 	}
-	if p.Target.PodUID != "" || p.Target.PodName != "" || !identity.Text(p.Target.Namespace.UID, 64) || !identity.Text(p.Target.Workload.UID, 64) || p.Target.ClusterID != p.Intent.Target.ClusterID || p.Target.Namespace.Name != p.Intent.Target.Namespace || p.Target.Workload.Name != p.Intent.Target.Name || p.Target.Workload.Kind != p.Intent.Target.Kind || p.Intent.HistoryAuthored != nil || p.Intent.Reason != nil && (!p.Intent.Reason.Valid() || p.Deadline.After(p.Intent.Reason.ExpiresAt)) || p.Intent.Sharing != nil && !p.Intent.Sharing.Valid() || p.Intent.RepeatedFrom != nil && (!authorization.UUID(p.Intent.RepeatedFrom.CaptureID) || p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) {
+	if p.Target.PodUID != "" || p.Target.PodName != "" || !identity.Text(p.Target.Namespace.UID, 64) || !identity.Text(p.Target.Workload.UID, 64) || p.Target.ClusterID != p.Intent.Target.ClusterID || p.Target.Namespace.Name != p.Intent.Target.Namespace || p.Target.Workload.Name != p.Intent.Target.Name || p.Target.Workload.Kind != p.Intent.Target.Kind || p.Intent.HistoryAuthored != nil || p.Intent.Reason != nil && !p.Intent.Reason.Valid() || p.Intent.Sharing != nil && !p.Intent.Sharing.Valid() || p.Intent.RepeatedFrom != nil && (!authorization.UUID(p.Intent.RepeatedFrom.CaptureID) || p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) {
 		return false
 	}
 	ids := map[string]bool{}

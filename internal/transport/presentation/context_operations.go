@@ -274,6 +274,8 @@ type ContextActionData struct {
 	ReasonCode string `json:"reason_code,omitempty"`
 }
 type ContextProgressData struct {
+	Reason                *string             `json:"reason,omitempty"`
+	ReasonState           string              `json:"reason_state,omitempty"`
 	RepeatedFrom          string              `json:"repeated_from_capture_id,omitempty"`
 	HistoryState          string              `json:"history_state,omitempty"`
 	CaptureID             string              `json:"capture_id"`
@@ -609,6 +611,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 			}
 			data := ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: actions, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, RetryAfterSeconds: progress.RetryAfterSeconds, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: operation}
 			data.CancellationRequested = progress.CancellationRequested
+			data.Reason, data.ReasonState = progress.Reason, progress.ReasonState
 			if operation == "recordingSave" {
 				data.CanCancel = data.CanCancel && s.recordingSaveCancellationEnabled
 			}

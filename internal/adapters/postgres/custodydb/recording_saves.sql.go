@@ -303,7 +303,7 @@ func (q *Queries) ReadRecordingSources(ctx context.Context, arg ReadRecordingSou
 
 const recordSnapshotCancellation = `-- name: RecordSnapshotCancellation :one
 UPDATE context_capture SET snapshot_cancel_joined_at=$3,snapshot_cancel_proof=$4,snapshot_cancel_proof_digest=$5
-WHERE root_id=$1 AND id=$2 AND snapshot_cancel_requested_at IS NOT NULL AND snapshot_cancel_joined_at IS NULL RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal
+WHERE root_id=$1 AND id=$2 AND snapshot_cancel_requested_at IS NOT NULL AND snapshot_cancel_joined_at IS NULL RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason_ref
 `
 
 type RecordSnapshotCancellationParams struct {
@@ -371,6 +371,7 @@ func (q *Queries) RecordSnapshotCancellation(ctx context.Context, arg RecordSnap
 		&i.SnapshotCancelProofDigest,
 		&i.GroupID,
 		&i.GroupOrdinal,
+		&i.ReasonRef,
 	)
 	return i, err
 }
@@ -378,7 +379,7 @@ func (q *Queries) RecordSnapshotCancellation(ctx context.Context, arg RecordSnap
 const recordUnstartedSnapshotCancellation = `-- name: RecordUnstartedSnapshotCancellation :one
 UPDATE context_capture c SET snapshot_cancel_joined_at=clock_timestamp()
 WHERE c.root_id=$1 AND c.id=$2 AND c.snapshot_cancel_requested_at IS NOT NULL AND c.snapshot_cancel_joined_at IS NULL
- AND NOT EXISTS(SELECT 1 FROM context_execution e WHERE e.root_id=$1 AND e.capture_id=$2 AND e.started_at IS NOT NULL) RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal
+ AND NOT EXISTS(SELECT 1 FROM context_execution e WHERE e.root_id=$1 AND e.capture_id=$2 AND e.started_at IS NOT NULL) RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason_ref
 `
 
 type RecordUnstartedSnapshotCancellationParams struct {
@@ -437,13 +438,14 @@ func (q *Queries) RecordUnstartedSnapshotCancellation(ctx context.Context, arg R
 		&i.SnapshotCancelProofDigest,
 		&i.GroupID,
 		&i.GroupOrdinal,
+		&i.ReasonRef,
 	)
 	return i, err
 }
 
 const requestSnapshotCancellation = `-- name: RequestSnapshotCancellation :one
 UPDATE context_capture SET snapshot_cancel_key=$3,snapshot_cancel_actor=$4,snapshot_cancel_requested_at=clock_timestamp()
-WHERE root_id=$1 AND id=$2 AND snapshot_cancel_requested_at IS NULL AND progress_revision=$5 RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal
+WHERE root_id=$1 AND id=$2 AND snapshot_cancel_requested_at IS NULL AND progress_revision=$5 RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest, snapshot_cancel_key, snapshot_cancel_actor, snapshot_cancel_requested_at, snapshot_cancel_joined_at, snapshot_cancel_proof, snapshot_cancel_proof_digest, group_id, group_ordinal, reason_ref
 `
 
 type RequestSnapshotCancellationParams struct {
@@ -511,6 +513,7 @@ func (q *Queries) RequestSnapshotCancellation(ctx context.Context, arg RequestSn
 		&i.SnapshotCancelProofDigest,
 		&i.GroupID,
 		&i.GroupOrdinal,
+		&i.ReasonRef,
 	)
 	return i, err
 }

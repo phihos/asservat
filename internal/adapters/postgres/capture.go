@@ -18,6 +18,7 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
+	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
@@ -398,6 +399,16 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			reviewed.Actor = a.Requester()
 			reviewed.Target = a.Plan.Input.Target.Request
 		}
+		var reasonRef []byte
+		if reviewed.Intent.Reason != nil {
+			if s.auditMAC == nil {
+				return value.ErrUnavailable
+			}
+			reasonRef, err = json.Marshal(reviewed.Intent.Reason)
+			if err != nil {
+				return value.ErrUnavailable
+			}
+		}
 		var policyReservation *policyCaptureReservation
 		if group == nil {
 			policyReservation, err = lockPolicyCaptureReservation(ctx, q, recovery, a, s.recovery.installationID())
@@ -660,7 +671,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			childPreviewID = ""
 			childRequestKey = recordingGroupChildRequestKey(group.Preview.CaptureID, int(ordinal.Int16))
 		}
-		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{GroupID: groupID, GroupOrdinal: ordinal, ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(childPreviewID), RequestKey: childRequestKey, SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil, AcceptedAt: acceptedAt})
+		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ReasonRef: reasonRef, GroupID: groupID, GroupOrdinal: ordinal, ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(childPreviewID), RequestKey: childRequestKey, SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil, AcceptedAt: acceptedAt})
 		if err != nil {
 			return err
 		}
@@ -679,12 +690,21 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 				managedUntil = capacityUntil.Time
 			}
 			bound := contextMetadataDeadline(ctx, managedUntil, auditUntil, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil, controlUntil, a.Storage.FreshUntil, binding.FreshUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time, in.Deadline)
-			operation, e := auditapp.PrepareCaptureOperation(intent, auditAccount, s.auditMAC, bound)
+			var operation auditvalue.OperationIntent
+			if reviewed.Intent.Reason != nil {
+				envelope, decodeErr := auditapp.DecodeCaptureReasonEnvelope(reviewed.ReasonEnvelope)
+				if decodeErr != nil {
+					return value.ErrUnavailable
+				}
+				operation, e = auditapp.PrepareCaptureReasonOperation(intent, auditAccount, s.auditMAC, bound, envelope)
+			} else {
+				operation, e = auditapp.PrepareCaptureOperation(intent, auditAccount, s.auditMAC, bound)
+			}
 			if e != nil {
 				return value.ErrUnavailable
 			}
 			body, e := auditapp.EncodeCaptureOperationIntent(operation)
-			if e != nil || len(body) > 16<<10 {
+			if e != nil {
 				return value.ErrUnavailable
 			}
 			if e = q.ReserveCaptureAudit(ctx, custodydb.ReserveCaptureAuditParams{RootID: id(s.root), CaptureID: row.ID, IntentValue: body, CaptureDigest: digest(intent), OriginalUntil: ts(bound)}); e != nil {

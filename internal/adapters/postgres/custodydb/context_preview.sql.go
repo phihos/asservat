@@ -153,7 +153,7 @@ func (q *Queries) DemandCapacityRefresh(ctx context.Context, arg DemandCapacityR
 }
 
 const findContextPreview = `-- name: FindContextPreview :one
-SELECT id, root_id, capture_id, attempt_id, actor_key, principal_key, blueprint_json, blueprint_sha256, created_at, deadline, closed_at, closed_request_key, closed_submission_digest, preview_kind FROM context_preview WHERE root_id=$1 AND id=$2 AND actor_key=$3
+SELECT id, root_id, capture_id, attempt_id, actor_key, principal_key, blueprint_json, blueprint_sha256, created_at, deadline, closed_at, closed_request_key, closed_submission_digest, preview_kind, reason_envelope FROM context_preview WHERE root_id=$1 AND id=$2 AND actor_key=$3
 `
 
 type FindContextPreviewParams struct {
@@ -180,6 +180,7 @@ func (q *Queries) FindContextPreview(ctx context.Context, arg FindContextPreview
 		&i.ClosedRequestKey,
 		&i.ClosedSubmissionDigest,
 		&i.PreviewKind,
+		&i.ReasonEnvelope,
 	)
 	return i, err
 }
@@ -211,8 +212,8 @@ func (q *Queries) FindContextPreviewFence(ctx context.Context, arg FindContextPr
 }
 
 const insertContextPreview = `-- name: InsertContextPreview :exec
-INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline,reason_envelope)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::bytea)
 `
 
 type InsertContextPreviewParams struct {
@@ -226,6 +227,7 @@ type InsertContextPreviewParams struct {
 	BlueprintSha256 []byte
 	CreatedAt       pgtype.Timestamptz
 	Deadline        pgtype.Timestamptz
+	ReasonEnvelope  []byte
 }
 
 func (q *Queries) InsertContextPreview(ctx context.Context, arg InsertContextPreviewParams) error {
@@ -240,6 +242,7 @@ func (q *Queries) InsertContextPreview(ctx context.Context, arg InsertContextPre
 		arg.BlueprintSha256,
 		arg.CreatedAt,
 		arg.Deadline,
+		arg.ReasonEnvelope,
 	)
 	return err
 }

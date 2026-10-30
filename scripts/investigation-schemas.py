@@ -212,9 +212,8 @@ def main():
             description.pop("enabledByDefault", None)
             branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
             if name == "preview_recording_save":
-                # No protected free-text reason producer is installed. Preserve
-                # only the same concrete capture-time sharing subset as capture.
-                description["inputSchema"]["properties"].pop("reason")
+                # Protected recording-save reasons use the accepted opaque audit path.
+                # Keep the same bounded capture-time sharing subset.
                 sharing = copy.deepcopy(documents["sharing-request.schema.json"]["$defs"]["capture"])
                 for k in ("outputSelection", "maxArtifactsPerCapture", "reason", "management"):
                     sharing["properties"].pop(k)
@@ -304,7 +303,7 @@ def main():
             "preview_capture": ["preview_id", "expires_at", "execution_digest", "pod_count", "max_bytes", "max_process_starts", "approval_required", "capture_enabled", "blockers", "warnings", "navigation_uri", "lifecycle_plan", "capture_assessment", "preset_ref", "target_ref", "selected_pods", "pod_selection"],
             "request_capture": ["capture_id", "phase", "navigation_uri", "operation", "repeated_from_capture_id", "history_state"],
             "resolve_capture_request": None,
-            "get_capture": ["capture_id", "revision", "phase", "actions", "case_id", "navigation_uri", "retry_after_seconds", "can_cancel", "blockers", "operation", "sharing", "repeated_from_capture_id", "history_state", "cancellation_requested"],
+            "get_capture": ["capture_id", "revision", "phase", "actions", "case_id", "navigation_uri", "retry_after_seconds", "can_cancel", "blockers", "operation", "sharing", "repeated_from_capture_id", "history_state", "cancellation_requested", "reason", "reason_state"],
             "get_case": ["case", "artifacts", "timeline"],
  "prepare_artifact_download": None,
  "get_artifact_download": None,

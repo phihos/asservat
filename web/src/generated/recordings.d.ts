@@ -180,6 +180,7 @@ export interface components {
         McpInput_preview_recording_save: {
             recording_handles: string[];
             before?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+            /** @description Optional Unicode scalars preserved verbatim; omit when absent. Empty is invalid. Repeat does not restore it. */
             reason?: string;
             sharing?: components["schemas"]["Contract_sharing_request_23966cae8e071ea3"];
             /** Format: uuid */

@@ -32,8 +32,8 @@ const (
 )
 
 // ProtectedReasonRef identifies separately encrypted, scope-bound control data.
-// Its digest covers ciphertext, never free text. A reference is not authority;
-// a current protected reader must check it before preview and new admission.
+// Its digest covers ciphertext, never free text. It is descriptive metadata,
+// not collection authority. Zero expiry follows mandatory audit retirement.
 type ProtectedReasonRef struct {
 	ID               string
 	CiphertextDigest artifact.Digest
@@ -41,7 +41,7 @@ type ProtectedReasonRef struct {
 }
 
 func (r ProtectedReasonRef) Valid() bool {
-	return authorization.UUID(r.ID) && r.CiphertextDigest != (artifact.Digest{}) && previewTime(r.ExpiresAt)
+	return authorization.UUID(r.ID) && r.CiphertextDigest != (artifact.Digest{}) && (r.ExpiresAt.IsZero() || previewTime(r.ExpiresAt))
 }
 
 // ContextIntent is private authored intent for the one implemented diagnostic,
@@ -134,6 +134,7 @@ type ContextPreview struct {
 	ScopeDigest                                            artifact.Digest
 	CreatedAt, Deadline                                    time.Time
 	SelectionUntil                                         time.Time `json:",omitzero"`
+	ReasonEnvelope                                         []byte    `json:",omitempty"`
 }
 
 // Executor is distinct from the immutable initiating principal of a manual
@@ -160,7 +161,7 @@ func (p ContextPreview) Valid() bool {
 	if p.Intent.Snapshot != nil && (!previewTime(p.SelectionUntil) || !p.SelectionUntil.After(p.CreatedAt) || p.SelectionUntil.After(p.CreatedAt.Add(time.Minute)) || !p.Intent.Snapshot.Request.ProcessingUntil.Equal(p.Deadline)) || p.Intent.Snapshot == nil && !p.SelectionUntil.IsZero() {
 		return false
 	}
-	if (p.Intent.RepeatedFrom != nil && p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) || !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.IssuerEpoch) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || (p.Intent.Snapshot == nil && p.Deadline.After(p.CreatedAt.Add(5*time.Minute))) || p.Intent.Reason != nil && p.Deadline.After(p.Intent.Reason.ExpiresAt) {
+	if len(p.ReasonEnvelope) > 16<<10 || (p.Intent.RepeatedFrom != nil && p.Deadline.After(p.Intent.RepeatedFrom.ExpiresAt)) || !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.IssuerEpoch) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || (p.Intent.Snapshot == nil && p.Deadline.After(p.CreatedAt.Add(5*time.Minute))) {
 		return false
 	}
 	seen := map[string]bool{}
@@ -211,6 +212,7 @@ func (p ContextPreview) Current(now time.Time) bool {
 }
 
 func (p ContextPreview) Clone() ContextPreview {
+	p.ReasonEnvelope = slices.Clone(p.ReasonEnvelope)
 	p.Group = p.Group.Clone()
 	p.CanonicalScope = slices.Clone(p.CanonicalScope)
 	p.Audience = slices.Clone(p.Audience)

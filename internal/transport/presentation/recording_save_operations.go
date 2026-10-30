@@ -149,6 +149,7 @@ type recordingSaveInput struct {
 	Handles          []string             `json:"recording_handles,omitempty"`
 	Before           string               `json:"before,omitempty"`
 	Sharing          *ContextSharingInput `json:"sharing,omitempty"`
+	Reason           *string              `json:"reason,omitempty"`
 	RepeatedFrom     string               `json:"repeated_from_capture_id,omitempty"`
 }
 
@@ -246,7 +247,7 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 			}
 		}
 		var result app.ContextPreviewResult
-		result, operationErr = s.saves.Preview(bounded, current, app.RecordingSavePreviewRequest{Handles: append([]string(nil), in.Handles...), Before: before, Sharing: in.Sharing.intent(), RepeatedFromCaptureID: in.RepeatedFrom})
+		result, operationErr = s.saves.Preview(bounded, current, app.RecordingSavePreviewRequest{Handles: append([]string(nil), in.Handles...), Before: before, Sharing: in.Sharing.intent(), RepeatedFromCaptureID: in.RepeatedFrom, Reason: in.Reason})
 		if operationErr == nil {
 			p, m := result.Preview, result.RecordingSave
 			if m == nil || p.ScopeDigest != result.Assessment.PlanDigest || !s.config.Now().Before(p.SelectionUntil) {

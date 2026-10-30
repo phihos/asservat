@@ -512,6 +512,7 @@ type CaptureOperationIntent struct {
 	HistoryParametersRequired bool
 	RepeatedFromCaptureID     pgtype.UUID
 	RepeatedFromExpiresAt     pgtype.Timestamptz
+	ReasonRef                 []byte
 }
 
 type CaptureOperationLifecycle struct {
@@ -909,6 +910,7 @@ type ContextCapture struct {
 	SnapshotCancelProofDigest []byte
 	GroupID                   pgtype.UUID
 	GroupOrdinal              pgtype.Int2
+	ReasonRef                 []byte
 }
 
 type ContextCaseLocator struct {
@@ -1032,6 +1034,7 @@ type ContextPreview struct {
 	ClosedRequestKey       []byte
 	ClosedSubmissionDigest []byte
 	PreviewKind            string
+	ReasonEnvelope         []byte
 }
 
 type ContextPreviewFence struct {

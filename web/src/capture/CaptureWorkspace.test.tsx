@@ -214,7 +214,7 @@ it('renders the reviewed recorder assessment and requests approval without claim
 it('renders grouped recording actions with exact child identity and retained Pod labels', async () => {
   window.history.replaceState(null, '', '/captures/' + id(8));
   const client = new SyntheticOperations(); const controller = new Investigation(client); controllers.push(controller);
-  const reported = { capture_id: id(8), revision: 1, phase: 'Partial', operation: 'recordingSave', can_cancel: false, blockers: [], navigation_uri: 'https://asservat.invalid/captures/' + id(8), actions: [
+  const reported = { reason: '  grouped reason\n<&>  ', reason_state: 'available', capture_id: id(8), revision: 1, phase: 'Partial', operation: 'recordingSave', can_cancel: false, blockers: [], navigation_uri: 'https://asservat.invalid/captures/' + id(8), actions: [
     { action_id: 'traffic', action_instance_id: id(101), pod_uid: 'original-pod-a', pod_name: 'api-a', phase: 'Succeeded' },
     { action_id: 'traffic', action_instance_id: id(102), pod_uid: 'original-pod-b', pod_name: 'api-b', phase: 'Cancelled' },
   ] };
@@ -226,6 +226,8 @@ it('renders grouped recording actions with exact child identity and retained Pod
     expect(screen.getByText('api-a')).toBeTruthy(); expect(screen.getByText('api-b')).toBeTruthy();
     expect(screen.getAllByText('traffic')).toHaveLength(2);
     expect(document.querySelectorAll('.progress-actions li')).toHaveLength(2);
+    expect(screen.getAllByRole('region', {name:'Save reason'})).toHaveLength(1);
+    expect(screen.getByRole('region', {name:'Save reason'}).querySelector('p')!.textContent).toBe(reported.reason);
     expect(errors.mock.calls.some(call => call.some(value => String(value).includes('same key')))).toBe(false);
     expect(client.calls.every(call => call.name === 'get_capture' && !!call.input && typeof call.input === 'object' && 'capture_id' in call.input && call.input.capture_id === id(8))).toBe(true);
     expect(document.querySelector('a[href="/captures/' + id(101) + '"]')).toBeNull();
@@ -247,4 +249,12 @@ it('requests grouped cancellation once on the parent while stored results remain
  expect(screen.getByRole('link',{name:'View evidence'}).getAttribute('href')).toBe('/cases/'+id(50));expect(screen.getByRole('heading',{name:'Saving recorded history'})).toBeTruthy();
  expect(screen.queryByText('Collection cancelled')).toBeNull();expect(screen.queryByRole('button',{name:'Cancel recording save'})).toBeNull();
  expect(client.calls.filter(call=>call.name==='cancel_capture')).toHaveLength(1);expect(client.calls.every(call=>!!call.input&&typeof call.input==='object'&&'capture_id'in call.input&&call.input.capture_id===id(8))).toBe(true);
+});
+
+it('keeps parent capture progress available when descriptive reason has retired',async()=>{
+ window.history.replaceState(null,'','/captures/'+id(8));const client=new SyntheticOperations();const controller=new Investigation(client);controllers.push(controller);
+ client.responder=()=>{const response=progressResult();if(response.status==='ok'){response.data.reason_state='unavailable';response.data.operation='recordingSave';}return response;};
+ render(<CaptureWorkspace session={session} scope={new AbortController().signal} controller={controller}/>);
+ expect(await screen.findByText(/The save reason is unavailable/)).toBeTruthy();
+ expect(document.querySelector('.progress-actions')).toBeTruthy();expect(screen.queryByRole('region',{name:'Save reason'})).toBeNull();
 });
