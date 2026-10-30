@@ -250,16 +250,19 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		result, operationErr = s.saves.Preview(bounded, current, app.RecordingSavePreviewRequest{Handles: append([]string(nil), in.Handles...), Before: before, Sharing: in.Sharing.intent(), RepeatedFromCaptureID: in.RepeatedFrom, Reason: in.Reason})
 		if operationErr == nil {
 			p, m := result.Preview, result.RecordingSave
-			if m == nil || p.ScopeDigest != result.Assessment.PlanDigest || !s.config.Now().Before(p.SelectionUntil) {
-				return OperationReply{}, value.ErrUnavailable
+			if m == nil || p.ScopeDigest != result.Assessment.PlanDigest {
+				return OperationReply{}, stopped("preview-shape", value.ErrUnavailable)
+			}
+			if !s.config.Now().Before(p.SelectionUntil) {
+				return OperationReply{}, stopped("preview-selection-expired", value.ErrUnavailable)
 			}
 			rows, windows, selectionErr := recordingPreviewSelection(result, in.Handles)
 			if selectionErr != nil {
-				return OperationReply{}, selectionErr
+				return OperationReply{}, stopped("preview-rows", selectionErr)
 			}
 			assessment, assessmentErr := recordingSaveAssessment(result)
 			if assessmentErr != nil {
-				return OperationReply{}, assessmentErr
+				return OperationReply{}, stopped("preview-assessment", assessmentErr)
 			}
 			until = identity.Earlier(until, result.ValidUntil)
 			blockers := []string{}
@@ -294,11 +297,11 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		b, err = json.Marshal(out)
 	}
 	if err != nil || s.contracts.ValidateOutput(name, b) != nil {
-		return OperationReply{}, value.ErrUnavailable
+		return OperationReply{}, stopped("output-contract", value.ErrUnavailable)
 	}
 	if !s.config.Now().Before(until) || bounded.Err() != nil {
 		clear(b)
-		return OperationReply{}, value.ErrUnavailable
+		return OperationReply{}, stopped("reply-interval", value.ErrUnavailable)
 	}
 	return OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), recordingSavePreview: name == "preview_recording_save"}, nil
 }
