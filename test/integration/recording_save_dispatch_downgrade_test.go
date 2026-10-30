@@ -123,7 +123,7 @@ func recordingSaveGroupBoundsSQL(t *testing.T) (string, string) {
 func groupBoundsDefinition(t *testing.T, ctx context.Context, admin *pgxpool.Pool) string {
 	t.Helper()
 	var body string
-	if err := admin.QueryRow(ctx, "SELECT pg_get_functiondef('public.recording_save_group_window_valid(public.context_capture,public.recording_save_group,timestamptz)'::regprocedure)").Scan(&body); err != nil {
+	if err := admin.QueryRow(ctx, "SELECT pg_get_functiondef(to_regprocedure($1::text))", "public.recording_save_group_window_valid(public.context_capture,public.recording_save_group,timestamptz)").Scan(&body); err != nil {
 		t.Fatal(err)
 	}
 	return body
@@ -148,7 +148,7 @@ func qualifyRecordingSaveGroupBoundsEmptyDownUp(t *testing.T, ctx context.Contex
 		t.Fatal("empty112Up", err)
 	}
 	var restored string
-	if err = tx.QueryRow(ctx, "SELECT pg_get_functiondef('public.recording_save_group_window_valid(public.context_capture,public.recording_save_group,timestamptz)'::regprocedure)").Scan(&restored); err != nil || restored != before {
+	if err = tx.QueryRow(ctx, "SELECT pg_get_functiondef(to_regprocedure($1::text))", "public.recording_save_group_window_valid(public.context_capture,public.recording_save_group,timestamptz)").Scan(&restored); err != nil || restored != before {
 		t.Fatal("112empty restoration changed function", err)
 	}
 	if err = tx.Rollback(ctx); err != nil {
