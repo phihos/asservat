@@ -1,6 +1,6 @@
 # Sustained implementation progress
 
-## Existing-source Save composition: local work in progress (2026-10-30)
+## Existing-source Save: automatic SQL/storage component qualified (2026-10-30)
 
 [ADR-264](decisions/264-existing-source-packet-snapshots.md) adds a typed existing-source
 window, separate from finite recording and source observation authority. Local
@@ -14,14 +14,45 @@ Schema 106 keeps bounded authenticated completion coverage separately from the
 immutable accepted expectation. Publication and native readers derive the final
 manifest expectation while retaining the original execution digest. PostgreSQL
 unit/race checks pass for projection tampering and distinct original/final audit
-bindings; actual SQL trigger, key-role and end-to-end qualification remain pending.
+bindings.
 Schema 107 now retains the full original source audience and minimal target,
 binds their canonical audience digest before first arm, and returns the existing
 occurrence creation time for automatic Save. SQL admission and execution share
 the original/current audience intersection check; legacy sources cannot Save.
 Full PostgreSQL and authorization package races pass locally, as do the tagged
 fixture storage-contract check and compilation of the genuine source-to-snapshot
-completion outer. Migration, real role and end-to-end qualification remain pending.
+completion outer.
+
+The owned PostgreSQL/S3/OpenBao run on frozen `30e51ec1` passed all nine required
+test names (ten actual names, including the SQL type-alias control). Supervisor,
+fixture and suite qualification exits were 0; supervisor runtime was 37.817 seconds
+and the Go package reported 8.698 seconds. Root independently verified 3,472
+canonical and 36,111 tracked source hashes, both archived artifacts, the restored
+31,495-file result baseline and exact container/network/scratch cleanup. All 16
+pre-existing containers were preserved. Evidence is archived under
+`/home/phil/.cache/asservat-build/codex-bf86-resume/source-window-save-sql106-107-6/`.
+
+The run covers source provenance and empty/populated downgrade behavior, rejection
+of changed occurrence time and a newly introduced audience member, genuine
+automatic admission, encrypted production, write-once completion and exact replay,
+independent headers-only verification, purpose-specific publication/key roles,
+processing lineage and 4,592 exact native PCAPNG bytes through the existing framed
+reader. Original/final expectation digests remain distinct; saving leaves prepaid
+source observation spend unchanged. The source tuple measured 2,129 bytes with two
+original audience references. These are component measurements, not aggregate
+overhead or storage-budget qualification.
+
+Two preceding failed runs are retained: prefix 4 exposed an uppercase `Executor`
+key that Go accepted but SQL's lowercase audit path rejected; the compiler now
+has a case-sensitive wire regression and the explicit lowercase tag. Prefix 5
+reached publication but the fixture called the pod-status-only buffered reader;
+the fixture now uses the existing bounded PCAPNG stream and checks its original
+expiry/deletion metadata and final whole-file hash. No production read limit was
+expanded. Target, process, packet, initial authority and clock observations remain
+synthetic; remote key-opening/download-session transport and installed collectors
+are not qualified by this run. Admission/execution use the fixture's installed
+hub-runtime role union; this is not a dedicated capture/API database-role run.
+
 The public ongoing compiler remains disabled. Manual Save
 inventory/submission and browser/MCP composition are in progress; the current
 one-Pod incident backend is not qualification of the accepted larger grouped

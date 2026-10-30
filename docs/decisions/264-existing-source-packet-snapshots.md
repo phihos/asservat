@@ -54,7 +54,8 @@ watch, service, credential, timer or configuration. The existing API execution
 role receives UPDATE on those three columns, and the existing verification-key
 reader receives SELECT. Downgrade refuses retained snapshot completions that the
 older schema cannot represent. Unit/race checks cover projection integrity and
-finite behavior; real SQL and full installed Save qualification remain pending.
+finite behavior. The owned real SQL/storage component qualification is recorded
+in implementation-progress.md; full installed Save qualification remains pending.
 
 The encrypted detailed manifest also retains the exact accepted canonical
 source-window scope and original source binding. Their independently supplied
@@ -115,8 +116,9 @@ Downgrade refuses populated original provenance instead of discarding it.
 Terminal source metadata retirement remains unimplemented; retaining audience
 references and names adds to that known gap. No finite metadata-retirement or
 public-readiness claim follows from this implementation. Local codec, audience,
-legacy, tamper and grant tests pass; actual migration and end-to-end SQL Save
-qualification remain pending.
+legacy, tamper and grant tests pass. The owned automatic source-to-snapshot SQL,
+encrypted publication and native-stream component run also passes; manual,
+installed-source and full Save qualification remain pending.
 
 Observed stop/close and snapshot-processing completion timestamps retain their
 actual nanoseconds in authenticated coverage JSON and projected lifecycle.
