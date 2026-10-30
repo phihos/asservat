@@ -60,6 +60,16 @@ func qualifySourceSnapshotServices(t *testing.T, manual, cancellation, requireAp
 	if len(groups) > 0 {
 		groupCount = groups[0]
 	}
+	qualifySourceSnapshotServicesMode(t, sourceSnapshotQualificationMode{manual: manual, cancellation: cancellation, requireApproval: requireApproval, reason: reason, groupCount: groupCount})
+}
+
+type sourceSnapshotQualificationMode struct {
+	manual, cancellation, requireApproval, reason, dispatch bool
+	groupCount                                              int
+}
+
+func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualificationMode) {
+	manual, cancellation, requireApproval, reason, groupCount := mode.manual, mode.cancellation, mode.requireApproval, mode.reason, mode.groupCount
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		t.Run("empty-provenance-down-up", func(t *testing.T) {
 			provider, closeProvider := source107MigrationProvider(t, admin)
@@ -241,6 +251,10 @@ func qualifySourceSnapshotServices(t *testing.T, manual, cancellation, requireAp
 			}
 			if reason {
 				qualifyManualRecordingSaveReason(t, ctx, f, seed.s, accepted, renewal, fresh(t), intents)
+				return
+			}
+			if mode.dispatch {
+				qualifyManualRecordingSaveDispatch(t, ctx, f, seed.s, accepted, ledger, renewal, fresh, intents)
 				return
 			}
 			if groupCount > 0 {

@@ -34,7 +34,27 @@ import (
 // observations remain synthetic fixture facts; no collector or native clock
 // qualification follows from this test. The caller supplies genuine reviewed
 // source admission, occurrence and capture acceptance, never hand-inserted rows.
+type sourceSnapshotCompletionState struct {
+	ObservationBefore int64
+	Executions        *postgres.APIContextExecutions
+	Execution         executionvalue.APIExecution
+	Process           executionvalue.APIProcessBinding
+	Bound             *objectstore.CustodyStore
+	Channel           *delivery.NodeChannel
+	Peer              delivery.NodePeer
+	Holder            *bootstrap.ConnectorRecordings
+	Work              collector.Work
+	Close             func()
+	RecordStored      func(context.Context, evidence.RecordingCollection, artifact.SourceSnapshotOutcome) (executionvalue.APIExecution, error)
+}
+
 func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation, artifact.RecoveryProof)) {
+	stage := startSourceSnapshotCompletion(t, ctx, f, policy, snapshot, intents)
+	defer stage.Close()
+	completeSourceSnapshotCompletion(t, ctx, f, policy, snapshot, stage, beforeStored...)
+}
+
+func startSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication) *sourceSnapshotCompletionState {
 	t.Helper()
 	s, accepted, admission := policy.Scenario, snapshot.Accepted, snapshot.Admission
 	e := accepted.Expectation
@@ -184,7 +204,12 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 	holder := bootstrap.NewConnectorRecordings(channel, nil, clock, func(line string) { t.Log(line) })
 	channel.SetPacketSink(holder)
 	prepared := holder.Prepare(preparedArtifact, e)
-	defer prepared.Close()
+	queued := false
+	defer func() {
+		if !queued {
+			prepared.Close()
+		}
+	}()
 	x := collector.SourceSnapshot{Binding: b, CaptureID: accepted.CaptureID, AttemptID: e.Registration.Location.AttemptID, WriterPodUID: process.PodUID, WriterEpoch: process.ProcessEpoch, ExpectationDigest: [32]byte(evidence.ContextExpectationDigest(e)), Request: *e.Snapshot}
 	if _, err = prepared.StartSourceSnapshot(ctx, x); err != nil {
 		t.Fatal("original source snapshot queue", err)
@@ -193,6 +218,23 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 	if err != nil || len(work) != 1 || work[0].Snapshot == nil || !work[0].Snapshot.Equal(x) {
 		t.Fatal("queued original source snapshot", work, err)
 	}
+
+	queued = true
+	return &sourceSnapshotCompletionState{ObservationBefore: observationBefore, Executions: executions, Execution: execution, Process: process, Bound: bound, Channel: channel, Peer: peer, Holder: holder, Work: work[0], Close: prepared.Close}
+}
+
+func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, stage *sourceSnapshotCompletionState, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation, artifact.RecoveryProof)) {
+	t.Helper()
+	s, accepted, admission := policy.Scenario, snapshot.Accepted, snapshot.Admission
+	e := accepted.Expectation
+	clock := func() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
+	executions, execution, process := stage.Executions, stage.Execution, stage.Process
+	bound, channel, peer, holder := stage.Bound, stage.Channel, stage.Peer, stage.Holder
+	work := []collector.Work{stage.Work}
+	b, observationBefore := snapshot.Source.Binding, stage.ObservationBefore
+	guards := postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard}
+	hub := f.roles["hub-runtime"]
+	var err error
 
 	end := e.Snapshot.T0.Add(e.Snapshot.After)
 	if wait := time.Until(end); wait > 0 {
@@ -253,7 +295,11 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 	for _, hook := range beforeStored {
 		hook(executions, execution, processObservation, recovery)
 	}
-	execution, err = executions.RecordAPIStoredSnapshotCompletion(ctx, execution, completion, outcome.SourceSnapshotCoverage, processObservation, recovery)
+	if stage.RecordStored != nil {
+		execution, err = stage.RecordStored(ctx, collected, outcome)
+	} else {
+		execution, err = executions.RecordAPIStoredSnapshotCompletion(ctx, execution, completion, outcome.SourceSnapshotCoverage, processObservation, recovery)
+	}
 	if err != nil {
 		t.Fatal("atomic snapshot completion", err)
 	}
