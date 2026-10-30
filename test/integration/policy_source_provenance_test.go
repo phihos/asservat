@@ -177,7 +177,15 @@ func TestPolicySourceSnapshotWithRealServices(t *testing.T) {
 					t.Fatal("snapshot resampled original occurrence", err)
 				}
 			})
-			t.Run("encrypted-completion-publication-native", func(t *testing.T) { qualifySourceSnapshotCompletion(t, ctx, f, accepted, snapshot, intents) })
+			t.Run("encrypted-completion-publication-native", func(t *testing.T) {
+				qualifySourceSnapshotCompletion(t, ctx, f, accepted, snapshot, intents)
+				r := snapshot.Accepted.Expectation.Registration
+				var artifactID string
+				var anchor, deleteBy time.Time
+				if err := admin.QueryRow(ctx, "SELECT artifact_id::text,anchor_at,delete_by FROM context_processing WHERE root_id=$1 AND capture_id=$2", s.a.RootID, snapshot.Accepted.CaptureID).Scan(&artifactID, &anchor, &deleteBy); err != nil || artifactID != r.Location.ArtifactID || !anchor.Equal(r.AnchorAt) || !deleteBy.Equal(r.DeleteBy) {
+					t.Fatal("snapshot processing lineage changed original acquisition or deletion bounds", artifactID, anchor, deleteBy, err)
+				}
+			})
 		}
 		qualifyPolicyRecorderAdmission(t, ctx, admin, f.fixturePool, f.store, f.keys, func(*testing.T) captureAdmissionScenario { return seed }, option)
 	})
