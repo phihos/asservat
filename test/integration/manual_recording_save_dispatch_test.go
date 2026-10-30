@@ -32,6 +32,11 @@ func TestManualRecordingSaveDispatchWorkflowWithRealServices(t *testing.T) {
 	qualifySourceSnapshotServicesMode(t, sourceSnapshotQualificationMode{manual: true, groupCount: 2, dispatch: true})
 }
 
+// This standalone maximum fanout uses its own pristine service fixture.
+func TestManualRecordingSaveDispatchWorkflow16WithRealServices(t *testing.T) {
+	qualifySourceSnapshotServicesMode(t, sourceSnapshotQualificationMode{manual: true, groupCount: 16, dispatch: true})
+}
+
 type dispatchWorkflowIdentity struct {
 	who   identity.Identity
 	until time.Time
@@ -160,34 +165,41 @@ func dispatchWorkflowEnvelope(t *testing.T, reply presentation.OperationReply, e
 
 func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication) {
 	t.Helper()
-	if policy.Compiled.IncidentPods != 2 {
-		t.Fatal("first workflow qualifier requires independently configuredN2")
+	count := policy.Compiled.IncidentPods
+	if count != 2 && count != 16 {
+		t.Fatal("workflow qualifier requires independently configured N2 or N16")
 	}
 	began := time.Now()
 	sources := []captureapp.PolicySourceAdmission{original}
 	checks := []captureapp.PolicySourceCheck{refresh(t)}
-	check := refresh(t)
-	check.SourceID, check.Fence = custodyID(), custodyID()
-	check.Target.Request.PodUID = custodyID()
-	check.Target.Request.PodName += "-workflow-second"
-	check.Target.Pin.UID, check.Target.Pin.Name = check.Target.Request.PodUID, check.Target.Request.PodName
-	check.Node.PodUID = check.Target.Request.PodUID
-	retained, err := manualGroupRetentionPolicies(ctx, policy.Scenario.retention, check.Target.Target())
-	if err != nil {
-		t.Fatal(err)
+	for n := 1; n < count; n++ {
+		check := refresh(t)
+		check.SourceID, check.Fence = custodyID(), custodyID()
+		check.Target.Request.PodUID = custodyID()
+		if count == 2 {
+			check.Target.Request.PodName += "-workflow-second"
+		} else {
+			check.Target.Request.PodName += fmt.Sprintf("-workflow-%d", n)
+		}
+		check.Target.Pin.UID, check.Target.Pin.Name = check.Target.Request.PodUID, check.Target.Request.PodName
+		check.Node.PodUID = check.Target.Request.PodUID
+		retained, err := manualGroupRetentionPolicies(ctx, policy.Scenario.retention, check.Target.Target())
+		if err != nil {
+			t.Fatal(err)
+		}
+		check.Retention, err = privacy.Resolve(retained, privacy.Input{Target: check.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: policy.Compiled.RetentionSeconds, AnchorAt: check.ObservedAt}, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		check.Initial = true
+		check.InitialCredit = 1 << 20
+		second, err := ledger.AdmitSource(ctx, check)
+		if err != nil {
+			t.Fatal("real additional source", n, err)
+		}
+		sources = append(sources, second)
+		checks = append(checks, check)
 	}
-	check.Retention, err = privacy.Resolve(retained, privacy.Input{Target: check.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: policy.Compiled.RetentionSeconds, AnchorAt: check.ObservedAt}, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	check.Initial = true
-	check.InitialCredit = 1 << 20
-	second, err := ledger.AdmitSource(ctx, check)
-	if err != nil {
-		t.Fatal("real secondsource", err)
-	}
-	sources = append(sources, second)
-	checks = append(checks, check)
 	maximum := min(policy.Compiled.Recorder.Action.MaxBytes, int64(artifact.RecordingNativeLimit))
 	authorities, err := postgres.NewAutomationAuthorities(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID, policy.Authority.InstallationID)
 	if err != nil {
@@ -202,13 +214,13 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	prepare := func() (value.RecordingSaveGroupAdmission, []policySourceSnapshotAdmissionFixture) {
 		var err error
 		readers.Sources, err = ledger.ListSources(ctx, policy.Authority.PolicyUID)
-		if err != nil || len(readers.Sources) != 2 {
+		if err != nil || len(readers.Sources) != count {
 			t.Fatal("exact bounded source set", err, len(readers.Sources))
 		}
 		// One common current controller refresh per cohort; each target still reads
 		// its own real SQL permission, retention and storage facts.
 		common := refresh(t)
-		parts := make([]policySourceSnapshotAdmissionFixture, 2)
+		parts := make([]policySourceSnapshotAdmissionFixture, count)
 		for n, source := range sources {
 			current := common
 			current.SourceID, current.Fence = source.Permit.Binding.SourceID, source.Permit.Binding.Fence
@@ -255,7 +267,7 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	if err = previews.CreateRecordingGroupPreview(ctx, group.Preview); err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("workflow_sources=2 setup_ms=%d final_preparation_ms=%d original_first_proof_remaining_ms=%d", time.Since(began).Milliseconds(), time.Since(preparedAt).Milliseconds(), time.Until(manualGroupProofDeadline(group)).Milliseconds())
+	t.Logf("workflow_sources=%d setup_ms=%d final_preparation_ms=%d original_first_proof_remaining_ms=%d", count, time.Since(began).Milliseconds(), time.Since(preparedAt).Milliseconds(), time.Until(manualGroupProofDeadline(group)).Milliseconds())
 	before := readManualSaveCounters(t, ctx, f, policy)
 	var accepted value.Accepted
 	var longID string
@@ -265,11 +277,11 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 		var err error
 		accepted, err = admissions.AdmitRecordingSaveGroup(call, group)
 		end()
-		if err != nil || accepted.Group == nil || len(accepted.Group.Children) != 2 {
+		if err != nil || accepted.Group == nil || len(accepted.Group.Children) != count {
 			t.Fatal("real positive group admission", err)
 		}
 		earliest := accepted.Group.Children[0].Expectation.Snapshot.StartBy
-		t.Logf("workflow_sources=2 admission_ms=%d actual_t0_age_at_return_ms=%d original_startby_remaining_ms=%d", time.Since(admittedAt).Milliseconds(), time.Since(accepted.CreatedAt).Milliseconds(), time.Until(earliest).Milliseconds())
+		t.Logf("workflow_sources=%d admission_ms=%d actual_t0_age_at_return_ms=%d original_startby_remaining_ms=%d", count, time.Since(admittedAt).Milliseconds(), time.Since(accepted.CreatedAt).Milliseconds(), time.Until(earliest).Milliseconds())
 		// NO counter/replay/history/provider setup between actual SQL t0 and starts.
 		started := time.Now()
 		reply, id, err := operations.call(ctx, identity.RecordingSaveRequestWindow, group.Preview.ID, group.IdempotencyKey, true)
@@ -287,10 +299,10 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 			t.Fatal("actual workflow changed parent receipt", string(data))
 		}
 		var executions int
-		if err = f.admin.QueryRow(ctx, `SELECT count(*) FROM context_execution e JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id WHERE c.group_id=$1 AND e.phase='started'`, accepted.CaptureID).Scan(&executions); err != nil || executions != 2 {
-			t.Fatal("real runner did not start both admitted children", executions, err)
+		if err = f.admin.QueryRow(ctx, `SELECT count(*) FROM context_execution e JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id WHERE c.group_id=$1 AND e.phase='started'`, accepted.CaptureID).Scan(&executions); err != nil || executions != count {
+			t.Fatal("real runner did not start all admitted children", executions, err)
 		}
-		t.Logf("workflow_sources=2 actual_normal_audit_plus_continue_ms=%d original_t0_age_after_queue_ms=%d original_startby_remaining_ms=%d; real SQL/runner/producer/holder/nodequeue, in-process local attestations synthetic", time.Since(started).Milliseconds(), time.Since(accepted.CreatedAt).Milliseconds(), time.Until(earliest).Milliseconds())
+		t.Logf("workflow_sources=%d actual_normal_audit_plus_continue_ms=%d original_t0_age_after_queue_ms=%d original_startby_remaining_ms=%d; real SQL/runner/producer/holder/nodequeue, in-process local attestations synthetic", count, time.Since(started).Milliseconds(), time.Since(accepted.CreatedAt).Milliseconds(), time.Until(earliest).Milliseconds())
 	}) {
 		return
 	}
@@ -321,7 +333,7 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	}
 	if !t.Run("passive-replay-keeps-shared-t0-and-spend", func(t *testing.T) {
 		after := readManualSaveCounters(t, ctx, f, policy)
-		if after.Executions != before.Executions+1 || after.Collected != before.Collected+2*maximum || after.Occurrences != before.Occurrences || after.Observed != before.Observed || after.Shares != before.Shares || after.Reservations != before.Reservations+2 {
+		if after.Executions != before.Executions+1 || after.Collected != before.Collected+int64(count)*maximum || after.Occurrences != before.Occurrences || after.Observed != before.Observed || after.Shares != before.Shares || after.Reservations != before.Reservations+count {
 			t.Fatal("real workflow changed accepted resource units", before, after)
 		}
 		var original []byte

@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -127,21 +128,40 @@ func newManualSnapshotWorkflow(t *testing.T, ctx context.Context, f *capacitySQL
 	})
 	return w
 }
-func (w *manualSnapshotWorkflow) StartContext(ctx context.Context, current identities.CurrentIdentity, id string) error {
+func (w *manualSnapshotWorkflow) StartContext(ctx context.Context, current identities.CurrentIdentity, id string) (err error) {
+	began := time.Now()
+	state := ""
+	defer func() {
+		step := "none"
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			step = fixed.FixedStep()
+		}
+		remaining := time.Duration(0)
+		if deadline, ok := ctx.Deadline(); ok {
+			remaining = time.Until(deadline)
+		}
+		w.t.Logf("actual_child_start capture=%s elapsed_ms=%d state=%s fixed_step=%s request_remaining_ms=%d error=%v", id, time.Since(began).Milliseconds(), state, step, remaining.Milliseconds(), err)
+	}()
 	result, err := w.Runner.Execute(ctx, current, id)
+	state = result.State
 	if err != nil {
-		return err
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			return fmt.Errorf("real runner step %s: %w", fixed.FixedStep(), err)
+		}
+		return fmt.Errorf("real runner execute: %w", err)
 	}
 	if result.State != "Recording" {
 		return fmt.Errorf("real runner did not queue: %s", result.State)
 	}
 	recovery, err := w.policy.Scenario.recovery.reader.RecoveryState(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("real runner post-start recovery: %w", err)
 	}
 	_, execution, err := w.Executions.ReadRecordingWork(ctx, id, recovery)
 	if err != nil {
-		return err
+		return fmt.Errorf("real runner post-start work: %w", err)
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -185,10 +205,11 @@ func (w *manualSnapshotWorkflow) PrepareContext(ctx context.Context, e artifact.
 	w.mu.Lock()
 	w.stages[e.CaptureUID] = stage
 	w.mu.Unlock()
-	return &manualWorkflowPrepared{PreparedContext: output, recorder: output, node: node, stage: stage}, nil
+	return &manualWorkflowPrepared{PreparedContext: output, recorder: output, node: node, stage: stage, t: w.t}, nil
 }
 
 type manualWorkflowPrepared struct {
+	t *testing.T
 	evidence.PreparedContext
 	recorder evidence.SourceSnapshotRecorder
 	node     *manualSnapshotNode
@@ -213,6 +234,7 @@ func (p *manualWorkflowPrepared) StartSourceSnapshot(ctx context.Context, x coll
 	}
 	p.node.after = work[0].Sequence
 	p.stage.Work = work[0]
+	p.t.Logf("actual_child_queue capture=%s source=%s queued_at=%s consumed_at=%s original_start_by=%s work_not_after=%s", x.CaptureID, x.Binding.SourceID, queued.Format(time.RFC3339Nano), workflowNow().Format(time.RFC3339Nano), x.Request.StartBy.Format(time.RFC3339Nano), work[0].NotAfter.Format(time.RFC3339Nano))
 	return queued, nil
 }
 func (w *manualSnapshotWorkflow) Complete(t *testing.T, ctx context.Context, part policySourceSnapshotAdmissionFixture) {
