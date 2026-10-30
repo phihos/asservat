@@ -72,6 +72,31 @@ func (s *dispatchGroupAdmissions) AdmitRecordingSaveGroup(ctx context.Context, i
 	return out, err
 }
 
+// This fixture already supplies synthetic identity/settings observations at
+// source admission. Keep the same explicit boundary for the real request guard:
+// it is a bounded configured policy, never a grant or a constant allow result.
+type dispatchWorkflowApprovalSettings struct {
+	policy    identity.Policy
+	hardUntil time.Time
+}
+
+func (s dispatchWorkflowApprovalSettings) IdentityPolicy(ctx context.Context, issuer string) (identity.Policy, error) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	if ctx == nil || ctx.Err() != nil || issuer != s.policy.Issuer || !now.Before(s.hardUntil) {
+		return identity.Policy{}, identity.ErrDenied
+	}
+	p := s.policy
+	p.ObservedAt = now
+	p.FreshUntil = identity.Earlier(now.Add(5*time.Second), s.hardUntil)
+	if end, ok := ctx.Deadline(); ok {
+		p.FreshUntil = identity.Earlier(p.FreshUntil, end).UTC().Truncate(time.Microsecond)
+	}
+	if p.Validate(now) != nil {
+		return identity.Policy{}, identity.ErrUnavailable
+	}
+	return p, nil
+}
+
 type dispatchWorkflowIdentity struct {
 	who   identity.Identity
 	until time.Time
@@ -119,7 +144,7 @@ func (s *dispatchWorkflowOperations) call(ctx context.Context, window time.Durat
 
 // Consume only the already accepted normal/resolution backing. Unlike legacy
 // audit helpers this does not provision a replacement pool or refill a quota.
-func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, admissions *postgres.ContextAdmissions, intents auditapp.CaptureOperationPublication, workflow *manualSnapshotWorkflow, who identity.Identity) *dispatchWorkflowOperations {
+func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, admissions *postgres.ContextAdmissions, intents auditapp.CaptureOperationPublication, workflow *manualSnapshotWorkflow, who identity.Identity, settings identity.Policy) *dispatchWorkflowOperations {
 	t.Helper()
 	profiles := f.readAuditProfiles(t)
 	journalPool := f.fixturePool("operation_audit_runtime", "synthetic-operation-journal")
@@ -167,7 +192,12 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 		t.Fatal(err)
 	}
 	groupRequests := &dispatchGroupAdmissions{t: t, base: admissions}
-	investigation := captureapp.ContextInvestigation{RootID: policy.Scenario.a.RootID, InstallationID: policy.Authority.InstallationID, Previews: previews, Replay: admissions, Admission: admissions, Targets: workflow.Facts, Eligibility: workflow.Eligibility, Capabilities: workflow.Facts, Retention: workflow.Retention, Storage: storage, Processing: processing, Recovery: policy.Scenario.recovery.reader, PolicyAccepted: policy.Reader, RecordingSources: previews, RecordingGroups: groupRequests, RecordingPolicies: captureapp.CurrentRecordingPolicies{Documents: dispatchPolicyDocuments{policy}, Accepted: policy.Reader, CompileRecorder: policySourceCompile(pcap.NewCompiler()), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}, RecordingSaveEnabled: true, Lifetime: time.Minute, Now: time.Now, NewID: custodyID}
+	hardUntil := time.Now().Add(time.Minute).UTC().Truncate(time.Microsecond)
+	approvals := dispatchWorkflowApprovalSettings{policy: settings, hardUntil: hardUntil}
+	if _, err := approvals.IdentityPolicy(ctx, policy.Authority.Creator.Issuer); err != nil {
+		t.Fatal("bounded synthetic approval settings", err)
+	}
+	investigation := captureapp.ContextInvestigation{RootID: policy.Scenario.a.RootID, InstallationID: policy.Authority.InstallationID, Previews: previews, Replay: admissions, Admission: admissions, Targets: workflow.Facts, Eligibility: workflow.Eligibility, Capabilities: workflow.Facts, Retention: workflow.Retention, Storage: storage, Processing: processing, Recovery: policy.Scenario.recovery.reader, PolicyAccepted: policy.Reader, RecordingSources: previews, RecordingGroups: groupRequests, RecordingPolicies: captureapp.CurrentRecordingPolicies{Documents: dispatchPolicyDocuments{policy}, Accepted: policy.Reader, CompileRecorder: policySourceCompile(pcap.NewCompiler()), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}, Approvals: approvals, RecordingSaveEnabled: true, Lifetime: time.Minute, Now: time.Now, NewID: custodyID}
 	submission := captureapp.ContextSubmission{ContextInvestigation: investigation, Intents: intents, Start: workflow}
 	reads, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], investigation.RootID, policy.Scenario.recovery.guard)
 	if err != nil {
@@ -182,7 +212,7 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := &dispatchWorkflowOperations{t: t, identity: dispatchWorkflowIdentity{who: who, until: time.Now().Add(time.Minute)}, groupRequests: groupRequests}
+	out := &dispatchWorkflowOperations{t: t, identity: dispatchWorkflowIdentity{who: who, until: hardUntil}, groupRequests: groupRequests}
 	out.service, err = presentation.NewHealthyAuditedOperations(presentation.AuditedOperationsConfig{RootID: investigation.RootID, Retention: time.Duration(profiles.Normal.RetainedSeconds) * time.Second, NormalConcurrency: 1, ResolutionConcurrency: 1, PerPrincipalConcurrency: 1, NormalPerSecond: 100, ResolutionPerSecond: 100, Now: time.Now, NewID: func() string { out.lastID = custodyID(); return out.lastID }}, inner, gates["normal"], gates["resolution"], mac)
 	if err != nil {
 		t.Fatal(err)
@@ -302,7 +332,7 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	// They create no preview row, reservation, accepted capture or native keys.
 	_, parts := prepare()
 	workflow := newManualSnapshotWorkflow(t, ctx, f, policy, parts)
-	operations := newDispatchWorkflowOperations(t, ctx, f, policy, admissions, intents, workflow, parts[0].Admission.RecordingSave.Initiator.VerifiedIdentity)
+	operations := newDispatchWorkflowOperations(t, ctx, f, policy, admissions, intents, workflow, parts[0].Admission.RecordingSave.Initiator.VerifiedIdentity, checks[0].Settings)
 	var shortID string
 	if !t.Run("legacy-five-second-normal-audit-downgrade", func(t *testing.T) {
 		before := readManualSaveCounters(t, ctx, f, policy)
