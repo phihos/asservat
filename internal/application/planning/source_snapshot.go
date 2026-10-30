@@ -27,7 +27,7 @@ type sourceWindowSelection struct {
 type sourceWindowScope struct {
 	Version                                                          string `json:"schemaVersion"`
 	CaptureID, CaseID                                                string
-	Executor                                                         principal
+	Executor                                                         principal `json:"executor"`
 	Target                                                           authorization.Target
 	Namespace, PodName                                               string
 	ActionID, PolicyUID, TriggerKind                                 string
