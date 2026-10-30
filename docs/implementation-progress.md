@@ -38,9 +38,9 @@ fixture measurements are not installed latency or aggregate overhead guarantees.
 Initial identity, target, process, packet and clock facts, plus regional history
 routing, remain synthetic. Real SQL/storage/crypto/native-reader composition is
 qualified; installed collectors, remote key-opening/download-session transport,
-syscall sources, optional reasons and sixteen-source SQL cost remain unqualified.
-Sixteen-member preview/response serialization and query-bound checks are local
-component evidence only. The supported homelab release remains unfinished.
+syscall sources, optional reasons and sixteen-source native execution remain
+unqualified. Sixteen-member preview/response serialization and regional query
+bounds remain separate local component evidence. The supported homelab release remains unfinished.
 
 The thirteen affected Go packages pass race tests; whole-repository vet, generated
 SQL (68 files), specification (13,363 assertions), architecture, Go dependency
@@ -69,6 +69,24 @@ source-list reads. Group preparation is being aligned with production's existing
 shared readers and source-set read, while retaining each target's real permission,
 retention and storage checks and one original proof interval. No timing bound is
 increased and no sixteen-source success is inferred from this failure.
+
+After removing repeated fixture-only setup, `manual-group16-central-sql109-3`
+passed all ten required names (eleven actual) on frozen `5d38fb5d`: supervisor
+exit 0 in 54.589 seconds; Go package 22.182 seconds. Root verified the same
+3,568 canonical / 36,221 tracked hashes, two archived artifacts, restored
+31,495 prior result files and exact owned cleanup, preserving all 16 existing
+containers. The positive preparation took 971 ms, including one 126 ms common
+refresh and 434 ms for sixteen per-target permission/retention/storage reads;
+source listing took 13 ms. SQL admission took 3,410 ms, leaving 732 ms on the
+earliest original proof. Exact replay took 433 ms and added no debit. The
+last-child fault reached its trigger and rolled back the complete group.
+Actual membership, canonical selection, distinct child Pods and progress rows
+all counted sixteen; phase remained Pending. Encrypted parent history and
+populated downgrade refusal passed. This is central admission/replay/progress/
+history qualification only: no child execution, publication or native transfer
+ran in this selection. The narrow proof margin is not installed sustainability
+or full sixteen-source workflow qualification. No production limits, checks or
+freshness periods changed to obtain this result.
 
 Failures are retained rather than counted as passes. Ordinary prefix 1 exposed
 the missing group table in the exact first-install inventory; a failing local

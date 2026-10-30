@@ -3,7 +3,8 @@
 This proposal began at `850684b3`. The grouped implementation now has local
 application, transport and console component checks, plus qualified two-source
 PostgreSQL/S3/OpenBao ordinary, grant-backed and mixed-cancellation cases.
-Installed workflow and sixteen-source SQL qualification remain pending. The existing single-source Save, cancellation and grant-backed
+Sixteen-source central SQL admission also passes; installed workflow and
+sixteen-source native execution remain pending. The existing single-source Save, cancellation and grant-backed
 SQL/storage component results are recorded in [implementation progress](../implementation-progress.md).
 Installed collector, syscall, optional reason and full end-to-end qualification
 remain separate unfinished work.
