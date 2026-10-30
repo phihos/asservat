@@ -158,6 +158,6 @@ a prospective fifteen-second transport/audit envelope, selected while routing
 the original owned bearer request. Other ordinary operations keep five seconds;
 evidence-read windows keep twenty. All earlier caller/credential/session ends
 remain binding. Group admission keeps its original five-second facts phase and
-each snapshot keeps its original SQL t0+5s StartBy. Optional encrypted history
+new manual groups select a fixed StartBy within original ingress end and SQL t0+15s, with all source/processing limits (ADR-269). Old accepted dates and ordinary/singleton five-second builders remain unchanged. Optional encrypted history
 follows mandatory start attempts. Continue uses the same operation window and
 never changes accepted dates; passive replay does not dispatch.

@@ -176,5 +176,5 @@ The browser uses the same prospective fifteen-second `request_capture` envelope
 as MCP for grouped recording saves ([ADR-268](../decisions/268-grouped-save-dispatch-window.md)).
 It is selected before session request ownership; origin, CSRF, current identity
 and every shorter original session/caller bound remain unchanged. Grouped start
-attempts precede optional history and retain each accepted t0+5s StartBy. No
+attempts precede optional history. New manual groups select StartBy once within the original request end and t0+15s, clipped by source/processing bounds (ADR-269); old accepted dates and ordinary/singleton five-second builders remain unchanged. No
 browser provider token, new approval page or client-supplied deadline is added.

@@ -197,3 +197,21 @@ func TestSourceSnapshotKnownCloseRetainsUnknownLossAlongsideHistoryGaps(t *testi
 		})
 	}
 }
+
+func TestSnapshotDispatchStructuralMaximumRetainsIndependentHardEnds(t *testing.T) {
+	e, _, _ := snapshotProjectionFixture()
+	q := *e.Snapshot
+	q.StartBy = q.IssuedAt.Add(15 * time.Second)
+	if !q.Valid() {
+		t.Fatal("bounded group dispatch structurally refused")
+	}
+	q.StartBy = q.StartBy.Add(time.Microsecond)
+	if q.Valid() {
+		t.Fatal("overlong structural interval accepted")
+	}
+	q.StartBy = q.IssuedAt.Add(15 * time.Second)
+	q.SourceHardUntil = q.IssuedAt.Add(10 * time.Second)
+	if q.Valid() {
+		t.Fatal("structural maximum extended source hardend")
+	}
+}

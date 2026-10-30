@@ -87,7 +87,19 @@ func (g *RecordingSaveGroupPreview) valid(p ContextPreview) bool {
 // RecordingSaveGroupAdmission is one root-locked admission, not N public calls.
 // The current independently checked child facts are transient; Preview is the
 // single compact protected blueprint against which they must all be compared.
+// GroupRequestBounds is transient server-owned request provenance. It is never
+// loaded from preview JSON or accepted replay and grants no admission authority.
+type GroupRequestBounds struct {
+	StartedAt, Until time.Time
+	Requester        identity.Principal
+}
+
+func (b GroupRequestBounds) Valid(at time.Time) bool {
+	return b.Requester.Valid() && previewTime(b.StartedAt) && previewTime(b.Until) && !at.Before(b.StartedAt) && at.Before(b.Until) && b.Until.After(b.StartedAt) && !b.Until.After(b.StartedAt.Add(identity.RecordingSaveRequestWindow))
+}
+
 type RecordingSaveGroupAdmission struct {
+	RequestBounds          *GroupRequestBounds `json:"-"`
 	Preview                ContextPreview
 	RootID, IdempotencyKey string
 	SubmissionDigest       artifact.Digest

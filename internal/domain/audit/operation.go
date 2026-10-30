@@ -63,6 +63,23 @@ func OperationRequestWindow(name string) time.Duration {
 	}
 }
 
+// CaptureOperationRequestWindow bounds bookkeeping for a committed manual
+// group. Its validated group provenance does not authorize acquisition; every
+// effect retains its independently accepted/current authority and deadlines.
+func CaptureOperationRequestWindow(c CaptureIntent) time.Duration {
+	if c.Group != nil && c.Valid() {
+		return identity.RecordingSaveRequestWindow
+	}
+	return 5 * time.Second
+}
+
+func (r OperationIntent) requestWindow() time.Duration {
+	if r.Name == CaptureOperationName && r.Capture != nil {
+		return CaptureOperationRequestWindow(*r.Capture)
+	}
+	return OperationRequestWindow(r.Name)
+}
+
 // OperationIntent contains only bounded audit facts. It is not a permit, and
 // persisted identity/deadline fields never become current caller authority.
 type OperationIntent struct {
@@ -88,7 +105,7 @@ func (r OperationIntent) Valid() bool {
 	return (r.Lifecycle == nil || r.Lifecycle.Valid(r)) && authorization.UUID(r.ID) && authorization.UUID(r.RootID) && authorization.UUID(r.TraceID) && OperationLane(r.Name) != "" &&
 		r.actorValid() && r.connectorReservationsValid() && r.capturePayloadValid() && identity.Text(r.MACVersion, 64) && identity.Text(r.AccountVersion, 64) &&
 		r.PrincipalDigest != (artifact.Digest{}) && r.InputDigest != (artifact.Digest{}) &&
-		identity.Fresh(r.CreatedAt, r.RequestUntil, r.CreatedAt, OperationRequestWindow(r.Name)) && r.WriteUntil.After(r.CreatedAt) && !r.WriteUntil.After(r.CreatedAt.Add(30*time.Second)) &&
+		identity.Fresh(r.CreatedAt, r.RequestUntil, r.CreatedAt, r.requestWindow()) && r.WriteUntil.After(r.CreatedAt) && !r.WriteUntil.After(r.CreatedAt.Add(30*time.Second)) &&
 		!r.RequestUntil.After(r.WriteUntil) && r.RetainUntil.After(r.WriteUntil) && !r.RetainUntil.After(r.CreatedAt.Add(3660*24*time.Hour))
 }
 

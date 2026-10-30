@@ -35,26 +35,28 @@ import (
 type policyRecorderProtectedCase struct {
 	// SourceAccepted stops before any occurrence/capture: a real audited policy
 	// acceptance can qualify the separate ordinary source ledger in this fixture.
-	Ongoing              bool
-	RecordingSaves       bool
-	RecurringSharing     bool
-	OrdinaryGrant        bool
-	IncidentPods         int
-	PolicyExecutions     int64
-	PolicyCollectedBytes int64
-	Retention            string
-	SourceAccepted       func(*testing.T, policySourceAcceptedFixture)
-	Hub                  *pgxpool.Pool
-	Admissions           *postgres.ContextAdmissions
-	Filters              planning.FilterCompiler
-	Expression           string
-	Subjects             []cfg.Subject
-	Intent               func(context.Context, string) error
-	Stored               func(policyObservationRetirementInput)
-	PermissionsAccepted  func(cfg.PermissionBatch)
+	Ongoing               bool
+	RecordingSaves        bool
+	RecurringSharing      bool
+	OrdinaryGrant         bool
+	IncidentPods          int
+	PolicyExecutions      int64
+	PolicyCollectedBytes  int64
+	PolicyFinalizeTimeout string
+	Retention             string
+	SourceAccepted        func(*testing.T, policySourceAcceptedFixture)
+	Hub                   *pgxpool.Pool
+	Admissions            *postgres.ContextAdmissions
+	Filters               planning.FilterCompiler
+	Expression            string
+	Subjects              []cfg.Subject
+	Intent                func(context.Context, string) error
+	Stored                func(policyObservationRetirementInput)
+	PermissionsAccepted   func(cfg.PermissionBatch)
 }
 
 type policySourceAcceptedFixture struct {
+	RawSpec   []byte
 	GrantID   string
 	Scenario  captureAdmissionScenario
 	Compiled  capture.RestartPolicy
@@ -264,6 +266,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 					}
 				}
 			}
+			if len(protected) > 0 {
+				policyRecorderFinalizeTimeout(authored, protected[0].PolicyFinalizeTimeout)
+			}
 			spec, err = json.Marshal(authored)
 			if err != nil {
 				t.Fatal(err)
@@ -326,7 +331,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				if protected[0].OrdinaryGrant {
 					grant = attachOrdinaryPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "ordinary-source", *compiled.Recorder)
 				}
-				protected[0].SourceAccepted(t, policySourceAcceptedFixture{GrantID: grant, Scenario: s, Compiled: compiled, Authority: authority, Source: source, Sources: sources, Reader: reader, Record: record})
+				protected[0].SourceAccepted(t, policySourceAcceptedFixture{RawSpec: append([]byte(nil), spec...), GrantID: grant, Scenario: s, Compiled: compiled, Authority: authority, Source: source, Sources: sources, Reader: reader, Record: record})
 				return
 			}
 			var grant string
@@ -712,5 +717,38 @@ func TestManualSaveRecurringSharingAuthorHasCurrentOwnerEligibility(t *testing.T
 	denied.Denies = slices.Clone(p.Allows)
 	if r, _ := authorization.PolicyWorkloadShareManagement(corrected, denied, target, "binding", []string{"maintainers"}, now); r.Eligible || r.Reason != "ExplicitDeny" {
 		t.Fatal("sharing fixture bypassed current deny", r)
+	}
+}
+
+// Empty preserves every legacy authored profile. A nonempty override is applied
+// before compilation/review, never to an accepted row or an existing source.
+func policyRecorderFinalizeTimeout(authored map[string]any, timeout string) {
+	if timeout == "" {
+		return
+	}
+	composition := authored["profileComposition"].(map[string]any)
+	composition["maxDuration"] = timeout
+	component := composition["components"].([]any)[0].(map[string]any)
+	for _, entry := range component["overrides"].([]any) {
+		edit := entry.(map[string]any)
+		if edit["field"] == "actionTimeout" {
+			edit["value"] = timeout
+		}
+	}
+}
+
+func TestManualSaveProspectiveThirtySecondProfileCompiles(t *testing.T) {
+	var authored map[string]any
+	if err := json.Unmarshal(publicPolicySpec(t, authorization.AcceptedPolicyAuthority{ClusterID: custodyID()}), &authored); err != nil {
+		t.Fatal(err)
+	}
+	policyRecorderFinalizeTimeout(authored, "30s")
+	raw, err := json.Marshal(authored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := captureapp.CompilePolicyWithRecorders(raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
+	if err != nil || compiled.Recorder == nil || compiled.Recorder.Action.Timeout != "30s" || compiled.Recorder.Composition.MaxDuration != "30s" {
+		t.Fatal("prospective authored policy profile refused", err)
 	}
 }

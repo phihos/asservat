@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	capture "asservat.local/asservat/internal/domain/capture"
 )
 
 func TestRecordingSaveGroupCanonicalScopePreservesCompleteSelection(t *testing.T) {
@@ -227,5 +228,78 @@ func TestRecordingSaveChildIdentityDoesNotAcceptAutomaticScope(t *testing.T) {
 	group := value.RecordingSaveGroupBinding{ParentCaptureID: in.CaptureID, SelectionDigest: plan.ScopeDigest, ChildCount: 1}
 	if _, err := ReadRecordingSaveChildScopeIdentity(plan.CanonicalScope, plan.ScopeDigest, group, "00000000-0000-4000-8000-000000000801"); err == nil {
 		t.Fatal("automatic scope became group membership")
+	}
+}
+
+func TestRecordingSaveGroupAcceptanceKeepsOriginalIngressEnd(t *testing.T) {
+	plans, registrations, now := groupedRecordingSavePlans(t)
+	parent, err := ReadContextScopeIdentity(plans[0].CanonicalScope, plans[0].ScopeDigest)
+	if err != nil || parent.Requester == nil {
+		t.Fatal(err)
+	}
+	t0 := now.Add(3 * time.Second)
+	bounds := capture.GroupRequestBounds{StartedAt: now, Until: now.Add(15 * time.Second), Requester: *parent.Requester}
+	for n, plan := range plans {
+		accepted, _, err := ReanchorRecordingSaveGroup(plan, registrations[n], t0, now.Add(time.Hour), bounds)
+		if err != nil || !accepted.Input.Snapshot.Request.StartBy.Equal(bounds.Until) {
+			t.Fatal("group restarted15s after acceptance instead of original ingress", err)
+		}
+		if !accepted.Input.Snapshot.Request.T0.Equal(t0) || accepted.ScopeDigest != plan.ScopeDigest || !plan.Input.Snapshot.Request.StartBy.Equal(now.Add(5*time.Second)) {
+			t.Fatal("group acceptance changed original plan identity")
+		}
+		short := bounds
+		short.Until = now.Add(4 * time.Second)
+		accepted, _, err = ReanchorRecordingSaveGroup(plan, registrations[n], t0, now.Add(time.Hour), short)
+		if err != nil || !accepted.Input.Snapshot.Request.StartBy.Equal(short.Until) {
+			t.Fatal("short original caller was widened", err)
+		}
+		legacy, _, err := ReanchorRecordingSave(plan, registrations[n], t0, now.Add(time.Hour))
+		if err != nil || !legacy.Input.Snapshot.Request.StartBy.Equal(t0.Add(5*time.Second)) {
+			t.Fatal("legacy group changed interval", err)
+		}
+	}
+	for name, change := range map[string]func(*value.ContextPlan, *capture.GroupRequestBounds){
+		"singleton":       func(p *value.ContextPlan, _ *capture.GroupRequestBounds) { p.Input.Snapshot.Group = nil },
+		"requester":       func(_ *value.ContextPlan, b *capture.GroupRequestBounds) { b.Requester.Subject += "other" },
+		"expired-ingress": func(_ *value.ContextPlan, b *capture.GroupRequestBounds) { b.Until = t0 },
+		"child-index":     func(p *value.ContextPlan, _ *capture.GroupRequestBounds) { p.Input.Snapshot.Group.ChildIndex = 1 },
+		"scope": func(p *value.ContextPlan, _ *capture.GroupRequestBounds) {
+			p.CanonicalScope = append(append([]byte(nil), p.CanonicalScope...), byte('x'))
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := plans[0]
+			p.Input.Snapshot = p.Input.Snapshot.Clone()
+			b := bounds
+			change(&p, &b)
+			if _, _, err := ReanchorRecordingSaveGroup(p, registrations[0], t0, now.Add(time.Hour), b); err == nil {
+				t.Fatal("unreviewed group bounds accepted")
+			}
+		})
+	}
+}
+
+func TestAcceptedGroupRecompilationPreservesEveryStoredStartBound(t *testing.T) {
+	plans, registrations, now := groupedRecordingSavePlans(t)
+	t0 := now.Add(2 * time.Second)
+	for _, span := range []time.Duration{3 * time.Second, 5 * time.Second, 15 * time.Second} {
+		t.Run(span.String(), func(t *testing.T) {
+			accepted, _, err := ReanchorRecordingSave(plans[0], registrations[0], t0, now.Add(time.Hour))
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The independently accepted SQL expectation supplies this exact date;
+			// recompilation must never select a different interval from current time.
+			accepted.Input.Snapshot.Request.StartBy = t0.Add(span)
+			encoded, _ := json.Marshal(accepted.Input.Snapshot.Request)
+			rebuilt, err := CompileContext(accepted.Input, t0.Add(100*time.Millisecond))
+			if err != nil {
+				t.Fatal("stored accepted request refused", err)
+			}
+			got, _ := json.Marshal(rebuilt.Input.Snapshot.Request)
+			if !bytes.Equal(encoded, got) || rebuilt.ScopeDigest != accepted.ScopeDigest {
+				t.Fatal("recompilation renewed or rewrote stored dates")
+			}
+		})
 	}
 }

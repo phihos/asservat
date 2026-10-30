@@ -16,13 +16,16 @@ type SourceSnapshotRequest struct {
 	MaxBytes                               int64
 }
 
+// Valid imposes the structural maximum. Ordinary producers select five
+// seconds; only the protected grouped-admission path selects a longer bound.
+// Exact accepted dates, source hard ends and current caller bounds still apply.
 func (s SourceSnapshotRequest) Valid() bool {
 	if !uuid(s.SourceID) || !uuid(s.Fence) || !uuid(s.SnapshotID) ||
 		!lifecycleTime(s.SourceStartedAt) || !lifecycleTime(s.SourceHardUntil) ||
 		s.SourceBindingDigest == (Digest{}) || !lifecycleTime(s.IssuedAt) || !lifecycleTime(s.T0) || !lifecycleTime(s.StartBy) || !lifecycleTime(s.ProcessingUntil) ||
 		!s.SourceStartedAt.Before(s.SourceHardUntil) ||
 		s.T0.After(s.IssuedAt) || !s.IssuedAt.Before(s.StartBy) || !s.StartBy.Before(s.ProcessingUntil) ||
-		s.StartBy.After(s.IssuedAt.Add(5*time.Second)) || s.StartBy.After(s.SourceHardUntil) || !s.IssuedAt.Before(s.SourceHardUntil) || !s.T0.Before(s.SourceHardUntil) ||
+		s.StartBy.After(s.IssuedAt.Add(15*time.Second)) || s.StartBy.After(s.SourceHardUntil) || !s.IssuedAt.Before(s.SourceHardUntil) || !s.T0.Before(s.SourceHardUntil) ||
 		s.MaxBytes < minRecordingBytes || s.MaxBytes > RecordingNativeLimit {
 		return false
 	}

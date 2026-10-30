@@ -136,7 +136,11 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		}
 		a.Replay = true
 	} else {
-		a, err = s.ContextInvestigation.Request(call, current, preview, key)
+		bounds := value.GroupRequestBounds{StartedAt: started.UTC().Truncate(time.Microsecond), Until: until.UTC().Truncate(time.Microsecond), Requester: i.Principal}
+		if !bounds.Valid(s.Now()) {
+			return zero, value.ErrDenied
+		}
+		a, err = s.ContextInvestigation.requestWithGroupBounds(call, current, preview, key, &bounds)
 		if err != nil {
 			return a, err
 		}

@@ -168,6 +168,10 @@ func TestGroupedSubmissionSixteenStartsBeforeAdvisoryHistory(t *testing.T) {
 			if len(f.accepted) != 1 || !out.CreatedAt.Equal(original) || !out.Group.Children[0].Expectation.Snapshot.StartBy.Equal(original.Add(5*time.Second)) {
 				t.Fatal("composition changed immutable group")
 			}
+			bounds := fixture.seen[0].RequestBounds
+			if bounds == nil || !bounds.StartedAt.Equal(original) || !bounds.Until.Equal(original.Add(15*time.Second)) || bounds.Requester != f.actor {
+				t.Fatal("same request ingress bounds lost across five-second preparation/admission", bounds)
+			}
 			// New HTTP identity, passive exact replay: no acknowledgement, start, history.
 			reads, starts := len(ports.reads), len(ports.starts)
 			again, err := submission.Request(t.Context(), current, preview.Preview.ID, "group-timing")

@@ -93,3 +93,5 @@ control spends3.410s in SQL and300ms per start: remaining children refuse under
 the unchanged StartBy instead of receiving a fresh five seconds. These costs
 and2.75s history are controlled parameters, not typical regional latency. The actual RegionalStart/Router test must retain Standby2/Captures1.
 A passing control test is not sixteen native artifacts or installed qualification.
+
+ADR-269 prospectively separates original grouped request ownership and committed audit bookkeeping from short admission observations. It supersedes the group StartBy=t0+5s composition; existing accepted dates remain unchanged.

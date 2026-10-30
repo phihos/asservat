@@ -1057,3 +1057,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-266: grouped recording-save accounting](266-grouped-recording-save-accounting.md): one policy execution per Save, applicable grant starts per source, one shared acceptance time and independently funded child outputs; two-source SQL/storage component qualification passes, installed workflow pending.
 
 - [ADR-267: encrypted recording-save reasons](267-encrypted-recording-save-reasons.md): immutable reason reference, opaque encrypted body in existing preview/audit lifecycle, reason-only32KiB format and authorized parent metadata; SQL/provider qualification pending.
+
+- [ADR-269: original grouped Save request bounds](269-original-grouped-save-request-bounds.md): carry one original request through admission, fixed group audit bookkeeping and bounded serial dispatch; local implementation in progress, sixteen-source native workflow qualification pending.

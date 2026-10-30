@@ -175,6 +175,9 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 			return err
 		}
 		acceptedAt := clock.Time.UTC()
+		if in.RequestBounds != nil && (!in.RequestBounds.Valid(acceptedAt) || in.RequestBounds.Requester != human.Principal) {
+			return value.ErrDenied
+		}
 		var deadline time.Time
 		ids := make([]pgtype.UUID, len(children))
 		for n := range children {
@@ -184,7 +187,11 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 			if children[n].RepeatedFrom != nil {
 				until = identity.Earlier(until, children[n].RepeatedFrom.ExpiresAt)
 			}
-			children[n].Plan, children[n].Registration, err = planning.ReanchorRecordingSave(children[n].Plan, children[n].Registration, acceptedAt, until)
+			if in.RequestBounds != nil {
+				children[n].Plan, children[n].Registration, err = planning.ReanchorRecordingSaveGroup(children[n].Plan, children[n].Registration, acceptedAt, until, *in.RequestBounds)
+			} else {
+				children[n].Plan, children[n].Registration, err = planning.ReanchorRecordingSave(children[n].Plan, children[n].Registration, acceptedAt, until)
+			}
 			if err != nil || children[n].Plan.Input.Deadline.After(r.processingLimit) {
 				return value.ErrDenied
 			}
@@ -221,7 +228,7 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 					return value.ErrCapacity
 				}
 			}
-			if _, err := s.admitContextInTransaction(ctx, q, p.ID, child, topology, &contextAdmissionGroupOptions{Recovery: recovery, Stream: stream, Preview: protected, PolicyReservation: r}); err != nil {
+			if _, err := s.admitContextInTransaction(ctx, q, p.ID, child, topology, &contextAdmissionGroupOptions{Recovery: recovery, Stream: stream, Preview: protected, PolicyReservation: r, RequestBounds: in.RequestBounds}); err != nil {
 				return err
 			}
 			if err := r.manual.insertReservation(ctx, q, s.root, child.Plan.Input.CaptureID, child, r.grant, r.bytes); err != nil {

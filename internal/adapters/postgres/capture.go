@@ -265,6 +265,7 @@ type contextAdmissionGroupOptions struct {
 	Stream            custodydb.PermissionStream
 	Preview           value.ContextPreview
 	PolicyReservation *policyCaptureReservation
+	RequestBounds     *value.GroupRequestBounds
 }
 
 func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *custodydb.Queries, previewID string, a value.Admission, topology privacyvalue.PolicyTopology, group *contextAdmissionGroupOptions) (value.Accepted, error) {
@@ -424,7 +425,11 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if a.RepeatedFrom != nil {
 				processingUntil = identity.Earlier(processingUntil, a.RepeatedFrom.ExpiresAt)
 			}
-			a.Plan, r, err = planning.ReanchorRecordingSave(a.Plan, r, policyReservation.manual.acceptedAt, processingUntil)
+			if group != nil && group.RequestBounds != nil {
+				a.Plan, r, err = planning.ReanchorRecordingSaveGroup(a.Plan, r, policyReservation.manual.acceptedAt, processingUntil, *group.RequestBounds)
+			} else {
+				a.Plan, r, err = planning.ReanchorRecordingSave(a.Plan, r, policyReservation.manual.acceptedAt, processingUntil)
+			}
 			if err != nil || a.Plan.Input.Deadline.After(policyReservation.processingLimit) {
 				return value.ErrDenied
 			}
@@ -435,7 +440,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			}
 		}
 		var auditAccount audit.CaptureAuditAccount
-		var auditUntil time.Time
+		var auditUntil, auditHardUntil time.Time
 		if s.auditMAC != nil {
 			raw, e := q.LockCaptureAuditAdmission(ctx, custodydb.LockCaptureAuditAdmissionParams{RootID: id(s.root), AllocationID: id(r.AllocationID)})
 			if e != nil {
@@ -444,12 +449,13 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			var observed struct {
 				audit.CaptureAuditAccount
 				ValidUntil time.Time
+				HardUntil  time.Time
 			}
 			if len(raw) > 8<<10 || json.Unmarshal(raw, &observed) != nil || !observed.CaptureAuditAccount.Valid() || observed.RootID != s.root || observed.AllocationID != r.AllocationID || observed.AccountVersion != s.auditMAC.AccountVersion() {
 				return value.ErrUnavailable
 			}
 			auditAccount = observed.CaptureAuditAccount
-			auditUntil = observed.ValidUntil
+			auditUntil, auditHardUntil = observed.ValidUntil, observed.HardUntil
 		}
 		p, allocation, err := lockAllocation(ctx, q, r.AllocationID)
 		if err != nil {
@@ -690,15 +696,22 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 				managedUntil = capacityUntil.Time
 			}
 			bound := contextMetadataDeadline(ctx, managedUntil, auditUntil, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil, controlUntil, a.Storage.FreshUntil, binding.FreshUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time, in.Deadline)
+			requestUntil := bound
+			if group != nil && group.RequestBounds != nil {
+				requestUntil, e = recordingGroupAuditUntil(*group.RequestBounds, a, intent, auditHardUntil, controlUntil, p.ValidUntil.Time, allocation.ValidUntil.Time)
+				if e != nil {
+					return e
+				}
+			}
 			var operation auditvalue.OperationIntent
 			if reviewed.Intent.Reason != nil {
 				envelope, decodeErr := auditapp.DecodeCaptureReasonEnvelope(reviewed.ReasonEnvelope)
 				if decodeErr != nil {
 					return value.ErrUnavailable
 				}
-				operation, e = auditapp.PrepareCaptureReasonOperation(intent, auditAccount, s.auditMAC, bound, envelope)
+				operation, e = auditapp.PrepareCaptureReasonOperation(intent, auditAccount, s.auditMAC, requestUntil, envelope)
 			} else {
-				operation, e = auditapp.PrepareCaptureOperation(intent, auditAccount, s.auditMAC, bound)
+				operation, e = auditapp.PrepareCaptureOperation(intent, auditAccount, s.auditMAC, requestUntil)
 			}
 			if e != nil {
 				return value.ErrUnavailable

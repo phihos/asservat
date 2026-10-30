@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/pcap"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	captureapp "asservat.local/asservat/internal/application/capture"
@@ -37,6 +38,40 @@ func TestManualRecordingSaveDispatchWorkflow16WithRealServices(t *testing.T) {
 	qualifySourceSnapshotServicesMode(t, sourceSnapshotQualificationMode{manual: true, groupCount: 16, dispatch: true})
 }
 
+// A different independently initialized fixture prospectively authors30s
+// completion. It tests one real request owner across admission and all starts.
+func TestManualRecordingSaveRequest16ThirtySecondProfileWithRealServices(t *testing.T) {
+	qualifySourceSnapshotServicesMode(t, sourceSnapshotQualificationMode{manual: true, groupCount: 16, dispatch: true, dispatchRequest: true})
+}
+
+type dispatchPolicyDocuments struct{ policy policySourceAcceptedFixture }
+
+func (d dispatchPolicyDocuments) ReadPolicy(ctx context.Context, name, uid string) (value.PolicySource, []byte, error) {
+	if ctx.Err() != nil || name != d.policy.Source.Name || uid != d.policy.Source.Revision.UID {
+		return value.PolicySource{}, nil, value.ErrUnavailable
+	}
+	// Original authored input is explicitly synthetic, but it is the exact real
+	// compiler/SQLacceptance input. Current accepted authority is read separately.
+	return d.policy.Source, bytes.Clone(d.policy.RawSpec), nil
+}
+
+type dispatchGroupAdmissions struct {
+	t        *testing.T
+	base     *postgres.ContextAdmissions
+	request  value.RecordingSaveGroupAdmission
+	accepted value.Accepted
+	calls    int
+}
+
+func (s *dispatchGroupAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in value.RecordingSaveGroupAdmission) (value.Accepted, error) {
+	began := time.Now()
+	s.calls++
+	out, err := s.base.AdmitRecordingSaveGroup(ctx, in)
+	s.request, s.accepted = in, out
+	s.t.Logf("actual_request_sql_admission children=%d elapsed_ms=%d t0_age_ms=%d error=%v", len(in.Children), time.Since(began).Milliseconds(), time.Since(out.CreatedAt).Milliseconds(), err)
+	return out, err
+}
+
 type dispatchWorkflowIdentity struct {
 	who   identity.Identity
 	until time.Time
@@ -53,16 +88,19 @@ func (r dispatchWorkflowIdentity) Resolve(ctx context.Context, _ string) (identi
 }
 
 type dispatchWorkflowOperations struct {
-	t        *testing.T
-	service  *presentation.AuditedOperations
-	identity dispatchWorkflowIdentity
-	lastID   string
+	t                *testing.T
+	service          *presentation.AuditedOperations
+	identity         dispatchWorkflowIdentity
+	lastID           string
+	groupRequests    *dispatchGroupAdmissions
+	originalOwnerEnd time.Time
 }
 
 func (s *dispatchWorkflowOperations) call(ctx context.Context, window time.Duration, preview, key string, continuation bool) (presentation.OperationReply, string, error) {
 	s.t.Helper()
 	caller, cancel := context.WithTimeout(ctx, window)
 	defer cancel()
+	s.originalOwnerEnd, _ = caller.Deadline()
 	current, _, err := identities.NewBearerRequestWithin(caller, s.identity, "synthetic-workflow-token", time.Now, window)
 	if err != nil {
 		s.t.Fatal(err)
@@ -128,7 +166,8 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 	if err != nil {
 		t.Fatal(err)
 	}
-	investigation := captureapp.ContextInvestigation{RootID: policy.Scenario.a.RootID, InstallationID: policy.Authority.InstallationID, Previews: previews, Replay: admissions, Admission: admissions, Targets: workflow.Facts, Eligibility: workflow.Eligibility, Capabilities: workflow.Facts, Retention: workflow.Retention, Storage: storage, Processing: processing, Recovery: policy.Scenario.recovery.reader, PolicyAccepted: policy.Reader, RecordingSaveEnabled: true, Lifetime: time.Minute, Now: time.Now, NewID: custodyID}
+	groupRequests := &dispatchGroupAdmissions{t: t, base: admissions}
+	investigation := captureapp.ContextInvestigation{RootID: policy.Scenario.a.RootID, InstallationID: policy.Authority.InstallationID, Previews: previews, Replay: admissions, Admission: admissions, Targets: workflow.Facts, Eligibility: workflow.Eligibility, Capabilities: workflow.Facts, Retention: workflow.Retention, Storage: storage, Processing: processing, Recovery: policy.Scenario.recovery.reader, PolicyAccepted: policy.Reader, RecordingSources: previews, RecordingGroups: groupRequests, RecordingPolicies: captureapp.CurrentRecordingPolicies{Documents: dispatchPolicyDocuments{policy}, Accepted: policy.Reader, CompileRecorder: policySourceCompile(pcap.NewCompiler()), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}, RecordingSaveEnabled: true, Lifetime: time.Minute, Now: time.Now, NewID: custodyID}
 	submission := captureapp.ContextSubmission{ContextInvestigation: investigation, Intents: intents, Start: workflow}
 	reads, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], investigation.RootID, policy.Scenario.recovery.guard)
 	if err != nil {
@@ -143,7 +182,7 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := &dispatchWorkflowOperations{t: t, identity: dispatchWorkflowIdentity{who: who, until: time.Now().Add(time.Minute)}}
+	out := &dispatchWorkflowOperations{t: t, identity: dispatchWorkflowIdentity{who: who, until: time.Now().Add(time.Minute)}, groupRequests: groupRequests}
 	out.service, err = presentation.NewHealthyAuditedOperations(presentation.AuditedOperationsConfig{RootID: investigation.RootID, Retention: time.Duration(profiles.Normal.RetainedSeconds) * time.Second, NormalConcurrency: 1, ResolutionConcurrency: 1, PerPrincipalConcurrency: 1, NormalPerSecond: 100, ResolutionPerSecond: 100, Now: time.Now, NewID: func() string { out.lastID = custodyID(); return out.lastID }}, inner, gates["normal"], gates["resolution"], mac)
 	if err != nil {
 		t.Fatal(err)
@@ -187,8 +226,9 @@ func logDispatchWorkflowFailure(t *testing.T, ctx context.Context, f *capacitySQ
 	t.Logf("workflow_failure_stored_child_deadlines=%s", rows)
 }
 
-func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication) {
+func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication, requestModes ...bool) {
 	t.Helper()
+	requestMode := len(requestModes) > 0 && requestModes[0]
 	count := policy.Compiled.IncidentPods
 	if count != 2 && count != 16 {
 		t.Fatal("workflow qualifier requires independently configured N2 or N16")
@@ -280,6 +320,9 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	}) {
 		return
 	}
+	if requestMode && !t.Run("empty-group112-down-up-before-request", func(t *testing.T) { qualifyRecordingSaveGroupBoundsEmptyDownUp(t, ctx, f.admin) }) {
+		return
+	}
 	// The real positive request starts only after setup and the compatible audit.
 	// This is a new reviewed parent; no old preview/capture or first proof is renewed.
 	preparedAt := time.Now()
@@ -295,26 +338,34 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	before := readManualSaveCounters(t, ctx, f, policy)
 	var accepted value.Accepted
 	var longID string
-	if !t.Run("real-sql-admission-to-queued-group-workflow", func(t *testing.T) {
-		call, end := context.WithDeadline(ctx, manualGroupProofDeadline(group))
-		admittedAt := time.Now()
-		var err error
-		accepted, err = admissions.AdmitRecordingSaveGroup(call, group)
-		end()
-		if err != nil || accepted.Group == nil || len(accepted.Group.Children) != count {
-			t.Fatal("real positive group admission", err)
+	submissionCase := "real-sql-admission-to-queued-group-workflow"
+	if requestMode {
+		submissionCase = "real-one-owner-request-admission-to-queued-group-workflow"
+	}
+	if !t.Run(submissionCase, func(t *testing.T) {
+		if !requestMode {
+			call, end := context.WithDeadline(ctx, manualGroupProofDeadline(group))
+			admittedAt := time.Now()
+			accepted, err = admissions.AdmitRecordingSaveGroup(call, group)
+			end()
+			if err != nil || accepted.Group == nil || len(accepted.Group.Children) != count {
+				t.Fatal("real positive group admission", err)
+			}
+			t.Logf("workflow_sources=%d admission_ms=%d actual_t0_age_at_return_ms=%d original_startby_remaining_ms=%d", count, time.Since(admittedAt).Milliseconds(), time.Since(accepted.CreatedAt).Milliseconds(), time.Until(accepted.Group.Children[0].Expectation.Snapshot.StartBy).Milliseconds())
 		}
-		earliest := accepted.Group.Children[0].Expectation.Snapshot.StartBy
-		t.Logf("workflow_sources=%d admission_ms=%d actual_t0_age_at_return_ms=%d original_startby_remaining_ms=%d", count, time.Since(admittedAt).Milliseconds(), time.Since(accepted.CreatedAt).Milliseconds(), time.Until(earliest).Milliseconds())
-		// NO counter/replay/history/provider setup between actual SQL t0 and starts.
+		// The new Request owns REALSQLadmission and all starts under one owner;
+		// legacy Continue keeps its original separate accepted-only qualification.
 		started := time.Now()
-		reply, id, err := operations.call(ctx, identity.RecordingSaveRequestWindow, group.Preview.ID, group.IdempotencyKey, true)
+		reply, id, err := operations.call(ctx, identity.RecordingSaveRequestWindow, group.Preview.ID, group.IdempotencyKey, !requestMode)
+		if requestMode {
+			accepted = operations.groupRequests.accepted
+		}
 		longID = id
 		var response struct {
 			Status string `json:"status"`
 		}
 		if err != nil || json.Unmarshal(reply.Body, &response) != nil || response.Status != "ok" {
-			logDispatchWorkflowFailure(t, ctx, f, accepted.CaptureID)
+			logDispatchWorkflowFailure(t, ctx, f, group.Preview.CaptureID)
 		}
 		if err != nil {
 			t.Fatal("actual audited Continue", err)
@@ -328,6 +379,21 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 		if json.Unmarshal(data, &receipt) != nil || receipt.CaptureID != accepted.CaptureID || receipt.Phase != "Accepted" {
 			t.Fatal("actual workflow changed parent receipt", string(data))
 		}
+		if accepted.Group == nil || len(accepted.Group.Children) != count {
+			t.Fatal("real request did not admit exact complete group")
+		}
+		if requestMode {
+			original := operations.groupRequests.request.RequestBounds
+			if operations.groupRequests.calls != 1 || original == nil || original.Requester != group.Preview.Actor || original.Until.After(operations.originalOwnerEnd) {
+				t.Fatal("original request provenance changed across actualSQLadmission")
+			}
+			for _, child := range accepted.Group.Children {
+				if child.Expectation.Snapshot.StartBy.After(original.Until) {
+					t.Fatal("snapshot exceeds original request owner")
+				}
+			}
+		}
+		earliest := accepted.Group.Children[0].Expectation.Snapshot.StartBy
 		var executions int
 		if err = f.admin.QueryRow(ctx, `SELECT count(*) FROM context_execution e JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id WHERE c.group_id=$1 AND e.phase='started'`, accepted.CaptureID).Scan(&executions); err != nil || executions != count {
 			t.Fatal("real runner did not start all admitted children", executions, err)
@@ -346,9 +412,18 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	}) {
 		return
 	}
+	if requestMode && !t.Run("populated-group112-downgrade-refusal", func(t *testing.T) {
+		qualifyRecordingSaveGroupBoundsPopulatedDowngrade(t, ctx, f.admin, accepted.CaptureID)
+	}) {
+		return
+	}
 	for n := range parts {
 		parts[n].Accepted = accepted.Group.Children[n]
-		parts[n].Admission.Plan, parts[n].Admission.Registration, err = planningapp.ReanchorRecordingSave(parts[n].Admission.Plan, parts[n].Admission.Registration, accepted.CreatedAt, policy.Authority.NotAfter)
+		if requestMode {
+			parts[n].Admission.Plan, parts[n].Admission.Registration, err = planningapp.ReanchorRecordingSaveGroup(parts[n].Admission.Plan, parts[n].Admission.Registration, accepted.CreatedAt, policy.Authority.NotAfter, *operations.groupRequests.request.RequestBounds)
+		} else {
+			parts[n].Admission.Plan, parts[n].Admission.Registration, err = planningapp.ReanchorRecordingSave(parts[n].Admission.Plan, parts[n].Admission.Registration, accepted.CreatedAt, policy.Authority.NotAfter)
+		}
 		if err != nil {
 			t.Fatal(err)
 		}

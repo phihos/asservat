@@ -454,7 +454,14 @@ func acceptedContext(a value.Accepted, digest artifact.Digest) bool {
 // Request resolves accepted idempotency before touching a preview. Existing
 // operation lookup never needs a live pod or fresh acquisition facts. Only a
 // missing original key may refresh the reviewed blueprint and enter admission.
-func (s ContextInvestigation) Request(ctx context.Context, source identities.CurrentIdentity, previewID, key string) (result value.Accepted, failure error) {
+func (s ContextInvestigation) Request(ctx context.Context, source identities.CurrentIdentity, previewID, key string) (value.Accepted, error) {
+	return s.requestWithGroupBounds(ctx, source, previewID, key, nil)
+}
+
+// Only the composed request owner can supply ingress bounds, before this
+// method creates its five-second current-observation phase. Direct callers
+// retain the legacy interval; replay returns its original accepted dates.
+func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source identities.CurrentIdentity, previewID, key string, bounds *value.GroupRequestBounds) (result value.Accepted, failure error) {
 	defer func() { s.reportRequestFailure(failure) }()
 	var zero value.Accepted
 	if !s.configured() || ctx == nil || source == nil || ctx.Err() != nil {
@@ -504,7 +511,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 		return zero, value.ErrUnavailable
 	}
 	if p.Group != nil {
-		return s.requestRecordingSaveGroup(ctx, source, p, key, recovery)
+		return s.requestRecordingSaveGroup(ctx, source, p, key, recovery, bounds)
 	}
 	executionSource, manualSave, err := s.manualSaveRequest(ctx, source, p)
 	if err != nil {

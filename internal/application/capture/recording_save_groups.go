@@ -263,7 +263,7 @@ func aggregateRecordingSaveAssessment(p value.ContextPreview, children []Recordi
 
 // requestRecordingSaveGroup refreshes every member before the one atomic parent
 // admission. No child preview or independent public admission is created.
-func (s ContextInvestigation) requestRecordingSaveGroup(ctx context.Context, current identities.CurrentIdentity, p value.ContextPreview, key string, recovery artifact.RecoveryProof) (value.Accepted, error) {
+func (s ContextInvestigation) requestRecordingSaveGroup(ctx context.Context, current identities.CurrentIdentity, p value.ContextPreview, key string, recovery artifact.RecoveryProof, bounds *value.GroupRequestBounds) (value.Accepted, error) {
 	var zero value.Accepted
 	if s.RecordingSources == nil || s.RecordingGroups == nil || s.RecordingPolicies == nil || s.PolicyAccepted == nil || p.Group == nil || !p.Current(s.Now()) || p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != RecordingSaveGroupAssessmentRulesDigest() {
 		return zero, value.ErrUnavailable
@@ -299,13 +299,22 @@ func (s ContextInvestigation) requestRecordingSaveGroup(ctx context.Context, cur
 	if err != nil || !caller.Valid(s.Now()) || caller.Principal != p.Actor {
 		return zero, value.ErrDenied
 	}
+	var original *value.GroupRequestBounds
+	if bounds != nil {
+		copy := *bounds
+		copy.Until = identity.Earlier(copy.Until, caller.ValidUntil).UTC().Truncate(time.Microsecond)
+		if copy.Requester != caller.Principal || !copy.Valid(s.Now()) {
+			return zero, value.ErrDenied
+		}
+		original = &copy
+	}
 	executor := newPolicyIdentity(ctx, s.PolicyAccepted, a, identity.Earlier(caller.ValidUntil, policy.Accepted.SourceUntil), s.Now)
 	resolved, err := s.resolveRecordingGroup(ctx, rows)
 	if err != nil {
 		return zero, err
 	}
 	t0 := s.Now().UTC().Truncate(time.Microsecond)
-	request := value.RecordingSaveGroupAdmission{Preview: p.Clone(), RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: ContextRequestDigest(p.ID), Recovery: recovery}
+	request := value.RecordingSaveGroupAdmission{RequestBounds: original, Preview: p.Clone(), RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: ContextRequestDigest(p.ID), Recovery: recovery}
 	facts := make([]contextFacts, len(rows))
 	preparedUntil := make([]time.Time, len(rows))
 	initiators := make([]authorization.CaptureEligibility, len(rows))
@@ -350,9 +359,15 @@ func (s ContextInvestigation) requestRecordingSaveGroup(ctx context.Context, cur
 		}
 		initiator.ValidUntil = identity.Earlier(initiator.ValidUntil, child.RecordingSave.Initiator.ValidUntil)
 		child.RecordingSave.Initiator = initiator
+		if request.RequestBounds != nil {
+			request.RequestBounds.Until = identity.Earlier(request.RequestBounds.Until, initiator.VerifiedIdentity.ValidUntil).UTC().Truncate(time.Microsecond)
+		}
 	}
 	if !p.Current(s.Now()) || !recovery.Valid(s.Now()) || ctx.Err() != nil {
 		return zero, value.ErrChanged
+	}
+	if request.RequestBounds != nil && !request.RequestBounds.Valid(s.Now()) {
+		return zero, value.ErrDenied
 	}
 	accepted, err := s.RecordingGroups.AdmitRecordingSaveGroup(ctx, request)
 	if err != nil {

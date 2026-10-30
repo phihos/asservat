@@ -64,8 +64,8 @@ func qualifySourceSnapshotServices(t *testing.T, manual, cancellation, requireAp
 }
 
 type sourceSnapshotQualificationMode struct {
-	manual, cancellation, requireApproval, reason, dispatch bool
-	groupCount                                              int
+	manual, cancellation, requireApproval, reason, dispatch, dispatchRequest bool
+	groupCount                                                               int
 }
 
 func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualificationMode) {
@@ -117,6 +117,9 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, OrdinaryGrant: requireApproval, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		if groupCount > 0 {
 			option.IncidentPods = groupCount
+		}
+		if mode.dispatchRequest {
+			option.PolicyFinalizeTimeout = "30s"
 		}
 		if groupCount > 0 && requireApproval {
 			option.PolicyExecutions = 1
@@ -254,7 +257,7 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				return
 			}
 			if mode.dispatch {
-				qualifyManualRecordingSaveDispatch(t, ctx, f, seed.s, accepted, ledger, renewal, fresh, intents)
+				qualifyManualRecordingSaveDispatch(t, ctx, f, seed.s, accepted, ledger, renewal, fresh, intents, mode.dispatchRequest)
 				return
 			}
 			if groupCount > 0 {
