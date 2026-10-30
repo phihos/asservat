@@ -107,3 +107,68 @@ func TestSourceWorkUsesBoundedRegionalConversationWithoutCapture(t *testing.T) {
 		})
 	}
 }
+
+type sourceSnapshotCanceller struct {
+	calls int
+	last  collector.SourceSnapshot
+	fail  bool
+}
+
+func (c *sourceSnapshotCanceller) CancelSourceSnapshot(ctx context.Context, x collector.SourceSnapshot) error {
+	c.calls++
+	c.last = x
+	if ctx.Err() != nil || c.fail {
+		return fleet.ErrUnavailable
+	}
+	return nil
+}
+func TestSourceWorkSnapshotCancellationUsesRestrictiveRegionalStream(t *testing.T) {
+	for _, refused := range []bool{false, true} {
+		t.Run(map[bool]string{false: "queuedOnly", true: "unavailable"}[refused], func(t *testing.T) {
+			arm, r := sourceStreamWorkFixture()
+			now := arm.IssuedAt()
+			b := arm.Binding()
+			b.AudienceDigest = [32]byte{7}
+			q := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(deliveryapp.SourceBindingDigest(b)), SourceID: b.SourceID, Fence: b.Fence, SnapshotID: "66666666-6666-4666-8666-666666666666", SourceStartedAt: now.Add(-time.Minute), SourceHardUntil: now.Add(-time.Second), T0: now.Add(-30 * time.Second), IssuedAt: now.Add(-30 * time.Second), StartBy: now.Add(-25 * time.Second), ProcessingUntil: now.Add(time.Minute), Before: time.Second, MaxBytes: 65536}
+			x := collector.SourceSnapshot{Binding: b, CaptureID: "44444444-4444-4444-8444-444444444444", AttemptID: "55555555-5555-4555-8555-555555555555", WriterPodUID: arm.Channel.Executor.PodUID, WriterEpoch: arm.Channel.Executor.ProcessEpoch, ExpectationDigest: [32]byte{5}, Request: q}
+			w := app.SourceWork{Channel: arm.Channel, StopSnapshot: &x, StopIssuedAt: now, NotAfter: arm.NotAfter}
+			if !w.Valid(time.Now()) {
+				t.Fatal("invalid synthetic restrictive control")
+			}
+			ctx, cancel := context.WithDeadline(t.Context(), w.NotAfter)
+			defer cancel()
+			hub, region := historyStreamPair(t, ctx, r)
+			queue := &sourceQueue{}
+			snapshots := &sourceSnapshotCanceller{fail: refused}
+			local := &SourceLocal{Queue: queue, Snapshots: snapshots, Verifier: sourceWorkVerifierFunc(func(_ context.Context, b []byte, current fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
+				if current.Channel != w.Channel || string(b) != "synthetic-cancel-signature" {
+					return app.AuthenticatedSourceWork{}, fleet.ErrDenied
+				}
+				return app.AuthenticatedSourceWork{Work: w, KeyID: "synthetic", TrustRevision: workFixture().TrustRevision, VerifiedAt: now, ValidUntil: w.NotAfter}, nil
+			})}
+			done := make(chan error, 1)
+			go func() {
+				f, current, err := region.AwaitWork(ctx)
+				if err == nil && f.Kind == contracts.SourceWorkFrame {
+					err = serveRegionalSource(ctx, region, current, f.Payload, local, time.Now)
+				}
+				clear(f.Payload)
+				done <- err
+			}()
+			err := serveHubSource(ctx, hub, w, []byte("synthetic-cancel-signature"), time.Now)
+			if refused {
+				if !errors.Is(err, fleet.ErrUnavailable) {
+					t.Fatal(err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+			if snapshots.calls != 1 || !snapshots.last.Equal(x) || queue.calls != 0 {
+				t.Fatal("cancellation became source arm/stop or replayed", snapshots.calls, queue.calls)
+			}
+		})
+	}
+}

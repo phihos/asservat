@@ -182,3 +182,40 @@ func TestSourceWorkMaximumProgramAndEarlierHardBounds(t *testing.T) {
 		})
 	}
 }
+
+func TestSourceWorkSnapshotCancellationUsesCurrentControlAndOriginalWriter(t *testing.T) {
+	base, receiver, trust, key, now := apiWorkFixture(t)
+	arm := sourceSignatureWork(base, *now)
+	b := arm.Source.Permit.Binding
+	b.AudienceDigest = [32]byte{7}
+	q := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(deliveryapp.SourceBindingDigest(b)), SourceID: b.SourceID, Fence: b.Fence, SnapshotID: "66666666-6666-4666-8666-666666666666", SourceStartedAt: now.Add(-time.Minute), SourceHardUntil: now.Add(-time.Second), T0: now.Add(-30 * time.Second), IssuedAt: now.Add(-30 * time.Second), StartBy: now.Add(-25 * time.Second), ProcessingUntil: now.Add(time.Minute), Before: time.Second, MaxBytes: 65536}
+	x := collector.SourceSnapshot{Binding: b, CaptureID: "44444444-4444-4444-8444-444444444444", AttemptID: base.AttemptID, WriterPodUID: base.Channel.Executor.PodUID, WriterEpoch: base.Channel.Executor.ProcessEpoch, ExpectationDigest: [32]byte{5}, Request: q}
+	w := app.SourceWork{Channel: base.Channel, StopSnapshot: &x, StopIssuedAt: *now, NotAfter: now.Add(3 * time.Second)}
+	signatures := apiSignatures(t, func(context.Context) (value.APIContextWorkTrust, error) { return trust, nil }, key, now)
+	signed, err := signatures.SignSourceWork(t.Context(), w)
+	if err != nil {
+		t.Fatal("expired source wrongly blocked restrictive cancel", err)
+	}
+	accepted, err := signatures.VerifySourceWork(t.Context(), signed, receiver)
+	if err != nil || accepted.Work.StopSnapshot == nil || !accepted.Work.StopSnapshot.Equal(x) || accepted.Work.RouteID() != x.CaptureID {
+		t.Fatal("lost exact snapshot cancellation", accepted, err)
+	}
+	for name, change := range map[string]func(*app.SourceWork){
+		"replacementWriter": func(v *app.SourceWork) {
+			copy := *v.StopSnapshot
+			copy.WriterEpoch = base.AttemptID
+			v.StopSnapshot = &copy
+		},
+		"mixedStopSource":        func(v *app.SourceWork) { v.Stop = true },
+		"mixedArm":               func(v *app.SourceWork) { v.Source = arm.Source },
+		"renewedControlDeadline": func(v *app.SourceWork) { v.NotAfter = v.StopIssuedAt.Add(5*time.Second + time.Nanosecond) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			v := w
+			change(&v)
+			if _, err := signatures.SignSourceWork(t.Context(), v); err == nil {
+				t.Fatal("invalid restrictive cancellation signed")
+			}
+		})
+	}
+}
