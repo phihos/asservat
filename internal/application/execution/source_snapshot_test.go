@@ -125,3 +125,60 @@ func TestAPIContextSnapshotCollectionKeepsAcceptedDigestAndChecksCoverage(t *tes
 		t.Fatal("different source window reached completion persistence", err, recorder.snapshotCompletions)
 	}
 }
+
+// A regional holder transfers ownership at enqueue and completes in a later
+// collect exchange. Its prepared handle deliberately has no CompleteStored.
+type queuedSnapshotOutput struct {
+	now            func() time.Time
+	starts, closes int
+	fail           bool
+}
+
+func (p *queuedSnapshotOutput) PrepareContext(context.Context, artifact.ContextExpectation) (evidence.PreparedContext, error) {
+	return &queuedSnapshotPrepared{p}, nil
+}
+
+type queuedSnapshotPrepared struct{ owner *queuedSnapshotOutput }
+
+func (p *queuedSnapshotPrepared) StoreContext(context.Context, []byte, time.Time, time.Time) (artifact.Copies, error) {
+	return artifact.Copies{}, value.ErrUnavailable
+}
+func (p *queuedSnapshotPrepared) Close() { p.owner.closes++ }
+func (p *queuedSnapshotPrepared) StartSourceSnapshot(context.Context, collector.SourceSnapshot) (time.Time, error) {
+	p.owner.starts++
+	if p.owner.fail {
+		return time.Time{}, value.ErrUnavailable
+	}
+	return p.owner.now(), nil
+}
+func TestAPIContextSnapshotQueuedHolderDoesNotRequireSynchronousCompletion(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		t.Run(map[bool]string{false: "queued", true: "refused"}[fail], func(t *testing.T) {
+			f, runner, current := snapshotExecutionFixture(t)
+			output := &queuedSnapshotOutput{now: runner.Now, fail: fail}
+			runner.Output = output
+			result, err := runner.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+			if output.starts != 1 || output.closes < 1 {
+				t.Fatalf("holder did not own and close start: starts=%d closes=%d result=%s err=%v", output.starts, output.closes, result.State, err)
+			}
+			if !fail && (err != nil || result.State != "Recording" || f.record.Phase != "started") {
+				t.Fatal("queued holder prematurely finalized", result, err, f.record.Phase)
+			}
+			if fail && (err == nil || f.record.Phase != "captureFailed") {
+				t.Fatal("refused holder did not record failure", result, err, f.record.Phase)
+			}
+			if f.captures.Load() != 0 || f.stores.Load() != 0 {
+				t.Fatal("snapshot used synchronous acquisition")
+			}
+		})
+	}
+}
+
+func TestAPIContextSynchronousOutputStillRequiresJoinedCompletion(t *testing.T) {
+	f, runner, current := apiRunner(t)
+	output := &queuedSnapshotOutput{now: runner.Now}
+	runner.Output = output
+	if _, err := runner.Execute(t.Context(), current, f.work.Accepted.CaptureID); err == nil || output.starts != 0 || output.closes != 1 || f.captures.Load() != 0 {
+		t.Fatal("synchronous output bypassed required joined completion", err, output)
+	}
+}

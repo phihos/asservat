@@ -398,9 +398,12 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	}
 	defer prepared.Close()
 	closer, ok := prepared.(evidence.StoredContextCloser)
-	if !ok {
+	if !ok && w.Accepted.Expectation.Recording == nil && w.Accepted.Expectation.Snapshot == nil {
 		return zero, executeStep{"PrepareContext", value.ErrUnavailable}
 	}
+	// Queued recorders transfer ownership to the regional holder. Their joined
+	// completion is recorded by CollectRecording, not this start exchange.
+	// A refused enqueue settles only a failed outcome and never uses closer.
 	if err := check.current(startCtx, s.Now()); err != nil {
 		return zero, executeStep{"PrepareContext", err}
 	}
