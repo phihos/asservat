@@ -144,6 +144,12 @@ func (r *policyCaptureReservation) spend(ctx context.Context, q *custodydb.Queri
 	acceptanceID := r.occurrence.AcceptanceID
 	if r.manual != nil {
 		acceptanceID = r.manual.acceptanceID
+		// Automatic Tick already spent its execution. A first manual save
+		// spends here before the existing output guard requires that fact.
+		// All writes remain in the admission transaction and roll back together.
+		if err := r.manual.spend(ctx, q, root, capture, a, r.grant, r.bytes); err != nil {
+			return err
+		}
 	}
 	n, err := q.SpendPolicyCollectedBytes(ctx, custodydb.SpendPolicyCollectedBytesParams{RootID: id(root), ID: acceptanceID, Bytes: r.bytes})
 	if err != nil {
@@ -162,7 +168,7 @@ func (r *policyCaptureReservation) spend(ctx context.Context, q *custodydb.Queri
 		}
 	}
 	if r.manual != nil {
-		return r.manual.spend(ctx, q, root, capture, a, r.grant, r.bytes)
+		return ctx.Err()
 	}
 	n, err = q.ReservePolicyOccurrenceOutput(ctx, custodydb.ReservePolicyOccurrenceOutputParams{RootID: id(root), ID: r.occurrence.ID, ReservedCaptureID: id(capture), GrantID: r.grant, ReservedBytes: r.bytes})
 	if err != nil {
