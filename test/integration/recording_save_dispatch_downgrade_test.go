@@ -161,7 +161,7 @@ func qualifyRecordingSaveGroupBoundsEmptyDownUp(t *testing.T, ctx context.Contex
 func qualifyRecordingSaveGroupBoundsPopulatedDowngrade(t *testing.T, ctx context.Context, admin *pgxpool.Pool, parent string) {
 	t.Helper()
 	var longer int
-	if err := admin.QueryRow(ctx, `SELECT count(*) FROM context_capture c JOIN operation_audit a ON a.root_id=c.root_id AND a.id=c.intent_operation_id WHERE c.group_id=$1 AND (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Snapshot,StartBy}')::timestamptz>c.created_at+interval '5 seconds' AND a.request_until>c.created_at+interval '5 seconds'`).Scan(&longer); err != nil || longer != 16 {
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM context_capture c JOIN operation_audit a ON a.root_id=c.root_id AND a.id=c.intent_operation_id WHERE c.group_id=$1 AND (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Snapshot,StartBy}')::timestamptz>c.created_at+interval '5 seconds' AND a.request_until>c.created_at+interval '5 seconds'`, parent).Scan(&longer); err != nil || longer != 16 {
 		t.Fatal("qualifier requires all16 genuine retained longer group dates", longer, err)
 	}
 	before := groupBoundsDefinition(t, ctx, admin)
