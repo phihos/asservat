@@ -236,27 +236,53 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		return live[0], len(all), true
 	}
 	type recording struct {
-		Handle   string `json:"recording_handle"`
-		PodUID   string `json:"pod_uid"`
-		Policy   string `json:"policy_uid"`
-		State    string `json:"state"`
-		History  string `json:"history"`
-		Eligible bool   `json:"save_eligible"`
+		Handle   string   `json:"recording_handle"`
+		PodUID   string   `json:"pod_uid"`
+		Policy   string   `json:"policy_uid"`
+		State    string   `json:"state"`
+		History  string   `json:"history"`
+		Eligible bool     `json:"save_eligible"`
+		Blockers []string `json:"blockers"`
 	}
 	target := map[string]any{"target_ref": map[string]any{"cluster_id": f.cluster, "namespace": f.namespace, "kind": "Deployment", "name": f.workload}}
+	// lastSelection keeps the most recent public answer for failure analysis.
+	var lastSelection string
 	selection := func(call context.Context) (recording, bool) {
 		var page struct {
 			Recordings []recording `json:"recordings"`
 		}
-		if !read(call, "list_recordings", target, &page) {
+		reply, code, err := invoke(call, "list_recordings", target)
+		if err != nil || reply.Status != "ok" || code != "" {
+			lastSelection = fmt.Sprintf("status=%s code=%s err=%v", reply.Status, code, err)
 			return recording{}, false
 		}
+		if json.Unmarshal(reply.Data, &page) != nil {
+			t.Fatal("list_recordings data")
+		}
+		lastSelection = fmt.Sprintf("%d recordings", len(page.Recordings))
 		for _, r := range page.Recordings {
+			lastSelection += fmt.Sprintf("; policy=%t pod=%t state=%s history=%s eligible=%t handle=%t blockers=%v", r.Policy == active.PolicyUID, r.PodUID == podUID, r.State, r.History, r.Eligible, r.Handle != "", r.Blockers)
 			if r.Policy == active.PolicyUID && r.PodUID == podUID && r.Eligible && r.Handle != "" {
 				return r, true
 			}
 		}
 		return recording{}, false
+	}
+	// A bounded retry absorbs one transient answer; five seconds keeps the
+	// retained marker well inside the requested window.
+	selectNow := func(what string) recording {
+		t.Helper()
+		call, stop := context.WithTimeout(ctx, 5*time.Second)
+		defer stop()
+		for {
+			if r, ok := selection(call); ok {
+				return r
+			}
+			if installedJourneyPause(call, 500*time.Millisecond) != nil {
+				diagnose()
+				t.Fatal(what, "selection unavailable:", lastSelection)
+			}
+		}
 	}
 	type preview struct {
 		ID string `json:"preview_id"`
@@ -317,10 +343,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal(err)
 	}
 	retainedSent := marker(ongoingSaveRetainedPort)
-	selected, ok := selection(ctx)
-	if !ok {
-		t.Fatal("fresh Save selection unavailable")
-	}
+	selected := selectNow("fresh Save")
 	captureID, t0 := save(map[string]any{"recording_handles": []string{selected.Handle}, "before": "15s"}, "native-ongoing-save")
 	afterSent := marker(ongoingSaveAfterPort)
 	// Refuse ambiguous boundary evidence instead of adding tolerance.
@@ -375,17 +398,14 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 
 	// Fresh selection repeat; the original handle is not reused.
-	repeatSelection, ok := selection(ctx)
-	if !ok {
-		t.Fatal("fresh repeat selection unavailable")
-	}
+	repeatSelection := selectNow("fresh repeat")
 	repeatID, _ := save(map[string]any{"recording_handles": []string{repeatSelection.Handle}, "before": "15s", "repeated_from_capture_id": captureID}, "native-ongoing-repeat")
 	published(repeatID)
-	if same, count, ok = current(ctx); !ok || same.ID != src.ID || count != 1 {
+	if same, count, ok2 = current(ctx); !ok2 || same.ID != src.ID || count != 1 {
 		t.Fatal("repeat changed or re-armed the original source", same, count)
 	}
 
-	// Natural expiry at the original grant-bounded hard deadline, no stop call.
+	// Natural expiry at the original authority-bounded hard deadline, no stop call.
 	var expired ongoingSaveSource
 	wait("natural source expiry", time.Until(src.HardUntil)+time.Minute, func(call context.Context) bool {
 		all, err := sources(call)
@@ -398,7 +418,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	if expired.ID != src.ID || expired.EndedAt.Before(src.HardUntil) || expired.Credit < src.Credit {
 		t.Fatal("natural expiry ended early, changed source or refunded credit", expired)
 	}
-	if _, ok = selection(ctx); ok {
+	if _, ok := selection(ctx); ok {
 		t.Fatal("expired source still offered for Save")
 	}
 
