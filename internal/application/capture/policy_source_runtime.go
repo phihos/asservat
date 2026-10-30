@@ -22,6 +22,32 @@ type OngoingRecorderObserver interface {
 	ResolveOngoingRecorders(context.Context, []targets.OngoingRecorderRequest) ([]targets.OngoingRecorderResolution, error)
 }
 
+// sourceStage names the bounded step that failed, for the trigger's
+// content-free counters. It adds no state or retry.
+type sourceStage struct {
+	stage string
+	err   error
+}
+
+func (e sourceStage) Error() string { return e.stage + ": " + e.err.Error() }
+func (e sourceStage) Unwrap() error { return e.err }
+
+func staged(stage string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return sourceStage{stage, err}
+}
+
+// sourceStageOf returns the first labelled source step of err, or "".
+func sourceStageOf(err error) string {
+	var s sourceStage
+	if errors.As(err, &s) {
+		return s.stage
+	}
+	return ""
+}
+
 // PolicySourceRuntime maintains ordinary ongoing rings on the existing policy
 // poll. It creates no timer, watch, retry queue, capture or disclosure route.
 // Metadata uses bounded batches; SQL admission and dispatch remain serialized.
@@ -90,7 +116,7 @@ func (s *PolicySourceRuntime) StopPolicy(ctx context.Context, policy string) err
 
 func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolicy, a authorization.AcceptedPolicyAuthority, o targets.RestartObservation) error {
 	if !s.configured() || ctx == nil || ctx.Err() != nil || !p.Valid() || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing" || !a.Valid(s.Now()) || !o.Valid(s.Now()) || !o.Answers(p.Request()) || o.ClusterID != a.ClusterID || o.Namespace.UID != a.NamespaceUID || o.Workload.UID != a.WorkloadUID || len(o.Pods) > p.ObservedPods {
-		return value.ErrUnavailable
+		return staged("precheck", value.ErrUnavailable)
 	}
 	cohortStarted := s.Now().UTC().Truncate(time.Microsecond)
 	cohortUntil := identity.Earlier(cohortStarted.Add(5*time.Second), identity.Earlier(o.FreshUntil, a.NotAfter))
@@ -99,7 +125,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 	ctx = cohort
 	rows, err := s.Ledger.ListSources(ctx, a.PolicyUID)
 	if err != nil {
-		return err
+		return staged("list", err)
 	}
 	existing := make(map[string]PolicySourceState, len(rows))
 	present := make(map[string]bool, len(o.Pods))
@@ -120,11 +146,11 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 	}
 	recovery, err := s.Recovery.RecoveryState(ctx)
 	if err != nil {
-		return errors.Join(failed, err)
+		return errors.Join(failed, staged("recovery", err))
 	}
 	settings, err := s.Settings.IdentityPolicy(ctx, a.Creator.Issuer)
 	if err != nil || settings.Validate(s.Now()) != nil || settings.Issuer != a.Creator.Issuer {
-		return errors.Join(failed, value.ErrUnavailable)
+		return errors.Join(failed, staged("settings", value.ErrUnavailable))
 	}
 	// This check interval starts once. Independent regional/retention reads can
 	// only shorten it, never freshen a complete workload observation.
@@ -171,7 +197,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 	}
 	for _, pod := range o.Pods {
 		if call.Err() != nil || !s.Now().Before(until) {
-			return errors.Join(failed, value.ErrUnavailable)
+			return errors.Join(failed, staged("deadline", value.ErrUnavailable))
 		}
 		old, known := existing[pod.UID]
 		if known && !old.EndedAt.IsZero() {
@@ -185,12 +211,16 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 		var e error
 		observed, ok := prefetched[pod.UID]
 		if !ok {
-			failed = errors.Join(failed, value.ErrUnavailable)
+			failed = errors.Join(failed, staged("resolve-missing", value.ErrUnavailable))
 			continue
 		}
 		resolved, e = observed.value, observed.err
-		if e != nil || !resolved.Recorder.ValidSource(s.Now()) || resolved.Recorder.Target.Request != request.Target {
-			failed = errors.Join(failed, value.ErrUnavailable)
+		if e != nil {
+			failed = errors.Join(failed, staged("resolve", e))
+			continue
+		}
+		if !resolved.Recorder.ValidSource(s.Now()) || resolved.Recorder.Target.Request != request.Target {
+			failed = errors.Join(failed, staged("resolve-invalid", value.ErrUnavailable))
 			continue
 		}
 		node := *resolved.Recorder.Recorder.Source
@@ -218,7 +248,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 		ceiling := resolved.Ceilings
 		slots := min(int64(p.ObservedPods), ceiling.MaxActiveSources)
 		if slots < 1 || ceiling.MaxActiveSources > collector.MaxActiveSources || ceiling.InputBytesPerSecond < 1 || ceiling.InputBytesPerSecond > collector.MaxInputRate || ceiling.InputBurstBytes < 1 || ceiling.InputBurstBytes > collector.MaxInputBurst {
-			failed = errors.Join(failed, value.ErrCapacity)
+			failed = errors.Join(failed, staged("ceilings", value.ErrCapacity))
 			continue
 		}
 		rate := min(ceiling.InputBytesPerSecond, ceiling.InputBurstBytes) / slots
@@ -228,7 +258,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 		}
 		retention, e := s.Retention.Resolve(call, privacy.Input{Target: resolved.Recorder.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: p.RetentionSeconds, AnchorAt: started})
 		if e != nil {
-			failed = errors.Join(failed, e)
+			failed = errors.Join(failed, staged("retention", e))
 			continue
 		}
 		age, ageErr := time.ParseDuration(p.Recorder.Action.RingMaxAge)
@@ -236,7 +266,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 			return errors.Join(failed, value.ErrInvalid)
 		}
 		if !retention.Proof.Valid(s.Now()) || retention.Target != resolved.Recorder.Target.Target() || !s.Now().Before(retention.ValidUntil) {
-			failed = errors.Join(failed, value.ErrUnavailable)
+			failed = errors.Join(failed, staged("retention-proof", value.ErrUnavailable))
 			continue
 		}
 		if age > retention.ExpiresAt.Sub(retention.AnchorAt) {
@@ -282,7 +312,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 			} else {
 				state := resolved.State
 				if state.SourceID != old.Binding.SourceID || state.Fence != old.Binding.Fence || state.Credit < 1 || state.Credit > old.Credit || state.ObservedBytes < 0 || state.ObservedBytes > state.Credit || state.ObservedAt.After(s.Now()) || !s.Now().Before(state.FreshUntil) {
-					failed = errors.Join(failed, value.ErrUnavailable)
+					failed = errors.Join(failed, staged("state", value.ErrUnavailable))
 					continue
 				}
 				// Feedback is authenticated accounting, not current authority. Only
@@ -296,7 +326,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 		}
 		admission, e := s.Ledger.AdmitSource(call, check)
 		if e != nil {
-			failed = errors.Join(failed, e)
+			failed = errors.Join(failed, staged("admit", e))
 			if known && (errors.Is(e, value.ErrDenied) || errors.Is(e, value.ErrChanged) || errors.Is(e, value.ErrConflict)) {
 				if endErr := s.Ledger.EndSource(call, old.Binding.SourceID); endErr == nil {
 					failed = errors.Join(failed, s.Dispatcher.StopSource(call, old.ClusterID, old.Binding))
@@ -307,7 +337,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 			continue
 		}
 		if call.Err() != nil || !admission.Permit.Dispatchable(s.Now()) {
-			failed = errors.Join(failed, value.ErrUnavailable)
+			failed = errors.Join(failed, staged("permit", value.ErrUnavailable))
 			continue
 		}
 
@@ -321,7 +351,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 		}
 		// Signing/delivery retains this same original call and exact committed
 		// SourceID/fence/cumulative credit. Unknown delivery never refunds it.
-		failed = errors.Join(failed, s.Dispatcher.DispatchSource(call, check.Target, node, source))
+		failed = errors.Join(failed, staged("dispatch", s.Dispatcher.DispatchSource(call, check.Target, node, source)))
 	}
 	return failed
 }

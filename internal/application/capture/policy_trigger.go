@@ -172,7 +172,11 @@ func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) {
 			continue
 		}
 		if err := t.tick(ctx, p, r); err != nil {
-			t.report("tick/" + failureClass(err))
+			stage := sourceStageOf(err)
+			if stage != "" {
+				stage += "/"
+			}
+			t.report("tick/" + stage + failureClass(err))
 		}
 	}
 }
@@ -189,10 +193,10 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	defer cancel()
 	source, spec, err := t.Documents.ReadPolicy(tick, p.Name, p.PolicyUID)
 	if err != nil {
-		return err
+		return staged("read-policy", err)
 	}
 	if err = t.Sources.ObservePolicy(tick, source); err != nil {
-		return err
+		return staged("observe-policy", err)
 	}
 	if source.Suspended || source.Deleted {
 		if t.OngoingSources != nil {
@@ -219,7 +223,7 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	// source/observation start. No ordinary/manual raw path is enabled here.
 	accepted, err := t.Accepted.AcceptedPolicyAuthority(tick, p.PolicyUID)
 	if err != nil {
-		return err
+		return staged("accepted", err)
 	}
 	a := accepted.Authority
 	if compiled.Recorder != nil && RecorderPolicyScopeDigest(source.Revision.UID, accepted.IntentVersion, source.CollectionDigest, compiled, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits) != a.ScopeDigest {
@@ -230,10 +234,10 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	}
 	observation, err := t.Observer.ObserveWorkloadRestarts(tick, compiled.Request())
 	if err != nil {
-		return err
+		return staged("workload", err)
 	}
 	if !observation.Answers(compiled.Request()) {
-		return value.ErrUnavailable
+		return staged("workload-answer", value.ErrUnavailable)
 	}
 	if observation.Namespace.UID != a.NamespaceUID || observation.Workload.UID != a.WorkloadUID {
 		// A replaced namespace or workload is outside the accepted scope.
@@ -244,6 +248,9 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 			return value.ErrRecorderUnavailable
 		}
 		if err := t.OngoingSources.Maintain(tick, compiled, a, observation); err != nil {
+			if sourceStageOf(err) == "" {
+				err = staged("maintain", err)
+			}
 			return err
 		}
 		// Arming remains independent of occurrence admission. Only an explicitly
