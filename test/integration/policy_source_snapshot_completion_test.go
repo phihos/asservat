@@ -89,6 +89,7 @@ func (s snapshotPublicationGateTrace) CheckContextPublication(ctx context.Contex
 // qualification follows from this test. The caller supplies genuine reviewed
 // source admission, occurrence and capture acceptance, never hand-inserted rows.
 type sourceSnapshotCompletionState struct {
+	KeyServices       *contextKeyUnwrapServices
 	ObservationBefore int64
 	Executions        *postgres.APIContextExecutions
 	Execution         executionvalue.APIExecution
@@ -405,7 +406,7 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 	checkedHeaders := 0
 	verifier.WithStreamCheck(artifact.PCAPNGArtifact, func() objectstore.StreamCheck { checkedHeaders++; return packets.NewHeadersCheck() })
 	unwrapControlsStarted := time.Now()
-	unwraps := qualifyContextKeyUnwraps(t, ctx, f.admin, f.fixturePool, s, final, accepted.CaptureID)
+	unwraps := qualifyContextKeyUnwraps(t, ctx, f.admin, f.fixturePool, s, final, accepted.CaptureID, stage.KeyServices)
 	unwrapControlsElapsed := time.Since(unwrapControlsStarted)
 	f.refreshBase(t)
 	trace := &snapshotPublicationTrace{}

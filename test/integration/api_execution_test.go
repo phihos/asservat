@@ -529,15 +529,22 @@ func narrowRole(t *testing.T, ctx context.Context, admin *pgxpool.Pool, prefix, 
 	return role
 }
 
-// qualifyContextKeyUnwraps checks ADR-181 on real PostgreSQL for a stored,
-// unpublished execution: only a verifier peer may unwrap, only this attempt's
-// keyset bindings, within the bounded allowance; the queue lists the capture.
-func qualifyContextKeyUnwraps(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, capture string) contextKeyUnwrapFixture {
-	scope := authorization.KeyScope{InstallationID: s.recovery.installation, Purpose: "artifact", KeyID: "fixture"}
+type contextKeyUnwrapServices struct {
+	unwraps *postgres.ContextKeyUnwraps
+	queue   *postgres.ContextPublicationQueue
+	scope   authorization.KeyScope
+}
+
+// One real verifier process owns these existing root-scoped roles and pools.
+// Per-attempt authority, bindings, peer observations and allowances stay below.
+func newContextKeyUnwrapServices(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, root, installation string) *contextKeyUnwrapServices {
+	t.Helper()
+	began := time.Now()
+	scope := authorization.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: "fixture"}
 	role := narrowRole(t, ctx, admin, "context_key_unwrap_", "synthetic-key-unwrap", postgres.ContextKeyUnwrapGrantSQL)
 	unwrapPool := poolFor(role, "synthetic-key-unwrap")
 	t.Cleanup(unwrapPool.Close)
-	unwraps, err := postgres.NewContextKeyUnwraps(ctx, unwrapPool, s.a.RootID, custodyID(), scope)
+	unwraps, err := postgres.NewContextKeyUnwraps(ctx, unwrapPool, root, custodyID(), scope)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -547,13 +554,33 @@ func qualifyContextKeyUnwraps(t *testing.T, ctx context.Context, admin *pgxpool.
 	})
 	queuePool := poolFor(queueRole, "synthetic-publication-queue")
 	t.Cleanup(queuePool.Close)
-	queue, err := postgres.NewContextPublicationQueue(ctx, queuePool, s.a.RootID)
+	queue, err := postgres.NewContextPublicationQueue(ctx, queuePool, root)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("actual_verifier_service_setup_us=%d helper_roles=2 helper_pools=2", time.Since(began).Microseconds())
+	return &contextKeyUnwrapServices{unwraps: unwraps, queue: queue, scope: scope}
+}
+
+// qualifyContextKeyUnwraps checks ADR-181 on real PostgreSQL for a stored,
+// unpublished execution: only a verifier peer may unwrap, only this attempt's
+// keyset bindings, within the bounded allowance; the queue lists the capture.
+func qualifyContextKeyUnwraps(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, e artifact.ContextExpectation, capture string, shared ...*contextKeyUnwrapServices) contextKeyUnwrapFixture {
+	var services *contextKeyUnwrapServices
+	if len(shared) > 0 {
+		services = shared[0]
+	}
+	if services == nil {
+		services = newContextKeyUnwrapServices(t, ctx, admin, poolFor, s.a.RootID, s.recovery.installation)
+	}
+	var err error
+	controlsStarted := time.Now()
+	defer func() {
+		t.Logf("actual_verifier_per_attempt_controls_us=%d", time.Since(controlsStarted).Microseconds())
+	}()
 	now := time.Now().UTC()
-	f := contextKeyUnwrapFixture{t: t, unwraps: unwraps, queue: queue, scope: scope, attempt: e.Registration.Location.AttemptID, binding: e.Binding(),
-		peer: authorization.KeyPeer{InstallationID: scope.InstallationID, PeerID: custodyID(), Role: "verifier", Certificate: artifact.Digest{0x51}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(50 * time.Minute)}}
+	f := contextKeyUnwrapFixture{t: t, unwraps: services.unwraps, queue: services.queue, scope: services.scope, attempt: e.Registration.Location.AttemptID, binding: e.Binding(),
+		peer: authorization.KeyPeer{InstallationID: services.scope.InstallationID, PeerID: custodyID(), Role: "verifier", Certificate: artifact.Digest{0x51}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(50 * time.Minute)}}
 	if !f.queued(ctx, capture) {
 		t.Fatal("stored unpublished capture missing from the publication queue")
 	}

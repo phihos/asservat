@@ -361,6 +361,12 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 		t.Fatal("workflow qualifier requires independently configured N2 or N16")
 	}
 	began := time.Now()
+	var keyServices *contextKeyUnwrapServices
+	if requestMode {
+		// Real long-lived verifier services exist before the request's final facts.
+		// Every child still supplies its own fresh peer, binding and bounded controls.
+		keyServices = newContextKeyUnwrapServices(t, ctx, f.admin, f.fixturePool, policy.Scenario.a.RootID, policy.Authority.InstallationID)
+	}
 	sources := []captureapp.PolicySourceAdmission{original}
 	checks := []captureapp.PolicySourceCheck{refresh(t)}
 	for n := 1; n < count; n++ {
@@ -429,6 +435,7 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	// They create no preview row, reservation, accepted capture or native keys.
 	_, parts := prepare()
 	workflow := newManualSnapshotWorkflow(t, ctx, f, policy, parts)
+	workflow.KeyServices = keyServices
 	operations := newDispatchWorkflowOperations(t, ctx, f, policy, admissions, intents, workflow, parts[0].Admission.RecordingSave.Initiator.VerifiedIdentity, checks[0].Settings)
 	var shortID string
 	if !t.Run("legacy-five-second-normal-audit-downgrade", func(t *testing.T) {
@@ -558,6 +565,20 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 			t.Fatal("fixture reanchor changed original accepted snapshot")
 		}
 	}
+	persistHistory := func() bool {
+		return t.Run("one-encrypted-parent-history-fresh-selection-settings", func(t *testing.T) {
+			who, err := operations.identity.Resolve(ctx, "synthetic-workflow-token")
+			if err != nil {
+				t.Fatal(err)
+			}
+			qualifyManualRecordingSaveGroupHistory(t, ctx, f, policy, group.Preview, accepted, who)
+		})
+	}
+	// History describes genuine accepted work, not completed evidence. Save it
+	// while its original write interval is live, after every mandatory start.
+	if requestMode && !persistHistory() {
+		return
+	}
 	for n, part := range parts {
 		if !t.Run(fmt.Sprintf("native-child-%d", n), func(t *testing.T) { workflow.Complete(t, ctx, part) }) {
 			return
@@ -596,11 +617,7 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	}) {
 		return
 	}
-	t.Run("one-encrypted-parent-history-fresh-selection-settings", func(t *testing.T) {
-		who, err := operations.identity.Resolve(ctx, "synthetic-workflow-token")
-		if err != nil {
-			t.Fatal(err)
-		}
-		qualifyManualRecordingSaveGroupHistory(t, ctx, f, policy, group.Preview, accepted, who)
-	})
+	if !requestMode {
+		persistHistory()
+	}
 }
