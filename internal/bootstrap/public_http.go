@@ -84,15 +84,16 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	// ADR-249: the protected identity settings carry the approval settings
 	// (step-up and the installation's recording-approval switch).
 	pc.investigation.Approvals = id.mcp.Policies
+	ongoingSources := pc.packetSourceRuntime(time.Now, ownerRandomID)
 	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
-		PublicContextOperationServices{Recordings: pc.recordings, Cancellations: pc.cancellations, History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection})
+		PublicContextOperationServices{ongoingSources: ongoingSources, Recordings: pc.recordings, Cancellations: pc.cancellations, History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection})
 	if err != nil {
 		return nil, &fixedStepError{"operations", mounts.ErrUnavailable}
 	}
 	// ADR-228: activate_policy and get_policy_status on the same audited
 	// routes, and the restart trigger that RunPublic supervises.
 	policies, trigger, err := composePublicPolicies(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
-		PublicContextOperationServices{History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
+		PublicContextOperationServices{ongoingSources: ongoingSources, History: pc.history, Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
 	if err != nil {
 		return nil, &fixedStepError{"policies", mounts.ErrUnavailable}
 	}

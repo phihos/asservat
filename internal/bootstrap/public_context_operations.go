@@ -1,13 +1,11 @@
 package bootstrap
 
 import (
-	"encoding/json"
 	"os"
 	"slices"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
-	"asservat.local/asservat/internal/adapters/packets"
 	analysisapp "asservat.local/asservat/internal/application/analysis"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
@@ -21,8 +19,6 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
-	planvalue "asservat.local/asservat/internal/domain/planning"
-	"asservat.local/asservat/internal/transport/conversion"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
@@ -31,17 +27,19 @@ import (
 // Protected deployment composition must verify original projections and supply
 // current scoped adapters before calling it; no missing service gets a default.
 type PublicContextOperationServices struct {
-	Recordings    *captureapp.RecordingSaves
-	Cancellations *captureapp.CaptureCancellation
-	History       *captureapp.HistoryParameterService
-	Investigation captureapp.ContextInvestigation
-	Intents       auditapp.CaptureOperationPublication
-	Regional      RegionalAPIContextStart
-	Progress      captureapp.ContextProgressService
-	Cases         catalogapp.ContextCaseService
-	Downloads     evidence.ContextDownloadCoordinator
-	Native        ContextNativeDownloadServices
-	Projection    *analysisapp.ContextProjectionService
+	// Candidate-only installed composition; never decoded from browser/MCP input.
+	ongoingSources *captureapp.PolicySourceRuntime
+	Recordings     *captureapp.RecordingSaves
+	Cancellations  *captureapp.CaptureCancellation
+	History        *captureapp.HistoryParameterService
+	Investigation  captureapp.ContextInvestigation
+	Intents        auditapp.CaptureOperationPublication
+	Regional       RegionalAPIContextStart
+	Progress       captureapp.ContextProgressService
+	Cases          catalogapp.ContextCaseService
+	Downloads      evidence.ContextDownloadCoordinator
+	Native         ContextNativeDownloadServices
+	Projection     *analysisapp.ContextProjectionService
 }
 
 type PublicContextOperationsConfig struct {
@@ -156,6 +154,7 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 		s.Native.Runtime == nil && s.Native.Stop.Active != nil || s.Native.Runtime != nil && s.Native.Stop.Active != s.Native.Runtime || s.Native.Stop.Ledger == nil || s.Native.Stop.Acknowledgements == nil || s.Native.Stop.Objects == nil {
 		return zero, presentation.ErrOperationsConfiguration
 	}
+	i.RecordingSaveEnabled = packetSourceCompositionReady(c, s)
 	// Shared freshness functions and recovery source are fixed once at assembly;
 	// this creates no observation and replaces no original request deadline.
 	i.Now, i.NewID, a.Now = c.Now, c.NewID, c.Now
@@ -210,11 +209,13 @@ func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOpera
 		return nil, nil, err
 	}
 	trigger := &captureapp.PolicyTrigger{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters), Ledger: pc.policyTriggers, Documents: pc.hubPolicies, Sources: pc.policies, Accepted: pc.policies, Observer: observer, Capture: v.submission, Audit: pc.policyAudit, Now: c.Now, Report: timedEventLog(os.Stderr, "policy trigger")}
-	if sourceObserver, ok := v.submission.Targets.(captureapp.OngoingRecorderObserver); ok && pc.policySources != nil && v.submission.Approvals != nil {
-		trigger.OngoingSources = &captureapp.PolicySourceRuntime{Ledger: pc.policySources, Dispatcher: pc.sourceDispatch, Observer: sourceObserver, Recovery: v.submission.Recovery, Retention: v.submission.Retention, Settings: v.submission.Approvals, Now: c.Now, NewID: c.NewID}
+	if v.submission.RecordingSaveEnabled {
+		trigger.OngoingSources = s.ongoingSources
+		trigger.SourceSnapshots = v.submission
 	}
-	// The public compiler above intentionally remains finite-only until the
-	// source-window Save workflow and installed qualification are complete.
+	// This isolated qualification candidate selects the existing source runtime;
+	// an incomplete or disabled composition never acquires ongoing sources.
+
 	return operations, trigger, nil
 }
 
@@ -304,22 +305,7 @@ func previewDelegations(in []contracts.PermissionDelegation) ([]authapp.PreviewD
 
 // Same manual composition/filter compiler, without inventing a preview or Pod.
 func publicPolicyRecorderCompiler(filters planningapp.FilterCompiler) captureapp.PolicyRecorderCompiler {
-	return func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
-		var wire contracts.CaptureComposition
-		if err := json.Unmarshal(raw, &wire); err != nil {
-			return planvalue.PolicyRecorderConfiguration{}, err
-		}
-		composition, err := conversion.CompositionFromWire(wire)
-		if err != nil || composition == nil {
-			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
-		}
-		cfg, err := planningapp.CompilePolicyRecorder(*composition, filters)
-		if err != nil {
-			return cfg, err
-		}
-		if cfg.Filter != nil && planningapp.RawBytePredicate(cfg.Action.Filter) && packets.CheckPrefixProgram(cfg.Filter.Program) != nil {
-			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
-		}
-		return cfg, nil
-	}
+	// Lifecycle comes from the normalized authored/default mode, never lookback.
+	// The existing source-capable compiler preserves explicit finite bytes.
+	return recordingSavePolicyCompiler(filters)
 }

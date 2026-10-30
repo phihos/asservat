@@ -8,10 +8,11 @@ import (
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/transport/conversion"
 	"encoding/json"
+	"time"
 )
 
-// The private reader verifies an already accepted ongoing definition. It does
-// not widen the public activation compiler or enable source/manual acquisition.
+// Shared inert lifecycle compilation for the accepted-source reader and this
+// unmerged native candidate. It grants no source/manual acquisition authority.
 func recordingSavePolicyCompiler(filters planningapp.FilterCompiler) captureapp.PolicyRecorderCompiler {
 	return func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
 		var wire contracts.CaptureComposition
@@ -31,4 +32,30 @@ func recordingSavePolicyCompiler(filters planningapp.FilterCompiler) captureapp.
 		}
 		return cfg, nil
 	}
+}
+
+// packetSourceCompositionReady is the single trusted acquisition decision for
+// this unmerged native candidate. Collection capability alone or a caller's
+// nested RecordingSaveEnabled value is insufficient. No observation is created.
+func packetSourceCompositionReady(c PublicContextOperationsConfig, s PublicContextOperationServices) bool {
+	r, i := s.ongoingSources, s.Investigation
+	if !c.CollectionEnabled || r == nil || r.Ledger == nil || r.Dispatcher == nil || r.Observer == nil || r.Recovery == nil || r.Retention == nil || r.Settings == nil || r.Now == nil || r.NewID == nil || i.RecordingPolicies == nil || i.PolicyAccepted == nil || i.RecordingSources == nil || i.RecordingGroups == nil || i.Approvals == nil {
+		return false
+	}
+	_, snapshots := i.Targets.(captureapp.SourceSnapshotGroupTargets)
+	_, single := i.Targets.(captureapp.SourceSnapshotTargets)
+	return snapshots && single
+}
+
+// Bind the existing source-purpose services only after protected identity
+// settings are available. This constructs no worker, watch or provider client.
+func (p *publicContext) packetSourceRuntime(now func() time.Time, newID func() string) *captureapp.PolicySourceRuntime {
+	if p == nil || p.policySources == nil || p.sourceDispatch.Router == nil || p.sourceDispatch.Signer == nil || p.sourceDispatch.Now == nil {
+		return nil
+	}
+	observer, ok := p.investigation.Targets.(captureapp.OngoingRecorderObserver)
+	if !ok {
+		return nil
+	}
+	return &captureapp.PolicySourceRuntime{Ledger: p.policySources, Dispatcher: p.sourceDispatch, Observer: observer, Recovery: p.investigation.Recovery, Retention: p.investigation.Retention, Settings: p.investigation.Approvals, Now: now, NewID: newID}
 }
