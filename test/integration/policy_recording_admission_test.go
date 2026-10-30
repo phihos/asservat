@@ -278,11 +278,21 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal(err)
 			}
 			author := s.a.Eligibility.VerifiedIdentity
-			if recurringSharing != nil && !slices.Contains(author.Scopes, authorization.ShareScope) {
-				author.Scopes = append(slices.Clone(author.Scopes), authorization.ShareScope)
+			if recurringSharing != nil {
+				author = policyRecorderRecurringSharingAuthor(author)
 			}
 			author.VerifiedAt, author.ValidUntil = now, now.Add(30*time.Second)
 			workload := authorization.WorkloadTarget{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID}
+			if recurringSharing != nil {
+				current, err := s.p.WorkloadPermissions(ctx, workload)
+				if err != nil {
+					t.Fatal("current recurring sharing workload permissions", err)
+				}
+				eligible, managers := authorization.PolicyWorkloadShareManagement(author, current, workload, authority.Delegation.UID, []string{sponsor.SubjectID}, clock())
+				if !eligible.Eligible || !slices.Equal(managers, recurringSharing.Management) {
+					t.Fatal("recurring sharing author preflight", eligible.Reason)
+				}
+			}
 			accepted := capture.PolicyAdmission{RootID: root, Recovery: recovery, Authority: authority, Author: author, Workload: &workload, Submission: capture.VerifiedPolicySubmission{Nonce: custodyID(), Actor: creator, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{92}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)}}
 			accepted.Sharing = recurringSharing
 			accepted.Verification = syntheticSubmissionCheck(accepted, now)
@@ -646,5 +656,42 @@ func TestManualSaveFixtureReviewedOptInAndSharingCompile(t *testing.T) {
 	old, err := captureapp.CompilePolicyWithRecorders(raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
 	if err != nil || old.RecordingSaves {
 		t.Fatal("legacy policy silently gained manual save capability", err)
+	}
+}
+
+// The sharing fixture author is independently entitled to read and share, in
+// addition to the capture-only identity used by the legacy admission cases.
+func policyRecorderRecurringSharingAuthor(author identity.Identity) identity.Identity {
+	for _, scope := range []string{"evidence:read", authorization.ShareScope} {
+		if !slices.Contains(author.Scopes, scope) {
+			author.Scopes = append(slices.Clone(author.Scopes), scope)
+		}
+	}
+	return author
+}
+
+func TestManualSaveRecurringSharingAuthorHasCurrentOwnerEligibility(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	author := identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.test", Subject: "developer", ClientID: "browser", Kind: identity.Human}, Groups: []string{"maintainers"}, Scopes: []string{"evidence:capture", authorization.ShareScope}, Policy: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+	target := authorization.WorkloadTarget{ClusterID: custodyID(), NamespaceUID: custodyID(), WorkloadUID: custodyID()}
+	owner := artifact.AudienceAssignment{Kind: "Group", Issuer: author.Principal.Issuer, SubjectID: "maintainers", Role: "evidence-owner", BasisKind: "AccessBinding", BasisUID: "binding", BasisDigest: artifact.Digest{2}, AssignmentID: custodyID()}
+	p := authorization.WorkloadProjection{Target: target, Revision: identity.Revision{UID: "permissions", Generation: 1, Digest: artifact.Digest{3}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), DeniesComplete: true, DeniesObservedAt: now, DeniesFreshUntil: now.Add(30 * time.Second), Allows: []authorization.CurrentAssignment{{Audience: owner, ObservedAt: now, FreshUntil: now.Add(30 * time.Second)}}}
+	if r, _ := authorization.PolicyWorkloadShareManagement(author, p, target, "binding", []string{"maintainers"}, now); r.Eligible || r.Reason != "InsufficientScope" {
+		t.Fatal("capture+share identity must reproduce missing read refusal", r)
+	}
+	corrected := policyRecorderRecurringSharingAuthor(author)
+	r, management := authorization.PolicyWorkloadShareManagement(corrected, p, target, "binding", []string{"maintainers"}, now)
+	if !r.Eligible || len(management) != 1 || management[0] != owner {
+		t.Fatal("sharing fixture author lacks genuine current owner eligibility", r, management)
+	}
+	missingOwner := p
+	missingOwner.Allows = nil
+	if r, _ := authorization.PolicyWorkloadShareManagement(corrected, missingOwner, target, "binding", []string{"maintainers"}, now); r.Eligible {
+		t.Fatal("scopes alone invented owner authority")
+	}
+	denied := p
+	denied.Denies = slices.Clone(p.Allows)
+	if r, _ := authorization.PolicyWorkloadShareManagement(corrected, denied, target, "binding", []string{"maintainers"}, now); r.Eligible || r.Reason != "ExplicitDeny" {
+		t.Fatal("sharing fixture bypassed current deny", r)
 	}
 }
