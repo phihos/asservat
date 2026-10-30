@@ -154,14 +154,25 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation bool) 
 				}
 				t.Logf("actual_source107_tuple_bytes=%d original_audience_refs=%d", tuple, len(rows[0].Audience))
 			})
-			t.Run("immutable-provenance-and-down-refusal", func(t *testing.T) {
+			t.Run("immutable-source-provenance", func(t *testing.T) {
 				if _, err = admin.Exec(ctx, `UPDATE policy_recording_source SET source_target_json=jsonb_set(source_target_json,'{Request,PodName}','"replacement"'::jsonb) WHERE root_id=$1 AND id=$2`, s.a.RootID, sourceID); capacitySQLState(err) != "23514" {
 					t.Fatal("original target mutated", err)
 				}
+				// Goose commits each Down separately. Only probe Down107 when
+				// already at107; dropping an empty108 first would tear down
+				// the schema required by the subsequent execution checks.
 				provider, closeProvider := source107MigrationProvider(t, admin)
 				defer closeProvider()
-				if _, err = provider.DownTo(ctx, 106); err == nil {
-					t.Fatal("populated provenance discarded")
+				version, err := provider.GetDBVersion(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if version == 107 {
+					t.Run("populated107-down-refusal", func(t *testing.T) {
+						if _, err := provider.DownTo(ctx, 106); err == nil {
+							t.Fatal("populated provenance discarded")
+						}
+					})
 				}
 			})
 			source107AddReader(t, ctx, f, "later-source-readers")
@@ -189,6 +200,23 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation bool) 
 				} else {
 					qualifyManualRecordingSave(t, ctx, f, seed.s, accepted, renewal, fresh(t), intents)
 				}
+				t.Run("populated-manual-down-refusal", func(t *testing.T) {
+					provider, closeProvider := source107MigrationProvider(t, admin)
+					defer closeProvider()
+					if _, err := provider.DownTo(ctx, 107); capacitySQLState(err) != "P0001" {
+						t.Fatal("expected manual migration guard refusal", err)
+					}
+					version, err := provider.GetDBVersion(ctx)
+					if err != nil || version != 108 {
+						t.Fatal("refusal partially changed schema", version, err)
+					}
+					// Use the real runtime role after refusal to check that the
+					// table and its purpose-specific access survived intact.
+					var reservations int
+					if err := f.roles["hub-runtime"].QueryRow(ctx, "SELECT count(*) FROM recording_save_reservation").Scan(&reservations); err != nil || reservations == 0 {
+						t.Fatal("manual reservation/access lost after refusal", reservations, err)
+					}
+				})
 				return
 			}
 			snapshotCheck := fresh(t)
