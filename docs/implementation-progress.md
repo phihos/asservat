@@ -29,6 +29,13 @@ at a later step; none has passed. Results, not claims:
   attachment). Hypothesis, unverified: 15 s source renewals and the Save
   compete for the single standby (ADR-209 one-standby decision). Changing
   that reopens a maintainer decision.
+- Confirmed (run 41132757629, router AttachState diagnostic): at the Save's
+  attach refusal the cluster had `live=0 idle=0` standbys and the previous
+  attachment had consumed one `<2s` earlier; source dispatch also refused at
+  attach twice. Each source maintenance tick attaches to deliver the renewed
+  permit, consuming the cluster's only standby every 15 s per source, so
+  Saves (and other context starts) race the renewals. This also scales
+  against ADR-209 as source count grows. Awaiting maintainer direction.
 
 Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit
 stop. Candidate remains unmerged; no collection is enabled for users.
