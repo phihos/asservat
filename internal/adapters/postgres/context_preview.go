@@ -120,6 +120,9 @@ func (s *ContextPreviews) CreateContextPreview(ctx context.Context, p value.Cont
 		if _, err := q.DeleteExpiredContextPreviewFences(ctx, id(s.root)); err != nil {
 			return err
 		}
+		if _, err := q.DeleteExpiredRecordingSelections(ctx, id(s.root)); err != nil {
+			return err
+		}
 		count, err := q.CountContextPreviews(ctx, id(s.root))
 		if err != nil {
 			return err

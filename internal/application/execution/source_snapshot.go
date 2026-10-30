@@ -27,5 +27,11 @@ func snapshotContext(w APIContextWork) (*planning.SourceSnapshotContext, error) 
 	if origin := e.Lifecycle.Origin; origin != nil && (origin.PolicyUID != b.PolicyUID || origin.PolicyExecutionDigest != artifact.Digest(b.Scope)) {
 		return nil, value.ErrConflict
 	}
-	return &planning.SourceSnapshotContext{Request: *e.Snapshot, ActionID: e.ActionID, PolicyUID: b.PolicyUID, TriggerKind: e.Lifecycle.TriggerKind, ExecutionDigest: artifact.Digest(b.Scope), RecipeDigest: e.RecipeDigest, SourceAudience: w.SourceAudience, SourceAudienceDigest: artifact.Digest(b.AudienceDigest), SourceTarget: w.SourceTarget}, nil
+	var manualScope []byte
+	var definitionDigest artifact.Digest
+	if e.Lifecycle.TriggerKind == "recordingSave" && e.SourceSnapshotManifest != nil {
+		definitionDigest = artifact.Digest(b.ExpectationDigest)
+		manualScope = append([]byte(nil), e.SourceSnapshotManifest.CanonicalScope...)
+	}
+	return &planning.SourceSnapshotContext{RecordingSaveScope: manualScope, SourceDefinitionDigest: definitionDigest, Request: *e.Snapshot, ActionID: e.ActionID, PolicyUID: b.PolicyUID, TriggerKind: e.Lifecycle.TriggerKind, ExecutionDigest: artifact.Digest(b.Scope), RecipeDigest: e.RecipeDigest, SourceAudience: w.SourceAudience, SourceAudienceDigest: artifact.Digest(b.AudienceDigest), SourceTarget: w.SourceTarget}, nil
 }

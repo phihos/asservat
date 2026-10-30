@@ -82,7 +82,7 @@ func (s ContextProgressService) Get(ctx context.Context, source identities.Curre
 		return zero, value.ErrUnavailable
 	}
 	until := identity.Earlier(identity.Earlier(p.ValidUntil, i.ValidUntil), r.FreshUntil)
-	out := value.ContextProgress{RepeatedFrom: p.RepeatedFrom, HistoryState: p.HistoryState, CaptureID: p.CaptureID, Revision: p.Revision, Phase: p.Phase, ActionPhase: p.ActionPhase, ReasonCode: p.ReasonCode, CreatedAt: p.CreatedAt, Deadline: p.Deadline}
+	out := value.ContextProgress{CanCancel: p.CanCancel, CancellationRequested: p.CancellationRequested, Operation: p.Operation, ActionID: p.ActionID, RepeatedFrom: p.RepeatedFrom, HistoryState: p.HistoryState, CaptureID: p.CaptureID, Revision: p.Revision, Phase: p.Phase, ActionPhase: p.ActionPhase, ReasonCode: p.ReasonCode, CreatedAt: p.CreatedAt, Deadline: p.Deadline}
 	if p.Phase == "Pending" || p.Phase == "Running" || p.Phase == "Finalizing" {
 		out.RetryAfterSeconds = 2
 	}

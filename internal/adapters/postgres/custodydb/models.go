@@ -901,6 +901,12 @@ type ContextCapture struct {
 	SnapshotCoverage          []byte
 	SnapshotCoverageDigest    []byte
 	SnapshotExpectationDigest []byte
+	SnapshotCancelKey         []byte
+	SnapshotCancelActor       []byte
+	SnapshotCancelRequestedAt pgtype.Timestamptz
+	SnapshotCancelJoinedAt    pgtype.Timestamptz
+	SnapshotCancelProof       []byte
+	SnapshotCancelProofDigest []byte
 }
 
 type ContextCaseLocator struct {
@@ -2284,6 +2290,33 @@ type ProcessingRule struct {
 	RetireBy        pgtype.Timestamptz
 	State           string
 	CurrentDecision pgtype.UUID
+}
+
+type RecordingSaveReservation struct {
+	CaptureID       pgtype.UUID
+	RootID          pgtype.UUID
+	PolicyUid       string
+	AcceptanceID    pgtype.UUID
+	GrantID         pgtype.UUID
+	ReservedBytes   int64
+	AcceptedAt      pgtype.Timestamptz
+	ProcessingUntil pgtype.Timestamptz
+}
+
+type RecordingSelectionSet struct {
+	ID             pgtype.UUID
+	RootID         pgtype.UUID
+	ActorKey       []byte
+	PrincipalKey   []byte
+	ClusterID      pgtype.UUID
+	NamespaceUid   string
+	WorkloadUid    string
+	PolicyUid      string
+	AfterSourceID  pgtype.UUID
+	HasMore        bool
+	ReferencesJson []byte
+	CreatedAt      pgtype.Timestamptz
+	ExpiresAt      pgtype.Timestamptz
 }
 
 type RetentionCatchup struct {

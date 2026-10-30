@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -153,5 +154,34 @@ func TestSourceProvenanceMaintenanceMetadataCost(t *testing.T) {
 			}
 			t.Logf("20sources_%drefs DTO_JSON_bytes=%d original_JSON_field_bytes_per_source=%d local20row_decode_hash_wall=%s; DTO serialization/local timing only, not actual PG wire/runtime overhead. SQL row bound112KiB x1025 safety rows=117555200bytes maximum record data per list; no new query/cache", refs, len(raw), len(row.BindingJson)+len(row.SourceAudienceJson)+len(row.SourceTargetJson), time.Since(start))
 		})
+	}
+}
+
+func TestManualSourceDefinitionDigestUsesOriginalRecorderDefinition(t *testing.T) {
+	row, selected := sourceProvenanceTestRow(t, 2)
+	source, err := policySourceState(row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected.TriggerKind = "recordingSave"
+	selected.SourceDefinitionDigest = artifact.Digest(source.Binding.ExpectationDigest)
+	if selected.SourceDefinitionDigest == selected.Request.SourceBindingDigest {
+		t.Fatal("fixture must distinguish recorder definition from session binding")
+	}
+	if err := sourceSnapshotProvenance(source, selected); err != nil {
+		t.Fatal("original recorder definition refused", err)
+	}
+	selected.SourceDefinitionDigest = selected.Request.SourceBindingDigest
+	if sourceSnapshotProvenance(source, selected) == nil {
+		t.Fatal("session binding mislabeled as recorder definition")
+	}
+	selected.TriggerKind = "policy"
+	selected.SourceDefinitionDigest = artifact.Digest{}
+	if err := sourceSnapshotProvenance(source, selected); err != nil {
+		t.Fatal("automatic snapshot contract changed", err)
+	}
+	raw, err := json.Marshal(selected)
+	if err != nil || bytes.Contains(raw, []byte("SourceDefinitionDigest")) {
+		t.Fatal("manual-only field changed automatic JSON", string(raw), err)
 	}
 }

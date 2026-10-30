@@ -135,6 +135,16 @@ type ContextPreview struct {
 	SelectionUntil                                         time.Time `json:",omitzero"`
 }
 
+// Executor is distinct from the immutable initiating principal of a manual
+// existing-recording save. This routing identity is reauthorized at every
+// effect; deriving it here cannot transfer source authority to the initiator.
+func (p ContextPreview) Executor() identity.Principal {
+	if s := p.Intent.Snapshot; s != nil && s.TriggerKind == "recordingSave" {
+		return authorization.PolicyPrincipal(p.InstallationID, s.PolicyUID)
+	}
+	return p.Actor
+}
+
 func previewTime(t time.Time) bool {
 	return !t.IsZero() && t.Year() >= 2020 && t.Year() <= 9999 && t.Nanosecond()%1000 == 0
 }

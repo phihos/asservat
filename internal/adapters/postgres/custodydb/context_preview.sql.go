@@ -58,6 +58,8 @@ const countContextPreviews = `-- name: CountContextPreviews :one
 SELECT count(*) FROM (
  SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND context_preview_read_until(p.root_id,p.id)>clock_timestamp()
  UNION ALL
+ SELECT r.id FROM recording_selection_set AS r WHERE r.root_id=$1 AND r.expires_at>clock_timestamp()
+ UNION ALL
  SELECT f.preview_id FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.expires_at>clock_timestamp()
  LIMIT 1000
 ) AS bounded
@@ -73,6 +75,8 @@ func (q *Queries) CountContextPreviews(ctx context.Context, rootID pgtype.UUID) 
 const countPrincipalContextPreviews = `-- name: CountPrincipalContextPreviews :one
 SELECT count(*) FROM (
  SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND p.principal_key=$2 AND context_preview_read_until(p.root_id,p.id)>clock_timestamp()
+ UNION ALL
+ SELECT r.id FROM recording_selection_set AS r WHERE r.root_id=$1 AND r.principal_key=$2 AND r.expires_at>clock_timestamp()
  UNION ALL
  SELECT f.preview_id FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.principal_key=$2 AND f.expires_at>clock_timestamp()
  LIMIT 10

@@ -79,7 +79,7 @@ func (s publicSigners) SignSourceWork(ctx context.Context, w fleetapp.SourceWork
 	if signer == nil {
 		return nil, fleet.ErrUnavailable
 	}
-	if !w.Stop && w.Target.Request.ClusterID != w.Channel.Connector.Binding.ClusterID {
+	if !w.Stop && w.StopSnapshot == nil && w.Target.Request.ClusterID != w.Channel.Connector.Binding.ClusterID {
 		return nil, fleet.ErrUnavailable
 	}
 	return signer.SignSourceWork(ctx, w)
@@ -88,6 +88,8 @@ func (s publicSigners) SignSourceWork(ctx context.Context, w fleetapp.SourceWork
 // publicContext holds the ADR-180 P3 services: the investigation, its audit
 // intents, the hub-run regional start, progress and cases.
 type publicContext struct {
+	recordings    *captureapp.RecordingSaves
+	cancellations *captureapp.CaptureCancellation
 	history       *captureapp.HistoryParameterService
 	investigation captureapp.ContextInvestigation
 	intents       auditapp.CaptureOperationPublication
@@ -421,6 +423,12 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.collect = RegionalRecordingCollect{Runner: executionapp.APIContextRunner{Record: executionSQL, Capabilities: capabilities, Recovery: out.recovery, Now: time.Now}, Recordings: executionSQL, Signer: signers, Router: router, Now: time.Now, Report: eventLog(os.Stderr, "recording collect refused")}
 	// ADR-248: node recorder availability is a regional pre-work query.
 	out.investigation.Recorders = queries
+	// Passive existing-source services reuse current protected ports. The trusted
+	// acquisition gate remains false until installed source/clock qualification.
+	recordingPolicies := captureapp.CurrentRecordingPolicies{Documents: out.hubPolicies, Accepted: out.policies, CompileRecorder: recordingSavePolicyCompiler(out.investigation.Filters), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}
+	out.investigation.RecordingPolicies, out.investigation.PolicyAccepted = recordingPolicies, out.policies
+	out.recordings = &captureapp.RecordingSaves{Targets: queries, Investigation: out.investigation, Inventory: captureapp.RecordingInventory{RootID: root, Permissions: out.permissions, Eligibility: eligibility, Candidates: previews, Policies: recordingPolicies, Selections: previews, Accepted: out.policies, Now: time.Now, NewID: ownerRandomID}}
+	out.cancellations = &captureapp.CaptureCancellation{RootID: root, InstallationID: installation, Ledger: executionSQL, Dispatcher: out.sourceDispatch, Recovery: out.recovery, Now: time.Now}
 
 	progress, err := postgres.NewContextProgressReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {

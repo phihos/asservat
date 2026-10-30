@@ -75,6 +75,12 @@ func TestPublicDownloadSourceRoleReadsReceiptsWithoutEffectPrivileges(t *testing
 func TestPublicContextDraftRolesHaveExactPurposeGrants(t *testing.T) {
 	common := []publicRuntimeGrant{{"schema", "public", "", "USAGE"}, {"table", "goose_db_version", "", "SELECT"}}
 	previews := append(slices.Clone(common),
+		// SQL108: passive source references and shared preview-budget sets.
+		publicRuntimeGrant{"table", "recording_selection_set", "", "SELECT"},
+		publicRuntimeGrant{"table", "recording_selection_set", "", "INSERT"},
+		publicRuntimeGrant{"table", "recording_selection_set", "", "DELETE"},
+		publicRuntimeGrant{"table", "policy_recording_source", "", "SELECT"},
+		publicRuntimeGrant{"table", "policy_source", "", "SELECT"},
 		publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"},
 		publicRuntimeGrant{"table", "permission_stream", "", "SELECT"},
 		publicRuntimeGrant{"table", "context_preview", "", "SELECT"},

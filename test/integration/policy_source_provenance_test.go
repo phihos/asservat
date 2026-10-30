@@ -36,6 +36,18 @@ import (
 // administrator, target, node report and packet observations are synthetic;
 // this neither starts a collector nor establishes installed/native readiness.
 func TestPolicySourceSnapshotWithRealServices(t *testing.T) {
+	qualifySourceSnapshotRealServices(t, false, false)
+}
+
+func TestManualRecordingSaveWithRealServices(t *testing.T) {
+	qualifySourceSnapshotRealServices(t, true, false)
+}
+
+func TestManualRecordingSaveCancellationWithRealServices(t *testing.T) {
+	qualifySourceSnapshotRealServices(t, true, true)
+}
+
+func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation bool) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 		t.Run("empty-provenance-down-up", func(t *testing.T) {
 			provider, closeProvider := source107MigrationProvider(t, admin)
@@ -47,7 +59,11 @@ func TestPolicySourceSnapshotWithRealServices(t *testing.T) {
 				t.Fatal("Up107 empty", err)
 			}
 		})
-		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects)
+		f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
+			if manual {
+				configureManualSourceCapacity(f)
+			}
+		})
 		f.template.Policies[0].SourceResources = &capacity.SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}, Workload: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}
 		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
 			t.Fatal(err)
@@ -69,7 +85,7 @@ func TestPolicySourceSnapshotWithRealServices(t *testing.T) {
 			t.Fatal(err)
 		}
 		seed, intents, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
-		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
+		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
 			source107AddReader(t, ctx, f, "original-source-readers")
 			accepted.Scenario.batch = policyRecorderCloneBatch(f.batch)
@@ -126,7 +142,7 @@ func TestPolicySourceSnapshotWithRealServices(t *testing.T) {
 			}
 			t.Run("full-original-provenance", func(t *testing.T) {
 				rows, err := ledger.ListSources(ctx, accepted.Authority.PolicyUID)
-				if err != nil || len(rows) != 1 || len(rows[0].Audience) != 2 || len(rows[0].Audience) <= len(accepted.Authority.Owners) || rows[0].Target == nil || rows[0].Binding != old.Permit.Binding {
+				if err != nil || len(rows) != 1 || (manual && len(rows[0].Audience) < 3 || !manual && len(rows[0].Audience) != 2) || len(rows[0].Audience) <= len(accepted.Authority.Owners) || rows[0].Target == nil || rows[0].Binding != old.Permit.Binding {
 					t.Fatal("full original audience/target not captured", err)
 				}
 				if rows[0].Target.Request != initial.Target.Request || rows[0].Target.Pin != initial.Target.Pin {
@@ -164,8 +180,16 @@ func TestPolicySourceSnapshotWithRealServices(t *testing.T) {
 				t.Fatal("quiet renewal replaced original provenance", err)
 			}
 			originalRows, err := ledger.ListSources(ctx, accepted.Authority.PolicyUID)
-			if err != nil || len(originalRows) != 1 || len(originalRows[0].Audience) != 2 {
+			if err != nil || len(originalRows) != 1 || (manual && len(originalRows[0].Audience) < 3 || !manual && len(originalRows[0].Audience) != 2) {
 				t.Fatal("new readers adopted old source", err)
+			}
+			if manual {
+				if cancellation {
+					qualifyManualRecordingSaveCancellation(t, ctx, f, seed.s, accepted, renewal, fresh(t), intents)
+				} else {
+					qualifyManualRecordingSave(t, ctx, f, seed.s, accepted, renewal, fresh(t), intents)
+				}
+				return
 			}
 			snapshotCheck := fresh(t)
 			snapshot := admitPolicySourceSnapshotFixture(t, ctx, f.roles["hub-runtime"], seed.s, accepted, renewal, snapshotCheck, 64<<10, func(t *testing.T, a value.Admission, p value.ContextPreview) {

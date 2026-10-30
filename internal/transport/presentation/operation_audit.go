@@ -556,7 +556,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 }
 func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationReply, callErr error, effectPossible bool) (audit.OperationOutcome, error) {
 	out := audit.OperationOutcome{Intent: in, Status: "unavailable", Reason: "authority_unavailable", Effect: "none", ClientReceipt: "unknown", MetadataUntil: in.RequestUntil, RecordedAt: s.config.Now().UTC().Truncate(time.Microsecond)}
-	if effectPossible && (in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" || in.Name == "decide_review" || in.Name == "revoke_grant" || in.Name == "request_policy_grant" || queryOperation(in.Name)) {
+	if effectPossible && (in.Name == "cancel_capture" || in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" || in.Name == "decide_review" || in.Name == "revoke_grant" || in.Name == "request_policy_grant" || queryOperation(in.Name)) {
 		out.Effect = "unknown"
 	}
 	if queryOperation(in.Name) {
@@ -619,20 +619,27 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			out.Status = "success"
 			out.Reason = "prepared"
 			var refs struct {
-				CaptureID  string             `json:"capture_id"`
-				ArtifactID string             `json:"artifact_id"`
-				Acceptance string             `json:"acceptance_id"`
-				GrantID    string             `json:"grant_id"`
-				DownloadID string             `json:"download_id"`
-				CaseID     string             `json:"case_id"`
-				State      string             `json:"state"`
-				Case       ContextCaseSummary `json:"case"`
-				Artifacts  []struct {
+				CancellationRequested bool               `json:"cancellation_requested"`
+				CaptureID             string             `json:"capture_id"`
+				ArtifactID            string             `json:"artifact_id"`
+				Acceptance            string             `json:"acceptance_id"`
+				GrantID               string             `json:"grant_id"`
+				DownloadID            string             `json:"download_id"`
+				CaseID                string             `json:"case_id"`
+				State                 string             `json:"state"`
+				Case                  ContextCaseSummary `json:"case"`
+				Artifacts             []struct {
 					ID string `json:"artifact_id"`
 				} `json:"artifacts"`
 			}
 			if json.Unmarshal(envelope.Data, &refs) != nil {
 				return out, auditapp.ErrUnavailable
+			}
+			if in.Name == "cancel_capture" {
+				out.Effect = "none"
+				if refs.CancellationRequested {
+					out.Effect = "accepted"
+				}
 			}
 			if refs.CaptureID != "" {
 				out.CaptureIDs = []string{refs.CaptureID}

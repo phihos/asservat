@@ -91,7 +91,7 @@ func findContextRequest(ctx context.Context, q *custodydb.Queries, in value.Repl
 		if e != nil {
 			return zero, false, e
 		}
-		if scope.Actor == in.Identity.Principal {
+		if scope.RequestingPrincipal() == in.Identity.Principal {
 			return row, true, nil
 		}
 	} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -195,7 +195,7 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 			if err != nil {
 				return err
 			}
-			if scope.Actor != in.Identity.Principal {
+			if scope.RequestingPrincipal() != in.Identity.Principal {
 				return value.ErrDenied
 			}
 			if err = authorize(scope.Target); err != nil {

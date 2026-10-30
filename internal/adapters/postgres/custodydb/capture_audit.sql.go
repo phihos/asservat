@@ -152,7 +152,7 @@ func (q *Queries) ReadCaptureOperation(ctx context.Context, arg ReadCaptureOpera
 }
 
 const readCaptureOperationIntent = `-- name: ReadCaptureOperationIntent :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at,NULL::bytea AS snapshot_coverage,NULL::bytea AS snapshot_coverage_digest,NULL::bytea AS snapshot_expectation_digest FROM capture_operation_intents WHERE root_id=$1 AND id=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at,NULL::bytea AS snapshot_coverage,NULL::bytea AS snapshot_coverage_digest,NULL::bytea AS snapshot_expectation_digest,NULL::bytea AS snapshot_cancel_key,NULL::bytea AS snapshot_cancel_actor,NULL::timestamptz AS snapshot_cancel_requested_at,NULL::timestamptz AS snapshot_cancel_joined_at,NULL::bytea AS snapshot_cancel_proof,NULL::bytea AS snapshot_cancel_proof_digest FROM capture_operation_intents WHERE root_id=$1 AND id=$2
 `
 
 type ReadCaptureOperationIntentParams struct {
@@ -200,6 +200,12 @@ type ReadCaptureOperationIntentRow struct {
 	SnapshotCoverage          []byte
 	SnapshotCoverageDigest    []byte
 	SnapshotExpectationDigest []byte
+	SnapshotCancelKey         []byte
+	SnapshotCancelActor       []byte
+	SnapshotCancelRequestedAt pgtype.Timestamptz
+	SnapshotCancelJoinedAt    pgtype.Timestamptz
+	SnapshotCancelProof       []byte
+	SnapshotCancelProofDigest []byte
 }
 
 // Original intent view deliberately excludes later completion observations.
@@ -246,6 +252,12 @@ func (q *Queries) ReadCaptureOperationIntent(ctx context.Context, arg ReadCaptur
 		&i.SnapshotCoverage,
 		&i.SnapshotCoverageDigest,
 		&i.SnapshotExpectationDigest,
+		&i.SnapshotCancelKey,
+		&i.SnapshotCancelActor,
+		&i.SnapshotCancelRequestedAt,
+		&i.SnapshotCancelJoinedAt,
+		&i.SnapshotCancelProof,
+		&i.SnapshotCancelProofDigest,
 	)
 	return i, err
 }

@@ -59,6 +59,26 @@ one-Pod incident backend is not qualification of the accepted larger grouped
 Save contract. These foundations do not complete S-04 or the platform goal.
 
 
+[ADR-265](decisions/265-manual-existing-recording-saves.md) records the manual
+SQL108 continuation. Local core app/adapters pass six-package race checks;
+Go presentation/contracts/browser/MCP affected races pass. Console TypeScript,
+canonical validators and 251 tests pass, as do the build and the two existing
+HTTPS browser journeys. Those browser journeys cover existing flows; the new
+manual UI has component/generated HTTP-client coverage, not installed SQL108
+workflow qualification. The 101-source inventory failure has a RED→GREEN
+regression, with server-side policy filtering, bounded keyset continuation and
+exact later-page source lookup. Empty-workload discovery likewise has an
+actual failing live-Pod dependency regression and passing metadata-only tests.
+
+The genuine manual SQL outer now compiles with reviewed opt-in/recurring sharing
+established before policy acceptance, current ordinary initiator and original
+policy authority, and no detector Tick. Provider execution, migration/role
+qualification, shared spend/replay, cancellation joins and exact native output
+remain pending. Production `RecordingSaveEnabled` remains false, including the
+direct request/continuation path. Grouped saves, syscall sources, protected reason
+production and native source/clock qualification remain accepted unfinished work.
+
+
 ## Ordinary ongoing source ledger: SQL component qualified (2026-10-30)
 
 The owned PostgreSQL/S3/OpenBao run on frozen `e8f26396` passed the selected

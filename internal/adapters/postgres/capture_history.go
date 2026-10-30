@@ -108,13 +108,13 @@ func (s *ContextProgressReads) ListCaptureHistory(ctx context.Context, q value.H
 			// the row's own Pod differs from the currently resolved one.
 			p := projection
 			p.Target = t
-			e := authorization.CaptureHistoryEligibility(q.Identity, p, t, intent.Actor, accepted.Expectation.Audience, n.Time)
+			e := authorization.CaptureHistoryEligibility(q.Identity, p, t, intent.Requester(), accepted.Expectation.Audience, n.Time)
 			if !e.Eligible {
 				continue
 			}
 			until = identity.Earlier(until, e.ValidUntil)
 			visible = append(visible, c)
-			actors[c.ID] = intent.Actor
+			actors[c.ID] = intent.Requester()
 			if len(visible) == q.Limit {
 				break
 			}
@@ -211,6 +211,10 @@ func historyEntries(ctx context.Context, tx *custodydb.Queries, root string, vis
 		}
 		accepted.CreatedAt = accepted.CreatedAt.UTC()
 		entry := value.HistoryEntry{Requester: actors[c.ID], CaptureID: uid(c.ID), Origin: value.HistoryOrigin(c.HistoryOrigin.String), AcceptedAt: accepted.CreatedAt, ExpiresAt: accepted.CreatedAt.Add(value.HistoryLifetime), Phase: p.Phase, EvidenceState: value.HistoryEvidenceState(p.Phase, f.EffectiveExpiresAt.Time, now), ActionKinds: []string{accepted.Expectation.Type().EvidenceType}, RepeatState: "available", SettingsExpiresAt: accepted.CreatedAt.Add(value.HistoryLifetime)}
+		entry.Operation = "collect"
+		if e := accepted.Expectation; e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" {
+			entry.Operation = "recordingSave"
+		}
 		// Native evidence types differ from recipe action kinds.
 		entry.ActionKinds = historyActionKinds(accepted.Expectation)
 		if c.HistoryParametersRequired {
@@ -223,7 +227,7 @@ func historyEntries(ctx context.Context, tx *custodydb.Queries, root string, vis
 				entry.RepeatState = "parametersExpired"
 			} else if f.HistoryParametersState.String != "available" || f.HistoryCustodyState.String != artifact.StoredUnpublished {
 				entry.RepeatState = "parametersUnavailable"
-			} else if entry.Origin == value.HistoryPolicy {
+			} else if entry.Origin == value.HistoryPolicy || entry.Operation == "recordingSave" {
 				entry.RepeatState = "requiresSelection"
 			}
 		}
@@ -313,7 +317,7 @@ func (s *ContextProgressReads) ReadCaptureSettings(ctx context.Context, q value.
 		if err != nil {
 			return err
 		}
-		e := authorization.CaptureHistoryEligibility(q.Identity, projection, intent.Target, intent.Actor, accepted.Expectation.Audience, n.Time)
+		e := authorization.CaptureHistoryEligibility(q.Identity, projection, intent.Target, intent.Requester(), accepted.Expectation.Audience, n.Time)
 		if !e.Eligible {
 			return value.ErrDenied
 		}

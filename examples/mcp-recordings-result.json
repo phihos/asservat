@@ -45,7 +45,9 @@
               "id": "team-payments"
             }
           ]
-        }
+        },
+        "history": "Full",
+        "incident_pod_cap": 1
       },
       {
         "recording_handle": "recording-synthetic-syscalls",
@@ -86,9 +88,13 @@
               "id": "team-payments"
             }
           ]
-        }
+        },
+        "history": "Full",
+        "incident_pod_cap": 1
       }
-    ]
+    ],
+    "capture_enabled": false,
+    "expires_at": "2026-10-09T12:01:00Z"
   },
   "truncated": false,
   "next_cursor": null,

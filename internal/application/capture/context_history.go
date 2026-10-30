@@ -196,6 +196,9 @@ func (s ContextHistoryService) PreviewEditedRepeat(ctx context.Context, source i
 	if err != nil {
 		return ContextPreviewResult{}, value.CaptureSettings{}, err
 	}
+	if settings.RecordingSave != nil {
+		return ContextPreviewResult{}, settings, value.ErrRecordingSelectionRequired
+	}
 	originalTarget := targets.WorkloadRequest{ClusterID: settings.ClusterID, Namespace: settings.Namespace, Kind: settings.WorkloadKind, Name: settings.WorkloadName}
 	if edits.Target != nil && *edits.Target != originalTarget {
 		return ContextPreviewResult{}, value.CaptureSettings{}, value.ErrInvalid

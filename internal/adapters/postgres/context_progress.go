@@ -58,6 +58,10 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		return out, value.ErrUnavailable
 	}
 	out = value.ContextProgressObservation{CaptureID: accepted.CaptureID, CandidateCaseID: accepted.Expectation.CaseID, CandidateArtifactID: accepted.Expectation.Registration.Location.ArtifactID, Target: intent.Target, Revision: c.ProgressRevision, CreatedAt: accepted.CreatedAt, Deadline: accepted.Deadline, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "IntentAuditPending"}
+	out.Operation, out.ActionID = "collect", accepted.Expectation.ActionID
+	if e := accepted.Expectation; e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" {
+		out.Operation = "recordingSave"
+	}
 	if out.ShareID, err = captureShareID(c.ShareInstruction); err != nil {
 		return out, err
 	}
@@ -68,6 +72,12 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		}
 		out.ReasonCode = "DispatchUnconfirmed"
 	}
+	out.CancellationRequested = c.SnapshotCancelRequestedAt.Valid
+	if c.SnapshotCancelJoinedAt.Valid {
+		out.Phase, out.ActionPhase, out.ReasonCode = "Cancelled", "Cancelled", "CancellationJoined"
+		return out, nil
+	}
+	out.CanCancel = accepted.Expectation.Snapshot != nil && !out.CancellationRequested && !f.CatalogArtifactID.Valid && (len(executions) == 0 || executions[0].Phase == "prepared" || executions[0].Phase == "started")
 	verified := f.VerifiedCaptureID.Valid
 	if verified {
 		v := custodydb.ContextVerification{CaptureID: f.VerifiedCaptureID, RootID: f.VerifiedRootID, VerifiedAt: f.VerifiedAt, ExpectationDigest: f.ExpectationDigest, CopiesDigest: f.VerifiedCopiesDigest, IntentDigest: f.VerifiedIntentDigest, AuthorityDigest: f.AuthorityDigest, PermissionEpoch: f.PermissionEpoch, PermissionSequence: f.PermissionSequence.Int64}
@@ -122,6 +132,9 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 			out.Phase = "Indeterminate"
 			out.ActionPhase = "Indeterminate"
 			out.ReasonCode = "StorageOutcomeUnconfirmed"
+			return out, nil
+		case "cancelled":
+			out.Phase, out.ActionPhase, out.ReasonCode = "Cancelled", "Cancelled", "CancellationJoined"
 			return out, nil
 		case "stored":
 			out.Phase = "Finalizing"
@@ -200,7 +213,7 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 		if err != nil {
 			return err
 		}
-		eligible := authorization.CaptureProgressEligibility(request.Identity, projection, intent.Target, intent.Actor, n.Time)
+		eligible := authorization.CaptureProgressEligibility(request.Identity, projection, intent.Target, intent.Requester(), n.Time)
 		if !eligible.Eligible {
 			return value.ErrDenied
 		}
@@ -235,7 +248,7 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 			if e != nil {
 				return e
 			}
-			historical := authorization.CaptureHistoryEligibility(request.Identity, projection, intent.Target, intent.Actor, accepted.Expectation.Audience, n.Time)
+			historical := authorization.CaptureHistoryEligibility(request.Identity, projection, intent.Target, intent.Requester(), accepted.Expectation.Audience, n.Time)
 			if historical.Eligible {
 				out.RepeatedFrom = &value.HistoryLineage{CaptureID: uid(c.RepeatedFromCaptureID), ExpiresAt: c.RepeatedFromExpiresAt.Time}
 			}

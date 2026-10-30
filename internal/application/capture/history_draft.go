@@ -20,6 +20,22 @@ func HistoryDraftFromPreview(p value.ContextPreview, a value.Accepted) (value.Hi
 	if p.Intent.Target.Kind == "Pod" {
 		out.ExplicitPodUID = p.Target.PodUID
 	}
+	if saved := p.Intent.Snapshot; saved != nil && saved.TriggerKind == "recordingSave" {
+		out.RecordingSave = &value.RecordingSaveSettings{PolicyUID: saved.PolicyUID, PolicyExecutionDigest: saved.ExecutionDigest, Windows: []value.RecordingSavePreference{{ActionID: saved.ActionID, Before: saved.Request.Before}}}
+		out.Selection = "recordingSelectionRequired"
+		out.SelectorIdentity = &value.HistorySelector{ClusterID: p.Target.ClusterID, NamespaceUID: p.Target.Namespace.UID, WorkloadKind: p.Target.Workload.Kind, WorkloadUID: p.Target.Workload.UID}
+		api := "apps/v1"
+		if p.Intent.Target.Kind == "Pod" {
+			api = "v1"
+		}
+		out.AuthoredTargetJSON, _ = json.Marshal(map[string]any{"namespace": p.Intent.Target.Namespace, "workloadRef": map[string]string{"apiVersion": api, "kind": p.Intent.Target.Kind, "name": p.Intent.Target.Name, "uid": p.Target.Workload.UID}, "maxPods": 1, "selection": "allWithinLimit", "adoption": "pinUID"})
+		encoded, err := value.CanonicalHistoryParameters(out)
+		clear(encoded)
+		if err != nil {
+			return value.HistoryParameters{}, err
+		}
+		return out, nil
+	}
 	var scope struct {
 		Filters    json.RawMessage `json:"filters"`
 		Collection struct {

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant"]
+NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant"]
 
 RECORDER_EDITS = ["packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode"]
 
@@ -42,7 +42,7 @@ def history_subset(name, tool):
                                       "at most limit entries (default 20, maximum 100) and next_cursor for more. A recreated workload starts a new history. "
                                       "Repeat one with preview_capture history_capture_id. No evidence or settings are read.")
     else:
-        success["properties"]["data"] = {"$ref": PREFIX + "capture-history.schema.json#/$defs/record"}
+        success["properties"]["data"] = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"][0]["properties"]["data"])
         description["description"] = ("Read the repeatable settings of one visible capture-history entry: its authored target, recipe, dependency pins and requested retention. "
                                        "No reason, recipients, grants, credentials or old pod selection. Repeat it with preview_capture history_capture_id.")
     return description, [success, error]
@@ -200,7 +200,7 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name in ("activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant"):
+        if name in ("cancel_capture", "list_recordings", "preview_recording_save", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant"):
             # ADR-228: the runtime implements the whole canonical contract.
             # ADR-232: the share tools implement a bounded subset.
             # ADR-234: explain_access implements the whole canonical contract.
@@ -211,6 +211,17 @@ def main():
             description = copy.deepcopy(tool)
             description.pop("enabledByDefault", None)
             branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
+            if name == "preview_recording_save":
+                # No protected free-text reason producer is installed. Preserve
+                # only the same concrete capture-time sharing subset as capture.
+                description["inputSchema"]["properties"].pop("reason")
+                sharing = copy.deepcopy(documents["sharing-request.schema.json"]["$defs"]["capture"])
+                for k in ("outputSelection", "maxArtifactsPerCapture", "reason", "management"):
+                    sharing["properties"].pop(k)
+                sharing["properties"]["recipients"]["maxItems"] = 8
+                description["inputSchema"]["properties"]["sharing"] = sharing
+            if name in ("cancel_capture", "list_recordings", "preview_recording_save"):
+                branches = [b for b in branches if b["properties"]["status"].get("const") != "pending"]
             if name in ("create_share", "list_shares", "revoke_share", "transfer_share"):
                 description, branches = share_subset(name, tool)
             if name in ("list_capture_history", "get_capture_settings"):
@@ -227,7 +238,7 @@ def main():
                 output["properties"]["next_cursor"] = {"type": "null"}
             output["properties"]["narrowing_hint"] = {"type": "null"}
             output["properties"]["data_class"] = {"const": "metadata"}
-            if name == "list_capture_history":
+            if name in ("list_capture_history", "list_recordings"):
                 output["properties"]["next_cursor"] = copy.deepcopy(common["properties"]["next_cursor"])  # a cursor or null
             if name == "get_capture_settings":
                 output["properties"]["data_class"] = {"enum": ["metadata", "extract"]}  # extract on success
@@ -291,7 +302,7 @@ def main():
         output_keys = {
             "list_diagnostics": ["diagnostics"],
             "preview_capture": ["preview_id", "expires_at", "execution_digest", "pod_count", "max_bytes", "max_process_starts", "approval_required", "capture_enabled", "blockers", "warnings", "navigation_uri", "lifecycle_plan", "capture_assessment", "preset_ref", "target_ref", "selected_pods", "pod_selection"],
-            "request_capture": ["capture_id", "phase", "navigation_uri", "operation", "repeated_from_capture_id", "history_state"],
+            "request_capture": ["capture_id", "phase", "navigation_uri", "operation", "repeated_from_capture_id", "history_state", "cancellation_requested"],
             "resolve_capture_request": None,
             "get_capture": ["capture_id", "revision", "phase", "actions", "case_id", "navigation_uri", "retry_after_seconds", "can_cancel", "blockers", "operation", "sharing", "repeated_from_capture_id", "history_state"],
             "get_case": ["case", "artifacts", "timeline"],

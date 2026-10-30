@@ -9,6 +9,7 @@ import (
 	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
@@ -85,6 +86,12 @@ type ContextReasonReader interface {
 // ContextInvestigation is the shared browser/MCP use case for the exact bounded
 // pod-status diagnostic. It does not dispatch work or publish/read evidence.
 type ContextInvestigation struct {
+	// RecordingSaveEnabled is trusted composition after installed qualification.
+	// Passive previews and accepted metadata replay do not enable acquisition.
+	RecordingSaveEnabled bool
+	// Manual existing-source composition only; nil leaves that route unavailable.
+	RecordingPolicies      RecordingPolicies
+	PolicyAccepted         authapp.AcceptedPolicyReader
 	RootID, InstallationID string
 	Previews               ContextPreviewStore
 	Replay                 ContextAdmissionReplay
@@ -124,6 +131,7 @@ type ContextInvestigation struct {
 // ContextPreviewResult includes a transient assessment of the same reviewed
 // plan. Only Preview is persisted; assessment freshness never becomes authority.
 type ContextPreviewResult struct {
+	RecordingSave                          *RecordingSavePreviewMetadata
 	CollectorImageDigest, ProjectionDigest artifact.Digest
 	Recorder                               *RecorderPreviewResult
 	Preview                                value.ContextPreview
@@ -329,7 +337,7 @@ func retentionReview(r privacy.Resolution) value.ContextRetentionReview {
 }
 
 func (s ContextInvestigation) plan(p value.ContextPreview, f contextFacts) (planning.ContextPlan, error) {
-	return compiler.CompileContext(planning.ContextInput{CaptureID: p.CaptureID, CaseID: p.CaseID, Executor: p.Actor, Deadline: p.Deadline, Target: f.target, Retention: f.retention, Capability: f.capability, Snapshot: p.Intent.Snapshot, SnapshotSource: f.snapshotSource}, s.Now())
+	return compiler.CompileContext(planning.ContextInput{CaptureID: p.CaptureID, CaseID: p.CaseID, Executor: p.Executor(), Deadline: p.Deadline, Target: f.target, Retention: f.retention, Capability: f.capability, Snapshot: p.Intent.Snapshot, SnapshotSource: f.snapshotSource}, s.Now())
 }
 
 // Preview observes authorized metadata and writes only a bounded draft. It does
@@ -507,6 +515,13 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if !ValidContextPreview(p) || p.ID != previewID || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.Actor != i.Principal {
 		return zero, value.ErrDenied
 	}
+	if p.Intent.Snapshot != nil && p.Intent.Snapshot.TriggerKind == "recordingSave" && !s.RecordingSaveEnabled {
+		return zero, value.ErrUnavailable
+	}
+	executionSource, manualSave, err := s.manualSaveRequest(ctx, source, p)
+	if err != nil {
+		return zero, err
+	}
 	var storageWait *contextStorageWait
 	defer func() {
 		if storageWait != nil {
@@ -621,6 +636,18 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	}
 	anchor := s.Now().UTC().Truncate(time.Microsecond)
 	if saved := p.Intent.Snapshot; saved != nil {
+		if manualSave != nil {
+			timeout, scopeErr := compiler.RecordingSaveFinalizeTimeout(p.CanonicalScope, p.ScopeDigest)
+			if scopeErr != nil {
+				return zero, scopeErr
+			}
+			saved.Request.T0 = anchor
+			p.Deadline = identity.Earlier(anchor.Add(timeout), manualSave.Authority.NotAfter).UTC()
+			if p.Intent.RepeatedFrom != nil {
+				p.Deadline = identity.Earlier(p.Deadline, p.Intent.RepeatedFrom.ExpiresAt)
+			}
+			saved.Request.ProcessingUntil = p.Deadline
+		}
 		saved.Request.IssuedAt = anchor
 		saved.Request.StartBy = identity.Earlier(anchor.Add(5*time.Second), identity.Earlier(saved.Request.SourceHardUntil, saved.Request.ProcessingUntil.Add(-time.Microsecond)))
 		if d, ok := ctx.Deadline(); ok {
@@ -632,13 +659,18 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if snapshotObserved != nil {
 		snapshotFacts = append(snapshotFacts, *snapshotObserved)
 	}
-	f, err := s.factsWithStorageWait(ctx, source, i.Principal, p.Intent, target, anchor, storageWait, snapshotFacts...)
+	f, err := s.factsWithStorageWait(ctx, executionSource, p.Executor(), p.Intent, target, anchor, storageWait, snapshotFacts...)
 	if err != nil {
 		var changed contextStorageSelectionChange
 		if errors.As(err, &changed) {
 			return zero, s.requestChanged("storage")
 		}
 		return zero, err
+	}
+	if manualSave != nil {
+		p.Deadline = identity.Earlier(p.Deadline, f.retention.ExpiresAt).UTC()
+		p.Intent.Snapshot.Request.ProcessingUntil = p.Deadline
+		p.Intent.Snapshot.Request.StartBy = identity.Earlier(p.Intent.Snapshot.Request.StartBy, p.Deadline.Add(-time.Microsecond)).UTC()
 	}
 	processingStarted := time.Now()
 	coverage, err := s.processingCoverage(ctx, p, f, recovery, i.ValidUntil)
@@ -695,7 +727,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 			return zero, value.ErrAcquisitionClosed
 		}
 	}
-	final := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
+	final := s.Eligibility.ContextEligibilityCurrent(ctx, executionSource, target.Target())
 	final.DefaultAudience, err = SnapshotAudience(p.Intent.Snapshot, final.DefaultAudience)
 	if err != nil {
 		return zero, err
@@ -709,7 +741,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 		stage  string
 	}{
 		{!final.Eligible, "eligibility/denied"},
-		{final.Target != target.Target() || final.Principal != p.Actor || final.VerifiedIdentity.Principal != p.Actor, "eligibility/subject"},
+		{final.Target != target.Target() || final.Principal != p.Executor() || final.VerifiedIdentity.Principal != p.Executor(), "eligibility/subject"},
 		{!final.VerifiedIdentity.Valid(now), "eligibility/identity"},
 		{!slices.Equal(final.DefaultAudience, p.Audience), "eligibility/audience"},
 		{!now.Before(final.ValidUntil), "eligibility/expired"},
@@ -723,11 +755,27 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 			return zero, s.requestChanged(c.stage)
 		}
 	}
+	if manualSave != nil {
+		currentInitiator := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
+		if !currentInitiator.Eligible || currentInitiator.Principal != p.Actor || !currentInitiator.VerifiedIdentity.Valid(s.Now()) {
+			return zero, value.ErrDenied
+		}
+		currentInitiator.ValidUntil = identity.Earlier(currentInitiator.ValidUntil, manualSave.Initiator.ValidUntil)
+		manualSave.Initiator = currentInitiator
+	}
 	admitStarted := time.Now()
-	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{RepeatedFrom: p.Intent.RepeatedFrom, Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
+	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{RecordingSave: manualSave, RepeatedFrom: p.Intent.RepeatedFrom, Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
 	auditapp.MarkStep(ctx, "q-admit", admitStarted)
 	if err != nil {
 		return zero, err
+	}
+	if manualSave != nil && !a.Replay {
+		acceptedPlan, acceptedRegistration, reanchorErr := compiler.ReanchorRecordingSave(plan, r, a.CreatedAt, manualSaveProcessingBound(manualSave.Authority.NotAfter, p.Intent.RepeatedFrom))
+		if reanchorErr != nil || a.Expectation.Snapshot == nil || !a.Expectation.Snapshot.Equal(acceptedPlan.Input.Snapshot.Request) {
+			return zero, value.ErrUnavailable
+		}
+		p.Deadline, p.Intent.Snapshot = acceptedPlan.Input.Deadline, acceptedPlan.Input.Snapshot
+		r = acceptedRegistration
 	}
 	if !acceptedContext(a, digest) || a.CaptureID != p.CaptureID || a.ScopeDigest != p.ScopeDigest || a.Pin != p.Pin || a.Expectation.ExecutionClass != p.ExecutionClass || a.Expectation.CaseID != p.CaseID || a.Expectation.OccurrenceID != p.OccurrenceID || a.Expectation.Registration.Location != r.Location || a.Expectation.Registration.StoreID != r.StoreID || a.Expectation.Registration.AllocationID != r.AllocationID || a.Expectation.Registration.PoolRevision != r.PoolRevision || a.Expectation.Registration.AllocationRevision != r.AllocationRevision || a.Expectation.Registration.NativeLimit != r.NativeLimit || !a.Deadline.Equal(p.Deadline) {
 		return zero, value.ErrUnavailable

@@ -94,6 +94,7 @@ await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture',
 await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
 await operationBundle(['get_file_excerpt', 'get_query_result'], 'projection');
 await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');
+await operationBundle(['list_recordings', 'preview_recording_save'], 'recordings');
 await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_share', 'stop_future_sharing'], 'sharing');
 await operationBundle(['explain_access'], 'access');
 await operationBundle(['preview_access_change'], 'access-preview');
@@ -124,6 +125,7 @@ outputs['validate-capture.js'] = browserModules(outputs['validate-capture.js']);
 outputs['validate-evidence.js'] = browserModules(outputs['validate-evidence.js']);
 outputs['validate-projection.js'] = browserModules(outputs['validate-projection.js']);
 outputs['validate-policy.js'] = browserModules(outputs['validate-policy.js']);
+outputs['validate-recordings.js'] = browserModules(outputs['validate-recordings.js']);
 outputs['validate-sharing.js'] = browserModules(outputs['validate-sharing.js']);
 outputs['validate-access.js'] = browserModules(outputs['validate-access.js']);
 outputs['validate-access-preview.js'] = browserModules(outputs['validate-access-preview.js']);

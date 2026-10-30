@@ -50,6 +50,11 @@ type ContextInput struct {
 // SourceSnapshotContext binds a saved window to its original policy executor
 // and source definition. It cannot start or renew the separately owned source.
 type SourceSnapshotContext struct {
+	PolicyName string `json:",omitempty"`
+	// RecordingSaveScope is the immutable typed manual selection, independently
+	// constructed before acceptance. Policy snapshots leave it empty.
+	RecordingSaveScope               []byte          `json:",omitempty"`
+	SourceDefinitionDigest           artifact.Digest `json:",omitzero"`
 	Request                          artifact.SourceSnapshotRequest
 	ActionID, PolicyUID, TriggerKind string
 	ExecutionDigest                  artifact.Digest
@@ -64,6 +69,7 @@ func (s *SourceSnapshotContext) Clone() *SourceSnapshotContext {
 		return nil
 	}
 	out := *s
+	out.RecordingSaveScope = append(s.RecordingSaveScope[:0:0], s.RecordingSaveScope...)
 	out.SourceAudience = append(s.SourceAudience[:0:0], s.SourceAudience...)
 	if s.SourceTarget != nil {
 		target := *s.SourceTarget

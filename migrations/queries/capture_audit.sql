@@ -24,4 +24,4 @@ SELECT configure_capture_audit_backing(sqlc.arg(root_id)::uuid,sqlc.arg(pool_val
 
 -- name: ReadCaptureOperationIntent :one
 -- Original intent view deliberately excludes later completion observations.
-SELECT *,NULL::bytea AS snapshot_coverage,NULL::bytea AS snapshot_coverage_digest,NULL::bytea AS snapshot_expectation_digest FROM capture_operation_intents WHERE root_id=$1 AND id=$2;
+SELECT *,NULL::bytea AS snapshot_coverage,NULL::bytea AS snapshot_coverage_digest,NULL::bytea AS snapshot_expectation_digest,NULL::bytea AS snapshot_cancel_key,NULL::bytea AS snapshot_cancel_actor,NULL::timestamptz AS snapshot_cancel_requested_at,NULL::timestamptz AS snapshot_cancel_joined_at,NULL::bytea AS snapshot_cancel_proof,NULL::bytea AS snapshot_cancel_proof_digest FROM capture_operation_intents WHERE root_id=$1 AND id=$2;

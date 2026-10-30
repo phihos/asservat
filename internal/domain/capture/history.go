@@ -76,6 +76,7 @@ func (q HistoryQuery) Valid(now time.Time) bool {
 
 // HistoryEntry is a content-minimized summary of one accepted capture.
 type HistoryEntry struct {
+	Operation         string
 	Requester         identity.Principal
 	ActionKinds       []string
 	RepeatState       string
@@ -113,6 +114,7 @@ func (q SettingsQuery) Valid(now time.Time) bool {
 // capture: its authored target, recipe and dependency pins and requested
 // retention. It carries no reason, sharing, grant, credential or old pod.
 type CaptureSettings struct {
+	RecordingSave            *RecordingSaveSettings
 	FrozenFilters            []byte
 	ExplicitPodUID           string
 	Selection                string

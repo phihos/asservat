@@ -43,6 +43,7 @@ func SnapshotAudience(selected *planning.SourceSnapshotContext, current []artifa
 // PolicySnapshotSelection comes only from the current accepted policy and its
 // retained exact source row. It is not a public source handle or an arm permit.
 type PolicySnapshotSelection struct {
+	PolicyName  string
 	Policy      value.RestartPolicy
 	Authority   authorization.AcceptedPolicyAuthority
 	Source      PolicySourceState
@@ -53,6 +54,17 @@ type PolicySnapshotSelection struct {
 // PreviewPolicySnapshot prepares only the requested existing-source window.
 // It uses the shared preview/admission path and cannot invoke another action.
 func (s ContextInvestigation) PreviewPolicySnapshot(ctx context.Context, current identities.CurrentIdentity, selection PolicySnapshotSelection) (ContextPreviewResult, error) {
+	return s.previewSourceSnapshot(ctx, current, selection, nil)
+}
+
+type manualSnapshotSelection struct {
+	Current      identities.CurrentIdentity
+	Before       time.Duration
+	Sharing      *value.ContextSharing
+	RepeatedFrom *value.HistoryLineage
+}
+
+func (s ContextInvestigation) previewSourceSnapshot(ctx context.Context, current identities.CurrentIdentity, selection PolicySnapshotSelection, manual *manualSnapshotSelection) (ContextPreviewResult, error) {
 	var zero ContextPreviewResult
 	if !s.configured() || ctx == nil || current == nil {
 		return zero, value.ErrUnavailable
@@ -71,6 +83,16 @@ func (s ContextInvestigation) PreviewPolicySnapshot(ctx context.Context, current
 	if e1 != nil || e2 != nil || e3 != nil || e4 != nil || actionTimeout <= 0 || recipeTimeout <= 0 {
 		return zero, value.ErrInvalid
 	}
+	approvedBefore := before
+	if manual != nil {
+		if !p.RecordingSaves || before <= 0 || manual.Current == nil || manual.Before < 0 || manual.Before > before {
+			return zero, value.ErrDenied
+		}
+		if manual.Before > 0 {
+			before = manual.Before
+		}
+		after = 0
+	}
 	deadline := identity.Earlier(now.Add(min(actionTimeout, recipeTimeout)), a.NotAfter).UTC()
 	audienceDigest, err := compiler.SourceAudienceDigest(source.Audience)
 	if err != nil || audienceDigest != artifact.Digest(source.Binding.AudienceDigest) {
@@ -85,9 +107,25 @@ func (s ContextInvestigation) PreviewPolicySnapshot(ctx context.Context, current
 		return zero, value.ErrAcquisitionClosed
 	}
 	selected := &planning.SourceSnapshotContext{Request: request, ActionID: source.Binding.ActionID, PolicyUID: a.PolicyUID, TriggerKind: "policy", ExecutionDigest: a.ScopeDigest, RecipeDigest: p.Recorder.RecipeDigest, SourceAudience: slices.Clone(source.Audience), SourceAudienceDigest: audienceDigest, SourceTarget: source.Target}
+	if manual != nil {
+		selected.PolicyName = selection.PolicyName
+	}
 	i, err := current.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) || i.Principal != a.Executor {
 		return zero, value.ErrDenied
+	}
+	actor := i.Principal
+	var initiator authorization.CaptureEligibility
+	if manual != nil {
+		if source.Target == nil {
+			return zero, value.ErrDenied
+		}
+		initiator = s.Eligibility.ContextEligibilityCurrent(ctx, manual.Current, source.Target.Target())
+		if !initiator.Eligible || !initiator.VerifiedIdentity.Valid(s.Now()) {
+			return zero, value.ErrDenied
+		}
+		actor = initiator.Principal
+		selected.TriggerKind = "recordingSave"
 	}
 	required, err := s.requireRecordingApproval(ctx, current, i.Principal)
 	if err != nil {
@@ -106,6 +144,21 @@ func (s ContextInvestigation) PreviewPolicySnapshot(ctx context.Context, current
 		return zero, targets.ErrChanged
 	}
 	intent := value.ContextIntent{Target: targets.WorkloadRequest{ClusterID: selection.Target.ClusterID, Namespace: selection.Target.Namespace.Name, Kind: "Pod", Name: selection.Target.PodName}, RequestedSeconds: p.RetentionSeconds, Snapshot: selected, HistoryAuthored: p.HistoryAuthored.Clone()}
+	if manual != nil {
+		intent.HistoryAuthored = nil
+		intent.Target = targets.WorkloadRequest{ClusterID: selection.Target.ClusterID, Namespace: selection.Target.Namespace.Name, Kind: selection.Target.Workload.Kind, Name: selection.Target.Workload.Name}
+		if manual.Sharing != nil {
+			copy := *manual.Sharing
+			copy.Recipients = slices.Clone(copy.Recipients)
+			intent.Sharing = &copy
+		}
+		if manual.RepeatedFrom != nil {
+			copy := *manual.RepeatedFrom
+			intent.RepeatedFrom = &copy
+			selected.Request.ProcessingUntil = identity.Earlier(selected.Request.ProcessingUntil, copy.ExpiresAt)
+			selected.Request.StartBy = identity.Earlier(selected.Request.StartBy, selected.Request.ProcessingUntil.Add(-time.Microsecond))
+		}
+	}
 	wait := s.beginStorageWait(ctx, target, identity.Earlier(i.ValidUntil, recovery.FreshUntil), value.ContextStorageSelection{})
 	defer wait.close()
 	f, err := s.factsWithStorageWait(ctx, current, a.Executor, intent, target, artifact.SourceSnapshotAnchor(request), wait, *observed)
@@ -118,6 +171,15 @@ func (s ContextInvestigation) PreviewPolicySnapshot(ctx context.Context, current
 		return zero, value.ErrAcquisitionClosed
 	}
 	preview := value.ContextPreview{ExecutionClass: target.ExecutionClass, ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), AssessmentID: s.NewID(), AssessmentRulesDigest: compiler.SourceSnapshotAssessmentRulesDigest(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: now, Deadline: selected.Request.ProcessingUntil, SelectionUntil: now.Add(min(s.Lifetime, time.Minute))}
+	preview.Actor = actor
+	if manual != nil {
+		selected.SourceDefinitionDigest = artifact.Digest(source.Binding.ExpectationDigest)
+		preview.SelectionUntil = identity.Earlier(preview.SelectionUntil, preview.Deadline)
+		selected.RecordingSaveScope, _, err = compiler.CompileRecordingSaveScope(compiler.RecordingSaveScopeInput{CaptureID: preview.CaptureID, Requester: actor, Authority: a, Sources: []compiler.RecordingSaveScopeSource{{PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest, Original: *source.Target, ActionID: source.Binding.ActionID, Kind: p.Recorder.Action.Kind, DefinitionDigest: selected.SourceDefinitionDigest, AudienceDigest: audienceDigest, ApprovedBefore: approvedBefore, Before: before, MaxBytes: selected.Request.MaxBytes}}, IncidentPodLimit: recordingSaveIncidentPodCap(p), FinalizeTimeout: min(actionTimeout, recipeTimeout), CeilingDigest: artifact.Digest(f.capability.Revision.Digest), RetentionDigest: artifact.Digest(f.retention.PolicyRevision.Digest)}, s.Now())
+		if err != nil {
+			return zero, err
+		}
+	}
 	plan, err := s.plan(preview, f)
 	if err != nil {
 		return zero, err
@@ -143,7 +205,22 @@ func (s ContextInvestigation) PreviewPolicySnapshot(ctx context.Context, current
 		return zero, previewFailure("snapshot/after-store", value.ErrChanged)
 	}
 	until := identity.Earlier(plan.ValidUntil, identity.Earlier(i.ValidUntil, identity.Earlier(fresh.ValidUntil, coverage.FreshUntil)))
-	return ContextPreviewResult{CollectorImageDigest: f.capability.CollectorImageDigest, ProjectionDigest: f.capability.ProjectionDigest, Preview: preview.Clone(), Assessment: assessment, ValidUntil: until}, nil
+	if manual != nil {
+		freshInitiator := s.Eligibility.ContextEligibilityCurrent(ctx, manual.Current, target.Target())
+		if !freshInitiator.Eligible || freshInitiator.Principal != actor || !freshInitiator.VerifiedIdentity.Valid(s.Now()) {
+			return zero, value.ErrDenied
+		}
+		until = identity.Earlier(until, identity.Earlier(initiator.ValidUntil, freshInitiator.ValidUntil))
+	}
+	result := ContextPreviewResult{CollectorImageDigest: f.capability.CollectorImageDigest, ProjectionDigest: f.capability.ProjectionDigest, Preview: preview.Clone(), Assessment: assessment, ValidUntil: until}
+	if manual != nil {
+		state := "Unknown"
+		if observed.State.Stopped {
+			state = "Stopped"
+		}
+		result.RecordingSave = &RecordingSavePreviewMetadata{Before: before, IncidentPodCap: recordingSaveIncidentPodCap(p), Selected: []RecordingRow{{IncidentPodCap: recordingSaveIncidentPodCap(p), PolicyUID: a.PolicyUID, PodUID: source.Binding.PodUID, PodName: source.Target.Request.PodName, ActionID: source.Binding.ActionID, Kind: p.Recorder.Action.Kind, State: state, History: "Unknown", MaximumBefore: approvedBefore}}}
+	}
+	return result, nil
 }
 
 // Existing-source resolution intentionally supplies no fresh Pod RV or Pod

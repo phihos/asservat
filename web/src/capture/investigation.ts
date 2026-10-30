@@ -7,15 +7,16 @@ import { operations, OperationFailure, operationMessage, type Operations, type T
 // no hours means the server default (24 hours after publication).
 export type Draft = { target: Target; retention: string; sharing?: Recipient[]; shareHours?: number };
 export type State = {
-  stage: 'target' | 'diagnostics' | 'review' | 'reviewed' | 'uncertain' | 'closed' | 'progress' | 'approval';
+  stage: 'target' | 'diagnostics' | 'recordings' | 'review' | 'reviewed' | 'uncertain' | 'closed' | 'progress' | 'approval';
   busy: boolean; draft: Draft; diagnostics?: Diagnostic[]; preview?: Preview;
   progress?: Progress; captureID?: string; approvalURI?: string; error?: string; stale?: boolean; expired?: boolean; resolving?: boolean; canContinue?: boolean; continuing?: boolean;
   // ADR-236: recent captures of the draft target and the capture a review repeats.
   history?: HistoryEntry[]; historyMessage?: string; repeatedFrom?: string;
+  recordingRepeat?: { policyUID: string; captureID: string; before?: string };
   historyOrigin?: 'manual' | 'policy' | 'discovery' | 'all'; historyCursor?: string; settings?: Data<'get_capture_settings'>;
 };
 export const historyPageSize = 10;
-type Receipt = { preview_id: string; idempotency_key: string; captureID?: string; revision?: number; closed?: true; continuationBlocked?: true; approvalURI?: string };
+type Receipt = { operation?: 'recordingSave'; expectedCaptureID?: string; preview_id: string; idempotency_key: string; captureID?: string; revision?: number; closed?: true; continuationBlocked?: true; approvalURI?: string };
 type ReviewedHandle = { id: string; expiresAt: number; approvalRequired: boolean };
 const emptyDraft = (): Draft => ({ target: { cluster_id: '', namespace: '', kind: 'Deployment', name: '' }, retention: '' });
 const terminal = new Set(['Succeeded', 'Partial', 'Failed', 'Cancelled', 'Indeterminate']);
@@ -70,12 +71,12 @@ export class Investigation {
     this.selected = undefined; this.selectedComposition = undefined; this.repeatOf = undefined;
     if (captureID && !this.receipt) this.receipt = { preview_id: '', idempotency_key: '', captureID };
     this.publish({ diagnostics: undefined, preview: undefined, progress: undefined, error: undefined, busy: false, resolving: false, continuing: false, history: undefined, historyMessage: undefined,
-      captureID: this.receipt?.captureID, approvalURI: this.receipt?.approvalURI, stage: this.receipt ? this.receiptStage() : this.reviewed ? 'reviewed' : 'target', expired: this.reviewed ? this.reviewed.expiresAt <= Date.now() : false });
+      recordingRepeat: undefined, captureID: this.receipt?.captureID, approvalURI: this.receipt?.approvalURI, stage: this.receipt ? this.receiptStage() : this.reviewed ? 'reviewed' : 'target', expired: this.reviewed ? this.reviewed.expiresAt <= Date.now() : false });
     this.expireReview();
     const abort = () => {
       this.invalidate(); this.session = undefined; this.selected = undefined; this.selectedComposition = undefined; this.repeatOf = undefined;
       this.publish({ diagnostics: undefined, preview: undefined, progress: undefined, busy: false, resolving: false, continuing: false, history: undefined, historyMessage: undefined,
-        stage: this.receipt ? this.receiptStage() : this.reviewed ? 'reviewed' : 'target' });
+        recordingRepeat: undefined, stage: this.receipt ? this.receiptStage() : this.reviewed ? 'reviewed' : 'target' });
     };
     scope.addEventListener('abort', abort, { once: true });
     if (scope.aborted) abort();
@@ -143,6 +144,29 @@ export class Investigation {
     }
   }
 
+  showRecordings = () => {
+    if (this.receipt || this.state.busy) return;
+    this.invalidate(); this.selected = undefined; this.selectedComposition = undefined; this.reviewed = undefined;
+    this.publish({ stage: 'recordings', diagnostics: undefined, preview: undefined, error: undefined, recordingRepeat: undefined });
+  };
+  // The recordings view already verified its canonical passive preview. Reuse
+  // the existing receipt before I/O, including uncertain same-key recovery.
+  submitRecordingSave = async (previewID: string, captureID: string, expiresAt: string) => {
+    if (this.receipt || this.state.busy || this.state.stage !== 'recordings' || !this.session || !this.scope || this.scope.aborted) return;
+    const expiry = Date.parse(expiresAt);
+    if (!Number.isFinite(expiry) || expiry <= Date.now()) return;
+    this.receipt = { operation: 'recordingSave', expectedCaptureID: captureID, preview_id: previewID, idempotency_key: this.newID() };
+    await this.retrySubmission();
+  };
+  selectRecordingsAgain = (settings: Data<'get_capture_settings'>) => {
+    if (this.state.busy || settings.kind !== 'recordingSaveSettings' || Date.parse(settings.expires_at) <= Date.now()) return;
+    const workload = settings.settings.target.workloadRef;
+    if (!workload || this.receipt && this.receipt.captureID !== settings.capture_id) return;
+    this.invalidate(); this.receipt = undefined; this.reviewed = undefined;
+    this.publish({ stage: 'recordings', draft: { target: { cluster_id: settings.cluster_id, namespace: settings.settings.target.namespace, kind: workload.kind, name: workload.name }, retention: '' },
+      recordingRepeat: { policyUID: settings.settings.policy.policyUID, captureID: settings.capture_id, ...(settings.settings.action_windows.length === 1 && { before: settings.settings.action_windows[0].before }) },
+      captureID: undefined, progress: undefined, settings: undefined, preview: undefined, diagnostics: undefined, error: undefined });
+  };
   discover = async () => {
     if (this.receipt || this.state.busy) return;
     const data = await this.run('list_diagnostics', { target_ref: structuredClone(this.state.draft.target) });
@@ -212,7 +236,14 @@ export class Investigation {
   // "Collect again": the server restores the capture's target and requested
   // retention into a fresh preview and runs every current check.
   repeat = async (captureID: string, selection?: 'currentEligiblePod') => {
-    if (this.state.busy || !this.prepareHistoryRepeat(captureID)) return;
+    if (this.state.busy) return;
+    if (this.state.history?.some(entry => entry.capture_id === captureID && entry.operation === 'recordingSave') || this.state.settings?.kind === 'recordingSaveSettings' && this.state.settings.capture_id === captureID) {
+      if (this.state.settings?.capture_id !== captureID) await this.showSettings(captureID);
+      const saved = this.state.settings;
+      if (saved?.kind === 'recordingSaveSettings' && saved.capture_id === captureID) this.selectRecordingsAgain(saved);
+      return;
+    }
+    if (!this.prepareHistoryRepeat(captureID)) return;
     this.selected = undefined; this.selectedComposition = undefined; this.repeatOf = captureID; this.reviewed = undefined;
     this.repeatSelection = selection;
     this.repeatRetention = undefined;
@@ -338,6 +369,7 @@ export class Investigation {
     this.publish({ stage: 'uncertain', preview: undefined, diagnostics: undefined, resolving: false });
     const data = await this.run('request_capture', { preview_id: receipt.preview_id, idempotency_key: receipt.idempotency_key });
     if (!data || receipt !== this.receipt) return;
+    if (receipt.operation && data.operation !== receipt.operation) { this.publish({ error: 'The saved recording outcome could not be verified. Resolve the same request before continuing.' }); return; }
     await this.openAccepted(receipt, data.capture_id);
   };
   continueAcquisition = async () => {
@@ -359,6 +391,7 @@ export class Investigation {
     this.publish({ resolving: false });
     if (!data) return; // Errors and unknown closure replies never prove non-admission.
     if (data.state === 'accepted') {
+      if (receipt.operation && data.operation !== receipt.operation) { this.publish({ error: 'The saved recording outcome could not be verified. Resolve the same request before continuing.' }); return; }
       await this.openAccepted(receipt, data.capture_id);
     } else if (data.state === 'closed' && !receipt.captureID) {
       receipt.closed = true; this.reviewed = undefined; this.selected = undefined; this.selectedComposition = undefined;
@@ -367,6 +400,9 @@ export class Investigation {
   };
   private async openAccepted(receipt: Receipt, captureID: string) {
     if (receipt !== this.receipt) return;
+    if (receipt.expectedCaptureID && receipt.expectedCaptureID !== captureID) {
+      this.publish({ error: 'The saved recording outcome could not be verified. Keep this tab open and resolve the same request.' }); return;
+    }
     if (receipt.captureID && receipt.captureID !== captureID) {
       this.publish({ error: 'The request outcome could not be verified. Keep the original request and check it again.' }); return;
     }
@@ -380,7 +416,7 @@ export class Investigation {
     if (!id || this.state.busy) return;
     const data = await this.run('get_capture', { capture_id: id });
     if (!data) { this.publish({ progress: undefined }); return; }
-    if (data.capture_id !== id || data.revision < (this.receipt?.revision ?? 0)) {
+    if (data.capture_id !== id || this.receipt?.operation && data.operation !== this.receipt.operation || data.revision < (this.receipt?.revision ?? 0)) {
       this.publish({ progress: undefined, error: 'The collection status could not be verified. Try checking it again.' }); return;
     }
     if (this.receipt?.captureID !== id) return;

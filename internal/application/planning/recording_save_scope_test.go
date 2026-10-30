@@ -57,6 +57,51 @@ func TestRecordingSaveScopeBindsRequesterAndOriginalExecutorWithAfterZero(t *tes
 	}
 }
 
+func TestRecordingSaveContextUsesTypedManualScopeAndSeparateAcceptanceClock(t *testing.T) {
+	scope, now := recordingSaveScopeInput(t)
+	in, _ := sourceSnapshotInput(t)
+	source := &scope.Sources[0]
+	source.ActionID, source.Before, source.MaxBytes = in.Snapshot.ActionID, in.Snapshot.Request.Before, in.Snapshot.Request.MaxBytes
+	in.Snapshot.SourceDefinitionDigest = source.DefinitionDigest
+	scope.CeilingDigest = artifact.Digest(in.Capability.Revision.Digest)
+	scope.RetentionDigest = artifact.Digest(in.Retention.PolicyRevision.Digest)
+	raw, digest, err := CompileRecordingSaveScope(scope, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.Executor = scope.Authority.Executor
+	in.Snapshot.SourceTarget = &source.Original
+	in.Snapshot.TriggerKind = "recordingSave"
+	in.Snapshot.RecordingSaveScope = raw
+	plan, err := CompileContext(in, now)
+	if err != nil || plan.ScopeDigest != digest || !bytes.Equal(plan.CanonicalScope, raw) {
+		t.Fatal("typed existing-source manual scope was replaced", err)
+	}
+	parsed, err := ReadContextScopeIdentity(plan.CanonicalScope, plan.ScopeDigest)
+	if err != nil || parsed.Requester == nil || *parsed.Requester != scope.Requester || parsed.Actor != scope.Authority.Executor {
+		t.Fatal("dual principal lost", err)
+	}
+	later := in
+	later.Snapshot = in.Snapshot.Clone()
+	later.Snapshot.Request.T0 = later.Snapshot.Request.T0.Add(time.Second)
+	later.Snapshot.Request.IssuedAt = later.Snapshot.Request.IssuedAt.Add(time.Second)
+	later.Retention.AnchorAt = later.Retention.AnchorAt.Add(time.Second)
+	later.Retention.ExpiresAt = later.Retention.ExpiresAt.Add(time.Second)
+	later.Retention.DeleteBy = later.Retention.DeleteBy.Add(time.Second)
+	accepted, err := CompileContext(later, now)
+	if err != nil || accepted.ScopeDigest != digest {
+		t.Fatal("acceptance clock changed reviewed source/window", err)
+	}
+	later.Snapshot.Request.MaxBytes /= 2
+	if _, err = CompileContext(later, now); err == nil {
+		t.Fatal("manual scope authorized a different output ceiling")
+	}
+	in.Snapshot.RecordingSaveScope = nil
+	if _, err = CompileContext(in, now); err == nil {
+		t.Fatal("manual save went through automatic source-window schema")
+	}
+}
+
 func TestRecordingSaveScopeRejectsBroaderOrMixedSelection(t *testing.T) {
 	for name, change := range map[string]func(*RecordingSaveScopeInput){
 		"no history":        func(in *RecordingSaveScopeInput) { in.Sources[0].Before = 0 },

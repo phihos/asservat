@@ -169,6 +169,11 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("capture_history_quota", "UPDATE", "used")
 		add("capture_history_parameter", "UPDATE", "capture_id", "visible", "state", "write_id", "write_digest", "write_started_at", "write_until", "write_executor_epoch", "writer_completion_json", "copies_digest", "delete_id", "delete_executor_epoch", "delete_started_at", "delete_until", "delete_fence", "purge_completion_json")
 	case "capture-admit":
+		read("recording_save_reservation", "policy_workload_window")
+		add("recording_save_reservation", "INSERT")
+		add("policy_workload_window", "INSERT")
+		add("policy_workload_window", "UPDATE", "tat")
+		add("policy_acceptance", "UPDATE", "executions_spent")
 		read("policy_recording_source")
 		add("policy_recording_source", "UPDATE", "root_id") // retained source row lock only
 		read("capture_history_parameter", "custody_copy")
@@ -278,11 +283,13 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
 		// Passive private blueprints only. SQL33/36 prohibit live deletion,
 		// content rewrites and restoring a closed preview. No capture admission.
-		read("permission_stream", "context_preview", "context_preview_fence")
+		read("permission_stream", "context_preview", "context_preview_fence", "recording_selection_set", "policy_recording_source", "policy_source")
 		add("permission_stream", "UPDATE", "id")
 		add("context_preview", "INSERT")
 		add("context_preview", "DELETE")
 		add("context_preview_fence", "DELETE")
+		add("recording_selection_set", "INSERT")
+		add("recording_selection_set", "DELETE")
 		// ADR-200: a refresh demand for an enrolled workload; no authority.
 		out = append(out, publicRuntimeGrant{"function", "demand_capacity_refresh(uuid,uuid,text,text,text,text,text)", "", "EXECUTE"})
 	case "capture-resolution":

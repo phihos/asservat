@@ -35,7 +35,8 @@ func HistoryParameterKeys(k HistoryKeys, root string, p value.HistoryParameters)
 		Recipe, Dependencies                      json.RawMessage
 		AuthoredTarget, Provenance, FrozenFilters json.RawMessage
 		RequestedSeconds                          int64
-	}{root, p.ExplicitPodUID, p.Target, p.NamespaceUID, p.WorkloadUID, p.Diagnostic, p.Composition, p.RecipeJSON, p.DependencyJSON, p.AuthoredTargetJSON, p.CompositionJSON, p.FrozenFilters, p.RequestedSeconds})
+		RecordingSave                             *value.RecordingSaveSettings `json:",omitempty"`
+	}{root, p.ExplicitPodUID, p.Target, p.NamespaceUID, p.WorkloadUID, p.Diagnostic, p.Composition, p.RecipeJSON, p.DependencyJSON, p.AuthoredTargetJSON, p.CompositionJSON, p.FrozenFilters, p.RequestedSeconds, p.RecordingSave})
 	if err != nil {
 		return selector, settings, err
 	}

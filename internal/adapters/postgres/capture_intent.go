@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"asservat.local/asservat/internal/application/planning"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -111,6 +112,14 @@ func captureIntent(row custodydb.ContextCapture) (audit.CaptureIntent, error) {
 	}
 	e := accepted.Expectation
 	out = audit.CaptureIntent{RootID: uid(row.RootID), CaptureID: accepted.CaptureID, CaseID: e.CaseID, OccurrenceID: e.OccurrenceID, ArtifactID: e.Registration.Location.ArtifactID, AttemptID: e.Registration.Location.AttemptID, Actor: identity.Principal{Issuer: scope.Executor.Issuer, Subject: scope.Executor.Subject, ClientID: scope.Executor.ClientID, Kind: scope.Executor.Kind}, Target: authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}, ScopeDigest: accepted.ScopeDigest, SubmissionDigest: accepted.SubmissionDigest, PermissionEpoch: uid(row.PermissionEpoch), PermissionSequence: row.PermissionSequence, IdentityRevision: identity.Revision{UID: row.IdentityPolicyUid, Generation: row.IdentityPolicyGeneration}, CreatedAt: accepted.CreatedAt, Deadline: accepted.Deadline, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy, ReservedBytes: e.Registration.ReservedBytes()}
+	if e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" {
+		parsed, err := planning.ReadContextScopeIdentity(row.ScopeJson, out.ScopeDigest)
+		if err != nil || parsed.Requester == nil || parsed.Actor != out.Actor {
+			return out, capture.ErrUnavailable
+		}
+		initiator := *parsed.Requester
+		out.Initiator = &initiator
+	}
 	copy(out.IdentityRevision.Digest[:], row.IdentityPolicyDigest)
 	copy(out.ExpectationDigest[:], digest(e))
 	if !out.Valid() {

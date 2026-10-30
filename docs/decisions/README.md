@@ -1046,3 +1046,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-260: API target observations after completed authenticated queries](260-api-target-observation-freshness.md)
 
 - [ADR-264: existing-source packet snapshots](264-existing-source-packet-snapshots.md): distinct immutable window admission, bounded owned copy/output and independently validated authenticated coverage; automatic/manual runtime composition and installed qualification remain in progress.
+
+- [ADR-265: manual existing-recording saves](265-manual-existing-recording-saves.md): passive bounded discovery, first-admission t0, distinct initiator/executor, shared budgets and joined cancellation; manual SQL108 and installed qualification pending.

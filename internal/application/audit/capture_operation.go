@@ -35,7 +35,7 @@ func PrepareCaptureOperation(c value.CaptureIntent, a value.CaptureAuditAccount,
 	// Only the live caller bound is reduced to SQL precision. Never round up
 	// an expiry or rewrite the already accepted capture's historical dates.
 	requestUntil = identity.Earlier(requestUntil, identity.Earlier(c.CreatedAt.Add(5*time.Second), until)).UTC().Truncate(time.Microsecond)
-	in := value.OperationIntent{ID: c.CaptureID, RootID: c.RootID, TraceID: c.OccurrenceID, Name: value.CaptureOperationName, InputFormat: value.CaptureOperationInputFormat, MACVersion: mac.Version(), AccountVersion: a.AccountVersion, Actor: c.Actor, PrincipalDigest: account, InputDigest: input, CreatedAt: c.CreatedAt, RequestUntil: requestUntil, WriteUntil: until, RetainUntil: c.CreatedAt.Add(time.Duration(a.RetainedSeconds) * time.Second), Capture: &c}
+	in := value.OperationIntent{ID: c.CaptureID, RootID: c.RootID, TraceID: c.OccurrenceID, Name: value.CaptureOperationName, InputFormat: value.CaptureOperationInputFormat, MACVersion: mac.Version(), AccountVersion: a.AccountVersion, Actor: c.Requester(), PrincipalDigest: account, InputDigest: input, CreatedAt: c.CreatedAt, RequestUntil: requestUntil, WriteUntil: until, RetainUntil: c.CreatedAt.Add(time.Duration(a.RetainedSeconds) * time.Second), Capture: &c}
 	return BindOperationLifecycle(in, a.Policy)
 }
 

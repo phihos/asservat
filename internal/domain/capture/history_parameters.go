@@ -63,11 +63,12 @@ func (b HistoryCiphertexts) PhysicalBytes() int64 {
 }
 
 var (
-	ErrSettingsUnavailable      = errors.New("saved capture settings unavailable")
-	ErrSettingsTooLarge         = errors.New("saved capture settings exceed the response limit")
-	ErrHistoryUnavailable       = errors.New("capture history projection unavailable")
-	ErrHistorySelectionRequired = errors.New("choose a current manual Pod selection")
-	ErrProfileChanged           = errors.New("saved dependency version is unavailable or changed")
+	ErrSettingsUnavailable        = errors.New("saved capture settings unavailable")
+	ErrSettingsTooLarge           = errors.New("saved capture settings exceed the response limit")
+	ErrHistoryUnavailable         = errors.New("capture history projection unavailable")
+	ErrHistorySelectionRequired   = errors.New("choose a current manual Pod selection")
+	ErrRecordingSelectionRequired = errors.New("choose current existing recordings")
+	ErrProfileChanged             = errors.New("saved dependency version is unavailable or changed")
 )
 
 // HistorySelector groups the authored selector, not the Pods it resolved to.
@@ -101,16 +102,17 @@ func (s HistorySelector) Valid() bool {
 // or transferable authority. It exists only in bounded memory or encrypted
 // objects; SQL stores its keyed identity and ciphertext receipts.
 type HistoryParameters struct {
-	ExplicitPodUID                             string `json:",omitempty"`
+	RecordingSave                              *RecordingSaveSettings `json:",omitempty"`
+	ExplicitPodUID                             string                 `json:",omitempty"`
 	Format                                     string
 	Target                                     targets.WorkloadRequest
 	NamespaceUID, WorkloadUID                  string
 	Diagnostic                                 string                       `json:",omitempty"`
 	Composition                                *planning.ProfileComposition `json:",omitempty"`
-	RecipeJSON, DependencyJSON                 json.RawMessage
-	FrozenFilters                              json.RawMessage  `json:",omitempty"`
-	AuthoredTargetJSON, CompositionJSON        json.RawMessage  `json:",omitempty"`
-	SelectorIdentity                           *HistorySelector `json:",omitempty"`
+	RecipeJSON, DependencyJSON                 json.RawMessage              `json:",omitempty"`
+	FrozenFilters                              json.RawMessage              `json:",omitempty"`
+	AuthoredTargetJSON, CompositionJSON        json.RawMessage              `json:",omitempty"`
+	SelectorIdentity                           *HistorySelector             `json:",omitempty"`
 	RequestedSeconds, OriginalEffectiveSeconds int64
 	PolicyOrigins                              []HistoryPolicyOrigin `json:",omitempty"`
 	Selection                                  string                `json:",omitempty"`
@@ -119,8 +121,13 @@ type HistoryParameters struct {
 
 func (p HistoryParameters) Valid() bool {
 	if (p.Target.Kind == "Pod" && !identity.Text(p.ExplicitPodUID, 64)) || (p.Target.Kind != "Pod" && p.ExplicitPodUID != "") || p.Format != HistoryParametersFormat || !p.Target.Valid() || !identity.Text(p.NamespaceUID, 64) || !identity.Text(p.WorkloadUID, 64) ||
-		p.RequestedSeconds < 0 || p.RequestedSeconds > privacy.MaxAgeSeconds || p.OriginalEffectiveSeconds < 1 || p.OriginalEffectiveSeconds > privacy.MaxAgeSeconds || p.OriginalExecutionDigest == (artifact.Digest{}) ||
-		!json.Valid(p.RecipeJSON) || !json.Valid(p.DependencyJSON) || len(p.RecipeJSON) == 0 || len(p.DependencyJSON) == 0 {
+		p.RequestedSeconds < 0 || p.RequestedSeconds > privacy.MaxAgeSeconds || p.OriginalEffectiveSeconds < 1 || p.OriginalEffectiveSeconds > privacy.MaxAgeSeconds || p.OriginalExecutionDigest == (artifact.Digest{}) {
+		return false
+	}
+	if p.RecordingSave != nil {
+		return p.RecordingSave.Valid() && p.Diagnostic == "" && p.Composition == nil && len(p.RecipeJSON) == 0 && len(p.DependencyJSON) == 0 && len(p.FrozenFilters) == 0 && len(p.CompositionJSON) == 0 && len(p.PolicyOrigins) == 0 && p.Selection == "recordingSelectionRequired" && p.SelectorIdentity != nil && p.SelectorIdentity.Valid() && p.SelectorIdentity.ClusterID == p.Target.ClusterID && p.SelectorIdentity.NamespaceUID == p.NamespaceUID && p.SelectorIdentity.WorkloadUID == p.WorkloadUID && json.Valid(p.AuthoredTargetJSON)
+	}
+	if !json.Valid(p.RecipeJSON) || !json.Valid(p.DependencyJSON) || len(p.RecipeJSON) == 0 || len(p.DependencyJSON) == 0 {
 		return false
 	}
 	if (len(p.FrozenFilters) > 0 && !json.Valid(p.FrozenFilters)) || len(p.PolicyOrigins) > 16 || (p.Selection != "" && p.Selection != "triggeringPod" && p.Selection != "allWithinLimit" && p.Selection != "explicitPod") {

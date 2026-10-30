@@ -187,3 +187,34 @@ func saveScopeHash(s string) bool {
 	}
 	return false
 }
+
+// recordingSaveContextMatches joins the reviewed manual scope to independent
+// current compilation input. An opaque passive scope alone cannot choose work.
+func recordingSaveContextMatches(raw []byte, digest artifact.Digest, in value.ContextInput) bool {
+	identity, err := readRecordingSaveScopeIdentity(raw, digest)
+	saved := in.Snapshot
+	if err != nil || saved == nil || saved.SourceTarget == nil || identity.Actor != in.Executor || identity.Target != in.Target.Target() || identity.CaptureID != in.CaptureID {
+		return false
+	}
+	var s recordingSaveScope
+	if json.Unmarshal(raw, &s) != nil || len(s.Sources) != 1 {
+		return false
+	}
+	source := s.Sources[0]
+	before, _ := scopeDuration(saved.Request.Before)
+	original := saved.SourceTarget
+	return s.Policy.PolicyUID == saved.PolicyUID && s.Policy.ExecutionDigest == hexDigest(saved.ExecutionDigest) && source.SourceID == saved.Request.SourceID && source.PodUID == in.Target.Request.PodUID && source.NodeUID == original.NodeUID && source.BootID == original.BootID && source.ActionID == saved.ActionID && source.Kind == "packetCapture" && source.Before == before && source.After == "0s" && saved.Request.After == 0 && source.MaxBytes == saved.Request.MaxBytes && source.DefinitionDigest == hexDigest(saved.SourceDefinitionDigest) && source.AudienceDigest == hexDigest(saved.SourceAudienceDigest) && s.Dependencies[0].Digest == hexDigest(artifact.Digest(in.Capability.Revision.Digest)) && s.Dependencies[1].Digest == hexDigest(artifact.Digest(in.Retention.PolicyRevision.Digest))
+}
+
+// RecordingSaveFinalizeTimeout reads authored limits from the exact canonical
+// manual scope. It is a limit only, never a new processing/source permit.
+func RecordingSaveFinalizeTimeout(raw []byte, digest artifact.Digest) (time.Duration, error) {
+	if _, err := readRecordingSaveScopeIdentity(raw, digest); err != nil {
+		return 0, err
+	}
+	var scope recordingSaveScope
+	if json.Unmarshal(raw, &scope) != nil {
+		return 0, value.ErrInvalid
+	}
+	return time.ParseDuration(scope.FinalizeTimeout)
+}

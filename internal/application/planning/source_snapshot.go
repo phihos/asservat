@@ -93,6 +93,15 @@ func compileSourceSnapshotContext(in value.ContextInput, now time.Time) (value.C
 	if err != nil {
 		return bad()
 	}
+	if s.TriggerKind == "recordingSave" {
+		raw = bytes.Clone(s.RecordingSaveScope)
+		raw, digest, err = canonical(raw)
+		if err != nil || !bytes.Equal(raw, s.RecordingSaveScope) || !recordingSaveContextMatches(raw, digest, in) {
+			return bad()
+		}
+	} else if len(s.RecordingSaveScope) != 0 {
+		return bad()
+	}
 	until := identity.Earlier(in.Deadline, identity.Earlier(targetUntil, identity.Earlier(in.Capability.FreshUntil, r.ValidUntil)))
 	in.Snapshot = in.Snapshot.Clone()
 	if in.SnapshotSource != nil {

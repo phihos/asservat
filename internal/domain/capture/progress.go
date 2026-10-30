@@ -25,6 +25,8 @@ func (q ProgressQuery) Valid(now time.Time) bool {
 // case/artifact IDs are not navigation authority or readable evidence references.
 // No status field authorizes execution, disclosure or release of capacity.
 type ContextProgressObservation struct {
+	CanCancel, CancellationRequested                bool
+	Operation, ActionID                             string
 	RepeatedFrom                                    *HistoryLineage
 	HistoryState                                    string
 	CaptureID, CandidateCaseID, CandidateArtifactID string
@@ -39,6 +41,12 @@ type ContextProgressObservation struct {
 }
 
 func (p ContextProgressObservation) Valid(now time.Time) bool {
+	if p.Operation != "" && p.Operation != "collect" && p.Operation != "recordingSave" {
+		return false
+	}
+	if p.ActionID != "" && !identity.Text(p.ActionID, 63) {
+		return false
+	}
 	if !authorization.UUID(p.CaptureID) || !authorization.UUID(p.CandidateCaseID) || !authorization.UUID(p.CandidateArtifactID) || !p.Target.Valid() || p.ShareID != "" && !authorization.UUID(p.ShareID) || p.Revision < 1 || p.Revision > MaxProgressRevision || !identity.Fresh(p.ObservedAt, p.ValidUntil, now, 5*time.Second) || p.CreatedAt.IsZero() || !p.Deadline.After(p.CreatedAt) {
 		return false
 	}
@@ -51,6 +59,8 @@ func (p ContextProgressObservation) Valid(now time.Time) bool {
 		return p.ActionPhase == "Failed" && p.ReasonCode == "AcquisitionFailed" || p.ActionPhase == "TargetGone" && p.ReasonCode == "PinnedPodGone" || p.ActionPhase == "Denied" && p.ReasonCode == "PodStatusDenied"
 	case "Finalizing":
 		return p.ActionPhase == "Finalizing" && (p.ReasonCode == "VerificationPending" || p.ReasonCode == "VerificationAuditPending" || p.ReasonCode == "PublicationPending")
+	case "Cancelled":
+		return p.ActionPhase == "Cancelled" && p.ReasonCode == "CancellationJoined"
 	case "Succeeded":
 		return p.ActionPhase == "Succeeded" && p.ReasonCode == "Published"
 	case "Indeterminate":
@@ -62,6 +72,8 @@ func (p ContextProgressObservation) Valid(now time.Time) bool {
 // ContextProgress contains only the public capture-level projection. A case ID
 // is populated only by the separate current case-navigation authorizer.
 type ContextProgress struct {
+	CancellationRequested          bool
+	Operation, ActionID            string
 	RepeatedFrom                   *HistoryLineage
 	HistoryState                   string
 	CaptureID, CaseID              string

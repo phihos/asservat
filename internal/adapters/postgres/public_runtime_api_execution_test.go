@@ -15,6 +15,14 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		t.Fatal("missing consolidated execution credential")
 	}
 	want := []publicRuntimeGrant{
+		{"table", "context_capture", "snapshot_cancel_key", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_actor", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_requested_at", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_joined_at", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_proof", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_proof_digest", "UPDATE"},
+		// SQL108: read the immutable manual save reservation; no insert/update.
+		{"table", "recording_save_reservation", "", "SELECT"},
 		{"table", "policy_recording_source", "", "SELECT"},
 		{"table", "policy_recording_source", "root_id", "UPDATE"},
 		{"table", "policy_occurrence", "", "SELECT"},

@@ -62,6 +62,9 @@ func sourceSnapshotProvenance(source app.PolicySourceState, selected *planning.S
 	}
 	digest, err := compiler.SourceAudienceDigest(selected.SourceAudience)
 	b, q := source.Binding, selected.Request
+	if selected.TriggerKind == "recordingSave" && selected.SourceDefinitionDigest != artifact.Digest(b.ExpectationDigest) {
+		return value.ErrChanged
+	}
 	if err != nil || digest != selected.SourceAudienceDigest || digest != artifact.Digest(b.AudienceDigest) || *selected.SourceTarget != *source.Target || selected.PolicyUID != b.PolicyUID || selected.ActionID != b.ActionID || selected.ExecutionDigest != artifact.Digest(b.Scope) || q.SourceID != b.SourceID || q.Fence != b.Fence || q.SourceBindingDigest != artifact.Digest(deliveryapp.SourceBindingDigest(b)) || !q.SourceStartedAt.Equal(source.StartedAt) || !q.SourceHardUntil.Equal(source.HardUntil) {
 		return value.ErrChanged
 	}

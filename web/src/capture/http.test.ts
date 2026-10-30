@@ -95,3 +95,14 @@ it('binds the explicit acquisition flag to the unchanged request header and reje
   expect(fetcher.mock.calls[0][1].body).toBe(JSON.stringify(body));
   expect(fetcher.mock.calls[0][1].headers['Idempotency-Key']).toBe(id(3));
 });
+it('accepts a durable cancellation request without treating the capture as terminal', async () => {
+  const progress = progressResult('Finalizing');
+  if (progress.status !== 'ok') throw new Error('fixture');
+  progress.data.cancellation_requested = true;
+  expect(validOutput_get_capture(progress)).toBe(true);
+  expect(validOutput_get_capture({ ...progress, data: { ...progress.data, cancellation_requested: 'true' } })).toBe(false);
+  const fetcher = vi.fn().mockResolvedValue(json(progress)); vi.stubGlobal('fetch', fetcher);
+  const response = await operations.call('get_capture', { capture_id: id(8) }, 'csrf', new AbortController().signal);
+  expect(response).toEqual(progress);
+  if (response.status === 'ok') expect(response.data.phase).toBe('Finalizing');
+});

@@ -132,3 +132,14 @@ assert.equal(sharing.validInput_create_share(shareInput), true);
 assert.equal(sharing.validInput_create_share({ ...shareInput, recipients: [{ kind: 'Team', issuer: 'https://identity.invalid', id: 'team' }] }), false);
 assert.equal(sharing.validInput_list_shares({ view: 'received', limit: 100 }), true);
 console.log('Native ESM share validators passed positive and negative checks.');
+
+// Recording inventory/save uses the same canonical schemas in native ESM.
+const recordings = await import('../src/generated/validate-recordings.js');
+assert.equal(recordings.validInput_list_recordings({ target_ref: { cluster_id: id, namespace: 'payments', kind: 'Deployment', name: 'api' }, limit: 20 }), true);
+assert.equal(recordings.validInput_preview_recording_save({ recording_handles: ['opaque-source'], before: '10s' }), true);
+for (const extra of [{ after: '5s' }, { t0: '2026-10-30T12:00:00Z' }, { executor: {} }, { recipe: 'core' }]) assert.equal(recordings.validInput_preview_recording_save({ recording_handles: ['opaque-source'], ...extra }), false);
+const saveExample = JSON.parse(await readFile(new URL('../../examples/mcp-recording-save-preview-result.json', import.meta.url), 'utf8'));
+assert.equal(recordings.validOutput_preview_recording_save(saveExample), true, 'typed recording-save preview');
+const badSource = structuredClone(saveExample); badSource.data.selected_recordings[0].packet_contents = 'not metadata';
+assert.equal(recordings.validOutput_preview_recording_save(badSource), false, 'recording metadata rejects evidence fields');
+console.log('Native ESM recording inventory/save validators passed positive and negative checks.');

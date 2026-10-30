@@ -874,8 +874,8 @@ export interface components {
                 phase: "Accepted";
                 /** Format: uri */
                 navigation_uri: string;
-                /** @constant */
-                operation: "collect";
+                /** @enum {unknown} */
+                operation: "collect" | "recordingSave";
                 /** @constant */
                 state: "accepted";
             } | {
@@ -961,6 +961,7 @@ export interface components {
                 };
                 /** @enum {unknown} */
                 history_state?: "available" | "unavailable";
+                cancellation_requested?: boolean;
             };
         } | {
             /** @constant */

@@ -33,6 +33,7 @@ type APIContextRetention interface {
 }
 
 type APIContextWork struct {
+	Initiator      *identity.Principal      `json:",omitempty"`
 	SourceBinding  *collector.SourceBinding `json:",omitempty"`
 	Accepted       capture.Accepted
 	Target         targets.Request
@@ -48,12 +49,13 @@ type APIExecutionCheck struct {
 	Recovery              artifact.RecoveryProof
 	Process               value.APIProcessObservation
 	CheckedAt, ValidUntil time.Time
+	Initiator             *authorization.CaptureEligibility
 }
 
 func (c APIExecutionCheck) Valid(now time.Time) bool {
 	w, e := c.Work, c.Work.Accepted.Expectation
 	t := c.Plan.Input.Target
-	return e.ExecutionClass == artifact.ContextAPIExecution && e.Validate() == nil && w.Accepted.State == capture.IntentAudited && w.Actor == c.Eligibility.Principal && c.Eligibility.VerifiedIdentity.Principal == w.Actor && c.Eligibility.Eligible && c.Eligibility.Target == t.Target() && c.Eligibility.VerifiedIdentity.Valid(now) && now.Before(c.Eligibility.ValidUntil) && compiler.VerifyContextPlan(c.Plan, now) && c.Plan.ScopeDigest == e.PlanDigest && c.Plan.Input.Executor == w.Actor && c.Plan.Input.CaptureID == e.CaptureUID && c.Plan.Input.Deadline.Equal(w.Accepted.Deadline) && t.Request == w.Target && t.Pin == w.Accepted.Pin && c.Process.Valid(now) && c.Process.Binding.ClusterID == e.Registration.Location.ClusterID && c.Process.Binding.ImageDigest == e.CollectorImageDigest && c.Process.Binding.InstallationID == c.Recovery.InstallationID && c.Process.Binding.IssuerEpoch == c.Recovery.IssuerEpoch && c.Recovery.Valid(now) && c.Plan.Input.Retention.Proof.Valid(now) && identity.Fresh(c.CheckedAt, c.ValidUntil, now, 5*time.Second) && !c.ValidUntil.After(c.Eligibility.ValidUntil) && !c.ValidUntil.After(c.Plan.ValidUntil) && !c.ValidUntil.After(c.Process.ValidUntil) && !c.ValidUntil.After(c.Recovery.FreshUntil) && now.Before(e.Registration.WriteUntil) && w.IntentDigest != (artifact.Digest{})
+	return c.initiatorValid(now) && e.ExecutionClass == artifact.ContextAPIExecution && e.Validate() == nil && w.Accepted.State == capture.IntentAudited && w.Actor == c.Eligibility.Principal && c.Eligibility.VerifiedIdentity.Principal == w.Actor && c.Eligibility.Eligible && c.Eligibility.Target == t.Target() && c.Eligibility.VerifiedIdentity.Valid(now) && now.Before(c.Eligibility.ValidUntil) && compiler.VerifyContextPlan(c.Plan, now) && c.Plan.ScopeDigest == e.PlanDigest && c.Plan.Input.Executor == w.Actor && c.Plan.Input.CaptureID == e.CaptureUID && c.Plan.Input.Deadline.Equal(w.Accepted.Deadline) && t.Request == w.Target && t.Pin == w.Accepted.Pin && c.Process.Valid(now) && c.Process.Binding.ClusterID == e.Registration.Location.ClusterID && c.Process.Binding.ImageDigest == e.CollectorImageDigest && c.Process.Binding.InstallationID == c.Recovery.InstallationID && c.Process.Binding.IssuerEpoch == c.Recovery.IssuerEpoch && c.Recovery.Valid(now) && c.Plan.Input.Retention.Proof.Valid(now) && identity.Fresh(c.CheckedAt, c.ValidUntil, now, 5*time.Second) && !c.ValidUntil.After(c.Eligibility.ValidUntil) && !c.ValidUntil.After(c.Plan.ValidUntil) && !c.ValidUntil.After(c.Process.ValidUntil) && !c.ValidUntil.After(c.Recovery.FreshUntil) && now.Before(e.Registration.WriteUntil) && w.IntentDigest != (artifact.Digest{})
 }
 
 // Typed facets share one installed SQL credential and pool (ADR-217). Their
@@ -246,7 +248,26 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	for _, d := range []time.Time{plan.ValidUntil, eligible.ValidUntil, recovery.FreshUntil, process.ValidUntil, e.Registration.WriteUntil} {
 		until = identity.Earlier(until, d)
 	}
-	out = APIExecutionCheck{w, plan, eligible, recovery, process, start, until.UTC().Truncate(time.Microsecond)}
+	var initiating *authorization.CaptureEligibility
+	if w.Initiator != nil {
+		caller, ok := current.(interface {
+			InitiatingIdentity(context.Context) (identity.Identity, error)
+		})
+		if !ok {
+			return out, nil, apiCheckStep{"Initiator", value.ErrDenied}
+		}
+		checkedCaller, e := caller.InitiatingIdentity(ctx)
+		if e != nil {
+			return out, nil, apiCheckStep{"Initiator", e}
+		}
+		ordinary := s.Eligibility.ContextEligibilityCurrent(ctx, initiatingIdentity{checkedCaller, s.Now}, t.Target())
+		if !ordinary.Eligible || ordinary.Principal != *w.Initiator {
+			return out, nil, apiCheckStep{"Initiator", value.ErrDenied}
+		}
+		initiating = &ordinary
+		until = identity.Earlier(until, ordinary.ValidUntil)
+	}
+	out = APIExecutionCheck{Work: w, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: process, CheckedAt: start, ValidUntil: until.UTC().Truncate(time.Microsecond), Initiator: initiating}
 	if err := out.current(ctx, s.Now()); err != nil {
 		return APIExecutionCheck{}, nil, err
 	}

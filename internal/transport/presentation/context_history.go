@@ -71,6 +71,9 @@ func (s *ContextOperations) historyCall(ctx context.Context, current identities.
 		if err != nil {
 			return nil, nil, time.Time{}, err
 		}
+		if settings.RecordingSave != nil {
+			return s.recordingSaveSettings(settings)
+		}
 		view := CaptureSettingsView{Target: settings.TargetJSON, RecipeSpec: json.RawMessage(planning.ContextRecipeSpec), DependencyPins: settings.DependencyJSON, RequestedRetention: strconv.FormatInt(settings.RequestedSeconds, 10) + "s"}
 		if len(settings.RecipeJSON) > 0 {
 			view.RecipeSpec = settings.RecipeJSON
@@ -143,7 +146,10 @@ func (s *ContextOperations) historyCall(ctx context.Context, current identities.
 			e.SettingsExpiresAt = e.ExpiresAt
 		}
 		entry := CaptureHistoryEntry{CaptureID: e.CaptureID, Origin: string(e.Origin), AcceptedAt: e.AcceptedAt, SummaryExpires: e.ExpiresAt, Phase: e.Phase, ActionKinds: e.ActionKinds,
-			EvidenceState: e.EvidenceState, RepeatState: e.RepeatState, SettingsExpires: e.SettingsExpiresAt, RepeatedFrom: e.RepeatedFrom, NavigationURI: s.config.PublicOrigin + "/captures/" + e.CaptureID, Operation: "collect"}
+			EvidenceState: e.EvidenceState, RepeatState: e.RepeatState, SettingsExpires: e.SettingsExpiresAt, RepeatedFrom: e.RepeatedFrom, NavigationURI: s.config.PublicOrigin + "/captures/" + e.CaptureID, Operation: e.Operation}
+		if entry.Operation == "" {
+			entry.Operation = "collect"
+		}
 		if e.Requester.Valid() {
 			entry.Requester = &CaptureHistoryRequester{Issuer: e.Requester.Issuer, SubjectID: e.Requester.Subject, IdentityType: string(e.Requester.Kind)}
 		}

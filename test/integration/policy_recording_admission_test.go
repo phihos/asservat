@@ -36,6 +36,8 @@ type policyRecorderProtectedCase struct {
 	// SourceAccepted stops before any occurrence/capture: a real audited policy
 	// acceptance can qualify the separate ordinary source ledger in this fixture.
 	Ongoing             bool
+	RecordingSaves      bool
+	RecurringSharing    bool
 	Retention           string
 	SourceAccepted      func(*testing.T, policySourceAcceptedFixture)
 	Hub                 *pgxpool.Pool
@@ -97,6 +99,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			b := &s.batch.Bases[0]
 			if len(protected) > 0 {
 				b.Subjects = protected[0].Subjects
+				if protected[0].RecurringSharing && !slices.Contains(b.Roles, "evidence-owner") {
+					b.Roles = append(slices.Clone(b.Roles), "evidence-owner")
+				}
 			}
 			b.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{authorization.PolicyContextAction, "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: 64 << 20}
 			if observed {
@@ -200,6 +205,24 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if json.Unmarshal(spec, &authored) != nil {
 				t.Fatal("policy spec")
 			}
+			var recurringSharing *capture.PolicyShareInstruction
+			if len(protected) > 0 && protected[0].RecurringSharing {
+				var owner artifact.AudienceAssignment
+				for _, assignment := range projection.Allows {
+					if assignment.Audience.BasisUID == b.Resource.UID && assignment.Audience.Role == "evidence-owner" {
+						owner = assignment.Audience
+					}
+				}
+				if owner.AssignmentID == "" {
+					t.Fatal("current recurring sharing owner absent")
+				}
+				recipient := authorization.ShareRecipient{Kind: "User", Issuer: creator.Issuer, ID: "synthetic-policy-recipient"}
+				sharingUntil := now.Add(30 * time.Minute).UTC().Truncate(time.Second)
+				recurringSharing = &capture.PolicyShareInstruction{Creator: creator, Management: []artifact.AudienceAssignment{owner}, Recipients: []authorization.ShareRecipient{recipient}, MaxCaptures: 4, NotAfter: sharingUntil}
+			}
+			if len(protected) > 0 {
+				policyRecorderReviewedSaveSpec(authored, protected[0].RecordingSaves, recurringSharing)
+			}
 			if len(protected) > 0 && protected[0].Retention != "" {
 				authored["retention"] = protected[0].Retention
 			}
@@ -255,9 +278,13 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal(err)
 			}
 			author := s.a.Eligibility.VerifiedIdentity
+			if recurringSharing != nil && !slices.Contains(author.Scopes, authorization.ShareScope) {
+				author.Scopes = append(slices.Clone(author.Scopes), authorization.ShareScope)
+			}
 			author.VerifiedAt, author.ValidUntil = now, now.Add(30*time.Second)
 			workload := authorization.WorkloadTarget{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID}
 			accepted := capture.PolicyAdmission{RootID: root, Recovery: recovery, Authority: authority, Author: author, Workload: &workload, Submission: capture.VerifiedPolicySubmission{Nonce: custodyID(), Actor: creator, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, EnvelopeDigest: artifact.Digest{92}, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)}}
+			accepted.Sharing = recurringSharing
 			accepted.Verification = syntheticSubmissionCheck(accepted, now)
 			record, err := acceptor.AcceptPolicy(ctx, accepted)
 			if err != nil {
@@ -265,6 +292,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			}
 			if err = (auditapp.PolicyAcceptancePublisher{Ledger: auditor, Objects: &objectstore.PolicyAcceptanceObjects{Store: store, Seal: keys, Open: keys}}).PublishPolicyAcceptances(ctx); err != nil {
 				t.Fatal(err)
+			}
+			if recurringSharing != nil && record.Record.Sharing == nil {
+				t.Fatal("accepted recurring sharing missing")
 			}
 			if len(protected) > 0 && protected[0].SourceAccepted != nil {
 				protected[0].SourceAccepted(t, policySourceAcceptedFixture{Scenario: s, Compiled: compiled, Authority: authority, Source: source, Sources: sources, Reader: reader, Record: record})
@@ -565,5 +595,56 @@ func policySourceCompile(filters planning.FilterCompiler) func(json.RawMessage) 
 			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
 		}
 		return planning.CompileOngoingPolicyRecorder(*c, filters)
+	}
+}
+
+// Set reviewed intent before raw source hashing/observation/acceptance. The same
+// constructor is exercised by the pure compiler contract control below.
+func policyRecorderReviewedSaveSpec(authored map[string]any, enabled bool, sharing *capture.PolicyShareInstruction) {
+	if enabled {
+		authored["recordingSaves"] = map[string]any{"enabled": true}
+	}
+	if sharing != nil {
+		recipients := make([]map[string]any, len(sharing.Recipients))
+		for n, recipient := range sharing.Recipients {
+			recipients[n] = map[string]any{"kind": recipient.Kind, "issuer": recipient.Issuer, "id": recipient.ID}
+		}
+		authored["sharing"] = map[string]any{"recipients": recipients, "futureCaptures": map[string]any{"enabled": true, "maxCaptures": sharing.MaxCaptures}, "notAfter": sharing.NotAfter.UTC().Format(time.RFC3339)}
+	}
+}
+
+func TestManualSaveFixtureReviewedOptInAndSharingCompile(t *testing.T) {
+	var authored map[string]any
+	if err := json.Unmarshal(publicPolicySpec(t, authorization.AcceptedPolicyAuthority{ClusterID: custodyID()}), &authored); err != nil {
+		t.Fatal(err)
+	}
+	component := authored["profileComposition"].(map[string]any)["components"].([]any)[0].(map[string]any)
+	for _, value := range component["overrides"].([]any) {
+		edit := value.(map[string]any)
+		if edit["field"] == "actionExecutionMode" {
+			edit["value"] = "ongoing"
+		}
+		if edit["field"] == "packetBefore" {
+			edit["value"] = "10s"
+		}
+	}
+	sharing := &capture.PolicyShareInstruction{Recipients: []authorization.ShareRecipient{{Kind: "User", Issuer: "https://id.example.test", ID: "synthetic-policy-recipient"}}, MaxCaptures: 4, NotAfter: time.Now().UTC().Truncate(time.Second).Add(30 * time.Minute)}
+	policyRecorderReviewedSaveSpec(authored, true, sharing)
+	raw, err := json.Marshal(authored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := captureapp.CompilePolicyWithRecorders(raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
+	if err != nil || !compiled.RecordingSaves || compiled.Recorder == nil || compiled.Recorder.Action.ExecutionMode != "ongoing" || compiled.Sharing == nil || compiled.Sharing.MaxCaptures != sharing.MaxCaptures || len(compiled.Sharing.Recipients) != 1 {
+		t.Fatal("reviewed manual opt-in and recurring sharing not supported by actual compiler", err)
+	}
+	delete(authored, "recordingSaves")
+	raw, err = json.Marshal(authored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := captureapp.CompilePolicyWithRecorders(raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
+	if err != nil || old.RecordingSaves {
+		t.Fatal("legacy policy silently gained manual save capability", err)
 	}
 }

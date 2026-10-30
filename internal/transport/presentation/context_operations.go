@@ -59,11 +59,12 @@ type ContextHistoryUseCase interface {
 }
 
 type ContextOperations struct {
-	config    ContextOperationsConfig
-	captures  ContextUseCase
-	progress  ContextProgressUseCase
-	history   ContextHistoryUseCase
-	contracts *contracts.InvestigationContracts
+	recordingSaveCancellationEnabled bool
+	config                           ContextOperationsConfig
+	captures                         ContextUseCase
+	progress                         ContextProgressUseCase
+	history                          ContextHistoryUseCase
+	contracts                        *contracts.InvestigationContracts
 }
 
 func (s *ContextOperations) PublicOrigin() string {
@@ -270,19 +271,20 @@ type ContextActionData struct {
 	ReasonCode string `json:"reason_code,omitempty"`
 }
 type ContextProgressData struct {
-	RepeatedFrom      string              `json:"repeated_from_capture_id,omitempty"`
-	HistoryState      string              `json:"history_state,omitempty"`
-	CaptureID         string              `json:"capture_id"`
-	Revision          int64               `json:"revision"`
-	Phase             string              `json:"phase"`
-	Actions           []ContextActionData `json:"actions"`
-	CaseID            string              `json:"case_id,omitempty"`
-	NavigationURI     string              `json:"navigation_uri"`
-	RetryAfterSeconds int                 `json:"retry_after_seconds,omitempty"`
-	CanCancel         bool                `json:"can_cancel"`
-	Blockers          []OperationBlocker  `json:"blockers"`
-	Operation         string              `json:"operation"`
-	Sharing           *ContextSharingData `json:"sharing,omitempty"`
+	RepeatedFrom          string              `json:"repeated_from_capture_id,omitempty"`
+	HistoryState          string              `json:"history_state,omitempty"`
+	CaptureID             string              `json:"capture_id"`
+	Revision              int64               `json:"revision"`
+	Phase                 string              `json:"phase"`
+	Actions               []ContextActionData `json:"actions"`
+	CaseID                string              `json:"case_id,omitempty"`
+	NavigationURI         string              `json:"navigation_uri"`
+	RetryAfterSeconds     int                 `json:"retry_after_seconds,omitempty"`
+	CanCancel             bool                `json:"can_cancel"`
+	CancellationRequested bool                `json:"cancellation_requested,omitempty"`
+	Blockers              []OperationBlocker  `json:"blockers"`
+	Operation             string              `json:"operation"`
+	Sharing               *ContextSharingData `json:"sharing,omitempty"`
 }
 
 func collectionBlockers(enabled bool) []OperationBlocker {
@@ -555,7 +557,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 			}
 			if operationErr == nil {
 				until = identity.Earlier(until, accepted.MetadataValidUntil)
-				data := ContextAcceptedData{CaptureID: accepted.CaptureID, Phase: "Accepted", NavigationURI: s.config.PublicOrigin + "/captures/" + accepted.CaptureID, Operation: "collect"}
+				data := ContextAcceptedData{CaptureID: accepted.CaptureID, Phase: "Accepted", NavigationURI: s.config.PublicOrigin + "/captures/" + accepted.CaptureID, Operation: acceptedRecordingOperation(accepted)}
 				if accepted.RepeatedFrom != nil && accepted.RepeatedFrom.Valid(s.config.Now()) {
 					data.RepeatedFrom = accepted.RepeatedFrom.CaptureID
 				}
@@ -577,7 +579,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 				if disposition.Accepted == nil {
 					return OperationReply{}, value.ErrUnavailable
 				}
-				out.Data = ContextResolutionData{State: "accepted", ContextAcceptedData: &ContextAcceptedData{CaptureID: disposition.Accepted.CaptureID, Phase: "Accepted", NavigationURI: s.config.PublicOrigin + "/captures/" + disposition.Accepted.CaptureID, Operation: "collect"}}
+				out.Data = ContextResolutionData{State: "accepted", ContextAcceptedData: &ContextAcceptedData{CaptureID: disposition.Accepted.CaptureID, Phase: "Accepted", NavigationURI: s.config.PublicOrigin + "/captures/" + disposition.Accepted.CaptureID, Operation: acceptedRecordingOperation(*disposition.Accepted)}}
 			case value.RequestClosed:
 				if disposition.Accepted != nil {
 					return OperationReply{}, value.ErrUnavailable
@@ -592,7 +594,18 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 		progress, operationErr = s.progress.Get(ctx, current, in.CaptureID)
 		if operationErr == nil {
 			until = identity.Earlier(until, progress.ValidUntil)
-			data := ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: []ContextActionData{{ActionID: "pod-status", Phase: progress.ActionPhase, ReasonCode: progress.ReasonCode}}, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, RetryAfterSeconds: progress.RetryAfterSeconds, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: "collect"}
+			operation, actionID := progress.Operation, progress.ActionID
+			if operation == "" {
+				operation = "collect"
+			}
+			if actionID == "" {
+				actionID = "pod-status"
+			}
+			data := ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: []ContextActionData{{ActionID: actionID, Phase: progress.ActionPhase, ReasonCode: progress.ReasonCode}}, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, RetryAfterSeconds: progress.RetryAfterSeconds, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: operation}
+			data.CancellationRequested = progress.CancellationRequested
+			if operation == "recordingSave" {
+				data.CanCancel = data.CanCancel && s.recordingSaveCancellationEnabled
+			}
 			data.HistoryState = progress.HistoryState
 			if progress.RepeatedFrom != nil && progress.RepeatedFrom.Valid(s.config.Now()) {
 				data.RepeatedFrom = progress.RepeatedFrom.CaptureID
@@ -607,6 +620,9 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 	}
 	if operationErr != nil {
 		out.Status, out.Data, out.NextCursor = "error", publicCaptureFailure(operationErr, name == "request_capture" || name == "resolve_capture_request"), nil
+		if errors.Is(operationErr, value.ErrRecordingSelectionRequired) {
+			out.Data = recordingSelectionFailure(s.config.PublicOrigin)
+		}
 		if name == "get_capture_settings" && errors.Is(operationErr, value.ErrSettingsTooLarge) {
 			out.Data = settingsSizeFailure(s.config.PublicOrigin, in.CaptureID)
 		}

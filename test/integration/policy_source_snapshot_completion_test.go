@@ -34,7 +34,7 @@ import (
 // observations remain synthetic fixture facts; no collector or native clock
 // qualification follows from this test. The caller supplies genuine reviewed
 // source admission, occurrence and capture acceptance, never hand-inserted rows.
-func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication) {
+func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation, artifact.RecoveryProof)) {
 	t.Helper()
 	s, accepted, admission := policy.Scenario, snapshot.Accepted, snapshot.Admission
 	e := accepted.Expectation
@@ -103,6 +103,19 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 		checked := clock()
 		until = identity.Earlier(until, identity.Earlier(eligibility.ValidUntil, identity.Earlier(plan.ValidUntil, recovery.FreshUntil)))
 		out := executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligibility, Recovery: recovery, Process: executionvalue.APIProcessObservation{Binding: process, CheckedAt: now, ValidUntil: now.Add(5 * time.Second)}, CheckedAt: checked, ValidUntil: until}
+		if admission.RecordingSave != nil {
+			human := admission.RecordingSave.Initiator.VerifiedIdentity
+			permissions, err := s.p.Permissions(ctx, admission.Eligibility.Target)
+			if err != nil {
+				t.Fatal("current manual initiator permission projection", err)
+			}
+			initiating := authorization.ContextEligibility(human, permissions, admission.Eligibility.Target, clock())
+			if !initiating.Eligible {
+				t.Fatal("current manual initiator rights", initiating.Reason)
+			}
+			out.Initiator = &initiating
+			out.ValidUntil = identity.Earlier(out.ValidUntil, initiating.ValidUntil)
+		}
 		if !out.Valid(clock()) {
 			t.Fatal("snapshot execution preflight invalid")
 		}
@@ -176,12 +189,25 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 		case <-timer.C:
 		}
 	}
-	if e.Snapshot.After < 50*time.Millisecond {
-		t.Fatal("fixture requires its authored positive post-window for synthetic packets")
+	var native []byte
+	observedUntil := e.Snapshot.T0.Add(49 * time.Millisecond)
+	if e.Snapshot.After == 0 {
+		// Manual saves contain only existing history.50 nanosecond-spaced synthetic
+		// headers end exactly at t0; interface statistics also close at t0.
+		first := e.Snapshot.T0.Add(-49 * time.Nanosecond)
+		if first.Before(artifact.SourceSnapshotAnchor(*e.Snapshot)) {
+			t.Fatal("fixture lacks its49ns historical span")
+		}
+		native = syntheticFilteredRecording(t, first, policy.Compiled.Recorder.Filter.Program, 2, syntheticRecordingTimes{Step: time.Nanosecond, End: e.Snapshot.T0})
+		observedUntil = e.Snapshot.T0
+	} else {
+		if e.Snapshot.After < 50*time.Millisecond {
+			t.Fatal("automatic fixture requires its authored positive post-window")
+		}
+		native = syntheticFilteredRecording(t, e.Snapshot.T0, policy.Compiled.Recorder.Filter.Program, 2)
 	}
-	native := syntheticFilteredRecording(t, e.Snapshot.T0, policy.Compiled.Recorder.Filter.Program, 2)
 	defer clear(native)
-	outcome := artifact.SourceSnapshotOutcome{NativeSHA256: artifact.Digest(sha256.Sum256(native)), SourceSnapshotCoverage: artifact.SourceSnapshotCoverage{Request: *e.Snapshot, AcceptedExpectationDigest: evidence.ContextExpectationDigest(e), NativeBytes: int64(len(native)), Retained: 50, AvailableFrom: e.Snapshot.SourceStartedAt, ObservedUntil: e.Snapshot.T0.Add(49 * time.Millisecond), CompletedAt: clock(), InputUnknown: true}}
+	outcome := artifact.SourceSnapshotOutcome{NativeSHA256: artifact.Digest(sha256.Sum256(native)), SourceSnapshotCoverage: artifact.SourceSnapshotCoverage{Request: *e.Snapshot, AcceptedExpectationDigest: evidence.ContextExpectationDigest(e), NativeBytes: int64(len(native)), Retained: 50, AvailableFrom: e.Snapshot.SourceStartedAt, ObservedUntil: observedUntil, CompletedAt: clock(), InputUnknown: true}}
 	final, err := artifact.ProjectSourceSnapshot(e, evidence.ContextExpectationDigest(e), outcome)
 	if err != nil {
 		t.Fatal(err)
@@ -208,6 +234,9 @@ func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capac
 	}
 	if _, err = executions.RecordAPIStoredCompletion(ctx, execution, completion, processObservation, recovery); err == nil {
 		t.Fatal("snapshot used finite completion")
+	}
+	for _, hook := range beforeStored {
+		hook(executions, execution, processObservation, recovery)
 	}
 	execution, err = executions.RecordAPIStoredSnapshotCompletion(ctx, execution, completion, outcome.SourceSnapshotCoverage, processObservation, recovery)
 	if err != nil {

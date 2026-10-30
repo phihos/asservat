@@ -44,7 +44,144 @@
         "executionDigest"
       ]
     },
-    "recording": {},
+    "recording": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "recording_handle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "policy_uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "policy_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "pod_uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "pod_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "action_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "kind": {
+          "enum": [
+            "packetCapture",
+            "syscallTrace"
+          ]
+        },
+        "state": {
+          "enum": [
+            "Unknown",
+            "Ready",
+            "Armed",
+            "Warming",
+            "Degraded",
+            "Stopped",
+            "Expired",
+            "Unavailable"
+          ]
+        },
+        "history": {
+          "enum": [
+            "Unknown",
+            "Full",
+            "Partial",
+            "None"
+          ]
+        },
+        "maximum_before": {
+          "anyOf": [
+            {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
+            },
+            {
+              "const": "0s"
+            }
+          ]
+        },
+        "save_eligible": {
+          "type": "boolean"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "incident_pod_cap": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "handle_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "available_before_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3600
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "execution_authority": {
+          "$ref": "https://asservat.io/spec/v1/policy-authority.schema.json#/$defs/summary"
+        }
+      },
+      "required": [
+        "policy_uid",
+        "pod_uid",
+        "pod_name",
+        "action_id",
+        "kind",
+        "state",
+        "history",
+        "maximum_before",
+        "save_eligible",
+        "blockers",
+        "incident_pod_cap"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "save_eligible": {
+                "const": true
+              }
+            },
+            "required": [
+              "save_eligible"
+            ]
+          },
+          "then": {
+            "required": [
+              "recording_handle"
+            ]
+          }
+        }
+      ]
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,
@@ -292,15 +429,26 @@
         },
         "recordings": {
           "type": "array",
-          "items": {},
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/recording-save.schema.json#/$defs/recording"
+          },
           "minItems": 0,
           "maxItems": 100,
           "uniqueItems": true
+        },
+        "capture_enabled": {
+          "type": "boolean"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
         }
       },
       "required": [
         "kind",
-        "recordings"
+        "recordings",
+        "capture_enabled",
+        "expires_at"
       ]
     },
     "preview": {
@@ -330,7 +478,9 @@
         },
         "selected_recordings": {
           "type": "array",
-          "items": {},
+          "items": {
+            "$ref": "https://asservat.io/spec/v1/recording-save.schema.json#/$defs/recording"
+          },
           "minItems": 1,
           "maxItems": 16,
           "uniqueItems": true
@@ -381,6 +531,14 @@
           "type": "string",
           "format": "uri",
           "maxLength": 2048
+        },
+        "capture_enabled": {
+          "type": "boolean"
+        },
+        "incident_pod_cap": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
         }
       },
       "required": [
@@ -394,7 +552,9 @@
         "windows",
         "capture_assessment",
         "blockers",
-        "navigation_uri"
+        "navigation_uri",
+        "capture_enabled",
+        "incident_pod_cap"
       ]
     },
     "settingsRecord": {

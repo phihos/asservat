@@ -23,6 +23,13 @@ type ContextScopeIdentity struct {
 	ApprovedAcceptance bool
 }
 
+func (s ContextScopeIdentity) RequestingPrincipal() identity.Principal {
+	if s.Requester != nil {
+		return *s.Requester
+	}
+	return s.Actor
+}
+
 // ReadContextScopeIdentity accepts only the exact canonical private compiler
 // shape. Unknown/duplicate fields, alternate formatting and changed digests fail.
 func ReadContextScopeIdentity(b []byte, want artifact.Digest) (ContextScopeIdentity, error) {

@@ -173,6 +173,9 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if a.Replay && !continuation {
 		return a, nil
 	}
+	if e := a.Expectation; e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" && !s.RecordingSaveEnabled {
+		return a, value.ErrUnavailable
+	}
 	if !s.Now().Before(a.Deadline) || !s.Now().Before(a.Expectation.Registration.WriteUntil) {
 		return a, value.ErrAcquisitionClosed
 	}
@@ -189,7 +192,7 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		}
 		return a, value.ErrUnavailable
 	}
-	if encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != a.CaptureID || r.Actor != i.Principal || r.ScopeDigest != a.ScopeDigest || r.SubmissionDigest != a.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(b)) || !r.Deadline.Equal(a.Deadline) {
+	if encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != a.CaptureID || r.Requester() != i.Principal || r.ScopeDigest != a.ScopeDigest || r.SubmissionDigest != a.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(b)) || !r.Deadline.Equal(a.Deadline) {
 		if s.ReportPreviewFailure != nil {
 			s.ReportPreviewFailure("request/intent/record")
 		}
@@ -204,8 +207,24 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if err = check(); err != nil {
 		return a, err
 	}
+	executionCurrent := current
+	if r.Initiator != nil {
+		if s.PolicyAccepted == nil || a.Expectation.Snapshot == nil || a.Expectation.Lifecycle == nil || a.Expectation.Lifecycle.Origin == nil {
+			return a, value.ErrUnavailable
+		}
+		_, policyUID, isPolicy := authorization.PolicyExecutor(r.Actor)
+		if !isPolicy {
+			return a, value.ErrDenied
+		}
+		accepted, e := s.PolicyAccepted.AcceptedPolicyAuthority(call, policyUID)
+		if e != nil || accepted.Authority.Executor != r.Actor || accepted.Authority.ScopeDigest != a.Expectation.Lifecycle.Origin.PolicyExecutionDigest {
+			return a, value.ErrDenied
+		}
+		liveUntil := identity.Earlier(until, accepted.SourceUntil)
+		executionCurrent = recordingSaveIdentity{policy: newPolicyIdentity(call, s.PolicyAccepted, accepted.Authority, liveUntil, s.Now), initiator: current, original: i, until: liveUntil}
+	}
 	startStarted := time.Now()
-	err = s.Start.StartContext(call, current, a.CaptureID)
+	err = s.Start.StartContext(call, executionCurrent, a.CaptureID)
 	auditapp.MarkStep(call, "s-start", startStarted)
 	if err != nil {
 		return a, err

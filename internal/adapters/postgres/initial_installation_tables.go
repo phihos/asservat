@@ -140,6 +140,8 @@ var initialInstallationTables = []string{
 	"processing_decision",
 	"processing_root",
 	"processing_rule",
+	"recording_save_reservation",
+	"recording_selection_set",
 	"retention_catchup",
 	"retention_catchup_effect",
 	"retention_checkpoint",

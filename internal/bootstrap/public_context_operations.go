@@ -31,6 +31,8 @@ import (
 // Protected deployment composition must verify original projections and supply
 // current scoped adapters before calling it; no missing service gets a default.
 type PublicContextOperationServices struct {
+	Recordings    *captureapp.RecordingSaves
+	Cancellations *captureapp.CaptureCancellation
 	History       *captureapp.HistoryParameterService
 	Investigation captureapp.ContextInvestigation
 	Intents       auditapp.CaptureOperationPublication
@@ -102,8 +104,31 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 		return nil, err
 	}
 	operations, err := presentation.NewInvestigationOperations(captures, cases, downloads)
-	if err != nil || s.Projection == nil {
-		return operations, err
+	if err != nil {
+		return nil, err
+	}
+	if s.Recordings != nil {
+		saves := *s.Recordings
+		saves.Investigation = v.submission.ContextInvestigation
+		saves.History = history
+		saves.Inventory.Now, saves.Inventory.NewID = c.Now, c.NewID
+		var cancel presentation.RecordingCancellationUseCase
+		if s.Cancellations != nil {
+			service := *s.Cancellations
+			service.Now = c.Now
+			cancel = service
+		}
+		recordings, e := presentation.NewRecordingSaveOperations(presentation.RecordingSaveOperationsConfig{PublicOrigin: c.PublicOrigin, CollectionEnabled: c.CollectionEnabled && v.submission.RecordingSaveEnabled, Now: c.Now, NewID: c.NewID}, saves, cancel)
+		if e != nil {
+			return nil, e
+		}
+		operations, e = presentation.NewInvestigationRecordingSaveOperations(operations, recordings)
+		if e != nil {
+			return nil, e
+		}
+	}
+	if s.Projection == nil {
+		return operations, nil
 	}
 	q := s.Projection
 	if q.Results.RootID != c.RootID || q.Results.InstallationID != c.InstallationID || !authorization.UUID(q.Results.HubProcessEpoch) || q.Results.Authority == nil || q.Results.Ledger == nil || q.Results.Reader == nil || q.Results.Now == nil || q.Results.NewID == nil || q.Recovery == nil || q.Routes == nil || q.Plans == nil || q.Workers == nil {

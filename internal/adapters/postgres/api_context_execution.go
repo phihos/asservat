@@ -65,7 +65,7 @@ func apiWork(c custodydb.ContextCapture) (app.APIContextWork, error) {
 	if accepted.Expectation.Snapshot != nil {
 		// Both callers immediately resolve this incomplete private value from
 		// the exact retained source row before any work can be returned/used.
-		out = app.APIContextWork{Accepted: accepted, Actor: intent.Actor}
+		out = app.APIContextWork{Accepted: accepted, Actor: intent.Actor, Initiator: intent.Initiator}
 		copy(out.IntentDigest[:], c.IntentDigest)
 		return out, nil
 	}
@@ -223,7 +223,7 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 	if !reflect.DeepEqual(w.SourceBinding, c.Work.SourceBinding) {
 		return sqlStep{"snapshot-source", value.ErrConflict}
 	}
-	if w.Actor != c.Work.Actor || w.Target != c.Work.Target || w.IntentDigest != c.Work.IntentDigest || w.Accepted.Pin != c.Work.Accepted.Pin || !bytes.Equal(digest(w.Accepted.Expectation), digest(e)) {
+	if !reflect.DeepEqual(w.Initiator, c.Work.Initiator) || w.Actor != c.Work.Actor || w.Target != c.Work.Target || w.IntentDigest != c.Work.IntentDigest || w.Accepted.Pin != c.Work.Accepted.Pin || !bytes.Equal(digest(w.Accepted.Expectation), digest(e)) {
 		return sqlStep{"conflict", value.ErrConflict}
 	}
 
@@ -266,6 +266,15 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 			}
 		}
 
+		if w.Initiator != nil {
+			if c.Initiator == nil {
+				return sqlStep{"initiator", value.ErrDenied}
+			}
+			caller := authorization.ContextEligibility(c.Initiator.VerifiedIdentity, projection, projection.Target, now.Time)
+			if !caller.Eligible || caller.Principal != *w.Initiator || !now.Time.Before(c.Initiator.ValidUntil) {
+				return sqlStep{"initiator", value.ErrDenied}
+			}
+		}
 		if !c.Valid(now.Time) || !eligible.Eligible || eligible.Principal != w.Actor || eligible.PermissionRevision != c.Eligibility.PermissionRevision || eligible.IdentityRevision != c.Eligibility.IdentityRevision || !slices.Equal(eligible.DefaultAudience, e.Audience) {
 			return sqlStep{"eligibility", value.ErrDenied}
 		}
@@ -488,7 +497,7 @@ func (s *APIContextExecutions) changeAPIStart(ctx context.Context, c app.APIExec
 	return out, nil
 }
 func (s *APIContextExecutions) RecordAPIOutcome(ctx context.Context, r value.APIExecution, process value.APIProcessObservation) (value.APIExecution, error) {
-	if r.WriterProtocol == artifact.ContextWriterProtocol && r.Phase == "stored" {
+	if r.Phase == "cancelled" || r.WriterProtocol == artifact.ContextWriterProtocol && r.Phase == "stored" {
 		return value.APIExecution{}, value.ErrDenied
 	}
 	return s.recordAPIOutcome(ctx, r, process, nil, nil, artifact.RecoveryProof{})
@@ -540,6 +549,10 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 		}
 		if old.WriterProtocol != r.WriterProtocol || old.Binding != r.Binding || old.Process != r.Process || old.ObjectUID != r.ObjectUID || old.ExpectationDigest != r.ExpectationDigest || !old.StartedAt.Equal(r.StartedAt) {
 			return value.ErrConflict
+		}
+		if old.Phase == "started" && c.SnapshotCancelRequestedAt.Valid && r.Phase != "stored" && completion == nil {
+			out = old
+			return ctx.Err() // Keep existing collector ownership until exact join/Stored wins.
 		}
 		if old.Phase != "started" {
 			if !reflect.DeepEqual(old, r) {

@@ -138,11 +138,11 @@ func validAdmission(a value.Admission) bool {
 	p := a.Plan.Input
 	t := p.Target.Target()
 	e := a.Eligibility
-	return authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && (p.Recorder == nil && p.Snapshot == nil && r.NativeLimit == artifact.MaxContextBytes || p.Recorder != nil && p.Snapshot == nil && r.NativeLimit == artifact.RecordingNativeLimit || p.Recorder == nil && p.Snapshot != nil && r.NativeLimit == p.Snapshot.Request.MaxBytes) && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
+	return manualAdmissionShape(a) && authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && (p.Recorder == nil && p.Snapshot == nil && r.NativeLimit == artifact.MaxContextBytes || p.Recorder != nil && p.Snapshot == nil && r.NativeLimit == artifact.RecordingNativeLimit || p.Recorder == nil && p.Snapshot != nil && r.NativeLimit == p.Snapshot.Request.MaxBytes) && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
 }
 
 func requestKey(a value.Admission) []byte {
-	return contextRequestKey(a.Plan.Input.Executor, a.IdempotencyKey)
+	return contextRequestKey(a.Requester(), a.IdempotencyKey)
 }
 
 func contextRequestKey(actor identity.Principal, key string) []byte {
@@ -192,6 +192,13 @@ func (s *ContextAdmissions) currentCaptureEligibility(ctx context.Context, q *cu
 	}
 	if fresh.Principal != a.Plan.Input.Executor || fresh.IdentityRevision != a.Eligibility.IdentityRevision || fresh.PermissionRevision != a.Eligibility.PermissionRevision {
 		return fresh, value.ErrChanged
+	}
+	if manual := a.RecordingSave; manual != nil {
+		caller := authorization.ContextEligibility(manual.Initiator.VerifiedIdentity, p, a.Plan.Input.Target.Target(), n.Time)
+		if !caller.Eligible || caller.Principal != a.Requester() || !n.Time.Before(manual.Initiator.ValidUntil) || caller.IdentityRevision != manual.Initiator.IdentityRevision {
+			return fresh, value.ErrDenied
+		}
+		fresh.ValidUntil = identity.Earlier(fresh.ValidUntil, caller.ValidUntil)
 	}
 	return fresh, nil
 }
@@ -312,6 +319,9 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 		var reviewed value.ContextPreview
 		if previewID != "" {
 			query := value.ReplayQuery{RootID: s.root, PreviewID: previewID, IdempotencyKey: a.IdempotencyKey, SubmissionDigest: a.SubmissionDigest, Identity: a.Eligibility.VerifiedIdentity, Recovery: a.Recovery}
+			if a.RecordingSave != nil {
+				query.Identity = a.RecordingSave.Initiator.VerifiedIdentity
+			}
 			if row, found, err := findContextRequest(ctx, q, query); err != nil {
 				return err
 			} else if found {
@@ -348,6 +358,22 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 		policyReservation, err := lockPolicyCaptureReservation(ctx, q, recovery, a, s.recovery.installationID())
 		if err != nil {
 			return err
+		}
+		var acceptedAt pgtype.Timestamptz
+		if policyReservation != nil && policyReservation.manual != nil {
+			processingUntil := policyReservation.manual.authorityUntil
+			if a.RepeatedFrom != nil {
+				processingUntil = identity.Earlier(processingUntil, a.RepeatedFrom.ExpiresAt)
+			}
+			a.Plan, r, err = planning.ReanchorRecordingSave(a.Plan, r, policyReservation.manual.acceptedAt, processingUntil)
+			if err != nil || a.Plan.Input.Deadline.After(policyReservation.processingLimit) {
+				return value.ErrDenied
+			}
+			a.Registration = r
+			acceptedAt = ts(policyReservation.manual.acceptedAt)
+			if !validAdmission(a) {
+				return value.ErrChanged
+			}
 		}
 		var auditAccount audit.CaptureAuditAccount
 		var auditUntil time.Time
@@ -568,11 +594,11 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 			}
 			repeatedID, repeatedUntil = id(a.RepeatedFrom.CaptureID), ts(a.RepeatedFrom.ExpiresAt)
 		}
-		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(previewID), RequestKey: requestKey(a), SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil})
+		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(previewID), RequestKey: requestKey(a), SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil, AcceptedAt: acceptedAt})
 		if err != nil {
 			return err
 		}
-		if err = policyReservation.spend(ctx, q, s.root, in.CaptureID); err != nil {
+		if err = policyReservation.spend(ctx, q, s.root, in.CaptureID, a); err != nil {
 			return err
 		}
 		if s.auditMAC != nil {

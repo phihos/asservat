@@ -94,8 +94,23 @@ func syntheticRecording(t *testing.T, started time.Time) []byte {
 	return syntheticFilteredRecording(t, started, recordingProgram, 0)
 }
 
-func syntheticFilteredRecording(t *testing.T, started time.Time, program []planvalue.BPFInstruction, flags byte) []byte {
+type syntheticRecordingTimes struct {
+	Step time.Duration
+	End  time.Time
+}
+
+func syntheticFilteredRecording(t *testing.T, started time.Time, program []planvalue.BPFInstruction, flags byte, timing ...syntheticRecordingTimes) []byte {
 	t.Helper()
+	step, end := time.Millisecond, started.Add(time.Second)
+	if len(timing) > 1 {
+		t.Fatal("ambiguous synthetic packet interval")
+	}
+	if len(timing) == 1 {
+		step, end = timing[0].Step, timing[0].End
+	}
+	if step <= 0 || started.Add(49*step).After(end) {
+		t.Fatal("synthetic packets exceed authored fixture interval")
+	}
 	rec, err := packets.NewRecorder(program, 1<<20, started, "synthetic")
 	if err != nil {
 		t.Fatal(err)
@@ -110,9 +125,9 @@ func syntheticFilteredRecording(t *testing.T, started time.Time, program []planv
 		payload := strings.Repeat("SYNTHETIC-MARKER", 8)
 		binary.BigEndian.PutUint16(ip[2:4], uint16(len(ip)+len(tcp)+len(payload)))
 		f := append(append(append([]byte{0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 6, 8, 0}, ip...), tcp...), payload...)
-		rec.Add(f[:packets.Snaplen], uint32(len(f)), started.Add(time.Duration(i)*time.Millisecond))
+		rec.Add(f[:packets.Snaplen], uint32(len(f)), started.Add(time.Duration(i)*step))
 	}
-	out, counters, err := rec.Close(started.Add(time.Second), 0)
+	out, counters, err := rec.Close(end, 0)
 	if err != nil || counters.Retained != 50 {
 		t.Fatal(counters, err)
 	}
