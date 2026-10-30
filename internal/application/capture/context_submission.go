@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"sync"
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
@@ -68,7 +69,7 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if continuation && !slices.Contains(i.Scopes, "evidence:capture") {
 		return zero, value.ErrDenied
 	}
-	until := identity.Earlier(i.ValidUntil, started.Add(5*time.Second))
+	until := identity.Earlier(i.ValidUntil, started.Add(identity.RecordingSaveRequestWindow))
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -112,12 +113,18 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		if e != nil {
 			return zero, e
 		}
-		if e = narrow(recovery.FreshUntil); e != nil {
-			return zero, e
+		if !recovery.Valid(s.Now()) {
+			return zero, value.ErrDenied
 		}
 		digest := ContextRequestDigest(preview)
 		var found bool
-		a, found, err = s.Replay.LookupContextAdmission(call, value.ReplayQuery{RootID: s.RootID, PreviewID: preview, IdempotencyKey: key, SubmissionDigest: digest, Identity: i, Recovery: recovery})
+		observed, endRead := context.WithDeadline(call, recovery.FreshUntil)
+		a, found, err = s.Replay.LookupContextAdmission(observed, value.ReplayQuery{RootID: s.RootID, PreviewID: preview, IdempotencyKey: key, SubmissionDigest: digest, Identity: i, Recovery: recovery})
+		readErr := observed.Err()
+		endRead()
+		if err == nil && readErr != nil {
+			err = value.ErrDenied
+		}
 		if err != nil {
 			return zero, err
 		}
@@ -134,8 +141,8 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 			return a, err
 		}
 	}
-	// Retain one advisory attempt on early failure, but spend the live original
-	// invocation on it before Start can block through that invocation's end.
+	// Retain one advisory attempt on early failure. Group starts take priority;
+	// advisory history uses only the remaining original request interval.
 	// Replay never writes history and no history outcome changes admission.
 	historyAttempted := false
 	persistHistory := func() {
@@ -178,8 +185,12 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		if !s.RecordingSaveEnabled {
 			return a, value.ErrUnavailable
 		}
+		err = s.dispatchRecordingSaveGroup(call, current, i, a, until, func() (context.Context, time.Time, error) { e := check(); return call, until, e })
 		persistHistory()
-		err = s.dispatchRecordingSaveGroup(call, current, i, a, until, check)
+		fresh, readErr := s.refreshGroupMetadata(i, a, preview, key, func() (context.Context, time.Time, error) { e := check(); return call, until, e })
+		return fresh, errors.Join(err, readErr)
+	}
+	if err = narrow(started.Add(5 * time.Second)); err != nil {
 		return a, err
 	}
 	if e := a.Expectation; e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" && !s.RecordingSaveEnabled {
@@ -262,7 +273,8 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if !found || !acceptedContext(fresh, a.SubmissionDigest) || fresh.CaptureID != a.CaptureID || fresh.ScopeDigest != a.ScopeDigest || fresh.Pin != a.Pin || !fresh.CreatedAt.Equal(a.CreatedAt) || !fresh.Deadline.Equal(a.Deadline) || encodeErr != nil || !bytes.Equal(encoded, b) {
 		return a, value.ErrUnavailable
 	}
-	if err = check(); err != nil {
+	err = check()
+	if err != nil {
 		return a, err
 	}
 	fresh.MetadataValidUntil = identity.Earlier(fresh.MetadataValidUntil, identity.Earlier(until, recovery.FreshUntil))
@@ -275,54 +287,144 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 
 // The parent owns navigation and admission only. Each real child consumes its
 // own acknowledged intent and accepted deadlines; sibling outcomes are separate.
-func (s ContextSubmission) dispatchRecordingSaveGroup(ctx context.Context, current identities.CurrentIdentity, i identity.Identity, a value.Accepted, until time.Time, check func() error) error {
+func (s ContextSubmission) dispatchRecordingSaveGroup(ctx context.Context, current identities.CurrentIdentity, i identity.Identity, a value.Accepted, until time.Time, check func() (context.Context, time.Time, error)) error {
 	if a.Group == nil || !acceptedContext(a, a.SubmissionDigest) || s.PolicyAccepted == nil {
 		return value.ErrUnavailable
 	}
-	intents := make([]audit.CaptureIntent, len(a.Group.Children))
-	// Validate the complete admitted cohort before the first dispatch.
+	// Only intent acknowledgement is parallel. The request owner performs all
+	// identity narrowing and actual starts serially, respecting Router capacity.
+	type acknowledgement struct {
+		index  int
+		intent audit.CaptureIntent
+		err    error
+	}
+	results := make(chan acknowledgement, len(a.Group.Children))
+	audits, cancelAudits := context.WithCancel(ctx)
+	var workers sync.WaitGroup
+	defer func() { cancelAudits(); workers.Wait() }()
 	for n, child := range a.Group.Children {
-		if err := check(); err != nil {
-			return err
-		}
-		r, err := s.Intents.AcknowledgedCaptureIntent(ctx, child.CaptureID)
-		raw, e := json.Marshal(child.Expectation)
-		if err != nil || e != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != child.CaptureID || r.Requester() != i.Principal || r.ScopeDigest != child.ScopeDigest || r.SubmissionDigest != child.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(raw)) || !r.Deadline.Equal(child.Deadline) || r.Group == nil || r.Group.ParentCaptureID != a.CaptureID || r.Group.ChildIndex != n || r.Group.ChildCount != len(a.Group.Children) || r.Group.SelectionDigest != a.ScopeDigest {
-			return value.ErrUnavailable
-		}
-		intents[n] = r
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			end := identity.Earlier(until, child.Expectation.Snapshot.StartBy)
+			call, cancel := context.WithDeadline(audits, end)
+			defer cancel()
+			if call.Err() != nil {
+				results <- acknowledgement{index: n, err: value.ErrAcquisitionClosed}
+				return
+			}
+			r, err := s.Intents.AcknowledgedCaptureIntent(call, child.CaptureID)
+			results <- acknowledgement{n, r, err}
+		}()
 	}
 	var failures []error
-	for n, child := range a.Group.Children {
-		if err := check(); err != nil {
+	for range a.Group.Children {
+		// A start can observe a shorter caller interval. Reconsume it before
+		// waiting again, and wait on that narrowed context rather than the
+		// original owner. Expiry then cancels and joins the remaining audits.
+		call, currentUntil, err := check()
+		if err != nil {
 			return errors.Join(append(failures, err)...)
 		}
-		if !s.Now().Before(child.Deadline) || !s.Now().Before(child.Expectation.Registration.WriteUntil) {
+		var result acknowledgement
+		select {
+		case <-call.Done():
+			return errors.Join(append(failures, call.Err())...)
+		case result = <-results:
+		}
+		n := result.index
+		child, r := a.Group.Children[n], result.intent
+		end := identity.Earlier(currentUntil, identity.Earlier(child.Expectation.Snapshot.StartBy, identity.Earlier(child.Deadline, child.Expectation.Registration.WriteUntil)))
+		if !s.Now().Before(end) {
 			failures = append(failures, value.ErrAcquisitionClosed)
 			continue
 		}
-		r := intents[n]
+		raw, encodeErr := json.Marshal(child.Expectation)
+		if result.err != nil || encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != child.CaptureID || r.Requester() != i.Principal || r.ScopeDigest != child.ScopeDigest || r.SubmissionDigest != child.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(raw)) || !r.Deadline.Equal(child.Deadline) || r.Group == nil || r.Group.ParentCaptureID != a.CaptureID || r.Group.ChildIndex != n || r.Group.ChildCount != len(a.Group.Children) || r.Group.SelectionDigest != a.ScopeDigest {
+			failures = append(failures, value.ErrUnavailable)
+			continue
+		}
 		_, uid, ok := authorization.PolicyExecutor(r.Actor)
 		if !ok || r.Initiator == nil || child.Expectation.Lifecycle == nil || child.Expectation.Lifecycle.Origin == nil {
 			failures = append(failures, value.ErrDenied)
 			continue
 		}
-		policy, err := s.PolicyAccepted.AcceptedPolicyAuthority(ctx, uid)
+		policy, err := s.PolicyAccepted.AcceptedPolicyAuthority(call, uid)
 		if err != nil || policy.Authority.Executor != r.Actor || policy.Authority.ScopeDigest != child.Expectation.Lifecycle.Origin.PolicyExecutionDigest {
 			failures = append(failures, value.ErrDenied)
 			continue
 		}
-		end := identity.Earlier(until, identity.Earlier(policy.SourceUntil, identity.Earlier(child.Deadline, child.Expectation.Registration.WriteUntil)))
-		live := recordingSaveIdentity{policy: newPolicyIdentity(ctx, s.PolicyAccepted, policy.Authority, end, s.Now), initiator: current, original: i, until: end}
-		call, cancel := context.WithDeadline(ctx, end)
-		err = s.Start.StartContext(call, live, child.CaptureID)
+		end = identity.Earlier(end, policy.SourceUntil)
+		// The policy read can block. Reconsume current caller authority before effect.
+		call, currentUntil, err = check()
+		if err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		end = identity.Earlier(end, currentUntil)
+		if !s.Now().Before(end) {
+			failures = append(failures, value.ErrAcquisitionClosed)
+			continue
+		}
+		live := recordingSaveIdentity{policy: newPolicyIdentity(call, s.PolicyAccepted, policy.Authority, end, s.Now), initiator: current, original: i, until: end}
+		childCall, cancel := context.WithDeadline(call, end)
+		err = s.Start.StartContext(childCall, live, child.CaptureID)
 		cancel()
 		if err != nil {
 			failures = append(failures, err)
 		}
 	}
-	if err := check(); err != nil {
+	if _, _, err := check(); err != nil {
 		failures = append(failures, err)
 	}
 	return errors.Join(failures...)
+}
+
+// Refresh only response metadata for the exact accepted parent and every real
+// child. This read never admits, acknowledges or starts work.
+func (s ContextSubmission) refreshGroupMetadata(i identity.Identity, a value.Accepted, preview, key string, check func() (context.Context, time.Time, error)) (value.Accepted, error) {
+	ctx, until, err := check()
+	if err != nil {
+		return a, err
+	}
+	if s.Now().Before(a.MetadataValidUntil) {
+		return a, nil
+	}
+	recovery, err := s.currentRecovery(ctx)
+	if err != nil {
+		return a, err
+	}
+	observed, cancel := context.WithDeadline(ctx, recovery.FreshUntil)
+	defer cancel()
+	fresh, found, err := s.Replay.LookupContextAdmission(observed, value.ReplayQuery{RootID: s.RootID, PreviewID: preview, IdempotencyKey: key, SubmissionDigest: a.SubmissionDigest, Identity: i, Recovery: recovery})
+	if err != nil {
+		return a, err
+	}
+	if !found || !acceptedContext(fresh, a.SubmissionDigest) || !sameAcceptedGroup(a, fresh) {
+		return a, value.ErrUnavailable
+	}
+	ctx, until, err = check()
+	if err != nil {
+		return a, err
+	}
+	fresh.MetadataValidUntil = identity.Earlier(fresh.MetadataValidUntil, identity.Earlier(until, recovery.FreshUntil))
+	if observed.Err() != nil || !recovery.Valid(s.Now()) || !s.Now().Before(fresh.MetadataValidUntil) {
+		return a, value.ErrDenied
+	}
+	fresh.Replay = a.Replay
+	return fresh, nil
+}
+
+func sameAcceptedGroup(a, b value.Accepted) bool {
+	if a.CaptureID != b.CaptureID || a.ScopeDigest != b.ScopeDigest || a.SubmissionDigest != b.SubmissionDigest || a.Pin != b.Pin || !a.CreatedAt.Equal(b.CreatedAt) || !a.Deadline.Equal(b.Deadline) || a.Group == nil || b.Group == nil || a.Group.CaseID != b.Group.CaseID || len(a.Group.Children) != len(b.Group.Children) {
+		return false
+	}
+	for n, x := range a.Group.Children {
+		y := b.Group.Children[n]
+		xb, xe := json.Marshal(x.Expectation)
+		yb, ye := json.Marshal(y.Expectation)
+		if xe != nil || ye != nil || !bytes.Equal(xb, yb) || x.CaptureID != y.CaptureID || x.ScopeDigest != y.ScopeDigest || x.SubmissionDigest != y.SubmissionDigest || x.Pin != y.Pin || !x.CreatedAt.Equal(y.CreatedAt) || !x.Deadline.Equal(y.Deadline) {
+			return false
+		}
+	}
+	return true
 }

@@ -150,3 +150,14 @@ identity is necessary but is not workload/evidence authority. Tool schemas,
 structured/text envelopes, cursor authorization, mutation idempotency, raw grants,
 authenticated native-download navigation and real provider/resource mapping need
 their own qualification before declaring an investigation flow available.
+
+## Grouped recording Save request window
+
+[ADR-268](../decisions/268-grouped-save-dispatch-window.md) gives `request_capture`
+a prospective fifteen-second transport/audit envelope, selected while routing
+the original owned bearer request. Other ordinary operations keep five seconds;
+evidence-read windows keep twenty. All earlier caller/credential/session ends
+remain binding. Group admission keeps its original five-second facts phase and
+each snapshot keeps its original SQL t0+5s StartBy. Optional encrypted history
+follows mandatory start attempts. Continue uses the same operation window and
+never changes accepted dates; passive replay does not dispatch.

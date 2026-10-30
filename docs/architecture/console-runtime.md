@@ -171,3 +171,10 @@ accessibility checks, protected deployment, or the complete investigation
 workflow. These fixtures do not qualify SQL admission, Kubernetes collection,
 evidence publication or protected installation. Missing backend composition
 remains an explicit unavailable operation in the UI.
+
+The browser uses the same prospective fifteen-second `request_capture` envelope
+as MCP for grouped recording saves ([ADR-268](../decisions/268-grouped-save-dispatch-window.md)).
+It is selected before session request ownership; origin, CSRF, current identity
+and every shorter original session/caller bound remain unchanged. Grouped start
+attempts precede optional history and retain each accepted t0+5s StartBy. No
+browser provider token, new approval page or client-supplied deadline is added.

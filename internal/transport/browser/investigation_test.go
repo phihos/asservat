@@ -209,8 +209,7 @@ func (w investigationDeadlineWriter) SetWriteDeadline(d time.Time) error {
 	return http.NewResponseController(w.ResponseWriter).SetWriteDeadline(d)
 }
 func TestInvestigationFinalIdentityShorteningReachesSocket(t *testing.T) {
-	until := time.Now().Add(2 * time.Second)
-	shorter := until.Add(-time.Second)
+	var until, shorter time.Time
 	calls := &investigationCalls{validUntil: until}
 	sessions := &investigationSession{readOnly: true}
 	sessions.beforeResolve = func() {
@@ -241,6 +240,11 @@ func TestInvestigationFinalIdentityShorteningReachesSocket(t *testing.T) {
 	req.Header.Set("X-CSRF-Token", strings.Repeat("C", 43))
 	req.Header.Set("Idempotency-Key", "stable-key")
 	req.AddCookie(&http.Cookie{Name: SessionCookie, Value: strings.Repeat("A", 43)})
+	// Fixture setup is outside the measured request. Retain the exact
+	// original2s/shorter1s intervals for the actual HTTP invocation.
+	until = time.Now().Add(2 * time.Second)
+	shorter = until.Add(-time.Second)
+	calls.validUntil = until
 	response, err := server.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)

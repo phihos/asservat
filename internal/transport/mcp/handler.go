@@ -568,7 +568,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if early, _ := decodeRouting(body); early.Method == "tools/call" && audit.OperationRequestWindow(early.Name) > requestLifetime {
-		if control.SetWriteDeadline(deadline) != nil {
+		operationUntil := identity.Earlier(deadline, started.Add(audit.OperationRequestWindow(early.Name)))
+		var shorten context.CancelFunc
+		ctx, shorten = context.WithDeadline(ctx, operationUntil)
+		defer shorten()
+		identityUntil := identityStarted.Add(audit.OperationRequestWindow(early.Name))
+		current = identities.ShortenRequest(current, identityUntil, h.now)
+		i.ValidUntil = identity.Earlier(i.ValidUntil, identityUntil)
+		ctx = context.WithValue(ctx, operationIdentityKey{}, current)
+		r = r.WithContext(ctx)
+		if !delivery.restrict(operationUntil) {
+			h.unavailable(w, "deadline-setup")
+			return
+		}
+		if control.SetWriteDeadline(operationUntil) != nil {
 			h.unavailable(w, "deadline-setup")
 			return
 		}

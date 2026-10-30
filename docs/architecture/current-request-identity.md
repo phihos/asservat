@@ -20,8 +20,12 @@ current identity again; passing the initial struct alone is insufficient.
 The handle keeps the original request's cancellation even if a consumer supplies
 `context.Background`, and links both contexts while a dependency blocks.
 
-The original interval ends at the earlier of initial identity validity and five
-seconds from construction start. A browser session's expiry also applies.
+Default constructors end the original interval at the earlier of initial identity
+validity and five seconds from construction start. Operation-specific `Within`
+constructors support existing evidence-read twenty-second windows and the
+prospective fifteen-second `request_capture` composition window (ADR-268);
+singleton application starts remain bounded to their original five seconds.
+The selected window is fixed before request ownership, never widened later. A browser session's expiry also applies.
 Later observations cannot renew that interval. A shorter current observation
 permanently shortens the request handle, including when concurrent provider
 reads complete out of order. A final locked check applies the earliest observed
