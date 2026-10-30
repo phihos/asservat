@@ -22,6 +22,7 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/domain/artifact"
+	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
 	executionvalue "asservat.local/asservat/internal/domain/execution"
@@ -29,6 +30,59 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 )
+
+// Test-only fixed-stage error diagnostics. Calls, arguments, contexts and
+// original errors are delegated unchanged; no extra authority or I/O is read.
+type snapshotPublicationTrace struct {
+	stage          string
+	failedAt       time.Time
+	authorityCalls int
+}
+
+func (s *snapshotPublicationTrace) failed(stage string, err error) {
+	if err != nil && s.stage == "" {
+		s.stage = stage
+		s.failedAt = time.Now().UTC().Truncate(time.Microsecond)
+	}
+}
+
+type snapshotPublicationLedgerTrace struct {
+	evidence.ContextPublicationFacets
+	trace *snapshotPublicationTrace
+}
+
+func (s snapshotPublicationLedgerTrace) AcceptedContextForPublication(ctx context.Context, id string) (artifact.ContextExpectation, error) {
+	out, err := s.ContextPublicationFacets.AcceptedContextForPublication(ctx, id)
+	s.trace.failed("accepted", err)
+	return out, err
+}
+func (s snapshotPublicationLedgerTrace) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority) (auditvalue.ContextVerification, error) {
+	out, err := s.ContextPublicationFacets.RecordContextVerification(ctx, e, c, a)
+	s.trace.failed("record", err)
+	return out, err
+}
+func (s snapshotPublicationLedgerTrace) AcknowledgeContextVerification(ctx context.Context, r auditvalue.ContextVerification, receipt auditvalue.Receipt) error {
+	err := s.ContextPublicationFacets.AcknowledgeContextVerification(ctx, r, receipt)
+	s.trace.failed("acknowledge", err)
+	return err
+}
+func (s snapshotPublicationLedgerTrace) PublishContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority) (artifact.PublishedContext, error) {
+	out, err := s.ContextPublicationFacets.PublishContext(ctx, e, c, a)
+	s.trace.failed("publish", err)
+	return out, err
+}
+
+type snapshotPublicationGateTrace struct {
+	base  evidence.ContextPublicationGate
+	trace *snapshotPublicationTrace
+}
+
+func (s snapshotPublicationGateTrace) CheckContextPublication(ctx context.Context, e artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
+	s.trace.authorityCalls++
+	out, err := s.base.CheckContextPublication(ctx, e)
+	s.trace.failed("authority", err)
+	return out, err
+}
 
 // Real SQL and encrypted object-store composition. Target, process and packet
 // observations remain synthetic fixture facts; no collector or native clock
@@ -350,11 +404,24 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 	}
 	checkedHeaders := 0
 	verifier.WithStreamCheck(artifact.PCAPNGArtifact, func() objectstore.StreamCheck { checkedHeaders++; return packets.NewHeadersCheck() })
+	unwrapControlsStarted := time.Now()
 	unwraps := qualifyContextKeyUnwraps(t, ctx, f.admin, f.fixturePool, s, final, accepted.CaptureID)
+	unwrapControlsElapsed := time.Since(unwrapControlsStarted)
 	f.refreshBase(t)
-	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audit, ContextCatalogPublisher: publish}, Authority: gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Now: time.Now}
+	trace := &snapshotPublicationTrace{}
+	facets := evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audit, ContextCatalogPublisher: publish}
+	publisher := evidence.ContextPublisher{Ledger: snapshotPublicationLedgerTrace{ContextPublicationFacets: facets, trace: trace}, Authority: snapshotPublicationGateTrace{base: gate, trace: trace}, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Now: time.Now}
+	publicationEntry := clock()
+	t.Logf("snapshot_publication_entry now=%s anchor=%s source_started=%s t0=%s write_until=%s expires_at=%s write_remaining_ms=%d read_remaining_ms=%d unwrap_control_us=%d", publicationEntry.Format(time.RFC3339Nano), e.Registration.AnchorAt.Format(time.RFC3339Nano), e.Snapshot.SourceStartedAt.Format(time.RFC3339Nano), e.Snapshot.T0.Format(time.RFC3339Nano), e.Registration.WriteUntil.Format(time.RFC3339Nano), e.Registration.ExpiresAt.Format(time.RFC3339Nano), e.Registration.WriteUntil.Sub(publicationEntry).Milliseconds(), e.Registration.ExpiresAt.Sub(publicationEntry).Milliseconds(), unwrapControlsElapsed.Microseconds())
 	published, err := publisher.Publish(ctx, accepted.CaptureID, execution.Copies)
 	if err != nil {
+		if trace.stage == "" {
+			trace.stage = "publisher-unwrapped"
+			trace.failedAt = clock()
+		}
+		r := e.Registration
+		q := e.Snapshot
+		t.Logf("snapshot_publication_failure stage=%s authority_calls=%d entry_now=%s failure_now=%s anchor=%s source_started=%s t0=%s start_by=%s write_until=%s expires_at=%s delete_by=%s entry_before_write=%t entry_before_expiry=%t failure_before_write=%t failure_before_expiry=%t", trace.stage, trace.authorityCalls, publicationEntry.Format(time.RFC3339Nano), trace.failedAt.Format(time.RFC3339Nano), r.AnchorAt.Format(time.RFC3339Nano), q.SourceStartedAt.Format(time.RFC3339Nano), q.T0.Format(time.RFC3339Nano), q.StartBy.Format(time.RFC3339Nano), r.WriteUntil.Format(time.RFC3339Nano), r.ExpiresAt.Format(time.RFC3339Nano), r.DeleteBy.Format(time.RFC3339Nano), publicationEntry.Before(r.WriteUntil), publicationEntry.Before(r.ExpiresAt), trace.failedAt.Before(r.WriteUntil), trace.failedAt.Before(r.ExpiresAt))
 		t.Fatal("semantic snapshot publication", err)
 	}
 	if checkedHeaders == 0 {

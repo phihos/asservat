@@ -249,7 +249,11 @@ No calendar estimate is claimed before the high-risk spikes. This is a substanti
 - [ ] TASK-08: add passive MCP inventory/preview, existing submit/poll/cancel dispatch and distinct history/settings repeat; browser parity and incremental impact/privacy disclosure.
 - [ ] TASK-03/11: implement the accepted encrypted scratch prerequisite, profile-specific readiness/remediation, isolated per-analysis PVC handoff, independent cleanup and failure qualification.
 
-All items remain unimplemented. The new requirements are REQ-SAV-001–004; storage isolation remains REQ-EVD-005/008 under accepted ADR-036. No third database, broker, public permission API or new collector deployment is introduced.
+These tasks remain open. Recording-save component implementation and local
+workflow qualification are tracked in [implementation progress](implementation-progress.md);
+they do not establish an installed grouped-save workflow. The requirements are
+REQ-SAV-001–004; storage isolation remains REQ-EVD-005/008 under accepted ADR-036.
+No third database, broker, public permission API or new collector deployment is introduced.
 
 ## UX, interface and domain implementation handoff
 
