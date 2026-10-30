@@ -208,13 +208,16 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 	}()
 	// Finite recordings cannot predate queueing. An independently admitted
 	// source snapshot retains its original acquisition window instead.
-	started := r.StartedAt.UTC().Truncate(time.Microsecond)
-	if held.snapshot == nil && started.Before(held.queued) {
-		started = held.queued
-	}
-	completed := r.EndedAt.UTC().Truncate(time.Microsecond)
-	if completed.Before(started) {
-		completed = started
+	started, completed := r.StartedAt.UTC(), r.EndedAt.UTC()
+	if held.snapshot == nil {
+		started = started.Truncate(time.Microsecond)
+		if started.Before(held.queued) {
+			started = held.queued
+		}
+		completed = completed.Truncate(time.Microsecond)
+		if completed.Before(started) {
+			completed = started
+		}
 	}
 	var copies artifact.Copies
 	var err error
