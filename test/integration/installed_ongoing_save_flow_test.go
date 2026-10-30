@@ -37,7 +37,7 @@ const (
 	ongoingSaveRetainedPort    = 9102
 	ongoingSaveAfterPort       = 9103
 	ongoingSaveBefore          = 15 * time.Second
-	ongoingSaveGrantLifetime   = 240
+	ongoingSaveLifetime        = 300
 )
 
 func installedOngoingSaveSpec(cluster, namespace, workload string) map[string]any {
@@ -71,8 +71,8 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("ongoing save requires a fresh disposable runner")
 	}
 	f := installedPolicyTarget
-	if f == nil || identity == nil || identity.ReviewerSubject == "" {
-		t.Fatal("ongoing save lacks installed target or independent reviewer")
+	if f == nil || identity == nil {
+		t.Fatal("ongoing save lacks installed target")
 	}
 	cert, err := x509.ParseCertificate(publicRoot)
 	if err != nil {
@@ -96,10 +96,6 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("ongoing save MCP", err)
 	}
 	defer requester.Close()
-	kc := *identity.kc
-	kc.username = "reviewer"
-	reviewer := &installedIdentity{kc: &kc, Issuer: identity.Issuer, RootPEM: identity.RootPEM, ReviewerSubject: identity.ReviewerSubject}
-	browser := reviewer.consoleSession(t, ctx, cert, address, origin)
 	invoke := func(call context.Context, name string, args any) (installedJourneyEnvelope, string, error) {
 		raw, err := json.Marshal(args)
 		if err != nil {
@@ -151,7 +147,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 	}
 
-	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "ongoing-packet-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "installed ongoing packet Save qualification", "automation": map[string]any{"allowedActions": []any{"packetCapture"}, "maxLifetimeSeconds": 3600, "maxExecutions": 8, "maxBytes": 64 << 20, "maxObservedBytes": 128 << 20}}}
+	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "ongoing-packet-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "installed ongoing packet Save qualification", "automation": map[string]any{"allowedActions": []any{"packetCapture"}, "maxLifetimeSeconds": ongoingSaveLifetime, "maxExecutions": 8, "maxBytes": 64 << 20, "maxObservedBytes": 128 << 20}}}
 	body, _ := json.Marshal(binding)
 	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
 		t.Fatal("operator packet automation envelope", err)
@@ -166,41 +162,19 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		AcceptanceID string `json:"acceptance_id"`
 		State        string `json:"state"`
 	}
-	wait("independently audited ongoing policy acceptance", 2*time.Minute, func(call context.Context) bool {
-		return read(call, "activate_policy", map[string]any{"policy_name": installedOngoingSaveName, "idempotency_key": "native-ongoing-activate"}, &active) && active.State == "active"
-	})
+	// Without required recording approval, source admission uses no policy
+	// grant: the accepted authority (envelope lifetime) bounds each source.
+	activate := func(key string) {
+		t.Helper()
+		wait("independently audited ongoing policy acceptance", 2*time.Minute, func(call context.Context) bool {
+			return read(call, "activate_policy", map[string]any{"policy_name": installedOngoingSaveName, "idempotency_key": key}, &active) && active.State == "active"
+		})
+	}
+	activate("native-ongoing-activate")
+	firstAcceptance := active.AcceptanceID
 	if active.PolicyUID == "" || active.AcceptanceID == "" {
 		t.Fatal("ongoing activation lost source identity", active)
 	}
-	type grant struct {
-		ID       string     `json:"grant_id"`
-		Phase    string     `json:"phase"`
-		NotAfter *time.Time `json:"not_after"`
-	}
-	approvedGrant := func(key string) grant {
-		t.Helper()
-		var g grant
-		must("request_policy_grant", map[string]any{
-			"policy_name": installedOngoingSaveName, "policy_uid": active.PolicyUID, "idempotency_key": key, "lifetime_seconds": ongoingSaveGrantLifetime,
-			"limits": map[string]any{"max_executions": 4, "max_collected_bytes": 64 << 20, "max_observed_bytes": 0},
-		}, &g)
-		if g.ID == "" || g.NotAfter == nil {
-			t.Fatal("ongoing grant request lost finite scope", g)
-		}
-		browser.approvedRecordingStepUp(t, ctx, reviewer, g.ID)
-		raw, _ := json.Marshal(installedPolicyRecordingDecisionArguments(g.ID))
-		if err := wire.ValidateInput("decide_review", raw); err != nil {
-			t.Fatal(err)
-		}
-		reply, status, err := browser.operation(ctx, "decide_review", installedPolicyRecordingDecisionArguments(g.ID), "native-decision-"+g.ID)
-		if err != nil || status != http.StatusOK || reply.Status != "ok" {
-			diagnose()
-			t.Fatal("ongoing grant review", status, reply.Status, err)
-		}
-		must("activate_policy", map[string]any{"policy_name": installedOngoingSaveName, "grant_id": g.ID, "idempotency_key": "native-attach-" + g.ID}, nil)
-		return g
-	}
-
 	var podName, podUID string
 	pods, err := f.region.CoreV1().Pods(f.namespace).List(ctx, meta.ListOptions{LabelSelector: "app=" + f.workload})
 	if err != nil {
@@ -323,7 +297,6 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 
 	// Incarnation 1: arm, renew past the first leaf, Save, repeat, natural expiry.
-	first := approvedGrant("native-ongoing-first")
 	var src ongoingSaveSource
 	armStarted := time.Now()
 	wait("ongoing source arm", 2*time.Minute, func(call context.Context) bool {
@@ -332,8 +305,8 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		return ok
 	})
 	armLatency := time.Since(armStarted)
-	if src.HardUntil.After(*first.NotAfter) {
-		t.Fatal("source hard bound outlives its grant", src.HardUntil, first.NotAfter)
+	if src.HardUntil.Sub(src.StartedAt) > ongoingSaveLifetime*time.Second {
+		t.Fatal("source hard bound outlives its accepted authority", src.StartedAt, src.HardUntil)
 	}
 	wait("Save-eligible source past its first leaf", 2*time.Minute, func(call context.Context) bool {
 		_, ok := selection(call)
@@ -430,15 +403,18 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 
 	// Incarnation 2: a new grant arms one new source; explicit stop ends it.
-	second := approvedGrant("native-ongoing-second")
+	activate("native-ongoing-reactivate")
+	if active.AcceptanceID == firstAcceptance {
+		t.Fatal("reactivation after authority expiry reused the original acceptance")
+	}
 	var replacement ongoingSaveSource
 	wait("second ongoing source arm", 3*time.Minute, func(call context.Context) bool {
 		s, n, ok := current(call)
 		replacement = s
 		return ok && n == 2
 	})
-	if replacement.ID == src.ID || replacement.HardUntil.After(*second.NotAfter) {
-		t.Fatal("second incarnation reused the old source or outlived its grant", replacement)
+	if replacement.ID == src.ID || replacement.HardUntil.Sub(replacement.StartedAt) > ongoingSaveLifetime*time.Second {
+		t.Fatal("second incarnation reused the old source or outlived its authority", replacement)
 	}
 	must("deactivate_policy", map[string]any{"policy_name": installedOngoingSaveName, "idempotency_key": "native-ongoing-stop"}, nil)
 	stopped := time.Now()
@@ -456,8 +432,8 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 
 	report := map[string]any{
-		"policyUID": active.PolicyUID, "acceptanceID": active.AcceptanceID, "podUID": podUID,
-		"firstGrantID": first.ID, "firstGrantNotAfter": first.NotAfter, "secondGrantID": second.ID,
+		"policyUID": active.PolicyUID, "podUID": podUID,
+		"firstAcceptanceID": firstAcceptance, "secondAcceptanceID": active.AcceptanceID, "envelopeLifetimeSeconds": ongoingSaveLifetime,
 		"sourceID": src.ID, "sourceFence": src.Fence, "sourceStartedAt": src.StartedAt, "sourceHardUntil": src.HardUntil, "sourceInitialLeafUntil": src.Leaf,
 		"sourceInitialCredit": src.InitialCredit, "sourceCreditAtArm": src.Credit, "sourceCreditAtExpiry": expired.Credit, "sourceEndedAt": expired.EndedAt,
 		"armLatencySeconds": armLatency.Seconds(), "saveCaptureID": captureID, "saveAcceptedAt": t0, "repeatCaptureID": repeatID,
