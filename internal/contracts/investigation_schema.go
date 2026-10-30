@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"strings"
 	"time"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
@@ -218,4 +219,32 @@ func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 		return ErrInvestigationWire
 	}
 	return nil
+}
+
+// OutputViolation names the first leaf output-schema violation by JSON
+// location and keyword only, never values, for failure reports.
+func (v *InvestigationContracts) OutputViolation(name string, b []byte) string {
+	if v == nil {
+		return "unavailable"
+	}
+	s, ok := v.tools[name]
+	if !ok {
+		return "unknown-tool"
+	}
+	limit := InvestigationOutputLimit
+	if name == "preview_recording_save" {
+		limit = InvestigationRecordingSavePreviewOutputLimit
+	}
+	out, err := investigationJSON(b, limit)
+	if err != nil {
+		return "decode"
+	}
+	verr, ok := s.output.Validate(out).(*jsonschema.ValidationError)
+	if !ok {
+		return "none"
+	}
+	for len(verr.Causes) > 0 {
+		verr = verr.Causes[0]
+	}
+	return "/" + strings.Join(verr.InstanceLocation, "/") + ":" + strings.Join(verr.ErrorKind.KeywordPath(), "/")
 }

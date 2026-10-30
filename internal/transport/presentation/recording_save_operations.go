@@ -296,8 +296,11 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		out.Status, out.Data, out.NextCursor = "error", OperationFailure{"ReduceLimit", "Use a smaller inventory page or recording selection to fit the metadata response.", false}, nil
 		b, err = json.Marshal(out)
 	}
-	if err != nil || s.contracts.ValidateOutput(name, b) != nil {
-		return OperationReply{}, stopped("output-contract", value.ErrUnavailable)
+	if err != nil {
+		return OperationReply{}, stopped("output-encode", value.ErrUnavailable)
+	}
+	if s.contracts.ValidateOutput(name, b) != nil {
+		return OperationReply{}, stopped("output-contract"+s.contracts.OutputViolation(name, b), value.ErrUnavailable)
 	}
 	if !s.config.Now().Before(until) || bounded.Err() != nil {
 		clear(b)
