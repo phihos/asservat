@@ -86,15 +86,15 @@ BEGIN
   AND ARRAY(SELECT k.attnum FROM unnest(c.conkey) AS k(attnum) ORDER BY k.attnum)=
       ARRAY(SELECT a.attnum FROM pg_catalog.pg_attribute a
        WHERE a.attrelid=c.conrelid AND NOT a.attisdropped AND a.attname IN ('intent','lane') ORDER BY a.attnum)
-  AND lower(regexp_replace(replace(replace(replace(pg_catalog.pg_get_expr(c.conbin,c.conrelid),'::text',''),'public.',''),'pg_catalog.',''),'[[:space:]()]','','g'))=
-      'jsonb_typeofintent=''object''andoctet_lengthintent<=casewhenlane=''capture''then16384else8192end';
+  AND regexp_replace(replace(replace(replace(pg_catalog.pg_get_expr(c.conbin,c.conrelid),'::text',''),'public.',''),'pg_catalog.',''),'[[:space:]()]','','g')=
+      'jsonb_typeofintent=''object''ANDoctet_lengthintent<=CASEWHENlane=''capture''THEN16384ELSE8192END';
  IF matches<>1 THEN
   RAISE EXCEPTION 'expected one exact legacy intent audit constraint, found %',matches USING ERRCODE='23514';
  END IF;
  EXECUTE format('ALTER TABLE public.operation_audit DROP CONSTRAINT %I',selected_name);
 END $$;
 -- +goose StatementEnd
-ALTER TABLE operation_audit ADD CONSTRAINT operation_audit_intent_check CHECK(jsonb_typeof(intent)='object' AND octet_length(intent::text)<=CASE WHEN lane='capture' THEN public.capture_audit_intent_limit(intent) ELSE 8192 END);
+ALTER TABLE operation_audit ADD CONSTRAINT operation_audit_intent_check CHECK(jsonb_typeof(intent)='object' AND octet_length(intent::text)<=CASE WHEN lane='capture' THEN CASE WHEN intent->>'Name'='persist_capture_intent' AND intent->>'InputFormat'='capture-intent-reason/v1' AND jsonb_typeof(intent->'ReasonEnvelope')='object' AND jsonb_typeof(intent->'Capture'->'ReasonRef')='object' THEN 32768 ELSE 16384 END ELSE 8192 END);
 -- +goose StatementBegin
 -- The SQL52 checks were unnamed. Select the exact authored predicate, never
 -- an assumed auto-generated name or a fragment of another constraint.
@@ -109,15 +109,15 @@ BEGIN
   AND ARRAY(SELECT k.attnum FROM unnest(c.conkey) AS k(attnum) ORDER BY k.attnum)=
       ARRAY(SELECT a.attnum FROM pg_catalog.pg_attribute a
        WHERE a.attrelid=c.conrelid AND NOT a.attisdropped AND a.attname IN ('outcome','lane') ORDER BY a.attnum)
-  AND lower(regexp_replace(replace(replace(replace(pg_catalog.pg_get_expr(c.conbin,c.conrelid),'::text',''),'public.',''),'pg_catalog.',''),'[[:space:]()]','','g'))=
-      'outcomeisnullorjsonb_typeofoutcome=''object''andoctet_lengthoutcome<=casewhenlane=''capture''then24576else16384end';
+  AND regexp_replace(replace(replace(replace(pg_catalog.pg_get_expr(c.conbin,c.conrelid),'::text',''),'public.',''),'pg_catalog.',''),'[[:space:]()]','','g')=
+      'outcomeISNULLORjsonb_typeofoutcome=''object''ANDoctet_lengthoutcome<=CASEWHENlane=''capture''THEN24576ELSE16384END';
  IF matches<>1 THEN
   RAISE EXCEPTION 'expected one exact legacy outcome audit constraint, found %',matches USING ERRCODE='23514';
  END IF;
  EXECUTE format('ALTER TABLE public.operation_audit DROP CONSTRAINT %I',selected_name);
 END $$;
 -- +goose StatementEnd
-ALTER TABLE operation_audit ADD CONSTRAINT operation_audit_outcome_check CHECK(outcome IS NULL OR (jsonb_typeof(outcome)='object' AND octet_length(outcome::text)<=CASE WHEN lane='capture' THEN CASE WHEN public.capture_audit_intent_limit(intent)=32768 THEN 32768 ELSE 24576 END ELSE 16384 END));
+ALTER TABLE operation_audit ADD CONSTRAINT operation_audit_outcome_check CHECK(outcome IS NULL OR (jsonb_typeof(outcome)='object' AND octet_length(outcome::text)<=CASE WHEN lane='capture' THEN CASE WHEN intent->>'Name'='persist_capture_intent' AND intent->>'InputFormat'='capture-intent-reason/v1' AND jsonb_typeof(intent->'ReasonEnvelope')='object' AND jsonb_typeof(intent->'Capture'->'ReasonRef')='object' THEN 32768 ELSE 24576 END ELSE 16384 END));
 
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION reserve_capture_audit(r uuid,capture uuid,i jsonb,capture_digest bytea,original_until timestamptz) RETURNS void
@@ -595,8 +595,8 @@ BEGIN
   AND ARRAY(SELECT k.attnum FROM unnest(c.conkey) AS k(attnum) ORDER BY k.attnum)=
       ARRAY(SELECT a.attnum FROM pg_catalog.pg_attribute a
        WHERE a.attrelid=c.conrelid AND NOT a.attisdropped AND a.attname IN ('intent','lane') ORDER BY a.attnum)
-  AND lower(regexp_replace(replace(replace(replace(pg_catalog.pg_get_expr(c.conbin,c.conrelid),'::text',''),'public.',''),'pg_catalog.',''),'[[:space:]()]','','g'))=
-      'jsonb_typeofintent=''object''andoctet_lengthintent<=casewhenlane=''capture''thencapture_audit_intent_limitintentelse8192end';
+  AND regexp_replace(replace(replace(replace(pg_catalog.pg_get_expr(c.conbin,c.conrelid),'::text',''),'public.',''),'pg_catalog.',''),'[[:space:]()]','','g')=
+      'jsonb_typeofintent=''object''ANDoctet_lengthintent<=CASEWHENlane=''capture''THENCASEWHENintent->>''Name''=''persist_capture_intent''ANDintent->>''InputFormat''=''capture-intent-reason/v1''ANDjsonb_typeofintent->''ReasonEnvelope''=''object''ANDjsonb_typeofintent->''Capture''->''ReasonRef''=''object''THEN32768ELSE16384ENDELSE8192END';
  IF matches<>1 THEN
   RAISE EXCEPTION 'expected one exact reason intent audit constraint, found %',matches USING ERRCODE='23514';
  END IF;
@@ -618,8 +618,8 @@ BEGIN
   AND ARRAY(SELECT k.attnum FROM unnest(c.conkey) AS k(attnum) ORDER BY k.attnum)=
       ARRAY(SELECT a.attnum FROM pg_catalog.pg_attribute a
        WHERE a.attrelid=c.conrelid AND NOT a.attisdropped AND a.attname IN ('outcome','lane','intent') ORDER BY a.attnum)
-  AND lower(regexp_replace(replace(replace(replace(pg_catalog.pg_get_expr(c.conbin,c.conrelid),'::text',''),'public.',''),'pg_catalog.',''),'[[:space:]()]','','g'))=
-      'outcomeisnullorjsonb_typeofoutcome=''object''andoctet_lengthoutcome<=casewhenlane=''capture''thencasewhencapture_audit_intent_limitintent=32768then32768else24576endelse16384end';
+  AND regexp_replace(replace(replace(replace(pg_catalog.pg_get_expr(c.conbin,c.conrelid),'::text',''),'public.',''),'pg_catalog.',''),'[[:space:]()]','','g')=
+      'outcomeISNULLORjsonb_typeofoutcome=''object''ANDoctet_lengthoutcome<=CASEWHENlane=''capture''THENCASEWHENintent->>''Name''=''persist_capture_intent''ANDintent->>''InputFormat''=''capture-intent-reason/v1''ANDjsonb_typeofintent->''ReasonEnvelope''=''object''ANDjsonb_typeofintent->''Capture''->''ReasonRef''=''object''THEN32768ELSE24576ENDELSE16384END';
  IF matches<>1 THEN
   RAISE EXCEPTION 'expected one exact reason outcome audit constraint, found %',matches USING ERRCODE='23514';
  END IF;
