@@ -1,5 +1,47 @@
 # Sustained implementation progress
 
+## Grouped Save: original request bounds and maximum-fanout qualification in progress (2026-10-30)
+
+[ADR-269](decisions/269-original-grouped-save-request-bounds.md) preserves the
+original authenticated request interval across admission, encrypted intent audit
+and dispatch. Only new manual groups can select a start bound within that
+original fifteen-second interval; admission observations still expire at their
+original five-second bounds. Old accepted records and replay retain their dates.
+SQL112 empty restoration and populated long-window downgrade refusal passed in
+the same-owner request fixture. This is not an extension of existing sources,
+retention or processing limits.
+
+Transaction-local raw permission projection reuse reduces the controlled
+sixteen-target load count from 144 to 16, while retaining current-time domain
+evaluation. `manual-group-projection-sql112-2` passed the actual permission-root
+serialization, original human-initiator expiry, late-child rollback, two native
+outputs, replay and history controls: supervisor exit 0 in 48.148 seconds, Go
+package 12.493 seconds. This does not test source-TTL expiry. Root verified the
+frozen source/result maps, archived artifacts and exact owned cleanup.
+
+The same-owner sixteen-source `manual-group16-request-sql112-6` on `ebb6725a`
+remains **failed**: admission completed in 3,652 ms with only 45 ms left in its
+observation context, and all sixteen children queued. Native checks passed for
+children 0–14 with 4,592 exact PCAPNG bytes each. Child 15 stored output but
+semantic publication returned `stale custody work`; replay and parent-history
+checks were not reached. The failure's exact fence is under investigation.
+Supervisor exit was 1 in 74.921 seconds, Go package 39.663 seconds. Root verified
+3,607 canonical and 36,265 tracked hashes, three archived artifacts, the restored
+31,495-file result baseline and exact owned cleanup, preserving sixteen prior
+containers. Failed prefixes remain archived; no deadline was changed to pass.
+
+The fixture prospectively authors a thirty-second action/composition profile
+before acceptance. Its existing retention and lookback still clip processing;
+this is neither qualification of builtin defaults nor an installed collector,
+regional RPC, remote key provider or public download-session qualification.
+Repeated recovery reads measured only 15.8 ms in diagnostic prefix 5, so they
+are not the next optimization target. Shared locked policy/delegation facts are
+being investigated to reduce repeated SQL reads while preserving every domain
+evaluation and original expiry. No latency saving is established yet.
+
+The complete grouped workflow and final combined repository gates remain
+pending. Collection remains disabled; no supported homelab release is established.
+
 ## Grouped Save through the real runner: two-source local workflow passed (2026-10-30)
 
 `manual-group-real-workflow-sql111-3` on frozen `f10b5754` passed all twelve
