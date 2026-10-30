@@ -291,8 +291,30 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Helper()
 		var p preview
 		must("preview_recording_save", args, &p)
+		// Existing journey contract: an accepted request whose acquisition did
+		// not start continues under the original preview/key, never a new one.
 		var progress installedJourneyCaptureProgress
-		must("request_capture", map[string]any{"preview_id": p.ID, "idempotency_key": key}, &progress)
+		request := map[string]any{"preview_id": p.ID, "idempotency_key": key}
+		var continued int
+		for deadline := time.Now().Add(30 * time.Second); ; {
+			reply, code, err := invoke(ctx, "request_capture", request)
+			if err == nil && reply.Status == "ok" && code == "" {
+				if json.Unmarshal(reply.Data, &progress) != nil {
+					t.Fatal("request_capture data")
+				}
+				break
+			}
+			if (err == nil && code != "AcquisitionNotStarted") || !time.Now().Before(deadline) {
+				diagnose()
+				t.Fatal("ongoing Save request", code, err, "continuations", continued)
+			}
+			continued++
+			request = map[string]any{"preview_id": p.ID, "idempotency_key": key, "continue_acquisition": true}
+			if err = installedJourneyPause(ctx, time.Second); err != nil {
+				t.Fatal(err)
+			}
+		}
+		t.Logf("ongoing Save %s accepted after %d continuations", progress.CaptureID, continued)
 		var t0 time.Time
 		if progress.CaptureID == "" || admin.QueryRow(ctx, `SELECT accepted_at FROM recording_save_reservation WHERE root_id=$1 AND capture_id=$2`, root, progress.CaptureID).Scan(&t0) != nil {
 			t.Fatal("Save lost its SQL-accepted T0", progress)
