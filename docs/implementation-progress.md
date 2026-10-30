@@ -1,11 +1,11 @@
 # Sustained implementation progress
 
-## Sixteen-source Save: selected local workflow passed; original-caller history composition pending (2026-10-30)
+## Sixteen-source Save: original-caller history and selected local workflow passed (2026-10-30)
 
-`manual-group16-request-sql112-8` on frozen `8577192d` passed all 28 required
-names (29 actual): supervisor exit 0 in 75.971 seconds, Go package 40.271 seconds.
+`manual-group16-request-sql112-9` on frozen `f7c3693b` passed all 28 required
+names (29 actual): supervisor exit 0 in 70.166 seconds, Go package 40.338 seconds.
 One original `ContextSubmission.Request` owner covers real SQL admission,
-encrypted capture-intent audit and all sixteen runner starts. All sixteen
+encrypted capture-intent audit, all sixteen runner starts and real history persistence. All sixteen
 children published and yielded 4,592 exact native PCAPNG bytes. Passive replay
 preserved the shared SQL acceptance time, execution identities and spend.
 SQL112 empty restoration and populated long-window downgrade refusal passed.
@@ -13,30 +13,41 @@ Root verified 3,607 canonical and 36,265 tracked hashes, two archived artifacts,
 the restored 31,495-file result baseline and exact owned cleanup, preserving
 sixteen prior containers.
 
-Admission measured 3,476 ms with 217 ms left in the original observation phase;
-the complete request/audit/queue phase measured 12,630 ms with 2,369 ms remaining
+Admission measured 3,482 ms with 170 ms left in the original observation phase;
+the complete request/audit/queue/history phase measured 13,688 ms with 1,311 ms remaining
 on the original start bound. This is one local measurement, not an availability
-or latency guarantee. The last publication entered with 1,196 ms of its original
+or latency guarantee. The last publication entered with 1,055 ms of its original
 write/read lifetime left. The test prospectively selects a thirty-second profile;
 existing source retention still clips processing. Builtin defaults, installed
 collectors, regional RPC, remote key providers and public download sessions are
 not qualified by this fixture.
 
 The fixture now constructs one root-scoped unwrap/queue service pair instead of
-two new roles and pools per child. Setup measured 294,505 microseconds once;
+two new roles and pools per child. Setup measured 187,273 microseconds once;
 each child's original allowance, denial, queue and replay controls still ran.
 History persistence/list/settings checks run while accepted work is pending,
 before its fixed write cutoff. N2 retains its post-completion history check.
 No source, retention, request or admission dates were extended. Prefixes 6–7
 remain archived: their late publication/history failures are not passes.
 
-History currently runs through a separate real helper in this fixture. Production
-supplies `ContextSubmission.History`, whose advisory persistence uses the original
-caller's remaining interval after group dispatch. The next qualification wires
-the genuine history service into that request path and checks one persisted
-parent without another history write or renewed caller. Final combined repository
-gates remain pending. Collection stays disabled; this is not a supported homelab
-release.
+The genuine `ContextSubmission.History` service used the original context,
+authenticated identity and draft after group dispatch. Its one persistence call
+took 957,678 microseconds and returned with 1,558 ms on the original caller
+deadline. The public response reported history available; later encrypted
+list/settings checks performed no second persistence call, and passive replay
+added no history write. The original authenticated identity bound and caller
+context deadline were checked independently; neither was renewed or extended.
+Prefix 8's earlier separate-helper history result remains archived with its
+narrower scope.
+
+The same combined `f7c3693b` candidate also passed
+`manual-recording-reason-sql112-1`: eleven required names (twelve actual),
+supervisor exit 0 in 175.707 seconds, Go package 167.257 seconds. This includes
+the unchanged real 150-second retirement wait, native bytes, current authorized
+reason display, actual preview deletion and restrictive downgrade. Root verified
+the same source/result baselines, two archived artifacts and exact owned cleanup.
+Final combined repository gates remain pending. Collection stays disabled; this
+is not a supported homelab release.
 
 ## Grouped Save: original request bounds and maximum-fanout qualification in progress (2026-10-30)
 
