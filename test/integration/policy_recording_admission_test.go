@@ -35,22 +35,23 @@ import (
 type policyRecorderProtectedCase struct {
 	// SourceAccepted stops before any occurrence/capture: a real audited policy
 	// acceptance can qualify the separate ordinary source ledger in this fixture.
-	Ongoing             bool
-	RecordingSaves      bool
-	RecurringSharing    bool
-	OrdinaryGrant       bool
-	IncidentPods        int
-	PolicyExecutions    int64
-	Retention           string
-	SourceAccepted      func(*testing.T, policySourceAcceptedFixture)
-	Hub                 *pgxpool.Pool
-	Admissions          *postgres.ContextAdmissions
-	Filters             planning.FilterCompiler
-	Expression          string
-	Subjects            []cfg.Subject
-	Intent              func(context.Context, string) error
-	Stored              func(policyObservationRetirementInput)
-	PermissionsAccepted func(cfg.PermissionBatch)
+	Ongoing              bool
+	RecordingSaves       bool
+	RecurringSharing     bool
+	OrdinaryGrant        bool
+	IncidentPods         int
+	PolicyExecutions     int64
+	PolicyCollectedBytes int64
+	Retention            string
+	SourceAccepted       func(*testing.T, policySourceAcceptedFixture)
+	Hub                  *pgxpool.Pool
+	Admissions           *postgres.ContextAdmissions
+	Filters              planning.FilterCompiler
+	Expression           string
+	Subjects             []cfg.Subject
+	Intent               func(context.Context, string) error
+	Stored               func(policyObservationRetirementInput)
+	PermissionsAccepted  func(cfg.PermissionBatch)
 }
 
 type policySourceAcceptedFixture struct {
@@ -107,7 +108,11 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 					b.Roles = append(slices.Clone(b.Roles), "evidence-owner")
 				}
 			}
-			b.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{authorization.PolicyContextAction, "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: 64 << 20}
+			collectedBytes := int64(64 << 20)
+			if len(protected) > 0 && protected[0].PolicyCollectedBytes > 0 {
+				collectedBytes = protected[0].PolicyCollectedBytes
+			}
+			b.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{authorization.PolicyContextAction, "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: collectedBytes}
 			if observed {
 				b.Automation.MaxObservedBytes = 1 << 30
 			}
@@ -199,7 +204,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			}
 			now := clock()
 			creator := s.a.Eligibility.VerifiedIdentity.Principal
-			authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: custodyID(), Creator: creator, ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{sponsor}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 64 << 20}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
+			authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: custodyID(), Creator: creator, ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{sponsor}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: collectedBytes}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
 			if observed {
 				authority.Limits.MaxObservedBytes = 1 << 30
 			}

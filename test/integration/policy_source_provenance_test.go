@@ -75,7 +75,8 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requi
 				configureManualGroupSourceCapacity(f, groupCount)
 			}
 		})
-		f.template.Policies[0].SourceResources = &capacity.SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}, Workload: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 4 << 20, InputBurstBytes: 4 << 20}}
+		sourceCeiling := int64(max(4, groupCount))
+		f.template.Policies[0].SourceResources = &capacity.SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: sourceCeiling, InputBytesPerSecond: sourceCeiling << 20, InputBurstBytes: sourceCeiling << 20}}, Workload: collector.SourceLimits{MaxActiveSources: sourceCeiling, InputBytesPerSecond: sourceCeiling << 20, InputBurstBytes: sourceCeiling << 20}}
 		if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
 			t.Fatal(err)
 		}
@@ -101,6 +102,10 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requi
 			option.IncidentPods = groupCount
 		}
 		if groupCount > 0 && requireApproval {
+			option.PolicyExecutions = 1
+		}
+		if groupCount == 16 {
+			option.PolicyCollectedBytes = 16 * artifact.RecordingNativeLimit
 			option.PolicyExecutions = 1
 		}
 		option.SourceAccepted = func(t *testing.T, accepted policySourceAcceptedFixture) {
@@ -148,7 +153,7 @@ func qualifySourceSnapshotRealServices(t *testing.T, manual, cancellation, requi
 					node.CollectorPodUID = old.Permit.Binding.CollectorPodUID
 					node.CollectorEpoch = old.Permit.Binding.CollectorEpoch
 				}
-				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Recovery: recovery, Retention: resolution, Settings: policy, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: 4, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
+				return captureapp.PolicySourceCheck{Policy: accepted.Compiled, Authority: accepted.Authority, Target: target, Node: node, Recovery: recovery, Retention: resolution, Settings: policy, SourceID: sourceID, Fence: fence, BytesPerSecond: 1 << 20, SourceSlots: sourceCeiling, ObservedAt: n, ValidUntil: n.Add(5 * time.Second)}
 			}
 			var originalGrant manualPolicyGrantSpend
 			if requireApproval {

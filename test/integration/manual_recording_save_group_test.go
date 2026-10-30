@@ -31,6 +31,10 @@ func TestManualRecordingSaveGroupWithRealServices(t *testing.T) {
 	qualifySourceSnapshotRealServices(t, true, false, false, 2)
 }
 
+func TestManualRecordingSaveGroupCentralSixteenWithRealServices(t *testing.T) {
+	qualifySourceSnapshotRealServices(t, true, false, false, 16)
+}
+
 func TestManualRecordingSaveGroupCancellationWithRealServices(t *testing.T) {
 	qualifySourceSnapshotRealServices(t, true, true, false, 2)
 }
@@ -172,41 +176,86 @@ func manualGroupWindows(t *testing.T, ctx context.Context, f *capacitySQLFixture
 
 func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication, cancellation bool) {
 	t.Helper()
-	secondCheck := refresh(t)
-	secondCheck.SourceID, secondCheck.Fence = custodyID(), custodyID()
-	secondCheck.Target.Request.PodUID = custodyID()
-	secondCheck.Target.Request.PodName += "-replica"
-	secondCheck.Target.Pin.UID = secondCheck.Target.Request.PodUID
-	secondCheck.Target.Pin.Name = secondCheck.Target.Request.PodName
-	secondCheck.Node.PodUID = secondCheck.Target.Request.PodUID
-	retained, err := manualGroupRetentionPolicies(ctx, policy.Scenario.retention, secondCheck.Target.Target())
-	if err != nil {
-		t.Fatal(err)
+	count := policy.Compiled.IncidentPods
+	if count < 2 || count > 16 || policy.Compiled.ObservedPods < count {
+		t.Fatal("reviewed incident/observation scope cannot cover group", count, policy.Compiled.ObservedPods)
 	}
-	secondCheck.Retention, err = privacy.Resolve(retained, privacy.Input{Target: secondCheck.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: policy.Compiled.RetentionSeconds, AnchorAt: secondCheck.ObservedAt}, time.Now())
-	if err != nil {
-		t.Fatal(err)
+	if count == 16 && (policy.Authority.Limits.MaxBytes < 16*artifact.RecordingNativeLimit || policy.Authority.Limits.MaxExecutions != 1) {
+		t.Fatal("sixteen-source case needs preaccepted128MiB and one policy execution")
 	}
-	secondCheck.Initial = true
-	secondCheck.InitialCredit = 1 << 20
-	second, err := ledger.AdmitSource(ctx, secondCheck)
-	if err != nil {
-		t.Fatal("second real source ledger admission", err)
+	sourceStarted := time.Now()
+	sources := []captureapp.PolicySourceAdmission{original}
+	templates := []captureapp.PolicySourceCheck{refresh(t)}
+	for index := 1; index < count; index++ {
+		check := refresh(t)
+		check.SourceID, check.Fence = custodyID(), custodyID()
+		check.Target.Request.PodUID = custodyID()
+		check.Target.Request.PodName = fmt.Sprintf("%s-replica-%02d", check.Target.Request.PodName, index)
+		check.Target.Pin.UID = check.Target.Request.PodUID
+		check.Target.Pin.Name = check.Target.Request.PodName
+		check.Node.PodUID = check.Target.Request.PodUID
+		retained, err := manualGroupRetentionPolicies(ctx, policy.Scenario.retention, check.Target.Target())
+		if err != nil {
+			t.Fatal(err)
+		}
+		check.Retention, err = privacy.Resolve(retained, privacy.Input{Target: check.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: policy.Compiled.RetentionSeconds, AnchorAt: check.ObservedAt}, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		check.Initial = true
+		check.InitialCredit = 1 << 20
+		source, err := ledger.AdmitSource(ctx, check)
+		if err != nil {
+			t.Fatal("additional real source ledger admission", index, err)
+		}
+		sources = append(sources, source)
+		templates = append(templates, check)
 	}
+	rows, err := ledger.ListSources(ctx, policy.Authority.PolicyUID)
+	if err != nil || len(rows) != count {
+		t.Fatal("actual source set cardinality", len(rows), err)
+	}
+	seenSources, seenPods := map[string]bool{}, map[string]bool{}
+	for _, source := range sources {
+		binding := source.Permit.Binding
+		if seenSources[binding.SourceID] || seenPods[binding.PodUID] || !time.Now().Before(source.Permit.LeafUntil) {
+			t.Fatal("source duplicate or original leaf expired")
+		}
+		seenSources[binding.SourceID] = true
+		seenPods[binding.PodUID] = true
+		found := false
+		for _, row := range rows {
+			if row.Binding.SourceID == binding.SourceID {
+				found = row.Binding == binding && row.Target != nil
+			}
+		}
+		if !found {
+			t.Fatal("actual immutable source binding unavailable")
+		}
+	}
+	t.Logf("group_sources=%d additional_source_arm_ms=%d metadata_controls_total=%d", count, time.Since(sourceStarted).Milliseconds(), 2*count+1)
 	maximumBytes := min(policy.Compiled.Recorder.Action.MaxBytes, int64(artifact.RecordingNativeLimit))
 	prepare := func() (value.RecordingSaveGroupAdmission, []policySourceSnapshotAdmissionFixture) {
-		firstPart := prepareManualRecordingSaveFixture(t, ctx, f.roles["hub-runtime"], policy, original, refresh(t), maximumBytes)
-		current := refresh(t)
-		secondCurrent := secondCheck
-		secondCurrent.Initial = false
-		secondCurrent.ExpectedCredit = second.Permit.Credit
-		secondCurrent.ObservedAt, secondCurrent.ValidUntil = current.ObservedAt, current.ValidUntil
-		secondCurrent.Target.ObservedAt, secondCurrent.Target.FreshUntil = current.ObservedAt, current.ValidUntil
-		secondCurrent.Node.ObservedAt, secondCurrent.Node.FreshUntil = current.ObservedAt, current.ValidUntil
-		secondCurrent.Settings = current.Settings
-		secondCurrent.Recovery = current.Recovery
-		secondPart := prepareManualRecordingSaveFixture(t, ctx, f.roles["hub-runtime"], policy, second, secondCurrent, maximumBytes)
-		group, parts := prepareManualRecordingSaveGroup(t, ctx, f, policy, []policySourceSnapshotAdmissionFixture{firstPart, secondPart})
+		began := time.Now()
+		parts := make([]policySourceSnapshotAdmissionFixture, count)
+		for index, source := range sources {
+			if !time.Now().Before(source.Permit.LeafUntil) {
+				t.Fatal("source expired before group preparation", index)
+			}
+			current := refresh(t)
+			current.SourceID, current.Fence = source.Permit.Binding.SourceID, source.Permit.Binding.Fence
+			current.Initial = false
+			current.ExpectedCredit = source.Permit.Credit
+			target := templates[index].Target
+			target.ObservedAt, target.FreshUntil = current.ObservedAt, current.ValidUntil
+			current.Target = target
+			current.Node.PodUID = target.Request.PodUID
+			// Each preparation resolves its own accepted retention. An unused first-Pod
+			// proof must not accidentally become this sibling's authority.
+			current.Retention = privacy.Resolution{}
+			parts[index] = prepareManualRecordingSaveFixture(t, ctx, f.roles["hub-runtime"], policy, source, current, maximumBytes)
+		}
+		group, parts := prepareManualRecordingSaveGroup(t, ctx, f, policy, parts)
 		previews, err := postgres.NewContextPreviews(ctx, f.roles["hub-runtime"], group.RootID)
 		if err != nil {
 			t.Fatal(err)
@@ -214,14 +263,12 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 		if err := previews.CreateRecordingGroupPreview(ctx, group.Preview); err != nil {
 			t.Fatal("one protected parent preview", err)
 		}
+		t.Logf("group_sources=%d preparation_ms=%d original_first_proof_remaining_ms=%d", count, time.Since(began).Milliseconds(), time.Until(manualGroupProofDeadline(group)).Milliseconds())
 		return group, parts
 	}
 	group, parts := prepare()
 	admit := func() (value.Accepted, error) {
-		until := group.Preview.SelectionUntil
-		for _, child := range group.Children {
-			until = identity.Earlier(until, identity.Earlier(child.Eligibility.ValidUntil, identity.Earlier(child.RecordingSave.Initiator.ValidUntil, child.Plan.ValidUntil)))
-		}
+		until := manualGroupProofDeadline(group)
 		call, cancel := context.WithDeadline(ctx, until)
 		defer cancel()
 		return admissions.AdmitRecordingSaveGroup(call, group)
@@ -273,9 +320,11 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 				t.Error(err)
 			}
 		}()
+		rollbackStarted := time.Now()
 		if _, err := admit(); err == nil {
 			t.Fatal("forced last-child failure admitted group")
 		}
+		t.Logf("group_sources=%d test_induced_last_child_rollback_ms=%d", count, time.Since(rollbackStarted).Milliseconds())
 		var reached bool
 		if err := f.admin.QueryRow(ctx, `SELECT is_called FROM public.asservat_group_fixture_reached`).Scan(&reached); err != nil || !reached {
 			t.Fatal("refusal did not reach test-induced final-child trigger", reached, err)
@@ -300,30 +349,34 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 	if err != nil {
 		t.Fatal("actual atomic group admission", err)
 	}
-	t.Logf("group_sources=2 atomic_admission_ms=%d original_first_proof_remaining_ms=%d configured_output_bytes=%d", time.Since(admittedStarted).Milliseconds(), time.Until(group.Children[0].Eligibility.ValidUntil).Milliseconds(), 2*maximumBytes)
-	if accepted.Group == nil || len(accepted.Group.Children) != 2 || accepted.CaptureID != group.Preview.CaptureID || accepted.Expectation.CaptureUID != "" {
+	t.Logf("group_sources=%d atomic_admission_ms=%d original_first_proof_remaining_ms=%d configured_output_bytes=%d", count, time.Since(admittedStarted).Milliseconds(), time.Until(manualGroupProofDeadline(group)).Milliseconds(), int64(count)*maximumBytes)
+	if accepted.Group == nil || len(accepted.Group.Children) != count || accepted.CaptureID != group.Preview.CaptureID || accepted.Expectation.CaptureUID != "" {
 		t.Fatal("group became fake artifact or lost children")
 	}
 	t.Run("one-parent-shared-t0-policy-and-grant-spend", func(t *testing.T) {
 		after := readManualSaveCounters(t, ctx, f, policy)
 		var full, chargedReplay int64
-		if err := f.admin.QueryRow(ctx, `SELECT charged_full,charged_replay FROM context_control_account WHERE root_id=$1 AND allocation_id=$2`, group.RootID, group.Preview.Storage.AllocationID).Scan(&full, &chargedReplay); err != nil || full != controlBeforeFull+3 || chargedReplay != controlBeforeReplay+3 {
+		if err := f.admin.QueryRow(ctx, `SELECT charged_full,charged_replay FROM context_control_account WHERE root_id=$1 AND allocation_id=$2`, group.RootID, group.Preview.Storage.AllocationID).Scan(&full, &chargedReplay); err != nil || full != controlBeforeFull+int64(count+1) || chargedReplay != controlBeforeReplay+int64(count+1) {
 			t.Fatal("group metadata did not charge parent plus genuine children", full, chargedReplay, err)
 		}
 		var unsharedManual int
-		if err := f.admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE group_id=$1 AND history_origin='manual' AND share_instruction IS NULL`, accepted.CaptureID).Scan(&unsharedManual); err != nil || unsharedManual != 2 {
+		if err := f.admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE group_id=$1 AND history_origin='manual' AND share_instruction IS NULL`, accepted.CaptureID).Scan(&unsharedManual); err != nil || unsharedManual != count {
 			t.Fatal("group inherited recurring sharing or automatic history", unsharedManual, err)
 		}
 		var childJournals int
-		if err := f.admin.QueryRow(ctx, `SELECT count(*) FROM context_preview WHERE root_id=$1 AND id IN($2,$3)`, group.RootID, parts[0].Preview.ID, parts[1].Preview.ID).Scan(&childJournals); err != nil || childJournals != 0 {
+		previewIDs := make([]string, len(parts))
+		for index, part := range parts {
+			previewIDs[index] = part.Preview.ID
+		}
+		if err := f.admin.QueryRow(ctx, `SELECT count(*) FROM context_preview WHERE root_id=$1 AND id=ANY($2::uuid[])`, group.RootID, previewIDs).Scan(&childJournals); err != nil || childJournals != 0 {
 			t.Fatal("child preview journals were persisted", childJournals, err)
 		}
-		if after.Executions != before.Executions+1 || after.Collected != before.Collected+2*maximumBytes || after.Occurrences != before.Occurrences || after.Observed != before.Observed || after.Shares != before.Shares || after.Reservations != before.Reservations+2 {
+		if after.Executions != before.Executions+1 || after.Collected != before.Collected+int64(count)*maximumBytes || after.Occurrences != before.Occurrences || after.Observed != before.Observed || after.Shares != before.Shares || after.Reservations != before.Reservations+count {
 			t.Fatal("wrong grouped policy/resource units", after, before)
 		}
 		if policy.GrantID != "" {
 			afterGrant := readManualPolicyGrantSpend(t, ctx, f, policy.GrantID)
-			if afterGrant.Executions != grantBefore.Executions+2 || afterGrant.Bytes != grantBefore.Bytes+2*maximumBytes || afterGrant.Observed != grantBefore.Observed {
+			if afterGrant.Executions != grantBefore.Executions+int64(count) || afterGrant.Bytes != grantBefore.Bytes+int64(count)*maximumBytes || afterGrant.Observed != grantBefore.Observed {
 				t.Fatal("grant did not count per source", afterGrant, grantBefore)
 			}
 		}
@@ -338,7 +391,9 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 				t.Fatal("group advanced occurrence window more than once", key, tat, err)
 			}
 		}
+		replayStarted := time.Now()
 		replay, err := admit()
+		t.Logf("group_sources=%d exact_replay_ms=%d original_first_proof_remaining_ms=%d", count, time.Since(replayStarted).Milliseconds(), time.Until(manualGroupProofDeadline(group)).Milliseconds())
 		if err != nil || replay.Group == nil || replay.CaptureID != accepted.CaptureID || !replay.CreatedAt.Equal(accepted.CreatedAt) || readManualSaveCounters(t, ctx, f, policy) != after {
 			t.Fatal("group replay changed identity/time/spend", err)
 		}
@@ -351,12 +406,22 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 			t.Fatal(err)
 		}
 	}
-	for index := range parts {
-		part := parts[index]
-		t.Run(fmt.Sprintf("native-child-%d", index), func(t *testing.T) { qualifySourceSnapshotCompletion(t, ctx, f, policy, part, intents) })
-		if cancellation && index == 0 {
-			qualifyManualRecordingSaveGroupMixedCancellation(t, ctx, f, policy, accepted, parts[1])
-			break
+	if count > 2 {
+		t.Run("sixteen-central-only-no-execution-or-native", func(t *testing.T) {
+			var executions, catalog int
+			if err := f.admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM context_execution e JOIN context_capture c ON c.id=e.capture_id WHERE c.group_id=$1),(SELECT count(*) FROM context_catalog x JOIN context_capture c ON c.id=x.capture_id WHERE c.group_id=$1)`, accepted.CaptureID).Scan(&executions, &catalog); err != nil || executions != 0 || catalog != 0 {
+				t.Fatal("central-only case dispatched or published native work", executions, catalog, err)
+			}
+			qualifyManualGroupCentralProgress(t, ctx, f, policy, accepted, parts[0].Admission.RecordingSave.Initiator.VerifiedIdentity)
+		})
+	} else {
+		for index := range parts {
+			part := parts[index]
+			t.Run(fmt.Sprintf("native-child-%d", index), func(t *testing.T) { qualifySourceSnapshotCompletion(t, ctx, f, policy, part, intents) })
+			if cancellation && index == 0 {
+				qualifyManualRecordingSaveGroupMixedCancellation(t, ctx, f, policy, accepted, parts[1])
+				break
+			}
 		}
 	}
 	t.Run("one-encrypted-parent-history-fresh-selection-settings", func(t *testing.T) {
@@ -656,4 +721,48 @@ func qualifyManualRecordingSaveGroupHistory(t *testing.T, ctx context.Context, f
 	if err := f.admin.QueryRow(ctx, `SELECT count(*) FROM capture_history_parameter WHERE root_id=$1`, preview.RootID).Scan(&summaries); err != nil || summaries != 1 {
 		t.Fatal("group did not store one settings envelope", summaries, err)
 	}
+}
+
+func manualGroupProofDeadline(group value.RecordingSaveGroupAdmission) time.Time {
+	until := group.Preview.SelectionUntil
+	for _, child := range group.Children {
+		until = identity.Earlier(until, identity.Earlier(child.Eligibility.ValidUntil, identity.Earlier(child.RecordingSave.Initiator.ValidUntil, child.Plan.ValidUntil)))
+	}
+	return until
+}
+
+func qualifyManualGroupCentralProgress(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, parent value.Accepted, human identity.Identity) {
+	t.Helper()
+	f.refreshBase(t)
+	recovery, err := policy.Scenario.recovery.reader.RecoveryState(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	human.VerifiedAt, human.ValidUntil = now, now.Add(5*time.Second)
+	reader, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], policy.Scenario.a.RootID, policy.Scenario.recovery.guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	progress, err := reader.ReadContextProgress(ctx, value.ProgressQuery{RootID: policy.Scenario.a.RootID, CaptureID: parent.CaptureID, Identity: human, Recovery: recovery})
+	if err != nil || len(progress.Actions) != 16 || progress.CaptureID != parent.CaptureID || progress.Phase == "Succeeded" || progress.CandidateArtifactID != "" {
+		t.Fatal("central-only parent progress lost real children or invented result", len(progress.Actions), progress.Phase, err)
+	}
+	states := map[string]string{}
+	for _, action := range progress.Actions {
+		states[action.InstanceID] = action.PodUID
+		if action.Phase == "Succeeded" {
+			t.Fatal("central-only child reported native success")
+		}
+	}
+	for _, child := range parent.Group.Children {
+		if states[child.CaptureID] != child.Expectation.PodUID {
+			t.Fatal("progress substituted a child instance or Pod")
+		}
+	}
+	var memberCount, sourceCount, pods int
+	if err := f.admin.QueryRow(ctx, `SELECT cardinality(g.child_ids),jsonb_array_length(convert_from(g.scope_json,'UTF8')::jsonb->'sources'),(SELECT count(DISTINCT convert_from(c.expectation_json,'UTF8')::jsonb->>'PodUID') FROM context_capture c WHERE c.group_id=g.id) FROM recording_save_group g WHERE g.id=$1`, parent.CaptureID).Scan(&memberCount, &sourceCount, &pods); err != nil || memberCount != 16 || sourceCount != 16 || pods != 16 {
+		t.Fatal("actual SQL group/cardinality differs from reviewed16", memberCount, sourceCount, pods, err)
+	}
+	t.Logf("actual_group_header_members=%d canonical_sources=%d distinct_child_pods=%d progress_actions=%d phase=%s; no execution/native qualification", memberCount, sourceCount, pods, len(progress.Actions), progress.Phase)
 }
