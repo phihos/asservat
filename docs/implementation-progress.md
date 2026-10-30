@@ -70,13 +70,33 @@ regression, with server-side policy filtering, bounded keyset continuation and
 exact later-page source lookup. Empty-workload discovery likewise has an
 actual failing live-Pod dependency regression and passing metadata-only tests.
 
-The genuine manual SQL outer now compiles with reviewed opt-in/recurring sharing
-established before policy acceptance, current ordinary initiator and original
-policy authority, and no detector Tick. Provider execution, migration/role
-qualification, shared spend/replay, cancellation joins and exact native output
-remain pending. Production `RecordingSaveEnabled` remains false, including the
-direct request/continuation path. Grouped saves, syscall sources, protected reason
+The combined core gates on `bed37640` passed: the full 66-package Go/race
+suite, 670 Kubernetes top-level selections, Go architecture, generated SQL,
+13,358 specification assertions and architecture checks. The final console
+check passed 252 tests; its final build also passed. Existing browser journeys
+remain synthetic component evidence for their existing flows.
+
+Manual service qualification has not passed. Three fresh owned
+PostgreSQL/S3/OpenBao attempts are retained under
+`/home/phil/.cache/asservat-build/codex-bf86-resume/manual-source-save-sql108-{1,2,3}/`.
+The first exposed missing ordinary read rights in the sharing-author fixture;
+`3e17f845` corrected that fixture without changing product permissions. The
+second exposed a downgrade-probe ordering error: Goose committed empty Down108
+before populated Down107 refused, leaving the fixture at107. `9299196a` confines
+the old probe to schema107 and adds a populated108 refusal check after real
+manual state exists, including schema/runtime-access survival checks. The third
+passed source provenance and the missing-rights/disabled-opt-in rejection checks,
+then failed the first permitted admission with `context allocation unavailable`.
+That failure remains under investigation. Actual supervisor exits were 1 for
+all three runs; none qualifies manual Save. Root verified frozen source hashes,
+archived artifacts, restored result baselines and exact owned cleanup for each;
+all 16 pre-existing containers were preserved.
+
+Shared spend/replay, cancellation joins and exact manual native output remain
+pending. Production `RecordingSaveEnabled` remains false, including the direct
+request/continuation path. Grouped saves, syscall sources, protected reason
 production and native source/clock qualification remain accepted unfinished work.
+
 
 
 ## Ordinary ongoing source ledger: SQL component qualified (2026-10-30)
