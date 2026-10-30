@@ -3,6 +3,7 @@ package contextstart
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -38,6 +39,9 @@ type Router struct {
 	// registered is closed and replaced when a standby registers or a query
 	// releases it, so a waiting query can retry within its original reserve.
 	registered chan struct{}
+	// lastAttach is when each cluster's latest attachment took a standby;
+	// diagnostic only (AttachState).
+	lastAttach map[string]time.Time
 }
 
 // queryReserve is the part of a query's original deadline kept for the query
@@ -418,6 +422,10 @@ func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachme
 		selected := r.selectLocked(cluster, deadline, func(*Standby) bool { return true })
 		if selected != nil {
 			selected.attached = true
+			if r.lastAttach == nil {
+				r.lastAttach = map[string]time.Time{}
+			}
+			r.lastAttach[cluster] = time.Now()
 			call, cancel := context.WithDeadline(ctx, deadline)
 			a := &Attachment{router: r, standby: selected, capture: capture, ctx: call, cancel: cancel}
 			r.captures[capture] = a
@@ -567,4 +575,44 @@ func (r *Router) Close() {
 	for _, a := range active {
 		a.Close()
 	}
+}
+
+// AttachState is a content-free diagnostic of one cluster's standbys for
+// attach refusal reports: live, idle, attached and query-busy counts and how
+// long ago the latest attachment consumed a standby. It grants nothing.
+func (r *Router) AttachState(cluster string) string {
+	if r == nil {
+		return "router=none"
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var live, idle, attached, busy int
+	for _, s := range r.standby {
+		if s.channel.Connector.Binding.ClusterID != cluster || !s.liveLocked() {
+			continue
+		}
+		live++
+		switch {
+		case s.attached:
+			attached++
+		case s.queryBusy:
+			busy++
+		default:
+			idle++
+		}
+	}
+	since := "never"
+	if at, ok := r.lastAttach[cluster]; ok {
+		since = attachAgeBucket(time.Since(at))
+	}
+	return fmt.Sprintf("standbys live=%d idle=%d attached=%d query-busy=%d last-attach=%s", live, idle, attached, busy, since)
+}
+
+func attachAgeBucket(d time.Duration) string {
+	for _, b := range []time.Duration{time.Second, 2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second} {
+		if d < b {
+			return "<" + b.String()
+		}
+	}
+	return ">=30s"
 }

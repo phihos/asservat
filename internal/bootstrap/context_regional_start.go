@@ -122,7 +122,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 			} else if errors.Is(e, fleetvalue.ErrInvalid) {
 				reason = "invalid"
 			}
-			s.Report("attach (" + reason + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
+			s.Report("attach (" + reason + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound + " " + s.Router.AttachState(target.ClusterID))
 		}
 		return notStarted
 	}
