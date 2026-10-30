@@ -39,6 +39,9 @@ func staged(stage string, err error) error {
 	return sourceStage{stage, err}
 }
 
+// StagedSourceError lets a source adapter name its own failing step.
+func StagedSourceError(stage string, err error) error { return staged(stage, err) }
+
 // sourceStageOf returns the first labelled source step of err, or "".
 func sourceStageOf(err error) string {
 	var s sourceStage
@@ -326,7 +329,10 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 		}
 		admission, e := s.Ledger.AdmitSource(call, check)
 		if e != nil {
-			failed = errors.Join(failed, staged("admit", e))
+			if sourceStageOf(e) == "" {
+				e = staged("admit", e)
+			}
+			failed = errors.Join(failed, e)
 			if known && (errors.Is(e, value.ErrDenied) || errors.Is(e, value.ErrChanged) || errors.Is(e, value.ErrConflict)) {
 				if endErr := s.Ledger.EndSource(call, old.Binding.SourceID); endErr == nil {
 					failed = errors.Join(failed, s.Dispatcher.StopSource(call, old.ClusterID, old.Binding))

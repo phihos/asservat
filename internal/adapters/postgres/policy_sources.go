@@ -83,17 +83,21 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		cutoff = nil
 	}
 	defer stopCutoff()
+	// step names the bounded admission step for content-free failure counters.
+	step := "topology"
 	topology, err := s.guards.Retention.observe(call, in.Authority.ClusterID)
 	if err != nil {
-		return out, err
+		return out, app.StagedSourceError("admit-"+step, err)
 	}
 	err = s.ledger.transaction(call, func(q *custodydb.Queries) error {
+		step = "recovery"
 		out = app.PolicySourceAdmission{}
 		stopCutoff()
 		trust, err := s.guards.Recovery.lock(call, q, s.root, in.Recovery)
 		if err != nil {
 			return err
 		}
+		step = "permissions"
 		permissions, err := q.LockPermissionStream(call, id(s.root))
 		if err != nil {
 			return err
@@ -102,6 +106,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		if err != nil {
 			return err
 		}
+		step = "accepted"
 		accepted, record, err := acceptedPolicyIn(call, q, s.root, s.installation, trust, policy)
 		if err != nil {
 			return err
@@ -110,6 +115,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		if !reflect.DeepEqual(a, in.Authority) || in.Settings.Issuer != a.Creator.Issuer || app.RecorderPolicyScopeDigest(a.PolicyUID, record.IntentVersion, policySource(policy).CollectionDigest, in.Policy, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits) != a.ScopeDigest {
 			return value.ErrChanged
 		}
+		step = "projection"
 		projection, err := automationProjection(call, q, permissions, s.installation, a, in.Target.Target())
 		if err != nil {
 			return err
@@ -122,6 +128,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		if in.Initial {
 			purpose = authorization.PolicyArm
 		}
+		step = "eligibility"
 		eligible := authorization.EvaluatePolicy(a, projection, authorization.PolicyUse{PolicyUID: a.PolicyUID, ScopeDigest: a.ScopeDigest, Target: in.Target.Target(), Purpose: purpose}, now.Time)
 		if !eligible.Eligible {
 			return value.ErrDenied
@@ -144,6 +151,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			}
 		}
 
+		step = "grant"
 		hard := a.NotAfter
 		// An ordinary require-all review is checked without consuming a raw-byte
 		// grant pool. A changed attachment cannot refill this source's input credit.
@@ -171,6 +179,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			}
 			hard = identity.Earlier(hard, identity.Earlier(g.PolicyNotAfter, g.ExpiresAt))
 		}
+		step = "storage"
 		storage, err := q.ObserveContextStorage(call, custodydb.ObserveContextStorageParams{RootID: id(s.root), ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUid: a.WorkloadUID})
 		if err != nil {
 			return err
@@ -191,6 +200,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		if err != nil {
 			return err
 		}
+		step = "resources"
 		resource, err := q.ReadPolicySourceResourceSelection(call, custodydb.ReadPolicySourceResourceSelectionParams{RootID: id(s.root), AllocationID: allocation.ID})
 		if err != nil {
 			return err
@@ -245,9 +255,11 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			}
 			return s.guards.Retention.check(call, q, topology, in.Retention.Proof, in.Target.Target())
 		}
+		step = "check"
 		if err = check(); err != nil {
 			return err
 		}
+		step = "insert"
 		row, err := q.ReadPolicyRecordingSource(call, custodydb.ReadPolicyRecordingSourceParams{RootID: id(s.root), ID: id(in.SourceID)})
 		first := errors.Is(err, pgx.ErrNoRows)
 		if err != nil && !first {
@@ -381,17 +393,22 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 				return value.ErrChanged
 			}
 		}
+		step = "permit"
 		if !p.Dispatchable(now.Time) {
 			return value.ErrUnavailable
 		}
 		out.Permit, out.First = p, first
+		step = "final-check"
 		return check()
 	})
 	if err != nil {
-		return app.PolicySourceAdmission{}, captureError(err)
+		if call.Err() != nil {
+			step += "-late"
+		}
+		return app.PolicySourceAdmission{}, app.StagedSourceError("admit-"+step, captureError(err))
 	}
 	if call.Err() != nil || !out.Permit.Dispatchable(time.Now()) {
-		return app.PolicySourceAdmission{}, value.ErrUnavailable
+		return app.PolicySourceAdmission{}, app.StagedSourceError("admit-committed-late", value.ErrUnavailable)
 	}
 	return out, nil
 }
