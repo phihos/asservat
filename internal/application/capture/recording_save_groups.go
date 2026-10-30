@@ -234,6 +234,9 @@ func (s RecordingSaves) previewRecordingSaveGroup(ctx context.Context, current i
 	return ContextPreviewResult{RecordingSave: metadata, Preview: parent, Assessment: assessment, CollectorImageDigest: parts[0].CollectorImageDigest, ProjectionDigest: parts[0].ProjectionDigest, ValidUntil: until}, nil
 }
 
+// recordingSaveGroupExplanation fits the public 256-character impact explanation.
+const recordingSaveGroupExplanation = "Saves existing windows from all selected sources. Each output uses its own frozen memory, encoding, encryption, storage and upload; no source starts or credits are added. Combined overhead is unmeasured; retention and gaps stay per source."
+
 func RecordingSaveGroupAssessmentRulesDigest() artifact.Digest {
 	return sha256.Sum256([]byte("asservat-recording-save-group-assessment/v1;all-child-incremental-limits;no-new-observation;source-aged-retention"))
 }
@@ -241,7 +244,7 @@ func aggregateRecordingSaveAssessment(p value.ContextPreview, children []Recordi
 	if p.Group == nil || len(children) != len(p.Group.Children) {
 		return planvalue.ContextAssessment{}, value.ErrInvalid
 	}
-	out := planvalue.ContextAssessment{ID: p.AssessmentID, PlanDigest: p.ScopeDigest, RulesDigest: RecordingSaveGroupAssessmentRulesDigest(), GeneratedAt: now, Impact: planvalue.AssessmentImpact{Level: "unknown", HasUnknowns: true, Effects: []string{"nodeCPU", "collectorMemory", "storageIO", "uploadContention"}, Explanation: "Saves existing windows from all selected sources. Each output separately consumes frozen memory, encoding, encryption, storage and upload capacity; no source starts or observation credits are added. Combined overhead is unmeasured. Retention and gaps remain specific to each source."}, Exposure: planvalue.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", UnknownContent: true}}
+	out := planvalue.ContextAssessment{ID: p.AssessmentID, PlanDigest: p.ScopeDigest, RulesDigest: RecordingSaveGroupAssessmentRulesDigest(), GeneratedAt: now, Impact: planvalue.AssessmentImpact{Level: "unknown", HasUnknowns: true, Effects: []string{"nodeCPU", "collectorMemory", "storageIO", "uploadContention"}, Explanation: recordingSaveGroupExplanation}, Exposure: planvalue.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", UnknownContent: true}}
 	capabilities := make([]artifact.Digest, 0, len(children))
 	for _, child := range children {
 		a := child.Assessment

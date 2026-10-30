@@ -13,6 +13,9 @@ import (
 // A change to its effects, exposure or interpretation requires a new rule digest.
 const contextAssessmentRule = `{"rule":"pod-status-assessment/v2","retentionAnchorRule":"submissionPreparation","recipe":"builtin-pod-status-v1","impact":"unknown","effects":["nodeCPU","collectorMemory","storageIO","uploadContention"],"retained":["personalIdentifiers","networkAddresses","paths"],"transient":["userContent","credentials","unknownApplicationData"],"metrics":"unavailable","limit":{"nativeOutputBytes":4096,"excludes":"API response, framing, encryption and total collector memory"}}`
 
+// SourceSnapshotExplanation fits the public 256-character impact explanation.
+const SourceSnapshotExplanation = "Copies an existing recording window, then encodes, encrypts and uploads it; no new source or attach starts. Incremental overhead is unmeasured. Preview reserves no history: eviction or source loss can give explicit partial evidence."
+
 func SourceSnapshotAssessmentRulesDigest() artifact.Digest {
 	return artifact.Digest(sha256.Sum256([]byte("source-window-assessment/v1;retention=original-source-acquisition;incremental=freeze,copy,encode,encrypt,upload;baseline=separate;overhead=unknown")))
 }
@@ -61,7 +64,7 @@ func AssessContext(plan value.ContextPlan, assessmentID string, now time.Time) (
 	rules, output := ContextAssessmentRulesDigestForClass(plan.Input.Target.ExecutionClass), int64(artifact.MaxContextBytes)
 	if saved := plan.Input.Snapshot; saved != nil {
 		rules, output = SourceSnapshotAssessmentRulesDigest(), saved.Request.MaxBytes
-		explanation = "Copies an existing recording window, then encodes, encrypts and uploads it. No new source or application attach is started. The live recorder baseline continues independently; incremental CPU, memory, storage and upload overhead is unmeasured. Preview reserves no history; eviction or source loss can produce explicit partial evidence."
+		explanation = SourceSnapshotExplanation
 	}
 	return value.ContextAssessment{
 		ID: assessmentID, PlanDigest: plan.ScopeDigest,
