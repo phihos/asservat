@@ -291,38 +291,32 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Helper()
 		var p preview
 		must("preview_recording_save", args, &p)
-		// Existing journey contract: an accepted request whose acquisition did
-		// not start continues under the original preview/key, never a new one.
-		var progress installedJourneyCaptureProgress
-		request := map[string]any{"preview_id": p.ID, "idempotency_key": key}
-		var continued int
-		for deadline := time.Now().Add(30 * time.Second); ; {
-			reply, code, err := invoke(ctx, "request_capture", request)
-			if err == nil && reply.Status == "ok" && code == "" {
-				if json.Unmarshal(reply.Data, &progress) != nil {
-					t.Fatal("request_capture data")
-				}
-				break
+		// Existing journey contract: resolve/continue the original preview and
+		// key on OutcomeUnknown or AcquisitionNotStarted, never a new request.
+		call := func(name string, arguments any, data any) (string, string) {
+			reply, code, err := invoke(ctx, name, arguments)
+			if err != nil {
+				return "error", "OutcomeUnknown"
 			}
-			if (err == nil && code != "AcquisitionNotStarted") || !time.Now().Before(deadline) {
-				diagnose()
-				t.Fatal("ongoing Save request", code, err, "continuations", continued)
+			if reply.Status == "ok" && code == "" && data != nil && json.Unmarshal(reply.Data, data) != nil {
+				t.Fatal("ongoing Save data", name)
 			}
-			continued++
-			request = map[string]any{"preview_id": p.ID, "idempotency_key": key, "continue_acquisition": true}
-			if err = installedJourneyPause(ctx, time.Second); err != nil {
-				t.Fatal(err)
-			}
+			return reply.Status, code
 		}
-		t.Logf("ongoing Save %s accepted after %d continuations", progress.CaptureID, continued)
+		var progress installedJourneyCaptureProgress
+		var err error
+		progress.CaptureID, err = installedJourneySubmit(ctx, call, map[string]any{"preview_id": p.ID, "idempotency_key": key})
+		if err != nil {
+			diagnose()
+			t.Fatal("ongoing Save request", err)
+		}
 		var t0 time.Time
 		if progress.CaptureID == "" || admin.QueryRow(ctx, `SELECT accepted_at FROM recording_save_reservation WHERE root_id=$1 AND capture_id=$2`, root, progress.CaptureID).Scan(&t0) != nil {
 			t.Fatal("Save lost its SQL-accepted T0", progress)
 		}
 		// Passive replay of the same key returns the original capture.
-		var replay installedJourneyCaptureProgress
-		must("request_capture", map[string]any{"preview_id": p.ID, "idempotency_key": key}, &replay)
-		if replay.CaptureID != progress.CaptureID {
+		replay, err := installedJourneySubmit(ctx, call, map[string]any{"preview_id": p.ID, "idempotency_key": key})
+		if err != nil || replay != progress.CaptureID {
 			t.Fatal("passive Save replay changed capture identity")
 		}
 		return progress.CaptureID, t0
