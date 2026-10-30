@@ -67,7 +67,7 @@ func requestRecordScope(row custodydb.ContextCapture) (planning.ContextScopeIden
 	// The canonical approved-timing marker also covers raw-predicate review.
 	// RequireApproval records the separate installation require-all switch;
 	// current policy/grant authority is checked independently after decoding.
-	if s.CaptureID != a.CaptureID || s.Target != target || s.ExecutionClass != e.ExecutionClass || !(s.ApprovedAcceptance && e.Recording != nil || s.Deadline.Equal(a.Deadline)) {
+	if s.CaptureID != a.CaptureID || s.Target != target || s.ExecutionClass != e.ExecutionClass || !(s.ApprovedAcceptance && (e.Recording != nil || e.Snapshot != nil) || s.Deadline.Equal(a.Deadline)) {
 		return planning.ContextScopeIdentity{}, value.ErrUnavailable
 	}
 	return s, nil
