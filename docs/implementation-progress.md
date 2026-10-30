@@ -76,26 +76,47 @@ suite, 670 Kubernetes top-level selections, Go architecture, generated SQL,
 check passed 252 tests; its final build also passed. Existing browser journeys
 remain synthetic component evidence for their existing flows.
 
-Manual service qualification has not passed. Three fresh owned
-PostgreSQL/S3/OpenBao attempts are retained under
-`/home/phil/.cache/asservat-build/codex-bf86-resume/manual-source-save-sql108-{1,2,3}/`.
-The first exposed missing ordinary read rights in the sharing-author fixture;
-`3e17f845` corrected that fixture without changing product permissions. The
-second exposed a downgrade-probe ordering error: Goose committed empty Down108
-before populated Down107 refused, leaving the fixture at107. `9299196a` confines
-the old probe to schema107 and adds a populated108 refusal check after real
-manual state exists, including schema/runtime-access survival checks. The third
-passed source provenance and the missing-rights/disabled-opt-in rejection checks,
-then failed the first permitted admission with `context allocation unavailable`.
-That failure remains under investigation. Actual supervisor exits were 1 for
-all three runs; none qualifies manual Save. Root verified frozen source hashes,
-archived artifacts, restored result baselines and exact owned cleanup for each;
-all 16 pre-existing containers were preserved.
+Manual SQL/storage component qualification passed on frozen `cdcb5f1e` in
+two separate fresh owned PostgreSQL/S3/OpenBao fixtures. Save prefix
+`manual-source-save-sql108-5` passed all 12 required names (13 actual): supervisor
+exit 0 in 26.650 seconds; package 8.363 seconds. It covers first admission with
+immutable acceptance time, exact replay without another debit, one shared policy
+execution and 8 MiB reserved output, no detector occurrence or observation refill,
+manual history, original executor versus human initiator, exclusion of recurring
+sharing, encrypted completion/publication and 4,592 exact PCAPNG bytes. A durable
+cancellation request cannot replace positively stored evidence. No policy grant
+was present in this fixture, so its grant branch is not qualified by this run.
 
-Shared spend/replay, cancellation joins and exact manual native output remain
-pending. Production `RecordingSaveEnabled` remains false, including the direct
+Cancellation prefix `manual-source-cancel-sql108-2` independently passed all eight
+required names (nine actual): supervisor exit 0 in 15.986 seconds; package 7.853
+seconds. It covers no-start fencing, started cancellation remaining pending until
+an exact joined proof, wrong-attempt/generic-outcome refusal, exact replay,
+retained charges and byte-identical original source state. Both suites prove
+populated108 downgrade refusal without partial teardown. Root independently
+verified 3,525 canonical and 36,176 tracked hashes, both artifacts per run,
+the restored 31,495-file result baseline and exact owned cleanup; all 16 existing
+containers were preserved. The cache base is
+`/home/phil/.cache/asservat-build/codex-bf86-resume/`.
+
+Four preceding failed Save attempts remain archived. Prefix1 lacked the sharing
+author's ordinary read scope; `3e17f845` corrected that fixture. Prefix2 committed
+empty Down108 before populated Down107 refused; `9299196a` isolated the probe.
+Prefix3 exposed a product ordering bug: first manual byte reservation required
+an execution debit that happened later. `dbe920f6` moves the existing manual
+spend earlier within the same transaction, preserving automatic ordering and
+query count. Its RED regression reproduced the failure; full PostgreSQL/capture
+races and architecture checks passed after the fix. Prefix4 reached encrypted
+storage but the cancellation caller fixture lacked the existing read scope;
+`cdcb5f1e` corrected only that identity and added current-rights/deny controls.
+Root verified failed artifacts, source hashes and exact cleanup for every run.
+
+Initial identity, target, report/process, packets and clocks remain synthetic.
+The native read uses the existing framed reader and local fixture key authority;
+this is not installed collector-clock or remote download-session qualification.
+Production `RecordingSaveEnabled` remains false, including the direct
 request/continuation path. Grouped saves, syscall sources, protected reason
-production and native source/clock qualification remain accepted unfinished work.
+production and installed browser/MCP collection remain accepted unfinished work.
+
 
 
 
