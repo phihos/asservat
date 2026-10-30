@@ -1,5 +1,52 @@
 # Sustained implementation progress
 
+## Recording Save reasons: local SQL/storage qualification passed (2026-10-30)
+
+[ADR-267](decisions/267-encrypted-recording-save-reasons.md) adds an optional,
+verbatim 1–512 Unicode-scalar reason. It stays outside collection scope and
+repeat settings. Admission copies its encrypted envelope into the mandatory
+capture audit journal and erases the preview body; status opens it only after
+current metadata authorization. Capture progress remains available after reason
+retirement. This adds no artifact raw-unwrapping authority.
+
+The fresh owned `manual-recording-reason-sql110-6` fixture on `a19d77d5` passed
+all eleven required names (twelve actual): supervisor exit 0 in 200.876 seconds,
+Go package 167.329 seconds. It verified real SQL110 admission, encrypted intent
+and outcome objects, 4,592 exact native PCAPNG bytes after selection expiry,
+actual preview-row deletion at its observed SQL read cutoff, replay without
+another debit, authorized display with one unwrap and denied display with none,
+display after the original writer cutoff, real original/terminal retirement,
+and populated downgrade refusal. Empty Down/Up also passed before runtime-role
+creation; that is not qualification of restoring existing-role view ACLs.
+
+Admission measured 178 ms and audit acknowledgement 202 ms. The joined SQL row
+measured 45,404 bytes; intent/outcome frames were 18,336/18,758 bytes and their
+objects 24,932/25,497 bytes. These are sample measurements, not universal physical
+row, WAL or backup bounds. The maximum-sized inner wrap representation is a test
+adapter over actual local encryption, not remote-provider qualification. Source,
+process, packet/clock mapping, backup profile and retirement-signing authority
+remain synthetic fixture inputs. The preaccepted short audit-retention profile
+uses real waits; no SQL aging or production deadline change was used.
+
+Root independently verified 3,591 canonical and 36,247 tracked source hashes,
+two archived artifacts, the restored 31,495-file result baseline and complete
+owned container/network/scratch cleanup, preserving all sixteen prior containers.
+Failed prefixes 1–5 remain archived. They exposed an assumed constraint name,
+PL/pgSQL CASE parsing, a private-helper dependency in global CHECKs, JSONB operator
+precedence, and a fixture confusing selection expiry with preview-row expiry.
+The fixes preserve existing permissions, byte limits and cleanup deadlines.
+
+Combined real-runner workflow qualification remains pending. Its fixture exposed
+a separate production interface defect: queued recording outputs were required
+to implement synchronous stored completion before reaching their typed branch.
+`aa57c4de` keeps that requirement for finite captures and leaves queued completion
+with `CollectRecording`. Queue success/refusal reproduced the defect before the
+fix; those cases, the finite negative and the full execution race package pass
+(exit 0, 1.356 seconds). No dependency, request, permission or state was added.
+This does not qualify installed collectors, remote key opening, download-session
+transport or all-sixteen native dispatch. Collection remains disabled and the
+supported homelab release remains unfinished.
+
 ## Grouped existing-recording Save: SQL/storage components qualified (2026-10-30)
 
 [ADR-266](decisions/266-grouped-recording-save-accounting.md) records the maintainer's
