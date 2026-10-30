@@ -4,6 +4,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"testing"
@@ -455,9 +456,31 @@ func TestManualRecordingSaveGroupFixtureFundsSourcesParentAndChildren(t *testing
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := capacity.CompileQualifiedRootBacking(q, plan); err != nil {
+			qualified, err := capacity.CompileQualifiedRootBacking(f.qualification, plan)
+			if err != nil {
 				t.Fatal("group configuration lacks protected root backing", err)
 			}
+			raw, _ := qualified.Canonical()
+			var compiled struct{ Input capacity.RootBackingInput }
+			if err := json.Unmarshal(raw, &compiled); err != nil {
+				t.Fatal(err)
+			}
+			if compiled.Input.RecordsPerAccount < backing.Records {
+				t.Fatal("compiled root has fewer records than workload protocol", compiled.Input.RecordsPerAccount, backing.Records)
+			}
+			slots := compiled.Input.Accounts * compiled.Input.RecordsPerAccount
+			if compiled.Input.Capture.RecordsPerAccount != compiled.Input.RecordsPerAccount || compiled.Input.Capture.Policy.MetadataSlots != slots || compiled.Input.ProcessingState.MaxCaptures < slots {
+				t.Fatal("capture/processing root does not cover grouped records")
+			}
+			b, w := compiled.Input.Capture.Policy.History.SlotBacking(compiled.Input.Capture.Policy.MaxPurgeLeases)
+			if compiled.Input.Capture.Policy.BackupReservedBytes != slots*b || compiled.Input.Capture.Policy.WALReservedBytes != slots*w {
+				t.Fatal("capture lane backup/WAL underfunded")
+			}
+			pb, pw, ok := compiled.Input.ProcessingState.RequiredBytes()
+			if !ok || compiled.Input.ProcessingState.BackupBytes < pb || compiled.Input.ProcessingState.WALBytes < pw {
+				t.Fatal("processing state backup/WAL underfunded")
+			}
+			t.Logf("root_records_per_account=%d capture_records_per_account=%d capture_metadata_slots=%d processing_max_captures=%d capture_backup=%d capture_wal=%d processing_backup=%d processing_wal=%d", compiled.Input.RecordsPerAccount, compiled.Input.Capture.RecordsPerAccount, compiled.Input.Capture.Policy.MetadataSlots, compiled.Input.ProcessingState.MaxCaptures, compiled.Input.Capture.Policy.BackupReservedBytes, compiled.Input.Capture.Policy.WALReservedBytes, compiled.Input.ProcessingState.BackupBytes, compiled.Input.ProcessingState.WALBytes)
 			nativeUnit := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
 			if f.template.Policies[0].Budget.Context.Bytes < int64(count)*nativeUnit {
 				t.Fatal("genuine output reservations underfunded")
@@ -475,6 +498,23 @@ func configureManualGroupSourceCapacity(f *capacitySQLFixture, count int) {
 	p.Protected, p.Hard, p.Context = protected, protected, protected
 	p.NamespaceMaximum = capacity.BudgetAmount{Bytes: capacityNativeAccounts * protected.Bytes, Objects: capacityNativeAccounts * protected.Objects}
 	f.template.Pools[0].Budget.Slots[0].Protected = protected
+	// Configure the protected root before its qualification is serialized and
+	// accepted. Workload object capacity alone does not enlarge root coverage.
+	records := int64(2*count + 1)
+	root := &f.qualification.RootBacking
+	root.RecordsPerAccount = records
+	root.Capture.RecordsPerAccount = records
+	slots := root.Accounts * records
+	backup, wal := root.Capture.Policy.History.SlotBacking(root.Capture.Policy.MaxPurgeLeases)
+	root.Capture.Policy.MetadataSlots = slots
+	root.Capture.Policy.BackupReservedBytes = slots * backup
+	root.Capture.Policy.WALReservedBytes = slots * wal
+	root.ProcessingState.MaxCaptures = slots
+	var ok bool
+	root.ProcessingState.BackupBytes, root.ProcessingState.WALBytes, ok = root.ProcessingState.RequiredBytes()
+	if !ok {
+		panic("invalid bounded grouped fixture processing backing")
+	}
 }
 
 // Synthetic regional routing only: authority comes from the real SQL ledger,

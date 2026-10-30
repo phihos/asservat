@@ -9,9 +9,10 @@ one SQL109 transaction and acceptance time, and genuine per-source child
 captures and artifacts. Parent progress, cancellation, history and fresh repeat
 retain those child identities. Source observation budgets are unchanged.
 
-The eight affected Go packages pass race tests, including PostgreSQL adapters,
+The thirteen affected Go packages pass race tests, including PostgreSQL adapters,
 application capture/planning/authorization, domain authorization/capture/audit
-and the regional transport. Generated SQL (68 files), specification (13,362
+and the regional transport, presentation, browser/MCP boundaries, operation audit
+and bootstrap. Generated SQL (68 files), specification (13,362
 assertions), architecture, Go dependency boundaries and OpenAPI checks pass.
 These checks do not establish real SQL109 migration or transaction behavior.
 Grouped ordinary, grant-backed and mixed-cancellation provider fixtures are
@@ -21,7 +22,16 @@ first-install inventory. A local failing regression reproduces the omission;
 the inventory now includes that permanent relation without weakening its exact
 comparison. The failed run and PostgreSQL log are archived; root verified
 unchanged source hashes, restored prior results and exact owned cleanup, with
-all 16 pre-existing containers preserved. Grouped runtime results remain pending. Sixteen-member serialization and query-bound
+all 16 pre-existing containers preserved. Grouped runtime results remain pending.
+A second fresh run (`manual-group-save-sql109-2`) passed initial activation and
+empty migration replay, then SQL refused workload enrollment: the fixture's
+five-record workload exceeded its prepaid three-record root account. This is a
+fixture funding mismatch, not successful group admission. Its failed log and
+PostgreSQL diagnostic are preserved with the same independent hash, result and
+cleanup verification. A meaningful local regression now checks the compiled root, capture audit
+slots and processing backing against every source, parent and child record.
+The fixture declares the complete backing before initialization; a new exact
+frozen run remains pending. Sixteen-member serialization and query-bound
 checks are component evidence; sixteen-member SQL cost remains unqualified.
 
 The first coherent browser run failed because one assertion still expected
