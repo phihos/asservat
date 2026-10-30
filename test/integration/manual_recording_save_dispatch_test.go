@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -204,14 +205,43 @@ func (r dispatchWorkflowIdentity) Resolve(ctx context.Context, _ string) (identi
 	return i, nil
 }
 
+// This spy delegates the original submission-owned arguments without refreshing
+// identity, context, facts or deadlines. Metadata reads later use a separate call.
+type dispatchHistoryPersistence struct {
+	service                          captureapp.HistoryParameterService
+	calls                            int
+	human                            identity.Identity
+	captureID                        string
+	acceptedAt, deadline             time.Time
+	draft                            []byte
+	draftErr, entryErr, exitErr, err error
+}
+
+func (h *dispatchHistoryPersistence) Persist(ctx context.Context, a value.Accepted, i identity.Identity, p value.HistoryParameters, source *value.HistoryLineage) error {
+	h.calls++
+	h.human = i
+	h.human.Groups, h.human.Scopes = slices.Clone(i.Groups), slices.Clone(i.Scopes)
+	h.captureID, h.acceptedAt = a.CaptureID, a.CreatedAt
+	h.deadline, _ = ctx.Deadline()
+	h.draft, h.draftErr = value.CanonicalHistoryParameters(p)
+	h.entryErr = ctx.Err()
+	started := time.Now()
+	h.err = h.service.Persist(ctx, a, i, p, source)
+	h.exitErr = ctx.Err()
+	// Timing is reported after the real effect, without additional service calls.
+	fmt.Printf("actual_submission_history_persist calls=%d elapsed_us=%d original_request_remaining_ms=%d entry_error=%v exit_error=%v error=%v\n", h.calls, time.Since(started).Microseconds(), time.Until(h.deadline).Milliseconds(), h.entryErr, h.exitErr, h.err)
+	return h.err
+}
+
 type dispatchWorkflowOperations struct {
-	t                *testing.T
-	service          *presentation.AuditedOperations
-	identity         dispatchWorkflowIdentity
-	lastID           string
-	groupRequests    *dispatchGroupAdmissions
-	originalOwnerEnd time.Time
-	times            *dispatchPortTimes
+	t                   *testing.T
+	service             *presentation.AuditedOperations
+	identity            dispatchWorkflowIdentity
+	lastID              string
+	groupRequests       *dispatchGroupAdmissions
+	originalOwnerEnd    time.Time
+	originalIdentityEnd time.Time
+	times               *dispatchPortTimes
 }
 
 func (s *dispatchWorkflowOperations) call(ctx context.Context, window time.Duration, preview, key string, continuation bool) (presentation.OperationReply, string, error) {
@@ -221,10 +251,11 @@ func (s *dispatchWorkflowOperations) call(ctx context.Context, window time.Durat
 	caller, cancel := context.WithTimeout(ctx, window)
 	defer cancel()
 	s.originalOwnerEnd, _ = caller.Deadline()
-	current, _, err := identities.NewBearerRequestWithin(caller, s.identity, "synthetic-workflow-token", time.Now, window)
+	current, initial, err := identities.NewBearerRequestWithin(caller, s.identity, "synthetic-workflow-token", time.Now, window)
 	if err != nil {
 		s.t.Fatal(err)
 	}
+	s.originalIdentityEnd = initial.ValidUntil
 	input, err := json.Marshal(struct {
 		Preview  string `json:"preview_id"`
 		Key      string `json:"idempotency_key"`
@@ -239,7 +270,7 @@ func (s *dispatchWorkflowOperations) call(ctx context.Context, window time.Durat
 
 // Consume only the already accepted normal/resolution backing. Unlike legacy
 // audit helpers this does not provision a replacement pool or refill a quota.
-func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, admissions *postgres.ContextAdmissions, intents auditapp.CaptureOperationPublication, workflow *manualSnapshotWorkflow, who identity.Identity, settings identity.Policy) *dispatchWorkflowOperations {
+func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, admissions *postgres.ContextAdmissions, intents auditapp.CaptureOperationPublication, workflow *manualSnapshotWorkflow, who identity.Identity, settings identity.Policy, history *dispatchHistoryPersistence) *dispatchWorkflowOperations {
 	t.Helper()
 	profiles := f.readAuditProfiles(t)
 	journalPool := f.fixturePool("operation_audit_runtime", "synthetic-operation-journal")
@@ -295,6 +326,9 @@ func newDispatchWorkflowOperations(t *testing.T, ctx context.Context, f *capacit
 	}
 	investigation := captureapp.ContextInvestigation{RootID: policy.Scenario.a.RootID, InstallationID: policy.Authority.InstallationID, Previews: previews, Replay: admissions, Admission: admissions, Targets: workflow.Facts, Eligibility: dispatchTimedEligibility{base: workflow.Eligibility, times: times}, Capabilities: workflow.Facts, Retention: workflow.Retention, Storage: storage, Processing: processing, Recovery: dispatchTimedRecovery{base: policy.Scenario.recovery.reader, times: times}, PolicyAccepted: policy.Reader, RecordingSources: previews, RecordingGroups: groupRequests, RecordingPolicies: captureapp.CurrentRecordingPolicies{Documents: dispatchPolicyDocuments{policy}, Accepted: policy.Reader, CompileRecorder: policySourceCompile(pcap.NewCompiler()), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}, Approvals: dispatchTimedApprovals{base: approvals, times: times}, RecordingSaveEnabled: true, Lifetime: time.Minute, Now: time.Now, NewID: custodyID}
 	submission := captureapp.ContextSubmission{ContextInvestigation: investigation, Intents: intents, Start: workflow}
+	if history != nil {
+		submission.History = history
+	}
 	reads, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], investigation.RootID, policy.Scenario.recovery.guard)
 	if err != nil {
 		t.Fatal(err)
@@ -362,10 +396,14 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	}
 	began := time.Now()
 	var keyServices *contextKeyUnwrapServices
+	var history *dispatchHistoryPersistence
 	if requestMode {
 		// Real long-lived verifier services exist before the request's final facts.
 		// Every child still supplies its own fresh peer, binding and bounded controls.
 		keyServices = newContextKeyUnwrapServices(t, ctx, f.admin, f.fixturePool, policy.Scenario.a.RootID, policy.Authority.InstallationID)
+		service, closeHistory := newManualGroupHistoryService(t, ctx, f, policy, policy.Scenario.a.RootID, policy.Authority.InstallationID)
+		defer closeHistory()
+		history = &dispatchHistoryPersistence{service: service}
 	}
 	sources := []captureapp.PolicySourceAdmission{original}
 	checks := []captureapp.PolicySourceCheck{refresh(t)}
@@ -436,7 +474,7 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 	_, parts := prepare()
 	workflow := newManualSnapshotWorkflow(t, ctx, f, policy, parts)
 	workflow.KeyServices = keyServices
-	operations := newDispatchWorkflowOperations(t, ctx, f, policy, admissions, intents, workflow, parts[0].Admission.RecordingSave.Initiator.VerifiedIdentity, checks[0].Settings)
+	operations := newDispatchWorkflowOperations(t, ctx, f, policy, admissions, intents, workflow, parts[0].Admission.RecordingSave.Initiator.VerifiedIdentity, checks[0].Settings, history)
 	var shortID string
 	if !t.Run("legacy-five-second-normal-audit-downgrade", func(t *testing.T) {
 		before := readManualSaveCounters(t, ctx, f, policy)
@@ -507,8 +545,9 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 		defer clear(reply.Body)
 		data := dispatchWorkflowEnvelope(t, reply, "ok")
 		var receipt struct {
-			CaptureID string `json:"capture_id"`
-			Phase     string `json:"phase"`
+			CaptureID    string `json:"capture_id"`
+			Phase        string `json:"phase"`
+			HistoryState string `json:"history_state"`
 		}
 		if json.Unmarshal(data, &receipt) != nil || receipt.CaptureID != accepted.CaptureID || receipt.Phase != "Accepted" {
 			t.Fatal("actual workflow changed parent receipt", string(data))
@@ -517,6 +556,15 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 			t.Fatal("real request did not admit exact complete group")
 		}
 		if requestMode {
+			expectedDraft, draftErr := captureapp.HistoryDraftFromPreview(group.Preview, accepted)
+			expectedBytes, canonicalErr := value.CanonicalHistoryParameters(expectedDraft)
+			originalIdentity := operations.identity.who
+			if receipt.HistoryState != "available" || history.calls != 1 || history.err != nil || history.entryErr != nil || history.exitErr != nil || history.draftErr != nil || draftErr != nil || canonicalErr != nil || !bytes.Equal(expectedBytes, history.draft) || history.captureID != accepted.CaptureID || !history.acceptedAt.Equal(accepted.CreatedAt) {
+				t.Fatal("actual original-owner history was not persisted exactly once", receipt.HistoryState, history.calls, history.err, history.entryErr, history.exitErr, draftErr, canonicalErr)
+			}
+			if history.human.Principal != originalIdentity.Principal || history.human.Policy != originalIdentity.Policy || !slices.Equal(history.human.Groups, originalIdentity.Groups) || !slices.Equal(history.human.Scopes, originalIdentity.Scopes) || history.human.VerifiedAt.After(accepted.CreatedAt) || history.human.ValidUntil.After(operations.originalIdentityEnd) || history.deadline.IsZero() || history.deadline.After(operations.originalOwnerEnd) {
+				t.Fatal("actual history persistence replaced original request identity or deadline")
+			}
 			original := operations.groupRequests.request.RequestBounds
 			if operations.groupRequests.calls != 1 || original == nil || original.Requester != group.Preview.Actor || original.Until.After(operations.originalOwnerEnd) {
 				t.Fatal("original request provenance changed across actualSQLadmission")
@@ -571,7 +619,18 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 			if err != nil {
 				t.Fatal(err)
 			}
-			qualifyManualRecordingSaveGroupHistory(t, ctx, f, policy, group.Preview, accepted, who)
+			if requestMode {
+				// A separate current metadata-read observation cannot replace
+				// the submission-owned identity already recorded by Persist.
+				who.ValidUntil = identity.Earlier(who.ValidUntil, who.VerifiedAt.Add(5*time.Second))
+				draft, err := captureapp.HistoryDraftFromPreview(group.Preview, accepted)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assertManualGroupHistory(t, ctx, f, policy, group.Preview, accepted, who, draft, history.service)
+			} else {
+				qualifyManualRecordingSaveGroupHistory(t, ctx, f, policy, group.Preview, accepted, who)
+			}
 		})
 	}
 	// History describes genuine accepted work, not completed evidence. Save it
@@ -608,6 +667,9 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 		var replayed []byte
 		if err = f.admin.QueryRow(ctx, `SELECT jsonb_agg(jsonb_build_array(c.id,c.created_at,c.expectation_json,e.attempt_id,e.binding_json,e.phase) ORDER BY c.group_ordinal)::text FROM context_capture c JOIN context_execution e ON e.capture_id=c.id AND e.root_id=c.root_id WHERE c.group_id=$1`, accepted.CaptureID).Scan(&replayed); err != nil || !bytes.Equal(original, replayed) || readManualSaveCounters(t, ctx, f, policy) != after {
 			t.Fatal("passive public replay changed real execution/time/spend", err)
+		}
+		if requestMode && history.calls != 1 {
+			t.Fatal("passive replay repeated history persistence", history.calls)
 		}
 		for _, child := range accepted.Group.Children {
 			if !child.CreatedAt.Equal(accepted.CreatedAt) || !child.Expectation.Snapshot.T0.Equal(accepted.CreatedAt) {

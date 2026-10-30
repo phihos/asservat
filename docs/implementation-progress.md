@@ -1,5 +1,43 @@
 # Sustained implementation progress
 
+## Sixteen-source Save: selected local workflow passed; original-caller history composition pending (2026-10-30)
+
+`manual-group16-request-sql112-8` on frozen `8577192d` passed all 28 required
+names (29 actual): supervisor exit 0 in 75.971 seconds, Go package 40.271 seconds.
+One original `ContextSubmission.Request` owner covers real SQL admission,
+encrypted capture-intent audit and all sixteen runner starts. All sixteen
+children published and yielded 4,592 exact native PCAPNG bytes. Passive replay
+preserved the shared SQL acceptance time, execution identities and spend.
+SQL112 empty restoration and populated long-window downgrade refusal passed.
+Root verified 3,607 canonical and 36,265 tracked hashes, two archived artifacts,
+the restored 31,495-file result baseline and exact owned cleanup, preserving
+sixteen prior containers.
+
+Admission measured 3,476 ms with 217 ms left in the original observation phase;
+the complete request/audit/queue phase measured 12,630 ms with 2,369 ms remaining
+on the original start bound. This is one local measurement, not an availability
+or latency guarantee. The last publication entered with 1,196 ms of its original
+write/read lifetime left. The test prospectively selects a thirty-second profile;
+existing source retention still clips processing. Builtin defaults, installed
+collectors, regional RPC, remote key providers and public download sessions are
+not qualified by this fixture.
+
+The fixture now constructs one root-scoped unwrap/queue service pair instead of
+two new roles and pools per child. Setup measured 294,505 microseconds once;
+each child's original allowance, denial, queue and replay controls still ran.
+History persistence/list/settings checks run while accepted work is pending,
+before its fixed write cutoff. N2 retains its post-completion history check.
+No source, retention, request or admission dates were extended. Prefixes 6–7
+remain archived: their late publication/history failures are not passes.
+
+History currently runs through a separate real helper in this fixture. Production
+supplies `ContextSubmission.History`, whose advisory persistence uses the original
+caller's remaining interval after group dispatch. The next qualification wires
+the genuine history service into that request path and checks one persisted
+parent without another history write or renewed caller. Final combined repository
+gates remain pending. Collection stays disabled; this is not a supported homelab
+release.
+
 ## Grouped Save: original request bounds and maximum-fanout qualification in progress (2026-10-30)
 
 [ADR-269](decisions/269-original-grouped-save-request-bounds.md) preserves the

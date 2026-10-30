@@ -706,39 +706,54 @@ func (r manualGroupHistoryRetention) ResolveRetainedCaseMetadata(ctx context.Con
 	return r.resolver().ResolveRetainedCaseMetadata(ctx, in, previous, origins)
 }
 
+// Construct the same real service before the original request, without
+// reserving/writing history or refreshing a caller identity.
+func newManualGroupHistoryService(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, root, installation string) (captureapp.HistoryParameterService, func()) {
+	t.Helper()
+	material := f.root.value.State.MAC
+	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guards := postgres.EffectTransactionGuards{Recovery: policy.Scenario.recovery.guard, Retention: policy.Scenario.retention.guard}
+	ledger, err := postgres.NewHistoryParameters(ctx, f.roles["hub-runtime"], root, guards)
+	if err != nil {
+		mac.Close()
+		t.Fatal(err)
+	}
+	legacy, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], root, policy.Scenario.recovery.guard)
+	if err != nil {
+		mac.Close()
+		t.Fatal(err)
+	}
+	service := captureapp.HistoryParameterService{RootID: root, InstallationID: installation, Ledger: ledger, Regional: manualGroupHistoryDispatcher{store: f.store}, Codec: objectstore.HistoryCodec{Sealer: f.keys, Opener: f.keys, Keys: mac}, Keys: mac, Recovery: policy.Scenario.recovery.reader, Retention: manualGroupHistoryRetention{fixture: policy.Scenario.retention}, Legacy: legacy, Limits: value.HistoryLimits{PerSelector: 10, PerInstallation: 100}, NewID: custodyID, Now: time.Now}
+	return service, mac.Close
+}
+
 func qualifyManualRecordingSaveGroupHistory(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, preview value.ContextPreview, accepted value.Accepted, human identity.Identity) {
 	t.Helper()
 	draft, err := captureapp.HistoryDraftFromPreview(preview, accepted)
 	if err != nil || draft.RecordingSave == nil || draft.Selection != "recordingSelectionRequired" {
 		t.Fatal("actual parent recording-save history draft", err)
 	}
-	material := f.root.value.State.MAC
-	mac, err := auditapp.NewOperationMAC(material.InputVersion, material.InputKey, material.AccountVersion, material.AccountKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer mac.Close()
-	guards := postgres.EffectTransactionGuards{Recovery: policy.Scenario.recovery.guard, Retention: policy.Scenario.retention.guard}
-	ledger, err := postgres.NewHistoryParameters(ctx, f.roles["hub-runtime"], preview.RootID, guards)
-	if err != nil {
-		t.Fatal(err)
-	}
-	legacy, err := postgres.NewContextProgressReads(ctx, f.roles["hub-runtime"], preview.RootID, policy.Scenario.recovery.guard)
-	if err != nil {
-		t.Fatal(err)
-	}
-	service := captureapp.HistoryParameterService{RootID: preview.RootID, InstallationID: preview.InstallationID, Ledger: ledger, Regional: manualGroupHistoryDispatcher{store: f.store}, Codec: objectstore.HistoryCodec{Sealer: f.keys, Opener: f.keys, Keys: mac}, Keys: mac, Recovery: policy.Scenario.recovery.reader, Retention: manualGroupHistoryRetention{fixture: policy.Scenario.retention}, Legacy: legacy, Limits: value.HistoryLimits{PerSelector: 10, PerInstallation: 100}, NewID: custodyID, Now: time.Now}
+	service, closeService := newManualGroupHistoryService(t, ctx, f, policy, preview.RootID, preview.InstallationID)
+	defer closeService()
 	f.refreshBase(t)
 	human.VerifiedAt = time.Now().UTC().Truncate(time.Microsecond)
 	human.ValidUntil = human.VerifiedAt.Add(5 * time.Second)
 	if err := service.Persist(ctx, accepted, human, draft, nil); err != nil {
 		t.Fatal("real encrypted grouped history persistence", err)
 	}
+	assertManualGroupHistory(t, ctx, f, policy, preview, accepted, human, draft, service)
+}
+
+func assertManualGroupHistory(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, preview value.ContextPreview, accepted value.Accepted, human identity.Identity, draft value.HistoryParameters, service captureapp.HistoryParameterService) {
+	t.Helper()
 	recovery, err := policy.Scenario.recovery.reader.RecoveryState(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	selector, err := captureapp.HistorySelectorKey(mac, preview.RootID, draft.Selector())
+	selector, err := captureapp.HistorySelectorKey(service.Keys, preview.RootID, draft.Selector())
 	if err != nil {
 		t.Fatal(err)
 	}
