@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	auditapp "asservat.local/asservat/internal/application/audit"
 	app "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -95,6 +96,8 @@ func findRecordingGroupRequest(ctx context.Context, q *custodydb.Queries, in val
 // AdmitRecordingSaveGroup composes existing child admission under one original
 // root transaction. A later child's refusal rolls back the entire selection.
 func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in value.RecordingSaveGroupAdmission) (value.Accepted, error) {
+	began := time.Now()
+	defer auditapp.MarkStep(ctx, "ga-total", began)
 	var out value.Accepted
 	p := in.Preview.Clone()
 	if s == nil || s.ledger == nil || ctx == nil || in.RootID != s.root || p.RootID != s.root || p.Group == nil || !app.ValidContextPreview(p) || !identity.Text(in.IdempotencyKey, 128) || in.SubmissionDigest != app.ContextRequestDigest(p.ID) || len(in.Children) != len(p.Group.Children) {
@@ -171,6 +174,7 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 				return value.ErrDenied
 			}
 		}
+		auditapp.MarkStep(ctx, "ga-prefix", began)
 		clock, err := q.CurrentTime(ctx)
 		if err != nil {
 			return err
@@ -210,32 +214,39 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 			return err
 		}
 		for n, child := range children {
-			r := reservations[n]
-			// Output and applicable grant starts remain per real source. The
-			// one policy incident debit above cannot authorize free children.
-			spent, err := q.SpendPolicyCollectedBytes(ctx, custodydb.SpendPolicyCollectedBytesParams{RootID: id(s.root), ID: first.acceptanceID, Bytes: r.bytes})
-			if err != nil {
-				return err
-			}
-			if spent != 1 {
-				return value.ErrCapacity
-			}
-			if r.grant.Valid {
-				spent, err = q.SpendPolicyGrantCapture(ctx, custodydb.SpendPolicyGrantCaptureParams{RootID: id(s.root), ID: r.grant, Bytes: r.bytes})
+			if err := func() error {
+				defer auditapp.MarkStep(ctx, "ga-child", time.Now())
+				r := reservations[n]
+				// Output and applicable grant starts remain per real source. The
+				// one policy incident debit above cannot authorize free children.
+				spent, err := q.SpendPolicyCollectedBytes(ctx, custodydb.SpendPolicyCollectedBytesParams{RootID: id(s.root), ID: first.acceptanceID, Bytes: r.bytes})
 				if err != nil {
 					return err
 				}
 				if spent != 1 {
 					return value.ErrCapacity
 				}
-			}
-			if _, err := s.admitContextInTransaction(ctx, q, p.ID, child, topology, &contextAdmissionGroupOptions{Recovery: recovery, Stream: stream, Preview: protected, PolicyReservation: r, RequestBounds: in.RequestBounds, Permissions: permissions}); err != nil {
-				return err
-			}
-			if err := r.manual.insertReservation(ctx, q, s.root, child.Plan.Input.CaptureID, child, r.grant, r.bytes); err != nil {
+				if r.grant.Valid {
+					spent, err = q.SpendPolicyGrantCapture(ctx, custodydb.SpendPolicyGrantCaptureParams{RootID: id(s.root), ID: r.grant, Bytes: r.bytes})
+					if err != nil {
+						return err
+					}
+					if spent != 1 {
+						return value.ErrCapacity
+					}
+				}
+				if _, err := s.admitContextInTransaction(ctx, q, p.ID, child, topology, &contextAdmissionGroupOptions{Recovery: recovery, Stream: stream, Preview: protected, PolicyReservation: r, RequestBounds: in.RequestBounds, Permissions: permissions}); err != nil {
+					return err
+				}
+				if err := r.manual.insertReservation(ctx, q, s.root, child.Plan.Input.CaptureID, child, r.grant, r.bytes); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
 				return err
 			}
 		}
+		defer auditapp.MarkStep(ctx, "ga-metadata", time.Now())
 		out, err = recordingGroupAccepted(ctx, q, header)
 		if err != nil {
 			return err

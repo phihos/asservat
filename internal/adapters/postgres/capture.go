@@ -521,6 +521,9 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			return err
 		}
 		check := func() error {
+			if group != nil {
+				defer auditapp.MarkStep(ctx, "ga-check", time.Now())
+			}
 			if err := s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
 				return err
 			}
