@@ -93,3 +93,29 @@ terminal artifact/source/cleanup verification.
     Transaction-local reuse may reduce repeated checks, but cannot establish
     that sixteen serial starts fit five seconds. SQL batching or parallel starts
     would add locking/error/concurrency costs and are not needed for this change.
+
+## Transaction-local facts reuse
+
+Maximum-fanout runs also exposed repeated metadata reads inside admission. One
+group now retains its exact permission-stream/transaction identity, at most
+sixteen full-target raw permission projections, and one shared accepted-policy
+and delegation fact set. The existing root lock blocks supported policy,
+delegation, permission and audit mutations; conflicting review locks also wait.
+Budget counters, grant decisions, source snapshots, storage, retention and
+recovery effects keep their existing checks and locks.
+
+This retains facts, not eligibility decisions. Every existing boundary still
+evaluates the domain policy and initiator rules against current database time,
+original source/delegation deadlines and the original verified identities.
+Changed scope, transaction, trust or stream identity refuses reuse. A backwards
+clock cannot make a reused observation predate its initial read. Ordinary and
+replay paths remain uncached; the bundle is discarded when the transaction ends.
+
+Controlled SQL-reader tests perform 64 full eligibility evaluations with one
+read of each shared source, acceptance, delegation and delegation-audit family.
+That is a query-count result, not measured workflow latency. The additional
+shared structs measure 1,296 bytes on the test architecture, plus bounded owner,
+action and string references; this is not an RSS ceiling. No schema, query
+family, privilege, credential, endpoint, watch, worker, timer or configuration
+option is added. Actual workflow results and remaining qualification limits
+are recorded in [implementation progress](../implementation-progress.md).
