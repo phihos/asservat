@@ -83,6 +83,9 @@ func TestGeneratedSourceSnapshotPlanDecodesAcceptedAPIWork(t *testing.T) {
 	if work.SourceTarget != nil || work.Target != (targets.Request{}) {
 		t.Fatal("scope labels were used as independent current source authority")
 	}
+	if kinds := historyActionKinds(e); len(kinds) != 1 || kinds[0] != "packetCapture" {
+		t.Fatal("valid packet snapshot mislabeled in capture history", kinds)
+	}
 	if scope, err := requestRecordScope(row); err != nil || scope.Actor != check.Authority.Executor || scope.Target != original.Target() {
 		t.Fatal("genuine accepted snapshot could not resolve its original request", err)
 	}

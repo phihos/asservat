@@ -212,11 +212,7 @@ func historyEntries(ctx context.Context, tx *custodydb.Queries, root string, vis
 		accepted.CreatedAt = accepted.CreatedAt.UTC()
 		entry := value.HistoryEntry{Requester: actors[c.ID], CaptureID: uid(c.ID), Origin: value.HistoryOrigin(c.HistoryOrigin.String), AcceptedAt: accepted.CreatedAt, ExpiresAt: accepted.CreatedAt.Add(value.HistoryLifetime), Phase: p.Phase, EvidenceState: value.HistoryEvidenceState(p.Phase, f.EffectiveExpiresAt.Time, now), ActionKinds: []string{accepted.Expectation.Type().EvidenceType}, RepeatState: "available", SettingsExpiresAt: accepted.CreatedAt.Add(value.HistoryLifetime)}
 		// Native evidence types differ from recipe action kinds.
-		if accepted.Expectation.Recording == nil {
-			entry.ActionKinds = []string{"kubernetesSnapshot"}
-		} else {
-			entry.ActionKinds = []string{"packetCapture"}
-		}
+		entry.ActionKinds = historyActionKinds(accepted.Expectation)
 		if c.HistoryParametersRequired {
 			if !f.HistoryVisible.Bool || !now.Before(f.HistorySummaryExpires.Time) {
 				continue
@@ -347,4 +343,11 @@ func (s *ContextProgressReads) ReadCaptureSettings(ctx context.Context, q value.
 		return value.CaptureSettings{}, captureError(err)
 	}
 	return out, nil
+}
+
+func historyActionKinds(expected artifact.ContextExpectation) []string {
+	if expected.Recording == nil && expected.Snapshot == nil {
+		return []string{"kubernetesSnapshot"}
+	}
+	return []string{"packetCapture"}
 }
