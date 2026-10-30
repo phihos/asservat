@@ -87,6 +87,19 @@ sharing, encrypted completion/publication and 4,592 exact PCAPNG bytes. A durabl
 cancellation request cannot replace positively stored evidence. No policy grant
 was present in this fixture, so its grant branch is not qualified by this run.
 
+A separate grant-backed run on `d8d564d7`, prefix
+`manual-source-grant-sql108-1`, passed all 15 required names (16 actual): supervisor
+exit 0 in 44.576 seconds; package 10.244 seconds. Before source arm it requested,
+decided and attached an ordinary policy grant through real SQL operations with
+explicit synthetic review authority. Require-approval source arm/replay/renewal
+left its execution, output and observation pools unchanged. Manual Save and
+replay charged that same grant one execution and 8 MiB output exactly once;
+completion, publication and cancellation added no spend. The suite also retrieved
+4,592 exact native bytes. It does not qualify the public audited grant workflow.
+Root verified the same source/result counts, both artifacts and exact cleanup.
+The variant changes only fixtures; product queries, permissions and mechanisms
+are unchanged.
+
 Cancellation prefix `manual-source-cancel-sql108-2` independently passed all eight
 required names (nine actual): supervisor exit 0 in 15.986 seconds; package 7.853
 seconds. It covers no-start fencing, started cancellation remaining pending until
@@ -116,6 +129,11 @@ this is not installed collector-clock or remote download-session qualification.
 Production `RecordingSaveEnabled` remains false, including the direct
 request/continuation path. Grouped saves, syscall sources, protected reason
 production and installed browser/MCP collection remain accepted unfinished work.
+The optional free-text reason still needs a pre-admission encrypted control-data
+writer and key-authority design. The existing encrypted history writer requires
+an accepted capture and its charged custody reservation; it cannot be reused as
+preview authority. No new storage or key mechanism was added for this optional
+field, and the explicit unsupported response remains.
 
 
 
