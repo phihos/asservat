@@ -15,10 +15,10 @@ import (
 // (ADR-228) is evaluated through its current acknowledged acceptance and
 // current team delegation instead: it has no scopes or groups of its own.
 func contextEligibilityIn(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, root, installation string, i identity.Identity, p authorization.Projection, target authorization.Target, now time.Time) authorization.CaptureEligibility {
-	return contextEligibilityInWithPermissions(ctx, q, stream, trust, root, installation, i, p, target, now, false)
+	return contextEligibilityInWithPermissions(ctx, q, stream, trust, root, installation, i, p, target, now, nil)
 }
 
-func contextEligibilityInWithPermissions(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, root, installation string, i identity.Identity, p authorization.Projection, target authorization.Target, now time.Time, reusePermissions bool) authorization.CaptureEligibility {
+func contextEligibilityInWithPermissions(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, root, installation string, i identity.Identity, p authorization.Projection, target authorization.Target, now time.Time, facts *recordingGroupFacts) authorization.CaptureEligibility {
 	inst, policy, ok := authorization.PolicyExecutor(i.Principal)
 	if !ok {
 		return authorization.ContextEligibility(i, p, target, now)
@@ -27,19 +27,26 @@ func contextEligibilityInWithPermissions(ctx context.Context, q *custodydb.Queri
 	if inst != installation {
 		return deny
 	}
-	row, err := q.ReadPolicySourceRow(ctx, custodydb.ReadPolicySourceRowParams{RootID: id(root), PolicyUid: policy})
+	var snapshot authorization.AcceptedPolicySnapshot
+	var err error
+	if facts != nil {
+		snapshot, err = facts.acceptedPolicy(ctx, q, stream, trust, root, installation, policy, target, now)
+	} else {
+		row, readErr := q.ReadPolicySourceRow(ctx, custodydb.ReadPolicySourceRowParams{RootID: id(root), PolicyUid: policy})
+		if readErr != nil {
+			return deny
+		}
+		snapshot, _, err = acceptedPolicyIn(ctx, q, root, installation, trust, row)
+	}
 	if err != nil {
 		return deny
 	}
-	snapshot, _, err := acceptedPolicyIn(ctx, q, root, installation, trust, row)
-	if err != nil {
-		return deny
+	var current authorization.AutomationProjection
+	if facts != nil {
+		current, err = facts.automation(ctx, q, stream, installation, snapshot.Authority, target, p)
+	} else {
+		current, err = automationProjection(ctx, q, stream, installation, snapshot.Authority, target)
 	}
-	var permissions *authorization.Projection
-	if reusePermissions {
-		permissions = &p
-	}
-	current, err := automationProjectionForWithPermissions(ctx, q, stream, installation, snapshot.Authority.Delegation, target, &snapshot.Authority, permissions)
 	if err != nil {
 		return deny
 	}

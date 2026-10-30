@@ -160,7 +160,7 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 		if err := currentPreview(ctx, q, protected); err != nil {
 			return err
 		}
-		permissions := newRecordingGroupPermissions(q, stream)
+		permissions := newRecordingGroupFacts(q, stream)
 		reservations := make([]*policyCaptureReservation, len(children))
 		for n, child := range children {
 			if _, err := s.currentCaptureEligibilityWithPermissions(ctx, q, stream, recovery, child, permissions); err != nil {
@@ -261,7 +261,7 @@ func authorizeRecordingGroupReplay(ctx context.Context, q *custodydb.Queries, st
 	return authorizeRecordingGroupReplayWithPermissions(ctx, q, stream, recovery, root, guard, query, accepted, nil)
 }
 
-func authorizeRecordingGroupReplayWithPermissions(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, recovery custodydb.FleetCurrentTrust, root string, guard *RecoveryTransactionGuard, query value.ReplayQuery, accepted value.Accepted, permissions *recordingGroupPermissions) (time.Time, error) {
+func authorizeRecordingGroupReplayWithPermissions(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, recovery custodydb.FleetCurrentTrust, root string, guard *RecoveryTransactionGuard, query value.ReplayQuery, accepted value.Accepted, permissions *recordingGroupFacts) (time.Time, error) {
 	until := contextMetadataDeadline(ctx, query.Identity.ValidUntil, query.Recovery.FreshUntil)
 	if accepted.Group == nil || len(accepted.Group.Children) < 2 {
 		return time.Time{}, value.ErrUnavailable

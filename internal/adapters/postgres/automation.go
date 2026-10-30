@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	app "asservat.local/asservat/internal/application/authorization"
@@ -65,6 +66,10 @@ func automationProjectionFor(ctx context.Context, q *custodydb.Queries, s custod
 }
 
 func automationProjectionForWithPermissions(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, installation string, basis identity.Revision, target authorization.Target, authority *authorization.AcceptedPolicyAuthority, lockedPermissions *authorization.Projection) (authorization.AutomationProjection, error) {
+	return automationProjectionForWithFacts(ctx, q, s, installation, basis, target, authority, lockedPermissions, nil)
+}
+
+func automationProjectionForWithFacts(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, installation string, basis identity.Revision, target authorization.Target, authority *authorization.AcceptedPolicyAuthority, lockedPermissions *authorization.Projection, facts *recordingGroupFacts) (authorization.AutomationProjection, error) {
 	var out authorization.AutomationProjection
 	now, err := q.CurrentTime(ctx)
 	if err != nil {
@@ -86,33 +91,65 @@ func automationProjectionForWithPermissions(ctx context.Context, q *custodydb.Qu
 			return out, err
 		}
 	}
-	rows, err := q.SelectAutomationBasis(ctx, custodydb.SelectAutomationBasisParams{StreamID: s.ID, Uid: basis.UID, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, Column5: target.WorkloadUID})
+	var currentBasis automationBasisFacts
+	if facts != nil {
+		if authority == nil {
+			return out, cfg.ErrInvalid
+		}
+		currentBasis, err = facts.automationBasis(ctx, q, s, installation, *authority, target, now.Time)
+	} else {
+		currentBasis, err = readAutomationBasis(ctx, q, s, basis, target)
+	}
 	if err != nil {
 		return out, err
 	}
+	out = authorization.AutomationProjection{InstallationID: installation, Delegation: basis, Envelope: currentBasis.Envelope, ObservedAt: s.ObservedAt.Time, FreshUntil: permissions.FreshUntil, Permissions: permissions}
+	out.NotAfter = currentBasis.NotAfter
+	now, err = q.CurrentTime(ctx)
+	if err != nil {
+		return authorization.AutomationProjection{}, err
+	}
+	if !identity.Fresh(out.ObservedAt, out.FreshUntil, now.Time, authorization.PermissionObservationInterval) || authority != nil && !authority.Valid(now.Time) || (!out.NotAfter.IsZero() && !now.Time.Before(out.NotAfter)) {
+		return authorization.AutomationProjection{}, cfg.ErrUnavailable
+	}
+	return out, nil
+}
+
+// Immutable, acknowledged delegation facts only. No permissions or computed
+// eligibility is retained here; callers compose the exact target and recheck time.
+type automationBasisFacts struct {
+	Envelope authorization.AutomationEnvelope
+	NotAfter time.Time
+}
+
+func readAutomationBasis(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, basis identity.Revision, target authorization.Target) (automationBasisFacts, error) {
+	rows, err := q.SelectAutomationBasis(ctx, custodydb.SelectAutomationBasisParams{StreamID: s.ID, Uid: basis.UID, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, Column5: target.WorkloadUID})
+	if err != nil {
+		return automationBasisFacts{}, err
+	}
 	if len(rows) != 1 {
-		return out, cfg.ErrUnavailable
+		return automationBasisFacts{}, cfg.ErrUnavailable
 	}
 	b := rows[0]
 	if b.SeenSequence != s.Sequence || b.Generation != basis.Generation || !bytes.Equal(b.SpecDigest, basis.Digest[:]) || !b.AcknowledgedAt.Valid || len(b.AutomationJson) == 0 || len(b.AutomationJson) > 4096 {
-		return out, cfg.ErrUnavailable
+		return automationBasisFacts{}, cfg.ErrUnavailable
 	}
 	var envelope authorization.AutomationEnvelope
 	decoder := json.NewDecoder(bytes.NewReader(b.AutomationJson))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(&envelope) != nil || !envelope.Valid() {
-		return out, cfg.ErrUnavailable
+		return automationBasisFacts{}, cfg.ErrUnavailable
 	}
 	audited, err := q.ReadAuthorityAudit(ctx, b.AutomationAuditID)
 	if err != nil {
-		return out, err
+		return automationBasisFacts{}, err
 	}
 	record, err := decodeAuthority(audited)
 	if err != nil {
-		return out, err
+		return automationBasisFacts{}, err
 	}
 	if !currentAuthorityAudit(audited, s.ID, b.AutomationAuditID) || record.RootID != uid(s.ID) || record.Epoch != uid(s.Epoch) || record.Sequence != s.Sequence {
-		return out, cfg.ErrUnavailable
+		return automationBasisFacts{}, cfg.ErrUnavailable
 	}
 	matched := false
 	for _, delegation := range record.Automation {
@@ -122,18 +159,11 @@ func automationProjectionForWithPermissions(ctx context.Context, q *custodydb.Qu
 		}
 	}
 	if !matched {
-		return out, cfg.ErrUnavailable
+		return automationBasisFacts{}, cfg.ErrUnavailable
 	}
-	out = authorization.AutomationProjection{InstallationID: installation, Delegation: basis, Envelope: envelope, ObservedAt: s.ObservedAt.Time, FreshUntil: permissions.FreshUntil, Permissions: permissions}
+	out := automationBasisFacts{Envelope: envelope}
 	if b.NotAfter.Valid {
 		out.NotAfter = b.NotAfter.Time
-	}
-	now, err = q.CurrentTime(ctx)
-	if err != nil {
-		return authorization.AutomationProjection{}, err
-	}
-	if !identity.Fresh(out.ObservedAt, out.FreshUntil, now.Time, authorization.PermissionObservationInterval) || authority != nil && !authority.Valid(now.Time) || (!out.NotAfter.IsZero() && !now.Time.Before(out.NotAfter)) {
-		return authorization.AutomationProjection{}, cfg.ErrUnavailable
 	}
 	return out, nil
 }
