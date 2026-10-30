@@ -50,6 +50,16 @@ accessibility scans). Those synthetic browser journeys exercise existing flows;
 they do not qualify a grouped installed backend. The full final Go gate remains
 pending for the grouped candidate.
 
+The dedicated sixteen-source central fixture is implemented but unqualified.
+Its first run (`manual-group16-central-sql109-1`, frozen `e3fd6e61`) exited 1
+before group admission. Foreground and background fixture heartbeat writers
+could persist observations out of timestamp order; the production fleet guard
+correctly rejected the stale write. Both fixture paths are being serialized
+around basis selection, timestamp sampling and persistence. Production fencing
+and original freshness bounds are unchanged. The failed run's source hashes,
+three archived artifacts, restored results and owned cleanup were independently
+verified, including preservation of all 16 pre-existing containers.
+
 Failures are retained rather than counted as passes. Ordinary prefix 1 exposed
 the missing group table in the exact first-install inventory; a failing local
 regression now covers the corrected inventory. Prefix 2 exposed fixture workload
