@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Combined grouped Save local gates passed (2026-10-30)
+
+Frozen `3d645fc5` passed `make gofmt-check go-check go-architecture-check
+sql-check spec-check architecture-check` with exit 0 in 2,344.944 seconds.
+The run includes repository vet/race tests, 68 generated SQL files, 13,375
+specification assertions and architecture checks. All seventeen exact Kubernetes
+groups were verified: 669 passed and one explicitly skipped
+`TestInitialRuntimeObjectRoundTripWithRealKubernetes`, which requires the separate
+native installation harness. That skip is not a native pass.
+
+Independent root read-back verified all 36,265 tracked hashes, the restored
+31,495-file result baseline, eight gate artifacts, sixteen preexisting containers
+and unchanged network inventory. The original-caller sixteen-source and combined
+reason qualifications below use the same production/test sources; only their
+qualification documentation changed before this gate run.
+
+The next slice is a fresh guarded disposable-host installed ongoing packet/Save
+journey. Public ongoing compiler/source-service composition is being prepared in
+an isolated, unmerged candidate. The verified branch still disables recording
+Save collection. Kernel prehistory, timestamp placement, installed source renewal,
+Stop/natural expiry, broader source lifecycle and syscall collection remain
+separate qualification work. No release or supported homelab deployment is implied.
+
 ## Sixteen-source Save: original-caller history and selected local workflow passed (2026-10-30)
 
 `manual-group16-request-sql112-9` on frozen `f7c3693b` passed all 28 required
@@ -46,8 +69,8 @@ supervisor exit 0 in 175.707 seconds, Go package 167.257 seconds. This includes
 the unchanged real 150-second retirement wait, native bytes, current authorized
 reason display, actual preview deletion and restrictive downgrade. Root verified
 the same source/result baselines, two archived artifacts and exact owned cleanup.
-Final combined repository gates remain pending. Collection stays disabled; this
-is not a supported homelab release.
+The combined repository gates subsequently passed at `3d645fc5`, as recorded
+above. Collection stays disabled; this is not a supported homelab release.
 
 ## Grouped Save: original request bounds and maximum-fanout qualification in progress (2026-10-30)
 
