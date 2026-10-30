@@ -174,7 +174,7 @@ func manualGroupWindows(t *testing.T, ctx context.Context, f *capacitySQLFixture
 	return out
 }
 
-func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication, cancellation bool) {
+func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication, cancellation bool, controls ...func(value.RecordingSaveGroupAdmission)) {
 	t.Helper()
 	count := policy.Compiled.IncidentPods
 	if count < 2 || count > 16 || policy.Compiled.ObservedPods < count {
@@ -299,6 +299,10 @@ func qualifyManualRecordingSaveGroup(t *testing.T, ctx context.Context, f *capac
 		return group, parts
 	}
 	group, parts := prepare()
+	for _, control := range controls {
+		control(group)
+		group, parts = prepare() // A different review/current facts after the refused probe.
+	}
 	admit := func() (value.Accepted, error) {
 		until := manualGroupProofDeadline(group)
 		call, cancel := context.WithDeadline(ctx, until)

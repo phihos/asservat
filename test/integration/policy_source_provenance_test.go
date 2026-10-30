@@ -64,8 +64,8 @@ func qualifySourceSnapshotServices(t *testing.T, manual, cancellation, requireAp
 }
 
 type sourceSnapshotQualificationMode struct {
-	manual, cancellation, requireApproval, reason, dispatch, dispatchRequest bool
-	groupCount                                                               int
+	manual, cancellation, requireApproval, reason, dispatch, dispatchRequest, projection bool
+	groupCount                                                                           int
 }
 
 func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualificationMode) {
@@ -261,7 +261,17 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 				return
 			}
 			if groupCount > 0 {
-				qualifyManualRecordingSaveGroup(t, ctx, f, seed.s, accepted, ledger, renewal, fresh, intents, cancellation)
+				var controls []func(value.RecordingSaveGroupAdmission)
+				if mode.projection {
+					controls = append(controls, func(group value.RecordingSaveGroupAdmission) {
+						if !t.Run("original-authority-expires-while-root-blocks-permission-refresh", func(t *testing.T) {
+							qualifyManualRecordingProjectionLock(t, ctx, f, seed.s, accepted, group)
+						}) {
+							t.FailNow()
+						}
+					})
+				}
+				qualifyManualRecordingSaveGroup(t, ctx, f, seed.s, accepted, ledger, renewal, fresh, intents, cancellation, controls...)
 				t.Run("populated-group-down-refusal", func(t *testing.T) {
 					provider, closeProvider := source107MigrationProvider(t, admin)
 					defer closeProvider()
