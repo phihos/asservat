@@ -26,7 +26,6 @@ import (
 	value "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
 	planvalue "asservat.local/asservat/internal/domain/planning"
-	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
@@ -82,7 +81,8 @@ func newManualSnapshotWorkflow(t *testing.T, ctx context.Context, f *capacitySQL
 		t.Fatal(err)
 	}
 	eligibility := authapp.CaptureEligibility{Human: authapp.Evaluator{Permissions: policy.Scenario.p, Now: workflowNow}, Accepted: policy.Reader, Current: current, Now: workflowNow}
-	retention := privacyapp.RetentionResolver{Policies: manualWorkflowRetention{policy.Scenario.retention}, RetainedPolicies: manualGroupRetainedPolicies{policy.Scenario.retention}, Now: workflowNow}
+	retained := privacyapp.AcceptedRetentionReader{Topology: policy.Scenario.retention.topology, Sources: policy.Scenario.retention.reader, Now: workflowNow}
+	retention := privacyapp.RetentionResolver{Policies: &retained, RetainedPolicies: &retained, Now: workflowNow}
 	w := &manualSnapshotWorkflow{Facts: facts, Executions: executions, Eligibility: eligibility, Retention: retention, t: t, f: f, policy: policy, nodes: map[manualSnapshotNodeKey]*manualSnapshotNode{}, stages: map[string]*sourceSnapshotCompletionState{}}
 	local := &manualWorkflowStarts{objects: map[string]value.PreparedStart{}, bindings: map[string]value.Binding{}, committed: map[string]value.Disposition{}}
 	w.Runner = executionapp.APIContextRunner{Read: executions, Prepare: executions, Record: executions, Process: facts, Local: local, Starts: local, Targets: facts, Eligibility: eligibility, Capabilities: facts, Retention: retention, Recovery: policy.Scenario.recovery.reader, Output: w, Collector: manualWorkflowNoCapture{}, Now: workflowNow}
@@ -155,21 +155,12 @@ func (w *manualSnapshotWorkflow) StartContext(ctx context.Context, current ident
 	if result.State != "Recording" {
 		return fmt.Errorf("real runner did not queue: %s", result.State)
 	}
-	recovery, err := w.policy.Scenario.recovery.reader.RecoveryState(ctx)
-	if err != nil {
-		return fmt.Errorf("real runner post-start recovery: %w", err)
-	}
-	_, execution, err := w.Executions.ReadRecordingWork(ctx, id, recovery)
-	if err != nil {
-		return fmt.Errorf("real runner post-start work: %w", err)
-	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	stage := w.stages[id]
 	if stage == nil || stage.Work.Snapshot == nil {
 		return fmt.Errorf("runner returned without actual node work")
 	}
-	stage.Execution = execution
 	return nil
 }
 func (w *manualSnapshotWorkflow) PrepareContext(ctx context.Context, e artifact.ContextExpectation) (evidence.PreparedContext, error) {
@@ -245,6 +236,16 @@ func (w *manualSnapshotWorkflow) Complete(t *testing.T, ctx context.Context, par
 	if stage == nil {
 		t.Fatal("no real started child", part.Accepted.CaptureID)
 	}
+	// These fixture-only reads serve completion inspection, not enqueue. Keep
+	// them outside the request's original start interval.
+	recovery, err := w.policy.Scenario.recovery.reader.RecoveryState(ctx)
+	if err != nil {
+		t.Fatal("completion recovery", err)
+	}
+	_, stage.Execution, err = w.Executions.ReadRecordingWork(ctx, part.Accepted.CaptureID, recovery)
+	if err != nil {
+		t.Fatal("original started child before completion", err)
+	}
 	stage.RecordStored = func(ctx context.Context, c evidence.RecordingCollection, _ artifact.SourceSnapshotOutcome) (value.APIExecution, error) {
 		recovery, err := w.policy.Scenario.recovery.reader.RecoveryState(ctx)
 		if err != nil {
@@ -264,6 +265,9 @@ func (w *manualSnapshotWorkflow) Complete(t *testing.T, ctx context.Context, par
 		started.Phase, started.AcquiredAt, started.CompletedAt, started.Copies = "stored", c.Acquired, c.Completion.StoredAt, c.Completion.Copies
 		return started, nil
 	}
+	// The legacy wrapper retains its observer-on-read behavior. This composed
+	// workflow uses the same continuously observed reader for publication too.
+	stage.Retention = &w.Retention
 	completeSourceSnapshotCompletion(t, ctx, w.f, w.policy, part, stage)
 }
 
@@ -282,11 +286,6 @@ func (manualWorkflowNoCapture) Capture(context.Context, artifact.PinnedPod) ([]b
 	return nil, value.ErrUnavailable
 }
 
-type manualWorkflowRetention struct{ f *retentionEffectFixture }
-
-func (r manualWorkflowRetention) RetentionPolicies(ctx context.Context, target authorization.Target) (privacy.PolicySet, error) {
-	return manualGroupRetentionPolicies(ctx, r.f, target)
-}
 func (f *manualSnapshotWorkflowFacts) part(id string) (policySourceSnapshotAdmissionFixture, bool) {
 	for _, p := range f.parts {
 		if p.Source.Binding.SourceID == id {

@@ -46,6 +46,7 @@ type sourceSnapshotCompletionState struct {
 	Work              collector.Work
 	Close             func()
 	RecordStored      func(context.Context, evidence.RecordingCollection, artifact.SourceSnapshotOutcome) (executionvalue.APIExecution, error)
+	Retention         *privacyapp.RetentionResolver
 }
 
 func qualifySourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capacitySQLFixture, policy policySourceAcceptedFixture, snapshot policySourceSnapshotAdmissionFixture, intents auditapp.CaptureOperationPublication, beforeStored ...func(*postgres.APIContextExecutions, executionvalue.APIExecution, executionvalue.APIProcessObservation, artifact.RecoveryProof)) {
@@ -335,6 +336,9 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 	retentionResolver := privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}
 	if admission.Plan.Input.Snapshot.Group != nil {
 		retentionResolver.RetainedPolicies = manualGroupRetainedPolicies{fixture: s.retention}
+	}
+	if stage.Retention != nil {
+		retentionResolver = *stage.Retention
 	}
 	gate, err := postgres.NewAPIContextPublicationGate(ctx, f.roles["publication-gate"], admission.RootID, guards, retentionResolver, s.recovery.reader)
 	if err != nil {

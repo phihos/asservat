@@ -114,6 +114,17 @@ func qualifySourceSnapshotServicesMode(t *testing.T, mode sourceSnapshotQualific
 			t.Fatal(err)
 		}
 		seed, intents, _ := f.prepareManagedContext(t, root, enrollment, policySourceFixtureRetentionSeconds)
+		if mode.dispatch {
+			// Reuse the one fixture worker after the actual retention source exists.
+			// Join its old fleet-only owner before installing the fixed scoped hook.
+			// The deferred closure always consumes only the current stop function.
+			previousStop := stop
+			stop = func() error { return nil }
+			if err := previousStop(); err != nil {
+				t.Fatal("join fleet-only fixture observer", err)
+			}
+			stop = f.keepFleetAndRetentionCurrent(seed.retention)
+		}
 		option := policyRecorderProtectedCase{Hub: f.roles["hub-runtime"], Admissions: seed.s, Filters: pcap.NewCompiler(), Expression: "tcp dst port 80", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "maintainers"}}, Ongoing: true, RecordingSaves: manual, RecurringSharing: manual, OrdinaryGrant: requireApproval, Retention: "31s", PermissionsAccepted: func(batch cfg.PermissionBatch) { f.batch = policyRecorderCloneBatch(batch) }}
 		if groupCount > 0 {
 			option.IncidentPods = groupCount

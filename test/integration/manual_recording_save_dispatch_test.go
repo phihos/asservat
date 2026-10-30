@@ -163,6 +163,30 @@ func dispatchWorkflowEnvelope(t *testing.T, reply presentation.OperationReply, e
 	return envelope.Data
 }
 
+// Failure-only readback runs after the real Continue has returned. It adds no
+// SQL work to a successful dispatch or to any child acquisition interval.
+func logDispatchWorkflowFailure(t *testing.T, ctx context.Context, f *capacitySQLFixture, parent string) {
+	t.Helper()
+	call, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	var rows []byte
+	err := f.admin.QueryRow(call, `SELECT coalesce(jsonb_agg(jsonb_build_object(
+ 'child',c.id,'ordinal',c.group_ordinal,'state',c.state,'createdAt',c.created_at,
+ 'startBy',convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Snapshot,StartBy}',
+ 'processingUntil',convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Snapshot,ProcessingUntil}',
+ 'executionPhase',e.phase,'auditRequestUntil',a.request_until,'auditWriteUntil',a.write_until,
+ 'intentStarted',a.intent_started,'intentAcknowledgedAt',c.intent_acknowledged_at
+ ) ORDER BY c.group_ordinal),'[]'::jsonb)::text
+ FROM context_capture c LEFT JOIN context_execution e ON e.root_id=c.root_id AND e.capture_id=c.id
+ LEFT JOIN operation_audit a ON a.root_id=c.root_id AND a.id=c.intent_operation_id
+ WHERE c.group_id=$1`, parent).Scan(&rows)
+	if err != nil {
+		t.Logf("workflow_failure_deadline_readback_error=%v", err)
+		return
+	}
+	t.Logf("workflow_failure_stored_child_deadlines=%s", rows)
+}
+
 func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *capacitySQLFixture, admissions *postgres.ContextAdmissions, policy policySourceAcceptedFixture, ledger *postgres.PolicySources, original captureapp.PolicySourceAdmission, refresh func(*testing.T) captureapp.PolicySourceCheck, intents auditapp.CaptureOperationPublication) {
 	t.Helper()
 	count := policy.Compiled.IncidentPods
@@ -286,6 +310,12 @@ func qualifyManualRecordingSaveDispatch(t *testing.T, ctx context.Context, f *ca
 		started := time.Now()
 		reply, id, err := operations.call(ctx, identity.RecordingSaveRequestWindow, group.Preview.ID, group.IdempotencyKey, true)
 		longID = id
+		var response struct {
+			Status string `json:"status"`
+		}
+		if err != nil || json.Unmarshal(reply.Body, &response) != nil || response.Status != "ok" {
+			logDispatchWorkflowFailure(t, ctx, f, accepted.CaptureID)
+		}
 		if err != nil {
 			t.Fatal("actual audited Continue", err)
 		}
