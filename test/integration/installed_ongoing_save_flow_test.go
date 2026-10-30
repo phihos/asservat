@@ -336,9 +336,20 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 	// Wait on SQL facts: every list_recordings opens a selection that counts
 	// toward the caller's ten open previews/selections.
-	wait("source still live past its first leaf", 2*time.Minute, func(call context.Context) bool {
+	// A start that fails before any Save is ended and re-armed under a new
+	// identity by the product; follow the live source and count re-arms.
+	// Lineage must still be unchanged across the Save itself.
+	rearms := 0
+	wait("a live source past its first leaf", 2*time.Minute, func(call context.Context) bool {
 		s, _, ok := current(call)
-		return ok && s.ID == src.ID && time.Now().After(src.Leaf.Add(time.Second))
+		if !ok {
+			return false
+		}
+		if s.ID != src.ID {
+			src = s
+			rearms++
+		}
+		return time.Now().After(src.Leaf.Add(time.Second))
 	})
 	outsideSent := marker(ongoingSaveOutsidePort)
 	if err = installedJourneyPause(ctx, ongoingSaveBefore+7*time.Second); err != nil {
@@ -353,7 +364,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("marker timing too close to the Save window boundary", outsideSent, retainedSent, t0)
 	}
 	same, count, ok2 := current(ctx)
-	if !ok2 || same.ID != src.ID || same.Fence != src.Fence || count != 1 {
+	if !ok2 || same.ID != src.ID || same.Fence != src.Fence || count != 1+rearms {
 		t.Fatal("Save changed, stopped or re-armed the original source", same, count)
 	}
 	caseID := published(captureID)
@@ -403,19 +414,28 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	repeatSelection := selectNow("fresh repeat")
 	repeatID, _ := save(map[string]any{"recording_handles": []string{repeatSelection.Handle}, "before": "15s", "repeated_from_capture_id": captureID}, "native-ongoing-repeat")
 	published(repeatID)
-	if same, count, ok2 = current(ctx); !ok2 || same.ID != src.ID || count != 1 {
+	if same, count, ok2 = current(ctx); !ok2 || same.ID != src.ID || count != 1+rearms {
 		t.Fatal("repeat changed or re-armed the original source", same, count)
 	}
 
+	byID := func(call context.Context, id string) (ongoingSaveSource, bool) {
+		all, err := sources(call)
+		if err != nil {
+			return ongoingSaveSource{}, false
+		}
+		for _, s := range all {
+			if s.ID == id {
+				return s, true
+			}
+		}
+		return ongoingSaveSource{}, false
+	}
 	// Natural expiry at the original authority-bounded hard deadline, no stop call.
 	var expired ongoingSaveSource
 	wait("natural source expiry", time.Until(src.HardUntil)+time.Minute, func(call context.Context) bool {
-		all, err := sources(call)
-		if err != nil || len(all) != 1 {
-			return false
-		}
-		expired = all[0]
-		return expired.EndedAt != nil
+		var ok bool
+		expired, ok = byID(call, src.ID)
+		return ok && expired.EndedAt != nil
 	})
 	if expired.ID != src.ID || expired.EndedAt.Before(src.HardUntil) || expired.Credit < src.Credit {
 		t.Fatal("natural expiry ended early, changed source or refunded credit", expired)
@@ -431,9 +451,9 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 	var replacement ongoingSaveSource
 	wait("second ongoing source arm", 3*time.Minute, func(call context.Context) bool {
-		s, n, ok := current(call)
+		s, _, ok := current(call)
 		replacement = s
-		return ok && n == 2
+		return ok && s.ID != src.ID
 	})
 	if replacement.ID == src.ID || replacement.HardUntil.Sub(replacement.StartedAt) > ongoingSaveLifetime*time.Second {
 		t.Fatal("second incarnation reused the old source or outlived its authority", replacement)
@@ -442,12 +462,9 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	stopped := time.Now()
 	var ended ongoingSaveSource
 	wait("explicit source stop", time.Minute, func(call context.Context) bool {
-		all, err := sources(call)
-		if err != nil || len(all) != 2 {
-			return false
-		}
-		ended = all[1]
-		return ended.EndedAt != nil
+		var ok bool
+		ended, ok = byID(call, replacement.ID)
+		return ok && ended.EndedAt != nil
 	})
 	if ended.ID != replacement.ID || !ended.EndedAt.Before(replacement.HardUntil) {
 		t.Fatal("explicit stop did not end the second source before its hard deadline", ended)
@@ -458,7 +475,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		"firstAcceptanceID": firstAcceptance, "secondAcceptanceID": active.AcceptanceID, "envelopeLifetimeSeconds": ongoingSaveLifetime,
 		"sourceID": src.ID, "sourceFence": src.Fence, "sourceStartedAt": src.StartedAt, "sourceHardUntil": src.HardUntil, "sourceInitialLeafUntil": src.Leaf,
 		"sourceInitialCredit": src.InitialCredit, "sourceCreditAtArm": src.Credit, "sourceCreditAtExpiry": expired.Credit, "sourceEndedAt": expired.EndedAt,
-		"armLatencySeconds": armLatency.Seconds(), "saveCaptureID": captureID, "saveAcceptedAt": t0, "repeatCaptureID": repeatID,
+		"armLatencySeconds": armLatency.Seconds(), "rearmsBeforeSave": rearms, "saveCaptureID": captureID, "saveAcceptedAt": t0, "repeatCaptureID": repeatID,
 		"outsideMarkerSent": outsideSent, "retainedMarkerSent": retainedSent, "afterMarkerSent": afterSent,
 		"retainedMarkerPackets": markers, "nativeBytes": len(native), "nativeSHA256": hex.EncodeToString(digest[:]),
 		"secondSourceID": replacement.ID, "explicitStopRequested": stopped, "secondSourceEndedAt": ended.EndedAt,

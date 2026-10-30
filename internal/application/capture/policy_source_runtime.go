@@ -384,7 +384,10 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 		}
 		// Signing/delivery retains this same original call and exact committed
 		// SourceID/fence/cumulative credit. Unknown delivery never refunds it.
-		failed = errors.Join(failed, staged("dispatch", s.Dispatcher.DispatchSource(call, check.Target, node, source)))
+		if e = s.Dispatcher.DispatchSource(call, check.Target, node, source); e != nil && sourceStageOf(e) == "" {
+			e = staged("dispatch", e)
+		}
+		failed = errors.Join(failed, e)
 	}
 	return failed
 }
