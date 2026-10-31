@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/types"
 	"math"
 	"net"
 	"net/http"
@@ -463,8 +464,17 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("expired source still offered for Save")
 	}
 
-	// Incarnation 2: a new grant arms one new source; explicit stop ends it.
-	activate("native-ongoing-reactivate")
+	// Incarnation 2: re-activation after authority expiry accepts anew and arms
+	// one new source; explicit stop ends it.
+	// specs/policy-automation.md: reactivation is a fresh acceptance of a
+	// changed scope; an unchanged revision is never accepted again. The
+	// operator changes the envelope's lifetime, which is part of the scope.
+	if err = f.hub.Patch(types.MergePatchType).AbsPath(f.base + "accessbindings/ongoing-packet-automation").Body([]byte(fmt.Sprintf(`{"spec":{"automation":{"maxLifetimeSeconds":%d}}}`, ongoingSaveLifetime+1))).Do(ctx).Error(); err != nil {
+		t.Fatal("operator changes the packet automation envelope", err)
+	}
+	wait("fresh acceptance of the changed envelope", 2*time.Minute, func(call context.Context) bool {
+		return read(call, "activate_policy", map[string]any{"policy_name": installedOngoingSaveName, "idempotency_key": "native-ongoing-reactivate"}, &active) && active.State == "active" && active.AcceptanceID != firstAcceptance
+	})
 	if active.AcceptanceID == firstAcceptance {
 		t.Fatal("reactivation after authority expiry reused the original acceptance")
 	}
