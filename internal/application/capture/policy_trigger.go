@@ -469,7 +469,7 @@ func failureClass(err error) string {
 	for _, c := range []struct {
 		name string
 		err  error
-	}{{"invalid", value.ErrInvalid}, {"denied", value.ErrDenied}, {"changed", value.ErrChanged}, {"capacity", value.ErrCapacity}, {"conflict", value.ErrConflict}, {"unavailable", value.ErrUnavailable}, {"target-limit", targets.ErrLimit}, {"target-changed", targets.ErrChanged}, {"target-unavailable", targets.ErrUnavailable}} {
+	}{{"acquisition-closed", value.ErrAcquisitionClosed}, {"preview-expired", value.ErrPreviewExpired}, {"settings-unavailable", value.ErrSettingsUnavailable}, {"history-unavailable", value.ErrHistoryUnavailable}, {"history-selection", value.ErrHistorySelectionRequired}, {"recording-selection", value.ErrRecordingSelectionRequired}, {"processing-coverage", value.ErrProcessingCoverage}, {"profile-changed", value.ErrProfileChanged}, {"target-replaced", value.ErrTargetReplaced}, {"recorder-unavailable", value.ErrRecorderUnavailable}, {"invalid", value.ErrInvalid}, {"denied", value.ErrDenied}, {"changed", value.ErrChanged}, {"capacity", value.ErrCapacity}, {"conflict", value.ErrConflict}, {"unavailable", value.ErrUnavailable}, {"target-limit", targets.ErrLimit}, {"target-changed", targets.ErrChanged}, {"target-unavailable", targets.ErrUnavailable}} {
 		if errors.Is(err, c.err) {
 			return c.name
 		}
