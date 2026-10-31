@@ -95,17 +95,33 @@ func (t PolicyTrigger) Run(ctx context.Context) error {
 	}
 	r := &triggerRunner{busy: map[string]bool{}}
 	defer r.wg.Wait()
-	ticker := time.NewTicker(value.TriggerPollInterval)
-	defer ticker.Stop()
+	// A failed policy tick is retried once after triggerRetryInterval instead
+	// of a full poll: an ongoing source's 30 s leaf (spec maximum) survives
+	// only one missed 15 s renewal (native runs to 41218189975 closed sources
+	// after two transient misses). A persistent failure returns to the
+	// normal interval after that one retry.
+	retried := false
 	for {
-		t.cycle(ctx, r)
+		started := time.Now()
+		wait := value.TriggerPollInterval
+		if failed := t.cycle(ctx, r); failed && !retried {
+			wait, retried = triggerRetryInterval, true
+		} else {
+			retried = false
+		}
+		// Measured from the cycle's start, like the former ticker.
+		timer := time.NewTimer(max(0, wait-time.Since(started)))
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return nil
-		case <-ticker.C:
+		case <-timer.C:
 		}
 	}
 }
+
+// triggerRetryInterval is the early next cycle after a failed policy tick.
+const triggerRetryInterval = 5 * time.Second
 
 // triggerRunner bounds capture goroutines to one per policy and joins them.
 type triggerRunner struct {
@@ -143,9 +159,10 @@ func (t PolicyTrigger) Cycle(ctx context.Context) {
 	t.cycle(ctx, nil)
 }
 
-func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) {
+// cycle reports whether any policy tick failed.
+func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) (failed bool) {
 	if !t.configured() || ctx.Err() != nil {
-		return
+		return false
 	}
 	if err := t.Ledger.SettleOccurrences(ctx, occurrenceSettleAge); err != nil {
 		t.report("settle/" + failureClass(err))
@@ -161,17 +178,18 @@ func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) {
 	policies, err := t.Ledger.ActivePolicies(ctx)
 	if err != nil {
 		t.report("list/" + failureClass(err))
-		return
+		return true
 	}
 	for _, p := range policies {
 		if ctx.Err() != nil {
-			return
+			return failed
 		}
 		if r != nil && r.running(p.PolicyUID) && t.OngoingSources == nil {
 			t.report("tick/busy")
 			continue
 		}
 		if err := t.tick(ctx, p, r); err != nil {
+			failed = true
 			stage := sourceStageOf(err)
 			if stage != "" {
 				stage += "/"
@@ -179,6 +197,7 @@ func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) {
 			t.report("tick/" + stage + failureClass(err))
 		}
 	}
+	return failed
 }
 
 // Tick observes the policy source and its workload once and runs the
