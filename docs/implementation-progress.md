@@ -46,7 +46,8 @@ at a later step; none has passed. Results, not claims:
   exchange, which runs before the start on the single-Save path. In run
   41132757629 that, not a source renewal, was the `last-attach=<2s`. The
   region reopened only on its 1 s poll tick after the 1 s retry, longer than
-  the start's ~2 s attach wait. A completed exchange now reopens at once.
+  the start's ~2 s attach wait. Any exchange that opened now reopens at once
+  (the hub closes a used standby, so its end is usually a read error).
   Installed rerun pending.
 
 Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit

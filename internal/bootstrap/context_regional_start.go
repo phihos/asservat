@@ -402,10 +402,12 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 				exchange, e := s.Client.OpenDiscovered(call, owner, observed)
 				retry = openingRetry(e)
 				if e == nil {
+					// An opened exchange passed every opening check; the hub
+					// ends a used standby by closing it, so its end is usually
+					// a read error. Either way the owner needs its next standby.
+					retry = 0
 					if e = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local); e != nil {
 						s.reportFailure("exchange", e)
-					} else {
-						retry = 0
 					}
 				} else {
 					s.reportFailure("open", e)
@@ -422,7 +424,7 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 			delete(active, e.owner)
 			next[e.owner] = s.Local.Now().Add(e.retry)
 			if e.retry == 0 {
-				// A completed exchange consumed the owner's one standby. Reopen
+				// An ended exchange consumed the owner's one standby. Reopen
 				// now, not on the next tick: the hub's following attach (a
 				// Save's start after its history write) waits only about two
 				// seconds for the replacement.
