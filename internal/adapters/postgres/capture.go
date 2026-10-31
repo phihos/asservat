@@ -661,7 +661,16 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if !a.RepeatedFrom.Valid(n.Time) || a.RepeatedFrom.CaptureID == in.CaptureID {
 				return value.ErrChanged
 			}
-			sourceCapture, _, e := historyAuthorizedCapture(ctx, q, s.root, s.recovery.installationID(), a.RepeatedFrom.CaptureID, a.Eligibility.VerifiedIdentity, stream, recovery, false)
+			// The repeat's lineage is the requester's: a recording Save
+			// executes as its policy, but its human initiator repeats and
+			// must hold read rights on the source history (specs/
+			// recording-saves.md; native run 41236725225 denied every repeat
+			// by checking the policy executor).
+			lineage := a.Eligibility.VerifiedIdentity
+			if a.RecordingSave != nil {
+				lineage = a.RecordingSave.Initiator.VerifiedIdentity
+			}
+			sourceCapture, _, e := historyAuthorizedCapture(ctx, q, s.root, s.recovery.installationID(), a.RepeatedFrom.CaptureID, lineage, stream, recovery, false)
 			if e != nil {
 				return e
 			}
