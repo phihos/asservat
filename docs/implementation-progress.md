@@ -14,6 +14,14 @@ explicit deactivation ended it before its hard deadline. One pass is not a
 pass rate: the parallel run 41244512181 failed because the first Save's
 advisory history was unavailable, so the repeat had no parameters.
 
+Pass rate after the remaining fixes (test retries retryable preview
+refusals; a still-valid trust observation survives a failed refresh):
+41246055056 and 41246060100 passed, 41246065147 failed (repeat collect
+refused at trust); 41247677195 and 41247688350 passed, 41247682605 failed
+(second policy's source refused at admit-insert, cause not yet labelled;
+diagnostics added); 41249333194, 41249338664 and 41249344262 passed. That is
+8 full passes in the last 11 runs and 3 of 3 in the latest batch.
+
 Product fixes found by this focus (see ADR-270/271/272 and commits on the
 branch): source work as a standby query, two staggered standbys per
 cluster, history after the start with its own budget and reply reserve,
