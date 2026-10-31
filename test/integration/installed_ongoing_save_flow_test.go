@@ -426,7 +426,10 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("ongoing Save window/header proof", err)
 	}
 
-	// Fresh selection repeat; the original handle is not reused.
+	// Fresh selection repeat; the original handle is not reused. Retained
+	// traffic inside its window: an empty window with incomplete history is
+	// reported as absence (CaptureFailed), not as evidence (run 41238165999).
+	marker(ongoingSaveRetainedPort)
 	repeatSelection := selectNow("fresh repeat")
 	repeatID, _ := save(map[string]any{"recording_handles": []string{repeatSelection.Handle}, "before": "15s", "repeated_from_capture_id": captureID}, "native-ongoing-repeat")
 	published(repeatID)
