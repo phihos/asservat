@@ -195,22 +195,34 @@ func TestRouterTerminalQueryWithdrawnBeforeJoinedResult(t *testing.T) {
 }
 
 // ADR-270 source work spends queries every tick. A standby whose last query
-// completed is retired at once, so the region opens a queryable replacement.
-func TestRouterRetiresStandbyAfterItsLastQuery(t *testing.T) {
-	for _, last := range []bool{false, true} {
+// completed is retired while its cluster has another standby, so the region
+// opens a queryable replacement; a lone one stays for an attach (ADR-179).
+func TestRouterRetiresExhaustedStandbyOnlyWithAnother(t *testing.T) {
+	for _, c := range []struct{ last, other bool }{{false, true}, {true, false}, {true, true}} {
 		w := workFixture()
 		cluster := w.Work.Target.ClusterID
-		router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+		router, err := NewRouter(RouterLimits{Standby: 2, Captures: 1, Clusters: []ClusterLimit{{cluster, 2, 1}}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		now := time.Now()
-		receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
-		standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
-		if err != nil {
-			t.Fatal(err)
+		register := func(exchange string) *Standby {
+			channel := w.Work.Channel
+			channel.ExchangeID = exchange
+			receiver := fleet.APIContextReceiver{Channel: channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+			s, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+			if err != nil {
+				t.Fatal(err)
+			}
+			return s
 		}
-		if last {
+		var other *Standby
+		if c.other {
+			other = register("00000000-0000-4000-8000-000000000099")
+		}
+		// Registered last, so the query selects it.
+		standby := register(w.Work.Channel.ExchangeID)
+		if c.last {
 			router.mu.Lock()
 			standby.queries = contracts.APIContextMaximumQueries - 1
 			router.mu.Unlock()
@@ -221,15 +233,16 @@ func TestRouterRetiresStandbyAfterItsLastQuery(t *testing.T) {
 			_, e := router.Query(ctx, cluster, queryResolvePod, struct{}{}, &struct{}{})
 			done <- e
 		}()
-		(<-standby.query).result <- queryResult{until: receiver.ValidUntil}
+		(<-standby.query).result <- queryResult{until: now.Add(5 * time.Second)}
 		if err := <-done; err != nil {
 			t.Fatal(err)
 		}
 		cancel()
-		if retired := standby.ctx.Err() != nil; retired != last {
-			t.Fatal("exhausted standby retirement", last, retired)
+		if retired := standby.ctx.Err() != nil; retired != (c.last && c.other) {
+			t.Fatal("exhausted standby retirement", c, retired)
 		}
 		standby.Finish()
+		other.Finish()
 		router.Close()
 	}
 }

@@ -202,6 +202,16 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 }
 func (s *Standby) Context() context.Context { return s.ctx }
 
+// otherLiveLocked reports another live standby of s's cluster.
+func (r *Router) otherLiveLocked(s *Standby) bool {
+	for _, o := range r.standby {
+		if o != s && o.channel.Connector.Binding.ClusterID == s.channel.Connector.Binding.ClusterID && o.liveLocked() {
+			return true
+		}
+	}
+	return false
+}
+
 // retireIdleLocked ends an idle standby that can no longer cover any work, so
 // its handler returns and the region opens a replacement. Attached or querying
 // standbys are left to their own work.
@@ -369,10 +379,11 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	defer func() {
 		r.mu.Lock()
 		selected.queryBusy = false
-		if selected.queries >= contracts.APIContextMaximumQueries {
+		if selected.queries >= contracts.APIContextMaximumQueries && r.otherLiveLocked(selected) {
 			// An exhausted standby can answer no further query (ADR-270
-			// source work spends them every tick): retire it now so the
-			// region opens a replacement instead of idling to its end.
+			// source work spends them every tick). While the cluster has
+			// another standby, retire it so the region opens a queryable
+			// replacement; a lone one stays for an attach (ADR-179).
 			selected.cancel()
 		} else {
 			selected.retireIdleLocked()

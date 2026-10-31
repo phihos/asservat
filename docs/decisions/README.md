@@ -1061,3 +1061,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-269: original grouped Save request bounds](269-original-grouped-save-request-bounds.md): carry one original request through admission, fixed group audit bookkeeping and bounded serial dispatch; local implementation in progress, sixteen-source native workflow qualification pending.
 
 - [ADR-270: source work is a standby query](270-source-work-standby-query.md): source arm/renewal/stop/cancel travel as one `source-work` query, so 15-second renewals never consume the cluster's one standby a Save needs; unit/real-stream tests pass, installed qualification pending.
+
+- [ADR-271: two context-start standbys per cluster](271-two-standbys-per-cluster.md): maintainer reopened ADR-209; join reserves two per cluster, the region keeps two staggered exchanges per owner and an exhausted standby retires only beside another; installed qualification pending.

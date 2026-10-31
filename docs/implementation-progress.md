@@ -48,6 +48,10 @@ at a later step; none has passed. Results, not claims:
   region reopened only on its 1 s poll tick after the 1 s retry, longer than
   the start's ~2 s attach wait. Any exchange that opened now reopens at once
   (the hub closes a used standby, so its end is usually a read error).
+- One standby per cluster still left the Save's start, renewals and
+  collection racing reopenings (runs to 41190979663). The maintainer
+  reopened ADR-209 as ADR-271: two staggered standbys per cluster. Unit
+  tests pass; installed rerun pending.
   Installed rerun pending.
 
 Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit
