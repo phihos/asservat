@@ -30,8 +30,10 @@ func (t Targets) ResolveOngoingRecorders(ctx context.Context, requests []targets
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	var out []targets.OngoingRecorderResolution
+	call, diagnostics := NewStreamDiagnosticContext(call)
 	until, err := t.Router.Query(call, requests[0].Target.ClusterID, queryResolveOngoingRecorders, requests, &out)
 	if err != nil {
+		t.report("ongoing/"+queryStep(err, diagnostics), "")
 		return nil, err
 	}
 	if call.Err() != nil || len(out) != len(requests) {
