@@ -246,3 +246,32 @@ func TestRouterRetiresExhaustedStandbyOnlyWithAnother(t *testing.T) {
 		router.Close()
 	}
 }
+
+// TryAttach never waits: without an idle standby it fails at once.
+func TestRouterTryAttachDoesNotWait(t *testing.T) {
+	w := workFixture()
+	cluster := w.Work.Target.ClusterID
+	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer router.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	started := time.Now()
+	if _, err := router.TryAttach(ctx, cluster, w.Work.CaptureID); !errors.Is(err, fleet.ErrUnavailable) || time.Since(started) > 100*time.Millisecond {
+		t.Fatal("try attach waited or succeeded without a standby", err, time.Since(started))
+	}
+	now := time.Now()
+	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer standby.Finish()
+	call, end := context.WithTimeout(context.Background(), time.Second)
+	defer end()
+	if a, err := router.TryAttach(call, cluster, w.Work.CaptureID); err != nil || a == nil {
+		t.Fatal("try attach refused an idle standby", err)
+	}
+}

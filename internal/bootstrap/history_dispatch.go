@@ -49,7 +49,10 @@ func (d RegionalHistoryDispatch) attach(ctx context.Context, cluster, captureID 
 	}
 	call, cancel := context.WithDeadline(ctx, until)
 	began := time.Now()
-	a, e := d.Router.Attach(call, cluster, captureID)
+	// No waiting inside the attach: its five seconds bound the exchange too,
+	// and PrepareHistory retries (native run 41212431803: a two-second wait
+	// left the exchange expired).
+	a, e := d.Router.TryAttach(call, cluster, captureID)
 	reportHistoryDispatch(d.Report, call, "attach", began, until, e)
 	if e != nil {
 		cancel()

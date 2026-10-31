@@ -408,6 +408,17 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	return result.until, result.err
 }
 func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachment, error) {
+	return r.attach(ctx, cluster, capture, true)
+}
+
+// TryAttach is Attach without waiting for a standby: it fails at once when
+// none is idle, so the caller's whole bound remains for its exchange. A
+// caller with its own retry loop uses it (ADR-272 advisory history).
+func (r *Router) TryAttach(ctx context.Context, cluster, capture string) (*Attachment, error) {
+	return r.attach(ctx, cluster, capture, false)
+}
+
+func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool) (*Attachment, error) {
 	if r == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(cluster) || !authorization.UUID(capture) {
 		return nil, fleet.ErrInvalid
 	}
@@ -453,6 +464,9 @@ func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachme
 		}
 		registered := r.registered
 		r.mu.Unlock()
+		if !wait {
+			return nil, fleet.ErrUnavailable
+		}
 		if timer == nil {
 			wait := time.Until(deadline.Add(-queryReserve))
 			if wait <= 0 {
