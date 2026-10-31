@@ -74,7 +74,15 @@ func (s ContextInvestigation) previewSourceSnapshot(ctx context.Context, current
 	return result, err
 }
 
-func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, current identities.CurrentIdentity, selection PolicySnapshotSelection, manual *manualSnapshotSelection, persist bool, resolved *targets.SourceSnapshotResolution) (ContextPreviewResult, planning.ContextPlan, error) {
+func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, current identities.CurrentIdentity, selection PolicySnapshotSelection, manual *manualSnapshotSelection, persist bool, resolved *targets.SourceSnapshotResolution) (_ ContextPreviewResult, _ planning.ContextPlan, err error) {
+	// step names the failing stage for content-free reports; an inner fixed
+	// preview label is kept.
+	step := "setup"
+	defer func() {
+		if err != nil {
+			err = previewFailure("snapshot/"+step, err)
+		}
+	}()
 	var zero ContextPreviewResult
 	var plan planning.ContextPlan
 	if !s.configured() || ctx == nil || current == nil {
@@ -87,6 +95,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	if !p.Valid() || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing" || !a.Valid(now) || selection.TriggeredAt.IsZero() || selection.TriggeredAt.After(now) || source.Binding.Scope != [32]byte(a.ScopeDigest) || source.Binding.PodUID != selection.Target.PodUID || source.Binding.PolicyUID != a.PolicyUID || source.ClusterID != a.ClusterID || source.NamespaceUID != a.NamespaceUID || source.WorkloadUID != a.WorkloadUID {
 		return zero, planning.ContextPlan{}, previewFailure("snapshot/selection", value.ErrChanged)
 	}
+	step = "action"
 	before, e1 := time.ParseDuration(p.Recorder.Action.Before)
 	after, e2 := time.ParseDuration(p.Recorder.Action.After)
 	actionTimeout, e3 := time.ParseDuration(p.Recorder.Action.Timeout)
@@ -105,6 +114,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		after = 0
 	}
 	deadline := identity.Earlier(now.Add(min(actionTimeout, recipeTimeout)), a.NotAfter).UTC()
+	step = "audience-digest"
 	audienceDigest, err := compiler.SourceAudienceDigest(source.Audience)
 	if err != nil || audienceDigest != artifact.Digest(source.Binding.AudienceDigest) {
 		return zero, planning.ContextPlan{}, previewFailure("snapshot/audience", value.ErrChanged)
@@ -128,6 +138,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	if manual != nil {
 		selected.PolicyName = selection.PolicyName
 	}
+	step = "identity"
 	i, err := current.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) || i.Principal != a.Executor {
 		return zero, planning.ContextPlan{}, value.ErrDenied
@@ -145,15 +156,18 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		actor = initiator.Principal
 		selected.TriggerKind = "recordingSave"
 	}
+	step = "approval"
 	required, err := s.requireRecordingApproval(ctx, current, i.Principal)
 	if err != nil {
 		return zero, planning.ContextPlan{}, err
 	}
 	selected.Request.RequireApproval = required
+	step = "recovery"
 	recovery, err := s.currentRecovery(ctx)
 	if err != nil {
 		return zero, planning.ContextPlan{}, err
 	}
+	step = "resolve"
 	var target targets.PodResolution
 	observed := resolved
 	if observed == nil {
@@ -167,6 +181,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		}
 		target = targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: observed.Original.Request, Pin: observed.Original.Pin}
 	}
+	step = "target"
 	if target.Request != selection.Target {
 		return zero, planning.ContextPlan{}, targets.ErrChanged
 	}
@@ -186,12 +201,14 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 			selected.Request.StartBy = identity.Earlier(selected.Request.StartBy, selected.Request.ProcessingUntil.Add(-time.Microsecond))
 		}
 	}
+	step = "facts"
 	wait := s.beginStorageWait(ctx, target, identity.Earlier(i.ValidUntil, recovery.FreshUntil), value.ContextStorageSelection{})
 	defer wait.close()
 	f, err := s.factsWithStorageWait(ctx, current, a.Executor, intent, target, artifact.SourceSnapshotAnchor(request), wait, *observed)
 	if err != nil {
 		return zero, planning.ContextPlan{}, err
 	}
+	step = "request-window"
 	selected.Request.ProcessingUntil = identity.Earlier(selected.Request.ProcessingUntil, f.retention.ExpiresAt).UTC()
 	selected.Request.StartBy = identity.Earlier(selected.Request.StartBy, selected.Request.ProcessingUntil.Add(-time.Microsecond)).UTC()
 	if !selected.Request.Valid() {
@@ -204,6 +221,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		child := g.Group.Children[manual.GroupIndex]
 		preview.CaptureID, preview.CaseID, preview.OccurrenceID, preview.ArtifactID, preview.AttemptID, preview.AssessmentID = child.CaptureID, g.CaseID, child.OccurrenceID, child.ArtifactID, child.AttemptID, child.AssessmentID
 	}
+	step = "scope"
 	if manual != nil {
 		selected.SourceDefinitionDigest = artifact.Digest(source.Binding.ExpectationDigest)
 		preview.SelectionUntil = identity.Earlier(preview.SelectionUntil, preview.Deadline)
@@ -218,19 +236,23 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 			return zero, planning.ContextPlan{}, err
 		}
 	}
+	step = "plan"
 	plan, err = s.plan(preview, f)
 	if err != nil {
 		return zero, planning.ContextPlan{}, err
 	}
 	preview.CanonicalScope, preview.ScopeDigest = slices.Clone(plan.CanonicalScope), plan.ScopeDigest
+	step = "assessment"
 	assessment, err := compiler.AssessContext(plan, preview.AssessmentID, s.Now())
 	if err != nil {
 		return zero, planning.ContextPlan{}, err
 	}
+	step = "coverage"
 	coverage, err := s.processingCoverage(ctx, preview, f, recovery, i.ValidUntil)
 	if err != nil {
 		return zero, planning.ContextPlan{}, err
 	}
+	step = "reason"
 	if manual != nil && persist {
 		if err = s.preparePreviewReason(ctx, &preview, manual.Reason); err != nil {
 			return zero, planning.ContextPlan{}, err
@@ -239,6 +261,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	if !ValidContextPreview(preview) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) {
 		return zero, planning.ContextPlan{}, previewFailure("snapshot/before-store", value.ErrChanged)
 	}
+	step = "store"
 	if persist {
 		if err = s.Previews.CreateContextPreview(ctx, preview.Clone()); err != nil {
 			return zero, planning.ContextPlan{}, err
@@ -253,6 +276,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	if err != nil || !fresh.Eligible || !fresh.VerifiedIdentity.Valid(s.Now()) || !fresh.VerifiedIdentity.ValidUntil.After(s.Now()) || !slices.Equal(freshAudience, preview.Audience) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) || ctx.Err() != nil {
 		return zero, planning.ContextPlan{}, previewFailure("snapshot/after-store", value.ErrChanged)
 	}
+	step = "initiator"
 	until := identity.Earlier(plan.ValidUntil, identity.Earlier(i.ValidUntil, identity.Earlier(fresh.ValidUntil, coverage.FreshUntil)))
 	if manual != nil {
 		freshInitiator := initiator
