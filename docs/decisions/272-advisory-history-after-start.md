@@ -31,7 +31,11 @@ regional standby the start then waited for.
    check, SQL claim and three-copy exchange exceeded five seconds on CI
    (native run 41215337179). The claim and settlement use a recovery
    observation read just before them.
-5. History remains advisory: its outcome never changes admission or the
+5. History ends one second before the original request window, and the
+   accepted reply's identity check and metadata re-read then use that window
+   rather than the start's narrowed bound, as group Saves already did
+   (native run 41227724909: the reply expired after history).
+6. History remains advisory: its outcome never changes admission or the
    start's result, and Persist keeps every recovery, retention, SQL identity
    and accepted-deadline check.
 

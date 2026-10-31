@@ -302,7 +302,7 @@ func TestSubmissionHistoryHasOwnBudgetAfterSlowStart(t *testing.T) {
 	defer cancel()
 	identityUntil := f.now.Add(5 * time.Second)
 	elapsed := f.now.Add(3 * time.Second)
-	history := &submissionHistoryBudget{f: f, started: start, until: identityUntil}
+	history := &submissionHistoryBudget{f: f, started: start, until: identityUntil.Add(-historyReplyReserve)}
 	svc.History = history
 	start.startHook = func() { f.now = elapsed }
 	start.startErr = context.DeadlineExceeded
@@ -312,15 +312,15 @@ func TestSubmissionHistoryHasOwnBudgetAfterSlowStart(t *testing.T) {
 	}
 }
 
-// History is capped by the original request window and stays advisory: a
-// slow history neither delays the start nor turns it into a failure.
+// History ends a reply reserve before the original request window and stays
+// advisory: a slow history neither delays the start nor costs its reply.
 func TestSubmissionSlowHistoryAfterStartStaysAdvisory(t *testing.T) {
 	f, start, svc, p := submissionTest(t)
 	start.current = f.source(t, t.Context())
 	window := f.now.Add(3 * time.Second)
 	ctx, cancel := context.WithDeadline(t.Context(), window)
 	defer cancel()
-	history := &submissionHistoryBudget{f: f, started: start, until: window, consume: true}
+	history := &submissionHistoryBudget{f: f, started: start, until: window.Add(-historyReplyReserve), consume: true}
 	svc.History = history
 	got, err := svc.Request(ctx, start.current, p.ID, "history-exhausted-budget")
 	if err != nil || got.CaptureID == "" || start.starts != 1 || f.admissions.Load() != 1 || history.calls != 1 || history.saved != 0 || got.HistoryRecorded || !got.HistoryUnavailable || got.HistoryParameters != nil {

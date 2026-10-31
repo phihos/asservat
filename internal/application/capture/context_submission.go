@@ -46,6 +46,11 @@ type ContextSubmission struct {
 // standby attach attempts and the exchange, inside the 15 s request window.
 const historyBudget = 10 * time.Second
 
+// historyReplyReserve keeps the end of the request window for the accepted
+// reply after history: advisory history never costs a started capture its
+// reply.
+const historyReplyReserve = time.Second
+
 func (s ContextSubmission) Request(ctx context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
 	return s.submit(ctx, current, preview, key, false)
 }
@@ -168,7 +173,7 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		began := time.Now()
 		e := value.ErrHistoryUnavailable
 		if s.History != nil {
-			own, end := context.WithDeadline(ctx, identity.Earlier(requestUntil, s.Now().Add(historyBudget)))
+			own, end := context.WithDeadline(ctx, identity.Earlier(requestUntil.Add(-historyReplyReserve), s.Now().Add(historyBudget)))
 			e = s.History.Persist(own, a, i, *a.HistoryParameters, a.HistorySource)
 			end()
 		}
@@ -257,6 +262,14 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if err != nil {
 		return a, err
 	}
+	// ADR-272: advisory history follows the start. As for groups, the
+	// remaining read-only bookkeeping (identity check and one metadata
+	// re-read) uses the original request window, not the start's narrowed
+	// bound, so the reply outlives history (native run 41227724909).
+	persistHistory()
+	wide, endWide := context.WithDeadline(ctx, requestUntil)
+	stops = append(stops, endWide)
+	call, until = wide, requestUntil
 	if err = check(); err != nil {
 		return a, err
 	}
