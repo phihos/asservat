@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/types"
 	"math"
 	"net"
 	"net/http"
@@ -469,8 +468,16 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	// specs/policy-automation.md: reactivation is a fresh acceptance of a
 	// changed scope; an unchanged revision is never accepted again. The
 	// operator changes the envelope's lifetime, which is part of the scope.
-	if err = f.hub.Patch(types.MergePatchType).AbsPath(f.base + "accessbindings/ongoing-packet-automation").Body([]byte(fmt.Sprintf(`{"spec":{"automation":{"maxLifetimeSeconds":%d}}}`, ongoingSaveLifetime+1))).Do(ctx).Error(); err != nil {
-		t.Fatal("operator changes the packet automation envelope", err)
+	// The operator replaces the binding (removing an envelope deactivates).
+	if err = f.hub.Delete().AbsPath(f.base + "accessbindings/ongoing-packet-automation").Do(ctx).Error(); err != nil {
+		t.Fatal("operator removes the packet automation envelope", err)
+	}
+	automation := binding["spec"].(map[string]any)["automation"].(map[string]any)
+	automation["maxLifetimeSeconds"] = ongoingSaveLifetime + 1
+	binding["metadata"] = map[string]any{"name": "ongoing-packet-automation-2"}
+	body, _ = json.Marshal(binding)
+	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
+		t.Fatal("operator adds the changed packet automation envelope", err)
 	}
 	wait("fresh acceptance of the changed envelope", 2*time.Minute, func(call context.Context) bool {
 		return read(call, "activate_policy", map[string]any{"policy_name": installedOngoingSaveName, "idempotency_key": "native-ongoing-reactivate"}, &active) && active.State == "active" && active.AcceptanceID != firstAcceptance
