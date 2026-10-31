@@ -89,6 +89,14 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Source admission charges the control account and needs a fresh storage
+	// binding; log their state on any failure (native run 41247682605 refused
+	// the second source at admit-insert).
+	base := diagnose
+	diagnose = func() {
+		base()
+		ongoingSaveControlDiagnostics(t, ctx, admin, root)
+	}
 	identity.initializeProcessing(t, ctx, cert, address, origin, diagnose)
 	c := sdk.NewClient(&sdk.Implementation{Name: "ongoing-save-requester", Version: "1"}, nil)
 	requester, err := c.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, identity.mcpTokenSource(origin).Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
@@ -576,4 +584,29 @@ func ongoingSavePackets(out []byte, t0 time.Time, before time.Duration) (int, er
 		return 0, fmt.Errorf("no retained pre-T0 marker packets")
 	}
 	return retained, nil
+}
+
+func ongoingSaveControlDiagnostics(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string) {
+	t.Helper()
+	call, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	for _, q := range []string{
+		`SELECT concat('pool configured=',configured,' paused=',paused,' valid=',clock_timestamp()<valid_until,' full=',full_limit,' replay=',replay_limit) FROM context_control_pool WHERE root_id=$1`,
+		`SELECT concat('account configured=',configured,' paused=',paused,' valid=',clock_timestamp()<valid_until,' full=',charged_full,'/',full_limit,' replay=',charged_replay,'/',replay_limit) FROM context_control_account WHERE root_id=$1`,
+		`SELECT concat('binding fresh=',clock_timestamp()<fresh_until) FROM context_storage_binding WHERE root_id=$1`,
+		`SELECT concat('sources unreleased=',count(*) FILTER (WHERE slot_released_at IS NULL),' ended=',count(*) FILTER (WHERE ended_at IS NOT NULL),' total=',count(*)) FROM policy_recording_source WHERE root_id=$1`,
+	} {
+		rows, err := admin.Query(call, q, root)
+		if err != nil {
+			t.Log("diagnostics: control query", err)
+			continue
+		}
+		for rows.Next() {
+			var line string
+			if rows.Scan(&line) == nil {
+				t.Log("diagnostics:", line)
+			}
+		}
+		rows.Close()
+	}
 }
