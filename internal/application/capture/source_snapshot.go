@@ -323,7 +323,7 @@ func (s ContextInvestigation) resolveSourceSnapshot(ctx context.Context, selecte
 	}
 	observed, err := resolver.ResolveSourceSnapshot(ctx, *selected.SourceTarget)
 	if err != nil {
-		return targets.PodResolution{}, nil, err
+		return targets.PodResolution{}, nil, previewFailure("snapshot/resolve-"+failureClass(err), err)
 	}
 	if !observed.Valid(s.Now()) || observed.Original != *selected.SourceTarget {
 		return targets.PodResolution{}, nil, previewFailure("snapshot/source-observation", value.ErrChanged)

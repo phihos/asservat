@@ -32,7 +32,11 @@ Source delivery is already a single exchange: one signed work, one
    trust, channel and deadline checks are unchanged. This is the one query
    that verifies and queues work; ADR-179's "queries are not operations"
    otherwise stands.
-4. The dedicated source-work frame (kind 40), its attachment path and its
+4. A standby whose last query completes is retired at once, so the region
+   opens a queryable replacement instead of idling to its residency end.
+   Native run 41180024841 showed previews and recorder resolution refused
+   while the exhausted standby idled.
+5. The dedicated source-work frame (kind 40), its attachment path and its
    receipt are removed. Source work counts against the existing eight queries
    per standby.
 
@@ -41,6 +45,6 @@ Source delivery is already a single exchange: one signed work, one
 Saves and other context starts no longer race source traffic for the
 standby; ADR-209 is unchanged. No state, configuration, privilege or
 fallback is added. Source traffic stays one round trip per source per tick
-and now also retires standbys through the query budget. The region no longer
+and retires one standby per eight queries instead of one per delivery. The region no longer
 receives a receipt for its reply; it never acted on one. Hub and region must
 run the same version, as for any frame change before the first release.

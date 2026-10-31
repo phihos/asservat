@@ -369,7 +369,14 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	defer func() {
 		r.mu.Lock()
 		selected.queryBusy = false
-		selected.retireIdleLocked()
+		if selected.queries >= contracts.APIContextMaximumQueries {
+			// An exhausted standby can answer no further query (ADR-270
+			// source work spends them every tick): retire it now so the
+			// region opens a replacement instead of idling to its end.
+			selected.cancel()
+		} else {
+			selected.retireIdleLocked()
+		}
 		if !r.closed && selected.liveLocked() {
 			close(r.registered)
 			r.registered = make(chan struct{})

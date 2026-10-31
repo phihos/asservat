@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 )
 
@@ -190,5 +191,45 @@ func TestRouterTerminalQueryWithdrawnBeforeJoinedResult(t *testing.T) {
 	case <-f.handled:
 		t.Fatal("terminal query released socket capacity before joined cleanup")
 	default:
+	}
+}
+
+// ADR-270 source work spends queries every tick. A standby whose last query
+// completed is retired at once, so the region opens a queryable replacement.
+func TestRouterRetiresStandbyAfterItsLastQuery(t *testing.T) {
+	for _, last := range []bool{false, true} {
+		w := workFixture()
+		cluster := w.Work.Target.ClusterID
+		router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now()
+		receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+		standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		if last {
+			router.mu.Lock()
+			standby.queries = contracts.APIContextMaximumQueries - 1
+			router.mu.Unlock()
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		done := make(chan error, 1)
+		go func() {
+			_, e := router.Query(ctx, cluster, queryResolvePod, struct{}{}, &struct{}{})
+			done <- e
+		}()
+		(<-standby.query).result <- queryResult{until: receiver.ValidUntil}
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+		cancel()
+		if retired := standby.ctx.Err() != nil; retired != last {
+			t.Fatal("exhausted standby retirement", last, retired)
+		}
+		standby.Finish()
+		router.Close()
 	}
 }
