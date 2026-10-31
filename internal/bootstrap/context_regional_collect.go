@@ -90,10 +90,18 @@ func (s RegionalRecordingCollect) report(step string, err error) {
 // Collect runs one collect exchange for a started recording. A recording
 // whose duration has not passed yet returns "Recording" without contacting
 // the region.
-func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string) (string, error) {
+func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string) (_ string, err error) {
 	if ctx == nil || !s.valid() || !authorization.UUID(captureID) {
 		return "", execution.ErrInvalid
 	}
+	// step names the failing collect step for the fixed refusal report.
+	step := "recovery"
+	defer func() {
+		var fixed interface{ FixedStep() string }
+		if err != nil && !errors.As(err, &fixed) {
+			err = &fixedStepError{step, err}
+		}
+	}()
 	started := s.Now().UTC().Truncate(time.Microsecond)
 	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer cancel()
@@ -101,6 +109,7 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 	if err != nil || !recovery.Valid(s.Now()) {
 		return "", execution.ErrUnavailable
 	}
+	step = "work"
 	w, exec, err := s.Recordings.ReadRecordingWork(call, captureID, recovery)
 	if err != nil {
 		return "", err
@@ -120,16 +129,20 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 	}
 	until := identity.Earlier(started.Add(5*time.Second), recovery.FreshUntil)
 	target := authorization.Target{ClusterID: w.Target.ClusterID, NamespaceUID: w.Target.Namespace.UID, WorkloadUID: w.Target.Workload.UID, PodUID: w.Target.PodUID}
+	step = "capability"
 	capability, err := s.Runner.Capabilities.ContextCapability(call, target)
 	if err != nil || !capability.Valid(s.Now()) {
 		return "", execution.ErrUnavailable
 	}
 	until = identity.Earlier(until, capability.FreshUntil)
+	step = "attach"
 	attachment, err := s.Router.Attach(call, target.ClusterID, captureID)
 	if err != nil {
+		step += " " + s.Router.AttachState(target.ClusterID)
 		return "", execution.ErrUnavailable
 	}
 	defer attachment.Close()
+	step = "receiver"
 	receiver, err := attachment.Receiver(call)
 	if err != nil {
 		return "", execution.ErrUnavailable
@@ -138,6 +151,7 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 	if receiver.Channel.Connector.Binding.InstallationID != recovery.InstallationID || receiver.Channel.Connector.Binding.IssuerEpoch != recovery.IssuerEpoch {
 		return "", execution.ErrDenied
 	}
+	step = "sign"
 	work, err := executionapp.NewAPIContextWork(w, receiver.Channel, capability, started, until, s.Now())
 	if err != nil {
 		return "", err
@@ -147,6 +161,7 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 		return "", err
 	}
 	defer clear(signed)
+	step = "run"
 	state, err := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		r := s.Runner
 		r.Process = ops
