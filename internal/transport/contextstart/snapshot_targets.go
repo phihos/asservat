@@ -21,8 +21,10 @@ func (t Targets) ResolveSourceSnapshot(ctx context.Context, r targets.SourceSnap
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	call, diagnostics := NewStreamDiagnosticContext(call)
 	until, err := t.Router.Query(call, r.Request.ClusterID, queryResolveSourceSnapshot, r, &out)
 	if err != nil {
+		t.report("source-snapshot/"+queryStep(err, diagnostics), "")
 		return targets.SourceSnapshotResolution{}, err
 	}
 	out, reason := checkSourceSnapshot(out, r, until, t.Now())

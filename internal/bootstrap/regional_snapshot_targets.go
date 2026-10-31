@@ -16,12 +16,14 @@ import (
 func (t reportedTargets) ResolveSourceSnapshot(ctx context.Context, original targets.SourceSnapshotTarget) (targets.SourceSnapshotResolution, error) {
 	var out targets.SourceSnapshotResolution
 	if ctx == nil || ctx.Err() != nil || !original.Valid() || t.recordings == nil {
+		t.refused("input")
 		return out, targets.ErrInvalid
 	}
 	registry, ok := t.recordings.nodes.(interface {
 		NodeByUID(string) (delivery.NodeView, bool)
 	})
 	if !ok {
+		t.refused("registry")
 		return out, targets.ErrUnavailable
 	}
 	now := t.recordings.now()
