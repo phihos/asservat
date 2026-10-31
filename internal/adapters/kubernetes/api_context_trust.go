@@ -153,39 +153,49 @@ func (s *APIContextWorkTrustSource) readTrust(ctx context.Context) (fleet.APICon
 	defer cancel()
 	recovery, e := s.recovery.RecoveryState(call)
 	if e != nil || !recovery.Valid(s.client.now()) || recovery.InstallationID != s.installed.InstallationID || recovery.IssuerEpoch != s.installed.IssuerEpoch {
-		return zero, cfg.ErrUnavailable
+		return zero, trustStep{"recovery", cfg.ErrUnavailable}
 	}
 	until = identity.Earlier(until, recovery.FreshUntil)
 	call, stopRecovery := context.WithDeadline(call, until)
 	defer stopRecovery()
 	guard, guardUntil, e := s.protection.current(call)
 	if e != nil {
-		return zero, e
+		return zero, trustStep{"guard", e}
 	}
 	until = identity.Earlier(until, guardUntil)
 	call, stopGuard := context.WithDeadline(call, until)
 	defer stopGuard()
 	if e = s.snapshot(call); e != nil {
-		return zero, e
+		return zero, trustStep{"snapshot", e}
 	}
 	final, finalUntil, e := s.protection.current(call)
 	if e != nil || guard != final {
-		return zero, cfg.ErrChanged
+		return zero, trustStep{"guard-final", cfg.ErrChanged}
 	}
 	until = identity.Earlier(until, finalUntil)
 	call, stopFinal := context.WithDeadline(call, until)
 	defer stopFinal()
 	if e = s.snapshot(call); e != nil {
-		return zero, e
+		return zero, trustStep{"snapshot-final", e}
 	}
 	last, e := s.recovery.RecoveryState(call)
 	if e != nil || !last.Valid(s.client.now()) || last.InstallationID != recovery.InstallationID || last.IssuerEpoch != recovery.IssuerEpoch || last.Revision != recovery.Revision {
-		return zero, cfg.ErrChanged
+		return zero, trustStep{"recovery-final", cfg.ErrChanged}
 	}
 	until = identity.Earlier(until, last.FreshUntil)
 	out, e := apiWorkTrustValue(s.installed, s.uid, start, until)
 	if e != nil || call.Err() != nil || !out.Valid(s.client.now()) || !recovery.Valid(s.client.now()) || s.client.now().Before(start) {
-		return zero, cfg.ErrUnavailable
+		return zero, trustStep{"value", cfg.ErrUnavailable}
 	}
 	return out, nil
 }
+
+// trustStep names where a work-trust read stopped (diagnostic only).
+type trustStep struct {
+	step string
+	err  error
+}
+
+func (e trustStep) Error() string     { return "work trust " + e.step }
+func (e trustStep) Unwrap() error     { return e.err }
+func (e trustStep) FixedStep() string { return "trust-" + e.step }

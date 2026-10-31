@@ -107,7 +107,10 @@ func (s *APIContextWorkSignatures) sourceCurrent(ctx context.Context, w app.Sour
 	}
 	t, e := s.trust.APIContextWorkTrust(ctx)
 	c := w.Channel
-	if e != nil || ctx.Err() != nil || !w.Valid(s.now()) || !t.Valid(s.now()) || t.RootID != c.RootID || t.InstallationID != c.Connector.Binding.InstallationID || t.ClusterID != c.Connector.Binding.ClusterID || t.IssuerEpoch != c.Connector.Binding.IssuerEpoch {
+	if e != nil {
+		return zero, key, errors.Join(value.ErrUnavailable, e)
+	}
+	if ctx.Err() != nil || !w.Valid(s.now()) || !t.Valid(s.now()) || t.RootID != c.RootID || t.InstallationID != c.Connector.Binding.InstallationID || t.ClusterID != c.Connector.Binding.ClusterID || t.IssuerEpoch != c.Connector.Binding.IssuerEpoch {
 		return zero, key, value.ErrUnavailable
 	}
 	for _, k := range t.Trust.Keys {
@@ -215,7 +218,12 @@ func (s *APIContextWorkSignatures) VerifySourceWork(ctx context.Context, encoded
 	first, key, e := s.sourceCurrent(call, w, h["kid"])
 	firstTook := time.Since(firstRead)
 	if e != nil {
-		return out, workStep{"source-trust", e}
+		step := "source-trust"
+		var fixed interface{ FixedStep() string }
+		if errors.As(e, &fixed) {
+			step += "/" + fixed.FixedStep()
+		}
+		return out, workStep{step, e}
 	}
 	until := identity.Earlier(w.NotAfter, identity.Earlier(r.ValidUntil, first.Trust.FreshUntil))
 	bounded, cancel := context.WithDeadline(call, until)
