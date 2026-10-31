@@ -38,7 +38,16 @@ at a later step; none has passed. Results, not claims:
   against ADR-209 as source count grows.
 - Fix (ADR-270, maintainer-selected): source work travels as a `source-work`
   standby query, so it never consumes the standby; ADR-209 unchanged. Unit
-  and real-stream router tests pass; installed rerun pending.
+  and real-stream router tests pass. An exhausted standby is retired after
+  its last query (runs 41178884491/41180024841: previews found no queryable
+  standby).
+- Correction (run 41182348047, `history dispatch: attach/ok` just before the
+  refusal): the Save's start loses the standby to its own advisory history
+  exchange, which runs before the start on the single-Save path. In run
+  41132757629 that, not a source renewal, was the `last-attach=<2s`. The
+  region reopened only on its 1 s poll tick after the 1 s retry, longer than
+  the start's ~2 s attach wait. A completed exchange now reopens at once.
+  Installed rerun pending.
 
 Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit
 stop. Candidate remains unmerged; no collection is enabled for users.

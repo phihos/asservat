@@ -404,6 +404,8 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 				if e == nil {
 					if e = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local); e != nil {
 						s.reportFailure("exchange", e)
+					} else {
+						retry = 0
 					}
 				} else {
 					s.reportFailure("open", e)
@@ -419,6 +421,13 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 		case e := <-ended:
 			delete(active, e.owner)
 			next[e.owner] = s.Local.Now().Add(e.retry)
+			if e.retry == 0 {
+				// A completed exchange consumed the owner's one standby. Reopen
+				// now, not on the next tick: the hub's following attach (a
+				// Save's start after its history write) waits only about two
+				// seconds for the replacement.
+				poll()
+			}
 		case <-ticker.C:
 			poll()
 		}
