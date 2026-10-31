@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -134,4 +135,62 @@ func OpeningStatsLine() string {
 	}
 	return fmt.Sprintf("requests=%d failed=%d slow>=1s=%d slow>=2s=%d limiter-waits>=100ms=%d wait-total=%s wait-max=%s limiter-refused=%d top:%s",
 		n, failed, slow1, slow2, waits, time.Duration(total).Round(10*time.Millisecond), time.Duration(max).Round(10*time.Millisecond), refused, b.String())
+}
+
+var guardCallers struct {
+	mu sync.Mutex
+	n  map[string]int64
+}
+
+// countGuardCaller counts admission-guard checks by the code path (two
+// calling function names) that made them; no data is recorded.
+func countGuardCaller() {
+	pcs := make([]uintptr, 3)
+	n := runtime.Callers(3, pcs)
+	frames := runtime.CallersFrames(pcs[:n])
+	var names []string
+	for len(names) < 2 {
+		f, more := frames.Next()
+		name := f.Function
+		if i := strings.LastIndex(name, "."); i >= 0 {
+			name = name[i+1:]
+		}
+		names = append(names, name)
+		if !more {
+			break
+		}
+	}
+	key := strings.Join(names, "<")
+	guardCallers.mu.Lock()
+	if guardCallers.n == nil {
+		guardCallers.n = map[string]int64{}
+	}
+	if len(guardCallers.n) < 32 || guardCallers.n[key] > 0 {
+		guardCallers.n[key]++
+	}
+	guardCallers.mu.Unlock()
+}
+
+// GuardCallersLine summarizes and resets the guard-check callers.
+func GuardCallersLine() string {
+	guardCallers.mu.Lock()
+	m := guardCallers.n
+	guardCallers.n = nil
+	guardCallers.mu.Unlock()
+	if len(m) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return m[keys[i]] > m[keys[j]] })
+	var b strings.Builder
+	for i, k := range keys {
+		if i == 6 {
+			break
+		}
+		fmt.Fprintf(&b, " [%s]=%d", k, m[k])
+	}
+	return "guard checks:" + b.String()
 }

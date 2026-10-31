@@ -106,6 +106,9 @@ func logOpeningStats(ctx context.Context, prefix string) {
 				if line := kube.OpeningStatsLine(); line != "" {
 					fmt.Fprintln(os.Stderr, prefix+": "+line)
 				}
+				if line := kube.GuardCallersLine(); line != "" {
+					fmt.Fprintln(os.Stderr, prefix+": "+line)
+				}
 			}
 		}
 	}()
