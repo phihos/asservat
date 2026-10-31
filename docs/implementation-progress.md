@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Installed ongoing packet + Save focus: first full pass (2026-10-31)
+
+Native run 41244506441 passed `continuation-ongoing-save` end to end on the
+installed product (UNPUBLISHED candidate, branch only): source armed in
+15.0 s; Save T0 2026-10-31T21:51:44.611958Z (SQL); native PCAPNG 812 B,
+SHA-256 bcfd997bac654238c1c9267b7ae9ff18f7f9bbc1b17acd478a323a8d8ece734e,
+retaining 6 pre-T0 header packets of the retained marker and no outside,
+post-T0 or payload bytes; repeat Save via fresh selection with lineage;
+natural expiry exactly at the authority-bounded hard deadline without a
+credit refund; a second policy's fresh acceptance armed a new source and
+explicit deactivation ended it before its hard deadline. One pass is not a
+pass rate: the parallel run 41244512181 failed because the first Save's
+advisory history was unavailable, so the repeat had no parameters.
+
+Product fixes found by this focus (see ADR-270/271/272 and commits on the
+branch): source work as a standby query, two staggered standbys per
+cluster, history after the start with its own budget and reply reserve,
+reuse of proof/trust/recovery/source/route observations within their
+original intervals, renewal and tick retries inside the 30 s leaf, and
+the repeat lineage authorized with the human initiator (it checked the
+policy executor and denied every repeat). Test corrections: retained
+traffic before the repeat, and the second incarnation through a second
+policy (an unchanged revision is never accepted again).
+
 ## Installed ongoing packet + Save focus: blocked at regional start (2026-10-30)
 
 New native suite `continuation-ongoing-save` (GitHub runner, guarded disposable
