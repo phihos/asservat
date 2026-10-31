@@ -404,7 +404,11 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	// synchronous audit completion is still pending. The deferred final report
 	// retains its original event and includes the completion stages.
 	if s.Timing != nil && (ctx.Err() != nil || !timing.call.IsZero() && (callErr != nil || out.Status != "success")) {
-		timing.report(event+"/service-failed", steps, s.Timing)
+		failed := event + "/service-failed"
+		if reply.failureStep != "" {
+			failed += "/" + reply.failureStep
+		}
+		timing.report(failed, steps, s.Timing)
 	}
 	// Once an outcome exists, completing its audit is allowed without reviving
 	// request authority. This bounded synchronous completion never redispatches.

@@ -306,7 +306,12 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		clear(b)
 		return OperationReply{}, stopped("reply-interval", value.ErrUnavailable)
 	}
-	return OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), recordingSavePreview: name == "preview_recording_save"}, nil
+	reply := OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), recordingSavePreview: name == "preview_recording_save"}
+	var step interface{ FixedStep() string }
+	if errors.As(operationErr, &step) {
+		reply.failureStep = step.FixedStep()
+	}
+	return reply, nil
 }
 
 func acceptedRecordingOperation(accepted value.Accepted) string {

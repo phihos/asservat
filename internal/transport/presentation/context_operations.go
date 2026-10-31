@@ -389,6 +389,9 @@ type OperationReply struct {
 	auditEffect     operationAuditEffect
 	owner           *operationReplyOwner
 	browserSettings bool
+	// failureStep is the service's fixed failure step behind a public error
+	// reply, for content-free timing reports only.
+	failureStep string
 }
 
 type operationAuditDecision uint8
