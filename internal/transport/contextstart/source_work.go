@@ -79,13 +79,19 @@ func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, signed []b
 // renewals and stops therefore never consume the cluster's one standby
 // (ADR-209) that Saves and other context starts attach to. sign receives the
 // selected standby's current receiver, since the work binds its channel.
-func (r *Router) DeliverSource(ctx context.Context, cluster string, sign func(fleet.APIContextReceiver) (app.SourceWork, []byte, error)) error {
+func (r *Router) DeliverSource(ctx context.Context, cluster string, sign func(fleet.APIContextReceiver) (app.SourceWork, []byte, error)) (err error) {
 	if r == nil || sign == nil {
 		return fleet.ErrInvalid
 	}
 	var w app.SourceWork
 	var reply contracts.SourceReply
-	_, err := r.Query(ctx, cluster, querySourceWork, receiverBody(func(current fleet.APIContextReceiver) (any, error) {
+	ctx, diagnostics := NewStreamDiagnosticContext(ctx)
+	defer func() {
+		if err != nil {
+			err = sourceDeliveryStep{queryStep(err, diagnostics), err}
+		}
+	}()
+	_, err = r.Query(ctx, cluster, querySourceWork, receiverBody(func(current fleet.APIContextReceiver) (any, error) {
 		var signed []byte
 		var e error
 		w, signed, e = sign(current)
@@ -108,3 +114,14 @@ func (r *Router) DeliverSource(ctx context.Context, cluster string, sign func(fl
 func SourceWorkEnd(w app.SourceWork, r fleet.APIContextReceiver) time.Time {
 	return identity.Earlier(w.Source.Permit.DispatchUntil, identity.Earlier(w.Target.FreshUntil, identity.Earlier(w.Node.FreshUntil, r.ValidUntil)))
 }
+
+// sourceDeliveryStep names where a source-work query stopped (answer label,
+// stream interruption or router) for content-free counters.
+type sourceDeliveryStep struct {
+	step string
+	err  error
+}
+
+func (e sourceDeliveryStep) Error() string     { return e.err.Error() }
+func (e sourceDeliveryStep) Unwrap() error     { return e.err }
+func (e sourceDeliveryStep) FixedStep() string { return e.step }

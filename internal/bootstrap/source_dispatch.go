@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	captureapp "asservat.local/asservat/internal/application/capture"
@@ -63,6 +64,10 @@ func (d RegionalSourceDispatch) DispatchSource(ctx context.Context, target targe
 		if err != nil {
 			if call.Err() != nil {
 				step += "-late"
+			}
+			var fixed interface{ FixedStep() string }
+			if errors.As(err, &fixed) {
+				step += "/" + fixed.FixedStep()
 			}
 			err = captureapp.StagedSourceError("dispatch-"+step, err)
 		}
