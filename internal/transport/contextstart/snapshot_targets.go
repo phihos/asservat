@@ -25,22 +25,49 @@ func (t Targets) ResolveSourceSnapshot(ctx context.Context, r targets.SourceSnap
 	if err != nil {
 		return targets.SourceSnapshotResolution{}, err
 	}
-	out, valid := validateSourceSnapshot(out, r, until, t.Now())
-	if call.Err() != nil || !valid {
+	out, reason := checkSourceSnapshot(out, r, until, t.Now())
+	if call.Err() != nil || reason != "" {
+		if reason == "" {
+			reason = "deadline"
+		}
+		t.report("source-snapshot/"+reason, "")
 		return targets.SourceSnapshotResolution{}, targets.ErrUnavailable
 	}
 	return out, nil
 }
 
 func validateSourceSnapshot(out targets.SourceSnapshotResolution, r targets.SourceSnapshotTarget, until, now time.Time) (targets.SourceSnapshotResolution, bool) {
+	out, reason := checkSourceSnapshot(out, r, until, now)
+	return out, reason == ""
+}
+
+// checkSourceSnapshot returns the first failing check as a fixed label.
+func checkSourceSnapshot(out targets.SourceSnapshotResolution, r targets.SourceSnapshotTarget, until, now time.Time) (targets.SourceSnapshotResolution, string) {
 	out.FreshUntil = identity.Earlier(out.FreshUntil, until)
 	out.Process.FreshUntil = identity.Earlier(out.Process.FreshUntil, until)
 	state := out.State
 	status := collector.SourceStatus{SourceID: state.SourceID, Fence: state.Fence, IssuedAt: state.IssuedAt, LeafUntil: state.LeafUntil, Credit: state.Credit, ObservedBytes: state.ObservedBytes, Closed: state.Closed, Stopped: state.Stopped, InputUnknown: state.InputUnknown, SourceStoppedAt: state.SourceStoppedAt, SnapshotUntil: state.SnapshotUntil}
-	if out.Original != r || !out.Valid(now) || !identity.Fresh(out.ReportedAt, out.ReportFreshUntil, now, collector.StatusStaleAfter) || !status.Valid(out.ReportedAt) {
-		return targets.SourceSnapshotResolution{}, false
+	reason := ""
+	switch {
+	case out.Original != r:
+		reason = "original"
+	case !out.Valid(now) && state.Closed:
+		reason = "closed"
+	case !out.Valid(now) && state.Stopped:
+		reason = "stopped"
+	case !out.Valid(now) && (!now.Before(out.FreshUntil) || !now.Before(out.ReportFreshUntil)):
+		reason = "expired"
+	case !out.Valid(now):
+		reason = "resolution"
+	case !identity.Fresh(out.ReportedAt, out.ReportFreshUntil, now, collector.StatusStaleAfter):
+		reason = "report-stale"
+	case !status.Valid(out.ReportedAt):
+		reason = "status"
 	}
-	return out, true
+	if reason != "" {
+		return targets.SourceSnapshotResolution{}, reason
+	}
+	return out, ""
 }
 
 const opResolveSourceSnapshot = "resolve-source-snapshot"
