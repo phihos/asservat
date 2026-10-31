@@ -156,7 +156,9 @@ func TestConnectorLifecycleLegacyStandaloneNativeCounts(t *testing.T) {
 	if err != nil || !proof.Valid(time.Now()) {
 		t.Fatal("standalone concrete proof did not complete; nested-cost regression not reached")
 	}
-	if len(f.proofs) != 1 || f.proofs[0].observer != 47 || f.proofs[0].probe != 9 || f.api.reviews.Load() != 2 {
+	// The proof's repeated connector source read reuses the observation within
+	// its original interval (sourceReuseMargin): 47/9 reads became 33/6.
+	if len(f.proofs) != 1 || f.proofs[0].observer != 33 || f.proofs[0].probe != 6 || f.api.reviews.Load() != 2 {
 		t.Fatal("standalone actual native read count differs from source graph")
 	}
 }
