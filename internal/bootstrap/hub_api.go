@@ -18,6 +18,7 @@ import (
 func RunHubAPI(ctx context.Context, podUID string) (result error) {
 	phase, purpose := startupFiles, "none"
 	defer ownerStartupAnnotate(&phase, &purpose, &result)
+	logOpeningStats(ctx, "hub kube opening")
 	files, err := os.OpenRoot(contracts.OwnerDeploymentRoot)
 	if err != nil {
 		return errors.Join(mounts.ErrUnavailable, err)

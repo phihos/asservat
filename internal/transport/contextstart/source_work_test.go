@@ -69,6 +69,7 @@ func (c *sourceSnapshotCanceller) CancelSourceSnapshot(ctx context.Context, x co
 	}
 	return nil
 }
+
 type freshConnectorSource struct{ countingLocal }
 
 func (freshConnectorSource) ReadConnectorIdentitySource(context.Context) (fleet.ConnectorIdentitySource, error) {

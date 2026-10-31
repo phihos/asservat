@@ -1,10 +1,15 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
+	"time"
+
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 )
 
 const (
@@ -85,4 +90,23 @@ func eventLogText(s string, maximum int) bool {
 		}
 	}
 	return true
+}
+
+// logOpeningStats prints the opening-client Kubernetes summary every ten
+// seconds with traffic, under prefix, until ctx ends (diagnostic only).
+func logOpeningStats(ctx context.Context, prefix string) {
+	t := time.NewTicker(10 * time.Second)
+	go func() {
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if line := kube.OpeningStatsLine(); line != "" {
+					fmt.Fprintln(os.Stderr, prefix+": "+line)
+				}
+			}
+		}
+	}()
 }
