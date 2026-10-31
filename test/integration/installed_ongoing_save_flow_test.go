@@ -463,24 +463,18 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("expired source still offered for Save")
 	}
 
-	// Incarnation 2: re-activation after authority expiry accepts anew and arms
-	// one new source; explicit stop ends it.
-	// specs/policy-automation.md: reactivation is a fresh acceptance of a
-	// changed scope; an unchanged revision is never accepted again. The
-	// operator changes the envelope's lifetime, which is part of the scope.
-	// The operator replaces the binding (removing an envelope deactivates).
-	if err = f.hub.Delete().AbsPath(f.base + "accessbindings/ongoing-packet-automation").Do(ctx).Error(); err != nil {
-		t.Fatal("operator removes the packet automation envelope", err)
+	// Incarnation 2: specs/policy-automation.md never accepts an unchanged
+	// revision again, and the expired acceptance cannot be renewed. The
+	// operator adds a second policy under the same envelope; its fresh
+	// acceptance arms one new source, and an explicit stop ends it.
+	second := installedOngoingSaveName + "-second"
+	policy = map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": second}, "spec": installedOngoingSaveSpec(f.cluster, f.namespace, f.workload)}
+	body, _ = json.Marshal(policy)
+	if err = f.hub.Post().AbsPath(f.base + "debugpolicies").Body(body).Do(ctx).Error(); err != nil {
+		t.Fatal("operator second ongoing policy", err)
 	}
-	automation := binding["spec"].(map[string]any)["automation"].(map[string]any)
-	automation["maxLifetimeSeconds"] = ongoingSaveLifetime + 1
-	binding["metadata"] = map[string]any{"name": "ongoing-packet-automation-2"}
-	body, _ = json.Marshal(binding)
-	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
-		t.Fatal("operator adds the changed packet automation envelope", err)
-	}
-	wait("fresh acceptance of the changed envelope", 2*time.Minute, func(call context.Context) bool {
-		return read(call, "activate_policy", map[string]any{"policy_name": installedOngoingSaveName, "idempotency_key": "native-ongoing-reactivate"}, &active) && active.State == "active" && active.AcceptanceID != firstAcceptance
+	wait("fresh acceptance of the second policy", 2*time.Minute, func(call context.Context) bool {
+		return read(call, "activate_policy", map[string]any{"policy_name": second, "idempotency_key": "native-ongoing-second"}, &active) && active.State == "active"
 	})
 	if active.AcceptanceID == firstAcceptance {
 		t.Fatal("reactivation after authority expiry reused the original acceptance")
@@ -494,7 +488,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	if replacement.ID == src.ID || replacement.HardUntil.Sub(replacement.StartedAt) > ongoingSaveLifetime*time.Second {
 		t.Fatal("second incarnation reused the old source or outlived its authority", replacement)
 	}
-	must("deactivate_policy", map[string]any{"policy_name": installedOngoingSaveName, "idempotency_key": "native-ongoing-stop"}, nil)
+	must("deactivate_policy", map[string]any{"policy_name": second, "idempotency_key": "native-ongoing-stop"}, nil)
 	stopped := time.Now()
 	var ended ongoingSaveSource
 	wait("explicit source stop", time.Minute, func(call context.Context) bool {
