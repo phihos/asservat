@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"encoding/json/jsontext"
-	"sync"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
@@ -43,7 +42,7 @@ type ConnectorIdentitySource struct {
 	// mu serializes reads so concurrent pulls share one; cached is the last
 	// observation, reused only while sourceReuseMargin of its own original
 	// interval remains.
-	mu     sync.Mutex
+	mu     ctxMutex
 	cached *app.ConnectorIdentityConfiguration
 }
 
@@ -152,8 +151,10 @@ func (s *ConnectorIdentitySource) ReadConnectorIdentityConfiguration(ctx context
 	if s == nil || ctx == nil {
 		return app.ConnectorIdentityConfiguration{}, value.ErrInvalid
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if !s.mu.lock(ctx) {
+		return app.ConnectorIdentityConfiguration{}, value.ErrUnavailable
+	}
+	defer s.mu.unlock()
 	if c := s.cached; c != nil && c.Valid(s.client.now().Add(sourceReuseMargin)) && ctx.Err() == nil {
 		out := *c
 		out.Backing = c.Backing.Clone()

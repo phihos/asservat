@@ -69,10 +69,15 @@ func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, ca
 	// exchange: right after a start a standby may be reopening, and the
 	// recording collect holds this capture's route and the cluster's capture
 	// slot for its short exchange (native run 41211070820), refused at once.
+	// Retries are bounded by the caller and by TryAttachLimit, so a sweep
+	// over an unreachable cluster does not spin for its whole context.
+	horizon := d.Now().Add(contextstart.TryAttachLimit)
+	if bound, ok := ctx.Deadline(); ok {
+		horizon = identity.Earlier(horizon, bound)
+	}
 	a, call, cancel, until, e := d.attach(ctx, cluster, captureID)
 	for e != nil {
-		bound, ok := ctx.Deadline()
-		if !ok || bound.Sub(d.Now()) < historyRetryLeft {
+		if horizon.Sub(d.Now()) < historyRetryLeft {
 			return nil, e
 		}
 		pause := time.NewTimer(historyRetryPause)

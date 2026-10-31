@@ -175,7 +175,11 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		e := value.ErrHistoryUnavailable
 		if s.History != nil {
 			own, end := context.WithDeadline(ctx, identity.Earlier(requestUntil.Add(-historyReplyReserve), s.Now().Add(historyBudget)))
-			e = s.History.Persist(own, a, i, *a.HistoryParameters, a.HistorySource)
+			// History runs after the start, possibly after a failed identity
+			// check: write it only for the same still-current requester.
+			if last, re := current.ResolveIdentity(own); re == nil && last.Valid(s.Now()) && last.Principal == i.Principal && last.Policy == i.Policy {
+				e = s.History.Persist(own, a, last, *a.HistoryParameters, a.HistorySource)
+			}
 			end()
 		}
 		auditapp.MarkStep(call, "s-history", began)

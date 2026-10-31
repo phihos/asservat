@@ -37,7 +37,7 @@ type RegionalLifecycle struct {
 	// recoveryMu serializes recovery fetches so concurrent readers share one
 	// hub round trip; recovery is the last observation, reused only while
 	// recoveryReuseMargin of its own original validity remains.
-	recoveryMu sync.Mutex
+	recoveryMu ctxMutex
 	recovery   *value.RecoveryState
 }
 
@@ -248,8 +248,10 @@ func (r *RegionalLifecycle) RecoveryState(ctx context.Context) (value.RecoverySt
 	if !ok || ctx == nil {
 		return value.RecoveryState{}, value.ErrUnavailable
 	}
-	r.recoveryMu.Lock()
-	defer r.recoveryMu.Unlock()
+	if !r.recoveryMu.lock(ctx) {
+		return value.RecoveryState{}, value.ErrUnavailable
+	}
+	defer r.recoveryMu.unlock()
 	if c := r.recovery; c != nil && c.Valid(r.Now().Add(recoveryReuseMargin)) && c.InstallationID == request.Process.Binding.InstallationID && ctx.Err() == nil {
 		return *c, nil
 	}

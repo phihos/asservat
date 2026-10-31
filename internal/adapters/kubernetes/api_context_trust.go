@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"slices"
-	"sync"
+	"strings"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -48,7 +48,7 @@ type APIContextWorkTrustSource struct {
 	// mu serializes reads so concurrent verifiers share one; cached is the
 	// last observation, reused only while trustReuseMargin of its own
 	// original interval remains.
-	mu     sync.Mutex
+	mu     ctxMutex
 	cached *fleet.APIContextWorkTrust
 }
 
@@ -126,8 +126,10 @@ func (s *APIContextWorkTrustSource) APIContextWorkTrust(ctx context.Context) (fl
 	if s == nil || ctx == nil || ctx.Err() != nil {
 		return fleet.APIContextWorkTrust{}, cfg.ErrInvalid
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if !s.mu.lock(ctx) {
+		return fleet.APIContextWorkTrust{}, cfg.ErrUnavailable
+	}
+	defer s.mu.unlock()
 	if c := s.cached; c != nil && c.Valid(s.client.now().Add(trustReuseMargin)) {
 		out := *c
 		out.Trust.Keys = slices.Clone(c.Trust.Keys)
@@ -146,8 +148,11 @@ func (s *APIContextWorkTrustSource) APIContextWorkTrust(ctx context.Context) (fl
 	// original interval: one transient guard read otherwise denied every
 	// work verification until the next success (native run 41246065147
 	// refused a Save's collect work at "trust"). Nothing is extended.
-	// A known change never falls back to the earlier observation.
-	if previous != nil && !errors.Is(err, cfg.ErrChanged) && previous.Valid(s.client.now()) && ctx.Err() == nil {
+	// A known change, or any recovery refusal, never falls back to the earlier
+	// observation; only guard/snapshot read failures do.
+	var step trustStep
+	recoveryStep := errors.As(err, &step) && strings.HasPrefix(step.step, "recovery")
+	if previous != nil && !recoveryStep && !errors.Is(err, cfg.ErrChanged) && previous.Valid(s.client.now()) && ctx.Err() == nil {
 		s.cached = previous
 		kept := *previous
 		kept.Trust.Keys = slices.Clone(previous.Trust.Keys)
