@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,6 +19,37 @@ import (
 var openingStats struct {
 	requests, slow1, slow2, failed       atomic.Int64
 	waits, refused, waitNanos, maxWaitNs atomic.Int64
+	mu                                   sync.Mutex
+	kinds                                map[string]int64
+}
+
+// requestKind is the request's verb and resource kind (with subresource),
+// e.g. "GET pods", "POST tokenreviews"; names, namespaces and bodies are
+// dropped.
+func requestKind(r *http.Request) string {
+	if r.URL == nil {
+		return r.Method + " other"
+	}
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	switch {
+	case len(parts) >= 2 && parts[0] == "api":
+		parts = parts[2:]
+	case len(parts) >= 3 && parts[0] == "apis":
+		parts = parts[3:]
+	default:
+		return r.Method + " other"
+	}
+	if len(parts) >= 3 && parts[0] == "namespaces" {
+		parts = parts[2:]
+	}
+	if len(parts) == 0 {
+		return r.Method + " other"
+	}
+	kind := parts[0]
+	if len(parts) >= 3 {
+		kind += "/" + parts[2]
+	}
+	return r.Method + " " + kind
 }
 
 type measuredLimiter struct{ flowcontrol.RateLimiter }
@@ -47,6 +81,15 @@ func (m measuredTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	resp, err := m.next.RoundTrip(r)
 	d := time.Since(start)
 	openingStats.requests.Add(1)
+	k := requestKind(r)
+	openingStats.mu.Lock()
+	if openingStats.kinds == nil {
+		openingStats.kinds = map[string]int64{}
+	}
+	if len(openingStats.kinds) < 64 || openingStats.kinds[k] > 0 {
+		openingStats.kinds[k]++
+	}
+	openingStats.mu.Unlock()
 	if err != nil {
 		openingStats.failed.Add(1)
 	}
@@ -69,6 +112,26 @@ func OpeningStatsLine() string {
 	}
 	slow1, slow2, failed := openingStats.slow1.Swap(0), openingStats.slow2.Swap(0), openingStats.failed.Swap(0)
 	refused, total, max := openingStats.refused.Swap(0), openingStats.waitNanos.Swap(0), openingStats.maxWaitNs.Swap(0)
-	return fmt.Sprintf("requests=%d failed=%d slow>=1s=%d slow>=2s=%d limiter-waits>=100ms=%d wait-total=%s wait-max=%s limiter-refused=%d",
-		n, failed, slow1, slow2, waits, time.Duration(total).Round(10*time.Millisecond), time.Duration(max).Round(10*time.Millisecond), refused)
+	openingStats.mu.Lock()
+	kinds := openingStats.kinds
+	openingStats.kinds = nil
+	openingStats.mu.Unlock()
+	type kc struct {
+		k string
+		n int64
+	}
+	top := make([]kc, 0, len(kinds))
+	for k, c := range kinds {
+		top = append(top, kc{k, c})
+	}
+	sort.Slice(top, func(i, j int) bool { return top[i].n > top[j].n })
+	var b strings.Builder
+	for i, t := range top {
+		if i == 6 {
+			break
+		}
+		fmt.Fprintf(&b, " [%s]=%d", t.k, t.n)
+	}
+	return fmt.Sprintf("requests=%d failed=%d slow>=1s=%d slow>=2s=%d limiter-waits>=100ms=%d wait-total=%s wait-max=%s limiter-refused=%d top:%s",
+		n, failed, slow1, slow2, waits, time.Duration(total).Round(10*time.Millisecond), time.Duration(max).Round(10*time.Millisecond), refused, b.String())
 }

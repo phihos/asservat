@@ -43,3 +43,19 @@ func TestOpeningStatsCountAndReset(t *testing.T) {
 		t.Fatal("stats not reset")
 	}
 }
+
+func TestOpeningRequestKind(t *testing.T) {
+	for path, want := range map[string]string{
+		"/api/v1/namespaces/app/pods/p-0":                                     "GET pods",
+		"/api/v1/namespaces/app":                                              "GET namespaces",
+		"/apis/apps/v1/namespaces/app/deployments/d":                          "GET deployments",
+		"/apis/authentication.k8s.io/v1/tokenreviews":                         "GET tokenreviews",
+		"/api/v1/namespaces/app/serviceaccounts/s/token":                      "GET serviceaccounts/token",
+		"/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/x": "GET validatingadmissionpolicies",
+	} {
+		r, _ := http.NewRequest(http.MethodGet, "https://k8s.invalid"+path, nil)
+		if got := requestKind(r); got != want {
+			t.Fatal(path, got)
+		}
+	}
+}
