@@ -154,7 +154,9 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		return execution.ErrUnavailable // the original interval ended: not retryable as not-started
 	}
 	mark = time.Now()
+	outer := ctx
 	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
+		ops.Timing = func(method string, d time.Duration) { auditapp.MarkDuration(outer, "op-"+method, d) }
 		r := s.Runner
 		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
 		r.Prepare = gatedPreparer{r.Prepare, gate}

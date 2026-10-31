@@ -108,6 +108,9 @@ type HubOperations struct {
 	mu     sync.Mutex
 	seq    int
 	broken bool
+	// Timing, when set, receives each operation's fixed method name and
+	// duration (diagnostic only).
+	Timing func(method string, d time.Duration)
 }
 
 var (
@@ -124,6 +127,9 @@ var (
 func (h *HubOperations) call(ctx context.Context, method string, in, out any) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.Timing != nil {
+		defer func(start time.Time) { h.Timing(method, time.Since(start)) }(time.Now())
+	}
 	if h.broken || ctx == nil || h.seq >= contracts.APIContextMaximumOperations {
 		return value.ErrUnavailable
 	}
