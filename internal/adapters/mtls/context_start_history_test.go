@@ -100,7 +100,7 @@ func NewHistoryTLSHarness(t *testing.T, delay time.Duration) HistoryTLSHarness {
 		t.Fatal(err)
 	}
 	source := &historyTLSSource{inner: f.connector, delay: delay}
-	stream, err := contextstart.NewOutboundStream(exchange.Context(), exchange.Receiver().Channel, exchange.Check, source, nil, response, writer, socket, exchange.Close)
+	stream, err := contextstart.NewOutboundStream(exchange.Context(), exchange.Receiver().Channel, exchange.Check, source, nil, nil, response, writer, socket, exchange.Close)
 	if err != nil {
 		exchange.Close()
 		cancel()

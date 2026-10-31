@@ -8,7 +8,6 @@ import (
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/configuration"
@@ -56,58 +55,6 @@ func sourceStreamWorkFixture() (app.SourceWork, fleet.APIContextReceiver) {
 	return w, fleet.APIContextReceiver{Channel: base.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
 }
 
-// Synthetic admitted authority/queue, actual source framing and original
-// peer leases. Real signature purpose/key checks have their separate JOSE test.
-func TestSourceWorkUsesBoundedRegionalConversationWithoutCapture(t *testing.T) {
-	for _, mode := range []string{"arm", "stop", "queue-refusal"} {
-		t.Run(mode, func(t *testing.T) {
-			w, r := sourceStreamWorkFixture()
-			if mode == "stop" {
-				w = app.SourceWork{Channel: w.Channel, Source: collector.PacketSource{Permit: collector.SourcePermit{Binding: w.Source.Permit.Binding}}, Stop: true, StopIssuedAt: w.Source.Permit.IssuedAt, NotAfter: w.NotAfter}
-			}
-			if !w.Valid(time.Now()) {
-				t.Fatal("invalid synthetic source work")
-			}
-			ctx, cancel := context.WithDeadline(t.Context(), w.NotAfter)
-			defer cancel()
-			hub, region := historyStreamPair(t, ctx, r)
-			queue := &sourceQueue{fail: mode == "queue-refusal"}
-			local := &SourceLocal{Queue: queue, Verifier: sourceWorkVerifierFunc(func(ctx context.Context, b []byte, current fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
-				if current.Channel != w.Channel || string(b) != "synthetic-source-signature" {
-					return app.AuthenticatedSourceWork{}, fleet.ErrDenied
-				}
-				return app.AuthenticatedSourceWork{Work: w, KeyID: "synthetic", TrustRevision: workFixture().TrustRevision, VerifiedAt: w.IssuedAt(), ValidUntil: w.NotAfter}, nil
-			})}
-			done := make(chan error, 1)
-			go func() {
-				f, current, err := region.AwaitWork(ctx)
-				if err == nil && f.Kind == contracts.SourceWorkFrame {
-					err = serveRegionalSource(ctx, region, current, f.Payload, local, time.Now)
-				}
-				clear(f.Payload)
-				done <- err
-			}()
-			err := serveHubSource(ctx, hub, w, []byte("synthetic-source-signature"), time.Now)
-			if mode == "queue-refusal" {
-				if !errors.Is(err, fleet.ErrUnavailable) {
-					t.Fatal("queue refusal lost", err)
-				}
-			} else if err != nil {
-				t.Fatal(err)
-			}
-			if err = <-done; err != nil {
-				t.Fatal("regional protocol", err)
-			}
-			if queue.calls != 1 {
-				t.Fatal("uncertain enqueue replayed", queue.calls)
-			}
-			if mode == "arm" && queue.last != w.Source.Permit {
-				t.Fatal("original source grant changed")
-			}
-		})
-	}
-}
-
 type sourceSnapshotCanceller struct {
 	calls int
 	last  collector.SourceSnapshot
@@ -122,53 +69,117 @@ func (c *sourceSnapshotCanceller) CancelSourceSnapshot(ctx context.Context, x co
 	}
 	return nil
 }
-func TestSourceWorkSnapshotCancellationUsesRestrictiveRegionalStream(t *testing.T) {
-	for _, refused := range []bool{false, true} {
-		t.Run(map[bool]string{false: "queuedOnly", true: "unavailable"}[refused], func(t *testing.T) {
-			arm, r := sourceStreamWorkFixture()
-			now := arm.IssuedAt()
-			b := arm.Binding()
-			b.AudienceDigest = [32]byte{7}
-			q := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(deliveryapp.SourceBindingDigest(b)), SourceID: b.SourceID, Fence: b.Fence, SnapshotID: "66666666-6666-4666-8666-666666666666", SourceStartedAt: now.Add(-time.Minute), SourceHardUntil: now.Add(-time.Second), T0: now.Add(-30 * time.Second), IssuedAt: now.Add(-30 * time.Second), StartBy: now.Add(-25 * time.Second), ProcessingUntil: now.Add(time.Minute), Before: time.Second, MaxBytes: 65536}
-			x := collector.SourceSnapshot{Binding: b, CaptureID: "44444444-4444-4444-8444-444444444444", AttemptID: "55555555-5555-4555-8555-555555555555", WriterPodUID: arm.Channel.Executor.PodUID, WriterEpoch: arm.Channel.Executor.ProcessEpoch, ExpectationDigest: [32]byte{5}, Request: q}
-			w := app.SourceWork{Channel: arm.Channel, StopSnapshot: &x, StopIssuedAt: now, NotAfter: arm.NotAfter}
-			if !w.Valid(time.Now()) {
-				t.Fatal("invalid synthetic restrictive control")
+type freshConnectorSource struct{ countingLocal }
+
+func (freshConnectorSource) ReadConnectorIdentitySource(context.Context) (fleet.ConnectorIdentitySource, error) {
+	now := time.Now()
+	return fleet.ConnectorIdentitySource{Observation: fleet.ConnectorCredentialObservation{ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}}, nil
+}
+
+// Synthetic admitted authority/queue over actual hub/region frame streams and
+// the real router. Real signature purpose/key checks have their JOSE test.
+// Every source delivery is one query: the standby stays idle for a Save.
+func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
+	for _, mode := range []string{"arm", "stop", "queue-refusal", "cancel", "cancel-refused", "sign-failure"} {
+		t.Run(mode, func(t *testing.T) {
+			w, r := sourceStreamWorkFixture()
+			switch mode {
+			case "stop":
+				w = app.SourceWork{Channel: w.Channel, Source: collector.PacketSource{Permit: collector.SourcePermit{Binding: w.Source.Permit.Binding}}, Stop: true, StopIssuedAt: w.Source.Permit.IssuedAt, NotAfter: w.NotAfter}
+			case "cancel", "cancel-refused":
+				now := w.IssuedAt()
+				b := w.Binding()
+				b.AudienceDigest = [32]byte{7}
+				q := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(deliveryapp.SourceBindingDigest(b)), SourceID: b.SourceID, Fence: b.Fence, SnapshotID: "66666666-6666-4666-8666-666666666666", SourceStartedAt: now.Add(-time.Minute), SourceHardUntil: now.Add(-time.Second), T0: now.Add(-30 * time.Second), IssuedAt: now.Add(-30 * time.Second), StartBy: now.Add(-25 * time.Second), ProcessingUntil: now.Add(time.Minute), Before: time.Second, MaxBytes: 65536}
+				x := collector.SourceSnapshot{Binding: b, CaptureID: "44444444-4444-4444-8444-444444444444", AttemptID: "55555555-5555-4555-8555-555555555555", WriterPodUID: w.Channel.Executor.PodUID, WriterEpoch: w.Channel.Executor.ProcessEpoch, ExpectationDigest: [32]byte{5}, Request: q}
+				w = app.SourceWork{Channel: w.Channel, StopSnapshot: &x, StopIssuedAt: now, NotAfter: w.NotAfter}
 			}
-			ctx, cancel := context.WithDeadline(t.Context(), w.NotAfter)
+			if !w.Valid(time.Now()) {
+				t.Fatal("invalid synthetic source work")
+			}
+			// The standby's passive residency outlives the work's own bound.
+			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 			defer cancel()
 			hub, region := historyStreamPair(t, ctx, r)
-			queue := &sourceQueue{}
-			snapshots := &sourceSnapshotCanceller{fail: refused}
-			local := &SourceLocal{Queue: queue, Snapshots: snapshots, Verifier: sourceWorkVerifierFunc(func(_ context.Context, b []byte, current fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
-				if current.Channel != w.Channel || string(b) != "synthetic-cancel-signature" {
+			hub.sources = NewSourceFeed(r.Channel.ExchangeID, time.Now)
+			region.local = freshConnectorSource{}
+			region.targets = &countingLocal{}
+			queue := &sourceQueue{fail: mode == "queue-refusal"}
+			snapshots := &sourceSnapshotCanceller{fail: mode == "cancel-refused"}
+			region.sourceWork = &SourceLocal{Queue: queue, Snapshots: snapshots, Verifier: sourceWorkVerifierFunc(func(_ context.Context, b []byte, current fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
+				if current.Channel != w.Channel || string(b) != "synthetic-source-signature" {
 					return app.AuthenticatedSourceWork{}, fleet.ErrDenied
 				}
-				return app.AuthenticatedSourceWork{Work: w, KeyID: "synthetic", TrustRevision: workFixture().TrustRevision, VerifiedAt: now, ValidUntil: w.NotAfter}, nil
+				return app.AuthenticatedSourceWork{Work: w, KeyID: "synthetic", TrustRevision: workFixture().TrustRevision, VerifiedAt: w.IssuedAt(), ValidUntil: w.NotAfter}, nil
 			})}
-			done := make(chan error, 1)
-			go func() {
-				f, current, err := region.AwaitWork(ctx)
-				if err == nil && f.Kind == contracts.SourceWorkFrame {
-					err = serveRegionalSource(ctx, region, current, f.Payload, local, time.Now)
+			cluster := r.Channel.Connector.Binding.ClusterID
+			router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer router.Close()
+			check := func(context.Context) (fleet.APIContextReceiver, error) { return r, nil }
+			standby, err := router.RegisterStandby(ctx, r, check)
+			if err != nil {
+				t.Fatal(err)
+			}
+			served := make(chan struct{})
+			go func() { defer close(served); defer standby.Finish(); _ = standby.Serve(hub, time.Now) }()
+			regionDone := make(chan struct{})
+			go func() { defer close(regionDone); _, _, _ = region.AwaitWork(ctx) }()
+			defer func() { cancel(); _ = hub.Close(); _ = region.Close(); <-served; <-regionDone }()
+
+			call, end := context.WithTimeout(ctx, time.Second)
+			defer end()
+			err = router.DeliverSource(call, cluster, func(current fleet.APIContextReceiver) (app.SourceWork, []byte, error) {
+				if current.Channel != r.Channel {
+					t.Error("work signed for another channel")
 				}
-				clear(f.Payload)
-				done <- err
-			}()
-			err := serveHubSource(ctx, hub, w, []byte("synthetic-cancel-signature"), time.Now)
-			if refused {
+				if mode == "sign-failure" {
+					return w, nil, fleet.ErrDenied
+				}
+				return w, []byte("synthetic-source-signature"), nil
+			})
+			switch mode {
+			case "queue-refusal", "cancel-refused":
 				if !errors.Is(err, fleet.ErrUnavailable) {
+					t.Fatal("effect refusal lost", err)
+				}
+			case "sign-failure":
+				if !errors.Is(err, fleet.ErrDenied) {
+					t.Fatal("sign failure lost", err)
+				}
+			default:
+				if err != nil {
 					t.Fatal(err)
 				}
-			} else if err != nil {
-				t.Fatal(err)
 			}
-			if err := <-done; err != nil {
-				t.Fatal(err)
+			cancelling := mode == "cancel" || mode == "cancel-refused"
+			switch {
+			case mode == "sign-failure":
+				if queue.calls != 0 || snapshots.calls != 0 {
+					t.Fatal("unsigned work reached the region")
+				}
+			case cancelling:
+				if snapshots.calls != 1 || !snapshots.last.Equal(*w.StopSnapshot) || queue.calls != 0 {
+					t.Fatal("cancellation became source arm/stop or replayed", snapshots.calls, queue.calls)
+				}
+			default:
+				if queue.calls != 1 || snapshots.calls != 0 {
+					t.Fatal("uncertain enqueue replayed", queue.calls)
+				}
+				if mode == "arm" && queue.last != w.Source.Permit {
+					t.Fatal("original source grant changed")
+				}
 			}
-			if snapshots.calls != 1 || !snapshots.last.Equal(x) || queue.calls != 0 {
-				t.Fatal("cancellation became source arm/stop or replayed", snapshots.calls, queue.calls)
+			// The same standby still takes the next capture's attachment.
+			attach, end2 := context.WithTimeout(ctx, 500*time.Millisecond)
+			defer end2()
+			a, err := router.Attach(attach, cluster, "77777777-7777-4777-8777-777777777777")
+			if err != nil {
+				t.Fatal("source delivery consumed the standby", err)
 			}
+			a.Close()
 		})
 	}
 }

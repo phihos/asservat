@@ -31,7 +31,13 @@ const (
 	queryPacketRecorder          = "packet-recorder"
 	queryResolvePacketRecorder   = "resolve-packet-recorder"
 	queryResolveOngoingRecorders = "resolve-ongoing-recorders"
+	// One signed source arm/renewal/stop. The only query that verifies and
+	// queues work; it keeps the standby waiting like any other query.
+	querySourceWork = "source-work"
 )
+
+// receiverBody builds a query body bound to the checked current receiver.
+type receiverBody func(fleet.APIContextReceiver) (any, error)
 
 // RecorderTargets is the region's optional packet recorder availability
 // (ADR-248). A region without it answers the query as unsupported, which
@@ -138,22 +144,9 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	seq, e := s.nextQuery()
-	if e != nil {
-		return time.Time{}, e
-	}
-	body, e := json.Marshal(in)
-	if e != nil {
-		return time.Time{}, fleet.ErrInvalid
-	}
-	payload, e := contracts.EncodeAPIContextOperation(contracts.APIContextOperation{Format: contracts.APIContextExchangeFormat, Sequence: seq, Method: method, Body: body})
-	if e != nil {
-		return time.Time{}, e
-	}
-	defer clear(payload)
 	defer markQuery(ctx, "q-total", time.Now())
 	pulled := time.Now()
-	if e = s.pullSource(call); e != nil {
+	if e := s.pullSource(call); e != nil {
 		s.record(streamHubQuerySource, streamErrorReason(e))
 		return time.Time{}, fleet.ErrUnavailable
 	}
@@ -166,6 +159,34 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 		s.interruptAt(streamSendPeer, streamPeerInvalid)
 		return time.Time{}, fleet.ErrUnavailable
 	}
+	if build, ok := in.(receiverBody); ok {
+		// Nothing was sent for this query yet: a build failure returns the
+		// stream to its passive residence like an answered query.
+		if in, e = build(receiver); e != nil {
+			if c := s.completeQuery(call, receiver.ValidUntil); c != nil {
+				return time.Time{}, c
+			}
+			return time.Time{}, errQueryAnswer{e}
+		}
+	}
+	// The sequence is reserved only once the query is certain to be sent.
+	seq, e := s.nextQuery()
+	if e != nil {
+		return time.Time{}, e
+	}
+	body, e := json.Marshal(in)
+	if b, ok := in.([]byte); ok {
+		clear(b)
+	}
+	if e != nil {
+		return time.Time{}, fleet.ErrInvalid
+	}
+	payload, e := contracts.EncodeAPIContextOperation(contracts.APIContextOperation{Format: contracts.APIContextExchangeFormat, Sequence: seq, Method: method, Body: body})
+	clear(body)
+	if e != nil {
+		return time.Time{}, e
+	}
+	defer clear(payload)
 	sentUntil, e := s.send(call, contracts.APIContextFrame{Kind: contracts.APIContextQueryFrame, Payload: payload})
 	if e != nil {
 		return time.Time{}, e
@@ -395,6 +416,13 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		} else {
 			e = targets.ErrUnsupported
 		}
+	case querySourceWork:
+		var signed []byte
+		if decodeOperationBody(q.Body, &signed) != nil || len(signed) == 0 || len(signed) > contracts.SourceSignedWorkBytes {
+			return contracts.ErrAPIContextProtocol
+		}
+		out, e = applySourceWork(bounded, owner, signed, s.sourceWork, time.Now)
+		clear(signed)
 	default:
 		return contracts.ErrAPIContextProtocol
 	}

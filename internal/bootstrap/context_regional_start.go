@@ -299,7 +299,7 @@ func ServeRegionalAPIContextExchange(exchange *mtls.ContextStartExchange, verifi
 		return e
 	}
 	receiver := exchange.Receiver()
-	stream, e := contextstart.NewOutboundStream(exchange.Context(), receiver.Channel, exchange.Check, local.Source, local.Targets, response, writer, connection, exchange.Close)
+	stream, e := contextstart.NewOutboundStream(exchange.Context(), receiver.Channel, exchange.Check, local.Source, local.Targets, local.Sources, response, writer, connection, exchange.Close)
 	if e != nil {
 		return e
 	}

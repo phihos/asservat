@@ -117,7 +117,7 @@ func TestContextStartOriginalResidencyCanEndSelectedQuery(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	stream, e := contextstart.NewOutboundStream(exchange.Context(), exchange.Receiver().Channel, exchange.Check, currentSource, f.targets, response, writer, socket, exchange.Close)
+	stream, e := contextstart.NewOutboundStream(exchange.Context(), exchange.Receiver().Channel, exchange.Check, currentSource, f.targets, nil, response, writer, socket, exchange.Close)
 	if e != nil {
 		t.Fatal(e)
 	}

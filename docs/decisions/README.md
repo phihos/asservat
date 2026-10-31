@@ -1059,3 +1059,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-267: encrypted recording-save reasons](267-encrypted-recording-save-reasons.md): immutable reason reference, opaque encrypted body in existing preview/audit lifecycle, reason-only32KiB format and authorized parent metadata; SQL/provider qualification pending.
 
 - [ADR-269: original grouped Save request bounds](269-original-grouped-save-request-bounds.md): carry one original request through admission, fixed group audit bookkeeping and bounded serial dispatch; local implementation in progress, sixteen-source native workflow qualification pending.
+
+- [ADR-270: source work is a standby query](270-source-work-standby-query.md): source arm/renewal/stop/cancel travel as one `source-work` query, so 15-second renewals never consume the cluster's one standby a Save needs; unit/real-stream tests pass, installed qualification pending.

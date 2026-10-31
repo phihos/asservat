@@ -35,26 +35,22 @@ func matchingSourceReply(w app.SourceWork, r contracts.SourceReply) bool {
 	return r.SourceID == w.Binding().SourceID && r.Fence == w.Binding().Fence && (w.StopSnapshot == nil && r.CaptureID == "" && r.SnapshotID == "" || w.StopSnapshot != nil && r.CaptureID == w.StopSnapshot.CaptureID && r.SnapshotID == w.StopSnapshot.Request.SnapshotID)
 }
 
-func serveRegionalSource(ctx context.Context, s Stream, r fleet.APIContextReceiver, signed []byte, local *SourceLocal, now func() time.Time) error {
+// applySourceWork is the region's answer to one source-work query: verify
+// against the current owner receiver, then queue the restrictive or arming
+// effect. An effect refusal is the closed "unavailable" state, not an error.
+func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, signed []byte, local *SourceLocal, now func() time.Time) (contracts.SourceReply, error) {
 	if local == nil || local.Verifier == nil || local.Queue == nil {
-		return fleet.ErrUnavailable
+		return contracts.SourceReply{}, targets.ErrUnsupported
 	}
 	auth, err := local.Verifier.VerifySourceWork(ctx, signed, r)
 	if err != nil || !auth.Valid(now()) {
-		return fleet.ErrDenied
+		return contracts.SourceReply{}, targets.ErrDenied
 	}
 	w := auth.Work
 	call, cancel := context.WithDeadline(ctx, auth.ValidUntil)
 	defer cancel()
-	ended := make(chan struct{})
-	stop := context.AfterFunc(s.Context(), func() { cancel(); close(ended) })
-	defer func() {
-		if !stop() {
-			<-ended
-		}
-	}()
 	if call.Err() != nil || !w.Valid(now()) {
-		return fleet.ErrUnavailable
+		return contracts.SourceReply{}, targets.ErrUnavailable
 	}
 	var effectErr error
 	if w.StopSnapshot != nil {
@@ -73,103 +69,38 @@ func serveRegionalSource(ctx context.Context, s Stream, r fleet.APIContextReceiv
 		state = "unavailable"
 	}
 	if call.Err() != nil || !auth.Valid(now()) {
-		return fleet.ErrUnavailable
+		return contracts.SourceReply{}, targets.ErrUnavailable
 	}
-	body, err := contracts.EncodeSourceReply(sourceReply(w, state))
+	return sourceReply(w, state), nil
+}
+
+// DeliverSource sends one signed source work as an ADR-179 query on an idle
+// standby, which keeps waiting for capture work afterwards. Source arms,
+// renewals and stops therefore never consume the cluster's one standby
+// (ADR-209) that Saves and other context starts attach to. sign receives the
+// selected standby's current receiver, since the work binds its channel.
+func (r *Router) DeliverSource(ctx context.Context, cluster string, sign func(fleet.APIContextReceiver) (app.SourceWork, []byte, error)) error {
+	if r == nil || sign == nil {
+		return fleet.ErrInvalid
+	}
+	var w app.SourceWork
+	var reply contracts.SourceReply
+	_, err := r.Query(ctx, cluster, querySourceWork, receiverBody(func(current fleet.APIContextReceiver) (any, error) {
+		var signed []byte
+		var e error
+		w, signed, e = sign(current)
+		return signed, e
+	}), &reply)
 	if err != nil {
 		return err
 	}
-	defer clear(body)
-	if err = s.Send(call, contracts.APIContextFrame{Kind: contracts.APIContextResultFrame, Payload: body}); err != nil {
-		return err
-	}
-	f, err := s.Receive(call)
-	defer clear(f.Payload)
-	if err != nil || f.Kind != contracts.APIContextReceiptFrame {
+	if !matchingSourceReply(w, reply) || reply.State != "queued" && reply.State != "unavailable" {
 		return contracts.ErrAPIContextProtocol
 	}
-	reply, err := contracts.DecodeSourceReply(f.Payload)
-	if err != nil || !matchingSourceReply(w, reply) || reply.State != "received" {
-		return contracts.ErrAPIContextProtocol
-	}
-	return nil
-}
-
-func serveHubSource(ctx context.Context, s Stream, w app.SourceWork, signed []byte, now func() time.Time) error {
-	if ctx == nil || s == nil || now == nil || ctx.Err() != nil || !w.Valid(now()) {
-		return fleet.ErrInvalid
-	}
-	call, cancel := context.WithDeadline(ctx, w.NotAfter)
-	defer cancel()
-	if err := s.Send(call, contracts.APIContextFrame{Kind: contracts.SourceWorkFrame, Payload: signed}); err != nil {
-		return err
-	}
-	f, err := s.Receive(call)
-	defer clear(f.Payload)
-	if err != nil || f.Kind != contracts.APIContextResultFrame {
-		return contracts.ErrAPIContextProtocol
-	}
-	r, err := contracts.DecodeSourceReply(f.Payload)
-	if err != nil || !matchingSourceReply(w, r) || (r.State != "queued" && r.State != "unavailable") {
-		return contracts.ErrAPIContextProtocol
-	}
-	if call.Err() != nil || !w.Valid(now()) {
-		return fleet.ErrUnavailable
-	}
-	body, err := contracts.EncodeSourceReply(sourceReply(w, "received"))
-	if err != nil {
-		return err
-	}
-	defer clear(body)
-	if err = s.Send(call, contracts.APIContextFrame{Kind: contracts.APIContextReceiptFrame, Payload: body}); err != nil {
-		return err
-	}
-	if r.State != "queued" {
+	if reply.State != "queued" {
 		return fleet.ErrUnavailable
 	}
 	return nil
-}
-
-// RunSource uses the existing owned finite attachment slot and joined cleanup;
-// it creates no capture/attempt or per-source encrypted intent/outcome objects.
-func (a *Attachment) RunSource(ctx context.Context, w app.SourceWork, signed []byte) error {
-	if a == nil || ctx == nil || ctx.Err() != nil || !w.Valid(time.Now()) || w.Channel != a.standby.channel || w.RouteID() != a.capture || len(signed) == 0 {
-		return fleet.ErrInvalid
-	}
-	a.mu.Lock()
-	if a.closed || a.dispatched || a.ctx.Err() != nil || a.standby.ctx.Err() != nil {
-		a.mu.Unlock()
-		return fleet.ErrUnavailable
-	}
-	a.router.mu.Lock()
-	if a.router.standby[a.standby.channel.ExchangeID] != a.standby || !a.standby.liveLocked() {
-		a.router.mu.Unlock()
-		a.mu.Unlock()
-		return fleet.ErrUnavailable
-	}
-	a.dispatched = true
-	a.work.Add(1)
-	defer a.work.Done()
-	call, cancel := context.WithDeadline(ctx, w.NotAfter)
-	defer cancel()
-	ended := make(chan struct{})
-	stop := context.AfterFunc(a.ctx, func() { cancel(); close(ended) })
-	defer func() {
-		if !stop() {
-			<-ended
-		}
-	}()
-	job := &captureJob{ctx: call, signed: append([]byte(nil), signed...), result: make(chan jobResult, 1)}
-	job.historyRun = func(run context.Context, s Stream) (string, error) {
-		err := serveHubSource(run, s, w, job.signed, time.Now)
-		recordStreamDiagnostic(run, s, err, streamHubOperations)
-		return "", err
-	}
-	a.standby.job <- job
-	a.router.mu.Unlock()
-	a.mu.Unlock()
-	result := <-job.result
-	return result.err
 }
 
 // SourceWorkEnd retains all original precommit/target/receiver bounds, while

@@ -172,7 +172,7 @@ func (f *contextStartTLSFixture) open(t *testing.T) (*ContextStartExchange, cont
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := contextstart.NewOutboundStream(e.Context(), e.Receiver().Channel, e.Check, f.connector, f.targets, response, writer, socket, e.Close)
+	stream, err := contextstart.NewOutboundStream(e.Context(), e.Receiver().Channel, e.Check, f.connector, f.targets, nil, response, writer, socket, e.Close)
 	if err != nil {
 		t.Fatal(err)
 	}

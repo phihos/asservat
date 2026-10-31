@@ -14,7 +14,6 @@ const SourceWorkFormat = "ordinary-packet-source-work/v1"
 // Finite capture limits remain unchanged.
 const SourceWorkBytes = 11 << 10
 const SourceSignedWorkBytes = 16 << 10
-const SourceWorkFrame APIContextFrameKind = 40
 
 type SourceWork struct {
 	Format       string            `json:"format"`

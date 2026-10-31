@@ -70,6 +70,8 @@ cluster. Regional facts arrive only as delegated proof.
    original five-second interval. No permission or recovery proof gains that
    interpretation. Queries are not
    operations: a region still executes no operation without verified work.
+   [ADR-270](270-source-work-standby-query.md) adds one exception: signed
+   source work is delivered as a query so it never consumes the standby.
    Each exchange answers at most eight queries (four until 2026-10-24; raised after an
    installed run exhausted one standby's budget within its 30 s life; the 2 MiB exchange cap
    bounds the per-query source frames to about 16).

@@ -52,6 +52,8 @@ type frameStream struct {
 	// querySeq is the last used query sequence on either side.
 	targets  QueryTargets
 	querySeq int
+	// work queues the region's source-work queries; nil refuses them.
+	sourceWork *SourceLocal
 }
 
 func newFrameStream(ctx context.Context, channel fleet.APIContextChannel, check ReceiverCheck, read io.Reader, write io.Writer, rd, wd func(time.Time) error, flush func() error, interrupt func()) (*frameStream, error) {
@@ -255,7 +257,7 @@ func (s *frameStream) Send(ctx context.Context, f contracts.APIContextFrame) err
 // pre-work query transition. Generic Send never changes completed deadlines.
 func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (time.Time, error) {
 	// ADR-178: the work check needs the region's fresh source first.
-	if s != nil && (f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame || f.Kind == contracts.SourceWorkFrame) {
+	if s != nil && (f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame) {
 		if e := s.pullSource(ctx); e != nil {
 			return time.Time{}, fleet.ErrUnavailable
 		}
@@ -267,7 +269,7 @@ func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (ti
 		}
 	}
 	mode := peerFrame
-	if f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame || f.Kind == contracts.SourceWorkFrame {
+	if f.Kind == contracts.APIContextWorkFrame || f.Kind == contracts.HistoryWorkFrame {
 		s.mu.Lock()
 		s.historyWork = f.Kind == contracts.HistoryWorkFrame
 		s.mu.Unlock()
@@ -505,7 +507,7 @@ func (s *frameStream) AwaitWork(ctx context.Context) (contracts.APIContextFrame,
 		}
 	}
 	reason := streamNoReason
-	if f.Kind != contracts.APIContextWorkFrame && f.Kind != contracts.HistoryWorkFrame && f.Kind != contracts.SourceWorkFrame {
+	if f.Kind != contracts.APIContextWorkFrame && f.Kind != contracts.HistoryWorkFrame {
 		reason = streamProtocol
 	} else if err := call.Err(); err != nil {
 		reason = streamErrorReason(err)

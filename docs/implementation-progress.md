@@ -35,7 +35,10 @@ at a later step; none has passed. Results, not claims:
   attach twice. Each source maintenance tick attaches to deliver the renewed
   permit, consuming the cluster's only standby every 15 s per source, so
   Saves (and other context starts) race the renewals. This also scales
-  against ADR-209 as source count grows. Awaiting maintainer direction.
+  against ADR-209 as source count grows.
+- Fix (ADR-270, maintainer-selected): source work travels as a `source-work`
+  standby query, so it never consumes the standby; ADR-209 unchanged. Unit
+  and real-stream router tests pass; installed rerun pending.
 
 Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit
 stop. Candidate remains unmerged; no collection is enabled for users.
