@@ -17,16 +17,20 @@ regional standby the start then waited for.
 
 1. Starts take priority on every path (single and group): advisory history
    runs after the start.
-2. History gets its own deadline: at most five seconds (`historyBudget`)
+2. History gets its own deadline: at most ten seconds (`historyBudget`)
    from when it begins, never beyond the original request window
    (`RecordingSaveRequestWindow`, the caller's identity validity and the
    caller's context). It is not limited by the start's narrowed bound.
-3. History remains advisory: its outcome never changes admission or the
+3. A failed standby attach for history is retried once while at least
+   four seconds remain (native run 41199782289: right after a start one
+   standby was reopening and the other busy, so the repeat Save found no
+   history).
+4. History remains advisory: its outcome never changes admission or the
    start's result, and Persist keeps every recovery, retention, SQL identity
    and accepted-deadline check.
 
 ## Consequences
 
 A slow start no longer starves history and slow history no longer starves
-the start. A request can take up to five seconds longer before replying,
+the start. A request can take up to ten seconds longer before replying,
 still inside its original window. Replay still never writes history.

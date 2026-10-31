@@ -42,8 +42,9 @@ type ContextSubmission struct {
 	Start   ContextAcceptedStart
 }
 
-// historyBudget bounds advisory history after a start (ADR-272).
-const historyBudget = 5 * time.Second
+// historyBudget bounds advisory history after a start (ADR-272): two
+// standby attach attempts and the exchange, inside the 15 s request window.
+const historyBudget = 10 * time.Second
 
 func (s ContextSubmission) Request(ctx context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
 	return s.submit(ctx, current, preview, key, false)

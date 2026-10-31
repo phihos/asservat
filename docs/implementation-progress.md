@@ -60,6 +60,10 @@ at a later step; none has passed. Results, not claims:
   `process@<0.5s`: the connector reused its cached process proof until
   expiry. A proof with under two seconds left is now produced again (no
   interval extended).
+- Run 41199782289: first Save qualified end to end (published, downloaded,
+  marker window passed). The repeat failed with ParametersUnavailable: the
+  first Save's history attach found no standby. History now retries its
+  attach once inside a ten-second own budget.
   Installed rerun pending.
 
 Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit

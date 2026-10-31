@@ -34,10 +34,12 @@ type regionalHistorySession struct {
 	report     func(string, string)
 }
 
-func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, captureID string) (fleetapp.HistorySession, error) {
-	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil {
-		return nil, fleet.ErrUnavailable
-	}
+// historyRetryLeft is the least time a retried attach needs for its own
+// wait and the history exchange that follows.
+const historyRetryLeft = 4 * time.Second
+
+// attach takes one standby within at most five seconds of ctx.
+func (d RegionalHistoryDispatch) attach(ctx context.Context, cluster, captureID string) (*contextstart.Attachment, context.Context, context.CancelFunc, time.Time, error) {
 	until := d.Now().Add(5 * time.Second)
 	if bound, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, bound)
@@ -48,9 +50,29 @@ func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, ca
 	reportHistoryDispatch(d.Report, call, "attach", began, until, e)
 	if e != nil {
 		cancel()
-		return nil, e
+		return nil, nil, nil, time.Time{}, e
 	}
-	began = time.Now()
+	return a, call, cancel, until, nil
+}
+
+func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, captureID string) (fleetapp.HistorySession, error) {
+	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil {
+		return nil, fleet.ErrUnavailable
+	}
+	// One retry: right after a start, one standby is reopening and the other
+	// may be querying, so the first attach's wait can end without one. The
+	// retry stays inside history's own budget (ADR-272) and needs enough
+	// time left for the exchange itself.
+	a, call, cancel, until, e := d.attach(ctx, cluster, captureID)
+	if e != nil {
+		if bound, ok := ctx.Deadline(); !ok || bound.Sub(d.Now()) < historyRetryLeft {
+			return nil, e
+		}
+		if a, call, cancel, until, e = d.attach(ctx, cluster, captureID); e != nil {
+			return nil, e
+		}
+	}
+	began := time.Now()
 	r, e := a.Receiver(call)
 	reportHistoryDispatch(d.Report, call, "receiver", began, until, e)
 	if e != nil {
