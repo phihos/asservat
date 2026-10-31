@@ -41,9 +41,9 @@ const historyRetryLeft = 4 * time.Second
 // historyRetryPause spaces history attach retries.
 const historyRetryPause = 250 * time.Millisecond
 
-// attach takes one standby within at most five seconds of ctx.
+// attach takes one idle standby for at most contextstart.TryAttachLimit.
 func (d RegionalHistoryDispatch) attach(ctx context.Context, cluster, captureID string) (*contextstart.Attachment, context.Context, context.CancelFunc, time.Time, error) {
-	until := d.Now().Add(5 * time.Second)
+	until := d.Now().Add(contextstart.TryAttachLimit)
 	if bound, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, bound)
 	}

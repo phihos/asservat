@@ -148,6 +148,12 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	if err != nil {
 		return err
 	}
+	// Reserve, seal and the attach consumed time: the claim's authority ends
+	// with the recovery observation it uses, so use a current one.
+	stage = "recovery-claim"
+	if recovery, err = s.currentRecovery(operation); err != nil {
+		return err
+	}
 	stage = "claim"
 	authority, err := s.Ledger.ClaimHistoryWrite(operation, value.HistoryWriteRequest{Storage: storage, Identity: i, Recovery: recovery, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch(), BundleDigest: bundleDigest})
 	if err != nil {
@@ -167,8 +173,21 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 			return artifact.ErrIntegrity
 		}
 	}
+	stage = "recovery-settle"
+	if recovery, err = s.currentRecovery(ctx); err != nil {
+		return err
+	}
 	stage = "settle"
 	return s.Ledger.CompleteHistoryWrite(ctx, value.HistoryWriteResult{Authority: authority, Copies: reply.Copies, Completion: *reply.WriterCompletion, Recovery: recovery})
+}
+
+// currentRecovery reads a current recovery observation with Persist's checks.
+func (s HistoryParameterService) currentRecovery(ctx context.Context) (artifact.RecoveryProof, error) {
+	recovery, err := s.Recovery.RecoveryState(ctx)
+	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
+		return recovery, value.ErrHistoryUnavailable
+	}
+	return recovery, nil
 }
 
 func (s HistoryParameterService) ListCaptureHistory(ctx context.Context, q value.HistoryQuery) (value.HistoryPage, error) {

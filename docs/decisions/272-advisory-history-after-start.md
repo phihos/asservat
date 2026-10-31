@@ -26,7 +26,12 @@ regional standby the start then waited for.
    run 41199782289), and the recording collect holds the capture's route and
    the cluster's capture slot for its short exchange (native run
    41211070820).
-4. History remains advisory: its outcome never changes admission or the
+4. History attaches without waiting inside the attach (`TryAttach`), and
+   its attachment may last up to ten seconds instead of five: the receiver
+   check, SQL claim and three-copy exchange exceeded five seconds on CI
+   (native run 41215337179). The claim and settlement use a recovery
+   observation read just before them.
+5. History remains advisory: its outcome never changes admission or the
    start's result, and Persist keeps every recovery, retention, SQL identity
    and accepted-deadline check.
 

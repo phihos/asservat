@@ -408,23 +408,29 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	return result.until, result.err
 }
 func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachment, error) {
-	return r.attach(ctx, cluster, capture, true)
+	return r.attach(ctx, cluster, capture, true, 5*time.Second)
 }
 
 // TryAttach is Attach without waiting for a standby: it fails at once when
 // none is idle, so the caller's whole bound remains for its exchange. A
-// caller with its own retry loop uses it (ADR-272 advisory history).
+// caller with its own retry loop uses it (ADR-272 advisory history); its
+// attachment may last up to TryAttachLimit.
 func (r *Router) TryAttach(ctx context.Context, cluster, capture string) (*Attachment, error) {
-	return r.attach(ctx, cluster, capture, false)
+	return r.attach(ctx, cluster, capture, false, TryAttachLimit)
 }
 
-func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool) (*Attachment, error) {
+// TryAttachLimit bounds a TryAttach attachment: a history write's receiver
+// check, SQL claim and three-copy exchange exceeded five seconds on CI
+// (native run 41215337179).
+const TryAttachLimit = 10 * time.Second
+
+func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool, limit time.Duration) (*Attachment, error) {
 	if r == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(cluster) || !authorization.UUID(capture) {
 		return nil, fleet.ErrInvalid
 	}
 	// Even a miscomposed caller cannot hold a live capture slot indefinitely.
 	deadline, ok := ctx.Deadline()
-	if !ok || !time.Now().Before(deadline) || deadline.After(time.Now().Add(5*time.Second)) {
+	if !ok || !time.Now().Before(deadline) || deadline.After(time.Now().Add(limit)) {
 		return nil, fleet.ErrInvalid
 	}
 	// A completed history exchange consumes its standby. Its next empty
