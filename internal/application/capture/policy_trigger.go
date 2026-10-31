@@ -95,19 +95,19 @@ func (t PolicyTrigger) Run(ctx context.Context) error {
 	}
 	r := &triggerRunner{busy: map[string]bool{}}
 	defer r.wg.Wait()
-	// A failed policy tick is retried once after triggerRetryInterval instead
-	// of a full poll: an ongoing source's 30 s leaf (spec maximum) survives
+	// A failed policy tick is retried after triggerRetryInterval instead of a
+	// full poll, at most triggerRetries times in a row: an ongoing source's 30 s leaf (spec maximum) survives
 	// only one missed 15 s renewal (native runs to 41218189975 closed sources
 	// after two transient misses). A persistent failure returns to the
-	// normal interval after that one retry.
-	retried := false
+	// normal interval after those retries.
+	retries := 0
 	for {
 		started := time.Now()
 		wait := value.TriggerPollInterval
-		if failed := t.cycle(ctx, r); failed && !retried {
-			wait, retried = triggerRetryInterval, true
-		} else {
-			retried = false
+		if failed := t.cycle(ctx, r); failed && retries < triggerRetries {
+			wait, retries = triggerRetryInterval, retries+1
+		} else if !failed {
+			retries = 0
 		}
 		// Measured from the cycle's start, like the former ticker.
 		timer := time.NewTimer(max(0, wait-time.Since(started)))
@@ -120,8 +120,14 @@ func (t PolicyTrigger) Run(ctx context.Context) error {
 	}
 }
 
-// triggerRetryInterval is the early next cycle after a failed policy tick.
-const triggerRetryInterval = 5 * time.Second
+// triggerRetryInterval is the early next cycle after a failed policy tick;
+// triggerRetries consecutive early cycles keep the next attempts (T+15, +20,
+// +25) inside a 30 s leaf (native run 41226338957 closed a source after one
+// early retry also failed).
+const (
+	triggerRetryInterval = 5 * time.Second
+	triggerRetries       = 2
+)
 
 // triggerRunner bounds capture goroutines to one per policy and joins them.
 type triggerRunner struct {
