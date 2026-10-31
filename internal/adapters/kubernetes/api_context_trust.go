@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"slices"
 	"sync"
 	"time"
@@ -132,12 +133,25 @@ func (s *APIContextWorkTrustSource) APIContextWorkTrust(ctx context.Context) (fl
 		out.Trust.Keys = slices.Clone(c.Trust.Keys)
 		return out, nil
 	}
+	previous := s.cached
 	s.cached = nil
 	out, err := s.readTrust(ctx)
 	if err == nil {
 		c := out
 		c.Trust.Keys = slices.Clone(out.Trust.Keys)
 		s.cached = &c
+		return out, nil
+	}
+	// A failed refresh does not void an observation still inside its own
+	// original interval: one transient guard read otherwise denied every
+	// work verification until the next success (native run 41246065147
+	// refused a Save's collect work at "trust"). Nothing is extended.
+	// A known change never falls back to the earlier observation.
+	if previous != nil && !errors.Is(err, cfg.ErrChanged) && previous.Valid(s.client.now()) && ctx.Err() == nil {
+		s.cached = previous
+		kept := *previous
+		kept.Trust.Keys = slices.Clone(previous.Trust.Keys)
+		return kept, nil
 	}
 	return out, err
 }
