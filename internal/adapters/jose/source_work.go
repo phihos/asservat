@@ -1,6 +1,7 @@
 package jose
 
 import (
+	"errors"
 	"time"
 
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
@@ -232,6 +233,10 @@ func (s *APIContextWorkSignatures) VerifySourceWork(ctx context.Context, encoded
 		reason := "changed"
 		if e != nil {
 			reason = "trust"
+			var fixed interface{ FixedStep() string }
+			if errors.As(e, &fixed) {
+				reason += "/" + fixed.FixedStep()
+			}
 		} else if bounded.Err() != nil || !s.now().Before(until) {
 			reason = "expired"
 		}

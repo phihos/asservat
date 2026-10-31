@@ -33,7 +33,17 @@ type RegionalLifecycle struct {
 	mu      sync.Mutex
 	issued  []regionalLeaf // the latest leaves and the process request they belong to
 	current *value.ConnectorProcessRequest
+
+	// recoveryMu serializes recovery fetches so concurrent readers share one
+	// hub round trip; recovery is the last observation, reused only while
+	// recoveryReuseMargin of its own original validity remains.
+	recoveryMu sync.Mutex
+	recovery   *value.RecoveryState
 }
+
+// recoveryReuseMargin is the least remaining validity a cached recovery
+// observation needs to be reused instead of fetched again.
+const recoveryReuseMargin = 2 * time.Second
 
 type regionalLeaf struct {
 	certificate value.ConnectorCredentialCertificate
@@ -229,16 +239,28 @@ var _ fleetapp.RecoveryReader = (*RegionalLifecycle)(nil)
 // RecoveryState asks the hub for its current recovery state, presented by this
 // region's admitted process. It only feeds verify-only work trust; it can
 // never clear or change recovery.
+//
+// Work verification reads it four times per source work; each read was its
+// own hub conversation (native run 41206952018 refused source work at the
+// second trust read). Reuse keeps the observation's original interval.
 func (r *RegionalLifecycle) RecoveryState(ctx context.Context) (value.RecoveryState, error) {
 	request, ok := r.admitted()
-	if !ok {
+	if !ok || ctx == nil {
 		return value.RecoveryState{}, value.ErrUnavailable
 	}
+	r.recoveryMu.Lock()
+	defer r.recoveryMu.Unlock()
+	if c := r.recovery; c != nil && c.Valid(r.Now().Add(recoveryReuseMargin)) && c.InstallationID == request.Process.Binding.InstallationID && ctx.Err() == nil {
+		return *c, nil
+	}
+	r.recovery = nil
 	frame, err := r.run(ctx, connectorlifecycle.PurposeRecovery, value.ClusterRenewal, uuid.NewString(), request, nil)
 	if err != nil || frame.Recovery == nil || !frame.Recovery.Valid(r.Now()) || frame.Recovery.InstallationID != request.Process.Binding.InstallationID {
 		return value.RecoveryState{}, unavailable(err)
 	}
-	return *frame.Recovery, nil
+	cached := *frame.Recovery
+	r.recovery = &cached
+	return cached, nil
 }
 
 // AuthenticateOwner authenticates the owner of an actual TLS session: the hub
