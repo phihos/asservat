@@ -64,6 +64,14 @@ at a later step; none has passed. Results, not claims:
   marker window passed). The repeat failed with ParametersUnavailable: the
   first Save's history attach found no standby. History now retries its
   attach once inside a ten-second own budget.
+- Measurement (runs 41202933942 to 41208314967): Kubernetes round trips are
+  fast and the ADR-208 limiter does not throttle. The cost is work-trust
+  reads: two guarded trust reads per work/source verification, the first
+  work operation took up to 2 s and source work was refused at the second
+  read, closing the source. Trust (and the region's delegated recovery)
+  observations are now reused while two seconds of their original five
+  remain; a trust change can take up to about three seconds longer to be
+  seen, still within each observation's own interval.
   Installed rerun pending.
 
 Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit

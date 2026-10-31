@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"slices"
+	"sync"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -42,7 +43,20 @@ type APIContextWorkTrustSource struct {
 	name, uid  string
 	installed  contracts.APIContextWorkTrustSettings
 	canonical  []byte
+
+	// mu serializes reads so concurrent verifiers share one; cached is the
+	// last observation, reused only while trustReuseMargin of its own
+	// original interval remains.
+	mu     sync.Mutex
+	cached *fleet.APIContextWorkTrust
 }
+
+// trustReuseMargin is the least remaining validity a cached trust
+// observation needs to be reused. Each verification reads trust twice; each
+// read is a guarded ConfigMap observation with its own proofs (native run
+// 41208314967: the first work operation spent up to two seconds there and
+// source work was refused at its second read).
+const trustReuseMargin = 2 * time.Second
 
 var _ app.APIContextWorkTrustReader = (*APIContextWorkTrustSource)(nil)
 
@@ -90,7 +104,7 @@ func NewAPIContextWorkTrustSource(c *PermissionClient, p *APIContextWorkTrustPro
 		return nil, e
 	}
 	installed.Keys = slices.Clone(installed.Keys)
-	return &APIContextWorkTrustSource{c, p, recovery, name, uid, installed, canonical}, nil
+	return &APIContextWorkTrustSource{client: c, protection: p, recovery: recovery, name: name, uid: uid, installed: installed, canonical: canonical}, nil
 }
 func (s *APIContextWorkTrustSource) snapshot(ctx context.Context) error {
 	data, ref, e := s.client.installationConfigMode(ctx, s.name, s.uid, true)
@@ -108,10 +122,28 @@ func (s *APIContextWorkTrustSource) snapshot(ctx context.Context) error {
 	return nil
 }
 func (s *APIContextWorkTrustSource) APIContextWorkTrust(ctx context.Context) (fleet.APIContextWorkTrust, error) {
-	var zero fleet.APIContextWorkTrust
 	if s == nil || ctx == nil || ctx.Err() != nil {
-		return zero, cfg.ErrInvalid
+		return fleet.APIContextWorkTrust{}, cfg.ErrInvalid
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if c := s.cached; c != nil && c.Valid(s.client.now().Add(trustReuseMargin)) {
+		out := *c
+		out.Trust.Keys = slices.Clone(c.Trust.Keys)
+		return out, nil
+	}
+	s.cached = nil
+	out, err := s.readTrust(ctx)
+	if err == nil {
+		c := out
+		c.Trust.Keys = slices.Clone(out.Trust.Keys)
+		s.cached = &c
+	}
+	return out, err
+}
+
+func (s *APIContextWorkTrustSource) readTrust(ctx context.Context) (fleet.APIContextWorkTrust, error) {
+	var zero fleet.APIContextWorkTrust
 	start := s.client.now()
 	until := start.Add(5 * time.Second)
 	if d, ok := ctx.Deadline(); ok {
