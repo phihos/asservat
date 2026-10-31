@@ -677,7 +677,15 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 		clear(b)
 		return OperationReply{}, value.ErrUnavailable
 	}
-	return OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), auditNoDispatch: auditNoDispatch, browserSettings: browserSettings}, nil
+	reply := OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), auditNoDispatch: auditNoDispatch, browserSettings: browserSettings}
+	if operationErr != nil {
+		// Content-free timing label: the service's fixed step, if any.
+		var step interface{ FixedStep() string }
+		if errors.As(operationErr, &step) {
+			reply.failureStep = step.FixedStep()
+		}
+	}
+	return reply, nil
 }
 
 func settingsSizeFailure(origin, captureID string) any {

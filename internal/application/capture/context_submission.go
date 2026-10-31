@@ -153,7 +153,8 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		}
 		a, err = s.ContextInvestigation.requestWithGroupBounds(call, current, preview, key, &bounds)
 		if err != nil {
-			return a, err
+			// Fixed label for the content-free timing report; classes kept.
+			return a, staged("request-admit", err)
 		}
 	}
 	// Retain one advisory attempt on early failure. Starts take priority:

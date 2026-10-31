@@ -34,10 +34,14 @@ func (e sourceStage) Unwrap() error { return e.err }
 
 // FixedStep names this bounded step in the transport's refusal report.
 func (e sourceStage) FixedStep() string {
-	// Preview failure stages are this package's own fixed labels.
+	// Nested steps are fixed labels from this package or its adapters.
 	var preview *contextPreviewFailure
 	if errors.As(e.err, &preview) {
 		return e.stage + "/" + preview.stage
+	}
+	var fixed interface{ FixedStep() string }
+	if errors.As(e.err, &fixed) {
+		return e.stage + "/" + fixed.FixedStep()
 	}
 	return e.stage
 }
