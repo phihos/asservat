@@ -72,6 +72,13 @@ at a later step; none has passed. Results, not claims:
   observations are now reused while two seconds of their original five
   remain; a trust change can take up to about three seconds longer to be
   seen, still within each observation's own interval.
+- Load attribution (runs 41222803098, 41224874137): the region made about
+  13,700 opening-client Kubernetes requests per run, dominated by
+  admission-guard checks (namespace, policy, binding reads). About 870 came
+  from the connector source observation the hub pulls before every query and
+  work check. That observation is now reused while two seconds of its
+  original five remain. A per-read connector proof recheck change was tried
+  and reverted: its tests pin per-read current checks.
   Installed rerun pending.
 
 Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit

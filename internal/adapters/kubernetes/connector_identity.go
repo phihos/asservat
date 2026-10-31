@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"sync"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
@@ -38,7 +39,20 @@ type ConnectorIdentitySource struct {
 	protection                    *ConnectorIdentityProtection
 	name, uid, installation, root string
 	binding                       value.PeerBinding
+
+	// mu serializes reads so concurrent pulls share one; cached is the last
+	// observation, reused only while sourceReuseMargin of its own original
+	// interval remains.
+	mu     sync.Mutex
+	cached *app.ConnectorIdentityConfiguration
 }
+
+// sourceReuseMargin is the least remaining freshness a cached observation
+// needs to be reused. The hub pulls this source before every query and work
+// check; each read took two admission-guard checks and two configuration
+// snapshots (native run 41224874137: about 870 of the region's guard
+// checks).
+const sourceReuseMargin = 2 * time.Second
 
 var _ app.ConnectorIdentitySourceReader = (*ConnectorIdentitySource)(nil)
 var _ app.ConnectorIdentityConfigurationReader = (*ConnectorIdentitySource)(nil)
@@ -135,10 +149,28 @@ func (s *ConnectorIdentitySource) ReadConnectorIdentitySource(ctx context.Contex
 	return c.Source, e
 }
 func (s *ConnectorIdentitySource) ReadConnectorIdentityConfiguration(ctx context.Context) (app.ConnectorIdentityConfiguration, error) {
-	var out app.ConnectorIdentityConfiguration
 	if s == nil || ctx == nil {
-		return out, value.ErrInvalid
+		return app.ConnectorIdentityConfiguration{}, value.ErrInvalid
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if c := s.cached; c != nil && c.Valid(s.client.now().Add(sourceReuseMargin)) && ctx.Err() == nil {
+		out := *c
+		out.Backing = c.Backing.Clone()
+		return out, nil
+	}
+	s.cached = nil
+	out, err := s.readConfiguration(ctx)
+	if err == nil {
+		c := out
+		c.Backing = out.Backing.Clone()
+		s.cached = &c
+	}
+	return out, err
+}
+
+func (s *ConnectorIdentitySource) readConfiguration(ctx context.Context) (app.ConnectorIdentityConfiguration, error) {
+	var out app.ConnectorIdentityConfiguration
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	start := s.client.now()
