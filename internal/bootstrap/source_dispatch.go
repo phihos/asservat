@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	captureapp "asservat.local/asservat/internal/application/capture"
@@ -79,26 +78,16 @@ func (d RegionalSourceDispatch) DispatchSource(ctx context.Context, target targe
 		return w
 	}
 	err = d.deliver(call, target.Request.ClusterID, &step, work)
-	// A leaf survives one missed 15 s renewal only. Retry once, inside the
-	// same permit's dispatch window, when the first attempt certainly queued
-	// nothing (native runs to 41213885706 closed sources after two misses).
-	if err != nil && sourceUndelivered(err) && call.Err() == nil {
+	// A 30 s leaf (spec maximum) renewed every 15 s survives one missed tick
+	// at most; native runs to 41216871303 closed sources after two transient
+	// misses. Retry once inside the same permit's dispatch window. Delivering
+	// the identical permit twice is harmless: SourceMeter.Renew accepts an
+	// equal issuance as a no-op, so an uncertain first delivery may repeat.
+	if err != nil && call.Err() == nil {
 		step = "query"
 		err = d.deliver(call, target.Request.ClusterID, &step, work)
 	}
 	return err
-}
-
-// sourceUndelivered reports a failure before the region could queue the
-// work: no standby, a failure before send, or the region's own refusal.
-// Anything after send is uncertain and is never repeated.
-func sourceUndelivered(err error) bool {
-	var fixed interface{ FixedStep() string }
-	if !errors.As(err, &fixed) {
-		return false
-	}
-	step := fixed.FixedStep()
-	return step == "router" || strings.HasPrefix(step, "answer/") || strings.HasPrefix(step, "send-")
 }
 
 func (d RegionalSourceDispatch) StopSource(ctx context.Context, cluster string, binding collector.SourceBinding) error {
