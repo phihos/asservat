@@ -56,6 +56,10 @@ at a later step; none has passed. Results, not claims:
   leaving the start under one second (ADR-212 headroom, AcquisitionClosed).
   History now runs after the start with its own budget inside the original
   window. Unit tests pass; installed rerun pending.
+- Run 41197238161: the start now attaches first but ADR-212 refused it at
+  `process@<0.5s`: the connector reused its cached process proof until
+  expiry. A proof with under two seconds left is now produced again (no
+  interval extended).
   Installed rerun pending.
 
 Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit

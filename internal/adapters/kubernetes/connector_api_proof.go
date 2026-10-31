@@ -69,6 +69,10 @@ func (s *connectorAPIProofState) finish(ctx context.Context, now func() time.Tim
 	return p, nil
 }
 
+// proofReuseMargin is the least remaining validity a cached proof needs to
+// be reused rather than produced again.
+const proofReuseMargin = 2 * time.Second
+
 // The initiating caller owns producer/recheck execution synchronously. Waiters
 // may cancel independently, but can neither detach a producer nor prolong its
 // original interval. No goroutine, timer or refresh survives this call.
@@ -89,7 +93,10 @@ func (s *connectorAPIProofState) read(ctx context.Context, now func() time.Time,
 	f := &connectorAPIProofFlight{done: make(chan struct{}), generation: s.generation}
 	s.flight = f
 	old := s.cached
-	if old != nil && !old.valid(now()) {
+	// A proof near its end would pass reuse yet fail the caller's ADR-212
+	// one-second headroom (installed native 41197238161: process@<0.5s).
+	// Produce a fresh one instead; no interval is extended.
+	if old != nil && !old.valid(now().Add(proofReuseMargin)) {
 		s.cached = nil
 		old = nil
 	}
