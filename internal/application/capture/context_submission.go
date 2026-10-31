@@ -42,6 +42,9 @@ type ContextSubmission struct {
 	Start   ContextAcceptedStart
 }
 
+// historyBudget bounds advisory history after a start (ADR-272).
+const historyBudget = 5 * time.Second
+
 func (s ContextSubmission) Request(ctx context.Context, current identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
 	return s.submit(ctx, current, preview, key, false)
 }
@@ -74,6 +77,8 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		until = identity.Earlier(until, d)
 	}
 	call, stop := context.WithDeadline(ctx, until)
+	// The original request window, before any narrowing for the start.
+	requestUntil := until
 	stops := []context.CancelFunc{stop}
 	defer func() {
 		for j := len(stops) - 1; j >= 0; j-- {
@@ -145,8 +150,10 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 			return a, err
 		}
 	}
-	// Retain one advisory attempt on early failure. Group starts take priority;
-	// advisory history uses only the remaining original request interval.
+	// Retain one advisory attempt on early failure. Starts take priority:
+	// advisory history runs after them with its own budget of at most
+	// historyBudget inside the original request window, so neither starves
+	// the other (ADR-272). Persist keeps every authority check.
 	// Replay never writes history and no history outcome changes admission.
 	historyAttempted := false
 	persistHistory := func() {
@@ -160,7 +167,9 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		began := time.Now()
 		e := value.ErrHistoryUnavailable
 		if s.History != nil {
-			e = s.History.Persist(call, a, i, *a.HistoryParameters, a.HistorySource)
+			own, end := context.WithDeadline(ctx, identity.Earlier(requestUntil, s.Now().Add(historyBudget)))
+			e = s.History.Persist(own, a, i, *a.HistoryParameters, a.HistorySource)
+			end()
 		}
 		auditapp.MarkStep(call, "s-history", began)
 		a.HistoryUnavailable, a.HistoryRecorded = e != nil, e == nil
@@ -222,12 +231,6 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		}
 		return a, value.ErrUnavailable
 	}
-	if err = check(); err != nil {
-		return a, err
-	}
-	persistHistory()
-	// History can block, so consume current identity again before dispatch;
-	// neither its completion nor a fresh identity extends the original bound.
 	if err = check(); err != nil {
 		return a, err
 	}

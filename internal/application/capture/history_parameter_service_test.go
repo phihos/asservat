@@ -269,6 +269,8 @@ type submissionHistoryBudget struct {
 	consume      bool
 }
 
+// ADR-272: history runs after the start with its own deadline, never beyond
+// the original request window.
 func (h *submissionHistoryBudget) Persist(ctx context.Context, a value.Accepted, _ identity.Identity, p value.HistoryParameters, _ *value.HistoryLineage) error {
 	h.calls++
 	until, ok := ctx.Deadline()
@@ -278,7 +280,7 @@ func (h *submissionHistoryBudget) Persist(ctx context.Context, a value.Accepted,
 	if ctx.Err() != nil || !h.f.now.Before(until) {
 		return value.ErrHistoryUnavailable
 	}
-	if h.started.starts != 0 || h.started.intentReads != 1 {
+	if h.started.starts != 1 || h.started.intentReads != 1 {
 		return value.ErrInvalid
 	}
 	if h.consume {
@@ -288,33 +290,41 @@ func (h *submissionHistoryBudget) Persist(ctx context.Context, a value.Accepted,
 	h.saved++
 	return nil
 }
-func TestSubmissionHistoryRetainsOriginalBudgetBeforeElapsedStart(t *testing.T) {
+
+// A slow, failed start no longer starves history: history runs after it with
+// its own budget, still bounded by the caller's identity (here five seconds)
+// and the original request window.
+func TestSubmissionHistoryHasOwnBudgetAfterSlowStart(t *testing.T) {
 	f, start, svc, p := submissionTest(t)
 	start.current = f.source(t, t.Context())
-	until := f.now.Add(5 * time.Second)
-	ctx, cancel := context.WithDeadline(t.Context(), until)
+	window := f.now.Add(identity.RecordingSaveRequestWindow)
+	ctx, cancel := context.WithDeadline(t.Context(), window)
 	defer cancel()
-	history := &submissionHistoryBudget{f: f, started: start, until: until}
+	identityUntil := f.now.Add(5 * time.Second)
+	elapsed := f.now.Add(3 * time.Second)
+	history := &submissionHistoryBudget{f: f, started: start, until: identityUntil}
 	svc.History = history
-	start.startHook = func() { f.now = until.Add(time.Microsecond) }
+	start.startHook = func() { f.now = elapsed }
 	start.startErr = context.DeadlineExceeded
-	got, err := svc.Request(ctx, start.current, p.ID, "history-before-elapsed-start")
+	got, err := svc.Request(ctx, start.current, p.ID, "history-after-slow-start")
 	if !errors.Is(err, context.DeadlineExceeded) || got.CaptureID == "" || start.starts != 1 || f.admissions.Load() != 1 || history.calls != 1 || history.saved != 1 || !got.HistoryRecorded || got.HistoryUnavailable || got.HistoryParameters != nil {
-		t.Fatalf("accepted start starved advisory history: err=%v starts=%d attempts=%d saved=%d recorded=%t unavailable=%t", err, start.starts, history.calls, history.saved, got.HistoryRecorded, got.HistoryUnavailable)
+		t.Fatalf("start starved advisory history: err=%v starts=%d attempts=%d saved=%d recorded=%t unavailable=%t", err, start.starts, history.calls, history.saved, got.HistoryRecorded, got.HistoryUnavailable)
 	}
 }
 
-func TestSubmissionSlowHistoryCannotExtendBudgetOrDispatchExpiredStart(t *testing.T) {
+// History is capped by the original request window and stays advisory: a
+// slow history neither delays the start nor turns it into a failure.
+func TestSubmissionSlowHistoryAfterStartStaysAdvisory(t *testing.T) {
 	f, start, svc, p := submissionTest(t)
 	start.current = f.source(t, t.Context())
-	until := f.now.Add(5 * time.Second)
-	ctx, cancel := context.WithDeadline(t.Context(), until)
+	window := f.now.Add(3 * time.Second)
+	ctx, cancel := context.WithDeadline(t.Context(), window)
 	defer cancel()
-	history := &submissionHistoryBudget{f: f, started: start, until: until, consume: true}
+	history := &submissionHistoryBudget{f: f, started: start, until: window, consume: true}
 	svc.History = history
 	got, err := svc.Request(ctx, start.current, p.ID, "history-exhausted-budget")
-	if err == nil || got.CaptureID == "" || start.starts != 0 || f.admissions.Load() != 1 || history.calls != 1 || history.saved != 0 || got.HistoryRecorded || !got.HistoryUnavailable || got.HistoryParameters != nil {
-		t.Fatalf("slow history renewed deadline or hid dispatch refusal: err=%v starts=%d calls=%d saved=%d recorded=%t unavailable=%t", err, start.starts, history.calls, history.saved, got.HistoryRecorded, got.HistoryUnavailable)
+	if err != nil || got.CaptureID == "" || start.starts != 1 || f.admissions.Load() != 1 || history.calls != 1 || history.saved != 0 || got.HistoryRecorded || !got.HistoryUnavailable || got.HistoryParameters != nil {
+		t.Fatalf("slow history extended the window or failed the start: err=%v starts=%d calls=%d saved=%d recorded=%t unavailable=%t", err, start.starts, history.calls, history.saved, got.HistoryRecorded, got.HistoryUnavailable)
 	}
 }
 

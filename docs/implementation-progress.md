@@ -52,6 +52,10 @@ at a later step; none has passed. Results, not claims:
   collection racing reopenings (runs to 41190979663). The maintainer
   reopened ADR-209 as ADR-271: two staggered standbys per cluster. Unit
   tests pass; installed rerun pending.
+- ADR-272 (maintainer-selected): run 41195635505 showed slow history
+  leaving the start under one second (ADR-212 headroom, AcquisitionClosed).
+  History now runs after the start with its own budget inside the original
+  window. Unit tests pass; installed rerun pending.
   Installed rerun pending.
 
 Not qualified: native PCAPNG marker window, repeat, natural expiry, explicit
