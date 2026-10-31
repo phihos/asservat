@@ -290,7 +290,22 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	save := func(args map[string]any, key string) (string, time.Time) {
 		t.Helper()
 		var p preview
-		must("preview_recording_save", args, &p)
+		// A retryable refusal (ParametersUnavailable, NotAvailable) is retried
+		// as a client would: a transient history read failed one repeat
+		// preview in native run 41244512181.
+		for attempt := 0; ; attempt++ {
+			reply, code, err := invoke(ctx, "preview_recording_save", args)
+			if err == nil && reply.Status == "ok" && code == "" {
+				if json.Unmarshal(reply.Data, &p) != nil {
+					t.Fatal("ongoing save public data", "preview_recording_save")
+				}
+				break
+			}
+			if attempt == 2 || err != nil || code != "ParametersUnavailable" && code != "NotAvailable" || installedJourneyPause(ctx, time.Second) != nil {
+				diagnose()
+				t.Fatal("ongoing save public operation", "preview_recording_save", code, err)
+			}
+		}
 		// Existing journey contract: resolve/continue the original preview and
 		// key on OutcomeUnknown or AcquisitionNotStarted, never a new request.
 		call := func(name string, arguments any, data any) (string, string) {
