@@ -38,6 +38,9 @@ type regionalHistorySession struct {
 // wait and the history exchange that follows.
 const historyRetryLeft = 4 * time.Second
 
+// historyRetryPause spaces history attach retries.
+const historyRetryPause = 250 * time.Millisecond
+
 // attach takes one standby within at most five seconds of ctx.
 func (d RegionalHistoryDispatch) attach(ctx context.Context, cluster, captureID string) (*contextstart.Attachment, context.Context, context.CancelFunc, time.Time, error) {
 	until := d.Now().Add(5 * time.Second)
@@ -59,18 +62,24 @@ func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, ca
 	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil {
 		return nil, fleet.ErrUnavailable
 	}
-	// One retry: right after a start, one standby is reopening and the other
-	// may be querying, so the first attach's wait can end without one. The
-	// retry stays inside history's own budget (ADR-272) and needs enough
-	// time left for the exchange itself.
+	// Retry while history's own budget (ADR-272) still leaves time for the
+	// exchange: right after a start a standby may be reopening, and the
+	// recording collect holds this capture's route and the cluster's capture
+	// slot for its short exchange (native run 41211070820), refused at once.
 	a, call, cancel, until, e := d.attach(ctx, cluster, captureID)
-	if e != nil {
-		if bound, ok := ctx.Deadline(); !ok || bound.Sub(d.Now()) < historyRetryLeft {
+	for e != nil {
+		bound, ok := ctx.Deadline()
+		if !ok || bound.Sub(d.Now()) < historyRetryLeft {
 			return nil, e
 		}
-		if a, call, cancel, until, e = d.attach(ctx, cluster, captureID); e != nil {
+		pause := time.NewTimer(historyRetryPause)
+		select {
+		case <-ctx.Done():
+			pause.Stop()
 			return nil, e
+		case <-pause.C:
 		}
+		a, call, cancel, until, e = d.attach(ctx, cluster, captureID)
 	}
 	began := time.Now()
 	r, e := a.Receiver(call)
