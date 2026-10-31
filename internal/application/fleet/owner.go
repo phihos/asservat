@@ -36,7 +36,11 @@ type OwnerRoutes struct {
 // be reused. Every context-start receiver check authenticated its owner with
 // about eleven Kubernetes route reads; on CI that check took up to a second
 // of a Save's five-second start bound (native run 41229262576).
-const routeReuseMargin = 2 * time.Second
+//
+// A receiver's validity ends with its route, and a history exchange needs
+// about two seconds of it (native run 41234176458 expired at a two-second
+// margin), so reuse needs three.
+const routeReuseMargin = 3 * time.Second
 
 func (s *OwnerRoutes) CurrentOwnerRoute(ctx context.Context, b value.OwnerBinding) (value.OwnerRoute, error) {
 	if s == nil || ctx == nil || s.Configurations == nil || s.Endpoints == nil || s.Now == nil || !b.Valid() {
