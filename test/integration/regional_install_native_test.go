@@ -426,15 +426,18 @@ func regionalLogs(t *testing.T, ctx context.Context, api kubernetes.Interface) {
 		for _, s := range p.Status.ContainerStatuses {
 			t.Logf("connector pod %s ready=%v restarts=%d waiting=%v", p.Name, s.Ready, s.RestartCount, s.State.Waiting != nil)
 		}
-		stream, err := api.CoreV1().Pods("asservat-connector").GetLogs(p.Name, &core.PodLogOptions{LimitBytes: ptr.To(int64(8 << 10))}).Stream(ctx)
-		if err != nil {
-			continue
-		}
-		b, _ := io.ReadAll(io.LimitReader(stream, 8<<10))
-		stream.Close()
-		for _, line := range strings.Split(string(b), "\n") {
-			if strings.HasPrefix(line, "connector") || strings.HasPrefix(line, "regional") {
-				t.Log("regional:", line)
+		// The head holds startup; the tail holds the events at the failure.
+		for _, o := range []core.PodLogOptions{{LimitBytes: ptr.To(int64(8 << 10))}, {TailLines: ptr.To(int64(300)), LimitBytes: ptr.To(int64(64 << 10))}} {
+			stream, err := api.CoreV1().Pods("asservat-connector").GetLogs(p.Name, &o).Stream(ctx)
+			if err != nil {
+				continue
+			}
+			b, _ := io.ReadAll(io.LimitReader(stream, 64<<10))
+			stream.Close()
+			for _, line := range strings.Split(string(b), "\n") {
+				if strings.HasPrefix(line, "connector") || strings.HasPrefix(line, "regional") {
+					t.Log("regional:", line)
+				}
 			}
 		}
 	}
