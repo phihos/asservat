@@ -6,6 +6,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -32,6 +33,7 @@ func (t reportedTargets) ResolveSourceSnapshot(ctx context.Context, original tar
 	}
 	view, ok := registry.NodeByUID(original.NodeUID)
 	if !ok || !view.Current || view.Report == nil || view.Identity.NodeUID != original.NodeUID || view.Identity.BootID != original.BootID || view.Identity.PodUID != original.CollectorPodUID || view.Identity.Epoch != original.CollectorEpoch {
+		t.refused("node")
 		return out, targets.ErrUnavailable
 	}
 	report := view.Report
@@ -43,9 +45,18 @@ func (t reportedTargets) ResolveSourceSnapshot(ctx context.Context, original tar
 		}
 		out = targets.SourceSnapshotResolution{Original: original, Process: targets.PacketSourceObservation{PodUID: original.Request.PodUID, NodeUID: original.NodeUID, BootID: original.BootID, CollectorPodUID: original.CollectorPodUID, CollectorEpoch: original.CollectorEpoch, ObservedAt: now, FreshUntil: until}, State: targets.RecorderSourceState{SourceID: state.SourceID, Fence: state.Fence, IssuedAt: state.IssuedAt, LeafUntil: state.LeafUntil, Credit: state.Credit, ObservedBytes: state.ObservedBytes, Closed: state.Closed, Stopped: state.Stopped, InputUnknown: state.InputUnknown, SourceStoppedAt: state.SourceStoppedAt, SnapshotUntil: state.SnapshotUntil, ObservedAt: report.ObservedAt, FreshUntil: reportUntil}, ReportedAt: report.ObservedAt, ReportFreshUntil: reportUntil, ObservedAt: now, FreshUntil: until}
 		if ctx.Err() != nil || !out.Valid(t.recordings.now()) {
+			t.refused("invalid")
 			return targets.SourceSnapshotResolution{}, targets.ErrUnavailable
 		}
 		return out, nil
 	}
+	t.refused(fmt.Sprintf("missing sources=%d", len(report.Sources)))
 	return out, targets.ErrUnavailable
+}
+
+// refused logs a fixed source snapshot refusal reason; no identifiers.
+func (t reportedTargets) refused(reason string) {
+	if t.report != nil {
+		t.report("source-snapshot", reason)
+	}
 }
