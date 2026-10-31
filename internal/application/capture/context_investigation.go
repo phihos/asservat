@@ -476,7 +476,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	preStorageStarted := time.Now()
 	i, err := source.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) {
-		return zero, value.ErrDenied
+		return zero, previewFailure("request/identity", value.ErrDenied)
 	}
 	recovery, err := s.currentRecovery(ctx)
 	if err != nil {
@@ -489,7 +489,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		return zero, err
 	}
 	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !recovery.Valid(s.Now()) || s.Now().Before(started) {
-		return zero, value.ErrDenied
+		return zero, previewFailure("request/identity-current", value.ErrDenied)
 	}
 	if found {
 		previous.MetadataValidUntil = identity.Earlier(previous.MetadataValidUntil, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
@@ -505,7 +505,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	}
 	p = p.Clone()
 	if !ValidContextPreview(p) || p.ID != previewID || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.Actor != i.Principal {
-		return zero, value.ErrDenied
+		return zero, previewFailure("request/preview-owner", value.ErrDenied)
 	}
 	if (p.Group != nil || p.Intent.Snapshot != nil && p.Intent.Snapshot.TriggerKind == "recordingSave") && !s.RecordingSaveEnabled {
 		return zero, value.ErrUnavailable
@@ -753,7 +753,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	if manualSave != nil {
 		currentInitiator := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
 		if !currentInitiator.Eligible || currentInitiator.Principal != p.Actor || !currentInitiator.VerifiedIdentity.Valid(s.Now()) {
-			return zero, value.ErrDenied
+			return zero, previewFailure("request/initiator", value.ErrDenied)
 		}
 		currentInitiator.ValidUntil = identity.Earlier(currentInitiator.ValidUntil, manualSave.Initiator.ValidUntil)
 		manualSave.Initiator = currentInitiator
@@ -762,7 +762,12 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{RecordingSave: manualSave, RepeatedFrom: p.Intent.RepeatedFrom, Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
 	auditapp.MarkStep(ctx, "q-admit", admitStarted)
 	if err != nil {
-		return zero, err
+		label := "request/admit-sql"
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			label += "/" + fixed.FixedStep()
+		}
+		return zero, previewFailure(label, err)
 	}
 	if manualSave != nil && !a.Replay {
 		acceptedPlan, acceptedRegistration, reanchorErr := compiler.ReanchorRecordingSave(plan, r, a.CreatedAt, manualSaveProcessingBound(manualSave.Authority.NotAfter, p.Intent.RepeatedFrom))
@@ -781,7 +786,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	// Effects may already be committed when a response becomes unavailable. The
 	// next call recovers the original operation through the read-only lookup.
 	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !recovery.Valid(s.Now()) || s.Now().Before(started) {
-		return zero, value.ErrDenied
+		return zero, previewFailure("request/identity-after", value.ErrDenied)
 	}
 	if !a.Replay {
 		draft, e := HistoryDraftFromPreview(p, a)
@@ -795,7 +800,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
 	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, identity.Earlier(final.ValidUntil, final.VerifiedIdentity.ValidUntil))
 	if !s.Now().Before(a.MetadataValidUntil) {
-		return zero, value.ErrDenied
+		return zero, previewFailure("request/metadata", value.ErrDenied)
 	}
 	return a, nil
 }
