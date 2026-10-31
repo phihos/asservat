@@ -2,6 +2,7 @@ package contextstart
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/application/evidence"
@@ -21,6 +22,8 @@ type SourceLocal struct {
 	Snapshots evidence.SourceSnapshotCanceller
 	Verifier  app.SourceWorkVerifier
 	Queue     SourceQueue
+	// Report, when set, receives a refused verification's fixed step.
+	Report func(string)
 }
 
 func sourceReply(w app.SourceWork, state string) contracts.SourceReply {
@@ -44,6 +47,20 @@ func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, signed []b
 	}
 	auth, err := local.Verifier.VerifySourceWork(ctx, signed, r)
 	if err != nil || !auth.Valid(now()) {
+		step := "invalid-authentication"
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			step = fixed.FixedStep()
+		} else if err != nil {
+			step = "verify"
+		}
+		if local.Report != nil {
+			local.Report(step)
+		}
+		// Only a real denial is denied; an unavailable trust read is not.
+		if err != nil && !errors.Is(err, fleet.ErrDenied) {
+			return contracts.SourceReply{}, targets.ErrUnavailable
+		}
 		return contracts.SourceReply{}, targets.ErrDenied
 	}
 	w := auth.Work

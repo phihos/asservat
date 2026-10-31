@@ -100,7 +100,7 @@ func (s *APIContextWorkSignatures) sourceCurrent(ctx context.Context, w app.Sour
 	var zero value.APIContextWorkTrust
 	var key value.WorkKey
 	if s == nil || s.trust == nil || s.now == nil || ctx == nil || ctx.Err() != nil || !w.Valid(s.now()) {
-		return zero, key, value.ErrDenied
+		return zero, key, workStep{"source-trust-start", value.ErrDenied}
 	}
 	t, e := s.trust.APIContextWorkTrust(ctx)
 	c := w.Channel
@@ -114,8 +114,11 @@ func (s *APIContextWorkSignatures) sourceCurrent(ctx context.Context, w app.Sour
 			break
 		}
 	}
-	if len(key.PublicKey) != ed25519.PublicKeySize || w.IssuedAt().Before(key.NotBefore) || w.NotAfter.After(key.NotAfter) || s.now().Before(key.NotBefore) || !s.now().Before(key.NotAfter) {
-		return zero, value.WorkKey{}, value.ErrDenied
+	if len(key.PublicKey) != ed25519.PublicKeySize {
+		return zero, value.WorkKey{}, workStep{"source-key", value.ErrDenied}
+	}
+	if w.IssuedAt().Before(key.NotBefore) || w.NotAfter.After(key.NotAfter) || s.now().Before(key.NotBefore) || !s.now().Before(key.NotAfter) {
+		return zero, value.WorkKey{}, workStep{"source-key-window", value.ErrDenied}
 	}
 	return t, key, nil
 }
@@ -193,14 +196,21 @@ func (s *APIContextWorkSignatures) VerifySourceWork(ctx context.Context, encoded
 		return out, value.ErrInvalid
 	}
 	w, e := sourceWorkValue(payload)
-	if e != nil || !w.Matches(r, s.now()) {
-		return out, value.ErrDenied
+	switch {
+	case e != nil:
+		return out, workStep{"source-payload", value.ErrDenied}
+	case !w.Valid(s.now()):
+		return out, workStep{"source-expired", value.ErrDenied}
+	case !r.Valid(s.now()):
+		return out, workStep{"source-receiver", value.ErrDenied}
+	case w.Channel != r.Channel:
+		return out, workStep{"source-channel", value.ErrDenied}
 	}
 	call, stop := context.WithDeadline(ctx, identity.Earlier(w.NotAfter, r.ValidUntil))
 	defer stop()
 	first, key, e := s.sourceCurrent(call, w, h["kid"])
 	if e != nil {
-		return out, e
+		return out, workStep{"source-trust", e}
 	}
 	until := identity.Earlier(w.NotAfter, identity.Earlier(r.ValidUntil, first.Trust.FreshUntil))
 	bounded, cancel := context.WithDeadline(call, until)
@@ -208,12 +218,12 @@ func (s *APIContextWorkSignatures) VerifySourceWork(ctx context.Context, encoded
 	actual, e := jws.Verify(encoded, jws.WithKey(jwa.EdDSAEd25519(), ed25519.PublicKey(key.PublicKey)))
 	defer clear(actual)
 	if e != nil || !bytes.Equal(actual, payload) {
-		return out, value.ErrDenied
+		return out, workStep{"source-signature", value.ErrDenied}
 	}
 	last, current, e := s.sourceCurrent(bounded, w, h["kid"])
 	until = identity.Earlier(until, last.Trust.FreshUntil)
 	if e != nil || last.Trust.Revision != first.Trust.Revision || !bytes.Equal(current.PublicKey, key.PublicKey) || !current.NotBefore.Equal(key.NotBefore) || !current.NotAfter.Equal(key.NotAfter) || bounded.Err() != nil || !s.now().Before(until) || !w.Matches(r, s.now()) {
-		return out, value.ErrUnavailable
+		return out, workStep{"source-final", value.ErrUnavailable}
 	}
 	out = app.AuthenticatedSourceWork{Work: w, KeyID: key.ID, TrustRevision: first.Trust.Revision, VerifiedAt: s.now().UTC(), ValidUntil: until}
 	if !out.Valid(s.now()) {

@@ -267,7 +267,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
 		if queue, ok := r.output.recordings.nodes.(contextstart.SourceQueue); ok {
-			local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Queue: queue, Snapshots: r.output.recordings}
+			local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Queue: queue, Snapshots: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
 		}
 	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
