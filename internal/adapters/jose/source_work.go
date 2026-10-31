@@ -1,6 +1,8 @@
 package jose
 
 import (
+	"time"
+
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	app "asservat.local/asservat/internal/application/fleet"
 	wire "asservat.local/asservat/internal/contracts"
@@ -208,7 +210,9 @@ func (s *APIContextWorkSignatures) VerifySourceWork(ctx context.Context, encoded
 	}
 	call, stop := context.WithDeadline(ctx, identity.Earlier(w.NotAfter, r.ValidUntil))
 	defer stop()
+	firstRead := time.Now()
 	first, key, e := s.sourceCurrent(call, w, h["kid"])
+	firstTook := time.Since(firstRead)
 	if e != nil {
 		return out, workStep{"source-trust", e}
 	}
@@ -220,14 +224,32 @@ func (s *APIContextWorkSignatures) VerifySourceWork(ctx context.Context, encoded
 	if e != nil || !bytes.Equal(actual, payload) {
 		return out, workStep{"source-signature", value.ErrDenied}
 	}
+	lastRead := time.Now()
 	last, current, e := s.sourceCurrent(bounded, w, h["kid"])
+	lastTook := time.Since(lastRead)
 	until = identity.Earlier(until, last.Trust.FreshUntil)
 	if e != nil || last.Trust.Revision != first.Trust.Revision || !bytes.Equal(current.PublicKey, key.PublicKey) || !current.NotBefore.Equal(key.NotBefore) || !current.NotAfter.Equal(key.NotAfter) || bounded.Err() != nil || !s.now().Before(until) || !w.Matches(r, s.now()) {
-		return out, workStep{"source-final", value.ErrUnavailable}
+		reason := "changed"
+		if e != nil {
+			reason = "trust"
+		} else if bounded.Err() != nil || !s.now().Before(until) {
+			reason = "expired"
+		}
+		return out, workStep{"source-final-" + reason + " trust1" + durationBucket(firstTook) + " trust2" + durationBucket(lastTook), value.ErrUnavailable}
 	}
 	out = app.AuthenticatedSourceWork{Work: w, KeyID: key.ID, TrustRevision: first.Trust.Revision, VerifiedAt: s.now().UTC(), ValidUntil: until}
 	if !out.Valid(s.now()) {
 		return app.AuthenticatedSourceWork{}, value.ErrUnavailable
 	}
 	return out, nil
+}
+
+// durationBucket is a coarse fixed label for diagnostics.
+func durationBucket(d time.Duration) string {
+	for _, b := range []time.Duration{250 * time.Millisecond, 500 * time.Millisecond, time.Second, 2 * time.Second, 3 * time.Second} {
+		if d < b {
+			return "@<" + b.String()
+		}
+	}
+	return "@>=3s"
 }
