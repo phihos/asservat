@@ -433,6 +433,77 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 		return native, file
 	}
+	// The ongoing-incident focus spends the workload's shared trigger budget
+	// (two per five minutes) on the incident alone: in ongoing-save, Save and
+	// repeat already spend it, so a third occurrence is correctly suppressed
+	// as cooldown (runs 41278608533/41278610152).
+	if installedJourneyFocus() == "ongoing-incident" {
+		// Automatic incident: a real restart of the armed Pod's container admits
+		// one policy occurrence, whose snapshot the policy executor saves from the
+		// running source (no manual request, no finite recipe). The retained-port
+		// marker just before the restart must be in the saved window.
+		incidentSent := marker(ongoingSaveRetainedPort)
+		pod, err := f.region.CoreV1().Pods(f.namespace).Get(ctx, podName, meta.GetOptions{})
+		if err != nil || string(pod.UID) != podUID {
+			t.Fatal("ongoing incident Pod before restart", err)
+		}
+		kill, stopKill := context.WithTimeout(ctx, 15*time.Second)
+		killed := installedKillContainer(t, kill, *pod)
+		stopKill()
+		if !killed {
+			t.Fatal("ongoing incident workload did not stop")
+		}
+		before := int32(0)
+		if len(pod.Status.ContainerStatuses) == 1 {
+			before = pod.Status.ContainerStatuses[0].RestartCount
+		}
+		wait("the incident container restart", time.Minute, func(call context.Context) bool {
+			p, err := f.region.CoreV1().Pods(f.namespace).Get(call, podName, meta.GetOptions{})
+			if err != nil || len(p.Status.ContainerStatuses) != 1 || p.Status.ContainerStatuses[0].RestartCount <= before {
+				return false
+			}
+			if term := p.Status.ContainerStatuses[0].LastTerminationState.Terminated; term != nil {
+				t.Logf("incident container restart %d: reason %q exit %d", p.Status.ContainerStatuses[0].RestartCount, term.Reason, term.ExitCode)
+			}
+			return true
+		})
+		var incidentID string
+		wait("automatic incident snapshot occurrence", 2*time.Minute, func(call context.Context) bool {
+			return admin.QueryRow(call, `SELECT coalesce(capture_id::text,'') FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND capture_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`, root, active.PolicyUID, podUID).Scan(&incidentID) == nil && incidentID != ""
+		})
+		incidentNative, incidentFile := fetchNative(published(incidentID), "native-ongoing-incident-download", "ongoing-incident.pcapng")
+		incidentOut, err := exec.CommandContext(ctx, "tshark", ongoingSaveFieldArgs(incidentFile)...).Output()
+		if err != nil {
+			t.Fatal("offline incident Wireshark read", err)
+		}
+		incidentMarkers := 0
+		for _, line := range strings.Split(strings.TrimSpace(string(incidentOut)), "\n") {
+			fields := strings.Split(line, "\t")
+			if len(fields) >= 3 && (fields[1] == strconv.Itoa(ongoingSaveRetainedPort) || fields[2] == strconv.Itoa(ongoingSaveRetainedPort)) {
+				incidentMarkers++
+			}
+		}
+		if incidentMarkers == 0 {
+			t.Fatal("automatic incident snapshot lacks the pre-restart marker", incidentSent, len(incidentNative))
+		}
+		// A container restart may legitimately re-attach the source; record it.
+		afterIncident, incidentCount, _ := current(ctx)
+		t.Logf("automatic incident %s retained %d marker packets; source after restart %s (sources %d)", incidentID, incidentMarkers, afterIncident.ID, incidentCount)
+		report := map[string]any{
+			"policyUID": active.PolicyUID, "podUID": podUID, "sourceID": src.ID, "armLatencySeconds": armLatency.Seconds(), "rearmsBeforeIncident": rearms,
+			"incidentCaptureID": incidentID, "incidentMarkerSent": incidentSent, "incidentMarkerPackets": incidentMarkers, "incidentNativeBytes": len(incidentNative), "sourceAfterIncident": afterIncident.ID,
+			"scope": "one automatic exit-detector incident snapshot from one active ordinary ongoing networkHeaders source on one installed Pod; no Save in the same trigger budget window",
+		}
+		raw, err := json.MarshalIndent(report, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile("../results/ongoing-incident-report.json", append(raw, '\n'), 0600); err != nil {
+			t.Fatal(err)
+		}
+		_ = outsideSent
+		return
+	}
 	retainedSent := marker(ongoingSaveRetainedPort)
 	selected := selectNow("fresh Save")
 	captureID, t0 := save(map[string]any{"recording_handles": []string{selected.Handle}, "before": "15s"}, "native-ongoing-save")
@@ -469,58 +540,6 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("repeat changed or re-armed the original source", same, count)
 	}
 
-	// Automatic incident: a real restart of the armed Pod's container admits
-	// one policy occurrence, whose snapshot the policy executor saves from the
-	// running source (no manual request, no finite recipe). The retained-port
-	// marker just before the restart must be in the saved window.
-	incidentSent := marker(ongoingSaveRetainedPort)
-	pod, err := f.region.CoreV1().Pods(f.namespace).Get(ctx, podName, meta.GetOptions{})
-	if err != nil || string(pod.UID) != podUID {
-		t.Fatal("ongoing incident Pod before restart", err)
-	}
-	kill, stopKill := context.WithTimeout(ctx, 15*time.Second)
-	killed := installedKillContainer(t, kill, *pod)
-	stopKill()
-	if !killed {
-		t.Fatal("ongoing incident workload did not stop")
-	}
-	before := int32(0)
-	if len(pod.Status.ContainerStatuses) == 1 {
-		before = pod.Status.ContainerStatuses[0].RestartCount
-	}
-	wait("the incident container restart", time.Minute, func(call context.Context) bool {
-		p, err := f.region.CoreV1().Pods(f.namespace).Get(call, podName, meta.GetOptions{})
-		if err != nil || len(p.Status.ContainerStatuses) != 1 || p.Status.ContainerStatuses[0].RestartCount <= before {
-			return false
-		}
-		if term := p.Status.ContainerStatuses[0].LastTerminationState.Terminated; term != nil {
-			t.Logf("incident container restart %d: reason %q exit %d", p.Status.ContainerStatuses[0].RestartCount, term.Reason, term.ExitCode)
-		}
-		return true
-	})
-	var incidentID string
-	wait("automatic incident snapshot occurrence", 2*time.Minute, func(call context.Context) bool {
-		return admin.QueryRow(call, `SELECT coalesce(capture_id::text,'') FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND capture_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`, root, active.PolicyUID, podUID).Scan(&incidentID) == nil && incidentID != ""
-	})
-	incidentNative, incidentFile := fetchNative(published(incidentID), "native-ongoing-incident-download", "ongoing-incident.pcapng")
-	incidentOut, err := exec.CommandContext(ctx, "tshark", ongoingSaveFieldArgs(incidentFile)...).Output()
-	if err != nil {
-		t.Fatal("offline incident Wireshark read", err)
-	}
-	incidentMarkers := 0
-	for _, line := range strings.Split(strings.TrimSpace(string(incidentOut)), "\n") {
-		fields := strings.Split(line, "\t")
-		if len(fields) >= 3 && (fields[1] == strconv.Itoa(ongoingSaveRetainedPort) || fields[2] == strconv.Itoa(ongoingSaveRetainedPort)) {
-			incidentMarkers++
-		}
-	}
-	if incidentMarkers == 0 {
-		t.Fatal("automatic incident snapshot lacks the pre-restart marker", incidentSent, len(incidentNative))
-	}
-	// A container restart may legitimately re-attach the source; record it.
-	afterIncident, incidentCount, _ := current(ctx)
-	t.Logf("automatic incident %s retained %d marker packets; source after restart %s (sources %d)", incidentID, incidentMarkers, afterIncident.ID, incidentCount)
-
 	byID := func(call context.Context, id string) (ongoingSaveSource, bool) {
 		all, err := sources(call)
 		if err != nil {
@@ -533,13 +552,8 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 		return ongoingSaveSource{}, false
 	}
-	// Natural expiry at the original authority-bounded hard deadline, no stop
-	// call, for the source active after the incident (a re-attached source
-	// keeps the same acceptance and hard deadline).
+	// Natural expiry at the original authority-bounded hard deadline, no stop call.
 	natural := src
-	if afterIncident.ID != "" {
-		natural = afterIncident
-	}
 	var expired ongoingSaveSource
 	wait("natural source expiry", time.Until(natural.HardUntil)+time.Minute, func(call context.Context) bool {
 		var ok bool
@@ -598,7 +612,6 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		"armLatencySeconds": armLatency.Seconds(), "rearmsBeforeSave": rearms, "saveCaptureID": captureID, "saveAcceptedAt": t0, "repeatCaptureID": repeatID,
 		"outsideMarkerSent": outsideSent, "retainedMarkerSent": retainedSent, "afterMarkerSent": afterSent,
 		"retainedMarkerPackets": markers, "nativeBytes": len(native), "nativeSHA256": hex.EncodeToString(digest[:]),
-		"incidentCaptureID": incidentID, "incidentMarkerSent": incidentSent, "incidentMarkerPackets": incidentMarkers, "incidentNativeBytes": len(incidentNative), "sourceAfterIncident": afterIncident.ID,
 		"secondSourceID": replacement.ID, "explicitStopRequested": stopped, "secondSourceEndedAt": ended.EndedAt,
 		"scope": "one active ordinary ongoing networkHeaders source on one installed Pod; history labels are as reported (Unknown/Partial are not upgraded); no quiet-Full, clock-step, loss, multi-node or syscall claim",
 	}
@@ -610,6 +623,12 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal(err)
 	}
 	t.Logf("UNPUBLISHED installed ongoing Save proof: source %s armed in %.1fs, Save %s T0=%s retained %d marker packets, PCAPNG %dB SHA256=%x, natural expiry %s, explicit stop of %s", src.ID, armLatency.Seconds(), captureID, t0.Format(time.RFC3339Nano), markers, len(native), digest, expired.EndedAt.Format(time.RFC3339Nano), replacement.ID)
+}
+
+// installedOngoingFocus selects the installed ongoing packet source flow:
+// Save qualification or the automatic incident snapshot.
+func installedOngoingFocus() bool {
+	return installedJourneyFocus() == "ongoing-save" || installedJourneyFocus() == "ongoing-incident"
 }
 
 func ongoingSaveFieldArgs(file string) []string {

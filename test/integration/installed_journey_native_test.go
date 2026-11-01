@@ -1141,7 +1141,7 @@ func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS")
 // 20-minute limit; docs/implementation-progress.md records the split.
 func installedFastFixture() bool {
 	switch installedJourneyFocus() {
-	case "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "native-paced", "policy-recording", "ongoing-save":
+	case "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "native-paced", "policy-recording", "ongoing-save", "ongoing-incident":
 		return true
 	}
 	return false
