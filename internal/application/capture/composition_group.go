@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	auditapp "asservat.local/asservat/internal/application/audit"
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -364,15 +365,23 @@ func (s ContextSubmission) dispatchCompositionGroup(ctx context.Context, current
 		}
 		childCall, cancel := context.WithDeadline(call, end)
 		r, err := s.Intents.AcknowledgedCaptureIntent(childCall, child.CaptureID)
-		raw, encodeErr := json.Marshal(child.Expectation)
-		if err != nil || encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != child.CaptureID || r.Requester() != i.Principal || r.Initiator != nil || r.ScopeDigest != child.ScopeDigest || r.SubmissionDigest != child.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(raw)) || !r.Deadline.Equal(child.Deadline) || r.Group == nil || r.Group.ParentCaptureID != a.CaptureID || r.Group.ChildIndex != n || r.Group.ChildCount != len(a.Group.Children) {
+		if err != nil {
 			cancel()
+			s.reportGroupFailure("request/intent/" + auditapp.CaptureOperationFailureStage(err))
+			failures = append(failures, value.ErrUnavailable)
+			continue
+		}
+		raw, encodeErr := json.Marshal(child.Expectation)
+		if encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != child.CaptureID || r.Requester() != i.Principal || r.Initiator != nil || r.ScopeDigest != child.ScopeDigest || r.SubmissionDigest != child.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(raw)) || !r.Deadline.Equal(child.Deadline) || r.Group == nil || r.Group.ParentCaptureID != a.CaptureID || r.Group.ChildIndex != n || r.Group.ChildCount != len(a.Group.Children) {
+			cancel()
+			s.reportGroupFailure("request/intent/record")
 			failures = append(failures, value.ErrUnavailable)
 			continue
 		}
 		err = s.Start.StartContext(childCall, current, child.CaptureID)
 		cancel()
 		if err != nil {
+			s.reportGroupFailure("request/start/" + failureClass(err))
 			failures = append(failures, err)
 		}
 	}
@@ -380,4 +389,10 @@ func (s ContextSubmission) dispatchCompositionGroup(ctx context.Context, current
 		failures = append(failures, err)
 	}
 	return errors.Join(failures...)
+}
+
+func (s ContextSubmission) reportGroupFailure(stage string) {
+	if s.ReportPreviewFailure != nil {
+		s.ReportPreviewFailure(stage)
+	}
 }
