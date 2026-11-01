@@ -1,6 +1,7 @@
 # ADR-275 — One policy arms one source per composed recorder
 
-Date: 2026-11-01. Status: proposed (agent decision); implementation is slice
+Date: 2026-11-01. Status: accepted (agent decision); native qualification
+continuation-ongoing-mixed run 41333094076 passed. Implementation is slice
 B2 in docs/research/capture-profile-catalogs-plan.md.
 Requirements: REQ-CPR-003 (specs/capture-profiles.md), SC-CPR-003,
 specs/action-lifecycle.md.
