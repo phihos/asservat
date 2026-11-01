@@ -139,7 +139,7 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	// complete quiet one reports absence; add a zero-byte result if pods
 	// with no syscalls in a whole window turn out to matter.
 	if counters.Retained == 0 && (!coverage.Complete || copy.records) {
-		n.snapshotFailed(x, "empty", fmt.Errorf("window %s..%s available from %s, stopped %s, closed %s, evicted %t, input unknown %t", coverage.Requested.From.Format(time.RFC3339Nano), coverage.Requested.Until.Format(time.RFC3339Nano), coverage.AvailableFrom.Format(time.RFC3339Nano), coverage.SourceStoppedAt.Format(time.RFC3339Nano), coverage.SourceClosedAt.Format(time.RFC3339Nano), coverage.HistoryEvicted, coverage.InputUnknown))
+		n.snapshotFailed(x, "empty", fmt.Errorf("window %s..%s available from %s, stopped %s, closed %s, evicted %t, input unknown %t; source %s", coverage.Requested.From.Format(time.RFC3339Nano), coverage.Requested.Until.Format(time.RFC3339Nano), coverage.AvailableFrom.Format(time.RFC3339Nano), coverage.SourceStoppedAt.Format(time.RFC3339Nano), coverage.SourceClosedAt.Format(time.RFC3339Nano), coverage.HistoryEvicted, coverage.InputUnknown, n.sourceCounters(x.Binding.SourceID)))
 		n.uploadSnapshotFailure(ctx, epoch, workID, x, copy.records)
 		return
 	}
@@ -184,4 +184,18 @@ func (n *nodeSources) snapshotFailed(x collector.SourceSnapshot, stage string, e
 	if n.log != nil {
 		n.log(fmt.Sprintf("node collector: source %s snapshot %s failed at %s: %v", x.Binding.SourceID, x.Request.SnapshotID, stage, err))
 	}
+}
+
+// sourceCounters is the source's content-free ring and meter accounting.
+func (n *nodeSources) sourceCounters(id string) string {
+	n.mu.Lock()
+	s := n.sources[id]
+	n.mu.Unlock()
+	if s == nil {
+		return "gone"
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.ring.State()
+	return fmt.Sprintf("seen=%d retained=%d malformed=%d evicted=%d observed=%dB closed=%t", st.Packets.Seen, st.Packets.Retained, st.Packets.Malformed, st.HistoryEvicted, s.meter.ObservedBytes(), s.closed)
 }
