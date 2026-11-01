@@ -75,3 +75,22 @@ func TestSourceSnapshotScopeUsesOriginalInstantsAcrossSQLTimeLocations(t *testin
 		t.Fatal("SQL timestamp location changed immutable source scope", err)
 	}
 }
+
+// ADR-273: a syscall source window retains as syscall metadata; a packet
+// retention resolution cannot be reused for it, nor the reverse.
+func TestSourceSnapshotEvidenceTypeFollowsTheSourceKind(t *testing.T) {
+	in, now := sourceSnapshotInput(t)
+	in.Snapshot.ActionKind = "syscallTrace"
+	if _, err := CompileContext(in, now); err == nil {
+		t.Fatal("syscall window accepted packet retention")
+	}
+	in.Retention.EvidenceType = "syscallTrace"
+	plan, err := CompileContext(in, now)
+	if err != nil || !VerifyContextPlan(plan, now) {
+		t.Fatal("syscall window refused syscall retention", err)
+	}
+	in.Snapshot.ActionKind = ""
+	if _, err = CompileContext(in, now); err == nil {
+		t.Fatal("packet window accepted syscall retention")
+	}
+}
