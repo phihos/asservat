@@ -13,6 +13,16 @@ interval. The proof, trust, connector-source and recovery caches now reuse
 only with at least three seconds left, like the owner route cache. Original
 intervals are unchanged; more checks are fresh.
 
+Verification (measured, ff2dd3f7): native `continuation-ongoing-incident`
+41303223216 and 41303225144 and `continuation-ongoing-syscall` 41303227101 and
+41303229264 passed; `make go-check` passed. Cost: a cached observation is now
+reused for about two seconds of its five-second interval instead of three, so
+fresh guarded reads can rise by up to about half for these four caches
+(`sourceReuseMargin` was introduced to cut about 870 guard checks in run
+41224874137). The incident focus does not print the regional request
+counters, so the actual change is not measured yet; measure it on the next
+`continuation-ongoing-save` run, which reports them.
+
 ## Installed automatic incident snapshot from an ongoing packet source (2026-11-01)
 
 New native suite `continuation-ongoing-incident`: an exit-detector DebugPolicy
