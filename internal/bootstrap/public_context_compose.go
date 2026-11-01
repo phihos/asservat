@@ -405,7 +405,8 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		Lifetime: time.Duration(p.PreviewSeconds) * time.Second}
 	// REQ-CPR-001: organization capture profiles are published in the
 	// protected hub namespace; the hub reads them with its observer client.
-	profiles, err := kube.NewCaptureProfileCatalog(observer, control)
+	// Namespace profiles are read by the target's region.
+	profiles, err := kube.NewCaptureProfileCatalog(observer, control, queries)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

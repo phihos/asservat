@@ -298,6 +298,7 @@ def check_cluster(directory):
     # connector (RBAC escalation check), read-only.
     assert {"apiGroups": [""], "resources": ["pods/log"], "verbs": ["get"]} in role["rules"]
     assert {"apiGroups": ["metrics.k8s.io"], "resources": ["pods"], "verbs": ["list"]} in role["rules"]
+    assert {"apiGroups": ["asservat.io"], "resources": ["captureprofiles"], "verbs": ["get"]} in role["rules"]
     for change in [{"mode": "hub"}, {"cluster": {"image": "registry.example/asservat:latest"}}, {"cluster": {"bootstrapSecret": ""}},
                    {"cluster": {"offer": json.dumps({"format": "other"})}}, {"cluster": {"namespace": "kube-system"}}]:
         v = json.loads(json.dumps(base))

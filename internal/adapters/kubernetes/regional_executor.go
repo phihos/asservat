@@ -69,7 +69,10 @@ func regionalExecutorRBAC(namespace string) (cluster []rbac.PolicyRule, connecto
 		// counts and times leave the region); a resource policy's poll lists
 		// the workload's metrics API PodMetrics.
 		{APIGroups: []string{""}, Resources: []string{"pods/log"}, Verbs: []string{"get"}},
-		{APIGroups: []string{"metrics.k8s.io"}, Resources: []string{"pods"}, Verbs: []string{"list"}}}
+		{APIGroups: []string{"metrics.k8s.io"}, Resources: []string{"pods"}, Verbs: []string{"list"}},
+		// REQ-CPR-001: a preview/start reads exact namespace CaptureProfile
+		// versions in the target's namespace.
+		{APIGroups: []string{"asservat.io"}, Resources: []string{"captureprofiles"}, Verbs: []string{"get"}}}
 	connector = []rbac.PolicyRule{
 		// get for the settings/trust reads; update only for their dry-run probes.
 		{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{RegionalSettings, RegionalWorkTrust}, Verbs: []string{"get", "update"}},

@@ -129,6 +129,27 @@ func (t Targets) ObserveWorkloadRestarts(ctx context.Context, r targets.RestartR
 	return out, nil
 }
 
+// ReadCaptureProfiles asks the target's region for exact namespace catalog
+// versions (REQ-CPR-001). A mismatched answer is unavailable.
+func (t Targets) ReadCaptureProfiles(ctx context.Context, r targets.ProfileCatalogRequest) (targets.ProfileCatalogAnswer, error) {
+	var out targets.ProfileCatalogAnswer
+	if !r.Valid() || t.Router == nil || ctx == nil || ctx.Err() != nil {
+		return out, targets.ErrInvalid
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	call, diagnostics := NewStreamDiagnosticContext(call)
+	if _, err := t.Router.Query(call, r.ClusterID, queryCaptureProfiles, r, &out); err != nil {
+		t.report("profiles/"+queryStep(err, diagnostics), "")
+		return targets.ProfileCatalogAnswer{}, err
+	}
+	if !out.Answers(r) {
+		t.report("profiles/result", "")
+		return targets.ProfileCatalogAnswer{}, targets.ErrUnavailable
+	}
+	return out, nil
+}
+
 // ReviewAccess asks the target Pod's region for one decision-time review
 // (ADR-245). The answer is the region's closed outcome for exactly this
 // request; a transport failure, an unsupported region or a mismatched answer
