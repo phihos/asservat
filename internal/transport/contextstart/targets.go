@@ -150,6 +150,27 @@ func (t Targets) ReadCaptureProfiles(ctx context.Context, r targets.ProfileCatal
 	return out, nil
 }
 
+// ListCaptureProfiles asks the target's region for its namespace catalog
+// (one bounded LIST). A mismatched answer is unavailable.
+func (t Targets) ListCaptureProfiles(ctx context.Context, r targets.ProfileListRequest) (targets.ProfileCatalogAnswer, error) {
+	var out targets.ProfileCatalogAnswer
+	if !r.Valid() || t.Router == nil || ctx == nil || ctx.Err() != nil {
+		return out, targets.ErrInvalid
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	call, diagnostics := NewStreamDiagnosticContext(call)
+	if _, err := t.Router.Query(call, r.ClusterID, queryListCaptureProfiles, r, &out); err != nil {
+		t.report("profile-list/"+queryStep(err, diagnostics), "")
+		return targets.ProfileCatalogAnswer{}, err
+	}
+	if !out.Lists(r) {
+		t.report("profile-list/result", "")
+		return targets.ProfileCatalogAnswer{}, targets.ErrUnavailable
+	}
+	return out, nil
+}
+
 // ReviewAccess asks the target Pod's region for one decision-time review
 // (ADR-245). The answer is the region's closed outcome for exactly this
 // request; a transport failure, an unsupported region or a mismatched answer

@@ -81,7 +81,7 @@ func BuildProviderOwnerWorkload(p OwnerWorkloadPlan, clusterID string, selection
 		rbac.PolicyRule{APIGroups: []string{"asservat.io"}, Resources: []string{"debugpolicies"}, Verbs: []string{"get"}},
 		// REQ-CPR-001: organization CaptureProfile versions are read (one GET
 		// per referenced version) on preview and start; never written.
-		rbac.PolicyRule{APIGroups: []string{"asservat.io"}, Resources: []string{"captureprofiles"}, Verbs: []string{"get"}})
+		rbac.PolicyRule{APIGroups: []string{"asservat.io"}, Resources: []string{"captureprofiles"}, Verbs: []string{"get", "list"}})
 	w.ClusterRole.Rules = append(w.ClusterRole.Rules, rbac.PolicyRule{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: guards, Verbs: []string{"get"}})
 	// ADR-190 decision 7: the hub cluster's capacity observation reads
 	// namespace and workload metadata cluster-wide and the selector guard.

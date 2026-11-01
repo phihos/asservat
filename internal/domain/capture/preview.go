@@ -18,6 +18,9 @@ import (
 // and request_capture is refused before acceptance: nothing is reserved or charged.
 var ErrRecorderUnavailable = errors.New("packet and syscall recorders are not available")
 
+// ErrProfileNotFound names a capture profile version that is not published.
+var ErrProfileNotFound = errors.New("capture profile version is not published")
+
 var (
 	ErrPreviewExpired        = errors.New("context preview expired; review a new preview")
 	ErrDiagnosticUnavailable = errors.New("requested context diagnostic is unavailable")

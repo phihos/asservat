@@ -114,6 +114,7 @@ type resolvedProfile struct {
 	Ref                                            value.ProfileRef
 	Name, Version                                  string
 	Definition                                     profileDefinition
+	RawDefinition                                  json.RawMessage
 	Digest                                         artifact.Digest
 	SourceClusterID, SourceNamespaceUID, SourceUID string
 	Deprecated                                     bool
@@ -177,7 +178,7 @@ func parseProfileDocument(b []byte) (resolvedProfile, error) {
 	if err != nil || !(value.ProfileRef{Catalog: "builtin", Name: doc.Name, Version: doc.Version}).Valid() {
 		return resolvedProfile{}, value.ErrInvalid
 	}
-	return resolvedProfile{Name: doc.Name, Version: doc.Version, Definition: def, Digest: digest}, nil
+	return resolvedProfile{Name: doc.Name, Version: doc.Version, Definition: def, RawDefinition: doc.Definition, Digest: digest}, nil
 }
 
 // BuiltinProfileDigest returns the definition digest of one embedded builtin

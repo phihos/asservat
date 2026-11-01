@@ -20,7 +20,7 @@ func TestRegionalExecutorCanReadTargetChain(t *testing.T) {
 		}
 		return false
 	}
-	for _, need := range [][3]string{{"", "namespaces", "get"}, {"", "pods", "get"}, {"", "pods", "list"}, {"apps", "deployments", "get"}, {"apps", "statefulsets", "get"}, {"apps", "replicasets", "get"}, {"", "events", "list"}, {"", "pods/log", "get"}, {"metrics.k8s.io", "pods", "list"}, {"asservat.io", "captureprofiles", "get"}} {
+	for _, need := range [][3]string{{"", "namespaces", "get"}, {"", "pods", "get"}, {"", "pods", "list"}, {"apps", "deployments", "get"}, {"apps", "statefulsets", "get"}, {"apps", "replicasets", "get"}, {"", "events", "list"}, {"", "pods/log", "get"}, {"metrics.k8s.io", "pods", "list"}, {"asservat.io", "captureprofiles", "get"}, {"asservat.io", "captureprofiles", "list"}} {
 		if !can(need[0], need[1], need[2]) {
 			t.Errorf("connector cannot %s %s/%s cluster-wide", need[2], need[0], need[1])
 		}

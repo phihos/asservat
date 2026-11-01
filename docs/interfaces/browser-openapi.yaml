@@ -12538,8 +12538,43 @@ components:
           type: integer
           minimum: 1
           maximum: 100
-      required:
-      - target_handle
+        target_ref:
+          type: object
+          additionalProperties: false
+          properties:
+            cluster_id:
+              type: string
+              format: uuid
+            namespace:
+              type: string
+              minLength: 1
+              maxLength: 63
+            kind:
+              enum:
+              - Deployment
+              - StatefulSet
+              - Pod
+            name:
+              type: string
+              minLength: 1
+              maxLength: 253
+          required:
+          - cluster_id
+          - namespace
+          - kind
+          - name
+      required: []
+      oneOf:
+      - required:
+        - target_handle
+        not:
+          required:
+          - target_ref
+      - required:
+        - target_ref
+        not:
+          required:
+          - target_handle
     McpOutput_list_capture_profiles:
       allOf:
       - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
@@ -12678,9 +12713,44 @@ components:
           maxLength: 128
         profile_ref:
           $ref: https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/profileRef
+        target_ref:
+          type: object
+          additionalProperties: false
+          properties:
+            cluster_id:
+              type: string
+              format: uuid
+            namespace:
+              type: string
+              minLength: 1
+              maxLength: 63
+            kind:
+              enum:
+              - Deployment
+              - StatefulSet
+              - Pod
+            name:
+              type: string
+              minLength: 1
+              maxLength: 253
+          required:
+          - cluster_id
+          - namespace
+          - kind
+          - name
       required:
-      - target_handle
       - profile_ref
+      oneOf:
+      - required:
+        - target_handle
+        not:
+          required:
+          - target_ref
+      - required:
+        - target_ref
+        not:
+          required:
+          - target_handle
     McpOutput_get_capture_profile:
       allOf:
       - $ref: https://asservat.io/spec/v1/mcp-result.schema.json

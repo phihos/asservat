@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -19,6 +20,11 @@ type catalogFixture struct {
 }
 
 func (c *catalogFixture) ReadCatalogProfiles(_ context.Context, _ targets.PodResolution, refs []planning.ProfileRef) ([]planning.CatalogProfile, error) {
+	c.reads++
+	return c.profiles, nil
+}
+
+func (c *catalogFixture) ListCatalogProfiles(_ context.Context, _ targets.PodResolution, catalog string) ([]planning.CatalogProfile, error) {
 	c.reads++
 	return c.profiles, nil
 }
@@ -112,5 +118,35 @@ func TestCatalogProfileStartFromStoredPreview(t *testing.T) {
 	catalog.profiles[0].SourceUID = "republished"
 	if _, err = f.request(t, p, "changed"); errors.Is(err, reachedRecordingAdmission) || len(f.seen) != 1 {
 		t.Fatal("changed version reached admission", err)
+	}
+}
+
+// REQ-CPR-001: an eligible caller lists builtins and published versions with
+// availability and modes, and reads one exact version with its digest; a
+// missing version is not found and an ineligible caller is denied.
+func TestCaptureProfileListAndGet(t *testing.T) {
+	f := newInvestigationFixture()
+	ref := planning.ProfileRef{Catalog: "organization", Name: "team-network", Version: "v3"}
+	f.svc.Profiles = &catalogFixture{profiles: []planning.CatalogProfile{{Ref: ref, SourceUID: "org-profile", Document: organizationDocument(t, "team-network", "v3"), Deprecated: true}}}
+	ctx := context.Background()
+	source := f.source(t, ctx)
+	target := f.compositionIntent(networkComposition()).Target
+	all, _, err := f.svc.CaptureProfiles(ctx, source, target, "")
+	if err != nil || len(all) != 3 || all[0].Ref.Catalog != "builtin" || !all[0].Available || all[2].Ref != ref || all[2].Available || !all[2].Deprecated || len(all[2].ExecutionModes) != 2 {
+		t.Fatalf("list = %+v, %v", all, err)
+	}
+	if builtins, _, err := f.svc.CaptureProfiles(ctx, source, target, "builtin"); err != nil || len(builtins) != 2 {
+		t.Fatal("builtin filter", builtins, err)
+	}
+	got, _, err := f.svc.CaptureProfile(ctx, source, target, ref)
+	if err != nil || got.Ref != ref || got.Digest != all[2].Digest || !bytes.Contains(got.Definition, []byte(`"editableFields"`)) {
+		t.Fatal("get", got, err)
+	}
+	if _, _, err = f.svc.CaptureProfile(ctx, source, target, planning.ProfileRef{Catalog: "organization", Name: "absent", Version: "v1"}); !errors.Is(err, value.ErrProfileNotFound) {
+		t.Fatal("absent version", err)
+	}
+	f.denied = true
+	if _, _, err = f.svc.CaptureProfiles(ctx, source, target, ""); err == nil {
+		t.Fatal("ineligible caller listed profiles")
 	}
 }

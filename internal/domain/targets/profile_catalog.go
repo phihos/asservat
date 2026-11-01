@@ -68,3 +68,33 @@ func (a ProfileCatalogAnswer) Answers(r ProfileCatalogRequest) bool {
 	}
 	return true
 }
+
+// MaxListedProfiles bounds one catalog listing (list_capture_profiles limit).
+const MaxListedProfiles = 100
+
+// ProfileListRequest asks the target's region to list the CaptureProfile
+// versions in the target's own namespace with one bounded LIST.
+type ProfileListRequest struct {
+	ClusterID string
+	Namespace configuration.NamespaceRef
+}
+
+func (r ProfileListRequest) Valid() bool {
+	return authorization.UUID(r.ClusterID) && identity.Text(r.Namespace.Name, 63) && identity.Text(r.Namespace.UID, 64)
+}
+
+// Lists reports whether a is a bounded listing of exactly r's namespace.
+func (a ProfileCatalogAnswer) Lists(r ProfileListRequest) bool {
+	if a.ClusterID != r.ClusterID || a.Namespace != r.Namespace || len(a.Profiles) > MaxListedProfiles {
+		return false
+	}
+	seen := map[ProfileVersion]bool{}
+	for _, p := range a.Profiles {
+		v := ProfileVersion{p.Name, p.Version}
+		if seen[v] || !identity.Text(p.Name, 63) || !identity.Text(p.Version, 32) || !identity.Text(p.UID, 64) || len(p.Definition) == 0 {
+			return false
+		}
+		seen[v] = true
+	}
+	return true
+}
