@@ -1,9 +1,11 @@
 package planning
 
 import (
+	"asservat.local/asservat/internal/domain/artifact"
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -462,5 +464,34 @@ func TestSplitCompositionPerComponent(t *testing.T) {
 	}
 	if one, err := SplitComposition(network(), &fakeCompiler{program: fixtureProgram}); err != nil || len(one) != 1 {
 		t.Fatal("one component", err)
+	}
+}
+
+// ADR-276: the parent scope binds each child's exact scope digest under one
+// executor and target; children of another executor are refused.
+func TestRecorderGroupBindsChildScopes(t *testing.T) {
+	children, err := SplitComposition(mixed(32<<20), &fakeCompiler{program: fixtureProgram})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plans []value.RecorderPlan
+	for i, c := range children {
+		evidence, _ := RecorderEvidenceType(c)
+		in, now := recorderInput(t, c, evidence)
+		in.CaptureID = fmt.Sprintf("00000000-0000-4000-8000-00000000010%d", i)
+		p, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		plans = append(plans, p)
+	}
+	scope, digest, err := CompileRecorderGroup("00000000-0000-4000-8000-000000000200", plans)
+	if err != nil || digest == (artifact.Digest{}) || !bytes.Contains(scope, []byte(hexDigest(plans[0].ScopeDigest))) || !bytes.Contains(scope, []byte(hexDigest(plans[1].ScopeDigest))) {
+		t.Fatalf("%s %v", scope, err)
+	}
+	other := plans[1]
+	other.CanonicalScope = bytes.Replace(other.CanonicalScope, []byte(`"subject":"`), []byte(`"subject":"x`), 1)
+	if _, _, err = CompileRecorderGroup("00000000-0000-4000-8000-000000000200", []value.RecorderPlan{plans[0], other}); err == nil {
+		t.Fatal("children of another executor were grouped")
 	}
 }
