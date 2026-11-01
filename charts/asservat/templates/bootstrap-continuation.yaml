@@ -52,6 +52,11 @@ rules:
   - apiGroups: [asservat.io]
     resources: [debugpolicies]
     verbs: [get, create]
+  # REQ-CPR-001: the hub-api reads organization CaptureProfiles (the runner
+  # grants it, so it must hold it).
+  - apiGroups: [asservat.io]
+    resources: [captureprofiles]
+    verbs: [get]
   # ADR-195: the hub-worker's retention reader and guard probe, and the
   # installation administrator's baseline policy and its later edits.
   - apiGroups: [asservat.io]

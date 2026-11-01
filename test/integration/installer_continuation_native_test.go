@@ -653,6 +653,7 @@ func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"accessbindings", "permissionsources"}, Verbs: []string{"get", "list", "watch", "create"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"accessbindings"}, Verbs: []string{"delete"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"debugpolicies"}, Verbs: []string{"get", "create"}},
+		{APIGroups: []string{"asservat.io"}, Resources: []string{"captureprofiles"}, Verbs: []string{"get"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidenceretentionpolicies"}, Verbs: []string{"get", "list", "watch", "create", "update"}},
 		{APIGroups: []string{""}, Resources: []string{"namespaces", "pods"}, Verbs: []string{"get", "list"}},
 		// ADR-242: the hub-worker's namespace inheritance watch.
