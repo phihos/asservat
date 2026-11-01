@@ -91,6 +91,13 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		}
 		return zero, value.ErrTargetReplaced
 	}
+	if len(intent.Composition.Components) > 1 && target.ExecutionClass == artifact.ContextAPIExecution && s.Recorders != nil {
+		// ADR-276: a manual multi-profile composition is a reviewed group.
+		r, err := s.previewCompositionGroup(ctx, source, intent, i, recovery, target, created)
+		if !errors.Is(err, errRecordingNotAcceptable) && !errors.Is(err, value.ErrRecorderUnavailable) {
+			return r, err
+		}
+	}
 	available, err := s.packetRecorderAvailable(ctx, intent, target)
 	if err != nil {
 		return zero, previewFailure("recorder", err)

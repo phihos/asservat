@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-// Parent status retains every admitted child. Configured action IDs are not
+// Parent status retains every admitted child (a recording save group or an
+// ADR-276 composition group, whose children share one Pod). Configured action IDs are not
 // unique across Pods and cannot identify a grouped action instance.
 func recordingProgressActions(p value.ContextProgress) ([]ContextActionData, error) {
 	if len(p.Actions) == 0 {
@@ -20,7 +21,7 @@ func recordingProgressActions(p value.ContextProgress) ([]ContextActionData, err
 		}
 		return []ContextActionData{{ActionID: action, Phase: p.ActionPhase, ReasonCode: p.ReasonCode}}, nil
 	}
-	if p.Operation != "recordingSave" || len(p.Actions) > value.MaxRecordingSaveGroupChildren {
+	if (p.Operation != "recordingSave" && p.Operation != "collect") || len(p.Actions) > value.MaxRecordingSaveGroupChildren {
 		return nil, value.ErrUnavailable
 	}
 	out := make([]ContextActionData, 0, len(p.Actions))

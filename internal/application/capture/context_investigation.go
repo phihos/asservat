@@ -442,8 +442,15 @@ func acceptedContext(a value.Accepted, digest artifact.Digest) bool {
 		}
 		seen := map[string]bool{a.CaptureID: true}
 		var deadline time.Time
-		for _, child := range a.Group.Children {
-			if child.Expectation.Snapshot == nil || child.Expectation.Lifecycle == nil || child.Expectation.Lifecycle.TriggerKind != "recordingSave" || child.Group != nil || !acceptedContext(child, child.SubmissionDigest) || seen[child.CaptureID] || child.ScopeDigest != a.ScopeDigest || child.Expectation.CaseID != a.Group.CaseID || !child.CreatedAt.Equal(a.CreatedAt) {
+		composition := compositionGroupAccepted(a)
+		for n, child := range a.Group.Children {
+			if composition {
+				// ADR-276: each child is a single manual recording of its own scope.
+				b := child.Expectation.CompositionGroup
+				if b == nil || b.ParentCaptureID != a.CaptureID || b.ChildIndex != n || b.ChildCount != len(a.Group.Children) || child.Expectation.Recording == nil || child.Group != nil || !acceptedContext(child, child.SubmissionDigest) || seen[child.CaptureID] || child.Expectation.CaseID != a.Group.CaseID || !child.CreatedAt.Equal(a.CreatedAt) {
+					return false
+				}
+			} else if child.Expectation.Snapshot == nil || child.Expectation.Lifecycle == nil || child.Expectation.Lifecycle.TriggerKind != "recordingSave" || child.Group != nil || !acceptedContext(child, child.SubmissionDigest) || seen[child.CaptureID] || child.ScopeDigest != a.ScopeDigest || child.Expectation.CaseID != a.Group.CaseID || !child.CreatedAt.Equal(a.CreatedAt) {
 				return false
 			}
 			seen[child.CaptureID] = true
@@ -515,6 +522,9 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	}
 	if (p.Group != nil || p.Intent.Snapshot != nil && p.Intent.Snapshot.TriggerKind == "recordingSave") && !s.RecordingSaveEnabled {
 		return zero, value.ErrUnavailable
+	}
+	if p.CompositionGroup != nil {
+		return s.requestCompositionGroup(ctx, source, p, key, i, recovery)
 	}
 	if p.Group != nil {
 		return s.requestRecordingSaveGroup(ctx, source, p, key, recovery, bounds)

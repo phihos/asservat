@@ -419,7 +419,15 @@ func (s *ContextAdmissions) AdmitRecordingCompositionGroup(ctx context.Context, 
 			return value.ErrChanged
 		}
 		protected, err := previewRecord(row)
-		if err != nil || protected.CompositionGroup == nil || !bytes.Equal(digest(protected), digest(p)) {
+		if err != nil || protected.CompositionGroup == nil {
+			return value.ErrChanged
+		}
+		// ADR-252: an approved parent is accepted within its grant (checked
+		// per child below), so only its review window may be reanchored.
+		if approvedContextPlan(children[0]) {
+			protected.CreatedAt, protected.Deadline = p.CreatedAt, p.Deadline
+		}
+		if !bytes.Equal(digest(protected), digest(p)) {
 			return value.ErrChanged
 		}
 		if err := checkContextPreviewFence(ctx, q, s.root, p.ID, p.Actor); err != nil {
