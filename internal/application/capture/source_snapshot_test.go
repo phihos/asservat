@@ -50,7 +50,20 @@ func TestSnapshotAudienceKeepsFullOriginalReadersAndExcludesNewAssignments(t *te
 }
 
 func TestPolicySourceSnapshotPreviewAndRequestUseOnlyExistingWindow(t *testing.T) {
-	cohort := newSourceCohortFixture(t, 1)
+	policySourceSnapshotPreview(t, networkComposition())
+}
+
+// ADR-273: a syscall source saves its window through the same path.
+func TestPolicySyscallSourceSnapshotPreviewAndRequest(t *testing.T) {
+	plan := policySourceSnapshotPreview(t, &planning.ProfileComposition{Components: []planning.ProfileComponent{{ID: "calls", Profile: planning.ProfileRef{Catalog: "builtin", Name: "syscall-activity", Version: "v1"}}}, MaxTotalBytes: 16 << 20, MaxDuration: "30s"})
+	if plan.Input.Snapshot.ActionKind != "syscallTrace" || plan.Input.Retention.EvidenceType != "syscallTrace" {
+		t.Fatal("syscall window planned as packets", plan.Input.Snapshot.ActionKind, plan.Input.Retention.EvidenceType)
+	}
+}
+
+func policySourceSnapshotPreview(t *testing.T, composition *planning.ProfileComposition) planning.ContextPlan {
+	t.Helper()
+	cohort := newSourceCohortFixtureWith(t, 1, composition)
 	if err := cohort.maintain(0); err != nil {
 		t.Fatal("initial synthetic source", err)
 	}
@@ -117,6 +130,7 @@ func TestPolicySourceSnapshotPreviewAndRequestUseOnlyExistingWindow(t *testing.T
 	if plan.Input.Snapshot == nil || plan.Input.Recorder != nil || plan.Input.Snapshot.Request.T0 != originalT0 || plan.Input.Snapshot.Request.ProcessingUntil != originalDeadline || plan.Input.Retention.AnchorAt != artifact.SourceSnapshotAnchor(saved.Request) {
 		t.Fatal("request renewed original window/processing/source age", plan.Input.Snapshot)
 	}
+	return plan
 }
 
 type retainedSourceTargetsFixture struct {

@@ -134,7 +134,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	if !request.Valid() {
 		return zero, planning.ContextPlan{}, value.ErrAcquisitionClosed
 	}
-	selected := &planning.SourceSnapshotContext{Request: request, ActionID: source.Binding.ActionID, PolicyUID: a.PolicyUID, TriggerKind: "policy", ExecutionDigest: a.ScopeDigest, RecipeDigest: p.Recorder.RecipeDigest, SourceAudience: slices.Clone(source.Audience), SourceAudienceDigest: audienceDigest, SourceTarget: source.Target}
+	selected := &planning.SourceSnapshotContext{Request: request, ActionID: source.Binding.ActionID, PolicyUID: a.PolicyUID, TriggerKind: "policy", ActionKind: snapshotActionKind(p.Recorder.Action.Kind), ExecutionDigest: a.ScopeDigest, RecipeDigest: p.Recorder.RecipeDigest, SourceAudience: slices.Clone(source.Audience), SourceAudienceDigest: audienceDigest, SourceTarget: source.Target}
 	if manual != nil {
 		selected.PolicyName = selection.PolicyName
 	}
@@ -343,4 +343,12 @@ func snapshotFactsTargetUntil(f contextFacts) time.Time {
 		return f.snapshotSource.FreshUntil
 	}
 	return f.target.FreshUntil
+}
+
+// snapshotActionKind names a syscall source; the packet source stays empty.
+func snapshotActionKind(kind string) string {
+	if kind == "syscallTrace" {
+		return kind
+	}
+	return ""
 }

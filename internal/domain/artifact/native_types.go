@@ -94,10 +94,10 @@ const RemoteNativeLimit = FrameBytes
 func (t NativeType) DownloadLimit() int64 { return min(t.MaxBytes, RemoteNativeLimit) }
 
 // DownloadEvidenceType reports an evidence type the installed download path
-// serves (ADR-248): pod-status context and packet captures (PCAPNG). Syscall
-// traces have no producer yet and stay refused until their own increment.
+// serves (ADR-248): pod-status context, packet captures (PCAPNG) and syscall
+// metadata (JSON Lines, ADR-273).
 func DownloadEvidenceType(evidenceType string) bool {
-	return evidenceType == "context" || evidenceType == "packetCapture"
+	return evidenceType == "context" || evidenceType == "packetCapture" || evidenceType == "syscallTrace"
 }
 
 // ValidNativeDownloadMetadata checks the fixed, type-derived facts of prepared

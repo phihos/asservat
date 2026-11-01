@@ -33,7 +33,7 @@ func passing() Facts {
 		DebugFS: Supported, TraceFS: Supported, BPFFS: Supported, HostProcesses: Supported, Runtime: RuntimeContainerd, Engine: Engine{Linked: true, Initialized: true, Version: "v0.57.0"}}
 }
 
-func TestAssessPassingProbeOffersOnlyThePacketRecorder(t *testing.T) {
+func TestAssessPassingProbeOffersBothRecorders(t *testing.T) {
 	out := Assess(passing())
 	if len(out) != 2 || out[0].Mechanism != MechanismPacket || out[1].Mechanism != MechanismSyscall {
 		t.Fatalf("mechanisms %+v", out)
@@ -41,8 +41,13 @@ func TestAssessPassingProbeOffersOnlyThePacketRecorder(t *testing.T) {
 	if a := out[0]; !a.Prerequisites || a.Adapter != AdapterAvailable || len(a.Reasons) != 0 || a.Hook != HookTC {
 		t.Fatalf("packet recorder (ADR-248, tc hook of the gadget): %+v", a)
 	}
-	if a := out[1]; !a.Prerequisites || a.Adapter != AdapterUnavailable || !slices.Equal(a.Reasons, []Reason{ReasonRecorderNotImplemented}) {
-		t.Fatalf("increment 4 has no syscall recorder: %+v", a)
+	if a := out[1]; !a.Prerequisites || a.Adapter != AdapterAvailable || len(a.Reasons) != 0 {
+		t.Fatalf("syscall metadata recorder (ADR-273): %+v", a)
+	}
+	f := passing()
+	f.TraceFS = SupportUnknown
+	if a := Assess(f)[1]; a.Adapter != AdapterUnavailable || !slices.Equal(a.Reasons, []Reason{ReasonTracingUnavailable}) {
+		t.Fatalf("syscall recorder without tracefs: %+v", a)
 	}
 }
 
@@ -93,5 +98,19 @@ func TestRuntimeAndHostProcesses(t *testing.T) {
 	}
 	if HostProcessesVisible([]string{"asservat"}) != Unsupported || HostProcessesVisible([]string{"kubelet\n"}) != Supported {
 		t.Fatal("host processes")
+	}
+}
+
+func TestSyscallFilterValid(t *testing.T) {
+	ok := SyscallFilter{MaxEvents: 100_000, MaxTrackedThreads: 4096}
+	some := ok
+	some.Names = []string{"openat", "read"}
+	if !ok.Valid() || !some.Valid() || (SyscallFilter{}).Valid() {
+		t.Fatal("selection validity")
+	}
+	for _, bad := range [][]string{{"read", "read"}, {"read", "openat"}, {""}, make([]string, MaxSyscallFilter+1)} {
+		if (SyscallFilter{Names: bad, MaxEvents: 1, MaxTrackedThreads: 1}).Valid() {
+			t.Fatalf("%v accepted", bad)
+		}
 	}
 }

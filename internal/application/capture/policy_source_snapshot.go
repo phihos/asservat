@@ -2,6 +2,7 @@ package capture
 
 import (
 	"context"
+	"errors"
 
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -32,14 +33,30 @@ func (t PolicyTrigger) captureSourceSnapshot(ctx context.Context, current identi
 	}
 	preview, err := t.SourceSnapshots.PreviewPolicySnapshot(ctx, current, PolicySnapshotSelection{Policy: p, Authority: a, Source: *selected, Target: selected.Target.Request, TriggeredAt: occurrence.TriggeredAt})
 	if err != nil {
+		// The closed refusal is the recorded outcome; the fixed preview
+		// stage only names where it failed.
+		t.reportStage("occurrence-preview", err)
 		return "", refusalFor(err)
 	}
 	if preview.Preview.Target.PodUID != occurrence.PodUID || preview.Preview.Actor != a.Executor || preview.Preview.Intent.Snapshot == nil || !preview.Preview.Intent.Snapshot.Request.T0.Equal(occurrence.TriggeredAt) {
+		t.report("occurrence-preview/mismatch")
 		return "", "unavailable"
 	}
 	admitted, err := t.SourceSnapshots.Request(ctx, current, preview.Preview.ID, occurrence.ID)
 	if authorization.UUID(admitted.CaptureID) {
 		return admitted.CaptureID, ""
 	}
+	t.reportStage("occurrence-request", err)
 	return "", refusalFor(err)
+}
+
+// reportStage names where a policy snapshot was refused: the fixed stage of
+// a labeled failure, else its class. The closed refusal is the outcome.
+func (t PolicyTrigger) reportStage(prefix string, err error) {
+	var fixed interface{ FixedStep() string }
+	if errors.As(err, &fixed) {
+		t.report(prefix + "/" + fixed.FixedStep())
+		return
+	}
+	t.report(prefix + "/" + failureClass(err))
 }

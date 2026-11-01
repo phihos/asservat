@@ -191,9 +191,9 @@ type Availability struct {
 
 // implemented lists recorders this build provides. Increment 4 (ADR-248)
 // provides the manual networkHeaders packet recorder; it still needs a linked
-// and initialized engine (ReasonEngineUnavailable otherwise). Syscall
-// recording arrives with increment 10.
-var implemented = map[Mechanism]bool{MechanismPacket: true}
+// and initialized engine (ReasonEngineUnavailable otherwise). Increment 10
+// (ADR-273) adds the metadata-mode syscall recorder.
+var implemented = map[Mechanism]bool{MechanismPacket: true, MechanismSyscall: true}
 
 // Assess derives each mechanism's availability from the facts. A fact that
 // is unknown or denied counts as missing; nothing is assumed.

@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -171,14 +172,18 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		_, _ = io.Copy(io.Discard, pcapng)
 		return value.ErrConflict
 	}
+	nativeType := r.NativeType
+	if nativeType == "" {
+		nativeType = artifact.PCAPNGArtifact
+	}
 	if held.snapshot != nil {
 		x := held.snapshot
-		if r.Snapshot == nil || node.BootID != x.Binding.BootID || node.PodUID != x.Binding.CollectorPodUID || node.Epoch != x.Binding.CollectorEpoch || r.ProgramDigest != x.Binding.ProgramDigest || !r.Snapshot.Request.Equal(x.Request) || r.Snapshot.AcceptedExpectationDigest != artifact.Digest(x.ExpectationDigest) {
+		if r.Snapshot == nil || nativeType != held.expectation.NativeType || node.BootID != x.Binding.BootID || node.PodUID != x.Binding.CollectorPodUID || node.Epoch != x.Binding.CollectorEpoch || r.ProgramDigest != x.Binding.ProgramDigest || !r.Snapshot.Request.Equal(x.Request) || r.Snapshot.AcceptedExpectationDigest != artifact.Digest(x.ExpectationDigest) {
 			h.mu.Unlock()
 			_, _ = io.Copy(io.Discard, pcapng)
 			return value.ErrDenied
 		}
-	} else if r.Snapshot != nil {
+	} else if r.Snapshot != nil || nativeType != artifact.PCAPNGArtifact {
 		h.mu.Unlock()
 		_, _ = io.Copy(io.Discard, pcapng)
 		return value.ErrDenied
@@ -221,6 +226,7 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 	}
 	var copies artifact.Copies
 	var err error
+	storeStarted := h.now()
 	if held.snapshot != nil {
 		copies, err = prepared.StoreSnapshot(ctx, pcapng, started, completed, *r.Snapshot)
 	} else {
@@ -241,9 +247,13 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 	}
 	if err != nil || !outcome.Valid(e.Registration) {
 		outcome = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
-		h.log("connector recording " + r.CaptureID + " store unconfirmed")
+		reason := "invalid outcome"
+		if err != nil {
+			reason = err.Error() // fixed artifact error classes, no content
+		}
+		h.log("connector recording " + r.CaptureID + " store unconfirmed: " + reason)
 	} else {
-		h.log("connector recording " + r.CaptureID + " stored")
+		h.log(fmt.Sprintf("connector recording %s stored: %d native bytes in %s, window end %s, processing until %s", r.CaptureID, r.CapturedBytes, h.now().Sub(storeStarted).Round(10*time.Millisecond), completed.Format(time.RFC3339Nano), held.expectation.Registration.WriteUntil.Format(time.RFC3339Nano)))
 	}
 	h.mu.Lock()
 	held.outcome = outcome

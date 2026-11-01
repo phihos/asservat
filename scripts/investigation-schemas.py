@@ -354,7 +354,7 @@ def main():
             artifacts = data["properties"]["artifacts"]
             artifacts["minItems"] = 1
             row = artifacts["items"]["properties"]
-            row["kind"] = {"enum": ["pod-status", "packetCapture"]}
+            row["kind"] = {"enum": ["pod-status", "packetCapture", "syscallTrace"]}
             row["data_class"] = {"const": "metadata"}
             row["completeness"] = {"const": "complete"}
             notice = copy.deepcopy(documents["capture-assessment.schema.json"]["$defs"]["artifactNotice"])

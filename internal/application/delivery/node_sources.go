@@ -72,7 +72,7 @@ func (c *NodeChannel) enqueueSource(ctx context.Context, expected *targets.Packe
 		return collector.Work{}, ErrNodeUnavailable
 	}
 	if source != nil {
-		if expected == nil || !expected.Valid(now) || b.PodUID != expected.PodUID || b.NodeUID != expected.NodeUID || b.BootID != expected.BootID || b.CollectorPodUID != expected.CollectorPodUID || b.CollectorEpoch != expected.CollectorEpoch || !c.view(e, now).PacketRecorderAvailable() || !source.Permit.Dispatchable(now) {
+		if expected == nil || !expected.Valid(now) || b.PodUID != expected.PodUID || b.NodeUID != expected.NodeUID || b.BootID != expected.BootID || b.CollectorPodUID != expected.CollectorPodUID || b.CollectorEpoch != expected.CollectorEpoch || !c.view(e, now).RecorderAvailable(sourceMechanism(*source)) || !source.Permit.Dispatchable(now) {
 			return collector.Work{}, ErrNodeUnavailable
 		}
 		// Same-process certificate renewal preserves the source incarnation;
@@ -168,4 +168,27 @@ func (c *NodeChannel) NodeByUID(uid string) (NodeView, bool) {
 		return NodeView{}, false
 	}
 	return c.view(e, c.now()), true
+}
+
+func sourceMechanism(s collector.PacketSource) collector.Mechanism {
+	if s.Syscalls != nil {
+		return collector.MechanismSyscall
+	}
+	return collector.MechanismPacket
+}
+
+// SyscallFilterDigest binds a syscall source's accepted selection (ADR-273)
+// into Binding.ProgramDigest. It is never zero and domain-separated from BPF
+// program digests.
+func SyscallFilterDigest(f collector.SyscallFilter) [32]byte {
+	// A nil and an empty selection are the same "all syscalls" source; wire
+	// decoding produces either (installed run 41284196310 refused the node work).
+	if len(f.Names) == 0 {
+		f.Names = nil
+	}
+	b, _ := json.Marshal(struct {
+		Kind string
+		collector.SyscallFilter
+	}{"asservat-syscall-filter/v1", f})
+	return sha256.Sum256(b)
 }

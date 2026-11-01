@@ -59,11 +59,17 @@ func (c *NodeChannel) NodeByName(name string) (NodeView, bool) {
 // PacketRecorderAvailable reports whether the view's current report offers
 // the packet recorder.
 func (v NodeView) PacketRecorderAvailable() bool {
+	return v.RecorderAvailable(collector.MechanismPacket)
+}
+
+// RecorderAvailable reports whether the node's current report offers the
+// mechanism's recorder.
+func (v NodeView) RecorderAvailable(mechanism collector.Mechanism) bool {
 	if !v.Current || v.Report == nil {
 		return false
 	}
 	for _, m := range v.Report.Mechanisms {
-		if m.Mechanism == collector.MechanismPacket {
+		if m.Mechanism == mechanism {
 			return m.Adapter == collector.AdapterAvailable && m.Prerequisites
 		}
 	}

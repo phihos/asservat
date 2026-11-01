@@ -1107,3 +1107,25 @@ func TestRingSparseRecordsSurviveOlderRecordsAgingOut(t *testing.T) {
 		t.Fatalf("recent sparse history lost: %d records, coverage %+v", n, s.Coverage())
 	}
 }
+
+func TestRingAddRecordBypassesPacketDecoder(t *testing.T) {
+	r, now := ringFixture(t, nil)
+	record := bytes.Repeat([]byte{0xAB}, 48) // not an Ethernet frame
+	if err := r.AddRecord(record, now, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.AddRecord(record, now.Add(-time.Minute), now); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("record before start: %v", err)
+	}
+	if err := r.AddRecord(nil, now, now); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("empty record: %v", err)
+	}
+	s := ringCopy(t, r, now, now.Add(time.Second), now.Add(time.Second))
+	p, err := ringNext(s)
+	if err != nil || !bytes.Equal(p.Header[:p.Length], record) || p.Wire != 48 || !p.At.Equal(now) {
+		t.Fatalf("record %+v %v", p, err)
+	}
+	if st := r.State(); st.Packets.Retained != 1 || st.Packets.Malformed != 2 {
+		t.Fatalf("state %+v", st.Packets)
+	}
+}

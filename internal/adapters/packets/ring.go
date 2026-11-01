@@ -249,6 +249,32 @@ func (r *Ring) Add(frame []byte, wire uint32, at, observedAt time.Time) error {
 	if drop != DropNone {
 		return nil
 	}
+	return r.retain(prefix[:n], wire, at, observedAt)
+}
+
+// AddRecord retains one already-minimized fixed record (syscall metadata)
+// without the packet filter/header decoder; segments, eviction, coverage and
+// accounting are the packet ring's.
+func (r *Ring) AddRecord(record []byte, at, observedAt time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := r.advance(observedAt); err != nil {
+		return err
+	}
+	if r.state.Stopped {
+		return ErrRingClosed
+	}
+	r.state.Packets.Seen++
+	if len(record) == 0 || len(record) > Snaplen || at.IsZero() || at.Before(r.bounds.StartedAt) || at.After(observedAt) || at.Before(observedAt.Add(-r.limits.MaxAge)) || at.UnixNano() <= 0 || !time.Unix(0, at.UnixNano()).Equal(at) {
+		r.state.Packets.Malformed++
+		r.cleanSince = later(r.cleanSince, observedAt.Add(time.Nanosecond))
+		return ErrInvalid
+	}
+	return r.retain(record, uint32(len(record)), at, observedAt)
+}
+
+func (r *Ring) retain(data []byte, wire uint32, at, observedAt time.Time) error {
+	n := len(data)
 	if r.state.Packets.Retained == ^uint64(0) {
 		r.cleanSince = later(r.cleanSince, observedAt.Add(time.Nanosecond))
 		return ErrRingCapacity
@@ -275,7 +301,7 @@ func (r *Ring) Add(frame []byte, wire uint32, at, observedAt time.Time) error {
 	ringEndian.PutUint64(record, uint64(at.UnixNano()))
 	ringEndian.PutUint32(record[8:], wire)
 	ringEndian.PutUint16(record[12:], uint16(n))
-	copy(record[ringRecordHeader:], prefix[:n])
+	copy(record[ringRecordHeader:], data)
 	ringEndian.PutUint32(s, uint32(used+size))
 	count := ringEndian.Uint32(s[4:])
 	ringEndian.PutUint32(s[4:], count+1)

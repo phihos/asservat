@@ -55,7 +55,7 @@ func compileSourceSnapshotContext(in value.ContextInput, now time.Time) (value.C
 		return bad()
 	}
 	r := in.Retention
-	if r.Target != in.Target.Target() || !r.PolicyRevision.Valid() || !now.Before(r.ValidUntil) || !r.Deadlines.Valid() || !now.Before(r.ExpiresAt) || !r.AnchorAt.Equal(artifact.SourceSnapshotAnchor(s.Request)) || r.PrivacyClass != "potentialPersonalData" || r.EvidenceType != "packetCapture" || !identity.Text(r.PurposeRef, 128) || len(r.Policies) < 1 || len(r.Policies) > 64 || r.RequestedSeconds < 1 || r.MaximumSeconds < 1 || r.DeletionBudgetSeconds < 1 || r.DeletionBudgetSeconds >= r.MaximumSeconds {
+	if r.Target != in.Target.Target() || !r.PolicyRevision.Valid() || !now.Before(r.ValidUntil) || !r.Deadlines.Valid() || !now.Before(r.ExpiresAt) || !r.AnchorAt.Equal(artifact.SourceSnapshotAnchor(s.Request)) || r.PrivacyClass != "potentialPersonalData" || r.EvidenceType != snapshotEvidenceType(s.ActionKind) || !identity.Text(r.PurposeRef, 128) || len(r.Policies) < 1 || len(r.Policies) > 64 || r.RequestedSeconds < 1 || r.MaximumSeconds < 1 || r.DeletionBudgetSeconds < 1 || r.DeletionBudgetSeconds >= r.MaximumSeconds {
 		return bad()
 	}
 	if p := r.Proof; p != (artifact.RetentionProof{}) && (!p.Valid(now) || !p.Matches(p.RootID, r.Target.ClusterID, r.Target.NamespaceUID, r.Target.WorkloadUID, r.Target.PodUID) || p.Policy != r.PolicyRevision || r.ValidUntil.After(p.ValidUntil)) {
@@ -148,4 +148,13 @@ func SourceSnapshotLifecycle(s *value.SourceSnapshotContext) (*artifact.OngoingL
 
 func sourceScopePrincipal(p principal) identity.Principal {
 	return identity.Principal{Issuer: p.Issuer, Subject: p.Subject, ClientID: p.ClientID, Kind: identity.Kind(p.Kind)}
+}
+
+// snapshotEvidenceType is the retention evidence type of a source window:
+// syscall metadata for a syscall source (ADR-273), else packet capture.
+func snapshotEvidenceType(actionKind string) string {
+	if actionKind == "syscallTrace" {
+		return actionKind
+	}
+	return "packetCapture"
 }

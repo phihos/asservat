@@ -468,7 +468,8 @@
                   "collection_kind": {
                     "enum": [
                       "podStatus",
-                      "packetCapture"
+                      "packetCapture",
+                      "syscallTrace"
                     ],
                     "description": "Accepted collection action; controls available approval commands, not acquisition authority."
                   },

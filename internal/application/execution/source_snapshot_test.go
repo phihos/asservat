@@ -18,6 +18,13 @@ import (
 
 func snapshotExecutionFixture(t *testing.T) (*apiRunnerFixture, APIContextRunner, identities.CurrentIdentity) {
 	t.Helper()
+	return snapshotExecutionFixtureFor(t, artifact.PCAPNGArtifact)
+}
+
+// snapshotExecutionFixtureFor admits a source window of nativeType: packet
+// headers or syscall metadata (ADR-273).
+func snapshotExecutionFixtureFor(t *testing.T, nativeType string) (*apiRunnerFixture, APIContextRunner, identities.CurrentIdentity) {
+	t.Helper()
 	f, runner, current := apiRunner(t)
 	f.work.Accepted.Deadline = f.now.Add(20 * time.Second)
 	e := f.work.Accepted.Expectation
@@ -31,6 +38,9 @@ func snapshotExecutionFixture(t *testing.T) (*apiRunnerFixture, APIContextRunner
 	request := artifact.SourceSnapshotRequest{SourceBindingDigest: deliveryapp.SourceBindingDigest(b), SourceID: b.SourceID, Fence: b.Fence, SnapshotID: contextID(68), SourceStartedAt: f.now.Add(-time.Minute), SourceHardUntil: f.now.Add(time.Hour), T0: f.now, IssuedAt: f.now, StartBy: f.now.Add(5 * time.Second), ProcessingUntil: f.work.Accepted.Deadline, Before: 30 * time.Second, MaxBytes: artifact.RecordingNativeLimit}
 	snapshot := &planning.SourceSnapshotContext{Request: request, ActionID: b.ActionID, PolicyUID: b.PolicyUID, TriggerKind: "policy", ExecutionDigest: artifact.Digest(b.Scope), RecipeDigest: e.RecipeDigest, SourceAudience: e.Audience, SourceAudienceDigest: audienceDigest}
 	f.retention.EvidenceType = "packetCapture"
+	if nativeType == artifact.SyscallRecordsArtifact {
+		snapshot.ActionKind, f.retention.EvidenceType = "syscallTrace", "syscallTrace"
+	}
 	f.retention.AnchorAt = artifact.SourceSnapshotAnchor(request)
 	f.retention.ExpiresAt = f.retention.ExpiresAt.Add(-30 * time.Second)
 	f.retention.DeleteBy = f.retention.DeleteBy.Add(-30 * time.Second)
@@ -38,7 +48,7 @@ func snapshotExecutionFixture(t *testing.T) (*apiRunnerFixture, APIContextRunner
 	if err != nil {
 		t.Fatal("snapshot plan", err)
 	}
-	e.NativeType, e.ActionID, e.Snapshot = artifact.PCAPNGArtifact, b.ActionID, &request
+	e.NativeType, e.ActionID, e.Snapshot = nativeType, b.ActionID, &request
 	e.Lifecycle, err = compiler.SourceSnapshotLifecycle(snapshot)
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +77,13 @@ func snapshotExecutionFixture(t *testing.T) (*apiRunnerFixture, APIContextRunner
 }
 
 func TestAPIContextSnapshotRecompilesOnlyAdmittedSource(t *testing.T) {
-	f, runner, current := snapshotExecutionFixture(t)
+	for _, nativeType := range []string{artifact.PCAPNGArtifact, artifact.SyscallRecordsArtifact} {
+		t.Run(nativeType, func(t *testing.T) { snapshotRecompilesOnlyAdmittedSource(t, nativeType) })
+	}
+}
+
+func snapshotRecompilesOnlyAdmittedSource(t *testing.T, nativeType string) {
+	f, runner, current := snapshotExecutionFixtureFor(t, nativeType)
 	b := *f.work.SourceBinding
 	check, _, err := runner.checkObserved(t.Context(), current, f.work, f.actor.ValidUntil, nil, nil)
 	if err != nil || !check.Valid(f.now) || check.Plan.Input.Snapshot == nil || check.Plan.Input.Recorder != nil {
@@ -98,7 +114,13 @@ func (s *snapshotCompletionFixture) RecordAPIStoredSnapshotCompletion(_ context.
 }
 
 func TestAPIContextSnapshotCollectionKeepsAcceptedDigestAndChecksCoverage(t *testing.T) {
-	f, runner, _ := snapshotExecutionFixture(t)
+	for _, nativeType := range []string{artifact.PCAPNGArtifact, artifact.SyscallRecordsArtifact} {
+		t.Run(nativeType, func(t *testing.T) { snapshotCollectionKeepsAcceptedDigest(t, nativeType) })
+	}
+}
+
+func snapshotCollectionKeepsAcceptedDigest(t *testing.T, nativeType string) {
+	f, runner, _ := snapshotExecutionFixtureFor(t, nativeType)
 	e := f.work.Accepted.Expectation
 	accepted := evidence.ContextExpectationDigest(e)
 	coverage := artifact.SourceSnapshotCoverage{Request: *e.Snapshot, AcceptedExpectationDigest: accepted, NativeBytes: 100, Retained: 1, AvailableFrom: e.Snapshot.T0.Add(-time.Second), ObservedUntil: e.Snapshot.T0, CompletedAt: f.now}

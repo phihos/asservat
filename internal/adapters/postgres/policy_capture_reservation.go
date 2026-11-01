@@ -66,6 +66,9 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 	if a.Plan.Input.Recorder != nil || a.Plan.Input.Snapshot != nil {
 		action = "packetCapture"
 	}
+	if s := a.Plan.Input.Snapshot; s != nil && s.ActionKind == "syscallTrace" {
+		action = s.ActionKind
+	}
 	if !slices.Contains(record.Authority.Actions, action) {
 		return nil, value.ErrDenied
 	}

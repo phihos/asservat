@@ -51,6 +51,9 @@ func WirePacketSource(s collector.PacketSource) contracts.NodePacketSource {
 	for i, ins := range s.Program {
 		w.Program[i] = contracts.NodeBPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
 	}
+	if s.Syscalls != nil {
+		w.Syscalls = &contracts.NodeSyscallFilter{Names: append([]string{}, s.Syscalls.Names...), ErrorsOnly: s.Syscalls.ErrorsOnly, MaxEvents: s.Syscalls.MaxEvents, MaxTrackedThreads: s.Syscalls.MaxTrackedThreads}
+	}
 	return w
 }
 func DomainPacketSource(w contracts.NodePacketSource) (collector.PacketSource, bool) {
@@ -63,7 +66,16 @@ func DomainPacketSource(w contracts.NodePacketSource) (collector.PacketSource, b
 	for i, ins := range w.Program {
 		s.Program[i] = planning.BPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
 	}
+	if w.Syscalls != nil {
+		if len(w.Syscalls.Names) > collector.MaxSyscallFilter {
+			return collector.PacketSource{}, false
+		}
+		s.Syscalls = &collector.SyscallFilter{Names: append([]string{}, w.Syscalls.Names...), ErrorsOnly: w.Syscalls.ErrorsOnly, MaxEvents: w.Syscalls.MaxEvents, MaxTrackedThreads: w.Syscalls.MaxTrackedThreads}
+	}
 	limits := DomainCeilings(w.NodeLimits)
 	s.Resources = collector.SourceResources{PolicyUID: w.ResourcePolicyUID, Node: collector.PolicyLimits{SourceLimits: limits.SourceLimits, RingBytes: limits.RingBytes, FrozenBytes: limits.FrozenBytes, UploadBytesPerSecond: limits.UploadBytesPerSecond, UploadBurstBytes: limits.UploadBurstBytes}, Workload: collector.SourceLimits{MaxActiveSources: w.WorkloadLimits.MaxActiveSources, InputBytesPerSecond: w.WorkloadLimits.InputBytesPerSecond, InputBurstBytes: w.WorkloadLimits.InputBurstBytes}}
+	if s.Syscalls != nil && deliveryapp.SyscallFilterDigest(*s.Syscalls) != s.Permit.Binding.ProgramDigest {
+		return collector.PacketSource{}, false
+	}
 	return s, s.Valid() && deliveryapp.SourceResourcesDigest(s.Resources) == s.Permit.Binding.ResourceDigest
 }

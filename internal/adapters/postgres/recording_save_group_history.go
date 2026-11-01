@@ -3,6 +3,8 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"slices"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -207,11 +209,21 @@ func recordingGroupHistoryEntries(ctx context.Context, tx *custodydb.Queries, ro
 			continue
 		}
 		var actions []value.ContextActionProgress
+		var kinds []string
 		evidenceAvailable, evidenceExpired, active := false, false, false
 		for _, c := range members[g.ID] {
 			f, ok := factsByID[c.ID]
 			if !ok || !bytes.Equal(c.ExpectationJson, f.ContextCapture.ExpectationJson) || !bytes.Equal(c.ScopeDigest, f.ContextCapture.ScopeDigest) {
 				return nil, value.ErrUnavailable
+			}
+			var expected artifact.ContextExpectation
+			if json.Unmarshal(c.ExpectationJson, &expected) != nil {
+				return nil, value.ErrUnavailable
+			}
+			for _, k := range historyActionKinds(expected) {
+				if !slices.Contains(kinds, k) {
+					kinds = append(kinds, k)
+				}
 			}
 			p, e := progressFacts(custodydb.ReadContextProgressFactsRow(f), executionsByID[c.ID]...)
 			if e != nil {
@@ -238,7 +250,7 @@ func recordingGroupHistoryEntries(ctx context.Context, tx *custodydb.Queries, ro
 		} else if evidenceExpired {
 			evidence = "expired"
 		}
-		entry := value.HistoryEntry{Operation: "recordingSave", Requester: actors[g.ID], CaptureID: uid(g.ID), Origin: value.HistoryManual, AcceptedAt: g.AcceptedAt.Time.UTC(), ExpiresAt: parameter.SummaryExpiresAt.Time, SettingsExpiresAt: identity.Earlier(parameter.SummaryExpiresAt.Time, parameter.EffectiveExpiresAt.Time), Phase: phase, EvidenceState: evidence, ActionKinds: []string{"packetCapture"}, RepeatState: "requiresSelection"}
+		entry := value.HistoryEntry{Operation: "recordingSave", Requester: actors[g.ID], CaptureID: uid(g.ID), Origin: value.HistoryManual, AcceptedAt: g.AcceptedAt.Time.UTC(), ExpiresAt: parameter.SummaryExpiresAt.Time, SettingsExpiresAt: identity.Earlier(parameter.SummaryExpiresAt.Time, parameter.EffectiveExpiresAt.Time), Phase: phase, EvidenceState: evidence, ActionKinds: slices.Sorted(slices.Values(kinds)), RepeatState: "requiresSelection"}
 		if !now.Before(entry.SettingsExpiresAt) {
 			entry.RepeatState = "parametersExpired"
 		} else if parameter.State != "available" || parameter.CustodyState != artifact.StoredUnpublished {

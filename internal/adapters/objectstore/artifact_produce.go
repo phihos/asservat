@@ -3,6 +3,7 @@ package objectstore
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"slices"
 	"sync"
@@ -133,20 +134,20 @@ func (a *PreparedArtifact) Store(ctx context.Context, src io.Reader, started, co
 func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, started, completed time.Time) (artifact.Copies, error) {
 	var out artifact.Copies
 	if a.used || a.encoder == nil || a.metadata == nil || src == nil {
-		return out, artifact.ErrInvalid
+		return out, fmt.Errorf("%w: prepared artifact used", artifact.ErrInvalid)
 	}
 	a.used = true
 	defer func() { a.encoder = nil; a.metadata = nil }()
 	e, p := a.expectation, a.producer
 	r := e.Registration
 	if !p.now().Before(r.WriteUntil) || completed.Before(started) || started.Before(r.AnchorAt) || completed.After(p.now()) {
-		return out, artifact.ErrInvalid
+		return out, fmt.Errorf("%w: store interval", artifact.ErrInvalid)
 	}
 	ctx, cancel := context.WithDeadline(ctx, r.WriteUntil)
 	defer cancel()
 	check, err := p.contracts.NativeCheck(e, manifest.ContextManifest{StartedAt: started, CompletedAt: completed})
 	if err != nil {
-		return out, err
+		return out, fmt.Errorf("%w: native check", err)
 	}
 	var index, small bytes.Buffer
 	var data io.Writer = &small

@@ -3,11 +3,13 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/gadget"
 	"asservat.local/asservat/internal/adapters/packets"
+	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/planning"
@@ -31,21 +33,35 @@ type packetSource struct {
 	stoppedUntil                   time.Time
 	closed, engineExited, released bool
 	inputUnknown                   bool
-	err                            error
-	done                           chan struct{}
-	release                        func()
-	budget                         *collector.Budget
-	budgetMu                       *sync.Mutex
-	lowering                       collector.PolicyLimits
+	// records marks a syscall source: frames are fixed records, and drops
+	// (rate, stale time, lost samples) are ring gaps that the saved window's
+	// coverage reports, not a source stop or source-level InputUnknown, which
+	// the hub would end and replace (ADR-273).
+	records   bool
+	maxEvents int64
+	err       error
+	done      chan struct{}
+	release   func()
+	budget    *collector.Budget
+	budgetMu  *sync.Mutex
+	lowering  collector.PolicyLimits
+	// log reports why the source stopped (nil in tests).
+	log func(string)
 }
 
-func newPacketSource(parent context.Context, permit collector.SourcePermit, lowering collector.PolicyLimits, limits packets.RingLimits, program []planning.BPFInstruction, engine observedPacketEngine, now func() time.Time, budget *collector.Budget, budgetMu *sync.Mutex) (*packetSource, error) {
+func newPacketSource(parent context.Context, permit collector.SourcePermit, lowering collector.PolicyLimits, limits packets.RingLimits, program []planning.BPFInstruction, syscallFilter *collector.SyscallFilter, engine observedPacketEngine, now func() time.Time, budget *collector.Budget, budgetMu *sync.Mutex, log func(string)) (*packetSource, error) {
 	if parent == nil || parent.Err() != nil || engine == nil || now == nil || budget == nil || budgetMu == nil || !permit.Startable(now()) {
 		return nil, collector.ErrInvalid
 	}
 	var actual [32]byte
 	if len(program) > 0 {
 		actual = [32]byte(compiler.FilterProgramDigest(program))
+	}
+	if syscallFilter != nil {
+		if len(program) > 0 || !syscallFilter.Valid() {
+			return nil, collector.ErrInvalid
+		}
+		actual = deliveryapp.SyscallFilterDigest(*syscallFilter)
 	}
 	if actual != permit.Binding.ProgramDigest {
 		return nil, collector.ErrInvalid
@@ -77,7 +93,10 @@ func newPacketSource(parent context.Context, permit collector.SourcePermit, lowe
 		release()
 		return nil, err
 	}
-	s := &packetSource{ctx: ctx, cancel: cancel, ring: ring, meter: meter, now: now, done: make(chan struct{}), release: release, budget: budget, budgetMu: budgetMu, lowering: lowering}
+	s := &packetSource{ctx: ctx, cancel: cancel, ring: ring, meter: meter, now: now, done: make(chan struct{}), release: release, budget: budget, budgetMu: budgetMu, lowering: lowering, records: syscallFilter != nil, log: log}
+	if syscallFilter != nil {
+		s.maxEvents = syscallFilter.MaxEvents
+	}
 	s.mu.Lock()
 	s.scheduleLocked()
 	s.mu.Unlock()
@@ -146,6 +165,9 @@ func (s *packetSource) stopLocked(err error) {
 		if s.err == nil {
 			s.err = err
 		}
+		if s.log != nil && err != nil && !errors.Is(err, context.Canceled) {
+			s.log(fmt.Sprintf("node collector: source %s stopped: %v", s.meter.Permit().Binding.SourceID, err))
+		}
 		s.cancel()
 		if s.timer != nil {
 			s.timer.Stop()
@@ -172,6 +194,10 @@ func (s *packetSource) add(f gadget.Frame) {
 	now := s.now()
 	// Debit original wire length before filter/sanitizer, including frames
 	// which the ring discards. There is no per-packet API or SQL call.
+	if s.records {
+		s.addRecordLocked(f, now)
+		return
+	}
 	if err := s.meter.Charge(int64(f.Wire), now); err != nil {
 		s.stopLocked(err)
 		return
@@ -192,9 +218,41 @@ func (s *packetSource) add(f gadget.Frame) {
 func (s *packetSource) notice(gadget.InputNotice) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.inputUnknown = true
 	_ = s.ring.Gap(s.now())
-	s.stopLocked(ErrObservationClosed)
+	if !s.records {
+		s.inputUnknown = true
+		s.stopLocked(ErrObservationClosed)
+	}
+}
+
+// addRecordLocked retains one syscall record. Over-rate events and records
+// outside the ring's time bounds are dropped as a visible ring gap; spent
+// credit, an expired leaf or a closed ring still stop the source.
+func (s *packetSource) addRecordLocked(f gadget.Frame, now time.Time) {
+	err := s.meter.Charge(int64(f.Wire), now)
+	if errors.Is(err, collector.ErrObservationRateExceeded) {
+		_ = s.ring.Gap(now)
+		return
+	}
+	if err != nil {
+		s.stopLocked(err)
+		return
+	}
+	if len(f.Data) == 0 {
+		return // charged but not retained (result: errors)
+	}
+	at := f.At
+	if at.After(now) {
+		at = now // boot-clock conversion can lead the wall clock slightly
+	}
+	if err := s.ring.AddRecord(f.Data, at, now); errors.Is(err, packets.ErrInvalid) {
+		_ = s.ring.Gap(now)
+	} else if err != nil {
+		s.inputUnknown = true
+		s.stopLocked(err)
+		return
+	}
+	s.scheduleLocked()
 }
 
 func (s *packetSource) run(engine observedPacketEngine, pod string) {
@@ -213,9 +271,11 @@ func (s *packetSource) run(engine observedPacketEngine, pod string) {
 	defer s.mu.Unlock()
 	s.engineExited = true
 	if stats.LostSamples > 0 {
-		s.inputUnknown = true
 		_ = s.ring.Gap(s.now())
-		err = errors.Join(err, ErrObservationClosed)
+		if !s.records {
+			s.inputUnknown = true
+			err = errors.Join(err, ErrObservationClosed)
+		}
 	}
 	if s.closed {
 		s.finishLocked()
@@ -284,13 +344,15 @@ func (s *packetSource) BeginWindow(processing context.Context, window packets.Ri
 		release()
 		return nil, err
 	}
-	return &packetSourceSnapshot{copy: copy, release: release}, nil
+	return &packetSourceSnapshot{copy: copy, release: release, records: s.records, maxEvents: s.maxEvents}, nil
 }
 
 type packetSourceSnapshot struct {
-	copy    *packets.WindowSnapshot
-	once    sync.Once
-	release func()
+	records   bool  // syscall records, encoded as JSON Lines
+	maxEvents int64 // syscall events per saved window
+	copy      *packets.WindowSnapshot
+	once      sync.Once
+	release   func()
 }
 
 // Close follows joined processing/upload and erases the copy before releasing

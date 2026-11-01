@@ -165,6 +165,9 @@ type PacketResult struct {
 	Snaplen       int
 	EngineVersion string
 	ProgramDigest [32]byte
+	// NativeType is empty for PCAPNG or artifact.SyscallRecordsArtifact for
+	// a syscall source snapshot (ADR-273).
+	NativeType string `json:",omitempty"`
 	// Failure is empty for a completed capture, otherwise why the engine
 	// stopped (TargetNotFound, TargetHostNetwork or CaptureFailed); the
 	// PCAPNG then holds what was retained before.
@@ -179,7 +182,7 @@ func (r PacketResult) Valid() bool {
 	dropped := r.Filtered + r.Unsupported + r.Fragment + r.Extension + r.Malformed + r.OutputFull
 	failure := r.Failure == "" || r.Failure == ReasonTargetNotFound || r.Failure == ReasonTargetHostNet || r.Failure == ReasonCaptureFailed
 	return validUUID(r.WorkID) && validUUID(r.CaptureID) && !r.StartedAt.IsZero() && !r.EndedAt.Before(r.StartedAt) && r.Retained+dropped == r.Seen &&
-		r.CapturedBytes > 0 && r.CapturedBytes <= MaxPacketCaptureBytes && r.Snaplen > 0 && r.Snaplen <= 1500 && len(r.EngineVersion) <= 64 && failure
+		r.CapturedBytes > 0 && r.CapturedBytes <= MaxPacketCaptureBytes && (r.NativeType == "" || r.NativeType == artifact.SyscallRecordsArtifact) && r.Snaplen > 0 && r.Snaplen <= 1500 && len(r.EngineVersion) <= 64 && failure
 }
 
 // Outcome of one work item, reported in the next status.

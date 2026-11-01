@@ -3,6 +3,7 @@ package objectstore
 import (
 	"context"
 	"crypto/sha256"
+	"fmt"
 	"hash"
 	"io"
 	"time"
@@ -18,9 +19,12 @@ func (a *PreparedArtifact) StoreSnapshot(ctx context.Context, src io.Reader, sta
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	e, err := artifact.ProjectSourceSnapshot(a.expectation, evidence.ContextExpectationDigest(a.expectation), o)
+	if err != nil {
+		return artifact.Copies{}, fmt.Errorf("%w: window coverage", err)
+	}
 	acquiredFrom, acquiredUntil := artifact.SourceSnapshotAcquisition(o.SourceSnapshotCoverage)
-	if err != nil || !started.Equal(acquiredFrom) || !completed.Equal(acquiredUntil) {
-		return artifact.Copies{}, artifact.ErrInvalid
+	if !started.Equal(acquiredFrom) || !completed.Equal(acquiredUntil) {
+		return artifact.Copies{}, fmt.Errorf("%w: acquisition interval", artifact.ErrInvalid)
 	}
 	a.expectation = e
 	retained := o.Retained

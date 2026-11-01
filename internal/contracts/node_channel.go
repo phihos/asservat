@@ -140,6 +140,14 @@ type NodePacketSource struct {
 	ResourcePolicyUID string               `json:"resourcePolicyUID"`
 	NodeLimits        NodeCeilings         `json:"nodeLimits"`
 	WorkloadLimits    NodeSourceLimits     `json:"workloadLimits"`
+	// Syscalls makes this a syscall metadata source (ADR-273).
+	Syscalls *NodeSyscallFilter `json:"syscalls,omitempty"`
+}
+type NodeSyscallFilter struct {
+	Names             []string `json:"names"`
+	ErrorsOnly        bool     `json:"errorsOnly,omitempty"`
+	MaxEvents         int64    `json:"maxEvents"`
+	MaxTrackedThreads int64    `json:"maxTrackedThreads"`
 }
 type NodeSourceLimits struct {
 	MaxActiveSources    int64 `json:"maxActiveSources"`
@@ -258,6 +266,7 @@ type NodePacketResult struct {
 	Snaplen       int                  `json:"snaplen"`
 	EngineVersion string               `json:"engineVersion"`
 	ProgramDigest string               `json:"programDigest"`
+	NativeType    string               `json:"nativeType,omitempty"`
 	Failure       string               `json:"failure"`
 }
 

@@ -21,3 +21,7 @@ func CapturePackets(context.Context, string, int, func(Frame)) (CaptureStats, er
 func CaptureObservedPackets(context.Context, string, int, func(Frame), func(InputNotice)) (CaptureStats, error) {
 	return CaptureStats{}, ErrEngineUnavailable
 }
+
+func TraceSyscalls(context.Context, string, []uint16, func([]byte), func(InputNotice)) (CaptureStats, error) {
+	return CaptureStats{}, ErrEngineUnavailable
+}

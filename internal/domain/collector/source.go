@@ -27,6 +27,10 @@ func (b SourceBinding) Valid() bool {
 }
 
 const SourceLeafLifetime = 30 * time.Second
+
+// SyscallEventCredit is the input credit one syscall event spends, so the
+// source's byte rate and credit bound events (ADR-273).
+const SyscallEventCredit = 256
 const SourceStatusLimit = MaxActiveSources + MaxQueuedWork
 
 // SourceRingLimits is the portable resolved ring plan. Its physical segment
@@ -50,6 +54,36 @@ type PacketSource struct {
 	Program   []planning.BPFInstruction
 	Ring      SourceRingLimits
 	Resources SourceResources
+	// Syscalls makes this a syscall metadata source (nil: packet source).
+	// Its digest (planning.SyscallFilterDigest) occupies Binding.ProgramDigest,
+	// so an authenticated packet permit can never start a syscall engine or
+	// the reverse; consumers recompute it.
+	Syscalls *SyscallFilter `json:",omitempty"`
+}
+
+// SyscallFilter is a syscall source's accepted selection: sorted unique
+// names (empty records every call; the node resolves names for its ABI and
+// refuses unknown ones), whether only failed calls are retained (every call
+// is still charged), the tracked-thread ceiling and the per-snapshot event cap.
+type SyscallFilter struct {
+	Names             []string
+	ErrorsOnly        bool
+	MaxEvents         int64
+	MaxTrackedThreads int64
+}
+
+const MaxSyscallFilter = 128
+
+func (f SyscallFilter) Valid() bool {
+	if len(f.Names) > MaxSyscallFilter || f.MaxEvents < 1 || f.MaxEvents > 1_000_000 || f.MaxTrackedThreads < 1 || f.MaxTrackedThreads > 16_384 {
+		return false
+	}
+	for i, n := range f.Names {
+		if len(n) == 0 || len(n) > 64 || i > 0 && n <= f.Names[i-1] {
+			return false
+		}
+	}
+	return true
 }
 
 // SourceResources binds the exact protected resource policy and lowerings,
@@ -85,7 +119,11 @@ func (s SourceStatus) Valid(observedAt time.Time) bool {
 }
 
 func (s PacketSource) Valid() bool {
-	return s.Permit.Valid(s.Permit.IssuedAt) && s.Ring.Valid() && s.Resources.Valid() && len(s.Program) <= planning.MaxFilterInstructions && (len(s.Program) == 0) == (s.Permit.Binding.ProgramDigest == [32]byte{})
+	common := s.Permit.Valid(s.Permit.IssuedAt) && s.Ring.Valid() && s.Resources.Valid()
+	if s.Syscalls != nil {
+		return common && len(s.Program) == 0 && s.Syscalls.Valid() && s.Permit.Binding.ProgramDigest != [32]byte{}
+	}
+	return common && len(s.Program) <= planning.MaxFilterInstructions && (len(s.Program) == 0) == (s.Permit.Binding.ProgramDigest == [32]byte{})
 }
 
 // SourcePermit separates the original hard session/start bounds, each new

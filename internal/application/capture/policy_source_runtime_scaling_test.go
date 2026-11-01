@@ -13,6 +13,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/collector"
+	planning "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -46,12 +47,17 @@ type sourceCohortFixture struct {
 
 func newSourceCohortFixture(t *testing.T, replicas int) *sourceCohortFixture {
 	t.Helper()
+	return newSourceCohortFixtureWith(t, replicas, networkComposition())
+}
+
+func newSourceCohortFixtureWith(t *testing.T, replicas int, composition *planning.ProfileComposition) *sourceCohortFixture {
+	t.Helper()
 	f, accepted, settings, _ := newTeamRecordingFixture(t)
 	p, err := compileSpec(t, restartSpec())
 	if err != nil {
 		t.Fatal(err)
 	}
-	recorder, err := compiler.CompileOngoingPolicyRecorder(*networkComposition(), &stubFilters{})
+	recorder, err := compiler.CompileOngoingPolicyRecorder(*composition, &stubFilters{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,6 +158,9 @@ func (s *sourceCohortFixture) AdmitSource(ctx context.Context, in PolicySourceCh
 			return PolicySourceAdmission{}, value.ErrConflict
 		}
 		b := collector.SourceBinding{RootID: s.f.svc.RootID, PolicyUID: s.authority.PolicyUID, AcceptanceID: fixtureID(800), SourceID: in.SourceID, Fence: in.Fence, ActionID: s.policy.Recorder.Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(s.authority.ScopeDigest), ExpectationDigest: [32]byte(s.policy.Recorder.Digest), ResourceDigest: deliveryapp.SourceResourcesDigest(resource)}
+		if s.policy.Recorder.Action.Kind == "syscallTrace" {
+			b.ProgramDigest = deliveryapp.SyscallFilterDigest(compiler.SyscallSource(*s.policy.Recorder))
+		}
 		row = PolicySourceState{Binding: b, ClusterID: s.authority.ClusterID, NamespaceUID: s.authority.NamespaceUID, WorkloadUID: s.authority.WorkloadUID, StartedAt: s.f.now, HardUntil: s.authority.NotAfter, StartBy: s.tickEnd, InitialLeafUntil: s.f.now.Add(collector.SourceLeafLifetime), Credit: in.InitialCredit, InitialCredit: in.InitialCredit, BytesPerSecond: in.BytesPerSecond}
 	} else if !row.EndedAt.IsZero() || row.Binding.SourceID != in.SourceID || row.Binding.Fence != in.Fence {
 		return PolicySourceAdmission{}, value.ErrConflict

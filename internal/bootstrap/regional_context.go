@@ -348,14 +348,14 @@ func (t reportedTargets) resolvePacketRecorder(ctx context.Context, r targets.Re
 	if err != nil {
 		return targets.RecorderResolution{}, err
 	}
-	return t.packetTargetAvailability(ctx, p, node, includeSource), nil
+	return t.packetTargetAvailability(ctx, p, node, includeSource, collector.MechanismPacket), nil
 }
-func (t reportedTargets) packetTargetAvailability(ctx context.Context, p targets.PodResolution, node string, includeSource bool) targets.RecorderResolution {
+func (t reportedTargets) packetTargetAvailability(ctx context.Context, p targets.PodResolution, node string, includeSource bool, mechanism collector.Mechanism) targets.RecorderResolution {
 	answer := targets.RecorderAnswer{Outcome: targets.RecorderUnavailable}
 	if node == "" {
 		answer.Outcome = targets.RecorderNoNode
 	} else if t.recordings != nil {
-		if v, ok := t.recordings.nodes.NodeByName(node); ok && v.PacketRecorderAvailable() {
+		if v, ok := t.recordings.nodes.NodeByName(node); ok && v.RecorderAvailable(mechanism) {
 			answer.Outcome = targets.RecorderAvailable
 			if !includeSource {
 				return targets.RecorderResolution{Target: p, Recorder: answer}

@@ -55,7 +55,7 @@ func sourceCheckCurrent(in app.PolicySourceCheck, now time.Time) bool {
 	if ageErr != nil || age <= 0 || age > in.Retention.ExpiresAt.Sub(in.Retention.AnchorAt) {
 		return false
 	}
-	return in.Policy.Valid() && p != nil && p.Action.ExecutionMode == "ongoing" && p.Action.PacketProfile == "networkHeaders" &&
+	return in.Policy.Valid() && p != nil && p.Action.ExecutionMode == "ongoing" && (p.Action.PacketProfile == "networkHeaders" || p.Action.Kind == "syscallTrace") &&
 		!compiler.RawBytePredicate(p.Action.Filter) && in.Authority.Valid(now) &&
 		in.Target.ExecutionClass == artifact.ContextAPIExecution && in.Target.Valid(now) && in.Node.Valid(now) &&
 		in.Target.Request.ClusterID == in.Authority.ClusterID && in.Target.Request.Namespace.UID == in.Authority.NamespaceUID && in.Target.Request.Workload.UID == in.Authority.WorkloadUID &&
@@ -321,6 +321,9 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			b := collector.SourceBinding{RootID: s.root, PolicyUID: a.PolicyUID, AcceptanceID: record.ID, SourceID: in.SourceID, Fence: in.Fence, ActionID: in.Policy.Recorder.Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(a.ScopeDigest), ExpectationDigest: [32]byte(in.Policy.Recorder.Digest), ResourceDigest: resourceDigest, AudienceDigest: [32]byte(originalAudienceDigest)}
 			if in.Policy.Recorder.Filter != nil {
 				b.ProgramDigest = [32]byte(compiler.FilterProgramDigest(in.Policy.Recorder.Filter.Program))
+			}
+			if in.Policy.Recorder.Action.Kind == "syscallTrace" {
+				b.ProgramDigest = deliveryapp.SyscallFilterDigest(compiler.SyscallSource(*in.Policy.Recorder))
 			}
 			if !b.Valid() {
 				return value.ErrInvalid

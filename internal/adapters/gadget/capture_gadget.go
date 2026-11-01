@@ -5,8 +5,6 @@ package gadget
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -28,7 +26,6 @@ import (
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/operators/simple"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/operators/socketenricher"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/runtime/local"
-	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sys/unix"
 	"oras.land/oras-go/v2/content/memory"
@@ -51,42 +48,28 @@ var tcpdumpBlobs = []pinnedBlob{
 // and tags the index with the gadget's reference. The memory store verifies
 // size and digest on push, so a changed file is refused before any load.
 func loadTcpdump(ctx context.Context, dir string) (*memory.Store, error) {
-	store := memory.New()
-	for _, b := range tcpdumpBlobs {
-		hexDigest := strings.TrimPrefix(b.digest, "sha256:")
-		raw, err := os.ReadFile(filepath.Join(dir, "blobs", "sha256", hexDigest))
-		if err != nil || int64(len(raw)) != b.size {
-			return nil, ErrEngineUnavailable
-		}
-		if sum := sha256.Sum256(raw); hex.EncodeToString(sum[:]) != hexDigest {
-			return nil, ErrEngineUnavailable
-		}
-		desc := ocispec.Descriptor{MediaType: b.mediaType, Digest: digest.Digest(b.digest), Size: b.size}
-		if err := store.Push(ctx, desc, bytes.NewReader(raw)); err != nil {
-			return nil, ErrEngineUnavailable
-		}
-		if b.digest == TcpdumpIndexDigest {
-			if err := store.Tag(ctx, desc, TcpdumpReference); err != nil {
-				return nil, ErrEngineUnavailable
-			}
-		}
-	}
-	return store, nil
+	return loadPinned(ctx, dir, TcpdumpReference, TcpdumpIndexDigest, tcpdumpBlobs)
 }
 
 // podProcess finds one process of the pod on this node from the host process
 // table (host PID namespace): the cgroup path of every container of a pod
 // names the pod UID, with dashes (cgroupfs) or underscores (systemd driver).
-// All containers of a pod share its network namespace, so any one will do.
+// All containers of a pod share its network namespace, so any one will do;
+// the lowest PID is preferred because a short-lived child (a forked request
+// handler) can exit before the attach reads its namespace (collector-packet
+// run 41280944426).
+// ponytail: lowest PID approximates the longest-lived process; compare start
+// times if PID wraparound ever matters.
 func podProcess(proc, podUID string) (int, error) {
 	marks := []string{"pod" + podUID, "pod" + strings.ReplaceAll(podUID, "-", "_")}
 	entries, err := os.ReadDir(proc)
 	if err != nil {
 		return 0, ErrEngineUnavailable
 	}
+	found := 0
 	for _, e := range entries {
 		pid, err := strconv.Atoi(e.Name())
-		if err != nil || pid <= 1 {
+		if err != nil || pid <= 1 || found != 0 && pid >= found {
 			continue
 		}
 		b, err := os.ReadFile(filepath.Join(proc, e.Name(), "cgroup"))
@@ -95,11 +78,15 @@ func podProcess(proc, podUID string) (int, error) {
 		}
 		for _, m := range marks {
 			if bytes.Contains(b, []byte(m)) {
-				return pid, nil
+				found = pid
+				break
 			}
 		}
 	}
-	return 0, ErrTargetNotFound
+	if found == 0 {
+		return 0, ErrTargetNotFound
+	}
+	return found, nil
 }
 
 func netns(proc string, pid int) (string, error) {
@@ -182,11 +169,11 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 	}
 	target, err := netns(proc, pid)
 	if err != nil {
-		return stats, ErrEngineUnavailable
+		return stats, fmt.Errorf("%w: pod network namespace: %v", ErrEngineUnavailable, err)
 	}
 	if host, err := netns(proc, 1); err != nil || host == target {
 		if err != nil {
-			return stats, ErrEngineUnavailable
+			return stats, fmt.Errorf("%w: host network namespace: %v", ErrEngineUnavailable, err)
 		}
 		return stats, ErrTargetHostNetwork
 	}
@@ -196,7 +183,7 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 	}
 	clock, err := newPacketClock(time.Now, readPacketMonotonic)
 	if err != nil {
-		return stats, ErrEngineUnavailable
+		return stats, fmt.Errorf("%w: packet clock", ErrEngineUnavailable)
 	}
 	var delivered sync.Mutex
 	log := &lossLogger{level: logger.WarnLevel, w: os.Stderr}
@@ -258,10 +245,10 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 	enricher := &socketenricher.SocketEnricher{}
 	enricherParams := enricher.GlobalParamDescs().ToParams()
 	if err := enricherParams.Set("socket-enricher-fields", ""); err != nil {
-		return stats, ErrEngineUnavailable
+		return stats, fmt.Errorf("%w: socket enricher parameters: %v", ErrEngineUnavailable, err)
 	}
 	if err := enricher.Init(enricherParams); err != nil {
-		return stats, ErrEngineUnavailable
+		return stats, fmt.Errorf("%w: socket enricher: %v", ErrEngineUnavailable, err)
 	}
 	defer enricher.Close()
 	gadgetCtx := gadgetcontext.New(ctx, TcpdumpReference,
@@ -271,7 +258,7 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 	)
 	runtime := local.New()
 	if err := runtime.Init(nil); err != nil {
-		return stats, ErrEngineUnavailable
+		return stats, fmt.Errorf("%w: local runtime: %v", ErrEngineUnavailable, err)
 	}
 	defer runtime.Close()
 	err = runtime.RunGadget(gadgetCtx, nil, map[string]string{"operator.oci.ebpf.snaplen": strconv.Itoa(snaplen)})
@@ -280,7 +267,7 @@ func CaptureObservedPackets(ctx context.Context, podUID string, snaplen int, del
 	invalidTime := clock.invalid
 	delivered.Unlock()
 	if invalidTime {
-		return stats, ErrEngineUnavailable
+		return stats, fmt.Errorf("%w: invalid packet timestamp", ErrEngineUnavailable)
 	}
 
 	if attachErr != nil {

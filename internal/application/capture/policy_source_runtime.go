@@ -7,6 +7,7 @@ import (
 	"time"
 
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/collector"
@@ -212,7 +213,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 			if known && !old.EndedAt.IsZero() {
 				continue
 			}
-			request := targets.OngoingRecorderRequest{Target: targets.Request{ClusterID: o.ClusterID, Namespace: o.Namespace, Workload: o.Workload, PodName: pod.Name, PodUID: pod.UID}}
+			request := targets.OngoingRecorderRequest{Target: targets.Request{ClusterID: o.ClusterID, Namespace: o.Namespace, Workload: o.Workload, PodName: pod.Name, PodUID: pod.UID}, Syscall: p.Recorder.Action.Kind == "syscallTrace"}
 			if known {
 				request.SourceID, request.Fence = old.Binding.SourceID, old.Binding.Fence
 			}
@@ -244,7 +245,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 		if known && !old.EndedAt.IsZero() {
 			continue
 		} // original quarantine owns the slot
-		request := targets.OngoingRecorderRequest{Target: targets.Request{ClusterID: o.ClusterID, Namespace: o.Namespace, Workload: o.Workload, PodName: pod.Name, PodUID: pod.UID}}
+		request := targets.OngoingRecorderRequest{Target: targets.Request{ClusterID: o.ClusterID, Namespace: o.Namespace, Workload: o.Workload, PodName: pod.Name, PodUID: pod.UID}, Syscall: p.Recorder.Action.Kind == "syscallTrace"}
 		if known {
 			request.SourceID, request.Fence = old.Binding.SourceID, old.Binding.Fence
 		}
@@ -293,11 +294,15 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 			continue
 		}
 		rate := min(ceiling.InputBytesPerSecond, ceiling.InputBurstBytes) / slots
+		if p.Recorder.Action.Kind == "syscallTrace" && p.Recorder.Action.MaxEventsPerSecond > 0 {
+			// Each syscall event spends collector.SyscallEventCredit (ADR-273).
+			rate = min(rate, p.Recorder.Action.MaxEventsPerSecond*collector.SyscallEventCredit)
+		}
 		if rate < 1 {
 			failed = errors.Join(failed, value.ErrCapacity)
 			continue
 		}
-		retention, e := s.Retention.Resolve(call, privacy.Input{Target: resolved.Recorder.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: p.RetentionSeconds, AnchorAt: started})
+		retention, e := s.Retention.Resolve(call, privacy.Input{Target: resolved.Recorder.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: p.Recorder.Action.EvidenceType, RequestedSeconds: p.RetentionSeconds, AnchorAt: started})
 		if e != nil {
 			failed = errors.Join(failed, staged("retention", e))
 			continue
@@ -388,6 +393,10 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 		source := collector.PacketSource{Permit: admission.Permit, Resources: admission.Resources, Ring: collector.SourceRingLimits{MaxAge: age, MaxBytes: p.Recorder.Action.RingMaxBytes, SegmentBytes: p.Recorder.Action.SegmentBytes, MaxSegments: p.Recorder.Action.MaxSegments, MaxFrozenBytes: p.Recorder.Action.MaxFrozenBytes, MaxConcurrentSnapshots: p.Recorder.Action.MaxConcurrentSnapshots}}
 		if p.Recorder.Filter != nil {
 			source.Program = slices.Clone(p.Recorder.Filter.Program)
+		}
+		if p.Recorder.Action.Kind == "syscallTrace" {
+			f := compiler.SyscallSource(*p.Recorder)
+			source.Syscalls = &f
 		}
 		if !source.Valid() {
 			failed = errors.Join(failed, value.ErrChanged)
