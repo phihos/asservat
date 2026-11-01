@@ -186,6 +186,14 @@ func TraceSyscalls(ctx context.Context, podUID string, numbers []uint16, deliver
 				traceNamespaces(run, proc, podUID, perfMaps, func(raw []byte, lostNow uint64) {
 					mu.Lock()
 					defer mu.Unlock()
+					if raw == nil && lostNow == 0 {
+						// A late-attached namespace: its calls before the
+						// attach are unknown, a gap of unknown size.
+						if notice != nil {
+							notice(InputNotice{})
+						}
+						return
+					}
 					if lostNow > 0 {
 						lost += lostNow
 						if notice != nil {
@@ -234,6 +242,7 @@ func traceNamespaces(ctx context.Context, proc, podUID string, outer *ebpf.Map, 
 	}
 	active := map[uint64]*traced{}
 	failed := map[uint64]bool{} // namespaces whose failure was already logged
+	scanned := false            // the first scan's namespaces are not late
 	var readers sync.WaitGroup
 	defer func() {
 		for ns, t := range active {
@@ -284,6 +293,11 @@ func traceNamespaces(ctx context.Context, proc, podUID string, outer *ebpf.Map, 
 				continue
 			}
 			active[ns] = &traced{inner: inner, reader: reader}
+			if scanned {
+				// A container that started after the first scan was traced
+				// up to one rescan late; report it as a gap, not quiet input.
+				emit(nil, 0)
+			}
 			readers.Add(1)
 			go func(r *perf.Reader) {
 				defer readers.Done()
@@ -302,6 +316,7 @@ func traceNamespaces(ctx context.Context, proc, podUID string, outer *ebpf.Map, 
 		}
 	}
 	scan()
+	scanned = true
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	for {

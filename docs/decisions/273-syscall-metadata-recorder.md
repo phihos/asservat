@@ -71,8 +71,9 @@ docs/research/syscall-recorder-plan.md.
   requires bytes.
 - Records keep pairing order, not call-time order.
 - Unknown syscall names are refused by the node, not at policy compile time.
-- Calls still in flight at a window's end are not in that window; a new
-  container's namespace is traced up to one second after it appears.
+- Calls still in flight at a window's end are not in that window. A new
+  container's namespace is traced up to one second after it appears; that
+  late attach is reported as an input gap (InputUnknown), not quiet input.
 - Perf buffers (64 pages per CPU per container namespace) are outside the
   ring reservation.
 - x86_64 only (other architectures report the recorder unavailable); arguments mode, raw syscall queries, live watch, finite
