@@ -55,7 +55,20 @@ func packetRecorderInput(intent value.ContextIntent, class artifact.ContextExecu
 // recordingPlan compiles the accepted context plan of an acceptable
 // composition preview: the authored composition with the filter programs
 // frozen in the reviewed scope (no filter compiler is consulted again).
-func (s ContextInvestigation) recordingPlan(p value.ContextPreview, f contextFacts) (planning.ContextPlan, error) {
+func (s ContextInvestigation) recordingPlan(ctx context.Context, p value.ContextPreview, f contextFacts) (planning.ContextPlan, error) {
+	// A stored preview carries no catalog documents: read the pinned
+	// organization/namespace versions again (one read per start) and require
+	// them still enabled and unchanged (REQ-CPR-001).
+	composition := p.Intent.Composition
+	if composition.Resolved == nil {
+		var err error
+		if composition, err = s.withCatalogProfiles(ctx, composition, f.target); err != nil {
+			return planning.ContextPlan{}, previewFailure("profiles", err)
+		}
+	}
+	if err := compiler.CatalogProfilesCurrent(*composition, p.CanonicalScope); err != nil {
+		return planning.ContextPlan{}, previewFailure("profiles", err)
+	}
 	recorder, err := compiler.RecorderContextFromScope(*p.Intent.Composition, p.CanonicalScope)
 	if err != nil {
 		return planning.ContextPlan{}, err
@@ -113,7 +126,7 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	ctx, coverageEnd := context.WithDeadline(ctx, coverage.FreshUntil)
 	defer coverageEnd()
 	// The accepted context plan must reproduce the reviewed scope exactly.
-	accepted, err := s.recordingPlan(p, f)
+	accepted, err := s.recordingPlan(ctx, p, f)
 	if err != nil || accepted.ScopeDigest != plan.ScopeDigest {
 		return zero, previewFailure("compile/accepted", value.ErrInvalid)
 	}

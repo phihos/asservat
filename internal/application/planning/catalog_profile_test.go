@@ -93,3 +93,35 @@ func mustBuiltin(t *testing.T) resolvedProfile {
 	}
 	return p
 }
+
+// REQ-CPR-001: a start rechecks the pinned catalog versions against the
+// current read; disabled, republished or deleted versions refuse.
+func TestCatalogProfilesCurrentAtStart(t *testing.T) {
+	ref := value.ProfileRef{Catalog: "organization", Name: "team-network", Version: "v2"}
+	doc := catalogDocument(t, "team-network", "v2")
+	p, err := parseProfileDocument(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Ref, p.SourceUID, p.SourceClusterID, p.SourceNamespaceUID = ref, "org-uid", "00000000-0000-4000-8000-000000000001", "hub-ns"
+	scope, _ := json.Marshal(struct {
+		Provenance wireProvenance `json:"profileComposition"`
+	}{wireProvenance{ResolvedProfiles: []wireResolved{p.wire("net")}}})
+	current := value.CatalogProfile{Ref: ref, SourceClusterID: p.SourceClusterID, SourceNamespaceUID: "hub-ns", SourceUID: "org-uid", Document: doc, Enabled: true}
+	check := func(resolved ...value.CatalogProfile) error {
+		return CatalogProfilesCurrent(namespaceComposition(t, ref, resolved...), scope)
+	}
+	if err := check(current); err != nil {
+		t.Fatal("current version refused", err)
+	}
+	disabled := current
+	disabled.Enabled = false
+	replaced := current
+	replaced.SourceUID = "recreated-uid"
+	for name, err := range map[string]error{"disabled": check(disabled), "replaced": check(replaced), "deleted": check()} {
+		var e value.CompositionError
+		if !errors.As(err, &e) || e.Code != value.CompositionProfileMissing {
+			t.Fatalf("%s version authorized a start: %v", name, err)
+		}
+	}
+}

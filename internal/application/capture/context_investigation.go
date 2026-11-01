@@ -683,7 +683,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	defer coverageEnd()
 	plan, err := s.plan(p, f)
 	if recording {
-		plan, err = s.recordingPlan(p, f)
+		plan, err = s.recordingPlan(ctx, p, f)
 	}
 	if err != nil {
 		return zero, err
