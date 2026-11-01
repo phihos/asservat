@@ -57,12 +57,25 @@ func installedOngoingSaveSpec(cluster, namespace, workload string) map[string]an
 // or for the ongoing-syscall focus the builtin syscall metadata recorder
 // (ADR-273) with its defaults.
 func installedOngoingComposition() map[string]any {
-	if installedJourneyFocus() == "ongoing-syscall" {
-		return map[string]any{"components": []any{map[string]any{"id": "calls", "profileRef": map[string]string{"catalog": "builtin", "name": "syscall-activity", "version": "v1"}}}, "maxTotalBytes": 16 << 20, "maxDuration": "30s"}
-	}
-	return map[string]any{"components": []any{map[string]any{"id": "network", "profileRef": map[string]string{"catalog": "builtin", "name": "network-connections", "version": "v1"}, "overrides": []any{
+	calls := map[string]any{"id": "calls", "profileRef": map[string]string{"catalog": "builtin", "name": "syscall-activity", "version": "v1"}}
+	network := map[string]any{"id": "network", "profileRef": map[string]string{"catalog": "builtin", "name": "network-connections", "version": "v1"}, "overrides": []any{
 		map[string]any{"actionID": "sample", "field": "packetFilter", "value": installedOngoingSaveFilter},
-	}}}, "maxTotalBytes": 16 << 20, "maxDuration": "20s"}
+	}}
+	switch installedJourneyFocus() {
+	case "ongoing-syscall":
+		return map[string]any{"components": []any{calls}, "maxTotalBytes": 16 << 20, "maxDuration": "30s"}
+	case "ongoing-mixed":
+		// ADR-275: one policy, one packet and one syscall source per Pod.
+		return map[string]any{"components": []any{network, calls}, "maxTotalBytes": 32 << 20, "maxDuration": "30s"}
+	}
+	return map[string]any{"components": []any{network}, "maxTotalBytes": 16 << 20, "maxDuration": "20s"}
+}
+
+// installedActionID is the compiler's generated expanded action ID
+// (REQ-CPR-003: "a" + 24 hex of sha256(component NUL local action)).
+func installedActionID(component, local string) string {
+	h := sha256.Sum256([]byte(component + "\x00" + local))
+	return "a" + hex.EncodeToString(h[:])[:24]
 }
 
 type ongoingSaveSource struct {
@@ -166,10 +179,14 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 
 	ongoingAction := "packetCapture"
-	if installedJourneyFocus() == "ongoing-syscall" {
-		ongoingAction = "syscallTrace"
+	allowed := []any{"packetCapture"}
+	switch installedJourneyFocus() {
+	case "ongoing-syscall":
+		ongoingAction, allowed = "syscallTrace", []any{"syscallTrace"}
+	case "ongoing-mixed":
+		ongoingAction, allowed = "packetCapture and syscallTrace", []any{"packetCapture", "syscallTrace"}
 	}
-	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "ongoing-packet-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "installed ongoing packet Save qualification", "automation": map[string]any{"allowedActions": []any{ongoingAction}, "maxLifetimeSeconds": ongoingSaveLifetime, "maxExecutions": 8, "maxBytes": 64 << 20, "maxObservedBytes": 128 << 20}}}
+	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "ongoing-packet-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "installed ongoing packet Save qualification", "automation": map[string]any{"allowedActions": allowed, "maxLifetimeSeconds": ongoingSaveLifetime, "maxExecutions": 8, "maxBytes": 64 << 20, "maxObservedBytes": 128 << 20}}}
 	body, _ := json.Marshal(binding)
 	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
 		t.Fatal("operator packet automation envelope", err)
@@ -223,7 +240,13 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		return sent
 	}
 	sources := func(call context.Context) ([]ongoingSaveSource, error) {
-		rows, err := admin.Query(call, `SELECT id::text,fence::text,started_at,hard_until,initial_leaf_until,initial_credit,credit,ended_at FROM policy_recording_source WHERE root_id=$1 AND policy_uid=$2 ORDER BY started_at`, root, active.PolicyUID)
+		// The mixed focus tracks its packet source here; its syscall source is
+		// checked separately.
+		action := ""
+		if installedJourneyFocus() == "ongoing-mixed" {
+			action = installedActionID("network", "sample")
+		}
+		rows, err := admin.Query(call, `SELECT id::text,fence::text,started_at,hard_until,initial_leaf_until,initial_credit,credit,ended_at FROM policy_recording_source WHERE root_id=$1 AND policy_uid=$2 AND ($3='' OR action_id=$3) ORDER BY started_at`, root, active.PolicyUID, action)
 		if err != nil {
 			return nil, err
 		}
@@ -384,6 +407,13 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		return ok
 	})
 	armLatency := time.Since(armStarted)
+	if installedJourneyFocus() == "ongoing-mixed" {
+		// Both recorders of the one policy arm on the same Pod (ADR-275).
+		wait("ongoing syscall source arm beside the packet source", 2*time.Minute, func(call context.Context) bool {
+			var live int
+			return admin.QueryRow(call, `SELECT count(*) FROM policy_recording_source WHERE root_id=$1 AND policy_uid=$2 AND action_id=$3 AND ended_at IS NULL`, root, active.PolicyUID, installedActionID("calls", "syscalls")).Scan(&live) == nil && live == 1
+		})
+	}
 	if src.HardUntil.Sub(src.StartedAt) > ongoingSaveLifetime*time.Second {
 		t.Fatal("source hard bound outlives its accepted authority", src.StartedAt, src.HardUntil)
 	}
@@ -451,13 +481,13 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	// (two per five minutes) on the incident alone: in ongoing-save, Save and
 	// repeat already spend it, so a third occurrence is correctly suppressed
 	// as cooldown (runs 41278608533/41278610152).
-	if installedJourneyFocus() == "ongoing-incident" || installedJourneyFocus() == "ongoing-syscall" {
+	if installedJourneyFocus() == "ongoing-incident" || installedJourneyFocus() == "ongoing-syscall" || installedJourneyFocus() == "ongoing-mixed" {
 		// Automatic incident: a real restart of the armed Pod's container admits
 		// one policy occurrence, whose snapshot the policy executor saves from the
 		// running source (no manual request, no finite recipe). The retained-port
 		// marker just before the restart must be in the saved window.
 		incidentSent := marker(ongoingSaveRetainedPort)
-		if installedJourneyFocus() == "ongoing-syscall" {
+		if installedJourneyFocus() == "ongoing-syscall" || installedJourneyFocus() == "ongoing-mixed" {
 			// An idle Go workload parks without syscalls; serving a few
 			// requests gives the window real pre-restart calls.
 			for range 5 {
@@ -517,12 +547,25 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		if incidentMarkers == 0 {
 			t.Fatal("automatic incident snapshot lacks pre-restart evidence", incidentSent, len(incidentNative))
 		}
+		// ADR-275: the same occurrence also saved the syscall recorder's window
+		// as its own child capture, with its own native download.
+		childID, childEvents := "", 0
+		if installedJourneyFocus() == "ongoing-mixed" {
+			wait("automatic incident syscall child capture", 2*time.Minute, func(call context.Context) bool {
+				return admin.QueryRow(call, `SELECT c.capture_id::text FROM policy_occurrence_capture c JOIN policy_occurrence o ON o.id=c.occurrence_id AND o.root_id=c.root_id WHERE o.root_id=$1 AND o.capture_id=$2 AND c.action_id=$3`, root, incidentID, installedActionID("calls", "syscalls")).Scan(&childID) == nil
+			})
+			childNative, _ := fetchNative(published(childID), "native-ongoing-mixed-syscall-download", "ongoing-mixed.jsonl")
+			if childEvents = ongoingSyscallEvents(t, childNative, podUID, killedAt); childEvents == 0 {
+				t.Fatal("incident syscall child lacks pre-restart calls", childID, len(childNative))
+			}
+			t.Logf("automatic incident syscall child %s retained %d pre-restart events", childID, childEvents)
+		}
 		// A container restart may legitimately re-attach the source; record it.
 		afterIncident, incidentCount, _ := current(ctx)
 		t.Logf("automatic incident %s retained %d marker packets; source after restart %s (sources %d)", incidentID, incidentMarkers, afterIncident.ID, incidentCount)
 		report := map[string]any{
 			"policyUID": active.PolicyUID, "podUID": podUID, "sourceID": src.ID, "armLatencySeconds": armLatency.Seconds(), "rearmsBeforeIncident": rearms,
-			"incidentCaptureID": incidentID, "incidentMarkerSent": incidentSent, "incidentMarkerPackets": incidentMarkers, "incidentNativeBytes": len(incidentNative), "sourceAfterIncident": afterIncident.ID,
+			"incidentCaptureID": incidentID, "incidentChildCaptureID": childID, "incidentChildSyscallEvents": childEvents, "incidentMarkerSent": incidentSent, "incidentMarkerPackets": incidentMarkers, "incidentNativeBytes": len(incidentNative), "sourceAfterIncident": afterIncident.ID,
 			"scope": "one automatic exit-detector incident snapshot from one active ordinary ongoing " + ongoingAction + " source on one installed Pod; no Save in the same trigger budget window",
 		}
 		raw, err := json.MarshalIndent(report, "", "  ")
@@ -660,7 +703,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 // Save qualification or the automatic incident snapshot.
 func installedOngoingFocus() bool {
 	f := installedJourneyFocus()
-	return f == "ongoing-save" || f == "ongoing-incident" || f == "ongoing-syscall"
+	return f == "ongoing-save" || f == "ongoing-incident" || f == "ongoing-syscall" || f == "ongoing-mixed"
 }
 
 // ongoingSyscallEvents checks a downloaded syscall window (ADR-273): JSON

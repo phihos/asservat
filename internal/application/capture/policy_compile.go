@@ -177,11 +177,6 @@ func compilePolicy(spec []byte, recipeName string, recipeDigest artifact.Digest,
 				return reject(".profileComposition", "invalid resolved recording")
 			}
 		}
-		// ponytail: ADR-275 step 2 arms one source per recorder; until then
-		// a policy records one action so nothing arms partially.
-		if len(compiled) > 1 {
-			return reject(".profileComposition", "one policy records one action in this release; split the composition")
-		}
 		out.Recorder = &compiled[0]
 		out.MoreRecorders = compiled[1:]
 	} else {
