@@ -743,7 +743,7 @@
         }
       },
       "then": {
-        "description": "Pod status (4 KiB), or a manual networkHeaders packet recording delivered through the connector (ADR-248, at most 8 MiB).",
+        "description": "Pod status (4 KiB), a manual networkHeaders packet recording delivered through the connector (ADR-248, at most 8 MiB), or a saved syscall metadata window as JSON Lines (ADR-273, at most 8 MiB).",
         "anyOf": [
           {
             "properties": {
@@ -799,6 +799,43 @@
               },
               "mediaType": {
                 "const": "application/x-pcapng"
+              },
+              "dataClass": {
+                "const": "metadata"
+              },
+              "collectionProvenance": {
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  }
+                }
+              },
+              "sizes": {
+                "properties": {
+                  "plaintextBytes": {
+                    "maximum": 8388608
+                  }
+                }
+              }
+            }
+          },
+          {
+            "properties": {
+              "target": {
+                "properties": {
+                  "scope": {
+                    "const": "pod"
+                  }
+                }
+              },
+              "kind": {
+                "const": "syscallTrace"
+              },
+              "format": {
+                "const": "asservat-syscall-events/v1"
+              },
+              "mediaType": {
+                "const": "application/x-ndjson"
               },
               "dataClass": {
                 "const": "metadata"

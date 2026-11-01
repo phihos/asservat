@@ -11,7 +11,19 @@ import (
 )
 
 func TestSourceSnapshotManifestRetainsPhysicalSourceWithoutSQLLookup(t *testing.T) {
+	sourceSnapshotManifest(t, artifact.PCAPNGArtifact)
+}
+
+// ADR-273: a saved syscall window's manifest is a valid artifact manifest
+// (installed runs refused it as an unknown kind/format).
+func TestSyscallSourceSnapshotManifest(t *testing.T) {
+	sourceSnapshotManifest(t, artifact.SyscallRecordsArtifact)
+}
+
+func sourceSnapshotManifest(t *testing.T, nativeType string) {
+	t.Helper()
 	v, e, l, c, _ := recorderFixture(t)
+	e.NativeType = nativeType
 	e.ExecutionClass, e.NodeUID, e.NodeBootID = artifact.ContextAPIExecution, "", ""
 	scope := json.RawMessage(`{"schemaVersion":"source-window/v1","selection":{"sourceID":"original-source<&"}}`)
 	binding := json.RawMessage(`{"NodeUID":"original-node","BootID":"original-boot","CollectorPodUID":"original-collector","CollectorEpoch":"original-epoch"}`)
