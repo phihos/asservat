@@ -43,7 +43,11 @@ func TestCatalogProfilesResolveWithoutShadowing(t *testing.T) {
 	ref := value.ProfileRef{Catalog: "namespace", Name: "team-network", Version: "v2"}
 	published := value.CatalogProfile{Ref: ref, SourceClusterID: "00000000-0000-4000-8000-000000000001", SourceNamespaceUID: "ns-uid", SourceUID: "profile-uid", Document: catalogDocument(t, "team-network", "v2"), Enabled: true, Deprecated: true}
 	c := namespaceComposition(t, ref, published)
-	actions, p, err := expand(c, &fakeCompiler{program: fixtureProgram})
+	actions, ps, err := expand(c, &fakeCompiler{program: fixtureProgram})
+	var p resolvedProfile
+	if len(ps) == 1 {
+		p = ps[0]
+	}
 	if err != nil || len(actions) == 0 || p.SourceUID != "profile-uid" || p.SourceNamespaceUID != "ns-uid" || !p.Deprecated || p.Ref != ref {
 		t.Fatalf("namespace profile %+v %v", p, err)
 	}
@@ -79,8 +83,8 @@ func TestCatalogProfilesResolveWithoutShadowing(t *testing.T) {
 
 	// A namespace object claiming the builtin name cannot replace the builtin.
 	impostor := value.CatalogProfile{Ref: value.ProfileRef{Catalog: "namespace", Name: "network-connections", Version: "v1"}, SourceClusterID: published.SourceClusterID, SourceNamespaceUID: "ns-uid", SourceUID: "impostor", Document: catalogDocument(t, "network-connections", "v1"), Enabled: true}
-	_, p, err = expand(namespaceComposition(t, value.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}, impostor), &fakeCompiler{program: fixtureProgram})
-	if err != nil || p.SourceUID != "" || p.Digest != mustBuiltin(t).Digest {
+	_, ps, err = expand(namespaceComposition(t, value.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}, impostor), &fakeCompiler{program: fixtureProgram})
+	if err != nil || len(ps) != 1 || ps[0].SourceUID != "" || ps[0].Digest != mustBuiltin(t).Digest {
 		t.Fatalf("builtin reference resolved to a namespace object: %+v %v", p, err)
 	}
 }

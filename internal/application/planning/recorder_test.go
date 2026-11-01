@@ -46,6 +46,17 @@ func syscalls(edits ...value.ProfileEdit) value.ProfileComposition {
 	return value.ProfileComposition{Components: []value.ProfileComponent{{ID: "calls", Profile: value.ProfileRef{Catalog: "builtin", Name: "syscall-activity", Version: "v1"}, Edits: edits}}, MaxTotalBytes: 16 << 20, MaxDuration: "30s"}
 }
 
+// mixed composes the network and syscall builtins (REQ-CPR-003).
+func mixed(bytes int64) value.ProfileComposition {
+	return value.ProfileComposition{Components: append(network().Components, syscalls().Components...), MaxTotalBytes: bytes, MaxDuration: "30s"}
+}
+
+func twoNetworks() value.ProfileComposition {
+	second := network().Components[0]
+	second.ID = "net2"
+	return value.ProfileComposition{Components: append(network().Components, second), MaxTotalBytes: 32 << 20, MaxDuration: "30s"}
+}
+
 func text(action, field, v string) value.ProfileEdit {
 	return value.ProfileEdit{ActionID: action, Field: field, Text: v}
 }
@@ -131,7 +142,8 @@ func TestCompositionNormalizationMatrix(t *testing.T) {
 		"organization catalog":           {value.ProfileComposition{Components: []value.ProfileComponent{{ID: "net", Profile: value.ProfileRef{Catalog: "organization", Name: "network-connections", Version: "v1"}}}, MaxTotalBytes: 1, MaxDuration: "1s"}, value.CompositionProfileMissing, "profile_composition.components[0].profileRef"},
 		"unknown version":                {value.ProfileComposition{Components: []value.ProfileComponent{{ID: "net", Profile: value.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v2"}}}, MaxTotalBytes: 1, MaxDuration: "1s"}, value.CompositionProfileMissing, "profile_composition.components[0].profileRef"},
 		"aggregate output never raised":  {func() value.ProfileComposition { x := network(); x.MaxTotalBytes = 1 << 20; return x }(), value.CompositionInvalid, "profile_composition.maxTotalBytes"},
-		"two components":                 {value.ProfileComposition{Components: append(network().Components, syscalls().Components...), MaxTotalBytes: 32 << 20, MaxDuration: "30s"}, value.CompositionInvalid, "profile_composition.components"},
+		"two packet sources":             {twoNetworks(), value.CompositionConflict, "profile_composition.components"},
+		"mixed over aggregate bytes":     {mixed(16 << 20), value.CompositionInvalid, "profile_composition.maxTotalBytes"},
 		"unresolved host name":           {network(text("sample", "packetFilter", "host db.payments.svc")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
 		"service name port":              {network(text("sample", "packetFilter", "tcp port https")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
 		"gateway resolves names":         {network(text("sample", "packetFilter", "gateway 10.0.0.1")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
@@ -152,6 +164,7 @@ func TestCompositionNormalizationMatrix(t *testing.T) {
 		})
 	}
 	for name, composition := range map[string]value.ProfileComposition{
+		"packet and syscall components":                mixed(32 << 20),
 		"defaults":                                     network(),
 		"onTrigger next interval":                      network(text("sample", "actionExecutionMode", "onTrigger"), text("sample", "packetBefore", "0s")),
 		"ongoing retrospective":                        network(text("sample", "packetAfter", "0s")),
@@ -414,4 +427,19 @@ func TestEmptyTextEditGetsFieldRemedy(t *testing.T) {
 	if !strings.Contains(err.Error(), "omit the edit") {
 		t.Fatal("empty filter lost its remedy", err)
 	}
+}
+
+// REQ-CPR-003 (slice B1): a mixed composition expands into one action per
+// component with generated IDs, while a manual capture (one artifact) refuses
+// to mix evidence types with a remedy instead of an opaque error.
+func TestMixedCompositionExpandsButManualRefuses(t *testing.T) {
+	actions, profiles, err := expand(mixed(32<<20), &fakeCompiler{program: fixtureProgram})
+	if err != nil || len(actions) != 2 || len(profiles) != 2 || actions[0].componentID != "net" || actions[1].componentID != "calls" {
+		t.Fatal("mixed expansion", err, len(actions), len(profiles))
+	}
+	if generatedID("a", "net", actions[0].localID) == generatedID("a", "calls", actions[1].localID) {
+		t.Fatal("generated IDs collide")
+	}
+	_, err = RecorderEvidenceType(mixed(32 << 20))
+	refusal(t, err, value.CompositionRecorderUnavailable, "profile_composition.components")
 }
