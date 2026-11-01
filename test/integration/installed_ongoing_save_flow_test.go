@@ -496,6 +496,9 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 				stop()
 			}
 		}
+		if installedPublisherSettled != nil {
+			installedPublisherSettled(ctx)
+		}
 		pod, err := f.region.CoreV1().Pods(f.namespace).Get(ctx, podName, meta.GetOptions{})
 		if err != nil || string(pod.UID) != podUID {
 			t.Fatal("ongoing incident Pod before restart", err)

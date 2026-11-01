@@ -46,6 +46,12 @@ type installedPolicyFixture struct {
 
 var installedPolicyTarget *installedPolicyFixture
 
+// installedPublisherSettled, when set by the installer journey, waits until
+// the publisher runs on the current cluster catalog: a catalog change (a
+// regional enrollment) restarts it within one 15 s tick, which would cost an
+// incident capture with a short publication margin its deadline.
+var installedPublisherSettled func(context.Context)
+
 const installedPolicyName = "regional-restarts"
 
 // installedPolicyJourney qualifies the S-03 increments on the installed

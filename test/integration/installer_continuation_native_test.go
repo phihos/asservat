@@ -517,6 +517,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			installedContextStandbyWindow(t, ctx, api, desired.TargetNamespace, prefix+"-owner")
 		}
 		t.Logf("installed focus %q starts (fast fixture %v)", installedJourneyFocus(), installedFastFixture())
+		installedPublisherSettled = func(c context.Context) {
+			waitInstalledPublisherSettled(t, c, api, desired.TargetNamespace, installation)
+		}
 		diagnose := func() {
 			installedSQLActivityDiagnostics(ctx, admin.Query, installation, t.Logf)
 			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker", contracts.PublisherName(installation))
@@ -1519,6 +1522,42 @@ func installedHubSettled(t *testing.T, ctx context.Context, api kubernetes.Inter
 		}
 		if time.Now().After(until) {
 			t.Fatal("hub processes did not settle after the PostgreSQL restart", err)
+		}
+	}
+}
+
+// waitInstalledPublisherSettled waits until the publisher's running container
+// started after the cluster catalog's last change, so no catalog restart is
+// pending.
+func waitInstalledPublisherSettled(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, installation string) {
+	t.Helper()
+	for until := time.Now().Add(2 * time.Minute); ; time.Sleep(time.Second) {
+		changed := time.Time{}
+		if cm, err := api.CoreV1().ConfigMaps(namespace).Get(ctx, contracts.OwnerClusterCatalogName(installation), meta.GetOptions{}); err == nil {
+			changed = cm.CreationTimestamp.Time
+			for _, m := range cm.ManagedFields {
+				if m.Time != nil && m.Time.After(changed) {
+					changed = m.Time.Time
+				}
+			}
+		}
+		pods, err := api.CoreV1().Pods(namespace).List(ctx, meta.ListOptions{})
+		if err == nil && !changed.IsZero() {
+			for _, p := range pods.Items {
+				if p.DeletionTimestamp != nil || !strings.HasPrefix(p.Name, contracts.PublisherName(installation)+"-") {
+					continue
+				}
+				for _, c := range p.Status.ContainerStatuses {
+					if c.Ready && c.State.Running != nil && c.State.Running.StartedAt.After(changed) {
+						return
+					}
+				}
+			}
+		}
+		if time.Now().After(until) {
+			// An unchanged-content catalog write restarts nothing.
+			t.Log("publisher started before the last catalog write; continuing", changed)
+			return
 		}
 	}
 }
