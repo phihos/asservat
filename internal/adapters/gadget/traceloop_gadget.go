@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cilium/ebpf"
@@ -242,7 +243,8 @@ func traceNamespaces(ctx context.Context, proc, podUID string, outer *ebpf.Map, 
 	}
 	active := map[uint64]*traced{}
 	failed := map[uint64]bool{} // namespaces whose failure was already logged
-	scanned := false            // the first scan's namespaces are not late
+	var records, lostTotal atomic.Uint64
+	scanned := false // the first scan's namespaces are not late
 	var readers sync.WaitGroup
 	defer func() {
 		for ns, t := range active {
@@ -295,6 +297,7 @@ func traceNamespaces(ctx context.Context, proc, podUID string, outer *ebpf.Map, 
 				continue
 			}
 			active[ns] = &traced{inner: inner, reader: reader}
+			fmt.Fprintf(os.Stderr, "syscall engine: tracing mount namespace %d (late %t)\n", ns, scanned)
 			if scanned {
 				// A container that started after the first scan was traced
 				// up to one rescan late; report it as a gap, not quiet input.
@@ -308,7 +311,9 @@ func traceNamespaces(ctx context.Context, proc, podUID string, outer *ebpf.Map, 
 					if err != nil {
 						return
 					}
+					records.Add(1)
 					if rec.LostSamples > 0 {
+						lostTotal.Add(rec.LostSamples)
 						emit(nil, rec.LostSamples)
 						continue
 					}
@@ -321,12 +326,15 @@ func traceNamespaces(ctx context.Context, proc, podUID string, outer *ebpf.Map, 
 	scanned = true
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
-	for {
+	for n := 1; ; n++ {
 		select {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
 			scan()
+			if n%30 == 0 { // a bounded content-free health line every 30s
+				fmt.Fprintf(os.Stderr, "syscall engine: %d namespaces, %d perf records, %d lost samples\n", len(active), records.Load(), lostTotal.Load())
+			}
 		}
 	}
 }
