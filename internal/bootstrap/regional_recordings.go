@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -225,6 +226,7 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 	}
 	var copies artifact.Copies
 	var err error
+	storeStarted := h.now()
 	if held.snapshot != nil {
 		copies, err = prepared.StoreSnapshot(ctx, pcapng, started, completed, *r.Snapshot)
 	} else {
@@ -251,7 +253,7 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		}
 		h.log("connector recording " + r.CaptureID + " store unconfirmed: " + reason)
 	} else {
-		h.log("connector recording " + r.CaptureID + " stored")
+		h.log(fmt.Sprintf("connector recording %s stored: %d native bytes in %s, window end %s, processing until %s", r.CaptureID, r.CapturedBytes, h.now().Sub(storeStarted).Round(10*time.Millisecond), completed.Format(time.RFC3339Nano), held.expectation.Registration.WriteUntil.Format(time.RFC3339Nano)))
 	}
 	h.mu.Lock()
 	held.outcome = outcome

@@ -147,7 +147,11 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	outcome := artifact.SourceSnapshotOutcome{NativeSHA256: artifact.Digest(sha256.Sum256(native)), SourceSnapshotCoverage: artifact.SourceSnapshotCoverage{Request: q, AcceptedExpectationDigest: artifact.Digest(x.ExpectationDigest), NativeBytes: int64(len(native)), Retained: counters.Retained, OutputFull: counters.OutputFull, AvailableFrom: coverage.AvailableFrom, ObservedUntil: coverage.ObservedUntil, SourceStoppedAt: coverage.SourceStoppedAt.UTC(), SourceClosedAt: coverage.SourceClosedAt.UTC(), CompletedAt: completed, HistoryComplete: pre.Complete && !coverage.InputUnknown && !coverage.HistoryEvicted, WindowComplete: coverage.Complete && counters.OutputFull == 0, HistoryEvicted: coverage.HistoryEvicted, InputUnknown: coverage.InputUnknown}}
 	result := collector.PacketResult{Snapshot: &outcome, WorkID: workID, CaptureID: x.CaptureID, StartedAt: acquiredFrom, EndedAt: acquiredUntil, Seen: counters.Seen, Retained: counters.Retained, OutputFull: counters.OutputFull, WireBytes: counters.WireBytes, CapturedBytes: int64(len(native)), Snaplen: snaplen, EngineVersion: n.version, ProgramDigest: x.Binding.ProgramDigest, NativeType: nativeType}
 	if result.Valid() && n.takeUpload(ctx, result.CapturedBytes) {
-		_ = n.upload(ctx, epoch, result, native)
+		uploadStarted := n.now()
+		err := n.upload(ctx, epoch, result, native)
+		if n.log != nil {
+			n.log(fmt.Sprintf("node collector: source %s snapshot %s: %d events, %d bytes, completed %s, upload %s (%v)", x.Binding.SourceID, q.SnapshotID, counters.Retained, len(native), completed.Format(time.RFC3339Nano), n.now().Sub(uploadStarted).Round(10*time.Millisecond), err))
+		}
 	}
 }
 
