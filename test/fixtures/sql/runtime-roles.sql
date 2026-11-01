@@ -349,8 +349,15 @@ GRANT UPDATE(installation_id) ON fleet_current_trust TO context_request_resoluti
 GRANT UPDATE(closed_at,closed_request_key,closed_submission_digest) ON context_preview TO context_request_resolution_runtime;
 GRANT INSERT,DELETE ON context_preview_fence TO context_request_resolution_runtime;
 GRANT DELETE ON context_preview TO context_request_resolution_runtime;
+-- ADR-266: resolution reads a recording save group (production capture-resolution).
+GRANT SELECT ON recording_save_group,recording_selection_set TO context_request_resolution_runtime;
+GRANT EXECUTE ON FUNCTION capture_preview_reason_copied(context_preview) TO context_request_resolution_runtime;
 GRANT SELECT ON context_preview,context_preview_fence TO capture_runtime;
 GRANT SELECT,DELETE ON context_preview_fence TO context_preview_runtime,context_preview_cleanup_runtime;
+-- 00108: previews create and expire recording selections, as the
+-- production capture-preview role (public_runtime_role_plan.go).
+GRANT SELECT,INSERT,DELETE ON recording_selection_set TO context_preview_runtime;
+GRANT SELECT ON policy_recording_source,policy_source TO context_preview_runtime;
 
 -- Migration37: separate protected control backing from immutable capture spend.
 CREATE ROLE context_control_config_runtime LOGIN PASSWORD 'synthetic-context-control-config';
@@ -629,3 +636,11 @@ GRANT SELECT ON capture_history_parameter TO retention_runtime,retention_catchup
 -- ADR-261: existing audited finalization alone retires an expired observation
 -- child; cleaner/audit roles cannot delete or refund either observed pool.
 GRANT SELECT(root_id,capture_id),DELETE ON policy_observation_session TO context_cleanup_finalize_runtime;
+
+-- ADR-266/00108-00110: recording selections and save groups, as the
+-- production capture-admit, capture-history and preview cleanup purposes
+-- (public_runtime_role_plan.go).
+GRANT SELECT,INSERT ON recording_save_group TO capture_runtime;
+GRANT SELECT ON recording_save_group TO context_progress_read_runtime,context_deadline_runtime;
+GRANT UPDATE(id) ON recording_save_group TO context_progress_read_runtime; -- row lock (production hub-metadata-read)
+GRANT SELECT,DELETE ON recording_selection_set TO context_preview_cleanup_runtime;
