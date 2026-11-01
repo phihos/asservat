@@ -55,30 +55,29 @@ scheduled after the main installed-qualification flakes are fixed.
 
 ## Implementation notes (2026-11-01)
 
-Done on `feature/s04-manual-mixed`: `SplitComposition`, `CompileRecorderGroup`
-(`recorder-group/v1`), `CompositionGroupPreview` on `ContextPreview`, and
-migration 00116 (custody shards 1–4 pass with it applied).
+Implemented on `feature/s04-manual-mixed`:
 
-Remaining, in order:
+- Planning: `SplitComposition`, `CompileRecorderGroup` (`recorder-group/v1`,
+  carrying the children's shared `timing` marker so the parent grant passes
+  `lock_approved_context_grant`, plus merged `profileComposition`/`lifecycle`
+  for display), `ReadRecorderGroupScope`, `RecorderGroupDisplay` and
+  `RecorderGroupSummary` (one review over all child actions).
+- SQL (migration 00116): kind-aware header, member, history and audit checks;
+  `AdmitRecordingCompositionGroup` inserts the header and admits every child
+  in one transaction (children created at the header's `accepted_at`, no
+  policy reservation, parent grant locked per child). Replay, resolution,
+  progress (`collect`, one Pod) and capture-intent readers are kind-aware;
+  cancellation of a composition group is refused (finite children).
+- Application: `previewCompositionGroup` (one eligibility/storage
+  observation, per-child retention by evidence type, per-child compile,
+  assessment and processing coverage), `requestCompositionGroup` (one
+  approval gate, both node recorders resolved for the same Pod, one atomic
+  admission) and serial `StartContext` per child under the human identity.
+- Tests: unit (planning, domain progress, presentation), custody
+  `recording-composition-group` and the native `continuation-manual-mixed`
+  focus.
 
-1. Admission (`internal/adapters/postgres/capture.go`). The single path
-   (`group == nil`) locks its own stored preview and grant via
-   `readReviewedContext`; the save-group path (`contextAdmissionGroupOptions`)
-   takes a policy reservation. A composition child needs a third branch:
-   recovery/stream from the group transaction, `reviewed` = the locked parent
-   preview with the child's own target/scope substituted, the parent grant
-   locked once (by parent preview ID, parent capture ID and parent scope
-   digest, `lock_approved_context_grant`), no policy reservation, and
-   `group_id`/`group_ordinal` from the child index (not `Snapshot.Group`).
-   `InsertRecordingSaveGroup` gains `group_kind` and nullable policy columns.
-2. `recordingGroupAccepted` / progress / history readers become kind-aware
-   (`Operation` collect, PodUID set, no `Snapshot.T0`), and composition
-   groups write no parent history entry.
-3. Application: `previewCompositionGroup` (split, compile each child, compile
-   the parent, one assessment and approval), `requestCompositionGroup` (one
-   approval gate, resolve both recorders, `AdmitRecordingCompositionGroup`,
-   serial `StartContext` per child under the human identity).
-4. Presentation: allow `collect` groups in progress actions; MCP/browser
-   schemas already carry `actions[]`.
-5. Tests: unit, custody shards, native `manual-mixed` (packet + syscall
-   finite recordings at once on one Pod).
+Known v1 limits: a component with several actions is refused; each child
+keeps the composition's `maxTotalBytes` as its own cap (the per-capture
+8 MiB recording limit still applies), and no parent history entry is
+written, so repeating needs a new preview.
