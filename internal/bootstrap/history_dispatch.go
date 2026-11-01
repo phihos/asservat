@@ -75,8 +75,27 @@ func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, ca
 	if bound, ok := ctx.Deadline(); ok {
 		horizon = identity.Earlier(horizon, bound)
 	}
-	a, call, cancel, until, e := d.attach(ctx, cluster, captureID)
-	for e != nil {
+	// A receiver refused right after attach (a standby that was reopening)
+	// is retried like the attach itself, within the same horizon (native
+	// runs 41339509646: receiver/failed left the history unwritten).
+	var a *contextstart.Attachment
+	var call context.Context
+	var cancel context.CancelFunc
+	var until time.Time
+	var r fleet.APIContextReceiver
+	var e error
+	for {
+		a, call, cancel, until, e = d.attach(ctx, cluster, captureID)
+		if e == nil {
+			began := time.Now()
+			r, e = a.Receiver(call)
+			reportHistoryDispatch(d.Report, call, "receiver", began, until, e)
+			if e == nil {
+				break
+			}
+			a.Close()
+			cancel()
+		}
 		if horizon.Sub(d.Now()) < historyRetryLeft {
 			return nil, e
 		}
@@ -87,15 +106,6 @@ func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, ca
 			return nil, e
 		case <-pause.C:
 		}
-		a, call, cancel, until, e = d.attach(ctx, cluster, captureID)
-	}
-	began := time.Now()
-	r, e := a.Receiver(call)
-	reportHistoryDispatch(d.Report, call, "receiver", began, until, e)
-	if e != nil {
-		a.Close()
-		cancel()
-		return nil, e
 	}
 	until = identity.Earlier(until, r.ValidUntil)
 	// The attachment retains call's cancellation. Its joined Close is the owner;
