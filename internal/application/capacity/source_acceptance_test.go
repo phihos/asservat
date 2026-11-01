@@ -1,11 +1,13 @@
 package capacity
 
 import (
+	"bytes"
 	"slices"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/collector"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 )
 
@@ -167,5 +169,69 @@ func TestCapacityEnrollmentHeartbeatCannotRefreshWorkloadOrPermission(t *testing
 	a.Revision++
 	if _, _, e := ComposeEnrollmentObservation(a, g, w, p, prior.Recovery, "original", now); e == nil {
 		t.Fatal("new source sequence refreshed old workload observation")
+	}
+}
+
+func TestOngoingResourcesRequireOriginalAcceptedCurrentBudget(t *testing.T) {
+	a, _, _, _, _, now := enrollmentObservationFacts()
+	name := a.Observation.Snapshot.Policies[0].Resource.Name
+	if limits, err := a.CurrentSourceResources(now, name); err != nil || limits != (SourceResourceLimits{}) {
+		t.Fatal("absent optional lowering limits changed old accepted source", limits, err)
+	}
+	want := SourceResourceLimits{Node: collector.PolicyLimits{RingBytes: 64 << 20, FrozenBytes: 32 << 20, SourceLimits: collector.SourceLimits{MaxActiveSources: 4, InputBytesPerSecond: 2 << 20, InputBurstBytes: 1 << 20}}, Workload: collector.SourceLimits{MaxActiveSources: 2}}
+	a.Observation.Snapshot.Policies[0].SourceResources = &want
+	// A caller editing decoded desired values cannot use the old accepted digest.
+	if _, err := a.CurrentSourceResources(now, name); err == nil {
+		t.Fatal("unaccepted DTO edit passed")
+	}
+	a.Observation = sourceObservationFixture(a.Observation.Snapshot)
+	got, err := a.CurrentSourceResources(now, name)
+	if err != nil || got != want {
+		t.Fatal("accepted limits lost", got, err)
+	}
+	got.Node.MaxActiveSources = 999
+	if next, err := a.CurrentSourceResources(now, name); err != nil || next != want {
+		t.Fatal("returned value aliases accepted source")
+	}
+	for _, check := range []struct {
+		at   time.Time
+		name string
+	}{{a.FreshUntil, name}, {now, "foreign-policy"}} {
+		if _, err := a.CurrentSourceResources(check.at, check.name); err == nil {
+			t.Fatal("expired or foreign policy accepted")
+		}
+	}
+	a.Revision = 0
+	if _, err := a.CurrentSourceResources(now, name); err == nil {
+		t.Fatal("unaccepted observation supplied limits")
+	}
+}
+
+func TestSourceResourcesDoNotChangeStoredProjection(t *testing.T) {
+	s, _, _ := capacitySelectionFixture()
+	name := s.Pools[0].Resource.Name
+	before, _, err := CanonicalProtectedPoolPlan(s, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := SelectedCapacitySourceDigest(s, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	complete := sourceObservationFixture(s)
+	s.Policies[0].SourceResources = &SourceResourceLimits{Node: collector.PolicyLimits{SourceLimits: collector.SourceLimits{MaxActiveSources: 4}, RingBytes: 64 << 20}}
+	after, _, err := CanonicalProtectedPoolPlan(s, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err := SelectedCapacitySourceDigest(s, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) || selected != next {
+		t.Fatal("resource-only enrichment changed existing storage projection")
+	}
+	if sourceObservationFixture(s).Digest == complete.Digest {
+		t.Fatal("complete accepted source omitted resource caps")
 	}
 }

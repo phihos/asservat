@@ -274,7 +274,13 @@ func (s *OwnerObservationOperationReader) boundaryLocal(ctx context.Context, r v
 				return zero, noDigest, e
 			}
 			last, e := ownerResource[core.Pod](route, ctx, base+"pods/"+location.pod, "v1", "Pod")
-			if e != nil || last.ResourceVersion != pod.ResourceVersion || !equalJSON(last, pod) {
+			if e != nil {
+				return zero, noDigest, cfg.ErrChanged
+			}
+			// Status/resourceVersion updates are not workload identity. Recheck
+			// the last Pod's live behavior and the same protected spec projection.
+			lastDigest, e := s.validateObjects(service, deployment, rs, last, b, location, release)
+			if e != nil || lastDigest != digest {
 				return zero, noDigest, cfg.ErrChanged
 			}
 			peer = OwnerObservationNativePeer{Pod: pod.Name, ReplicaSetUID: string(rs.UID), Addresses: slices.Clone(location.addresses), WorkloadDigest: digest}

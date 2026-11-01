@@ -76,3 +76,26 @@ func (p policyIdentity) ResolveIdentity(ctx context.Context) (identity.Identity,
 	}
 	return i, nil
 }
+
+// acceptedSettingsIssuer exposes only pinned protected-settings provenance from
+// the already observed acceptance. It is not creator authentication or a new
+// authority read; normal identity/eligibility and atomic admission remain required.
+func (p policyIdentity) acceptedSettingsIssuer(ctx context.Context) (string, error) {
+	if ctx == nil || ctx.Err() != nil || p.owner == nil || p.owner.Err() != nil || p.now == nil || p.cache == nil || !p.now().Before(p.until) {
+		return "", value.ErrDenied
+	}
+	p.cache.mu.Lock()
+	defer p.cache.mu.Unlock()
+	snapshot := p.cache.snapshot
+	a := snapshot.Authority
+	issuer := p.policy.Creator.Issuer
+	if p.cache.read.IsZero() || !p.now().Before(snapshot.SourceUntil) || !a.Valid(p.now()) || a.Executor != p.policy.Executor || a.ScopeDigest != p.policy.ScopeDigest || a.Delegation != p.policy.Delegation || a.Creator.Issuer != issuer {
+		return "", value.ErrDenied
+	}
+	for _, owner := range a.Owners {
+		if owner.Issuer != issuer {
+			return "", value.ErrDenied
+		}
+	}
+	return issuer, nil
+}

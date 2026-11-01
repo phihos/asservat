@@ -7,7 +7,7 @@ import (
 )
 
 func TestAPIContextFramesEnforceKindSpecificBoundsBeforePayloadRead(t *testing.T) {
-	for _, kind := range []APIContextFrameKind{APIContextHelloFrame, APIContextWorkFrame, APIContextResultFrame, APIContextReceiptFrame, APIContextOperationRequestFrame, APIContextOperationResponseFrame, APIContextSourceRequestFrame, APIContextSourceFrame, APIContextQueryFrame, APIContextAnswerFrame} {
+	for _, kind := range []APIContextFrameKind{APIContextHelloFrame, APIContextWorkFrame, APIContextResultFrame, APIContextReceiptFrame, APIContextOperationRequestFrame, APIContextOperationResponseFrame, APIContextSourceRequestFrame, APIContextSourceFrame, APIContextQueryFrame, APIContextAnswerFrame, HistoryWorkFrame, HistoryRequestFrame, HistoryResponseFrame, HistoryReceiptFrame} {
 		limit := apiContextFrameLimit(kind)
 		var wire bytes.Buffer
 		payload := bytes.Repeat([]byte{'x'}, limit)

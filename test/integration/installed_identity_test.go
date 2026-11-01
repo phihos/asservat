@@ -72,7 +72,7 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	}
 	// evidence:share is a default console scope so the browser can share (ADR-232 console).
 	scopes := []string{"basic", "evidence:read", "evidence:download", "evidence:capture", "evidence:share"}
-	if installedJourneyFocus() == "approved-recording" {
+	if installedRecordingFocus() {
 		scopes = append(scopes, "acr")
 	}
 	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "console", "protocol": "openid-connect", "publicClient": false, "secret": consoleSecret, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{strings.TrimSuffix(origin, "/") + "/auth/callback"}, "defaultClientScopes": scopes, "optionalClientScopes": []string{}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{audience("asservat-api"), groups}})
@@ -98,7 +98,7 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	user := created("/users", map[string]any{"username": "developer", "enabled": true, "email": "synthetic@example.invalid", "firstName": "Synthetic", "lastName": "Developer", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
 	kc.json("PUT", prefix+"/users/"+user+"/groups/"+group, nil)
 	var reviewer string
-	if installedJourneyFocus() == "approved-recording" {
+	if installedRecordingFocus() {
 		reviewer = created("/users", map[string]any{"username": "reviewer", "enabled": true, "email": "reviewer@example.invalid", "firstName": "Synthetic", "lastName": "Reviewer", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
 		kc.json("PUT", prefix+"/users/"+reviewer+"/groups/"+group, nil)
 	}

@@ -1,9 +1,34 @@
 # Decision records
 
+[ADR-268 — Grouped Save dispatch](268-grouped-save-dispatch-window.md) removes
+the all-sibling intent barrier and gives the composed request a prospective
+fifteen-second envelope while retaining every original child StartBy. Local
+control checks and installed qualification are tracked separately.
+
+[ADR-263 — Ordinary ongoing source active leases](263-ordinary-ongoing-source-leases.md)
+selects a distinct thirty-second source-purpose commitment under fresh issuance
+facts, cumulative credit and original hard ends. Contract only; runtime and
+installed qualification remain pending.
+
+[ADR-262 — Protected ongoing resource projection](262-protected-ongoing-resource-projection.md)
+
+Carry optional source limits alongside accepted policy observations while preserving storage identities. The bounded SQL upgrade is qualified; ongoing runtime and native resource profiles remain pending.
+
+[ADR-261 — Finite policy observation admission](261-finite-policy-observation-admission.md)
+records the engineering finite-window contract, original hard bounds, explicit
+revocation residual and held renewal machinery. Authority/prefix/native
+qualification remains pending; manual raw and ongoing modes are not enabled.
+
+[ADR-259 — Policy grants and observation spend](259-policy-grants-and-observation-spend.md)
+records accepted team-policy grants and prepaid observation; ADR-261 refines the
+first finite policy lease without a periodic renewal loop.
+Implementation and installed qualification remain in progress.
+
 [ADR-253 — Approval step-up sign-in](253-approval-stepup-login.md) adds an explicit console
 sign-in path using current protected ACR settings and fresh authentication. The
 existing signed-claim check still decides assurance; real-provider LoA qualification
 remains pending. No migration or new credential.
+- **ADR-255 — Encrypted parameterized capture history:** [Bounded immutable settings and faithful repeat](255-encrypted-capture-history.md); implementation in progress, native qualification pending.
 
 [ADR-249 — Sensitive acquisition grants](249-sensitive-acquisition-grants.md) is S-04 increment
 12 (12a, individual approval): an adHocCapture AccessGrant per reviewed packet/syscall plan that
@@ -1021,4 +1046,22 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 
 - [ADR-257: preserve authored packet evidence funding](257-approved-recording-funding.md)
 
+- [258 — Native response windows under slow delivery](258-slow-native-response-windows.md): retain one fixed response owner and cursor across fresh short leases, preserve actual credential expiry, and reuse the existing native-owner renewal. Selected SQL/S3/TLS qualification passes; installed aggregate-cost and slower-link qualification remain pending.
+
 - [ADR-260: API target observations after completed authenticated queries](260-api-target-observation-freshness.md)
+
+- [ADR-264: existing-source packet snapshots](264-existing-source-packet-snapshots.md): distinct immutable window admission, bounded owned copy/output and independently validated authenticated coverage; automatic/manual runtime composition and installed qualification remain in progress.
+
+- [ADR-265: manual existing-recording saves](265-manual-existing-recording-saves.md): passive bounded discovery, first-admission t0, distinct initiator/executor, shared budgets and joined cancellation; manual SQL108 and installed qualification pending.
+
+- [ADR-266: grouped recording-save accounting](266-grouped-recording-save-accounting.md): one policy execution per Save, applicable grant starts per source, one shared acceptance time and independently funded child outputs; two-source SQL/storage component qualification passes, installed workflow pending.
+
+- [ADR-267: encrypted recording-save reasons](267-encrypted-recording-save-reasons.md): immutable reason reference, opaque encrypted body in existing preview/audit lifecycle, reason-only32KiB format and authorized parent metadata; SQL/provider qualification pending.
+
+- [ADR-269: original grouped Save request bounds](269-original-grouped-save-request-bounds.md): carry one original request through admission, fixed group audit bookkeeping and bounded serial dispatch; local implementation in progress, sixteen-source native workflow qualification pending.
+
+- [ADR-270: source work is a standby query](270-source-work-standby-query.md): source arm/renewal/stop/cancel travel as one `source-work` query, so 15-second renewals never consume the cluster's one standby a Save needs; unit/real-stream tests pass, installed qualification pending.
+
+- [ADR-271: two context-start standbys per cluster](271-two-standbys-per-cluster.md): maintainer reopened ADR-209; join reserves two per cluster, the region keeps two staggered exchanges per owner and an exhausted standby retires only beside another; installed qualification pending.
+
+- [ADR-272: advisory history after the start](272-advisory-history-after-start.md): starts take priority; history follows with its own at-most-five-second budget inside the original request window; unit tests pass, installed qualification pending.

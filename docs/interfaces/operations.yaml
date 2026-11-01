@@ -553,3 +553,10 @@ operations:
   effect: command
   role: authorized-grant-revoker
   contract: specs/contracts/mcp-tools.json
+- operation: request_policy_grant
+  path: /api/v1/operations/request_policy_grant
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json

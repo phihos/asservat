@@ -1,7 +1,7 @@
 # ADR-209 — Two context-start standbys per hub owner
 
 Date: 2026-10-19. Status: withdrawn after installed native 65; the code change
-was reverted.
+was reverted. Superseded by [ADR-271](271-two-standbys-per-cluster.md).
 Requirements: REQ-EXE-002, REQ-FED-001/003, S-02; TASK-03 / TASK-11.
 
 ## Context

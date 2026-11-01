@@ -21,6 +21,18 @@ import (
 func validCompletedAPI(r value.APIExecution, e artifact.ContextExpectation) bool {
 	return r.Valid() && r.Phase == "stored" && r.Binding.CaptureID == e.CaptureUID && r.Binding.AttemptID == e.Registration.Location.AttemptID && r.Binding.ClusterID == e.Registration.Location.ClusterID && r.Binding.PodUID == e.PodUID && r.Binding.ScopeDigest == e.PlanDigest && r.ExpectationDigest == evidence.ContextExpectationDigest(e) && r.Process.ImageDigest == e.CollectorImageDigest && r.Copies.Validate(e.Registration) == nil && r.CompletedAt.Before(e.Registration.WriteUntil)
 }
+
+// A completed execution retains the admitted digest; semantic verification
+// binds the independently projected completion expectation instead.
+func validCompletedAPICapture(r value.APIExecution, e artifact.ContextExpectation, c custodydb.ContextCapture) bool {
+	accepted, err := admittedRecord(c)
+	if err != nil || !validCompletedAPI(r, accepted.Expectation) {
+		return false
+	}
+	projected, err := storedSnapshotProjection(accepted.Expectation, c.SnapshotCoverage, c.SnapshotCoverageDigest, c.SnapshotExpectationDigest)
+	return err == nil && (e.Snapshot == nil || len(c.SnapshotCoverage) > 0) && evidence.ContextExpectationDigest(projected) == evidence.ContextExpectationDigest(e)
+}
+
 func currentVerificationRecord(ctx context.Context, q *custodydb.Queries, c custodydb.ContextCapture, v custodydb.ContextVerification) (audit.ContextVerification, error) {
 	e, err := acceptedPublication(c)
 	if err != nil {
@@ -90,12 +102,12 @@ func (s *APIContextPublicationGate) CheckContextPublication(ctx context.Context,
 		if err != nil {
 			return err
 		}
-		row, err := q.ReadAPIExecution(ctx, custodydb.ReadAPIExecutionParams{RootID: id(s.publications.root), CaptureID: id(e.CaptureUID)})
+		row, err := q.ReadAPIExecutionPublication(ctx, custodydb.ReadAPIExecutionPublicationParams{RootID: id(s.publications.root), CaptureID: id(e.CaptureUID)})
 		if err != nil {
 			return privacyapp.ErrFence
 		}
-		r, err := apiExecution(row)
-		if err != nil || !validCompletedAPI(r, e) {
+		r, err := apiExecution(row.ContextExecution)
+		if err != nil || !validCompletedAPICapture(r, e, row.ContextCapture) {
 			return privacyapp.ErrFence
 		}
 		// The original protected process/issuer must match the installation for which

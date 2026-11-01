@@ -17,8 +17,9 @@ import (
 // answers while it still waits for work, so a query never consumes the
 // standby. Queries are not operations: no work is verified or executed.
 const (
-	queryResolveWorkload = "resolve-workload"
-	queryResolvePod      = "resolve-pod"
+	queryResolveWorkload         = "resolve-workload"
+	queryResolveWorkloadIdentity = "resolve-workload-identity"
+	queryResolvePod              = "resolve-pod"
 	// ADR-228: one bounded Pod LIST of a named workload's restart counters,
 	// plus one Event LIST of its namespace for a probe detector (ADR-230).
 	queryObserveRestarts = "observe-workload-restarts"
@@ -27,9 +28,16 @@ const (
 	queryReviewAccess = "review-access"
 	// ADR-248: whether the target Pod's node collector offers the packet
 	// recorder now.
-	queryPacketRecorder        = "packet-recorder"
-	queryResolvePacketRecorder = "resolve-packet-recorder"
+	queryPacketRecorder          = "packet-recorder"
+	queryResolvePacketRecorder   = "resolve-packet-recorder"
+	queryResolveOngoingRecorders = "resolve-ongoing-recorders"
+	// One signed source arm/renewal/stop. The only query that verifies and
+	// queues work; it keeps the standby waiting like any other query.
+	querySourceWork = "source-work"
 )
+
+// receiverBody builds a query body bound to the checked current receiver.
+type receiverBody func(fleet.APIContextReceiver) (any, error)
 
 // RecorderTargets is the region's optional packet recorder availability
 // (ADR-248). A region without it answers the query as unsupported, which
@@ -51,10 +59,20 @@ type PacketTargetResolver interface {
 	ResolvePacketRecorder(context.Context, targets.Request) (targets.RecorderResolution, error)
 }
 
+type OngoingTargetResolver interface {
+	ResolveOngoingRecorders(context.Context, []targets.OngoingRecorderRequest) ([]targets.OngoingRecorderResolution, error)
+}
+
 // RestartTargets is the region's optional restart observation (ADR-228). A
 // region without it answers the query as unsupported.
 type RestartTargets interface {
 	ObserveWorkloadRestarts(context.Context, targets.RestartRequest) (targets.RestartObservation, error)
+}
+
+// WorkloadIdentityTargets is metadata-only and does not require a live Pod.
+// Older resolvers return unsupported; the caller must not select a replacement.
+type WorkloadIdentityTargets interface {
+	ResolveWorkloadIdentity(context.Context, targets.WorkloadRequest) (targets.WorkloadIdentityResolution, error)
 }
 
 // QueryTargets is the region's own cluster target resolver.
@@ -126,22 +144,9 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	seq, e := s.nextQuery()
-	if e != nil {
-		return time.Time{}, e
-	}
-	body, e := json.Marshal(in)
-	if e != nil {
-		return time.Time{}, fleet.ErrInvalid
-	}
-	payload, e := contracts.EncodeAPIContextOperation(contracts.APIContextOperation{Format: contracts.APIContextExchangeFormat, Sequence: seq, Method: method, Body: body})
-	if e != nil {
-		return time.Time{}, e
-	}
-	defer clear(payload)
 	defer markQuery(ctx, "q-total", time.Now())
 	pulled := time.Now()
-	if e = s.pullSource(call); e != nil {
+	if e := s.pullSource(call); e != nil {
 		s.record(streamHubQuerySource, streamErrorReason(e))
 		return time.Time{}, fleet.ErrUnavailable
 	}
@@ -154,6 +159,34 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 		s.interruptAt(streamSendPeer, streamPeerInvalid)
 		return time.Time{}, fleet.ErrUnavailable
 	}
+	if build, ok := in.(receiverBody); ok {
+		// Nothing was sent for this query yet: a build failure returns the
+		// stream to its passive residence like an answered query.
+		if in, e = build(receiver); e != nil {
+			if c := s.completeQuery(call, receiver.ValidUntil); c != nil {
+				return time.Time{}, c
+			}
+			return time.Time{}, errQueryAnswer{e}
+		}
+	}
+	// The sequence is reserved only once the query is certain to be sent.
+	seq, e := s.nextQuery()
+	if e != nil {
+		return time.Time{}, e
+	}
+	body, e := json.Marshal(in)
+	if b, ok := in.([]byte); ok {
+		clear(b)
+	}
+	if e != nil {
+		return time.Time{}, fleet.ErrInvalid
+	}
+	payload, e := contracts.EncodeAPIContextOperation(contracts.APIContextOperation{Format: contracts.APIContextExchangeFormat, Sequence: seq, Method: method, Body: body})
+	clear(body)
+	if e != nil {
+		return time.Time{}, e
+	}
+	defer clear(payload)
 	sentUntil, e := s.send(call, contracts.APIContextFrame{Kind: contracts.APIContextQueryFrame, Payload: payload})
 	if e != nil {
 		return time.Time{}, e
@@ -291,6 +324,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	var out any
 	resolved := time.Now()
 	switch q.Method {
+	case queryResolveWorkloadIdentity:
+		var r targets.WorkloadRequest
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(WorkloadIdentityTargets); ok {
+			out, e = resolver.ResolveWorkloadIdentity(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
 	case queryResolveWorkload:
 		var r targets.WorkloadRequest
 		if decodeOperationBody(q.Body, &r) != nil {
@@ -343,6 +386,43 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		} else {
 			e = targets.ErrUnsupported
 		}
+	case queryResolveSourceSnapshots:
+		var r []targets.SourceSnapshotTarget
+		if decodeOperationBody(q.Body, &r) != nil || !ValidSourceSnapshotBatch(r, SourceSnapshotQueryBatchLimit) {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(SourceSnapshotBatchResolver); ok {
+			out, e = resolver.ResolveSourceSnapshots(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryResolveSourceSnapshot:
+		var r targets.SourceSnapshotTarget
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(SourceSnapshotTargetResolver); ok {
+			out, e = resolver.ResolveSourceSnapshot(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryResolveOngoingRecorders:
+		var r []targets.OngoingRecorderRequest
+		if decodeOperationBody(q.Body, &r) != nil || !targets.ValidOngoingRecorderBatch(r) {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(OngoingTargetResolver); ok {
+			out, e = resolver.ResolveOngoingRecorders(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case querySourceWork:
+		var signed []byte
+		if decodeOperationBody(q.Body, &signed) != nil || len(signed) == 0 || len(signed) > contracts.SourceSignedWorkBytes {
+			return contracts.ErrAPIContextProtocol
+		}
+		out, e = applySourceWork(bounded, owner, signed, s.sourceWork, time.Now)
+		clear(signed)
 	default:
 		return contracts.ErrAPIContextProtocol
 	}

@@ -4,11 +4,15 @@ WHERE c.root_id=$1 AND c.cluster_id=$2 AND c.namespace_uid=$3 AND j.completed_at
 ORDER BY c.sequence LIMIT 1 FOR UPDATE OF j;
 
 -- name: ListRetentionCatchupContexts :many
-SELECT a.id,a.cluster_id,a.artifact_id FROM context_capture c JOIN custody_attempt a ON a.id=c.attempt_id
-WHERE c.root_id=$1 AND c.created_at<=$2 AND a.state<>'deleted'
-AND (sqlc.narg(after_attempt)::uuid IS NULL OR c.attempt_id>sqlc.narg(after_attempt)::uuid)
+SELECT a.id,a.cluster_id,a.artifact_id FROM custody_attempt a
+WHERE a.id IN (
+ SELECT c.attempt_id FROM context_capture c WHERE c.root_id=$1 AND c.created_at<=$2
+ UNION ALL
+ SELECT h.attempt_id FROM capture_history_parameter h WHERE h.root_id=$1 AND h.created_at<=$2
+) AND a.state<>'deleted'
+AND (sqlc.narg(after_attempt)::uuid IS NULL OR a.id>sqlc.narg(after_attempt)::uuid)
 AND (sqlc.arg(hub)::boolean OR a.cluster_id=sqlc.arg(cluster_id)::uuid)
-ORDER BY c.attempt_id LIMIT sqlc.arg(page_limit);
+ORDER BY a.id LIMIT sqlc.arg(page_limit);
 
 -- name: AdvanceRetentionCatchup :exec
 UPDATE retention_catchup SET after_attempt=$2,visited=visited+$3,shortened=shortened+$4,

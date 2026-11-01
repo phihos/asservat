@@ -3,9 +3,11 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -16,9 +18,11 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
+	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	privacyvalue "asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -76,7 +80,7 @@ func captureError(err error) error {
 	if err == nil {
 		return nil
 	}
-	for _, e := range []error{value.ErrInvalid, value.ErrSharingDenied, value.ErrDenied, value.ErrChanged, value.ErrUnavailable, value.ErrCapacity, value.ErrProcessingCoverage, value.ErrConflict} {
+	for _, e := range []error{value.ErrStorageBindingExpired, value.ErrInvalid, value.ErrSharingDenied, value.ErrDenied, value.ErrChanged, value.ErrUnavailable, value.ErrCapacity, value.ErrProcessingCoverage, value.ErrConflict} {
 		if errors.Is(err, e) {
 			return e
 		}
@@ -138,11 +142,11 @@ func validAdmission(a value.Admission) bool {
 	p := a.Plan.Input
 	t := p.Target.Target()
 	e := a.Eligibility
-	return authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && (p.Recorder == nil && r.NativeLimit == artifact.MaxContextBytes || p.Recorder != nil && r.NativeLimit == artifact.RecordingNativeLimit) && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
+	return manualAdmissionShape(a) && authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && (p.Recorder == nil && p.Snapshot == nil && r.NativeLimit == artifact.MaxContextBytes || p.Recorder != nil && p.Snapshot == nil && r.NativeLimit == artifact.RecordingNativeLimit || p.Recorder == nil && p.Snapshot != nil && r.NativeLimit == p.Snapshot.Request.MaxBytes) && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
 }
 
 func requestKey(a value.Admission) []byte {
-	return contextRequestKey(a.Plan.Input.Executor, a.IdempotencyKey)
+	return contextRequestKey(a.Requester(), a.IdempotencyKey)
 }
 
 func contextRequestKey(actor identity.Principal, key string) []byte {
@@ -161,6 +165,9 @@ func admittedRecord(row custodydb.ContextCapture) (value.Accepted, error) {
 		return value.Accepted{}, value.ErrUnavailable
 	}
 	out := value.Accepted{CaptureID: uid(row.ID), State: row.State, Expectation: e, Pin: pin, CreatedAt: row.CreatedAt.Time, Deadline: row.Deadline.Time}
+	if row.RepeatedFromCaptureID.Valid {
+		out.RepeatedFrom = &value.HistoryLineage{CaptureID: uid(row.RepeatedFromCaptureID), ExpiresAt: row.RepeatedFromExpiresAt.Time}
+	}
 	copy(out.ScopeDigest[:], row.ScopeDigest)
 	copy(out.SubmissionDigest[:], row.SubmissionDigest)
 	if out.ScopeDigest != e.PlanDigest {
@@ -173,7 +180,11 @@ func admittedRecord(row custodydb.ContextCapture) (value.Accepted, error) {
 // projection after locks. Freshness, deny precedence, group membership and the
 // complete default audience use the same domain evaluator as the caller.
 func (s *ContextAdmissions) currentCaptureEligibility(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, a value.Admission) (authorization.CaptureEligibility, error) {
-	p, err := permissionProjection(ctx, q, stream, a.Plan.Input.Target.Target())
+	return s.currentCaptureEligibilityWithPermissions(ctx, q, stream, trust, a, nil)
+}
+
+func (s *ContextAdmissions) currentCaptureEligibilityWithPermissions(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, a value.Admission, permissions *recordingGroupFacts) (authorization.CaptureEligibility, error) {
+	p, err := permissions.read(ctx, q, stream, a.Plan.Input.Target.Target())
 	if err != nil {
 		return authorization.CaptureEligibility{}, value.ErrUnavailable
 	}
@@ -183,12 +194,19 @@ func (s *ContextAdmissions) currentCaptureEligibility(ctx context.Context, q *cu
 	}
 	// A policy executor re-checks its accepted policy and team delegation
 	// after these locks (ADR-228); a human is evaluated as before.
-	fresh := contextEligibilityIn(ctx, q, stream, trust, s.root, s.recovery.installationID(), a.Eligibility.VerifiedIdentity, p, a.Eligibility.Target, n.Time)
+	fresh := contextEligibilityInWithPermissions(ctx, q, stream, trust, s.root, s.recovery.installationID(), a.Eligibility.VerifiedIdentity, p, a.Eligibility.Target, n.Time, permissions)
 	if !fresh.Eligible || !n.Time.Before(a.Eligibility.ValidUntil) {
 		return fresh, value.ErrDenied
 	}
 	if fresh.Principal != a.Plan.Input.Executor || fresh.IdentityRevision != a.Eligibility.IdentityRevision || fresh.PermissionRevision != a.Eligibility.PermissionRevision {
 		return fresh, value.ErrChanged
+	}
+	if manual := a.RecordingSave; manual != nil {
+		caller := authorization.ContextEligibility(manual.Initiator.VerifiedIdentity, p, a.Plan.Input.Target.Target(), n.Time)
+		if !caller.Eligible || caller.Principal != a.Requester() || !n.Time.Before(manual.Initiator.ValidUntil) || caller.IdentityRevision != manual.Initiator.IdentityRevision {
+			return fresh, value.ErrDenied
+		}
+		fresh.ValidUntil = identity.Earlier(fresh.ValidUntil, caller.ValidUntil)
 	}
 	return fresh, nil
 }
@@ -232,90 +250,206 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 	if err != nil {
 		return out, captureError(err)
 	}
-	r := normalized(a.Registration)
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		recovery, err := s.recovery.lock(ctx, q, s.root, a.Recovery)
-		if err != nil {
-			return err
-		}
-		// The root serializes protected control capacity and reviewed admission. No network
-		// call or evidence byte transfer occurs while any of these locks is held.
-		stream, err := q.LockPermissionStream(ctx, id(s.root))
-		if err != nil {
-			return err
-		}
-		fresh, err := s.currentCaptureEligibility(ctx, q, stream, recovery, a)
-		if err != nil {
-			return err
-		}
-		old, err := q.FindContextCapture(ctx, custodydb.FindContextCaptureParams{RootID: id(s.root), RequestKey: requestKey(a)})
-		if err == nil {
-			if old.ID != id(a.Plan.Input.CaptureID) || !bytes.Equal(old.SubmissionDigest, a.SubmissionDigest[:]) || !bytes.Equal(old.ScopeDigest, a.Plan.ScopeDigest[:]) {
-				return value.ErrConflict
-			}
-			out, err = admittedRecord(old)
+		var err error
+		out, err = s.admitContextInTransaction(ctx, q, previewID, a, topology, nil)
+		return err
+	})
+	if err != nil {
+		return value.Accepted{}, captureError(err)
+	}
+	return out, nil
+}
+
+// contextAdmissionGroupOptions is private transaction-owned composition. The
+// parent has locked recovery/root/policy, resolved replay, validated the single
+// protected group and reserved shared budgets. This helper never commits it.
+type contextAdmissionGroupOptions struct {
+	Recovery          custodydb.FleetCurrentTrust
+	Stream            custodydb.PermissionStream
+	Preview           value.ContextPreview
+	PolicyReservation *policyCaptureReservation
+	RequestBounds     *value.GroupRequestBounds
+	Permissions       *recordingGroupFacts
+}
+
+func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *custodydb.Queries, previewID string, a value.Admission, topology privacyvalue.PolicyTopology, group *contextAdmissionGroupOptions) (value.Accepted, error) {
+	var out value.Accepted
+	if s == nil || q == nil || a.RootID != s.root || !validAdmission(a) || group == nil && approvedContextPlan(a) && previewID == "" {
+		return out, value.ErrInvalid
+	}
+	r := normalized(a.Registration)
+	err := func() error {
+		var recovery custodydb.FleetCurrentTrust
+		var stream custodydb.PermissionStream
+		var err error
+		if group == nil {
+			recovery, err = s.recovery.lock(ctx, q, s.root, a.Recovery)
 			if err != nil {
 				return err
 			}
-			fresh, err = s.currentCaptureEligibility(ctx, q, stream, recovery, a)
+			stream, err = q.LockPermissionStream(ctx, id(s.root))
 			if err != nil {
 				return err
 			}
-			if err = s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
-				return err
+		} else {
+			recovery, stream = group.Recovery, group.Stream
+			if group.PolicyReservation == nil || !captureapp.ReviewedRecordingSaveGroupChild(group.Preview, a) {
+				return value.ErrChanged
 			}
-			now, err := q.CurrentTime(ctx)
-			if err != nil {
-				return err
-			}
-			if !now.Time.Before(fresh.ValidUntil) || !now.Time.Before(a.Eligibility.ValidUntil) || !a.Recovery.Valid(now.Time) {
-				return value.ErrDenied
-			}
-			out.Replay = true
-			out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil)
-			return nil // no new storage, deadline, audience or acquisition on replay
 		}
-		if !errors.Is(err, pgx.ErrNoRows) {
+
+		// Retained acquisition provenance is immutable and read once in this
+		// transaction. Current eligibility is still rechecked after waits.
+		var retainedSource *captureapp.PolicySourceState
+		currentEligibility := func() (authorization.CaptureEligibility, error) {
+			var permissions *recordingGroupFacts
+			if group != nil {
+				permissions = group.Permissions
+			}
+			fresh, err := s.currentCaptureEligibilityWithPermissions(ctx, q, stream, recovery, a, permissions)
+			if err != nil || a.Plan.Input.Snapshot == nil {
+				return fresh, err
+			}
+			selected := a.Plan.Input.Snapshot
+			if retainedSource == nil {
+				row, readErr := q.ReadPolicyRecordingSource(ctx, custodydb.ReadPolicyRecordingSourceParams{RootID: id(s.root), ID: id(selected.Request.SourceID)})
+				if readErr != nil {
+					return fresh, readErr
+				}
+				source, decodeErr := policySourceState(row)
+				if decodeErr != nil {
+					return fresh, decodeErr
+				}
+				retainedSource = &source
+			}
+			audience, err := sourceSnapshotAudience(*retainedSource, selected, fresh.DefaultAudience)
+			if err != nil {
+				return fresh, err
+			}
+			fresh.DefaultAudience = audience
+			return fresh, nil
+		}
+		fresh, err := currentEligibility()
+		if err != nil {
 			return err
 		}
 		var reviewed value.ContextPreview
-		if previewID != "" {
-			query := value.ReplayQuery{RootID: s.root, PreviewID: previewID, IdempotencyKey: a.IdempotencyKey, SubmissionDigest: a.SubmissionDigest, Identity: a.Eligibility.VerifiedIdentity, Recovery: a.Recovery}
-			if row, found, err := findContextRequest(ctx, q, query); err != nil {
-				return err
-			} else if found {
-				if row.ID != id(a.Plan.Input.CaptureID) || !bytes.Equal(row.ScopeDigest, a.Plan.ScopeDigest[:]) {
+		if group == nil {
+			old, err := q.FindContextCapture(ctx, custodydb.FindContextCaptureParams{RootID: id(s.root), RequestKey: requestKey(a)})
+			if err == nil {
+				if old.ID != id(a.Plan.Input.CaptureID) || !bytes.Equal(old.SubmissionDigest, a.SubmissionDigest[:]) || !bytes.Equal(old.ScopeDigest, a.Plan.ScopeDigest[:]) {
 					return value.ErrConflict
 				}
-				out, err = admittedRecord(row)
+				out, err = admittedRecord(old)
 				if err != nil {
 					return err
 				}
-				out.Replay = true
-				fresh, err = s.currentCaptureEligibility(ctx, q, stream, recovery, a)
+				fresh, err = currentEligibility()
 				if err != nil {
 					return err
 				}
 				if err = s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
 					return err
 				}
-				n, err := q.CurrentTime(ctx)
+				now, err := q.CurrentTime(ctx)
 				if err != nil {
 					return err
 				}
-				if !n.Time.Before(fresh.ValidUntil) || !n.Time.Before(a.Eligibility.ValidUntil) || !a.Recovery.Valid(n.Time) {
+				if !now.Time.Before(fresh.ValidUntil) || !now.Time.Before(a.Eligibility.ValidUntil) || !a.Recovery.Valid(now.Time) {
 					return value.ErrDenied
 				}
+				out.Replay = true
 				out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil)
-				return ctx.Err()
+				return nil // no new storage, deadline, audience or acquisition on replay
 			}
-			reviewed, err = readReviewedContext(ctx, q, previewID, a)
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
+			if previewID != "" {
+				query := value.ReplayQuery{RootID: s.root, PreviewID: previewID, IdempotencyKey: a.IdempotencyKey, SubmissionDigest: a.SubmissionDigest, Identity: a.Eligibility.VerifiedIdentity, Recovery: a.Recovery}
+				if a.RecordingSave != nil {
+					query.Identity = a.RecordingSave.Initiator.VerifiedIdentity
+				}
+				if row, found, err := findContextRequest(ctx, q, query); err != nil {
+					return err
+				} else if found {
+					if row.ID != id(a.Plan.Input.CaptureID) || !bytes.Equal(row.ScopeDigest, a.Plan.ScopeDigest[:]) {
+						return value.ErrConflict
+					}
+					out, err = admittedRecord(row)
+					if err != nil {
+						return err
+					}
+					out.Replay = true
+					fresh, err = currentEligibility()
+					if err != nil {
+						return err
+					}
+					if err = s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
+						return err
+					}
+					n, err := q.CurrentTime(ctx)
+					if err != nil {
+						return err
+					}
+					if !n.Time.Before(fresh.ValidUntil) || !n.Time.Before(a.Eligibility.ValidUntil) || !a.Recovery.Valid(n.Time) {
+						return value.ErrDenied
+					}
+					out.MetadataValidUntil = contextMetadataDeadline(ctx, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil)
+					return ctx.Err()
+				}
+				reviewed, err = readReviewedContext(ctx, q, previewID, a)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			reviewed = group.Preview.Clone()
+			reviewed.Actor = a.Requester()
+			reviewed.Target = a.Plan.Input.Target.Request
+		}
+		var reasonRef []byte
+		if reviewed.Intent.Reason != nil {
+			if s.auditMAC == nil {
+				return value.ErrUnavailable
+			}
+			reasonRef, err = json.Marshal(reviewed.Intent.Reason)
+			if err != nil {
+				return value.ErrUnavailable
+			}
+		}
+		var policyReservation *policyCaptureReservation
+		if group == nil {
+			policyReservation, err = lockPolicyCaptureReservation(ctx, q, recovery, a, s.recovery.installationID())
 			if err != nil {
 				return err
 			}
+		} else {
+			policyReservation = group.PolicyReservation
+		}
+		var acceptedAt pgtype.Timestamptz
+		if policyReservation != nil && policyReservation.manual != nil {
+			processingUntil := policyReservation.manual.authorityUntil
+			if a.RepeatedFrom != nil {
+				processingUntil = identity.Earlier(processingUntil, a.RepeatedFrom.ExpiresAt)
+			}
+			if group != nil && group.RequestBounds != nil {
+				a.Plan, r, err = planning.ReanchorRecordingSaveGroup(a.Plan, r, policyReservation.manual.acceptedAt, processingUntil, *group.RequestBounds)
+			} else {
+				a.Plan, r, err = planning.ReanchorRecordingSave(a.Plan, r, policyReservation.manual.acceptedAt, processingUntil)
+			}
+			if err != nil || a.Plan.Input.Deadline.After(policyReservation.processingLimit) {
+				return value.ErrDenied
+			}
+			a.Registration = r
+			acceptedAt = ts(policyReservation.manual.acceptedAt)
+			if !validAdmission(a) {
+				return value.ErrChanged
+			}
 		}
 		var auditAccount audit.CaptureAuditAccount
-		var auditUntil time.Time
+		var auditUntil, auditHardUntil time.Time
 		if s.auditMAC != nil {
 			raw, e := q.LockCaptureAuditAdmission(ctx, custodydb.LockCaptureAuditAdmissionParams{RootID: id(s.root), AllocationID: id(r.AllocationID)})
 			if e != nil {
@@ -324,12 +458,13 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 			var observed struct {
 				audit.CaptureAuditAccount
 				ValidUntil time.Time
+				HardUntil  time.Time
 			}
 			if len(raw) > 8<<10 || json.Unmarshal(raw, &observed) != nil || !observed.CaptureAuditAccount.Valid() || observed.RootID != s.root || observed.AllocationID != r.AllocationID || observed.AccountVersion != s.auditMAC.AccountVersion() {
 				return value.ErrUnavailable
 			}
 			auditAccount = observed.CaptureAuditAccount
-			auditUntil = observed.ValidUntil
+			auditUntil, auditHardUntil = observed.ValidUntil, observed.HardUntil
 		}
 		p, allocation, err := lockAllocation(ctx, q, r.AllocationID)
 		if err != nil {
@@ -386,6 +521,9 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 			return err
 		}
 		check := func() error {
+			if group != nil {
+				defer auditapp.MarkStep(ctx, "ga-check", time.Now())
+			}
 			if err := s.recovery.check(ctx, q, recovery, s.root, a.Recovery); err != nil {
 				return err
 			}
@@ -393,7 +531,7 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 				return err
 			}
 			var err error
-			fresh, err = s.currentCaptureEligibility(ctx, q, stream, recovery, a)
+			fresh, err = currentEligibility()
 			if err != nil {
 				return err
 			}
@@ -405,7 +543,11 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 				return value.ErrChanged
 			}
 			if previewID != "" {
-				if err := currentReviewedContext(ctx, q, reviewed, a); err != nil {
+				if group != nil {
+					if !group.Preview.Current(n.Time) || !captureapp.ReviewedRecordingSaveGroupChild(group.Preview, a) {
+						return value.ErrChanged
+					}
+				} else if err := currentReviewedContext(ctx, q, reviewed, a); err != nil {
 					return err
 				}
 			}
@@ -427,12 +569,19 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 			if !a.Recovery.Valid(n.Time) || !n.Time.Before(fresh.ValidUntil) || !n.Time.Before(a.Eligibility.ValidUntil) {
 				return value.ErrDenied
 			}
+			if policyReservation != nil && !n.Time.Before(policyReservation.until) {
+				return value.ErrDenied
+			}
 			if managed && !processing.Current(n.Time) {
 				return value.ErrUnavailable
 			}
 
 			if previewID != "" {
-				if err := currentReviewedContext(ctx, q, reviewed, a); err != nil {
+				if group != nil {
+					if !group.Preview.Current(n.Time) || !captureapp.ReviewedRecordingSaveGroupChild(group.Preview, a) {
+						return value.ErrChanged
+					}
+				} else if err := currentReviewedContext(ctx, q, reviewed, a); err != nil {
 					return err
 				}
 			}
@@ -472,6 +621,21 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 			}
 			expected.NativeType, expected.ActionID, expected.Recording = artifact.PCAPNGArtifact, actionID, &recording
 		}
+		if in.Snapshot != nil {
+			lifecycle, err := planning.SourceSnapshotLifecycle(in.Snapshot)
+			if err != nil {
+				return value.ErrInvalid
+			}
+			expected.NativeType, expected.ActionID, expected.Snapshot, expected.Lifecycle, expected.TriggeredAt = artifact.PCAPNGArtifact, in.Snapshot.ActionID, in.Snapshot.Request.Clone(), lifecycle, in.Snapshot.Request.T0
+			if retainedSource == nil {
+				return value.ErrInvalid
+			}
+			bindingJSON, err := json.Marshal(retainedSource.Binding)
+			if err != nil {
+				return value.ErrInvalid
+			}
+			expected.SourceSnapshotManifest = &artifact.SourceSnapshotManifest{CanonicalScope: append(json.RawMessage(nil), a.Plan.CanonicalScope...), Binding: bindingJSON}
+		}
 		if expected.Validate() != nil {
 			return value.ErrInvalid
 		}
@@ -487,9 +651,61 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 		if s.auditMAC != nil {
 			operationID = in.CaptureID
 		}
-		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(previewID), RequestKey: requestKey(a), SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID), ShareInstruction: instruction})
+		var repeatedID pgtype.UUID
+		var repeatedUntil pgtype.Timestamptz
+		if a.RepeatedFrom != nil {
+			n, e := q.CurrentTime(ctx)
+			if e != nil {
+				return e
+			}
+			if !a.RepeatedFrom.Valid(n.Time) || a.RepeatedFrom.CaptureID == in.CaptureID {
+				return value.ErrChanged
+			}
+			// The repeat's lineage is the requester's: a recording Save
+			// executes as its policy, but its human initiator repeats and
+			// must hold read rights on the source history (specs/
+			// recording-saves.md; native run 41236725225 denied every repeat
+			// by checking the policy executor).
+			lineage := a.Eligibility.VerifiedIdentity
+			if a.RecordingSave != nil {
+				lineage = a.RecordingSave.Initiator.VerifiedIdentity
+			}
+			sourceCapture, _, e := historyAuthorizedCapture(ctx, q, s.root, s.recovery.installationID(), a.RepeatedFrom.CaptureID, lineage, stream, recovery, false)
+			if e != nil {
+				return e
+			}
+			if sourceCapture.HistoryParametersRequired {
+				source, e := q.ReadHistoryParameter(ctx, custodydb.ReadHistoryParameterParams{RootID: id(s.root), CaptureID: id(a.RepeatedFrom.CaptureID)})
+				if e != nil || !source.Visible || source.State != "available" || source.SummaryExpiresAt.Time.Before(a.RepeatedFrom.ExpiresAt) {
+					return value.ErrChanged
+				}
+				sourceStorage, e := historyStorage(ctx, q, source)
+				if e != nil || sourceStorage.Effective.ExpiresAt.Before(a.RepeatedFrom.ExpiresAt) {
+					return value.ErrChanged
+				}
+			} else if sourceCapture.CreatedAt.Time.Add(value.HistoryLifetime).Before(a.RepeatedFrom.ExpiresAt) {
+				return value.ErrChanged
+			}
+			repeatedID, repeatedUntil = id(a.RepeatedFrom.CaptureID), ts(a.RepeatedFrom.ExpiresAt)
+		}
+		var groupID pgtype.UUID
+		var ordinal pgtype.Int2
+		childPreviewID := previewID
+		childRequestKey := requestKey(a)
+		if group != nil {
+			groupID = id(group.Preview.CaptureID)
+			ordinal = pgtype.Int2{Int16: int16(a.Plan.Input.Snapshot.Group.ChildIndex), Valid: true}
+			childPreviewID = ""
+			childRequestKey = recordingGroupChildRequestKey(group.Preview.CaptureID, int(ordinal.Int16))
+		}
+		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ReasonRef: reasonRef, GroupID: groupID, GroupOrdinal: ordinal, ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(childPreviewID), RequestKey: childRequestKey, SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil, AcceptedAt: acceptedAt})
 		if err != nil {
 			return err
+		}
+		if group == nil {
+			if err = policyReservation.spend(ctx, q, s.root, in.CaptureID, a); err != nil {
+				return err
+			}
 		}
 		if s.auditMAC != nil {
 			intent, e := captureIntent(row)
@@ -501,12 +717,28 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 				managedUntil = capacityUntil.Time
 			}
 			bound := contextMetadataDeadline(ctx, managedUntil, auditUntil, fresh.ValidUntil, a.Eligibility.ValidUntil, a.Eligibility.VerifiedIdentity.ValidUntil, a.Recovery.FreshUntil, controlUntil, a.Storage.FreshUntil, binding.FreshUntil.Time, p.ValidUntil.Time, allocation.ValidUntil.Time, in.Deadline)
-			operation, e := auditapp.PrepareCaptureOperation(intent, auditAccount, s.auditMAC, bound)
+			requestUntil := bound
+			if group != nil && group.RequestBounds != nil {
+				requestUntil, e = recordingGroupAuditUntil(*group.RequestBounds, a, intent, auditHardUntil, controlUntil, p.ValidUntil.Time, allocation.ValidUntil.Time)
+				if e != nil {
+					return e
+				}
+			}
+			var operation auditvalue.OperationIntent
+			if reviewed.Intent.Reason != nil {
+				envelope, decodeErr := auditapp.DecodeCaptureReasonEnvelope(reviewed.ReasonEnvelope)
+				if decodeErr != nil {
+					return value.ErrUnavailable
+				}
+				operation, e = auditapp.PrepareCaptureReasonOperation(intent, auditAccount, s.auditMAC, requestUntil, envelope)
+			} else {
+				operation, e = auditapp.PrepareCaptureOperation(intent, auditAccount, s.auditMAC, requestUntil)
+			}
 			if e != nil {
 				return value.ErrUnavailable
 			}
 			body, e := auditapp.EncodeCaptureOperationIntent(operation)
-			if e != nil || len(body) > 16<<10 {
+			if e != nil {
 				return value.ErrUnavailable
 			}
 			if e = q.ReserveCaptureAudit(ctx, custodydb.ReserveCaptureAuditParams{RootID: id(s.root), CaptureID: row.ID, IntentValue: body, CaptureDigest: digest(intent), OriginalUntil: ts(bound)}); e != nil {
@@ -530,9 +762,9 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 			}
 		}
 		return err
-	})
+	}()
 	if err != nil {
-		return value.Accepted{}, captureError(err)
+		return value.Accepted{}, err
 	}
 	return out, nil
 }
@@ -552,4 +784,9 @@ func contextMetadataDeadline(ctx context.Context, deadlines ...time.Time) time.T
 		until = at
 	}
 	return until
+}
+
+func recordingGroupChildRequestKey(parent string, index int) []byte {
+	digest := sha256.Sum256([]byte("asservat-recording-save-group-child/v1\x00" + parent + "\x00" + strconv.Itoa(index)))
+	return digest[:]
 }

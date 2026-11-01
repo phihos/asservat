@@ -27,6 +27,7 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	planningapp "asservat.local/asservat/internal/application/planning"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -63,9 +64,33 @@ func (s publicSigners) SignAPIContextWork(ctx context.Context, w fleet.APIContex
 	return signer.SignAPIContextWork(ctx, w)
 }
 
+func (s publicSigners) SignHistoryWork(ctx context.Context, w fleetapp.HistoryWork) ([]byte, error) {
+	signer := s[w.Authority.Expectation.Registration.Location.ClusterID]
+	if signer == nil || w.Channel.Connector.Binding.ClusterID != w.Authority.Expectation.Registration.Location.ClusterID {
+		return nil, fleet.ErrUnavailable
+	}
+	return signer.SignHistoryWork(ctx, w)
+}
+
+// Source purpose remains distinct from capture/history signing even though
+// each cluster reuses its existing accepted signing trust and key provider.
+func (s publicSigners) SignSourceWork(ctx context.Context, w fleetapp.SourceWork) ([]byte, error) {
+	signer := s[w.Channel.Connector.Binding.ClusterID]
+	if signer == nil {
+		return nil, fleet.ErrUnavailable
+	}
+	if !w.Stop && w.StopSnapshot == nil && w.Target.Request.ClusterID != w.Channel.Connector.Binding.ClusterID {
+		return nil, fleet.ErrUnavailable
+	}
+	return signer.SignSourceWork(ctx, w)
+}
+
 // publicContext holds the ADR-180 P3 services: the investigation, its audit
 // intents, the hub-run regional start, progress and cases.
 type publicContext struct {
+	recordings    *captureapp.RecordingSaves
+	cancellations *captureapp.CaptureCancellation
+	history       *captureapp.HistoryParameterService
 	investigation captureapp.ContextInvestigation
 	intents       auditapp.CaptureOperationPublication
 	regional      RegionalAPIContextStart
@@ -98,6 +123,8 @@ type publicContext struct {
 	// audit, team delegation reads and the trigger ledger.
 	policies       *postgres.Policies
 	policyTriggers *postgres.PolicyTriggers
+	policySources  *postgres.PolicySources
+	sourceDispatch RegionalSourceDispatch
 	automation     *postgres.AutomationAuthorities
 	hubPolicies    *kube.HubPolicySources
 	policyAudit    auditapp.PolicyAcceptancePublisher
@@ -170,6 +197,10 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Standby < 1 || p.Standby > 64 || p.Captures < 1 || p.Captures > 16 || c.Native.Connections+p.Standby > 64 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
 		return nil, mounts.ErrUnavailable
 	}
+	historyBounds, err := captureHistoryBounds(p.CaptureHistory)
+	if err != nil {
+		return nil, err
+	}
 	open := func(purpose string) (*pgxpool.Pool, error) { return pools.open(ctx, purpose) }
 	need := func(purposes ...string) (map[string]*pgxpool.Pool, error) {
 		out := make(map[string]*pgxpool.Pool, len(purposes))
@@ -182,7 +213,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		return out, nil
 	}
-	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution", "policy-automation", "evidence-share", "access-review")
+	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution", "policy-automation", "evidence-share", "access-review", "capture-history")
 	if err != nil {
 		return nil, err
 	}
@@ -299,6 +330,12 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// ADR-179: no selector reader; selector policies refuse new collection.
 	accepted := privacyapp.AcceptedRetentionReader{Topology: shared.topologies, Sources: sources, Now: time.Now}
 	out.retention = privacyapp.RetentionResolver{Policies: accepted, RetainedPolicies: accepted, Now: time.Now}
+	historySQL, err := postgres.NewHistoryParameters(ctx, sql["capture-history"], root, shared.guards)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.history = &captureapp.HistoryParameterService{RootID: root, InstallationID: installation, Ledger: historySQL, Regional: RegionalHistoryDispatch{Router: router, Signer: signers, Now: time.Now, Report: timedEventLog(os.Stderr, "history dispatch")}, Codec: objectstore.HistoryCodec{Sealer: a.seal, Opener: a.open, Keys: out.mac}, Keys: out.mac, Recovery: out.recovery, Retention: out.retention, Limits: historyBounds, ReportFailure: eventLog(os.Stderr, "history unavailable")}
+
 	// ADR-228: policy captures share the investigation; the eligibility port
 	// evaluates a policy executor through its acceptance and team delegation.
 	if out.policies, err = postgres.NewPolicies(ctx, sql["policy-automation"], root, installation); err != nil {
@@ -307,6 +344,10 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if out.policyTriggers, err = postgres.NewPolicyTriggers(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	if out.policySources, err = postgres.NewPolicySources(ctx, sql["policy-automation"], root, installation, shared.guards); err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.sourceDispatch = RegionalSourceDispatch{Router: router, Signer: signers, Now: time.Now}
 	if out.automation, err = postgres.NewAutomationAuthorities(ctx, sql["policy-automation"], root, installation); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -316,6 +357,15 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.policyAudit = auditapp.PolicyAcceptancePublisher{Ledger: out.policies, Objects: a.policyObjects()}
 	eligibility := authapp.CaptureEligibility{Human: authapp.Evaluator{Permissions: out.permissions, Now: time.Now}, Accepted: out.policies, Current: out.automation, Now: time.Now}
 	previews, err := postgres.NewContextPreviews(ctx, sql["capture-preview"], root)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	previewCleanup, err := postgres.NewContextPreviewCleanup(ctx, sql["capture-preview"], root)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.history.PreviewCleanup = previewCleanup
+	reasonCipher, err := objectstore.NewCaptureReasonCipher(a.seal, a.open)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -380,14 +430,23 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	runner := executionapp.APIContextRunner{Read: executionSQL, Prepare: executionSQL, Record: executionSQL, Eligibility: eligibility, Retention: out.retention}
 	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
 	out.collect = RegionalRecordingCollect{Runner: executionapp.APIContextRunner{Record: executionSQL, Capabilities: capabilities, Recovery: out.recovery, Now: time.Now}, Recordings: executionSQL, Signer: signers, Router: router, Now: time.Now, Report: eventLog(os.Stderr, "recording collect refused")}
+	out.investigation.ReasonCipher = reasonCipher
 	// ADR-248: node recorder availability is a regional pre-work query.
 	out.investigation.Recorders = queries
+	// Passive existing-source services reuse current protected ports. The later
+	// trusted composition requires collection capability and the complete source
+	// runtime; this unmerged candidate still requires installed qualification.
+	recordingPolicies := captureapp.CurrentRecordingPolicies{Documents: out.hubPolicies, Accepted: out.policies, CompileRecorder: recordingSavePolicyCompiler(out.investigation.Filters), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}
+	out.investigation.RecordingPolicies, out.investigation.PolicyAccepted = recordingPolicies, out.policies
+	out.investigation.RecordingSources, out.investigation.RecordingGroups = previews, admissionsSQL
+	out.recordings = &captureapp.RecordingSaves{Targets: queries, Investigation: out.investigation, Inventory: captureapp.RecordingInventory{RootID: root, Permissions: out.permissions, Eligibility: eligibility, Candidates: previews, Policies: recordingPolicies, Selections: previews, Accepted: out.policies, Now: time.Now, NewID: ownerRandomID}}
+	out.cancellations = &captureapp.CaptureCancellation{RootID: root, InstallationID: installation, Ledger: executionSQL, Dispatcher: out.sourceDispatch, Recovery: out.recovery, Now: time.Now}
 
 	progress, err := postgres.NewContextProgressReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.progress = captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: progress, Reviews: out.reviews}
+	out.progress = captureapp.ContextProgressService{Reasons: captureapp.StoredCaptureReasons{Records: journal, Cipher: reasonCipher}, RootID: root, InstallationID: installation, Reader: progress, Reviews: out.reviews}
 	routes, err := postgres.NewContextCaseReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
@@ -404,7 +463,9 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.grants = authapp.GrantService{RootID: root, InstallationID: installation, Permissions: out.permissions, Store: grantStore, Recovery: out.recovery, NewID: ownerRandomID, Now: time.Now}
+	out.grants = authapp.GrantService{RootID: root, InstallationID: installation, Permissions: out.permissions, WorkloadPermissions: out.permissions, Store: grantStore, PolicyRequests: grantStore, ApprovalSettings: grantStore,
+		PolicyPlans: captureapp.PolicyGrantPlans{Accepted: out.policies, Sources: out.policies, Documents: out.hubPolicies, CompileRecorder: publicPolicyRecorderCompiler(out.investigation.Filters), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now},
+		Recovery:    out.recovery, NewID: ownerRandomID, Now: time.Now}
 	out.investigation.Grants = out.grants
 	out.caseRoutes = routes
 	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares, Reviews: out.reviews}

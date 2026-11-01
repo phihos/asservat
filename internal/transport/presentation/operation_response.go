@@ -7,15 +7,40 @@ import (
 	"strings"
 	"time"
 
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/identity"
 )
+
+// OperationRecordingSavePreviewFrameLimit retains the SDK text and structured
+// copies of the one larger passive metadata preview. Other writers stay64KiB.
+const OperationRecordingSavePreviewFrameLimit = 256 << 10
 
 // WriteOperationResponse retains the original delivery deadline through a
 // bounded write and flush. sent forbids appending an error after partial output.
 // The caller owns/join-closes its reply after this function and serialization
 // finish; no download permit, key slot or acquisition authority is reused here.
 func WriteOperationResponse(ctx context.Context, w http.ResponseWriter, status int, body []byte, until time.Time, check func(context.Context) error) (sent bool, err error) {
-	if ctx == nil || w == nil || check == nil || ctx.Err() != nil || len(body) > 64<<10 || until.IsZero() || !time.Now().Before(until) {
+	return writeOperationResponse(ctx, w, status, body, until, check, 64<<10)
+}
+
+// The original general/MCP writer keeps its 64KiB cap. Only an authenticated
+// browser settings reply gets the fixed larger budget, never a caller number.
+func WriteBrowserOperationResponse(ctx context.Context, w http.ResponseWriter, status int, name string, reply OperationReply, until time.Time) (bool, error) {
+	if reply.owner != nil {
+		// Owned queries retain the shared 64KiB payload and framing contract.
+		return WriteOperationReplyResponse(ctx, w, status, reply.Body, reply, until, reply.CheckDisclosure)
+	}
+	limit := 64 << 10
+	if name == "preview_recording_save" && reply.recordingSavePreview {
+		limit = contracts.InvestigationRecordingSavePreviewOutputLimit
+	}
+	if browserSettingsView(ctx, name) && reply.browserSettings {
+		limit = contracts.InvestigationBrowserSettingsOutputLimit
+	}
+	return writeOperationResponse(ctx, w, status, reply.Body, until, reply.CheckDisclosure, limit)
+}
+func writeOperationResponse(ctx context.Context, w http.ResponseWriter, status int, body []byte, until time.Time, check func(context.Context) error, limit int) (sent bool, err error) {
+	if ctx == nil || w == nil || check == nil || ctx.Err() != nil || len(body) > limit || until.IsZero() || !time.Now().Before(until) {
 		return false, ErrOperationDelivery
 	}
 	deadline, ok := ctx.Deadline()
@@ -56,6 +81,9 @@ func WriteOperationReplyResponse(ctx context.Context, w http.ResponseWriter, sta
 		return false, ErrOperationDelivery
 	}
 	if reply.owner == nil {
+		if reply.recordingSavePreview {
+			return writeOperationResponse(ctx, w, status, body, until, check, OperationRecordingSavePreviewFrameLimit)
+		}
 		return WriteOperationResponse(ctx, w, status, body, until, check)
 	}
 	if len(body) == 0 {

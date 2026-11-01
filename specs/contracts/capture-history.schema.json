@@ -102,6 +102,34 @@
             "collect",
             "recordingSave"
           ]
+        },
+        "requester": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "issuer": {
+              "type": "string",
+              "format": "uri",
+              "maxLength": 2048
+            },
+            "subject_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "identity_type": {
+              "enum": [
+                "human",
+                "service",
+                "policy"
+              ]
+            }
+          },
+          "required": [
+            "issuer",
+            "subject_id",
+            "identity_type"
+          ]
         }
       },
       "required": [
@@ -217,6 +245,9 @@
         },
         "profile_composition": {
           "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/provenance"
+        },
+        "original_effective_retention": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/duration"
         }
       },
       "required": [

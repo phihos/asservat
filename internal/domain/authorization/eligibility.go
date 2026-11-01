@@ -180,9 +180,15 @@ type evaluationDetail struct {
 }
 
 func evaluateDetail(i identity.Identity, p Projection, op Operation, t Target, e *Retained, now time.Time, requireRetained bool) (Result, evaluationDetail) {
+	return evaluateDetailScope(i, p, op, t, e, now, requireRetained, t.Valid())
+}
+
+// targetValid is supplied only by the concrete target wrapper or the typed
+// whole-workload wrapper. Keeping it private preserves Target.Valid's meaning.
+func evaluateDetailScope(i identity.Identity, p Projection, op Operation, t Target, e *Retained, now time.Time, requireRetained, targetValid bool) (Result, evaluationDetail) {
 	var detail evaluationDetail
 	deny := func(reason string) (Result, evaluationDetail) { return Result{Reason: reason}, detail }
-	if !op.Valid() || !t.Valid() {
+	if !op.Valid() || !targetValid {
 		return deny("InvalidRequest")
 	}
 	if !i.Valid(now) {

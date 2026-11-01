@@ -106,7 +106,13 @@ func initialSchemaInventory(ctx context.Context, q initialSchemaQuery, complete,
 	if e := q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname NOT IN ('public','pg_catalog','information_schema') AND nspname NOT LIKE 'pg_toast%' AND nspname NOT LIKE 'pg_temp_%')`).Scan(&extra); e != nil || extra {
 		return cfg.ErrChanged
 	}
-	rows, e := q.QueryContext(ctx, `SELECT c.relname,c.relkind,c.relpersistence,c.relrowsecurity,c.relforcerowsecurity,c.relowner=$1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','f','m') ORDER BY c.relname LIMIT 129`, owner)
+	// Include one overflow row so an unknown relation cannot hide beyond the
+	// closed inventory. Replay alone also permits the two transient tables.
+	maximum := len(initialInstallationTables)
+	if !complete {
+		maximum += len(initialTransientTables)
+	}
+	rows, e := q.QueryContext(ctx, `SELECT c.relname,c.relkind,c.relpersistence,c.relrowsecurity,c.relforcerowsecurity,c.relowner=$1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','f','m') ORDER BY c.relname LIMIT $2`, owner, maximum+1)
 	if e != nil {
 		return cfg.ErrUnavailable
 	}
@@ -122,7 +128,7 @@ func initialSchemaInventory(ctx context.Context, q initialSchemaQuery, complete,
 	}
 	e = rows.Err()
 	rows.Close()
-	if e != nil || len(names) > 128 {
+	if e != nil || len(names) > maximum {
 		return cfg.ErrChanged
 	}
 	if complete && !slices.Equal(names, initialInstallationTables) {

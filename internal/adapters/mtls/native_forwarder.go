@@ -113,7 +113,11 @@ func (f *NativeOwnerForwarder) OpenNativeOwner(ctx context.Context, origin evide
 	if !f.admit() {
 		return nil, nil, artifact.ErrDownloadCapacity
 	}
-	call, cancel := context.WithDeadline(ctx, origin.Lease.Until)
+	conversationUntil := origin.Lease.Until
+	if origin.Lease.Operation.Kind == value.NativeResponse {
+		conversationUntil = origin.Lease.Operation.Until
+	}
+	call, cancel := context.WithDeadline(ctx, conversationUntil)
 	rootJoined := make(chan struct{})
 	stopRoot := context.AfterFunc(f.root, func() { cancel(); close(rootJoined) })
 	cleanup := sync.OnceFunc(func() {
@@ -142,6 +146,9 @@ func (f *NativeOwnerForwarder) OpenNativeOwner(ctx context.Context, origin evide
 		return nil, nil, e
 	}
 	until := identity.Earlier(origin.Lease.Until, identity.Earlier(route.FreshUntil, localUntil))
+	if origin.Lease.Operation.Kind == value.NativeResponse {
+		until = conversationUntil
+	}
 	bounded, stopBound := context.WithDeadline(call, until)
 	oldCleanup := cleanup
 	cleanup = sync.OnceFunc(func() { stopBound(); oldCleanup() })

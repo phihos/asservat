@@ -39,7 +39,11 @@ var (
 type Frame struct {
 	Data []byte
 	Wire uint32
-	At   time.Time
+	// TimestampUnknown marks legacy arrival fallback. False alone does not
+	// qualify hub/node clock placement or continuous event-time coverage.
+	// This bit fits the existing padding before At on supported 64-bit nodes.
+	TimestampUnknown bool
+	At               time.Time
 }
 
 // CaptureStats are the engine's own counters for one capture.
@@ -47,3 +51,9 @@ type CaptureStats struct {
 	// LostSamples is what the gadget's perf reader reported lost.
 	LostSamples uint64
 }
+
+// InputNotice identifies a gap in the engine input before the predicate runs.
+// LostSamples is nonzero for a perf loss; zero means unknown input. It carries
+// no provider error text. The caller must stop its meter and cancel capture,
+// without waiting for capture to join inside this callback.
+type InputNotice struct{ LostSamples uint64 }

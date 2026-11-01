@@ -58,6 +58,8 @@ const countContextPreviews = `-- name: CountContextPreviews :one
 SELECT count(*) FROM (
  SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND context_preview_read_until(p.root_id,p.id)>clock_timestamp()
  UNION ALL
+ SELECT r.id FROM recording_selection_set AS r WHERE r.root_id=$1 AND r.expires_at>clock_timestamp()
+ UNION ALL
  SELECT f.preview_id FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.expires_at>clock_timestamp()
  LIMIT 1000
 ) AS bounded
@@ -73,6 +75,8 @@ func (q *Queries) CountContextPreviews(ctx context.Context, rootID pgtype.UUID) 
 const countPrincipalContextPreviews = `-- name: CountPrincipalContextPreviews :one
 SELECT count(*) FROM (
  SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND p.principal_key=$2 AND context_preview_read_until(p.root_id,p.id)>clock_timestamp()
+ UNION ALL
+ SELECT r.id FROM recording_selection_set AS r WHERE r.root_id=$1 AND r.principal_key=$2 AND r.expires_at>clock_timestamp()
  UNION ALL
  SELECT f.preview_id FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.principal_key=$2 AND f.expires_at>clock_timestamp()
  LIMIT 10
@@ -149,7 +153,7 @@ func (q *Queries) DemandCapacityRefresh(ctx context.Context, arg DemandCapacityR
 }
 
 const findContextPreview = `-- name: FindContextPreview :one
-SELECT id, root_id, capture_id, attempt_id, actor_key, principal_key, blueprint_json, blueprint_sha256, created_at, deadline, closed_at, closed_request_key, closed_submission_digest FROM context_preview WHERE root_id=$1 AND id=$2 AND actor_key=$3
+SELECT id, root_id, capture_id, attempt_id, actor_key, principal_key, blueprint_json, blueprint_sha256, created_at, deadline, closed_at, closed_request_key, closed_submission_digest, preview_kind, reason_envelope FROM context_preview WHERE root_id=$1 AND id=$2 AND actor_key=$3
 `
 
 type FindContextPreviewParams struct {
@@ -175,6 +179,8 @@ func (q *Queries) FindContextPreview(ctx context.Context, arg FindContextPreview
 		&i.ClosedAt,
 		&i.ClosedRequestKey,
 		&i.ClosedSubmissionDigest,
+		&i.PreviewKind,
+		&i.ReasonEnvelope,
 	)
 	return i, err
 }
@@ -206,8 +212,8 @@ func (q *Queries) FindContextPreviewFence(ctx context.Context, arg FindContextPr
 }
 
 const insertContextPreview = `-- name: InsertContextPreview :exec
-INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline,reason_envelope)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::bytea)
 `
 
 type InsertContextPreviewParams struct {
@@ -221,6 +227,7 @@ type InsertContextPreviewParams struct {
 	BlueprintSha256 []byte
 	CreatedAt       pgtype.Timestamptz
 	Deadline        pgtype.Timestamptz
+	ReasonEnvelope  []byte
 }
 
 func (q *Queries) InsertContextPreview(ctx context.Context, arg InsertContextPreviewParams) error {
@@ -235,6 +242,7 @@ func (q *Queries) InsertContextPreview(ctx context.Context, arg InsertContextPre
 		arg.BlueprintSha256,
 		arg.CreatedAt,
 		arg.Deadline,
+		arg.ReasonEnvelope,
 	)
 	return err
 }

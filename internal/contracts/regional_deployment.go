@@ -11,6 +11,9 @@ const RegionalDeploymentRoot = "/run/asservat/regional"
 const RegionalDeploymentMaxBytes = 256 << 10
 const RegionalPodUIDEnvironment = "ASSERVAT_REGIONAL_POD_UID"
 
+// Separate history-prefix capability; never use the evidence writer for reads.
+const RegionalHistoryCredentialFile = "history-storage.json"
+
 type RegionalDeployment struct {
 	Format              string                    `json:"format"`
 	InstallationID      string                    `json:"installationID"`

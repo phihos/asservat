@@ -18,6 +18,19 @@ func fixture() (PolicySet, Input, time.Time) {
 	}}, Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "coreDump", AnchorAt: now}, now
 }
 
+func TestCaseMetadataPreservesGeneralPrivacyRestrictionIndependentlyOfEvidenceKind(t *testing.T) {
+	set, input, now := fixture()
+	p := ScopedPolicy{Policy: set.Policies[1], CaseDefaultSeconds: 8 * 3600, CaseMaximumSeconds: 12 * 3600}
+	p.Policy.Rules = append(p.Policy.Rules, Rule{Name: "all-sensitive-control", PrivacyClasses: []string{"potentialPersonalData"}, MaxAgeSeconds: 3 * 3600})
+	set.Policies[0].DefaultSeconds, set.Policies[0].MaximumSeconds = 10*3600, 12*3600
+	set.Policies[1] = CaseMetadataPolicy(p)
+	input.ControlKind, input.EvidenceType = "case-metadata", "other"
+	got, err := Resolve(set, input, now)
+	if err != nil || got.RequestedSeconds != 8*3600 || got.MaximumSeconds != 3*3600 || !got.DeleteBy.Equal(now.Add(3*time.Hour)) || !got.ExpiresAt.Equal(now.Add(3*time.Hour-300*time.Second)) {
+		t.Fatal("metadata lost general privacy restriction or inherited evidence-only restriction", got, err)
+	}
+}
+
 func TestRetainedPolicyShorteningPreservesAlreadyOverdueCleanup(t *testing.T) {
 	set, in, now := fixture()
 	in.AnchorAt = now.Add(-3 * time.Hour)

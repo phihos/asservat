@@ -4,21 +4,76 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
+	"golang.org/x/net/http2"
 )
 
 type streamPrivateError struct{}
 
 func (*streamPrivateError) Error() string { panic("private error rendered") }
-func (*streamPrivateError) Unwrap() error { panic("private error unwrapped") }
-func (*streamPrivateError) Is(error) bool { panic("private error compared") }
+
+// Trusted error protocol methods may execute; inherited Error still panics
+// if classification renders private text.
+type streamAsError struct {
+	streamPrivateError
+	calls    int
+	accepted bool
+}
+
+func (e *streamAsError) As(target any) bool {
+	stream, ok := target.(*http2.StreamError)
+	if ok {
+		e.calls++
+		*stream = http2.StreamError{Code: http2.ErrCodeInternal, Cause: os.ErrDeadlineExceeded}
+	}
+	return ok && e.accepted
+}
+
+type streamWrappedError struct {
+	streamPrivateError
+	cause   error
+	unwraps int
+}
+
+func (e *streamWrappedError) Unwrap() error { e.unwraps++; return e.cause }
+
+type streamIsError struct{ streamPrivateError }
+
+func (*streamIsError) Is(target error) bool { return target == os.ErrDeadlineExceeded }
+
+func TestContextStreamDiagnosticUsesTrustedWrappedErrorsWithoutText(t *testing.T) {
+	// This is the actual Go1.27 HTTP2 onReadTimeout construction.
+	if streamErrorReason(fmt.Errorf("%w", os.ErrDeadlineExceeded)) != streamExpired {
+		t.Fatal("wrapped HTTP2 read deadline lost")
+	}
+	if streamErrorReason(&streamIsError{}) != streamExpired {
+		t.Fatal("trusted Is protocol ignored")
+	}
+	for _, tc := range []struct {
+		cause error
+		want  streamReason
+	}{
+		{os.ErrDeadlineExceeded, streamExpired},
+		{http2.StreamError{Code: http2.ErrCodeInternal}, streamHTTP2Internal},
+		{&streamPrivateError{}, streamOther},
+	} {
+		err := &streamWrappedError{cause: tc.cause}
+		if got := streamErrorReason(err); got != tc.want || err.unwraps == 0 {
+			t.Fatal("trusted Unwrap protocol", got, tc.want, err.unwraps)
+		}
+	}
+}
 
 type streamReaderFunc func([]byte) (int, error)
 
@@ -73,6 +128,44 @@ func requireStreamReason(t *testing.T, s *frameStream, stage streamStage, reason
 	s.Close()
 	if s.interruption() != got {
 		t.Fatal("joined close overwrote original deciding failure")
+	}
+}
+
+func TestContextStreamHTTP2DiagnosticCodesStayClosed(t *testing.T) {
+	for _, tc := range []struct {
+		code   http2.ErrCode
+		cause  error
+		reason streamReason
+	}{
+		{http2.ErrCodeInternal, os.ErrDeadlineExceeded, streamHTTP2Deadline},
+		{http2.ErrCodeInternal, nil, streamHTTP2Internal},
+		{http2.ErrCodeInternal, &streamPrivateError{}, streamHTTP2Internal},
+		{http2.ErrCodeCancel, nil, streamHTTP2Cancel},
+		{http2.ErrCodeProtocol, nil, streamHTTP2Protocol},
+		{http2.ErrCodeRefusedStream, nil, streamHTTP2Refused},
+		{http2.ErrCodeFlowControl, nil, streamHTTP2Other},
+	} {
+		for _, streamID := range []uint32{1, 999} {
+			if got := streamErrorReason(http2.StreamError{StreamID: streamID, Code: tc.code, Cause: tc.cause}); got != tc.reason {
+				t.Fatal("HTTP/2 closed class", got, tc.reason)
+			}
+		}
+	}
+	if streamErrorReason(&streamPrivateError{}) != streamOther {
+		t.Fatal("unrecognized error was inspected")
+	}
+}
+
+func TestContextStreamDiagnosticUsesTrustedAsWithoutErrorText(t *testing.T) {
+	for _, accepted := range []bool{true, false} {
+		err := &streamAsError{accepted: accepted}
+		want := streamOther
+		if accepted {
+			want = streamHTTP2Deadline
+		}
+		if got := streamErrorReason(err); got != want || err.calls != 1 {
+			t.Fatal("direct structured bridge invocation", got, want, err.calls)
+		}
 	}
 }
 
@@ -269,7 +362,9 @@ func TestContextStreamDiagnosticRetainedReadDeadline(t *testing.T) {
 		t.Fatal("retained original socket deadline did not interrupt pump")
 	}
 	s.Close()
-	requireStreamReason(t, s, streamRead, streamTimeout)
+	// net.Pipe's net.OpError wraps os.ErrDeadlineExceeded. The known
+	// deadline cause now precedes its less-specific net.Error timeout flag.
+	requireStreamReason(t, s, streamRead, streamExpired)
 	if checks.Load() != 1 || interrupts.Load() != 1 {
 		t.Fatal("background read refreshed authority or repeated close")
 	}
@@ -604,4 +699,47 @@ func TestContextStreamDiagnosticAdmissionAndPassiveBranches(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The hub's HTTP/2 write deadline is an active stream timer, even when the
+// handler is idle. This differs from the region's raw socket write deadline.
+func TestContextStartHTTP2WriteDeadlineEndsIdleStream(t *testing.T) {
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		controller := http.NewResponseController(w)
+		if err := controller.SetWriteDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
+			t.Error(err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		if err := controller.Flush(); err != nil {
+			t.Error(err)
+			return
+		}
+		<-r.Context().Done()
+	}))
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := server.Client().Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.ProtoMajor != 2 {
+		t.Fatal("fixture did not use HTTP/2")
+	}
+	_, err = io.ReadAll(response.Body)
+	if err == nil || ctx.Err() != nil {
+		t.Fatal("idle stream did not end at its independent write deadline", err, ctx.Err())
+	}
+	if reason := streamErrorReason(err); reason != streamHTTP2Internal {
+		t.Fatal("actual HTTP/2 write cutoff lost its closed INTERNAL class", reason)
+	}
+	t.Log("idle HTTP/2 write cutoff: closed http2-internal; no timeout cause inferred")
 }

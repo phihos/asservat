@@ -138,7 +138,7 @@ func lockInitialTables(ctx context.Context, tx pgx.Tx) error {
 	read := func() ([]string, error) {
 		rows, e := tx.Query(ctx, `SELECT c.relname,c.relkind::text,c.relpersistence::text,c.relrowsecurity
    FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
-   WHERE n.nspname='public' AND c.relkind IN ('r','p','f','m') ORDER BY c.relname`)
+   WHERE n.nspname='public' AND c.relkind IN ('r','p','f','m') ORDER BY c.relname LIMIT $1`, len(initialInstallationTables)+1)
 		if e != nil {
 			return nil, e
 		}
@@ -150,7 +150,7 @@ func lockInitialTables(ctx context.Context, tx pgx.Tx) error {
 			if e = rows.Scan(&name, &kind, &persistence, &rls); e != nil {
 				return nil, e
 			}
-			if kind != "r" || persistence != "p" || rls || len(names) >= 128 {
+			if kind != "r" || persistence != "p" || rls || len(names) >= len(initialInstallationTables) {
 				return nil, value.ErrDenied
 			}
 			names = append(names, name)

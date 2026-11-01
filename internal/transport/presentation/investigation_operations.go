@@ -218,6 +218,8 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 		part = s.captures
 	}
 	switch p := part.(type) {
+	case *RecordingSaveOperations:
+		return p.CallWithContext(ctx, current, call, name, raw)
 	case *ContextOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *ContextCaseOperations:

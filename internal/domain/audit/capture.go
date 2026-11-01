@@ -11,7 +11,16 @@ import (
 // CaptureIntent is minimized accepted-control provenance. The expectation
 // digest binds the complete audience/retention facts without copying evidence,
 // reason text, policy bodies, bearer tokens or source Kubernetes objects here.
+type CaptureGroupBinding struct {
+	ParentCaptureID        string
+	SelectionDigest        artifact.Digest
+	ChildIndex, ChildCount int
+}
+
 type CaptureIntent struct {
+	ReasonRef                                                      *CaptureReasonRef    `json:",omitempty"`
+	Group                                                          *CaptureGroupBinding `json:",omitempty"`
+	Initiator                                                      *identity.Principal  `json:",omitempty"`
 	RootID, CaptureID, CaseID, OccurrenceID, ArtifactID, AttemptID string
 	Actor                                                          identity.Principal
 	Target                                                         authorization.Target
@@ -24,12 +33,35 @@ type CaptureIntent struct {
 }
 
 func (r CaptureIntent) Valid() bool {
+	if r.ReasonRef != nil && (!r.ReasonRef.Valid() || r.Initiator == nil) {
+		return false
+	}
+	if g := r.Group; g != nil {
+		if r.Initiator == nil || !authorization.UUID(g.ParentCaptureID) || g.ParentCaptureID == r.CaptureID || g.SelectionDigest != r.ScopeDigest || g.ChildCount < 2 || g.ChildCount > 16 || g.ChildIndex < 0 || g.ChildIndex >= g.ChildCount {
+			return false
+		}
+	}
+	if r.Initiator != nil {
+		if !r.Initiator.Valid() {
+			return false
+		}
+		if _, _, policy := authorization.PolicyExecutor(r.Actor); !policy {
+			return false
+		}
+	}
 	for _, id := range []string{r.RootID, r.CaptureID, r.CaseID, r.OccurrenceID, r.ArtifactID, r.AttemptID} {
 		if !authorization.UUID(id) {
 			return false
 		}
 	}
 	return r.Actor.Valid() && r.Target.Valid() && authorization.UUID(r.PermissionEpoch) && r.PermissionSequence > 0 && r.IdentityRevision.Valid() && r.ScopeDigest != (artifact.Digest{}) && r.SubmissionDigest != (artifact.Digest{}) && r.ExpectationDigest != (artifact.Digest{}) && !r.CreatedAt.IsZero() && r.CreatedAt.Before(r.Deadline) && r.CreatedAt.Before(r.ExpiresAt) && r.ExpiresAt.Before(r.DeleteBy) && r.ReservedBytes > 0 && r.ReservedBytes < 16<<20
+}
+
+func (r CaptureIntent) Requester() identity.Principal {
+	if r.Initiator != nil {
+		return *r.Initiator
+	}
+	return r.Actor
 }
 func CaptureIntentKey(root, capture string) string {
 	return "capture-intent/v1/" + root + "/" + capture + "/record"

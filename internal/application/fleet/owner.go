@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -24,13 +25,50 @@ type OwnerRoutes struct {
 	Configurations OwnerConfigurationReader
 	Endpoints      OwnerEndpointReader
 	Now            func() time.Time
+
+	// mu guards recent, the last route per binding, reused only while
+	// routeReuseMargin of its own original interval remains.
+	mu     sync.Mutex
+	recent map[value.OwnerBinding]value.OwnerRoute
 }
 
+// routeReuseMargin is the least remaining validity a recent route needs to
+// be reused. Every context-start receiver check authenticated its owner with
+// about eleven Kubernetes route reads; on CI that check took up to a second
+// of a Save's five-second start bound (native run 41229262576).
+//
+// A receiver's validity ends with its route, and a history exchange needs
+// about two seconds of it (native run 41234176458 expired at a two-second
+// margin), so reuse needs three.
+const routeReuseMargin = 3 * time.Second
+
 func (s *OwnerRoutes) CurrentOwnerRoute(ctx context.Context, b value.OwnerBinding) (value.OwnerRoute, error) {
-	var out value.OwnerRoute
 	if s == nil || ctx == nil || s.Configurations == nil || s.Endpoints == nil || s.Now == nil || !b.Valid() {
-		return out, value.ErrInvalid
+		return value.OwnerRoute{}, value.ErrInvalid
 	}
+	s.mu.Lock()
+	r, ok := s.recent[b]
+	s.mu.Unlock()
+	if ok && r.Valid(s.Now().Add(routeReuseMargin)) && ctx.Err() == nil {
+		r.Configuration.Configuration = r.Configuration.Configuration.Clone()
+		return r, nil
+	}
+	out, err := s.readRoute(ctx, b)
+	if err == nil {
+		kept := out
+		kept.Configuration.Configuration = out.Configuration.Configuration.Clone()
+		s.mu.Lock()
+		if s.recent == nil || len(s.recent) >= 64 {
+			s.recent = map[value.OwnerBinding]value.OwnerRoute{}
+		}
+		s.recent[b] = kept
+		s.mu.Unlock()
+	}
+	return out, err
+}
+
+func (s *OwnerRoutes) readRoute(ctx context.Context, b value.OwnerBinding) (value.OwnerRoute, error) {
+	var out value.OwnerRoute
 	start := s.Now()
 	ctx, end := context.WithDeadline(ctx, start.Add(5*time.Second))
 	defer end()

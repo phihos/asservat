@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 var (
@@ -378,13 +379,20 @@ func sameAssessment(a, b []collector.Availability) bool {
 // closer than StatusMinimumSpacing are refused. Receipts remove the work they
 // answer from the queue.
 func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error {
-	if r.Sequence == 0 || r.ObservedAt.IsZero() || len(r.Receipts) > collector.MaxReceipts || len(r.Mechanisms) > 8 {
+	if r.Sequence == 0 || r.ObservedAt.IsZero() || len(r.Receipts) > collector.MaxReceipts || len(r.Mechanisms) > 8 || int64(len(r.Sources)) > collector.SourceStatusLimit {
 		return ErrNodeInvalid
 	}
 	for _, rc := range r.Receipts {
 		if (rc.Outcome != collector.OutcomeAccepted && rc.Outcome != collector.OutcomeRefused) || (rc.Reason != "" && !rc.Reason.Valid()) {
 			return ErrNodeInvalid
 		}
+	}
+	seenSources := make(map[string]bool, len(r.Sources))
+	for _, source := range r.Sources {
+		if !source.Valid(r.ObservedAt) || seenSources[source.SourceID] {
+			return ErrNodeInvalid
+		}
+		seenSources[source.SourceID] = true
 	}
 	c.mu.Lock()
 	e, err := c.current(p, epoch)
@@ -412,6 +420,15 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 	answered := map[answer]bool{}
 	for _, rc := range r.Receipts {
 		answered[answer{rc.Sequence, rc.WorkID}] = true
+		if rc.Outcome == collector.OutcomeAccepted {
+			for key, pending := range e.captures {
+				if pending.cancelID == rc.WorkID && pending.cancelSeq == rc.Sequence {
+					pending.cancelJoinedAt = now.UTC().Truncate(time.Microsecond)
+					e.captures[key] = pending
+				}
+			}
+		}
+
 	}
 	kept := e.work[:0]
 	for _, w := range e.work {
@@ -421,6 +438,7 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 	}
 	e.work = kept
 	stored := r
+	stored.Sources = append([]collector.SourceStatus(nil), r.Sources...)
 	e.report, e.reportedAt = &stored, now
 	e.reports++
 	view := c.view(e, now)
@@ -434,13 +452,13 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 // Enqueue queues one work item without payload for the node's current
 // process and wakes its poll. Packet captures use EnqueuePacket.
 func (c *NodeChannel) Enqueue(nodeUID string, kind collector.WorkKind, notAfter time.Time) (collector.Work, error) {
-	if !kind.Valid() || kind == collector.WorkPacketCapture {
+	if !kind.Valid() || kind == collector.WorkPacketCapture || kind == collector.WorkPacketSource || kind == collector.WorkStopPacketSource {
 		return collector.Work{}, ErrNodeInvalid
 	}
-	return c.enqueue(nodeUID, kind, notAfter, nil)
+	return c.enqueue(nodeUID, kind, notAfter, nil, nil, nil)
 }
 
-func (c *NodeChannel) enqueue(nodeUID string, kind collector.WorkKind, notAfter time.Time, packet *collector.PacketCapture) (collector.Work, error) {
+func (c *NodeChannel) enqueue(nodeUID string, kind collector.WorkKind, notAfter time.Time, packet *collector.PacketCapture, ctx context.Context, expected *targets.PacketSourceObservation) (collector.Work, error) {
 	var raw [16]byte
 	if _, err := rand.Read(raw[:]); err != nil {
 		return collector.Work{}, ErrNodeUnavailable
@@ -451,6 +469,28 @@ func (c *NodeChannel) enqueue(nodeUID string, kind collector.WorkKind, notAfter 
 	now := c.now()
 	if e == nil || !now.Before(notAfter) {
 		return collector.Work{}, ErrNodeUnavailable
+	}
+	// This check and insertion share the same mutex: a replaced collector
+	// cannot inherit work observed for an earlier process or boot.
+	if expected != nil {
+		if ctx == nil || ctx.Err() != nil || !expected.Valid(now) || packet == nil ||
+			packet.PodUID != expected.PodUID || e.id.NodeUID != expected.NodeUID ||
+			e.id.BootID != expected.BootID || e.id.PodUID != expected.CollectorPodUID ||
+			e.id.Epoch != expected.CollectorEpoch || !c.view(e, now).PacketRecorderAvailable() ||
+			notAfter.After(now.Add(collector.PacketCaptureStartWithin)) {
+			return collector.Work{}, ErrNodeUnavailable
+		}
+		if deadline, ok := ctx.Deadline(); ok && !now.Before(deadline) {
+			return collector.Work{}, ErrNodeUnavailable
+		}
+		if permit := packet.Observation; permit != nil {
+			b := permit.Binding
+			if !permit.ValidFinite(now) || !permit.StartBy.Equal(notAfter) || permit.Duration != packet.Duration ||
+				b.CaptureID != packet.CaptureID || b.PodUID != packet.PodUID || b.ProgramDigest != packet.ProgramDigest ||
+				b.NodeUID != e.id.NodeUID || b.BootID != e.id.BootID || b.CollectorPodUID != e.id.PodUID || b.CollectorEpoch != e.id.Epoch {
+				return collector.Work{}, ErrNodeUnavailable
+			}
+		}
 	}
 	for id, p := range e.captures {
 		if !now.Before(p.until) {
@@ -476,6 +516,7 @@ func (c *NodeChannel) view(e *nodeEntry, now time.Time) NodeView {
 	v := NodeView{Identity: e.id, EnrolledAt: e.enrolledAt, ReportedAt: e.reportedAt, Reports: e.reports, Queued: len(e.work)}
 	if e.report != nil {
 		r := *e.report
+		r.Sources = append([]collector.SourceStatus(nil), e.report.Sources...)
 		v.Report = &r
 		v.Current = now.Sub(e.reportedAt) <= collector.StatusStaleAfter
 	}

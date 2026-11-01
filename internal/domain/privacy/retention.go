@@ -49,6 +49,7 @@ type PolicySet struct {
 // Input classifications are derived by the qualified producer, never supplied
 // as a user claim that arbitrary data is nonpersonal or innocuous context.
 type Input struct {
+	ControlKind                string `json:",omitempty"` // "case-metadata" only for protected parameter/control records
 	Target                     authorization.Target
 	PrivacyClass, EvidenceType string
 	RequestedSeconds           int64 // zero selects the lowest applicable default
@@ -183,7 +184,7 @@ func ResolveRetained(set PolicySet, in Input, previous Deadlines, now time.Time)
 
 func resolveDeadlines(set PolicySet, in Input, now time.Time) (Resolution, error) {
 	var out Resolution
-	if !in.Target.Valid() || !class(in.PrivacyClass) || !evidenceType(in.EvidenceType) || in.RequestedSeconds < 0 || in.RequestedSeconds > MaxAgeSeconds || !finiteTime(in.AnchorAt) || in.AnchorAt.After(now) || len(in.Parents) > 64 {
+	if (in.ControlKind != "" && in.ControlKind != "case-metadata") || !in.Target.Valid() || !class(in.PrivacyClass) || !evidenceType(in.EvidenceType) || in.RequestedSeconds < 0 || in.RequestedSeconds > MaxAgeSeconds || !finiteTime(in.AnchorAt) || in.AnchorAt.After(now) || len(in.Parents) > 64 {
 		return out, ErrInvalid
 	}
 	if !set.Complete || set.Target != in.Target || !set.Revision.Valid() || !identity.Fresh(set.ObservedAt, set.FreshUntil, now, 60*time.Second) || len(set.Policies) < 1 || len(set.Policies) > 64 {
@@ -268,4 +269,19 @@ func Tighten(old, next Deadlines) (Deadlines, error) {
 		return Deadlines{}, ErrInvalid
 	}
 	return Deadlines{AnchorAt: identity.Earlier(old.AnchorAt, next.AnchorAt), ExpiresAt: identity.Earlier(old.ExpiresAt, next.ExpiresAt), DeleteBy: identity.Earlier(old.DeleteBy, next.DeleteBy)}, nil
+}
+
+// CaseMetadataPolicy projects the explicitly configured metadata lifetime.
+// Rules naming evidence kinds do not govern a user-authored control record;
+// general data-class restrictions continue to apply.
+func CaseMetadataPolicy(p ScopedPolicy) Policy {
+	out := p.Policy
+	out.DefaultSeconds, out.MaximumSeconds = p.CaseDefaultSeconds, p.CaseMaximumSeconds
+	out.Rules = nil
+	for _, r := range p.Policy.Rules {
+		if len(r.EvidenceTypes) == 0 {
+			out.Rules = append(out.Rules, r)
+		}
+	}
+	return out
 }

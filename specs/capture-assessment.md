@@ -90,3 +90,13 @@ Given the same target and composed plan in browser, MCP and GitOps, when assesse
 ## Existing-recording saves
 
 For operation=recordingSave, the same assessment service binds the recording-save/v1 scope digest. Selected actions remain executionMode=ongoing, but the preview context expressly describes **saving existing recordings**: no new observation pods or recorder attachment is requested. scope.observationPods counts distinct selected source pods already recording, separately from snapshot incident pods; do not label it new arming. Assess incremental frozen-buffer/encryption/upload/analysis costs, with any continuing-recorder baseline explicitly identified. No application-pause estimate is invented from an unrelated liveCore action in the policy. Sensitivity and automatic-deletion ages come from original source acquisition and earliest source/parent ceilings, with actual remaining time/coverage refreshed before pinning. Existing disclosure rules remain mandatory.
+
+For ADR-261's finite policy-observation mode, review and assessment must distinguish
+current admission facts from the committed active lease and latestStart. Explain
+that already-issued work may start within its original short start bound and
+continue after revocation only to its original lease (at most twenty seconds after
+issuance, with all original hard expiries winning). Do not promise immediate packet
+cancellation. Display prospective observed-byte reservation separately from actual
+measured input and retained output; unused/uncertain credit remains spent. A rate
+ceiling is not a throughput estimate. This wording does not enable manual raw or
+ongoing source arming, or claim installed/native qualification.

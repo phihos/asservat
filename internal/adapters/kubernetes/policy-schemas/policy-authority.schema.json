@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/policy-authority.schema.json",
+  "title": "Team policy authority v1; protected resolution, not client credentials",
+  "$defs": {
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowedActions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "kubernetesSnapshot",
+              "logs",
+              "processSnapshot",
+              "fileRead",
+              "packetCapture",
+              "networkSnapshot",
+              "runtimeDiagnostic",
+              "kernelCore",
+              "liveCore",
+              "command",
+              "httpDiagnostic",
+              "artifactCollect",
+              "profile",
+              "syscallTrace"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 14,
+          "uniqueItems": true
+        },
+        "maxLifetimeSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31536000
+        },
+        "maxExecutions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1099511627776
+        },
+        "maxObservedBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1099511627776
+        }
+      },
+      "required": [
+        "allowedActions",
+        "maxLifetimeSeconds",
+        "maxExecutions",
+        "maxBytes",
+        "maxObservedBytes"
+      ]
+    },
+    "accepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "team"
+        },
+        "installationID": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+        },
+        "delegation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "uid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "digest": {
+              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+            }
+          },
+          "required": [
+            "uid",
+            "generation",
+            "digest"
+          ]
+        },
+        "ownerAssignments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subject": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "Group"
+                  },
+                  "issuer": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "kind",
+                  "issuer",
+                  "id"
+                ]
+              },
+              "role": {
+                "const": "workload-maintainer"
+              },
+              "basisKind": {
+                "const": "AccessBinding"
+              },
+              "basisUID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "basisDigest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "assignmentID": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "subject",
+              "role",
+              "basisKind",
+              "basisUID",
+              "basisDigest",
+              "assignmentID"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true
+        },
+        "issuedAt": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        },
+        "notAfter": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxExecutions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "maxBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1099511627776
+            },
+            "maxObservedBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1099511627776
+            }
+          },
+          "required": [
+            "maxExecutions",
+            "maxBytes",
+            "maxObservedBytes"
+          ]
+        }
+      },
+      "required": [
+        "mode",
+        "installationID",
+        "delegation",
+        "ownerAssignments",
+        "issuedAt",
+        "notAfter",
+        "limits"
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "team"
+        },
+        "executor": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"
+        },
+        "continuesAfterCreatorLeaves": {
+          "const": true
+        },
+        "notAfter": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/timestamp"
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxExecutions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            },
+            "maxBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1099511627776
+            },
+            "maxObservedBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1099511627776
+            }
+          },
+          "required": [
+            "maxExecutions",
+            "maxBytes",
+            "maxObservedBytes"
+          ]
+        },
+        "state": {
+          "enum": [
+            "Ready",
+            "DelegationRequired",
+            "Revoked",
+            "Expired",
+            "OwnerAssignmentChanged",
+            "ReapprovalRequired",
+            "Unavailable"
+          ]
+        },
+        "reasonCodes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "minItems": 0,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "ownerTeams": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "Group"
+              },
+              "issuer": {
+                "type": "string",
+                "format": "uri"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "required": [
+              "kind",
+              "issuer",
+              "id"
+            ]
+          }
+        }
+      },
+      "required": [
+        "mode",
+        "executor",
+        "continuesAfterCreatorLeaves",
+        "notAfter",
+        "limits",
+        "state",
+        "reasonCodes",
+        "ownerTeams"
+      ]
+    }
+  }
+}

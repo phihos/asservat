@@ -98,7 +98,11 @@ func TestAuditedFailureTimingPrecedesBlockedFinish(t *testing.T) {
 				t.Fatal("call did not join Finish")
 			}
 			final := <-samples
-			if final.event != "normal" || !strings.Contains(final.line, " finish@") {
+			wantEvent := "normal"
+			if mode == "success" {
+				wantEvent = "request_capture"
+			}
+			if final.event != wantEvent || !strings.Contains(final.line, " finish@") {
 				t.Fatal("original final timing lost", final)
 			}
 			select {

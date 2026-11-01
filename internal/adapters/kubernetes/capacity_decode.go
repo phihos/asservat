@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"asservat.local/asservat/internal/domain/collector"
 	"bytes"
 	"crypto/sha256"
 	"embed"
@@ -106,6 +107,9 @@ func (v *capacityValidator) policyObservation(o permissionObject, r cfg.Resource
 	}
 	out.Resource.SpecDigest = digest
 	out.Budget = &port.PolicyBudgetInput{Name: r.Name, Pool: w.PoolRef, Cluster: w.Scope.ClusterID, Protected: capacityAmount(w.Workload.Protected), Hard: capacityAmount(w.Workload.HardLimit), Context: capacityAmount(w.Workload.ContextReserve), NamespaceMaximum: port.BudgetAmount{Bytes: w.NamespaceEnvelope.MaxStoredBytes, Objects: w.NamespaceEnvelope.MaxObjects}, NamespaceAccounts: w.NamespaceEnvelope.MaxWorkloadAccounts}
+	if w.Node.MaxActiveSources != 0 || w.Node.InputBytesPerSecond != 0 || w.Node.InputBurstBytes != 0 || w.Workload.MaxActiveSources != 0 || w.Workload.InputBytesPerSecond != 0 || w.Workload.InputBurstBytes != 0 || w.Node.MaxRingBytes != 0 || w.Node.MaxFrozenBytes != 0 {
+		out.SourceResources = &port.SourceResourceLimits{Node: collector.PolicyLimits{RingBytes: w.Node.MaxRingBytes, FrozenBytes: w.Node.MaxFrozenBytes, SourceLimits: collector.SourceLimits{MaxActiveSources: w.Node.MaxActiveSources, InputBytesPerSecond: w.Node.InputBytesPerSecond, InputBurstBytes: w.Node.InputBurstBytes}}, Workload: collector.SourceLimits{MaxActiveSources: w.Workload.MaxActiveSources, InputBytesPerSecond: w.Workload.InputBytesPerSecond, InputBurstBytes: w.Workload.InputBurstBytes}}
+	}
 	return out
 }
 

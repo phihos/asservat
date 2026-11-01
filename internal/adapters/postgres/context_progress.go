@@ -58,6 +58,17 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		return out, value.ErrUnavailable
 	}
 	out = value.ContextProgressObservation{CaptureID: accepted.CaptureID, CandidateCaseID: accepted.Expectation.CaseID, CandidateArtifactID: accepted.Expectation.Registration.Location.ArtifactID, Target: intent.Target, Revision: c.ProgressRevision, CreatedAt: accepted.CreatedAt, Deadline: accepted.Deadline, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "IntentAuditPending"}
+	if intent.ReasonRef != nil {
+		parent := intent.CaptureID
+		if intent.Group != nil {
+			parent = intent.Group.ParentCaptureID
+		}
+		out.ReasonMetadata = &value.CaptureReasonMetadata{RootID: intent.RootID, CaptureID: parent, AuditCaptureID: intent.CaptureID, Reference: value.ProtectedReasonRef{ID: intent.ReasonRef.ID, CiphertextDigest: intent.ReasonRef.CiphertextDigest, ExpiresAt: intent.ReasonRef.ExpiresAt}, Requester: intent.Requester(), ScopeDigest: intent.ScopeDigest}
+	}
+	out.Operation, out.ActionID = "collect", accepted.Expectation.ActionID
+	if e := accepted.Expectation; e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" {
+		out.Operation = "recordingSave"
+	}
 	if out.ShareID, err = captureShareID(c.ShareInstruction); err != nil {
 		return out, err
 	}
@@ -68,6 +79,12 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		}
 		out.ReasonCode = "DispatchUnconfirmed"
 	}
+	out.CancellationRequested = c.SnapshotCancelRequestedAt.Valid
+	if c.SnapshotCancelJoinedAt.Valid {
+		out.Phase, out.ActionPhase, out.ReasonCode = "Cancelled", "Cancelled", "CancellationJoined"
+		return out, nil
+	}
+	out.CanCancel = accepted.Expectation.Snapshot != nil && !out.CancellationRequested && !f.CatalogArtifactID.Valid && (len(executions) == 0 || executions[0].Phase == "prepared" || executions[0].Phase == "started")
 	verified := f.VerifiedCaptureID.Valid
 	if verified {
 		v := custodydb.ContextVerification{CaptureID: f.VerifiedCaptureID, RootID: f.VerifiedRootID, VerifiedAt: f.VerifiedAt, ExpectationDigest: f.ExpectationDigest, CopiesDigest: f.VerifiedCopiesDigest, IntentDigest: f.VerifiedIntentDigest, AuthorityDigest: f.AuthorityDigest, PermissionEpoch: f.PermissionEpoch, PermissionSequence: f.PermissionSequence.Int64}
@@ -122,6 +139,9 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 			out.Phase = "Indeterminate"
 			out.ActionPhase = "Indeterminate"
 			out.ReasonCode = "StorageOutcomeUnconfirmed"
+			return out, nil
+		case "cancelled":
+			out.Phase, out.ActionPhase, out.ReasonCode = "Cancelled", "Cancelled", "CancellationJoined"
 			return out, nil
 		case "stored":
 			out.Phase = "Finalizing"
@@ -179,6 +199,14 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 		if !request.Valid(first.Time) {
 			return value.ErrDenied
 		}
+		group, groupErr := q.LockRecordingSaveGroup(ctx, custodydb.LockRecordingSaveGroupParams{RootID: id(s.root), ID: id(request.CaptureID)})
+		if groupErr == nil {
+			out, err = s.readRecordingGroupProgress(ctx, q, group, request, recovery, stream, first.Time)
+			return err
+		}
+		if !errors.Is(groupErr, pgx.ErrNoRows) {
+			return groupErr
+		}
 		// This routing-only lookup provides no outward fields. Existence and access
 		// denial have the same result; lifecycle joins happen only after eligibility.
 		c, err := q.ReadPublicationCapture(ctx, custodydb.ReadPublicationCaptureParams{ID: id(request.CaptureID), RootID: id(s.root)})
@@ -188,61 +216,8 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 		if err != nil {
 			return err
 		}
-		intent, err := captureIntent(c)
-		if err != nil {
-			return value.ErrDenied
-		}
-		projection, err := permissionProjection(ctx, q, stream, intent.Target)
-		if err != nil {
-			return value.ErrDenied
-		}
-		n, err := q.CurrentTime(ctx)
-		if err != nil {
-			return err
-		}
-		eligible := authorization.CaptureProgressEligibility(request.Identity, projection, intent.Target, intent.Actor, n.Time)
-		if !eligible.Eligible {
-			return value.ErrDenied
-		}
-		f, err := q.ReadContextProgressFacts(ctx, custodydb.ReadContextProgressFactsParams{ID: c.ID, RootID: c.RootID})
-		if err != nil {
-			return err
-		}
-		if !bytes.Equal(f.ContextCapture.ScopeDigest, c.ScopeDigest) || !bytes.Equal(f.ContextCapture.ExpectationJson, c.ExpectationJson) {
-			return value.ErrUnavailable
-		}
-		var executions []executionvalue.APIExecution
-		if accepted, decodeErr := admittedRecord(c); decodeErr != nil {
-			return decodeErr
-		} else if accepted.Expectation.ExecutionClass == artifact.ContextAPIExecution {
-			row, readErr := q.ReadAPIExecution(ctx, custodydb.ReadAPIExecutionParams{RootID: c.RootID, CaptureID: c.ID})
-			if readErr == nil {
-				x, decodeErr := apiExecution(row)
-				if decodeErr != nil {
-					return decodeErr
-				}
-				executions = append(executions, x)
-			} else if !errors.Is(readErr, pgx.ErrNoRows) {
-				return readErr
-			}
-		}
-		out, err = progressFacts(f, executions...)
-		if err != nil {
-			return err
-		}
-		out.ObservedAt = first.Time
-		out.ValidUntil = identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(eligible.ValidUntil, request.Recovery.FreshUntil))
-		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
-			return err
-		}
-		n, err = q.CurrentTime(ctx)
-		if err != nil {
-			return err
-		}
-		if !request.Valid(n.Time) || !n.Time.Before(eligible.ValidUntil) || !out.Valid(n.Time) {
-			return value.ErrDenied
-		}
-		return ctx.Err()
+		out, err = s.readContextProgressInTransaction(ctx, q, c, request, recovery, stream, first.Time)
+		return err
 	})
 	if err != nil {
 		return value.ContextProgressObservation{}, captureError(err)
@@ -291,4 +266,82 @@ func (s *ContextDeadlines) ObserveOverdueContextCaptures(ctx context.Context, li
 		return 0, captureError(err)
 	}
 	return count, nil
+}
+
+func (s *ContextProgressReads) readContextProgressInTransaction(ctx context.Context, q *custodydb.Queries, c custodydb.ContextCapture, request value.ProgressQuery, recovery custodydb.FleetCurrentTrust, stream custodydb.PermissionStream, observedAt time.Time) (value.ContextProgressObservation, error) {
+	var out value.ContextProgressObservation
+	err := func() error {
+		intent, err := captureIntent(c)
+		if err != nil {
+			return value.ErrDenied
+		}
+		projection, err := permissionProjection(ctx, q, stream, intent.Target)
+		if err != nil {
+			return value.ErrDenied
+		}
+		n, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		eligible := authorization.CaptureProgressEligibility(request.Identity, projection, intent.Target, intent.Requester(), n.Time)
+		if !eligible.Eligible {
+			return value.ErrDenied
+		}
+		f, err := q.ReadContextProgressFacts(ctx, custodydb.ReadContextProgressFactsParams{ID: c.ID, RootID: c.RootID})
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(f.ContextCapture.ScopeDigest, c.ScopeDigest) || !bytes.Equal(f.ContextCapture.ExpectationJson, c.ExpectationJson) {
+			return value.ErrUnavailable
+		}
+		var executions []executionvalue.APIExecution
+		if accepted, decodeErr := admittedRecord(c); decodeErr != nil {
+			return decodeErr
+		} else if accepted.Expectation.ExecutionClass == artifact.ContextAPIExecution {
+			row, readErr := q.ReadAPIExecution(ctx, custodydb.ReadAPIExecutionParams{RootID: c.RootID, CaptureID: c.ID})
+			if readErr == nil {
+				x, decodeErr := apiExecution(row)
+				if decodeErr != nil {
+					return decodeErr
+				}
+				executions = append(executions, x)
+			} else if !errors.Is(readErr, pgx.ErrNoRows) {
+				return readErr
+			}
+		}
+		out, err = progressFacts(f, executions...)
+		if err != nil {
+			return err
+		}
+		if c.RepeatedFromCaptureID.Valid && n.Time.Before(c.RepeatedFromExpiresAt.Time) {
+			accepted, e := admittedRecord(c)
+			if e != nil {
+				return e
+			}
+			historical := authorization.CaptureHistoryEligibility(request.Identity, projection, intent.Target, intent.Requester(), accepted.Expectation.Audience, n.Time)
+			if historical.Eligible {
+				out.RepeatedFrom = &value.HistoryLineage{CaptureID: uid(c.RepeatedFromCaptureID), ExpiresAt: c.RepeatedFromExpiresAt.Time}
+			}
+		}
+		if c.HistoryParametersRequired {
+			out.HistoryState = "unavailable"
+			if f.HistoryParametersState.String == "available" && f.HistoryCustodyState.String == artifact.StoredUnpublished && f.HistoryVisible.Bool && n.Time.Before(f.HistorySummaryExpires.Time) && n.Time.Before(f.HistorySettingsExpires.Time) {
+				out.HistoryState = "available"
+			}
+		}
+		out.ObservedAt = observedAt
+		out.ValidUntil = identity.Earlier(observedAt.Add(5*time.Second), identity.Earlier(eligible.ValidUntil, request.Recovery.FreshUntil))
+		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
+			return err
+		}
+		n, err = q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		if !request.Valid(n.Time) || !n.Time.Before(eligible.ValidUntil) || !out.Valid(n.Time) {
+			return value.ErrDenied
+		}
+		return ctx.Err()
+	}()
+	return out, err
 }

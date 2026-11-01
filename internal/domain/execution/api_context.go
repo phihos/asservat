@@ -62,7 +62,7 @@ type APIExecution struct {
 	Process                            APIProcessBinding
 	ExpectationDigest                  artifact.Digest
 	ObjectUID                          string
-	Phase                              string // prepared, started, stored, captureFailed, targetGone, denied, storeUnconfirmed
+	Phase                              string // prepared, started, stored, captureFailed, targetGone, denied, storeUnconfirmed, cancelled
 	StartedAt, AcquiredAt, CompletedAt time.Time
 	Copies                             artifact.Copies
 }
@@ -82,11 +82,11 @@ func (r APIExecution) Valid() bool {
 		return r.StartedAt.IsZero() && r.AcquiredAt.IsZero() && r.CompletedAt.IsZero() && r.Copies == (artifact.Copies{})
 	case "started":
 		return r.ObjectUID != "" && canonicalTime(r.StartedAt) && !r.StartedAt.Before(r.Binding.NotBefore) && r.StartedAt.Before(r.Binding.NotAfter) && r.AcquiredAt.IsZero() && r.CompletedAt.IsZero() && r.Copies == (artifact.Copies{})
-	case "stored", "captureFailed", "targetGone", "denied", "storeUnconfirmed":
+	case "stored", "captureFailed", "targetGone", "denied", "storeUnconfirmed", "cancelled":
 		if r.ObjectUID == "" || !canonicalTime(r.StartedAt) || r.StartedAt.Before(r.Binding.NotBefore) || !r.StartedAt.Before(r.Binding.NotAfter) || !canonicalTime(r.CompletedAt) || r.CompletedAt.Before(r.StartedAt) {
 			return false
 		}
-		if r.Phase == "captureFailed" || r.Phase == "targetGone" || r.Phase == "denied" {
+		if r.Phase == "captureFailed" || r.Phase == "targetGone" || r.Phase == "denied" || r.Phase == "cancelled" {
 			return r.AcquiredAt.IsZero() && r.Copies == (artifact.Copies{})
 		}
 		if !canonicalTime(r.AcquiredAt) || r.AcquiredAt.Before(r.StartedAt) || !r.AcquiredAt.Before(r.Binding.NotAfter) || r.CompletedAt.Before(r.AcquiredAt) {

@@ -85,11 +85,7 @@ func (s *Retention) ReconcileRetentionPage(ctx context.Context, source value.Pol
 				out.Visited++
 				continue
 			}
-			c, err := q.ReadRetainedContext(ctx, custodydb.ReadRetainedContextParams{RootID: id(s.root), AttemptID: candidate.ID})
-			if err != nil {
-				return err
-			}
-			r, err := retainedContextOrigins(ctx, q, s.root, c, a)
+			r, err := retainedCustodyOrigins(ctx, q, s.root, a)
 			if err != nil {
 				return err
 			}

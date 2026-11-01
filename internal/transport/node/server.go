@@ -79,7 +79,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	body := http.MaxBytesReader(w, r.Body, contracts.NodeMaxRequest)
+	limit := int64(contracts.NodeMaxRequest)
+	if r.URL.Path == contracts.NodeStatusPath {
+		limit = contracts.NodeStatusMaxRequest
+	}
+	body := http.MaxBytesReader(w, r.Body, limit)
 	switch r.URL.Path {
 	case contracts.NodeEnrollPath:
 		req, err := contracts.DecodeNodeEnrollRequest(body)

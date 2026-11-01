@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/evidence"
 	app "asservat.local/asservat/internal/application/execution"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
@@ -60,6 +61,13 @@ func apiWork(c custodydb.ContextCapture) (app.APIContextWork, error) {
 	intent, err := captureIntent(c)
 	if err != nil {
 		return out, err
+	}
+	if accepted.Expectation.Snapshot != nil {
+		// Both callers immediately resolve this incomplete private value from
+		// the exact retained source row before any work can be returned/used.
+		out = app.APIContextWork{Accepted: accepted, Actor: intent.Actor, Initiator: intent.Initiator}
+		copy(out.IntentDigest[:], c.IntentDigest)
+		return out, nil
 	}
 	type scopeTarget struct {
 		Namespace string                           `json:"namespace"`
@@ -149,6 +157,9 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 		if err != nil {
 			return fail("work", err)
 		}
+		if err = sourceSnapshotWork(ctx, q, s.root, &out); err != nil {
+			return fail("snapshot-source", err)
+		}
 		projection, err := permissionProjection(ctx, q, stream, authorization.Target{ClusterID: out.Target.ClusterID, NamespaceUID: out.Target.Namespace.UID, WorkloadUID: out.Target.Workload.UID, PodUID: out.Target.PodUID})
 		if err != nil {
 			return fail("permission", value.ErrDenied)
@@ -180,7 +191,7 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 
 // check locks recovery -> permission -> pool/allocation -> attempt -> capture,
 // re-evaluating the same ordinary evaluator after every blocking SQL wait.
-func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, topology privacyvalue.PolicyTopology, fn func(custodydb.ContextCapture) error) error {
+func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, topology privacyvalue.PolicyTopology, effectUntil *time.Time, fn func(custodydb.ContextCapture, *policyCaptureGrantState) error) error {
 	trust, err := s.guards.Recovery.lock(ctx, q, s.root, c.Recovery)
 	if err != nil {
 		return sqlStep{"recovery-lock", err}
@@ -206,15 +217,27 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 	if err != nil {
 		return sqlStep{"work", err}
 	}
-	if w.Actor != c.Work.Actor || w.Target != c.Work.Target || w.IntentDigest != c.Work.IntentDigest || w.Accepted.Pin != c.Work.Accepted.Pin || !bytes.Equal(digest(w.Accepted.Expectation), digest(e)) {
+	if err = sourceSnapshotWork(ctx, q, s.root, &w); err != nil {
+		return sqlStep{"snapshot-source", err}
+	}
+	if !reflect.DeepEqual(w.SourceBinding, c.Work.SourceBinding) {
+		return sqlStep{"snapshot-source", value.ErrConflict}
+	}
+	if !reflect.DeepEqual(w.Initiator, c.Work.Initiator) || w.Actor != c.Work.Actor || w.Target != c.Work.Target || w.IntentDigest != c.Work.IntentDigest || w.Accepted.Pin != c.Work.Accepted.Pin || !bytes.Equal(digest(w.Accepted.Expectation), digest(e)) {
 		return sqlStep{"conflict", value.ErrConflict}
 	}
 
 	if !bytes.Equal(attempt.RequestDigest, digest(normalized(e.Registration))) || attempt.State != artifact.Reserved {
 		return sqlStep{"attempt-state", value.ErrDenied}
 	}
+	var policyGrant *policyCaptureGrantState
 	check := func() error {
-		if err := currentRecordingGrant(ctx, q, accepted); err != nil {
+		if _, _, policy := authorization.PolicyExecutor(w.Actor); policy {
+			policyGrant, err = lockCurrentPolicyCaptureGrant(ctx, q, accepted, w.Accepted)
+		} else {
+			err = currentRecordingGrant(ctx, q, accepted)
+		}
+		if err != nil {
 			return sqlStep{"approval", err}
 		}
 		if err := s.guards.Recovery.check(ctx, q, trust, s.root, c.Recovery); err != nil {
@@ -232,6 +255,26 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 			return sqlStep{"time", err}
 		}
 		eligible := contextEligibilityIn(ctx, q, stream, trust, s.root, s.guards.Recovery.installationID(), c.Eligibility.VerifiedIdentity, projection, c.Eligibility.Target, now.Time)
+		if e.Snapshot != nil && eligible.Eligible {
+			if w.SourceBinding == nil {
+				return sqlStep{"snapshot-source-audience", value.ErrDenied}
+			}
+			retained := captureapp.PolicySourceState{Binding: *w.SourceBinding, Audience: w.SourceAudience, Target: w.SourceTarget, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, StartedAt: e.Snapshot.SourceStartedAt, HardUntil: e.Snapshot.SourceHardUntil}
+			eligible.DefaultAudience, err = sourceSnapshotAudience(retained, c.Plan.Input.Snapshot, eligible.DefaultAudience)
+			if err != nil {
+				return sqlStep{"snapshot-source-audience", value.ErrDenied}
+			}
+		}
+
+		if w.Initiator != nil {
+			if c.Initiator == nil {
+				return sqlStep{"initiator", value.ErrDenied}
+			}
+			caller := authorization.ContextEligibility(c.Initiator.VerifiedIdentity, projection, projection.Target, now.Time)
+			if !caller.Eligible || caller.Principal != *w.Initiator || !now.Time.Before(c.Initiator.ValidUntil) {
+				return sqlStep{"initiator", value.ErrDenied}
+			}
+		}
 		if !c.Valid(now.Time) || !eligible.Eligible || eligible.Principal != w.Actor || eligible.PermissionRevision != c.Eligibility.PermissionRevision || eligible.IdentityRevision != c.Eligibility.IdentityRevision || !slices.Equal(eligible.DefaultAudience, e.Audience) {
 			return sqlStep{"eligibility", value.ErrDenied}
 		}
@@ -242,7 +285,7 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 		if err != nil {
 			return sqlStep{"time", err}
 		}
-		if !c.Valid(now.Time) || !now.Time.Before(eligible.ValidUntil) {
+		if !c.Valid(now.Time) || !now.Time.Before(eligible.ValidUntil) || effectUntil != nil && !now.Time.Before(*effectUntil) {
 			return sqlStep{"expired", value.ErrExpired}
 		}
 		return ctx.Err()
@@ -250,14 +293,21 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 	if err = check(); err != nil {
 		return sqlStep{"expired", err}
 	}
-	if err = fn(accepted); err != nil {
+	if err = fn(accepted, policyGrant); err != nil {
 		return sqlStep{"effect", err}
 	}
 	return check()
 }
 func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.APIExecutionCheck) (value.APIExecution, bool, error) {
+	return s.prepareAPIExecution(ctx, c, nil)
+}
+
+func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.APIExecutionCheck, observation *policyObservationPreparation) (value.APIExecution, bool, error) {
 	var out value.APIExecution
 	var first bool
+	if sensitivePolicyRecording(c) && observation == nil {
+		return out, false, value.ErrDenied
+	}
 	if !authorization.UUID(c.Work.Accepted.CaptureID) || c.Work.Accepted.Expectation.ExecutionClass != artifact.ContextAPIExecution {
 		return out, false, value.ErrInvalid
 	}
@@ -272,7 +322,14 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 		out = value.APIExecution{}
 		first = false
 		headroomRefused = false
-		err := s.checked(ctx, q, c, topology, func(accepted custodydb.ContextCapture) error {
+		// Runtime source freshness is a separate ephemeral effect bound. It must
+		// not change Binding.NotAfter or the existing persisted preparation digest.
+		var sourceUntil *time.Time
+		if observation != nil {
+			originalSourceUntil := observation.source.FreshUntil
+			sourceUntil = &originalSourceUntil
+		}
+		err := s.checked(ctx, q, c, topology, sourceUntil, func(accepted custodydb.ContextCapture, policyGrant *policyCaptureGrantState) error {
 			row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: accepted.ID})
 			if errors.Is(err, pgx.ErrNoRows) {
 				e := c.Work.Accepted.Expectation
@@ -329,6 +386,16 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 			// and after this result, and every active effect keeps its cutoff.
 			if (first || out.Phase != "prepared") && !now.Time.Before(out.Binding.NotAfter) {
 				return sqlStep{"expired", value.ErrExpired}
+			}
+			if observation != nil {
+				if err := s.preparePolicyObservation(ctx, q, c, accepted, policyGrant, now.Time, first, observation); err != nil {
+					return sqlStep{"observation", err}
+				}
+				// New preparation must still have dispatch slack after all existing
+				// post-effect reads. Exact replay is passive even after its old startBy.
+				if first {
+					*sourceUntil = identity.Earlier(*sourceUntil, observation.permit.StartBy)
+				}
 			}
 			return nil
 		})
@@ -397,7 +464,7 @@ func (s *APIContextExecutions) changeAPIStart(ctx context.Context, c app.APIExec
 		return out, err
 	}
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		return s.checked(ctx, q, c, topology, func(_ custodydb.ContextCapture) error {
+		return s.checked(ctx, q, c, topology, nil, func(_ custodydb.ContextCapture, _ *policyCaptureGrantState) error {
 			row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: id(r.Binding.CaptureID)})
 			if err != nil {
 				return err
@@ -430,18 +497,28 @@ func (s *APIContextExecutions) changeAPIStart(ctx context.Context, c app.APIExec
 	return out, nil
 }
 func (s *APIContextExecutions) RecordAPIOutcome(ctx context.Context, r value.APIExecution, process value.APIProcessObservation) (value.APIExecution, error) {
-	if r.WriterProtocol == artifact.ContextWriterProtocol && r.Phase == "stored" {
+	if r.Phase == "cancelled" || r.WriterProtocol == artifact.ContextWriterProtocol && r.Phase == "stored" {
 		return value.APIExecution{}, value.ErrDenied
 	}
-	return s.recordAPIOutcome(ctx, r, process, nil, artifact.RecoveryProof{})
+	return s.recordAPIOutcome(ctx, r, process, nil, nil, artifact.RecoveryProof{})
 }
 func (s *APIContextExecutions) RecordAPIStoredCompletion(ctx context.Context, r value.APIExecution, c artifact.ContextWriterCompletion, process value.APIProcessObservation, recovery artifact.RecoveryProof) (value.APIExecution, error) {
 	if r.WriterProtocol != artifact.ContextWriterProtocol || r.Phase != "stored" || c.Copies != r.Copies || !c.StoredAt.Equal(r.CompletedAt) || recovery.InstallationID != r.Process.InstallationID || recovery.IssuerEpoch != r.Process.IssuerEpoch {
 		return value.APIExecution{}, value.ErrInvalid
 	}
-	return s.recordAPIOutcome(ctx, r, process, &c, recovery)
+	return s.recordAPIOutcome(ctx, r, process, &c, nil, recovery)
 }
-func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.APIExecution, process value.APIProcessObservation, completion *artifact.ContextWriterCompletion, recovery artifact.RecoveryProof) (value.APIExecution, error) {
+
+// RecordAPIStoredSnapshotCompletion retains authenticated final coverage separately
+// from the accepted execution digest. The same transaction joins writer closure.
+func (s *APIContextExecutions) RecordAPIStoredSnapshotCompletion(ctx context.Context, r value.APIExecution, c artifact.ContextWriterCompletion, coverage artifact.SourceSnapshotCoverage, process value.APIProcessObservation, recovery artifact.RecoveryProof) (value.APIExecution, error) {
+	if r.WriterProtocol != artifact.ContextWriterProtocol || r.Phase != "stored" || c.Copies != r.Copies || !c.StoredAt.Equal(r.CompletedAt) || recovery.InstallationID != r.Process.InstallationID || recovery.IssuerEpoch != r.Process.IssuerEpoch {
+		return value.APIExecution{}, value.ErrInvalid
+	}
+	return s.recordAPIOutcome(ctx, r, process, &c, &coverage, recovery)
+}
+
+func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.APIExecution, process value.APIProcessObservation, completion *artifact.ContextWriterCompletion, snapshot *artifact.SourceSnapshotCoverage, recovery artifact.RecoveryProof) (value.APIExecution, error) {
 	var out value.APIExecution
 	if !r.Valid() || r.RootID != s.root || r.Phase == "prepared" || r.Phase == "started" || process.Binding != r.Process {
 		return out, value.ErrInvalid
@@ -473,8 +550,19 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 		if old.WriterProtocol != r.WriterProtocol || old.Binding != r.Binding || old.Process != r.Process || old.ObjectUID != r.ObjectUID || old.ExpectationDigest != r.ExpectationDigest || !old.StartedAt.Equal(r.StartedAt) {
 			return value.ErrConflict
 		}
+		if old.Phase == "started" && c.SnapshotCancelRequestedAt.Valid && r.Phase != "stored" && completion == nil {
+			out = old
+			return ctx.Err() // Keep existing collector ownership until exact join/Stored wins.
+		}
 		if old.Phase != "started" {
 			if !reflect.DeepEqual(old, r) {
+				return value.ErrConflict
+			}
+			if snapshot != nil {
+				if _, err := checkSnapshotCompletion(c, old.ExpectationDigest, *snapshot); err != nil {
+					return err
+				}
+			} else if len(c.SnapshotCoverage) != 0 {
 				return value.ErrConflict
 			}
 			out = old
@@ -503,6 +591,24 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 		e, err := acceptedPublication(c)
 		if err != nil {
 			return err
+		}
+		var snapshotRaw, snapshotDigest []byte
+		if snapshot != nil {
+			if completion == nil || e.Snapshot == nil || r.Phase != "stored" {
+				return value.ErrInvalid
+			}
+			var projectErr error
+			e, projectErr = artifact.ProjectSourceSnapshotCoverage(e, r.ExpectationDigest, *snapshot)
+			if projectErr != nil {
+				return projectErr
+			}
+			snapshotRaw, projectErr = json.Marshal(snapshot)
+			if projectErr != nil || len(snapshotRaw) > 8192 {
+				return value.ErrInvalid
+			}
+			snapshotDigest = digest(snapshot)
+		} else if completion != nil && e.Snapshot != nil {
+			return value.ErrInvalid
 		}
 		if r.Phase == "stored" && (r.Copies.Validate(e.Registration) != nil || !r.CompletedAt.Before(e.Registration.WriteUntil)) {
 			return value.ErrDenied
@@ -549,6 +655,12 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 			incarnation, err := q.ReadContextDatabaseIncarnation(ctx, id(recovery.InstallationID))
 			if err != nil {
 				return err
+			}
+			if snapshot != nil {
+				projectedDigest := evidence.ContextExpectationDigest(e)
+				if _, err = q.RecordSourceSnapshotCompletion(ctx, custodydb.RecordSourceSnapshotCompletionParams{RootID: id(s.root), ID: c.ID, SnapshotCoverage: snapshotRaw, SnapshotCoverageDigest: snapshotDigest, SnapshotExpectationDigest: projectedDigest[:]}); err != nil {
+					return err
+				}
 			}
 			ed := app.APIExecutionDigest(r)
 			cd := privacyapp.ContextWriterDigest(*completion)
@@ -603,15 +715,18 @@ func currentRecordingGrant(ctx context.Context, q *custodydb.Queries, row custod
 	if err != nil {
 		return err
 	}
+	intent, err := captureIntent(row)
+	if err != nil {
+		return err
+	}
+	if _, _, policy := authorization.PolicyExecutor(intent.Actor); policy {
+		return currentPolicyCaptureGrant(ctx, q, row, a)
+	}
 	if a.Expectation.Recording == nil || !a.Expectation.Recording.RequireApproval {
 		return nil
 	}
 	if !row.PreviewID.Valid {
 		return value.ErrDenied
-	}
-	intent, err := captureIntent(row)
-	if err != nil {
-		return err
 	}
 	actor := intent.Actor
 	until, err := q.LockApprovedContextGrant(ctx, custodydb.LockApprovedContextGrantParams{RootID: row.RootID, PreviewID: row.PreviewID, CaptureID: row.ID, Issuer: actor.Issuer, Subject: actor.Subject, ClientID: actor.ClientID, ExecutionDigest: row.ScopeDigest})

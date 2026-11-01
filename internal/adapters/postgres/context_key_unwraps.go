@@ -89,6 +89,13 @@ func (s *ContextKeyUnwraps) Resolve(ctx context.Context, peer authorization.KeyP
 		if !bytes.Equal(digest[:], exec.ExpectationDigest) {
 			return authapp.ErrKeyDenied
 		}
+		if e.Snapshot != nil && len(exec.SnapshotCoverage) == 0 {
+			return authapp.ErrKeyDenied
+		}
+		e, err = storedSnapshotProjection(e, exec.SnapshotCoverage, exec.SnapshotCoverageDigest, exec.SnapshotExpectationDigest)
+		if err != nil {
+			return authapp.ErrKeyDenied
+		}
 		known := false
 		for _, role := range contextKeyRoles {
 			binding, err := evidence.ArtifactKeyBinding(e.Binding(), role)
@@ -139,7 +146,7 @@ func ContextKeyUnwrapGrantSQL(role string) []string {
 		"GRANT SELECT ON goose_db_version TO " + r,
 		"GRANT SELECT, UPDATE (installation_id) ON fleet_current_trust TO " + r,
 		"GRANT SELECT (capture_id, root_id, attempt_id, expectation_digest, phase), UPDATE (capture_id) ON context_execution TO " + r,
-		"GRANT SELECT (id, root_id, expectation_json) ON context_capture TO " + r,
+		"GRANT SELECT (id, root_id, expectation_json, snapshot_coverage, snapshot_coverage_digest, snapshot_expectation_digest) ON context_capture TO " + r,
 		"GRANT SELECT (capture_id) ON context_catalog TO " + r,
 		"GRANT SELECT, INSERT (attempt_id, root_id, last_certificate_sha256, unwraps), UPDATE (unwraps, last_certificate_sha256) ON context_key_unwrap TO " + r,
 	}

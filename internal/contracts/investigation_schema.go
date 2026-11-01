@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"strings"
 	"time"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
@@ -23,6 +24,13 @@ const InvestigationInputLimit = 32 << 10
 // MCP carries the JSON both as structured content and compatibility text. This
 // bound leaves room for both copies inside the 64 KiB transport response limit.
 const InvestigationOutputLimit = 24 << 10
+
+// Bounded disclosures for16 selected source snapshots with64 retention refs each.
+const InvestigationRecordingSavePreviewOutputLimit = 128 << 10
+
+// The sole browser settings budget; audit independently bounds its minimized
+// output byte count. Wire contracts do not import domain behavior.
+const InvestigationBrowserSettingsOutputLimit = 160 << 10
 
 type InvestigationTool struct {
 	Name         string          `json:"name"`
@@ -56,7 +64,7 @@ func (investigationOfflineLoader) Load(string) (any, error) { return nil, ErrInv
 
 // InvestigationToolNames lists every embedded operation contract.
 func InvestigationToolNames() []string {
-	return []string{"list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant"}
+	return []string{"cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant"}
 }
 
 func NewInvestigationContracts() (*InvestigationContracts, error) {
@@ -124,6 +132,17 @@ func investigationJSON(b []byte, limit int) (any, error) {
 }
 
 func (v *InvestigationContracts) validate(name string, b []byte, output bool) error {
+	limit := InvestigationInputLimit
+	if output {
+		limit = InvestigationOutputLimit
+		if name == "preview_recording_save" {
+			limit = InvestigationRecordingSavePreviewOutputLimit
+		}
+	}
+	return v.validateBound(name, b, output, limit)
+}
+
+func (v *InvestigationContracts) validateBound(name string, b []byte, output bool, limit int) error {
 	if v == nil {
 		return ErrInvestigationWire
 	}
@@ -131,9 +150,9 @@ func (v *InvestigationContracts) validate(name string, b []byte, output bool) er
 	if !ok {
 		return ErrInvestigationWire
 	}
-	limit, schema := InvestigationInputLimit, s.input
+	schema := s.input
 	if output {
-		limit, schema = InvestigationOutputLimit, s.output
+		schema = s.output
 	}
 	out, err := investigationJSON(b, limit)
 	if err != nil || schema.Validate(out) != nil {
@@ -144,6 +163,15 @@ func (v *InvestigationContracts) validate(name string, b []byte, output bool) er
 
 func (v *InvestigationContracts) ValidateInput(name string, b []byte) error {
 	return v.validate(name, b, false)
+}
+
+// ValidateBrowserOutput uses the identical canonical schema. Only this fixed
+// server-owned operation has a larger browser body; MCP uses ValidateOutput.
+func (v *InvestigationContracts) ValidateBrowserOutput(name string, b []byte) error {
+	if name == "get_capture_settings" {
+		return v.validateBound(name, b, true, InvestigationBrowserSettingsOutputLimit)
+	}
+	return v.ValidateOutput(name, b)
 }
 func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 	if err := v.validate(name, b, true); err != nil {
@@ -191,4 +219,32 @@ func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 		return ErrInvestigationWire
 	}
 	return nil
+}
+
+// OutputViolation names the first leaf output-schema violation by JSON
+// location and keyword only, never values, for failure reports.
+func (v *InvestigationContracts) OutputViolation(name string, b []byte) string {
+	if v == nil {
+		return "unavailable"
+	}
+	s, ok := v.tools[name]
+	if !ok {
+		return "unknown-tool"
+	}
+	limit := InvestigationOutputLimit
+	if name == "preview_recording_save" {
+		limit = InvestigationRecordingSavePreviewOutputLimit
+	}
+	out, err := investigationJSON(b, limit)
+	if err != nil {
+		return "decode"
+	}
+	verr, ok := s.output.Validate(out).(*jsonschema.ValidationError)
+	if !ok {
+		return "none"
+	}
+	for len(verr.Causes) > 0 {
+		verr = verr.Causes[0]
+	}
+	return "/" + strings.Join(verr.InstanceLocation, "/") + ":" + strings.Join(verr.ErrorKind.KeywordPath(), "/")
 }

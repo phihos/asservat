@@ -184,10 +184,20 @@
                     "format": "uri",
                     "maxLength": 2048
                   },
+                  "repeated_from_capture_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
                   "operation": {
                     "enum": [
                       "collect",
                       "recordingSave"
+                    ]
+                  },
+                  "history_state": {
+                    "enum": [
+                      "available",
+                      "unavailable"
                     ]
                   }
                 },

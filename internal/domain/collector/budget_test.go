@@ -9,7 +9,7 @@ import (
 var t0 = time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
 
 func defaults() Ceilings {
-	return Ceilings{DefaultNodeRingBytes, DefaultNodeFrozen, DefaultNodeUploadRate, DefaultNodeBurst}
+	return Ceilings{SourceLimits{}, DefaultNodeRingBytes, DefaultNodeFrozen, DefaultNodeUploadRate, DefaultNodeBurst}
 }
 
 func TestCeilingsValidAndIntersect(t *testing.T) {
@@ -22,7 +22,7 @@ func TestCeilingsValidAndIntersect(t *testing.T) {
 		}
 	}
 	got := defaults().Intersect(PolicyLimits{RingBytes: 64 << 20, FrozenBytes: 1 << 40, UploadBurstBytes: 1 << 20})
-	if got != (Ceilings{64 << 20, DefaultNodeFrozen, DefaultNodeUploadRate, 1 << 20}) {
+	if got != (Ceilings{SourceLimits{}, 64 << 20, DefaultNodeFrozen, DefaultNodeUploadRate, 1 << 20}) {
 		t.Fatalf("intersection %+v", got)
 	}
 	if defaults().Intersect(PolicyLimits{}) != defaults() {
@@ -104,5 +104,50 @@ func TestUploadTokenBucket(t *testing.T) {
 	big.TakeUpload(t0, MaxNodeUploadBurst)
 	if got := big.Usage(t0.Add(1000 * time.Hour)).UploadAvailable; got != MaxNodeUploadBurst {
 		t.Fatalf("overflow guard: %d", got)
+	}
+}
+
+func TestOngoingSourceCeilingsAreIndependentAndOnlyLowered(t *testing.T) {
+	c := defaults()
+	if c.SourceLimits.Enabled() {
+		t.Fatal("legacy finite budgets must not enable ongoing sources")
+	}
+	c.SourceLimits = SourceLimits{DefaultActiveSources, DefaultInputRate, DefaultInputBurst}
+	if !c.Valid() || !c.SourceLimits.Enabled() {
+		t.Fatal("development ceilings rejected")
+	}
+	p := PolicyLimits{SourceLimits: SourceLimits{4, 2 << 20, 1 << 20}}
+	got := c.Intersect(p)
+	if got.SourceLimits != p.SourceLimits || got.RingBytes != c.RingBytes || got.UploadBytesPerSecond != c.UploadBytesPerSecond {
+		t.Fatal("ongoing limits changed finite quantities", got)
+	}
+	for i := 0; i < 20; i++ {
+		got = got.Intersect(p)
+	}
+	if got.SourceLimits != p.SourceLimits {
+		t.Fatal("replicas multiplied limits")
+	}
+	if c.Intersect(PolicyLimits{SourceLimits: SourceLimits{32, 32 << 20, 32 << 20}}) != c {
+		t.Fatal("policy raised collector ceilings")
+	}
+	if (Ceilings{}).Intersect(p).SourceLimits.Enabled() {
+		t.Fatal("policy enabled zero collector ceilings")
+	}
+	for _, s := range []SourceLimits{{-1, 1, 1}, {MaxActiveSources + 1, 1, 1}, {1, -1, 1}, {1, MaxInputRate + 1, 1}, {1, 1, MaxInputBurst + 1}} {
+		if s.Valid() {
+			t.Fatal("invalid source limits", s)
+		}
+	}
+}
+
+func TestPartialOngoingNodeCeilingsRefuseWhileOptionalPolicyCanLowerOneField(t *testing.T) {
+	for _, s := range []SourceLimits{{MaxActiveSources: 1}, {InputBytesPerSecond: 1, InputBurstBytes: 1}} {
+		if (Ceilings{SourceLimits: s}).Valid() {
+			t.Fatal("partial node caps accepted", s)
+		}
+	}
+	c := Ceilings{SourceLimits: SourceLimits{16, 16 << 20, 16 << 20}}
+	if !c.Intersect(PolicyLimits{SourceLimits: SourceLimits{MaxActiveSources: 2}}).Valid() {
+		t.Fatal("optional count-only policy invalidated complete node ceilings")
 	}
 }

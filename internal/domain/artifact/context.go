@@ -31,10 +31,12 @@ type RetentionRule struct {
 // historical value is pod status, whose serialized form and digest are
 // unchanged. Lifecycle is set only for a save from an ongoing source.
 type ContextExpectation struct {
-	ExecutionClass                                                    ContextExecutionClass `json:",omitempty"`
-	NativeType                                                        string                `json:",omitempty"`
-	Lifecycle                                                         *OngoingLifecycle     `json:",omitempty"`
-	Recording                                                         *Recording            `json:",omitempty"`
+	SourceSnapshotManifest                                            *SourceSnapshotManifest `json:",omitempty"`
+	Snapshot                                                          *SourceSnapshotRequest  `json:",omitempty"`
+	ExecutionClass                                                    ContextExecutionClass   `json:",omitempty"`
+	NativeType                                                        string                  `json:",omitempty"`
+	Lifecycle                                                         *OngoingLifecycle       `json:",omitempty"`
+	Recording                                                         *Recording              `json:",omitempty"`
 	Registration                                                      Registration
 	CaseID, OccurrenceID                                              string
 	NodeUID, NodeBootID, PodUID, Namespace, NamespaceUID, WorkloadUID string
@@ -71,7 +73,8 @@ func (e ContextExpectation) Validate() error {
 	// recording on the target's node collector, delivered through the connector.
 	podStatus := e.NativeType == PodStatusArtifact && e.ActionID == "pod-status" && e.DataClass == "metadata" && r.NativeLimit == MaxContextBytes && e.Recording == nil
 	recording := e.NativeType == PCAPNGArtifact && recorderActionID(e.ActionID) && e.DataClass == "metadata" && r.NativeLimit == RecordingNativeLimit && e.Recording.Valid() && e.Lifecycle == nil
-	if e.ExecutionClass == ContextAPIExecution && !podStatus && !recording || e.Recording != nil && !recording {
+	snapshot := e.NativeType == PCAPNGArtifact && recorderActionID(e.ActionID) && e.DataClass == "metadata" && e.Recording == nil && e.Snapshot != nil && e.Snapshot.Valid() && e.SourceSnapshotManifest.Valid() && e.Snapshot.MaxBytes == r.NativeLimit && !e.Snapshot.ProcessingUntil.After(r.WriteUntil) && e.Snapshot.T0.Equal(e.TriggeredAt) && SourceSnapshotAnchor(*e.Snapshot).Equal(r.AnchorAt) && e.Lifecycle != nil && e.Lifecycle.SourceSessionID == e.Snapshot.SourceID && e.Lifecycle.SnapshotID == e.Snapshot.SnapshotID && e.Lifecycle.SourceStartedAt.Equal(e.Snapshot.SourceStartedAt) && e.Lifecycle.RequestedBefore == e.Snapshot.Before && e.Lifecycle.After == e.Snapshot.After
+	if e.ExecutionClass == ContextAPIExecution && !podStatus && !recording && !snapshot || e.Recording != nil && !recording || e.Snapshot != nil && !snapshot || e.SourceSnapshotManifest != nil && !snapshot {
 		return ErrInvalid
 	}
 	// Pod status is an onTrigger snapshot; only recorder types save from an

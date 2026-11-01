@@ -61,7 +61,7 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 	// reply. Production HTTP, current-identity, CSRF and canonical projection are
 	// exercised without claiming SQL/admission/execution qualification.
 	captureService := &consoleSyntheticCaptures{state: "ready"}
-	operations, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: func() string { return consoleCaptureID(500) }}, captureService, captureService)
+	operations, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: origin, CollectionEnabled: true, Now: time.Now, NewID: func() string { return consoleCaptureID(500) }}, captureService, captureService, &consoleSyntheticHistory{captures: captureService})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +82,13 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 	if composed, err = presentation.NewInvestigationShareOperations(composed, shareOperations); err != nil {
 		t.Fatal(err)
 	}
+	grantOperations, managerGrants := newConsoleManagerGrants(t, origin)
+	if composed, err = presentation.NewInvestigationGrantOperations(composed, grantOperations); err != nil {
+		t.Fatal(err)
+	}
+	if composed, err = presentation.NewInvestigationPolicyOperations(composed, newConsolePolicyStatus(t, origin, managerGrants)); err != nil {
+		t.Fatal(err)
+	}
 	investigations, err := browser.NewInvestigationHandler(sessionHandler, composed, 4)
 	if err != nil {
 		t.Fatal(err)
@@ -93,6 +100,10 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 		}
 		if r.URL.Path == "/test/evidence" || r.URL.Path == "/test/evidence-stats" {
 			caseService.control(w, r, origin)
+			return
+		}
+		if r.URL.Path == "/test/policy-grant-stats" {
+			managerGrants.stats(w, r)
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/test/") {
@@ -205,7 +216,7 @@ func (s *consoleSyntheticSessions) Resolve(_ context.Context, cookie string, ref
 		s.state = "ready"
 	}
 	now := time.Now()
-	return app.SessionView{Identity: identity.Identity{Principal: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic-developer", ClientID: "console", Kind: identity.Human}, Policy: identity.Revision{UID: "synthetic-policy", Generation: 1, Digest: [32]byte{1}}, Scopes: []string{"evidence:read", "evidence:capture", "evidence:share"}, VerifiedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), s.expiresAt)}, CSRF: strings.Repeat("C", 43), ExpiresAt: s.expiresAt}, nil
+	return app.SessionView{Identity: identity.Identity{Principal: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic-developer", ClientID: "console", Kind: identity.Human}, Policy: identity.Revision{UID: "synthetic-policy", Generation: 1, Digest: [32]byte{1}}, Scopes: []string{"evidence:read", "evidence:capture", "evidence:share"}, Groups: []string{"maintainers"}, VerifiedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), s.expiresAt)}, CSRF: strings.Repeat("C", 43), ExpiresAt: s.expiresAt}, nil
 }
 
 func (s *consoleSyntheticSessions) CSRF(_ context.Context, cookie string) (string, error) {
@@ -333,6 +344,7 @@ type consoleSyntheticCaptures struct {
 	requests         []string
 	requestedSeconds int64
 	previews         int
+	historyMode      string
 }
 
 func (s *consoleSyntheticCaptures) CheckDiagnostic(ctx context.Context, current app.CurrentIdentity, _ targets.WorkloadRequest) (time.Time, error) {
@@ -467,6 +479,11 @@ func (s *consoleSyntheticCaptures) Get(ctx context.Context, current app.CurrentI
 		return capture.ContextProgress{}, capture.ErrUnavailable
 	}
 	p := capture.ContextProgress{CaptureID: id, Revision: 1, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "DispatchUnconfirmed", RetryAfterSeconds: 1, ValidUntil: identity.Earlier(started.Add(5*time.Second), i.ValidUntil)}
+	if s.historyMode == "history-ready" || s.historyMode == "history-large" {
+		p.HistoryState = "available"
+	} else if s.historyMode != "" {
+		p.HistoryState = "unavailable"
+	}
 	if s.state == "finalizing" {
 		p.Revision, p.Phase, p.ActionPhase, p.ReasonCode = 2, "Finalizing", "Finalizing", "VerificationPending"
 	}
@@ -504,6 +521,8 @@ func (s *consoleSyntheticCaptures) control(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	switch input.State {
+	case "history-ready", "history-large", "history-unavailable", "history-expired":
+		s.historyMode = input.State
 	case "ready", "unavailable", "lost-reply", "lost-reply-always", "finalizing", "evidence-ready", "reject-request", "lost-closure", "resolve-unavailable":
 		s.state = input.State
 	default:

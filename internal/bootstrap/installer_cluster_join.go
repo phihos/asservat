@@ -38,7 +38,7 @@ func RunInstallerClusterJoin(ctx context.Context, args []string, out io.Writer) 
 	selected := flags.String("context", "", "Kubernetes context override")
 	namespace := flags.String("namespace", "", "the hub's runtime namespace")
 	joinFile := flags.String("join", "", "the region's regional-join.json")
-	standby := flags.Int("standby", 1, "standby connections reserved for this cluster")
+	standby := flags.Int("standby", 2, "standby connections reserved for this cluster (ADR-271: one can serve while the other is in use or reopening)")
 	captures := flags.Int("captures", 1, "concurrent captures reserved for this cluster")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || *namespace == "" || *joinFile == "" || *standby < 1 || *standby > 16 || *captures < 1 || *captures > 16 {
 		return mounts.ErrUnavailable

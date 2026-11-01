@@ -107,7 +107,11 @@ type ownerNativeProofs struct {
 }
 
 func (p *ownerNativeProofs) ReadDownloadPeerProof(ctx context.Context, session string, peer value.KeyPeer) (value.KeyWorkerProof, error) {
-	var zero value.KeyWorkerProof
+	result, err := p.ReadNativeResponsePeerProof(ctx, session, peer)
+	return result.Proof, err
+}
+func (p *ownerNativeProofs) ReadNativeResponsePeerProof(ctx context.Context, session string, peer value.KeyPeer) (evidence.NativeResponsePeerProof, error) {
+	var zero evidence.NativeResponsePeerProof
 	if p == nil || ctx == nil || p.token == nil {
 		return zero, artifact.ErrInvalid
 	}
@@ -128,8 +132,8 @@ func (p *ownerNativeProofs) ReadDownloadPeerProof(ctx context.Context, session s
 	}
 	bounded, end := context.WithDeadline(call, observed.FreshUntil)
 	defer end()
-	out, err := proof.ReadDownloadPeerProof(bounded, session, peer)
-	if err != nil || bounded.Err() != nil || !observed.Valid(time.Now()) || out.Binding != observed.Worker.Binding {
+	out, err := proof.ReadNativeResponsePeerProof(bounded, session, peer)
+	if err != nil || bounded.Err() != nil || !observed.Valid(time.Now()) || out.Proof.Binding != observed.Worker.Binding {
 		return zero, artifact.ErrDownloadUnavailable
 	}
 	return out, nil

@@ -152,7 +152,11 @@ func (q *Queries) ReadCaptureOperation(ctx context.Context, arg ReadCaptureOpera
 }
 
 const readCaptureOperationIntent = `-- name: ReadCaptureOperationIntent :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin FROM capture_operation_intents WHERE root_id=$1 AND id=$2
+SELECT v.id, v.root_id, v.request_key, v.submission_digest, v.scope_digest, v.scope_json, v.expectation_json, v.pod_pin_json, v.attempt_id, v.permission_epoch, v.permission_sequence, v.identity_policy_uid, v.identity_policy_generation, v.identity_policy_digest, v.created_at, v.deadline, v.state, v.intent_acknowledged_at, v.intent_digest, v.intent_object_key, v.intent_object_version, v.intent_object_etag, v.intent_object_bytes, v.intent_object_sha256, v.progress_revision, v.deadline_observed_at, v.preview_id, v.intent_operation_id, v.share_instruction, v.history_cluster_id, v.history_namespace_uid, v.history_workload_uid, v.history_origin, v.history_parameters_required, v.repeated_from_capture_id, v.repeated_from_expires_at, v.reason_ref,NULL::bytea AS snapshot_coverage,NULL::bytea AS snapshot_coverage_digest,NULL::bytea AS snapshot_expectation_digest,NULL::bytea AS snapshot_cancel_key,NULL::bytea AS snapshot_cancel_actor,NULL::timestamptz AS snapshot_cancel_requested_at,NULL::timestamptz AS snapshot_cancel_joined_at,NULL::bytea AS snapshot_cancel_proof,NULL::bytea AS snapshot_cancel_proof_digest,g.group_id,g.group_ordinal FROM capture_operation_intents v LEFT JOIN LATERAL (SELECT  CASE WHEN convert_from(v.scope_json,'UTF8')::jsonb->>'schemaVersion'='recording-save/v1' AND jsonb_array_length(convert_from(v.scope_json,'UTF8')::jsonb->'sources')>1
+ THEN (convert_from(v.scope_json,'UTF8')::jsonb->>'captureID')::uuid ELSE NULL::uuid END AS group_id,
+ CASE WHEN convert_from(v.scope_json,'UTF8')::jsonb->>'schemaVersion'='recording-save/v1' AND jsonb_array_length(convert_from(v.scope_json,'UTF8')::jsonb->'sources')>1
+ THEN (SELECT (m.ordinality-1)::smallint FROM jsonb_array_elements(convert_from(v.scope_json,'UTF8')::jsonb->'sources') WITH ORDINALITY m(value,ordinality)
+ WHERE m.value->>'sourceSessionID'=convert_from(v.expectation_json,'UTF8')::jsonb#>>'{Snapshot,SourceID}') ELSE (-1)::smallint END AS group_ordinal) g ON true WHERE v.root_id=$1 AND v.id=$2
 `
 
 type ReadCaptureOperationIntentParams struct {
@@ -160,9 +164,61 @@ type ReadCaptureOperationIntentParams struct {
 	ID     pgtype.UUID
 }
 
-func (q *Queries) ReadCaptureOperationIntent(ctx context.Context, arg ReadCaptureOperationIntentParams) (CaptureOperationIntent, error) {
+type ReadCaptureOperationIntentRow struct {
+	ID                        pgtype.UUID
+	RootID                    pgtype.UUID
+	RequestKey                []byte
+	SubmissionDigest          []byte
+	ScopeDigest               []byte
+	ScopeJson                 []byte
+	ExpectationJson           []byte
+	PodPinJson                []byte
+	AttemptID                 pgtype.UUID
+	PermissionEpoch           pgtype.UUID
+	PermissionSequence        int64
+	IdentityPolicyUid         string
+	IdentityPolicyGeneration  int64
+	IdentityPolicyDigest      []byte
+	CreatedAt                 pgtype.Timestamptz
+	Deadline                  pgtype.Timestamptz
+	State                     string
+	IntentAcknowledgedAt      pgtype.Timestamptz
+	IntentDigest              []byte
+	IntentObjectKey           pgtype.Text
+	IntentObjectVersion       pgtype.Text
+	IntentObjectEtag          pgtype.Text
+	IntentObjectBytes         pgtype.Int8
+	IntentObjectSha256        []byte
+	ProgressRevision          int64
+	DeadlineObservedAt        pgtype.Timestamptz
+	PreviewID                 pgtype.UUID
+	IntentOperationID         pgtype.UUID
+	ShareInstruction          []byte
+	HistoryClusterID          pgtype.UUID
+	HistoryNamespaceUid       pgtype.Text
+	HistoryWorkloadUid        pgtype.Text
+	HistoryOrigin             pgtype.Text
+	HistoryParametersRequired bool
+	RepeatedFromCaptureID     pgtype.UUID
+	RepeatedFromExpiresAt     pgtype.Timestamptz
+	ReasonRef                 []byte
+	SnapshotCoverage          []byte
+	SnapshotCoverageDigest    []byte
+	SnapshotExpectationDigest []byte
+	SnapshotCancelKey         []byte
+	SnapshotCancelActor       []byte
+	SnapshotCancelRequestedAt pgtype.Timestamptz
+	SnapshotCancelJoinedAt    pgtype.Timestamptz
+	SnapshotCancelProof       []byte
+	SnapshotCancelProofDigest []byte
+	GroupID                   pgtype.UUID
+	GroupOrdinal              int16
+}
+
+// Original intent view deliberately excludes later completion observations.
+func (q *Queries) ReadCaptureOperationIntent(ctx context.Context, arg ReadCaptureOperationIntentParams) (ReadCaptureOperationIntentRow, error) {
 	row := q.db.QueryRow(ctx, readCaptureOperationIntent, arg.RootID, arg.ID)
-	var i CaptureOperationIntent
+	var i ReadCaptureOperationIntentRow
 	err := row.Scan(
 		&i.ID,
 		&i.RootID,
@@ -197,8 +253,39 @@ func (q *Queries) ReadCaptureOperationIntent(ctx context.Context, arg ReadCaptur
 		&i.HistoryNamespaceUid,
 		&i.HistoryWorkloadUid,
 		&i.HistoryOrigin,
+		&i.HistoryParametersRequired,
+		&i.RepeatedFromCaptureID,
+		&i.RepeatedFromExpiresAt,
+		&i.ReasonRef,
+		&i.SnapshotCoverage,
+		&i.SnapshotCoverageDigest,
+		&i.SnapshotExpectationDigest,
+		&i.SnapshotCancelKey,
+		&i.SnapshotCancelActor,
+		&i.SnapshotCancelRequestedAt,
+		&i.SnapshotCancelJoinedAt,
+		&i.SnapshotCancelProof,
+		&i.SnapshotCancelProofDigest,
+		&i.GroupID,
+		&i.GroupOrdinal,
 	)
 	return i, err
+}
+
+const readCaptureReason = `-- name: ReadCaptureReason :one
+SELECT read_capture_reason($1::uuid,$2::uuid)::jsonb
+`
+
+type ReadCaptureReasonParams struct {
+	RootID    pgtype.UUID
+	CaptureID pgtype.UUID
+}
+
+func (q *Queries) ReadCaptureReason(ctx context.Context, arg ReadCaptureReasonParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, readCaptureReason, arg.RootID, arg.CaptureID)
+	var column_1 []byte
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const reserveCaptureAudit = `-- name: ReserveCaptureAudit :exec

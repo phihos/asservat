@@ -61,7 +61,8 @@ func NewBearerRequest(ctx context.Context, resolver Resolver, token string, now 
 }
 
 // NewBearerRequestWithin is NewBearerRequest for a transport whose request may
-// be an evidence read: lifetime is at most value.EvidenceReadRequestWindow and
+// use an operation-specific interval: lifetime is at most
+// value.EvidenceReadRequestWindow and
 // only caps the request, never the resolver's own identity interval. The
 // transport must shorten every other request to its own operation window.
 func NewBearerRequestWithin(ctx context.Context, resolver Resolver, token string, now func() time.Time, lifetime time.Duration) (CurrentIdentity, value.Identity, error) {
@@ -91,7 +92,8 @@ func NewBrowserRequest(ctx context.Context, sessions BrowserSessionResolver, coo
 }
 
 // NewBrowserRequestWithin is NewBrowserRequest for an operation whose request
-// window (audit.OperationRequestWindow) may be an evidence read, matching MCP.
+// window (audit.OperationRequestWindow) may be an evidence read or grouped Save,
+// matching MCP.
 func NewBrowserRequestWithin(ctx context.Context, sessions BrowserSessionResolver, cookie string, allowRefresh bool, now func() time.Time, lifetime time.Duration) (CurrentIdentity, SessionView, error) {
 	if ctx == nil || sessions == nil || now == nil || ctx.Err() != nil || lifetime <= 0 || lifetime > value.EvidenceReadRequestWindow {
 		return nil, SessionView{}, value.ErrUnavailable

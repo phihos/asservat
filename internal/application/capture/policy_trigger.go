@@ -1,13 +1,16 @@
 package capture
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
+	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
@@ -31,16 +34,26 @@ type PolicyTriggerLedger interface {
 const occurrenceSettleAge = 2 * time.Minute
 
 // PolicyTrigger polls every active policy's workload for Pod restarts
-// (ADR-228), probe failures (ADR-230) or active alerts (ADR-231) and runs one ordinary pod-status
-// capture per admitted occurrence. It polls (no watch): each tick costs one
+// (ADR-228), probe failures (ADR-230) or active alerts (ADR-231) and runs one
+// supported snapshot or finite onTrigger recorder capture per admitted occurrence. It polls (no watch): each tick costs one
 // regional Pod LIST per policy, plus one Event LIST for a probe policy or
 // one Alertmanager GET for an alert policy.
 // The executor is the policy principal; every check a human capture passes
 // still runs, with team authority replacing the human's personal rights.
+// PolicySourceSnapshotCaptures is the same admitted capture service with a
+// distinct existing-window preview. Nil keeps source-save execution unavailable.
+type PolicySourceSnapshotCaptures interface {
+	PreviewPolicySnapshot(context.Context, identities.CurrentIdentity, PolicySnapshotSelection) (ContextPreviewResult, error)
+	Request(context.Context, identities.CurrentIdentity, string, string) (value.Accepted, error)
+}
+
 type PolicyTrigger struct {
+	// OngoingSources uses this same poll; nil keeps source execution unavailable.
+	OngoingSources         *PolicySourceRuntime
 	RootID, InstallationID string
 	RecipeName             string
 	RecipeDigest           artifact.Digest
+	CompileRecorder        PolicyRecorderCompiler
 	Ledger                 PolicyTriggerLedger
 	Documents              PolicyDocuments
 	Sources                PolicySourceWriter
@@ -51,7 +64,8 @@ type PolicyTrigger struct {
 	Now                    func() time.Time
 	// Report receives a fixed outcome label and producer-owned step timings;
 	// diagnostics, never authority.
-	Report func(event, timing string)
+	Report          func(event, timing string)
+	SourceSnapshots PolicySourceSnapshotCaptures
 }
 
 func (t PolicyTrigger) configured() bool {
@@ -81,17 +95,39 @@ func (t PolicyTrigger) Run(ctx context.Context) error {
 	}
 	r := &triggerRunner{busy: map[string]bool{}}
 	defer r.wg.Wait()
-	ticker := time.NewTicker(value.TriggerPollInterval)
-	defer ticker.Stop()
+	// A failed policy tick is retried after triggerRetryInterval instead of a
+	// full poll, at most triggerRetries times in a row: an ongoing source's 30 s leaf (spec maximum) survives
+	// only one missed 15 s renewal (native runs to 41218189975 closed sources
+	// after two transient misses). A persistent failure returns to the
+	// normal interval after those retries.
+	retries := 0
 	for {
-		t.cycle(ctx, r)
+		started := time.Now()
+		wait := value.TriggerPollInterval
+		if failed := t.cycle(ctx, r); failed && retries < triggerRetries {
+			wait, retries = triggerRetryInterval, retries+1
+		} else if !failed {
+			retries = 0
+		}
+		// Measured from the cycle's start, like the former ticker.
+		timer := time.NewTimer(max(0, wait-time.Since(started)))
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return nil
-		case <-ticker.C:
+		case <-timer.C:
 		}
 	}
 }
+
+// triggerRetryInterval is the early next cycle after a failed policy tick;
+// triggerRetries consecutive early cycles keep the next attempts (T+15, +20,
+// +25) inside a 30 s leaf (native run 41226338957 closed a source after one
+// early retry also failed).
+const (
+	triggerRetryInterval = 5 * time.Second
+	triggerRetries       = 2
+)
 
 // triggerRunner bounds capture goroutines to one per policy and joins them.
 type triggerRunner struct {
@@ -129,9 +165,10 @@ func (t PolicyTrigger) Cycle(ctx context.Context) {
 	t.cycle(ctx, nil)
 }
 
-func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) {
+// cycle reports whether any policy tick failed.
+func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) (failed bool) {
 	if !t.configured() || ctx.Err() != nil {
-		return
+		return false
 	}
 	if err := t.Ledger.SettleOccurrences(ctx, occurrenceSettleAge); err != nil {
 		t.report("settle/" + failureClass(err))
@@ -139,23 +176,34 @@ func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) {
 	if err := t.Audit.PublishPolicyAcceptances(ctx); err != nil {
 		t.report("audit/" + failureClass(err))
 	}
+	if t.OngoingSources != nil {
+		if err := t.OngoingSources.Sweep(ctx); err != nil {
+			t.report("source-sweep/" + failureClass(err))
+		}
+	}
 	policies, err := t.Ledger.ActivePolicies(ctx)
 	if err != nil {
 		t.report("list/" + failureClass(err))
-		return
+		return true
 	}
 	for _, p := range policies {
 		if ctx.Err() != nil {
-			return
+			return failed
 		}
-		if r != nil && r.running(p.PolicyUID) {
+		if r != nil && r.running(p.PolicyUID) && t.OngoingSources == nil {
 			t.report("tick/busy")
 			continue
 		}
 		if err := t.tick(ctx, p, r); err != nil {
-			t.report("tick/" + failureClass(err))
+			failed = true
+			stage := sourceStageOf(err)
+			if stage != "" {
+				stage += "/"
+			}
+			t.report("tick/" + stage + failureClass(err))
 		}
 	}
+	return failed
 }
 
 // Tick observes the policy source and its workload once and runs the
@@ -170,36 +218,75 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	defer cancel()
 	source, spec, err := t.Documents.ReadPolicy(tick, p.Name, p.PolicyUID)
 	if err != nil {
-		return err
+		return staged("read-policy", err)
 	}
 	if err = t.Sources.ObservePolicy(tick, source); err != nil {
-		return err
+		return staged("observe-policy", err)
 	}
 	if source.Suspended || source.Deleted {
+		if t.OngoingSources != nil {
+			return t.OngoingSources.StopPolicy(tick, p.PolicyUID)
+		}
 		return nil
 	}
-	compiled, err := CompileRestartPolicy(spec, t.RecipeName, t.RecipeDigest)
+	var compiled value.RestartPolicy
+	if t.CompileRecorder != nil {
+		compiled, err = CompilePolicyWithRecorders(spec, t.RecipeName, t.RecipeDigest, t.CompileRecorder)
+	} else {
+		compiled, err = CompileRestartPolicy(spec, t.RecipeName, t.RecipeDigest)
+	}
 	if err != nil {
 		return err
 	}
+	ongoing := compiled.Recorder != nil && compiled.Recorder.Action.ExecutionMode == "ongoing"
+	// Finite busy policies retain incident coalescing. Ongoing sources still
+	// renew before the busy/cooldown gate below.
+	if !ongoing && r != nil && r.running(p.PolicyUID) {
+		return nil
+	}
+	// A finite recorder proceeds through the real preview/admission and typed
+	// source/observation start. No ordinary/manual raw path is enabled here.
 	accepted, err := t.Accepted.AcceptedPolicyAuthority(tick, p.PolicyUID)
 	if err != nil {
-		return err
+		return staged("accepted", err)
 	}
 	a := accepted.Authority
+	if compiled.Recorder != nil && RecorderPolicyScopeDigest(source.Revision.UID, accepted.IntentVersion, source.CollectionDigest, compiled, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits) != a.ScopeDigest {
+		return value.ErrChanged
+	}
 	if compiled.ClusterID != a.ClusterID {
 		return value.ErrChanged
 	}
 	observation, err := t.Observer.ObserveWorkloadRestarts(tick, compiled.Request())
 	if err != nil {
-		return err
+		return staged("workload", err)
 	}
 	if !observation.Answers(compiled.Request()) {
-		return value.ErrUnavailable
+		return staged("workload-answer", value.ErrUnavailable)
 	}
 	if observation.Namespace.UID != a.NamespaceUID || observation.Workload.UID != a.WorkloadUID {
 		// A replaced namespace or workload is outside the accepted scope.
 		return value.ErrChanged
+	}
+	if ongoing {
+		if t.OngoingSources == nil {
+			return value.ErrRecorderUnavailable
+		}
+		if err := t.OngoingSources.Maintain(tick, compiled, a, observation); err != nil {
+			if sourceStageOf(err) == "" {
+				err = staged("maintain", err)
+			}
+			return err
+		}
+		// Arming remains independent of occurrence admission. Only an explicitly
+		// composed snapshot service can spend an incident; it cannot rerun
+		// the policy's finite recipe or construct a replacement source.
+		if t.SourceSnapshots == nil {
+			return value.ErrRecorderUnavailable
+		}
+		if r != nil && r.running(p.PolicyUID) {
+			return nil
+		}
 	}
 	occurrences, err := t.Ledger.Tick(tick, value.PolicyTick{Policy: compiled, Authority: a, Observation: observation})
 	if err != nil {
@@ -207,6 +294,16 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	}
 	if len(occurrences) == 0 {
 		return nil
+	}
+	var authored struct {
+		Target json.RawMessage `json:"target"`
+	}
+	if json.Unmarshal(spec, &authored) != nil {
+		return value.ErrInvalid
+	}
+	compiled.HistoryAuthored = &value.HistoryAuthored{Target: targets.WorkloadRequest{ClusterID: compiled.ClusterID, Namespace: compiled.Namespace, Kind: compiled.WorkloadKind, Name: compiled.WorkloadName}, TargetJSON: bytes.Clone(authored.Target), Selector: value.HistorySelector{ClusterID: a.ClusterID, NamespaceUID: a.NamespaceUID, WorkloadKind: compiled.WorkloadKind, WorkloadUID: a.WorkloadUID}, Selection: "triggeringPod", PolicyOrigins: []value.HistoryPolicyOrigin{{UID: source.Revision.UID, Generation: accepted.SourceRevision.Generation, IntentVersion: accepted.IntentVersion, CollectionDigest: source.CollectionDigest}}}
+	if !compiled.HistoryAuthored.Valid() {
+		return value.ErrChanged
 	}
 	if r == nil {
 		t.run(ctx, a, compiled, observation, occurrences)
@@ -240,7 +337,8 @@ func (t PolicyTrigger) run(ctx context.Context, a authorization.AcceptedPolicyAu
 	}
 }
 
-// capture runs the ordinary preview and request of the triggering Pod under
+// capture runs the appropriate snapshot/recorder preview and the ordinary
+// request of the triggering Pod under
 // the policy executor. The occurrence ID is the idempotency key: the request
 // is made once and never repeated after an ambiguous start (ADR-223).
 func (t PolicyTrigger) capture(ctx context.Context, a authorization.AcceptedPolicyAuthority, p value.RestartPolicy, o targets.RestartObservation, pod string, occurrence value.PolicyOccurrence) (captureID, refusal string) {
@@ -250,7 +348,14 @@ func (t PolicyTrigger) capture(ctx context.Context, a authorization.AcceptedPoli
 	call, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	current := newPolicyIdentity(call, t.Accepted, a, t.Now().Add(45*time.Second), t.Now)
-	intent := value.ContextIntent{Diagnostic: value.ContextDiagnosticName, Target: targets.WorkloadRequest{ClusterID: o.ClusterID, Namespace: o.Namespace.Name, Kind: "Pod", Name: pod}, RequestedSeconds: p.RetentionSeconds}
+	if p.Recorder != nil && p.Recorder.Action.ExecutionMode == "ongoing" {
+		return t.captureSourceSnapshot(call, current, a, p, o, pod, occurrence)
+	}
+	intent := value.ContextIntent{HistoryAuthored: p.HistoryAuthored.Clone(), Diagnostic: value.ContextDiagnosticName, Target: targets.WorkloadRequest{ClusterID: o.ClusterID, Namespace: o.Namespace.Name, Kind: "Pod", Name: pod}, RequestedSeconds: p.RetentionSeconds}
+	if p.Recorder != nil {
+		intent.Diagnostic = ""
+		intent.Composition = p.Recorder.Composition.Clone()
+	}
 	// A review that admitted nothing (a lost regional exchange, a replaced
 	// standby) is reviewed again, at most three times, two seconds apart, as a
 	// human retries a preview. Every review repeats all checks; the occurrence
@@ -278,18 +383,30 @@ func (t PolicyTrigger) capture(ctx context.Context, a authorization.AcceptedPoli
 // admitted capture, continuing a start refused before any effect.
 func (t PolicyTrigger) review(call context.Context, current policyIdentity, a authorization.AcceptedPolicyAuthority, intent value.ContextIntent, occurrence value.PolicyOccurrence) (string, error) {
 	mark := time.Now()
-	preview, err := t.Capture.Preview(call, current, intent)
+	var preview value.ContextPreview
+	var err error
+	if intent.Composition != nil {
+		recorder, e := t.Capture.PreviewComposition(call, current, intent)
+		err = e
+		if err == nil && !recorder.Recordable {
+			err = value.ErrRecorderUnavailable
+		}
+		preview = recorder.Preview
+	} else {
+		snapshot, e := t.Capture.Preview(call, current, intent)
+		preview, err = snapshot.Preview, e
+	}
 	auditapp.MarkStep(call, "policy-preview", mark)
 	if err != nil {
 		return "", err
 	}
 	// The named Pod must still be the triggering Pod of the accepted workload:
 	// a replacement under the same name is never captured instead.
-	if preview.Preview.Target.PodUID != occurrence.PodUID || preview.Preview.Target.Workload.UID != a.WorkloadUID || preview.Preview.Target.Namespace.UID != a.NamespaceUID {
+	if preview.Target.PodUID != occurrence.PodUID || preview.Target.Workload.UID != a.WorkloadUID || preview.Target.Namespace.UID != a.NamespaceUID {
 		return "", targets.ErrChanged
 	}
 	mark = time.Now()
-	accepted, err := t.Capture.Request(call, current, preview.Preview.ID, occurrence.ID)
+	accepted, err := t.Capture.Request(call, current, preview.ID, occurrence.ID)
 	auditapp.MarkStep(call, "policy-request", mark)
 	if !authorization.UUID(accepted.CaptureID) {
 		return "", err
@@ -305,7 +422,7 @@ func (t PolicyTrigger) review(call context.Context, current policyIdentity, a au
 			break
 		}
 		mark = time.Now()
-		_, err = t.Capture.Continue(call, current, preview.Preview.ID, occurrence.ID)
+		_, err = t.Capture.Continue(call, current, preview.ID, occurrence.ID)
 		auditapp.MarkStep(call, "policy-continue", mark)
 		if err != nil {
 			t.reportTimed("continue/"+failureClass(err), "")
@@ -352,7 +469,7 @@ func failureClass(err error) string {
 	for _, c := range []struct {
 		name string
 		err  error
-	}{{"invalid", value.ErrInvalid}, {"denied", value.ErrDenied}, {"changed", value.ErrChanged}, {"capacity", value.ErrCapacity}, {"conflict", value.ErrConflict}, {"unavailable", value.ErrUnavailable}, {"target-limit", targets.ErrLimit}, {"target-changed", targets.ErrChanged}, {"target-unavailable", targets.ErrUnavailable}} {
+	}{{"acquisition-closed", value.ErrAcquisitionClosed}, {"preview-expired", value.ErrPreviewExpired}, {"settings-unavailable", value.ErrSettingsUnavailable}, {"history-unavailable", value.ErrHistoryUnavailable}, {"history-selection", value.ErrHistorySelectionRequired}, {"recording-selection", value.ErrRecordingSelectionRequired}, {"processing-coverage", value.ErrProcessingCoverage}, {"profile-changed", value.ErrProfileChanged}, {"target-replaced", value.ErrTargetReplaced}, {"recorder-unavailable", value.ErrRecorderUnavailable}, {"invalid", value.ErrInvalid}, {"denied", value.ErrDenied}, {"changed", value.ErrChanged}, {"capacity", value.ErrCapacity}, {"conflict", value.ErrConflict}, {"unavailable", value.ErrUnavailable}, {"target-limit", targets.ErrLimit}, {"target-changed", targets.ErrChanged}, {"target-unavailable", targets.ErrUnavailable}} {
 		if errors.Is(err, c.err) {
 			return c.name
 		}

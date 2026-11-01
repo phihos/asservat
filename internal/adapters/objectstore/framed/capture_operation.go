@@ -57,6 +57,9 @@ func sealCaptureOperation(ctx context.Context, keys evidence.KeySealer, format, 
 	if e != nil {
 		return nil, e
 	}
+	if captureReasonFormat(format) {
+		return captureReasonOuterEnvelope(captureReasonOuter{format, []byte(key.Reference), []byte(key.Ciphertext), cipher})
+	}
 	return captureEnvelope(authorityEnvelope{format, key, cipher})
 }
 func verifyCaptureOperation(ctx context.Context, keys evidence.KeyOpener, format, root, id string, record any, encoded []byte, maxPlain int) error {
@@ -66,6 +69,9 @@ func verifyCaptureOperation(ctx context.Context, keys evidence.KeyOpener, format
 	canonical := jsontext.Value(bytes.Clone(encoded))
 	if canonical.Canonicalize() != nil {
 		return artifact.ErrIntegrity
+	}
+	if captureReasonFormat(format) {
+		return verifyCaptureReasonOperation(ctx, keys, format, root, id, record, canonical, maxPlain)
 	}
 	var envelope authorityEnvelope
 	d := json.NewDecoder(bytes.NewReader(canonical))
@@ -94,6 +100,63 @@ func verifyCaptureOperation(ctx context.Context, keys evidence.KeyOpener, format
 	plain, e := decrypt(a, envelope.Ciphertext, ad, int64(maxPlain))
 	if e != nil {
 		return e
+	}
+	defer clear(plain)
+	if !bytes.Equal(plain, expected) {
+		return artifact.ErrIntegrity
+	}
+	return nil
+}
+
+// Only the new reason formats use opaque byte keys; legacy JSON stays exact.
+type captureReasonOuter struct {
+	Format       string `json:"format"`
+	KeyReference []byte `json:"keyReference"`
+	WrappedKey   []byte `json:"wrappedKey"`
+	Ciphertext   []byte `json:"ciphertext"`
+}
+
+func captureReasonFormat(f string) bool {
+	return f == "asservat-capture-reason-intent/v1" || f == "asservat-capture-reason-outcome/v1"
+}
+func captureReasonOuterEnvelope(e captureReasonOuter) ([]byte, error) {
+	if !captureReasonFormat(e.Format) || len(e.KeyReference) == 0 || len(e.KeyReference) > 256 || len(e.WrappedKey) == 0 || len(e.WrappedKey) > 8192 || len(e.Ciphertext) == 0 || len(e.Ciphertext) > audit.CaptureReasonPlainLimit+4096 {
+		return nil, artifact.ErrInvalid
+	}
+	raw, err := json.Marshal(e)
+	if err != nil || len(raw) > audit.OperationCipherLimit {
+		return nil, artifact.ErrLimit
+	}
+	return raw, nil
+}
+func verifyCaptureReasonOperation(ctx context.Context, keys evidence.KeyOpener, format, root, id string, record any, canonical []byte, maxPlain int) error {
+	var e captureReasonOuter
+	d := json.NewDecoder(bytes.NewReader(canonical))
+	d.DisallowUnknownFields()
+	if d.Decode(&e) != nil || e.Format != format {
+		return artifact.ErrIntegrity
+	}
+	raw, err := captureReasonOuterEnvelope(e)
+	if err != nil {
+		return err
+	}
+	other := jsontext.Value(raw)
+	if other.Canonicalize() != nil || !bytes.Equal(other, canonical) {
+		return artifact.ErrIntegrity
+	}
+	expected, err := captureOperationPlain(record)
+	if err != nil {
+		return err
+	}
+	defer clear(expected)
+	ad := controlAuditAAD(format, root, id, expected)
+	a, err := openKey(ctx, keys, artifact.SealedKey{Reference: string(e.KeyReference), Ciphertext: string(e.WrappedKey)}, ad)
+	if err != nil {
+		return err
+	}
+	plain, err := decrypt(a, e.Ciphertext, ad, int64(maxPlain))
+	if err != nil {
+		return err
 	}
 	defer clear(plain)
 	if !bytes.Equal(plain, expected) {

@@ -6,6 +6,7 @@ import (
 
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -30,6 +31,10 @@ const (
 // RestartPolicy is the compiled, accepted subset. It contains configuration
 // intent only; executor, delegation and limits come from protected acceptance.
 type RestartPolicy struct {
+	// Zero preserves the historical one-Pod bound and serialized scope.
+	IncidentPods int `json:",omitzero"`
+	// Original accepted source context is private history input, excluded from policy intent equality.
+	HistoryAuthored                                  *HistoryAuthored `json:"-"`
 	ClusterID, Namespace, WorkloadKind, WorkloadName string
 	// Reasons is a sorted subset of OOMKilled, Error and CrashLoopBackOff.
 	Reasons []string
@@ -58,7 +63,11 @@ type RestartPolicy struct {
 	Resource *targets.ResourceCondition `json:",omitempty"`
 	// Sharing is the optional spec.sharing block (ADR-239). It is nil for a
 	// policy without one, so such a policy's scope digest is unchanged.
-	Sharing *PolicySharing `json:",omitempty"`
+	Sharing        *PolicySharing                        `json:",omitempty"`
+	Recorder       *planning.PolicyRecorderConfiguration `json:",omitempty"`
+	RecordingSaves bool                                  `json:",omitempty"`
+	// GrantRef is explicit control outside collection identity; it never resets spend.
+	GrantRef string `json:"-"`
 }
 
 // Detector kinds stored with watermarks and occurrences (migrations 00084
@@ -115,6 +124,15 @@ func (p RestartPolicy) Request() targets.RestartRequest {
 }
 
 func (p RestartPolicy) Valid() bool {
+	if p.IncidentPods < 0 || p.IncidentPods > 100 || p.IncidentPods > 1 && (!p.RecordingSaves || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing") {
+		return false
+	}
+	if p.RecordingSaves && (p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing") {
+		return false
+	}
+	if p.Recorder != nil && !p.Recorder.Valid() || p.GrantRef != "" && !authorization.UUID(p.GrantRef) {
+		return false
+	}
 	if !authorization.UUID(p.ClusterID) || !identity.Text(p.Namespace, 63) || (p.WorkloadKind != "Deployment" && p.WorkloadKind != "StatefulSet") || !identity.Text(p.WorkloadName, 253) || p.Interval < time.Second || p.Interval > 24*time.Hour || p.Burst < 1 || p.Burst > 10 || p.RetentionSeconds < 1 || p.RetentionSeconds > privacy.MaxAgeSeconds || p.ObservedPods < 1 || p.ObservedPods > targets.MaxRestartPods {
 		return false
 	}
@@ -281,6 +299,8 @@ type PolicyTick struct {
 // PolicyOccurrence is one admitted trigger occurrence. Its ID is the capture
 // request's idempotency key; it is never re-admitted or retried.
 type PolicyOccurrence struct {
+	// TriggeredAt is the original persisted occurrence clock, never dispatch time.
+	TriggeredAt           time.Time `json:",omitzero"`
 	ID, PolicyUID, PodUID string
 	Restarts              int64
 }
@@ -295,20 +315,26 @@ type PolicyStatus struct {
 	// ActiveID is the current acceptance; DeactivatedID is the latest
 	// acceptance of a deactivated policy (ADR-229). At most one is set.
 	PolicyUID, ActiveID, DeactivatedID string
+	AttachedGrantID                    string
 	Generation, IntentVersion          int64
 	AcceptedIntentVersion              int64
 	// AcceptedGeneration is the DebugPolicy generation the acceptance named.
-	AcceptedGeneration                   int64
-	Suspended, Deleted                   bool
-	Creator                              *identity.Principal
-	ExecutionsSpent, MaxExecutions       int64
-	NotAfter                             time.Time
-	WatchedPods, Occurrences, Captured   int64
-	Recent                               []PolicyOccurrenceStatus
-	Suppressions                         []PolicySuppression
-	ClusterID, NamespaceUID, WorkloadUID string
-	Authority                            authorization.AcceptedPolicyAuthority
-	SourceObservedAt, SourceFreshUntil   time.Time
+	AcceptedGeneration             int64
+	Suspended, Deleted             bool
+	Creator                        *identity.Principal
+	ExecutionsSpent, MaxExecutions int64
+	// Optional server-computed grant source-start ceiling; zero is legacy/unknown.
+	MaxGrantStarts int64
+	// Shared accepted pools: conservative charges/reservations, not measured output.
+	CollectedBytesSpent, MaxCollectedBytes int64
+	ObservedBytesSpent, MaxObservedBytes   int64
+	NotAfter                               time.Time
+	WatchedPods, Occurrences, Captured     int64
+	Recent                                 []PolicyOccurrenceStatus
+	Suppressions                           []PolicySuppression
+	ClusterID, NamespaceUID, WorkloadUID   string
+	Authority                              authorization.AcceptedPolicyAuthority
+	SourceObservedAt, SourceFreshUntil     time.Time
 	// Detector describes the current DebugPolicy's detector, if it compiles.
 	Detector *PolicyDetector
 	// Sharing is the acceptance's recurring sharing (ADR-239), if any.

@@ -257,9 +257,8 @@ func TestMCPClampsActualSocketToOriginalOperationDeadline(t *testing.T) {
 func TestMCPFinalIdentityShorteningReachesSocket(t *testing.T) {
 	for _, version := range []string{"2025-11-25", "2026-07-28"} {
 		t.Run(version, func(t *testing.T) {
-			until := time.Now().Add(2 * time.Second)
-			shorter := until.Add(-time.Second)
-			f := &mcpCaptureFixture{until: until}
+			var shorter time.Time
+			f := &mcpCaptureFixture{}
 			observed := make(chan time.Time, 4)
 			var h *Handler
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(operationDeadlineWriter{w, observed}, r) }))
@@ -279,6 +278,10 @@ func TestMCPFinalIdentityShorteningReachesSocket(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Fixture authority begins at dispatch, after schema/TLS construction.
+			// Setup time is not part of this operation or its final identity interval.
+			f.until = time.Now().Add(2 * time.Second)
+			shorter = f.until.Add(-time.Second)
 			response, b := send(t, server, rpcRequest(t, server, version, "tools/call", map[string]any{"name": "get_capture", "arguments": map[string]any{"capture_id": "00000000-0000-4000-8000-000000000030"}}))
 			if response.StatusCode != 200 || !strings.Contains(string(b), "IntentAuditPending") || len(observed) != 2 || checks.Load() != 4 {
 				t.Fatalf("unexpected path: %d %s checks=%d writes=%d", response.StatusCode, b, checks.Load(), len(observed))

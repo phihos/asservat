@@ -100,6 +100,7 @@ type admissionGuardReader interface {
 }
 
 func checkAdmissionGuard(ctx context.Context, observer admissionGuardReader, name string, pin GuardPin, expectedPolicy admission.ValidatingAdmissionPolicySpec, expectedBinding admission.ValidatingAdmissionPolicyBindingSpec) (string, error) {
+	countGuardCaller()
 	raw, err := observer.raw(ctx, "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/"+name, nil)
 	if err != nil {
 		return "", configurationSourceError(configurationSourceGuardPolicyRead, err)

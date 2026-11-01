@@ -39,7 +39,11 @@ func HistoricalSourcePolicies(s PolicySnapshot, r RetainedArtifact) ([]Policy, e
 				return nil, ErrUnavailable
 			}
 		}
-		policies = append(policies, p.Policy)
+		policy := p.Policy
+		if r.Input.ControlKind == "case-metadata" {
+			policy = CaseMetadataPolicy(p)
+		}
+		policies = append(policies, policy)
 	}
 	if len(policies) > 64 {
 		return nil, ErrUnavailable

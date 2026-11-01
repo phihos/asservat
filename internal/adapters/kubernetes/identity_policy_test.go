@@ -160,3 +160,31 @@ func TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings(t *testing.T) {
 		})
 	}
 }
+
+func TestIdentityPolicyPolicyGrantPeriodsAreProtectedAndCopied(t *testing.T) {
+	settings := identitySettingsFixture(t)
+	settings["approvals"] = map[string]any{"policyGrants": map[string]any{"defaultAgeSeconds": 604800, "maxAgeSeconds": 2592000, "renewalNoticeSeconds": 86400}}
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path != "/api/v1/namespaces/asservat-system/configmaps/identity.settings" {
+			return false
+		}
+		raw, _ := json.Marshal(settings)
+		object := map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "identity.settings", "namespace": permissionControl.Name, "uid": "identity-uid", "resourceVersion": "unchanged-benign-rv"}, "data": map[string]string{"identity.json": string(raw)}}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(object)
+		return true
+	})
+	reader, err := NewIdentityPolicyClient(f.client, "identity.settings", "identity-uid", "https://id.example.invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := reader.IdentityPolicy(context.Background(), "https://id.example.invalid")
+	if err != nil || p.PolicyGrants == nil || p.PolicyGrants.DefaultAge != 7*24*time.Hour || p.PolicyGrants.MaxAge != 30*24*time.Hour || p.PolicyGrants.RenewalNotice != 24*time.Hour {
+		t.Fatal("protected finite approval periods lost", p.PolicyGrants, err)
+	}
+	p.PolicyGrants.MaxAge = time.Second
+	again, err := reader.IdentityPolicy(context.Background(), p.Issuer)
+	if err != nil || again.PolicyGrants.MaxAge != 30*24*time.Hour {
+		t.Fatal("caller mutated cached protected periods", err)
+	}
+}

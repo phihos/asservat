@@ -325,6 +325,10 @@
             "policyUID",
             "policyExecutionDigest"
           ]
+        },
+        "sourceClosedAt": {
+          "type": "string",
+          "format": "date-time"
         }
       },
       "required": [

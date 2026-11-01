@@ -6,19 +6,47 @@ import (
 	"testing"
 )
 
-// This literal is the exact union of the three installed execution logins at
-// 2d02b4fe. A new table-wide write, unrelated privilege or lost column fails.
+// This literal retains the three original execution logins plus schema-102
+// original policy reservation/grant reads and a grant row lock. An unrelated
+// privilege, table-wide write or lost column fails.
 func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 	got, ok := publicRuntimeDutyGrants("api-execution")
 	if !ok {
 		t.Fatal("missing consolidated execution credential")
 	}
 	want := []publicRuntimeGrant{
+		// ADR-266: parent membership/status and immutable cancellation intent only.
+		{"table", "recording_save_group", "", "SELECT"},
+		{"table", "recording_save_group", "progress_revision", "UPDATE"},
+		{"table", "recording_save_group", "cancel_requested_at", "UPDATE"},
+		{"table", "recording_save_group", "cancel_request_key", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_key", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_actor", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_requested_at", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_joined_at", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_proof", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_proof_digest", "UPDATE"},
+		// SQL108: read the immutable manual save reservation; no insert/update.
+		{"table", "recording_save_reservation", "", "SELECT"},
+		{"table", "policy_recording_source", "", "SELECT"},
+		{"table", "policy_recording_source", "root_id", "UPDATE"},
+		{"table", "policy_occurrence", "", "SELECT"},
+		{"table", "policy_acceptance", "", "SELECT"},
+		{"table", "policy_source", "", "SELECT"},
+		{"table", "access_grant", "", "SELECT"},
+		{"table", "access_grant", "id", "UPDATE"},
+		{"table", "access_grant", "policy_observed_bytes_spent", "UPDATE"},
+		{"table", "policy_acceptance", "observed_bytes_spent", "UPDATE"},
+		{"table", "policy_observation_session", "", "SELECT"},
+		{"table", "policy_observation_session", "", "INSERT"},
 		{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"},
 		{"schema", "public", "", "USAGE"},
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_capture", "id", "UPDATE"},
+		{"table", "context_capture", "snapshot_coverage", "UPDATE"},
+		{"table", "context_capture", "snapshot_coverage_digest", "UPDATE"},
+		{"table", "context_capture", "snapshot_expectation_digest", "UPDATE"},
 		{"table", "context_execution", "", "SELECT"},
 		{"table", "context_execution", "acquired_at", "UPDATE"},
 		{"table", "context_execution", "attempt_id", "INSERT"},

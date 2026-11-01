@@ -113,3 +113,27 @@ func TestPolicyStatusReportsDetectorAndOccurrenceKinds(t *testing.T) {
 		t.Fatal("occurrence kinds", recent)
 	}
 }
+
+func TestPolicyStatusReportsSharedAcceptedPoolsIndependentlyOfGrants(t *testing.T) {
+	f := &policyOperationsFixture{scopes: []string{"evidence:read"}}
+	f.status = value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, ExecutionsSpent: 5, MaxExecutions: 100, CollectedBytesSpent: 16384, MaxCollectedBytes: 1048576, ObservedBytesSpent: 4096, MaxObservedBytes: 8192, NotAfter: time.Now().Add(time.Hour)}
+	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expired := range []bool{false, true} {
+		if expired {
+			f.status.NotAfter = time.Now().Add(-time.Hour)
+		}
+		out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"restarts"}`)
+		data := out["data"].(map[string]any)
+		for key, expected := range map[string]int64{"executions_spent": 5, "max_executions": 100, "collected_bytes_spent": 16384, "max_collected_bytes": 1048576, "observed_bytes_spent": 4096, "max_observed_bytes": 8192} {
+			if data[key] != float64(expected) {
+				t.Fatalf("shared accepted %s = %v, want %d", key, data[key], expected)
+			}
+		}
+		if expired && data["state"] != "expired" {
+			t.Fatal("budget metadata hid original expiry", data)
+		}
+	}
+}

@@ -19,40 +19,53 @@ import (
 // enough to exercise the service: one request per capture, one decision by a
 // distinct human, one revocation, monotonic pool spend and idempotent keys.
 type memoryGrants struct {
-	mu       sync.Mutex
-	now      func() time.Time
-	rows     map[string]value.Grant
-	keys     map[string]string
-	children map[string]value.GrantChild
-	uses     map[string]GrantUseRequest
-	decided  map[string]string
-	revoked  map[string]string
-	locator  map[string]string // artifact -> capture (published)
+	mu           sync.Mutex
+	now          func() time.Time
+	rows         map[string]value.Grant
+	keys         map[string]string
+	children     map[string]value.GrantChild
+	uses         map[string]GrantUseRequest
+	decided      map[string]string
+	revoked      map[string]string
+	locator      map[string]string // artifact -> capture (published)
+	policyInputs map[string]artifact.Digest
 }
 
 func newMemoryGrants(now func() time.Time) *memoryGrants {
-	return &memoryGrants{now: now, rows: map[string]value.Grant{}, keys: map[string]string{}, children: map[string]value.GrantChild{}, uses: map[string]GrantUseRequest{}, decided: map[string]string{}, revoked: map[string]string{}, locator: map[string]string{}}
+	return &memoryGrants{now: now, rows: map[string]value.Grant{}, keys: map[string]string{}, children: map[string]value.GrantChild{}, uses: map[string]GrantUseRequest{}, decided: map[string]string{}, revoked: map[string]string{}, locator: map[string]string{}, policyInputs: map[string]artifact.Digest{}}
 }
 
 func (m *memoryGrants) RequestGrant(_ context.Context, r StoredGrantRequest, _ artifact.RecoveryProof) (value.Grant, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	k := r.Grant.Requester.Issuer + "\n" + r.Grant.Requester.Subject + "\n" + r.IdempotencyKey
+	if r.Grant.Kind == value.GrantPolicy {
+		k = "policy:" + policyRequestTestKey(r.Grant.Requester, r.IdempotencyKey)
+	}
 	if id, ok := m.keys[k]; ok {
+		if r.Grant.Kind == value.GrantPolicy && m.policyInputs[k] != r.RequestDigest {
+			return value.Grant{}, false, ErrGrantConflict
+		}
 		return m.rows[id], true, nil
 	}
 	for _, g := range m.rows {
-		if g.CaptureID == r.Grant.CaptureID {
+		if g.Kind == value.GrantAdHocCapture && r.Grant.Kind == value.GrantAdHocCapture && g.CaptureID == r.Grant.CaptureID {
 			return value.Grant{}, false, ErrGrantConflict
 		}
 	}
 	g := r.Grant
 	g.RequestedAt = m.now()
 	g.ReviewUntil = g.RequestedAt.Add(value.GrantReviewWindow)
+	if g.Kind == value.GrantPolicy {
+		g.PolicyNotAfter = identity.Earlier(g.RequestedAt.Add(g.Lifetime), g.Policy.Authority.NotAfter)
+	}
 	if !g.Valid() {
 		return value.Grant{}, false, value.ErrGrantInvalid
 	}
 	m.rows[g.ID], m.keys[k] = g, g.ID
+	if g.Kind == value.GrantPolicy {
+		m.policyInputs[k] = r.RequestDigest
+	}
 	return g, false, nil
 }
 
@@ -124,6 +137,9 @@ func (m *memoryGrants) DecideGrant(_ context.Context, in GrantDecisionInput, _ a
 	g.Decision = &value.GrantDecision{Approved: in.Approve, Approver: in.Approver, Reason: in.Reason, ACR: in.ACR, AuthenticatedAt: in.AuthTime, DecidedAt: now}
 	if in.Approve {
 		g.ExpiresAt = now.Add(g.Lifetime)
+		if g.Kind == value.GrantPolicy {
+			g.ExpiresAt = g.PolicyNotAfter
+		}
 		if g.ResultAccess != nil {
 			g.ExpiresAt = identity.Earlier(g.ExpiresAt, g.ResultAccess.NotAfter)
 		}

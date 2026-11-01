@@ -52,11 +52,15 @@ func (q *Queries) InsertRetentionCatchupEffect(ctx context.Context, arg InsertRe
 }
 
 const listRetentionCatchupContexts = `-- name: ListRetentionCatchupContexts :many
-SELECT a.id,a.cluster_id,a.artifact_id FROM context_capture c JOIN custody_attempt a ON a.id=c.attempt_id
-WHERE c.root_id=$1 AND c.created_at<=$2 AND a.state<>'deleted'
-AND ($3::uuid IS NULL OR c.attempt_id>$3::uuid)
+SELECT a.id,a.cluster_id,a.artifact_id FROM custody_attempt a
+WHERE a.id IN (
+ SELECT c.attempt_id FROM context_capture c WHERE c.root_id=$1 AND c.created_at<=$2
+ UNION ALL
+ SELECT h.attempt_id FROM capture_history_parameter h WHERE h.root_id=$1 AND h.created_at<=$2
+) AND a.state<>'deleted'
+AND ($3::uuid IS NULL OR a.id>$3::uuid)
 AND ($4::boolean OR a.cluster_id=$5::uuid)
-ORDER BY c.attempt_id LIMIT $6
+ORDER BY a.id LIMIT $6
 `
 
 type ListRetentionCatchupContextsParams struct {

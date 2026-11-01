@@ -48,11 +48,18 @@ const nativeWindowReadLimit = 9*(artifact.FrameBytes+artifact.CipherOverhead) + 
 // outlives the artifact's ExpiresAt. Opening reads only the commit and
 // manifest objects and opens the data and index keys.
 func (v *ContextVerifier) OpenNative(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, readUntil time.Time) (*FramedNativeSource, error) {
+	return v.openNative(ctx, ctx, e, c, readUntil)
+}
+
+// openNative separates a finite initial key/metadata phase from the original
+// cursor owner. Canceling opening after acknowledgement never revives or ends
+// a retained cursor; caller cancellation and readUntil still own that cursor.
+func (v *ContextVerifier) openNative(ctx, opening context.Context, e artifact.ContextExpectation, c artifact.Copies, readUntil time.Time) (*FramedNativeSource, error) {
 	until := minDeadline(readUntil, e.Registration.ExpiresAt)
-	if v == nil || ctx == nil || !time.Now().Before(until) {
+	if v == nil || ctx == nil || opening == nil || !time.Now().Before(until) {
 		return nil, artifact.ErrInvalid
 	}
-	call, stop := context.WithDeadline(ctx, minDeadline(until, time.Now().Add(30*time.Second)))
+	call, stop := context.WithDeadline(opening, minDeadline(until, time.Now().Add(30*time.Second)))
 	defer stop()
 	reader, m, err := v.open(call, e, c, until)
 	if err != nil {
@@ -129,6 +136,13 @@ func (s *FramedNativeSource) read(ctx context.Context, offset, length int64) (ev
 		s.mu.Unlock()
 		return out, artifact.ErrDownloadUnavailable
 	}
+	if ctx.Err() != nil || s.owner.Err() != nil {
+		clear(s.carry)
+		s.carry = nil
+		s.closed = true
+		s.mu.Unlock()
+		return out, artifact.ErrDownloadUnavailable
+	}
 	if s.cursor == nil {
 		cursor, err := s.reader.Cursor(s.owner, offset, s.metadata.Size-offset)
 		if err != nil {
@@ -177,7 +191,7 @@ func (s *FramedNativeSource) read(ctx context.Context, offset, length int64) (ev
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.busy = false
-	if err != nil || s.closed {
+	if err != nil || s.closed || errors.Is(ctx.Err(), context.Canceled) || s.owner.Err() != nil {
 		clear(carry)
 		s.carry = nil
 		s.closed = true // an admitted failed read is terminal, as for the cursor

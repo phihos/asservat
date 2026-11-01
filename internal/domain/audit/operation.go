@@ -11,6 +11,24 @@ import (
 const OperationCipherLimit = 64 << 10
 const OperationOutputLimit = 24 << 10
 
+// Sixteen source assessments retain up to64 policy digests per source.
+// Only this passive preview may prepare the bounded larger metadata result.
+const OperationRecordingSavePreviewOutputLimit = 128 << 10
+
+// Only the authenticated browser settings view has this larger prepared-byte
+// maximum. Audit stores the HMAC/count/refs, never the parameter response body.
+const OperationCaptureSettingsOutputLimit = 160 << 10
+
+func operationOutputLimit(name string) int64 {
+	if name == "preview_recording_save" {
+		return OperationRecordingSavePreviewOutputLimit
+	}
+	if name == "get_capture_settings" {
+		return OperationCaptureSettingsOutputLimit
+	}
+	return OperationOutputLimit
+}
+
 // Lane is server-selected from the fixed operation, never supplied by a caller.
 func OperationLane(name string) string {
 	switch name {
@@ -24,7 +42,7 @@ func OperationLane(name string) string {
 		return "processing"
 	case "resolve_capture_request":
 		return "resolution"
-	case "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "download_artifact_content", "invalid_operation", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant":
+	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "download_artifact_content", "invalid_operation", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant":
 		return "normal"
 	default:
 		return ""
@@ -32,9 +50,12 @@ func OperationLane(name string) string {
 }
 
 // OperationRequestWindow is the maximum request interval of an operation:
-// identity.EvidenceReadRequestWindow for evidence reads, five seconds otherwise.
+// twenty seconds for evidence reads, fifteen for request_capture composition,
+// five seconds otherwise. Every contained authority retains its own bound.
 func OperationRequestWindow(name string) time.Duration {
 	switch name {
+	case "request_capture":
+		return identity.RecordingSaveRequestWindow
 	case "get_file_excerpt", "get_query_result", "prepare_artifact_download", "get_artifact_download":
 		return identity.EvidenceReadRequestWindow
 	default:
@@ -42,9 +63,27 @@ func OperationRequestWindow(name string) time.Duration {
 	}
 }
 
+// CaptureOperationRequestWindow bounds bookkeeping for a committed manual
+// group. Its validated group provenance does not authorize acquisition; every
+// effect retains its independently accepted/current authority and deadlines.
+func CaptureOperationRequestWindow(c CaptureIntent) time.Duration {
+	if c.Group != nil && c.Valid() {
+		return identity.RecordingSaveRequestWindow
+	}
+	return 5 * time.Second
+}
+
+func (r OperationIntent) requestWindow() time.Duration {
+	if r.Name == CaptureOperationName && r.Capture != nil {
+		return CaptureOperationRequestWindow(*r.Capture)
+	}
+	return OperationRequestWindow(r.Name)
+}
+
 // OperationIntent contains only bounded audit facts. It is not a permit, and
 // persisted identity/deadline fields never become current caller authority.
 type OperationIntent struct {
+	ReasonEnvelope                                                     *CaptureReasonEnvelope `json:",omitempty"`
 	ID, RootID, TraceID, Name, InputFormat, MACVersion, AccountVersion string
 	Actor                                                              identity.Principal              `json:",omitzero"`
 	Peer                                                               *OperationPeerActor             `json:",omitempty"`
@@ -66,7 +105,7 @@ func (r OperationIntent) Valid() bool {
 	return (r.Lifecycle == nil || r.Lifecycle.Valid(r)) && authorization.UUID(r.ID) && authorization.UUID(r.RootID) && authorization.UUID(r.TraceID) && OperationLane(r.Name) != "" &&
 		r.actorValid() && r.connectorReservationsValid() && r.capturePayloadValid() && identity.Text(r.MACVersion, 64) && identity.Text(r.AccountVersion, 64) &&
 		r.PrincipalDigest != (artifact.Digest{}) && r.InputDigest != (artifact.Digest{}) &&
-		identity.Fresh(r.CreatedAt, r.RequestUntil, r.CreatedAt, OperationRequestWindow(r.Name)) && r.WriteUntil.After(r.CreatedAt) && !r.WriteUntil.After(r.CreatedAt.Add(30*time.Second)) &&
+		identity.Fresh(r.CreatedAt, r.RequestUntil, r.CreatedAt, r.requestWindow()) && r.WriteUntil.After(r.CreatedAt) && !r.WriteUntil.After(r.CreatedAt.Add(30*time.Second)) &&
 		!r.RequestUntil.After(r.WriteUntil) && r.RetainUntil.After(r.WriteUntil) && !r.RetainUntil.After(r.CreatedAt.Add(3660*24*time.Hour))
 }
 
@@ -85,7 +124,7 @@ type OperationOutcome struct {
 func (r OperationOutcome) Valid() bool {
 	if !r.Intent.Valid() || !slices.Contains([]string{"success", "denied", "invalid", "unavailable", "interrupted"}, r.Status) ||
 		!slices.Contains([]string{"prepared", "not_available", "invalid_input", "authority_unavailable", "interrupted"}, r.Reason) ||
-		!slices.Contains([]string{"none", "accepted", "unknown"}, r.Effect) || r.ClientReceipt != "unknown" || r.OutputBytes < 0 || r.OutputBytes > OperationOutputLimit ||
+		!slices.Contains([]string{"none", "accepted", "unknown"}, r.Effect) || r.ClientReceipt != "unknown" || r.OutputBytes < 0 || r.OutputBytes > operationOutputLimit(r.Intent.Name) ||
 		r.OutputDigest == (artifact.Digest{}) || r.RecordedAt.Before(r.Intent.CreatedAt) || !r.RecordedAt.Before(r.Intent.WriteUntil) ||
 		r.MetadataUntil.Before(r.Intent.CreatedAt) || r.MetadataUntil.After(r.Intent.RequestUntil) {
 		return false
@@ -93,7 +132,7 @@ func (r OperationOutcome) Valid() bool {
 	if !r.credentialValid() || !r.captureOutcomeValid() {
 		return false
 	}
-	if r.Effect != "none" && !r.Intent.connectorOperation() && !r.Intent.processingOperation() && r.Intent.Name != "persist_capture_intent" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" {
+	if r.Effect != "none" && !r.Intent.connectorOperation() && !r.Intent.processingOperation() && r.Intent.Name != "persist_capture_intent" && r.Intent.Name != "cancel_capture" && r.Intent.Name != "request_capture" && r.Intent.Name != "resolve_capture_request" && r.Intent.Name != "prepare_artifact_download" && r.Intent.Name != "get_file_excerpt" && r.Intent.Name != "get_query_result" && r.Intent.Name != "activate_policy" && r.Intent.Name != "deactivate_policy" && r.Intent.Name != "create_share" && r.Intent.Name != "revoke_share" && r.Intent.Name != "transfer_share" && r.Intent.Name != "stop_future_sharing" && r.Intent.Name != "decide_review" && r.Intent.Name != "revoke_grant" && r.Intent.Name != "request_policy_grant" {
 		return false
 	}
 	if r.Status != "success" && (len(r.CaseIDs) > 0 || len(r.ArtifactIDs) > 0 || len(r.CaptureIDs) > 0) {

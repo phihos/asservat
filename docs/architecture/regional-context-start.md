@@ -16,7 +16,7 @@ The work type is `asservat-api-context-work+jws`, fixed Ed25519. Work binds the 
 
 | Item | Bound |
 | --- | --- |
-| Standby residence | Original 30 seconds; no human authority |
+| Standby residence | Original connector caller end (at most 30 seconds), intersected with the original hub native/request end; no human authority |
 | Setup, peer proof, work and operations | At most original 5 seconds; minimum of all contributing observations |
 | Complete discovered owner set | 16; oversized/incomplete list is unavailable |
 | Whole hub standby budget | At most 64, independently reserved per cluster |
@@ -31,7 +31,21 @@ JSON encoding disables HTML escaping before canonicalization. Actual maximum-str
 
 Work and independently current peer/trust observations may overlap without having identical ends. Verification takes their minimum; it does not reject a valid shorter proof or renew it. Every blocking read/sign/write retains that minimum. The stream owns a single bounded EOF reader, one queued frame and one decoder frame. Socket/pipe callbacks cancel and join before release. Stream termination cancels the hub runner and the regional operation contexts, including a blocked operation. A late positive backend result cannot authorize a reply after cancellation.
 
-Standby and capture reservations count closing owners until joined completion. Each discovered owner has an independent thirty-second conversation with at least one second before a fresh empty standby; after a TLS refusal (a registered owner process the hub no longer serves) the next attempt to that owner waits thirty seconds, so its setup proofs do not contend with the live owner's opening. A hub target query that finds no idle standby waits for the next registration only within its own original deadline, keeping 2.5 seconds for the query and the caller. A retry never carries a capture or signed work from a prior connection. SQL52/ADR134 determine whether an explicit current continuation can proceed; transport failure is not proof of non-admission or no effect.
+Standby and capture reservations count closing owners until joined completion. Each discovered owner has an independent thirty-second conversation with at least one second before a fresh empty standby; after a TLS refusal (a registered owner process the hub no longer serves) the next attempt to that owner waits thirty seconds, so its setup proofs do not contend with the live owner's opening. A hub target query or attachment that finds no idle standby waits for the next registration only within its own original deadline, keeping 2.5 seconds for the operation and the caller. Attachment waits only before reserving a conversation or dispatching work; actual capture capacity, duplicate capture IDs and invalid inputs still refuse immediately. Once waiting begins its fixed cutoff is checked again under the selection mutex, including when registration and expiry are both ready. An immediately available standby retains the original short-deadline behavior. A retry never carries a capture or signed work from a prior connection. SQL52/ADR134 determine whether an explicit current continuation can proceed; transport failure is not proof of non-admission or no effect.
+
+The private Hello carries required `standbyUntil`, the connector's original
+caller end floored to UTC microseconds. It is an availability observation, never
+peer/work authority. The hub rejects missing, malformed, expired or more-than-30s
+future values, and parents RegisterStandby from the minimum of that original end
+and its independent native/request context. Selection, idle retirement, stream
+ownership and passive socket-deadline restoration therefore use the same earlier
+end. Authentication/setup and every frame retain their independent original
+five-second bounds. The stream joins before that parent is released. Strict old
+closed decoders refuse the new field; new decoders refuse old missing input.
+There is no legacy fallback or rolling-upgrade qualification claim. These absolute
+UTC observations share the existing cross-cluster clock assumptions of the
+five-second peer/source proofs; no clock synchronization or monotonic remote
+lifetime can be established by this field, and a peer can still disconnect early.
 
 Router selection and attachment checks also observe the stream's own
 cancellation, even before the surrounding HTTP request notices it. A joined
@@ -122,3 +136,74 @@ Focused races exercise actual loopback TLS1.3/HTTP2 with process-owned keys: hub
 The native public journey (adr171-journey-2) passes the whole signed exchange with hub-run execution, regional capture/storage, publication and native download on the bare-Pod executor; see ADR-171. Pending qualification: the connector-Deployment executor's local start below, and failure/unknown partitions across those components. No deadline or client QPS limit is enlarged.
 
 Missing production inputs remain dedicated work-signing key/sign-only hub credential, verify-only regional trust, exact connector API profile/input ownership/RBAC, protected installed composition and regional command startup. Existing initial installation does not yet provision those inputs. The first installed context investigation remains unavailable until these producers and the combined runtime path are implemented and qualified.
+
+## Separate history ciphertext effects
+
+Capture-history control metadata uses `asservat-history-work+jws` with the
+existing protected work-signing trust and a separate `history-work/v1` payload.
+It is not an API execution. The dispatcher selects a live connector session
+before SQL issues authority, exposing that session's original deadline and
+actual executor process epoch. Signed authority fixes root, capture, original
+storage registration/allocation, attempt, request, operation, ciphertext or
+receipt digest, process epoch and original deadline. Each regional receive and
+final reply retains current channel checks and cancellation. A preparation
+lookup grants no storage authority; only signed write/read/purge work invokes
+storage effects.
+
+The distinct history frame family (32–35) carries at most **486077 bytes** of
+base64-encoded ciphertext bundle: data 192 KiB, index 4 KiB, manifest 128 KiB,
+commit 32 KiB, plus exact base64 expansion and 13 array bytes. An independently
+bounded 65536-byte envelope covers four version/ETag receipts, signed work and
+completions; total frame ceiling 551613 bytes. The shared codec checks each role
+before decoding allocation. Common query/operation frames remain 32 KiB and the
+existing exchange ceiling remains 2 MiB. Wire contracts are
+[history-work](../../specs/contracts/history-work.schema.json) and
+[history-ciphertexts](../../specs/contracts/history-ciphertexts.schema.json).
+
+Write completion requires all four acknowledged PUTs to return. Read pins exact
+stored versions. Purge inventories/removes versions, markers and incomplete
+multipart uploads and returns an independent typed completion bound to the
+original deletion fence. Zero receipts are accepted only for purge after the
+original WriteUntil and only with the exact zero-receipt digest; the SQL producer
+must independently establish that no writer claim was issued. Neither expiry
+nor object lookup establishes writer completion or releases capacity.
+
+The regional loader uses the fixed `history-storage.json` capability, limited
+to this root/cluster's history prefix. It cannot read/delete evidence or unwrap
+keys. [Installation instructions](../installation/helm.md) distinguish externally
+provisioned capabilities, readonly permission proposals and actual pinned
+Seaweed qualification. The focused storage gate does not qualify installed
+SQL-to-channel composition. Preparation currently inherits the router's finite
+five-second selection/exchange bound; measure the composed workflow before
+choosing any history-specific bound, preserving the original caller and signed
+operation deadlines.
+
+## Finite policy observation companion (ADR-261, not enabled)
+
+The same verified API work can explicitly replace `resolve-pod` with
+`resolve-packet-source`. Only a policy executor can use it; the regional resolver
+returns the exact Pod graph and original authenticated node-report interval in
+one resolution. Existing metadata queries retain their old shape and omit Source.
+The receiver keeps a value copy of this source for this exchange. Unavailable or
+unsupported source resolution refuses without falling back to a metadata answer.
+
+`start-policy-recording` carries the original finite SQL observation receipt and
+that exact source. Its expectation digest is compared with the independently
+verified signed work; `prepare-output` already matched the frozen expectation to
+that signed digest. The canonical program digest is derived again from those
+frozen instructions, not accepted from another receipt field. Capture, action,
+Pod, duration and source incarnation must agree. Source timestamps compare by
+instant, preserving their original cutoffs. The holder checks the actual prefix
+proof, transfers prepared keys once, and calls the expected-source node queue
+with the original permit StartBy. It performs no second Pod/node resolution.
+The authenticated queue independently checks the current node incarnation and
+original source interval under its existing mutex. No initial permit signature,
+new key, provider, watch or renewal loop is added; the initial work signature
+precedes this later receipt and is not represented as signing it.
+
+The runner uses the existing companion preparation transaction and preparation
+gate. A first=false receipt remains passive before key creation or dispatch.
+The ordinary start still refuses raw predicates before transferring keys. The
+policy trigger's raw guard remains closed pending actual node/meter, old-node
+refusal, positive retirement, complete backing and native qualification; this
+contract does not enable manual raw or ongoing acquisition.

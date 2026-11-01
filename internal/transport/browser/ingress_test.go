@@ -98,8 +98,19 @@ func (s *auditBrowserSession) Resolve(ctx context.Context, cookie string, refres
 }
 func auditedBrowserFixture(t *testing.T) (*InvestigationHandler, *httptest.Server, *investigationCalls, *ingressAuditFixture, *ingressAuditFixture, *auditBrowserSession) {
 	t.Helper()
+	return auditedBrowserTransportFixture(t, false, nil)
+}
+
+func auditedBrowserTransportFixture(t *testing.T, http2 bool, wrap func(http.Handler) http.Handler) (*InvestigationHandler, *httptest.Server, *investigationCalls, *ingressAuditFixture, *ingressAuditFixture, *auditBrowserSession) {
+	t.Helper()
 	var h *InvestigationHandler
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }))
+	var serve http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) })
+	if wrap != nil {
+		serve = wrap(serve)
+	}
+	server := httptest.NewUnstartedServer(serve)
+	server.EnableHTTP2 = http2
+	server.StartTLS()
 	t.Cleanup(server.Close)
 	sessions := &auditBrowserSession{}
 	calls := &investigationCalls{}

@@ -50,7 +50,9 @@
               "id": "team-payments"
             }
           ]
-        }
+        },
+        "history": "Full",
+        "incident_pod_cap": 1
       },
       {
         "recording_handle": "recording-synthetic-syscalls",
@@ -91,7 +93,9 @@
               "id": "team-payments"
             }
           ]
-        }
+        },
+        "history": "Full",
+        "incident_pod_cap": 1
       }
     ],
     "windows": [
@@ -268,7 +272,9 @@
       "handlingPolicyRef": "company-debug-evidence/v1"
     },
     "blockers": [],
-    "navigation_uri": "https://asservat.example.invalid/captures/previews/00000000-0000-4000-8000-000000000194"
+    "navigation_uri": "https://asservat.example.invalid/captures/previews/00000000-0000-4000-8000-000000000194",
+    "capture_enabled": false,
+    "incident_pod_cap": 1
   },
   "truncated": false,
   "next_cursor": null,

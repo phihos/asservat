@@ -251,3 +251,166 @@ workload's immutable enrollment identity without checking the binding.
 Operation audit outside the `capture` lane is no longer gated by
 `capacity_managed_root_until`. Capture preview and admission keep the demand
 lane and the binding/root freshness described above.
+
+
+## First Ready projection correction (2026-10-28)
+
+Migration 00103 (schema 103) corrects the same-observation first refresh.
+The initial Ready phase publishes the binding with its original short phase
+cutoff. The worker immediately refreshes using that same observation; the old
+`observed_at >= observed` no-op retained the short projection. A strictly newer
+observation received the accepted 30-second projection, so initial readiness
+and subsequent readiness had different lifetimes.
+
+Refresh now projects an equal short observation to **its original observation
+plus 30 seconds**, once, under the existing current proof, exact backing and
+post-lock deadline checks. An equal already projected observation is a no-op;
+a newer persisted observation is retained. The receipt keeps its original short
+interval. No observation is restamped to now, expired proof revived, account
+identity changed or caller deadline extended. Down restores the previous no-op
+rule without shortening already accepted projections. Schema floor 102 remains:
+no table, parameter, privilege or returned wire shape changes.
+
+This source defect is independently actionable under the accepted ADR-200
+projection. It is **not an established cause** of Native 40767389365, whose
+approved failure occurred after roughly 120 seconds. That run retained neither
+binding row times nor target-correlated demand completion times. The existing capacity producer fixture now has a passing real SQL RED/GREEN
+regression. This qualifies the projection correction, not that installed failure.
+
+Complexity gate (engineering correction, not a new maintainer requirement):
+
+1. Concrete initial-Ready inconsistency; frequency/installed impact unmeasured.
+2. The 30-second projection is already accepted; no new tolerated window.
+3. Applies to every newly enrolled workload's first same-observation refresh.
+4. Reuses the existing projection and transactional idempotency, no new pattern.
+5. Added credentials/privileges/network endpoints: 0.
+6. Added runtime states: 0; one existing short-projection case reaches the
+   existing update branch.
+7. Added configuration: 0.
+8. Uses the existing PostgreSQL transaction/locks, no added dependency.
+9. Same existing SQL call. At most three existing UPDATEs and one configuration
+   credit on the first short projection; duplicate debit 0. Added API calls,
+   watches, timers, goroutines and durable rows: 0. CPU/WAL bytes unmeasured.
+10. One additive function-only migration; Down retains stored rows and restores
+    the old branch. Actual SQL upgrade/Down/Up passes; installed mixed rollout
+    remains outside this component result.
+11. Adjusting the existing refresh branch is smaller than replacing the shared
+    enrollment phase finisher; documenting unequal initial lifetime would not
+    meet the already accepted projection.
+
+
+### Measured SQL result (2026-10-28)
+
+The frozen old-production test checkpoint
+`62be37b25666cc60199a4c1c74cb4fcf191138f8` failed the intended first-Ready
+property: the same-observation refresh retained its **4.665197-second** stored
+interval and configuration spend **6 → 6**. The three selected setup children
+passed. The first failing child stopped dependent cases.
+
+The tested correction is
+`4d8d72d8972d65a710852b7d7a6ef0a7761782a1`. Its initial binding interval was
+**4.670076 seconds**; explicit refresh projected it to **original observation
+plus 30 seconds**, with configuration debit **1**. The exact duplicate spent
+**0**, the returned receipt stayed within the original short proof, and an
+older current observation retained the newer binding. After real original
+proof expiry, both adapter and direct SQL refresh refused with **0 effects and
+0 configuration debit**. All six selected producer children passed.
+`TestCustodyUpgradeSchemaWithRealPostgres` also passed: 102 → 103, floor **102**,
+idempotent upgrade, exact prior function restoration on Down, Up again, and
+unknown-history refusal. The fixture activation/recovery row stayed unchanged.
+
+Both runs used the existing owned PostgreSQL/S3/OpenBao fleet fixture, Go **300s**,
+harness **360s**, and an outer **1100s** with a **10s** hard-kill bound; no quota,
+provider deadline or privilege changed. RED outer/Go/test exits were **1/1/1**
+(60.776s outer, 4.643s Go package). GREEN exits were **0/0/0** (51.461s outer,
+13.909s package; producer 10.12s, upgrade 2.73s). Original reports retain all
+**3352/3353** respective runtime/test source hashes, `sourceUnchangedDuringTest`
+true and empty cleanup failures. Each owned three-container set and network was
+independently absent after cleanup, before generated copies were removed.
+
+Immutable local evidence is under
+`/home/phil/.cache/asservat-build/codex-bf86-resume/capacity-initial-binding/`:
+`red-owned-1/verification.json` (SHA-256
+`110666450fb36911c0d73763f4e5ffeb1b24f31b8545d89cfab88747356f7349`)
+and `green-owned-1/verification.json` (SHA-256
+`45f91dc46ed4acbb20d4bc04e798492caa1f84263e181c087d662508d9f7922d`),
+with original logs/environment reports and actual terminal exits alongside.
+The final documentation follow-up leaves tested code byte-identical. Guard,
+source, workload and history inputs remain synthetic; this is actual SQL/role,
+adapter, enrollment and migration evidence, without collector execution,
+installed Native cause attribution, physical backing or measured CPU/WAL claims.
+
+
+## Closed demand-lane boundary diagnostics (2026-10-29)
+
+Native 40794688705 on frozen `fc0a4491` failed before capture/history: the exact
+selected binding had a complete 30-second interval but was expired by
+115.911311s, while its persisted current demand was 4.008091s old. No matching
+fresh publication reached the final authoritative read. All 3,400 source hashes
+matched, Go/test exited 1 (594.875s; approved child 126.05s), and cleanup reported
+no failures. The retained worker dump contained no demand-refresh outcome line.
+That does not establish a joined-slot, permission, locator or pool-contention
+cause. The repeated permission denial is the deliberate fixture reader probe.
+
+The pre-candidate boundary previously returned silently on demand-reader error
+or original-step expiry and when a selected demand matched no configured cluster.
+A local test reproduces those missing reports, with an empty-success control
+remaining quiet (RED exit 1, 0.404s). The existing callback now receives only
+`read`, `read-deadline` or `cluster-unmatched`, generic unavailable and elapsed
+wall time and a private zero placeholder in the generic read-left argument.
+The consumer renders `read left not-applicable` for these three stages because
+no source-read proof exists there; zero must never imply a measured exhausted
+proof. Numeric leftovers for actual candidate reconciliation are unchanged.
+No provider error text, namespace/workload/cluster identity or source body is
+passed. A blocked read retains its original context
+cutoff. Known clusters still reconcile; unknown clusters cause no observation.
+This is diagnostic correction, not an availability fix or new retry policy.
+
+No provider/API/SQL request, SQL grant, connection, timer, watch, service,
+persistent state or public setting is added. New Report invocations can add logging I/O. The reader returns
+at most sixteen demands, but each iteration selects exactly one round-robin
+candidate, scans for its cluster and then returns after at most one callback.
+It does not report once per demand in the batch or once per configured cluster.
+Read failure returns immediately after its single report; empty success stays
+quiet. The existing serial loop pauses 250ms after each completed iteration.
+Consequently, with iteration duration L, the long-run rate is at most
+`1 / (L + 0.25s)`: four reports/second/root for immediate errors or unmatched
+clusters, or about 0.19/second for a full five-second read expiry. Over a finite
+T-second interval, the ceiling is `floor(T / 0.25s) + 1`, including an initial
+report. Batch size sixteen does not multiply these limits. Before-read clock
+sampling has the same four/second long-run ceiling. Normal reconciliation,
+priority publication, original authority intervals and SQL checks are unchanged.
+Degraded reader/cluster states can thus produce additional log lines compared
+with the formerly silent path, bounded by this existing single-lane cadence.
+No sampler, counter or new reporting state is introduced.
+
+The installed pool is intentionally `MaxConns=1`. Source tracing rules out
+self-nesting inside the demand reader: its generated SQL call is one
+`pool.QueryRow(...).Scan`; pinned pgx v5.11.0 `pgxpool.poolRow.Scan` releases that
+connection before the adapter decodes/filters the result. The pool's only
+BeforeConnect hook rereads a mounted credential, not SQL; no current-config,
+recovery or owner callback borrows the pool inside this reader. Inspected
+capacity source/root/enrollment transactions use their transaction-bound queries
+and local decoding/MAC checks. Other concurrent facets still share the single
+pool and can wait; a later idle SQL snapshot cannot establish or exclude earlier
+contention. No real-SQL production-composition or Native self-blocking experiment
+is claimed. SQL row selection, decoding keys, role/connection limit, cluster
+wiring, original ownership and bounded batch order showed no functional mismatch
+in this source review. Functional cold-readiness causation remains unresolved.
+
+
+Local GREEN passes the focused boundary/known-cluster controls (race exit 0,
+3.612s), then full capacity races (9.444s) and bootstrap races (62.517s).
+Integration compilation (0.013s), affected vet, specification and design/import
+architecture gates pass. Error/deadline/cluster conditions are intentionally
+supplied test controls, not reconstructed Native facts. No SQL/Kubernetes
+fixture, hosted run or collector was started for this diagnostic checkpoint;
+functional evidence is still required before another installed attempt.
+
+
+A consumer-format regression reproduces the misleading `read left 0s [read]`
+with the earlier format (RED exit 1, 0.013s). The correction passes its race test
+(exit 0, 1.054s): all three pre-candidate stages are not-applicable, while real
+candidate numeric leftovers, including a real supplied zero, remain unchanged.
+The same callback and single logging write are used; there are no extra clock
+samples or I/O calls. This format correction adds no authority or budget fact.

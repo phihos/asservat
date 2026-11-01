@@ -47,6 +47,9 @@ func captureShareInstruction(ctx context.Context, q *custodydb.Queries, stream c
 		return nil, nil
 	}
 	i := a.Eligibility.VerifiedIdentity
+	if a.RecordingSave != nil {
+		i = a.RecordingSave.Initiator.VerifiedIdentity
+	}
 	target := a.Plan.Input.Target.Target()
 	if !s.Valid() || i.Principal != reviewed.Actor || s.Recipients[0].Issuer != i.Principal.Issuer {
 		return nil, value.ErrInvalid

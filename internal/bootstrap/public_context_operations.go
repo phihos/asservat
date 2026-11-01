@@ -27,14 +27,19 @@ import (
 // Protected deployment composition must verify original projections and supply
 // current scoped adapters before calling it; no missing service gets a default.
 type PublicContextOperationServices struct {
-	Investigation captureapp.ContextInvestigation
-	Intents       auditapp.CaptureOperationPublication
-	Regional      RegionalAPIContextStart
-	Progress      captureapp.ContextProgressService
-	Cases         catalogapp.ContextCaseService
-	Downloads     evidence.ContextDownloadCoordinator
-	Native        ContextNativeDownloadServices
-	Projection    *analysisapp.ContextProjectionService
+	// Candidate-only installed composition; never decoded from browser/MCP input.
+	ongoingSources *captureapp.PolicySourceRuntime
+	Recordings     *captureapp.RecordingSaves
+	Cancellations  *captureapp.CaptureCancellation
+	History        *captureapp.HistoryParameterService
+	Investigation  captureapp.ContextInvestigation
+	Intents        auditapp.CaptureOperationPublication
+	Regional       RegionalAPIContextStart
+	Progress       captureapp.ContextProgressService
+	Cases          catalogapp.ContextCaseService
+	Downloads      evidence.ContextDownloadCoordinator
+	Native         ContextNativeDownloadServices
+	Projection     *analysisapp.ContextProjectionService
 }
 
 type PublicContextOperationsConfig struct {
@@ -67,9 +72,24 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 	reader, readerOK := v.progress.Reader.(captureapp.ContextHistoryReader)
 	workloads, workloadsOK := v.submission.Targets.(captureapp.RestartObserver)
 	if readerOK && workloadsOK {
+		if s.History != nil {
+			s.History.Now, s.History.NewID, s.History.Legacy = c.Now, c.NewID, reader
+			reader = s.History
+			v.submission.History = s.History
+		}
 		history = captureapp.ContextHistoryService{RootID: c.RootID, InstallationID: c.InstallationID, Reader: reader, Targets: v.submission.Targets, Workloads: workloads, Previews: v.submission, Recovery: v.submission.Recovery, Now: c.Now}
+		if s.History != nil {
+			typed := history.(captureapp.ContextHistoryService)
+			typed.Keys = s.History.Keys
+			history = typed
+		}
 	}
-	captures, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: c.PublicOrigin, CollectionEnabled: c.CollectionEnabled, Now: c.Now, NewID: c.NewID}, v.submission, v.progress, history)
+	cfg := presentation.ContextOperationsConfig{PublicOrigin: c.PublicOrigin, CollectionEnabled: c.CollectionEnabled, Now: c.Now, NewID: c.NewID}
+	if s.History != nil {
+		cfg.HistoryRootID = c.RootID
+		cfg.HistoryCursorKeys = s.History.Keys
+	}
+	captures, err := presentation.NewContextOperationsWithHistory(cfg, v.submission, v.progress, history)
 	if err != nil {
 		return nil, err
 	}
@@ -82,8 +102,31 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 		return nil, err
 	}
 	operations, err := presentation.NewInvestigationOperations(captures, cases, downloads)
-	if err != nil || s.Projection == nil {
-		return operations, err
+	if err != nil {
+		return nil, err
+	}
+	if s.Recordings != nil {
+		saves := *s.Recordings
+		saves.Investigation = v.submission.ContextInvestigation
+		saves.History = history
+		saves.Inventory.Now, saves.Inventory.NewID = c.Now, c.NewID
+		var cancel presentation.RecordingCancellationUseCase
+		if s.Cancellations != nil {
+			service := *s.Cancellations
+			service.Now = c.Now
+			cancel = service
+		}
+		recordings, e := presentation.NewRecordingSaveOperations(presentation.RecordingSaveOperationsConfig{PublicOrigin: c.PublicOrigin, CollectionEnabled: c.CollectionEnabled && v.submission.RecordingSaveEnabled, Now: c.Now, NewID: c.NewID}, saves, cancel)
+		if e != nil {
+			return nil, e
+		}
+		operations, e = presentation.NewInvestigationRecordingSaveOperations(operations, recordings)
+		if e != nil {
+			return nil, e
+		}
+	}
+	if s.Projection == nil {
+		return operations, nil
 	}
 	q := s.Projection
 	if q.Results.RootID != c.RootID || q.Results.InstallationID != c.InstallationID || !authorization.UUID(q.Results.HubProcessEpoch) || q.Results.Authority == nil || q.Results.Ledger == nil || q.Results.Reader == nil || q.Results.Now == nil || q.Results.NewID == nil || q.Recovery == nil || q.Routes == nil || q.Plans == nil || q.Workers == nil {
@@ -111,6 +154,7 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 		s.Native.Runtime == nil && s.Native.Stop.Active != nil || s.Native.Runtime != nil && s.Native.Stop.Active != s.Native.Runtime || s.Native.Stop.Ledger == nil || s.Native.Stop.Acknowledgements == nil || s.Native.Stop.Objects == nil {
 		return zero, presentation.ErrOperationsConfiguration
 	}
+	i.RecordingSaveEnabled = packetSourceCompositionReady(c, s)
 	// Shared freshness functions and recovery source are fixed once at assembly;
 	// this creates no observation and replaces no original request deadline.
 	i.Now, i.NewID, a.Now = c.Now, c.NewID, c.Now
@@ -126,7 +170,13 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 	}
 	stop := s.Native.Stop
 	stop.Now = c.Now
-	return publicContextUseCases{captureapp.ContextSubmission{ContextInvestigation: i, Intents: a, Start: s.Regional}, p, k, d, stop}, nil
+	if s.History != nil {
+		s.History.Now, s.History.NewID = c.Now, c.NewID
+		if reader, ok := p.Reader.(captureapp.ContextHistoryReader); ok {
+			s.History.Legacy = reader
+		}
+	}
+	return publicContextUseCases{captureapp.ContextSubmission{ContextInvestigation: i, Intents: a, Start: s.Regional, History: s.History}, p, k, d, stop}, nil
 }
 
 // regionalHubRunner accepts only the hub's SQL/authority ports (ADR-171):
@@ -151,14 +201,21 @@ func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOpera
 	if !ok {
 		return nil, nil, presentation.ErrOperationsConfiguration
 	}
-	activation := captureapp.PolicyActivation{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Documents: pc.hubPolicies, Sources: pc.policies, Observer: observer, Ledger: pc.policyTriggers, Permissions: pc.permissions, Automation: pc.automation, Acceptor: pc.policies, Audit: pc.policyAudit, Recovery: v.submission.Recovery, Now: c.Now, Report: eventLog(os.Stderr, "policy activation refused")}
-	status := captureapp.PolicyStatusService{RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
+	activation := captureapp.PolicyActivation{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Documents: pc.hubPolicies, Sources: pc.policies, Observer: observer, Ledger: pc.policyTriggers, Permissions: pc.permissions, Automation: pc.automation, Acceptor: pc.policies, Audit: pc.policyAudit, Recovery: v.submission.Recovery, Now: c.Now, Report: eventLog(os.Stderr, "policy activation refused"), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters), WorkloadAutomation: pc.automation, GrantAttachments: pc.policies}
+	status := captureapp.PolicyStatusService{CompileRecorder: recordingSavePolicyCompiler(v.submission.Filters), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
 	deactivation := captureapp.PolicyDeactivation{RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
 	operations, err := presentation.NewPolicyOperations(c.PublicOrigin, c.Now, c.NewID, activation, status, deactivation)
 	if err != nil {
 		return nil, nil, err
 	}
-	trigger := &captureapp.PolicyTrigger{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Ledger: pc.policyTriggers, Documents: pc.hubPolicies, Sources: pc.policies, Accepted: pc.policies, Observer: observer, Capture: v.submission, Audit: pc.policyAudit, Now: c.Now, Report: timedEventLog(os.Stderr, "policy trigger")}
+	trigger := &captureapp.PolicyTrigger{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters), Ledger: pc.policyTriggers, Documents: pc.hubPolicies, Sources: pc.policies, Accepted: pc.policies, Observer: observer, Capture: v.submission, Audit: pc.policyAudit, Now: c.Now, Report: timedEventLog(os.Stderr, "policy trigger")}
+	if v.submission.RecordingSaveEnabled {
+		trigger.OngoingSources = s.ongoingSources
+		trigger.SourceSnapshots = v.submission
+	}
+	// This isolated qualification candidate selects the existing source runtime;
+	// an incomplete or disabled composition never acquires ongoing sources.
+
 	return operations, trigger, nil
 }
 
@@ -244,4 +301,11 @@ func previewDelegations(in []contracts.PermissionDelegation) ([]authapp.PreviewD
 		out = append(out, x)
 	}
 	return out, nil
+}
+
+// Same manual composition/filter compiler, without inventing a preview or Pod.
+func publicPolicyRecorderCompiler(filters planningapp.FilterCompiler) captureapp.PolicyRecorderCompiler {
+	// Lifecycle comes from the normalized authored/default mode, never lookback.
+	// The existing source-capable compiler preserves explicit finite bytes.
+	return recordingSavePolicyCompiler(filters)
 }

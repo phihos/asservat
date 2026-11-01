@@ -78,3 +78,33 @@ func TestDomainStatusRefusesOpenValues(t *testing.T) {
 		}
 	}
 }
+
+func TestSourceCeilingsSurviveClosedNodeProjection(t *testing.T) {
+	c := collector.Ceilings{SourceLimits: collector.SourceLimits{MaxActiveSources: 16, InputBytesPerSecond: 16 << 20, InputBurstBytes: 16 << 20}}
+	if DomainCeilings(WireCeilings(c)) != c {
+		t.Fatal("ongoing ceilings lost at node boundary")
+	}
+
+	report := sampleReport()
+	report.Budget.Ceilings.SourceLimits = c.SourceLimits
+	raw, err := json.Marshal(WireStatus("epoch", report))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := contracts.DecodeNodeStatus(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal("closed nonzero source ceiling codec", err)
+	}
+	back, ok := DomainStatus(decoded)
+	if !ok || !reflect.DeepEqual(back, report) {
+		t.Fatal("source ceiling report roundtrip changed", ok)
+	}
+	decoded.Budget.Ceilings.InputBurstBytes = 0
+	if _, ok = DomainStatus(decoded); ok {
+		t.Fatal("partial source report accepted")
+	}
+	old := contracts.NodeCeilings{}
+	if DomainCeilings(old).SourceLimits.Enabled() {
+		t.Fatal("missing old caps enabled ongoing capacity")
+	}
+}

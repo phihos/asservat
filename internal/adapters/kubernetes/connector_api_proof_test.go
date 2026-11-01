@@ -292,3 +292,30 @@ func TestConnectorAPIProofBlockedRecheckCannotPublishKnownChange(t *testing.T) {
 		t.Fatal("stale recheck remained cached")
 	}
 }
+
+// A cached proof with less than proofReuseMargin left is produced again, so a
+// start never receives one that would fail its one-second headroom.
+func TestConnectorAPIProofNearExpiryIsProducedAgain(t *testing.T) {
+	start := time.Now().UTC()
+	var state connectorAPIProofState
+	var producers, checks atomic.Int64
+	produce := func(context.Context) (connectorAPIProof, error) {
+		producers.Add(1)
+		return connectorCachedProof(t, start), nil
+	}
+	check := func(_ context.Context, p connectorAPIProof) (connectorAPIProof, error) { checks.Add(1); return p, nil }
+	clock := start
+	now := func() time.Time { return clock }
+	for _, c := range []struct {
+		at                time.Duration
+		producers, checks int64
+	}{{0, 1, 0}, {2 * time.Second, 1, 1}, {3*time.Second + time.Millisecond, 2, 1}} {
+		clock = start.Add(c.at)
+		if _, e := state.read(context.Background(), now, produce, check); e != nil && c.producers == 1 {
+			t.Fatal(c.at, e)
+		}
+		if producers.Load() != c.producers || checks.Load() != c.checks {
+			t.Fatal("reuse margin", c.at, producers.Load(), checks.Load())
+		}
+	}
+}

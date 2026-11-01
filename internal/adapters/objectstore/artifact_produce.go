@@ -42,13 +42,14 @@ func NewArtifactProducer(store *CustodyStore, keys evidence.KeySealer, journal p
 // PreparedArtifact holds the prepared keys of one attempt. It is single use:
 // a failed store leaves its journal and charges for cleanup, never a retry.
 type PreparedArtifact struct {
-	mu          sync.Mutex
-	producer    *ArtifactProducer
-	expectation artifact.ContextExpectation
-	plan        artifact.StreamingPlan
-	encoder     *framed.Encoder
-	metadata    *framed.ManifestWriter
-	used        bool
+	snapshotRetained *uint64
+	mu               sync.Mutex
+	producer         *ArtifactProducer
+	expectation      artifact.ContextExpectation
+	plan             artifact.StreamingPlan
+	encoder          *framed.Encoder
+	metadata         *framed.ManifestWriter
+	used             bool
 }
 
 // Prepare wraps the data, index and manifest keys before the source is read.
@@ -56,7 +57,7 @@ type PreparedArtifact struct {
 // streaming plan; it is required exactly when the limit exceeds one frame.
 func (p *ArtifactProducer) Prepare(ctx context.Context, e artifact.ContextExpectation, writerEpoch string) (*PreparedArtifact, error) {
 	r := e.Registration
-	if e.Validate() != nil || e.NativeType == artifact.PodStatusArtifact || r.StoreID != p.store.storeID || !p.now().Before(r.WriteUntil) {
+	if e.Validate() != nil || !evidence.ValidSourceSnapshotManifest(e) || e.NativeType == artifact.PodStatusArtifact || r.StoreID != p.store.storeID || !p.now().Before(r.WriteUntil) {
 		return nil, artifact.ErrInvalid
 	}
 	plan := artifact.StreamingPlan{Registration: r, WriterEpoch: writerEpoch}
@@ -79,6 +80,10 @@ func (p *ArtifactProducer) Prepare(ctx context.Context, e artifact.ContextExpect
 	e.Audience = slices.Clone(e.Audience)
 	e.RetentionRules = slices.Clone(e.RetentionRules)
 	e.Lifecycle = e.Lifecycle.Clone()
+	e.SourceSnapshotManifest = e.SourceSnapshotManifest.Clone()
+	if e.Snapshot != nil {
+		e.Snapshot = e.Snapshot.Clone()
+	}
 	return &PreparedArtifact{producer: p, expectation: e, plan: plan, encoder: encoder, metadata: metadata}, nil
 }
 
@@ -113,12 +118,19 @@ func (s streamingSink) Write(p []byte) (int, error) {
 }
 
 // Store encodes the native stream and writes all four objects. started and
-// completed describe the actual acquisition (for an ongoing save, its first
-// and last saved record), never a fabricated trigger time. The original
+// completed describe the actual acquisition interval, including quiet/filter
+// periods in a covered source window, never a fabricated trigger time. The original
 // WriteUntil bounds storage backpressure; nothing extends it.
 func (a *PreparedArtifact) Store(ctx context.Context, src io.Reader, started, completed time.Time) (artifact.Copies, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.expectation.Snapshot != nil {
+		return artifact.Copies{}, artifact.ErrInvalid
+	}
+	return a.storeLocked(ctx, src, started, completed)
+}
+
+func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, started, completed time.Time) (artifact.Copies, error) {
 	var out artifact.Copies
 	if a.used || a.encoder == nil || a.metadata == nil || src == nil {
 		return out, artifact.ErrInvalid
@@ -151,6 +163,12 @@ func (a *PreparedArtifact) Store(ctx context.Context, src io.Reader, started, co
 	}
 	if err = check.Close(); err != nil {
 		return out, err
+	}
+	if a.snapshotRetained != nil {
+		count, ok := check.(interface{ PacketCount() uint64 })
+		if !ok || count.PacketCount() != *a.snapshotRetained {
+			return out, artifact.ErrIntegrity
+		}
 	}
 	put := func(i int, body []byte) error {
 		if ctx.Err() != nil || !p.now().Before(r.WriteUntil) {

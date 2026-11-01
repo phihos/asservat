@@ -50,7 +50,7 @@ func historyService(f *investigationFixture) (ContextHistoryService, *historyRea
 }
 
 func historyServiceWithWorkloads(f *investigationFixture) (ContextHistoryService, *historyReaderFixture, *workloadObserverFixture) {
-	r := &historyReaderFixture{f: f, settings: value.CaptureSettings{ClusterID: fixtureID(4), NamespaceUID: "ns", WorkloadUID: "deployment", Namespace: "payments", WorkloadKind: "Deployment", WorkloadName: "api", RequestedSeconds: 120, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}}
+	r := &historyReaderFixture{f: f, settings: value.CaptureSettings{ClusterID: fixtureID(4), NamespaceUID: "ns", WorkloadUID: "deployment", Namespace: "payments", WorkloadKind: "Deployment", WorkloadName: "api", RequestedSeconds: 120, ExpiresAt: f.now.Add(time.Hour), ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}}
 	w := &workloadObserverFixture{f: f, uid: "deployment"}
 	return ContextHistoryService{RootID: f.svc.RootID, InstallationID: f.svc.InstallationID, Reader: r, Targets: f, Workloads: w, Previews: f.svc, Recovery: f, Now: func() time.Time { return f.now }}, r, w
 }

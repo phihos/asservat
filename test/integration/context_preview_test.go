@@ -97,6 +97,7 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	}
 
 	qualifyContextRequestResolution(t, ctx, admin, poolFor, create, newStore, blueprint, query)
+	qualifyContextStorageRequest(t, ctx, admin, poolFor, create)
 
 	t.Run("current-context-placement-is-scoped-read-only-and-preserves-original-freshness", func(t *testing.T) {
 		s := create(t, 1)
@@ -133,6 +134,67 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 				t.Fatal("expected storage-role permission denial", check.statement, err)
 			}
 		}
+	})
+
+	t.Run("expired-context-storage-read-preserves-refresh-classification", func(t *testing.T) {
+		s := create(t, 1)
+		readPool := poolFor("context_storage_read_runtime", "synthetic-context-storage-read")
+		defer readPool.Close()
+		reader, err := postgres.NewContextStorageReader(ctx, readPool, s.a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target := s.a.Eligibility.Target
+		original, err := reader.ContextStorage(ctx, target)
+		if err != nil {
+			t.Fatal("initial real storage read", err)
+		}
+		// Fixture administrator changes only the original observation's dates;
+		// no reader or requester can refresh the protected binding itself.
+		at := time.Now().UTC().Truncate(time.Microsecond)
+		observed, expired := at.Add(-31*time.Second), at.Add(-time.Second)
+		update := func(generation int64, observed, until time.Time) {
+			t.Helper()
+			tag, e := admin.Exec(ctx, `UPDATE context_storage_binding SET source_generation=$3,observed_at=$4,fresh_until=$5 WHERE root_id=$1 AND allocation_id=$2`, s.a.RootID, s.a.Registration.AllocationID, generation, observed, until)
+			if e != nil || tag.RowsAffected() != 1 {
+				t.Fatal("fixture binding interval", e, tag.RowsAffected())
+			}
+		}
+		update(s.a.Storage.Revision.Generation, observed, expired)
+		got, err := reader.ContextStorage(ctx, target)
+		var refusal interface{ ContextStorageRead() string }
+		if !errors.Is(err, capture.ErrStorageBindingExpired) || !errors.Is(err, capture.ErrUnavailable) || errors.Is(err, capture.ErrChanged) || !errors.As(err, &refusal) || refusal.ContextStorageRead() != "observation/source-expired" || got.Selection != original.Selection || !got.Binding.ObservedAt.Equal(observed) || !got.Binding.FreshUntil.Equal(expired) || got.Binding.Valid(time.Now()) || !got.Binding.Valid(observed) {
+			t.Fatal("actual Ledger erased expired-source readiness type or original selection", err, got.Selection == original.Selection)
+		}
+		// Expired metadata can identify a changed selection but never conceal it.
+		update(s.a.Storage.Revision.Generation+1, observed, expired)
+		changed, err := reader.ContextStorage(ctx, target)
+		if !errors.Is(err, capture.ErrStorageBindingExpired) || changed.Selection == original.Selection || changed.Binding.Revision.Generation != s.a.Storage.Revision.Generation+1 {
+			t.Fatal("expired read hid changed original revision", err)
+		}
+		// Future/invalid observations remain ordinary changes with no metadata.
+		update(s.a.Storage.Revision.Generation, at.Add(time.Minute), at.Add(90*time.Second))
+		invalid, err := reader.ContextStorage(ctx, target)
+		if !errors.Is(err, capture.ErrChanged) || errors.Is(err, capture.ErrStorageBindingExpired) || invalid.Binding.RootID != "" {
+			t.Fatal("invalid source became expired-only metadata", err)
+		}
+		// A canceled actual SQL call must never expose a prior expired receipt.
+		canceled, stop := context.WithCancel(ctx)
+		stop()
+		invalid, err = reader.ContextStorage(canceled, target)
+		if err == nil || errors.Is(err, capture.ErrStorageBindingExpired) || invalid.Binding.RootID != "" {
+			t.Fatal("canceled read returned expired receipt", err)
+		}
+		// Only a new successful protected read can provide the restored original
+		// observation. The expiry read itself made no authority or admission write.
+		update(s.a.Storage.Revision.Generation, original.Binding.ObservedAt, original.Binding.FreshUntil)
+		fresh, err := reader.ContextStorage(ctx, target)
+		var captures int
+		countErr := admin.QueryRow(ctx, `SELECT count(*) FROM context_capture WHERE root_id=$1`, s.a.RootID).Scan(&captures)
+		if err != nil || fresh.Selection != original.Selection || fresh.Binding != original.Binding || countErr != nil || captures != 0 {
+			t.Fatal("read renewed original facts or created admission", err, countErr, captures)
+		}
+		t.Log("actual Ledger/SELECT-only ContextStorageReader preserved expired metadata, changed selection and independent fresh read; zero captures")
 	})
 
 	t.Run("preview-principal-cap-is-atomic-across-clients", func(t *testing.T) {
@@ -234,6 +296,121 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if err != nil || !reflect.DeepEqual(got, p) {
 			t.Fatal("preview identity or original deadline changed", err)
 		}
+		// Exercise the exact fixture-only failure query against actual SQL and
+		// the immutable stored blueprint, without collection or enrollment.
+		facts, err := readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+		if err != nil || !facts.Preview || !facts.Binding || !facts.SelectedAllocation || facts.Enrolled || facts.Ready || facts.DemandRecorded || facts.DemandCurrent || !facts.ObservedAt.Time.Equal(s.a.Storage.ObservedAt) || !facts.FreshUntil.Time.Equal(s.a.Storage.FreshUntil) {
+			t.Fatal("exact preview storage diagnostic", facts, err)
+		}
+		missing, err := readInstalledInitialStorage(ctx, admin, p.RootID, custodyID())
+		if err != nil || missing.Preview || missing.Binding || missing.Enrolled || missing.DemandRecorded || !missing.Now.Valid {
+			t.Fatal("absent preview diagnostic", missing, err)
+		}
+		mismatch := fork(t, s, p.Actor, p.Deadline)
+		mismatch.Storage.AllocationID = custodyID()
+		if err := store.CreateContextPreview(ctx, mismatch); err != nil {
+			t.Fatal("immutable mismatched-selection witness", err)
+		}
+		facts, err = readInstalledInitialStorage(ctx, admin, p.RootID, mismatch.ID)
+		if err != nil || !facts.Preview || !facts.Binding || facts.SelectedAllocation {
+			t.Fatal("selected allocation mismatch diagnostic", facts, err)
+		}
+		// Administrator-only synthetic observations exercise the diagnostic;
+		// they do not constitute genuine enrollment or refresh qualification.
+		for _, seconds := range []int{3, 30} {
+			until := time.Now().UTC().Truncate(time.Microsecond).Add(-time.Second)
+			if _, err := admin.Exec(ctx, "UPDATE context_storage_binding SET observed_at=$2,fresh_until=$3 WHERE allocation_id=$1", p.Storage.AllocationID, until.Add(-time.Duration(seconds)*time.Second), until); err != nil {
+				t.Fatal("diagnostic original interval witness", err)
+			}
+			facts, err = readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+			if err != nil || facts.ShortInterval != (seconds == 3) || facts.ThirtySecondInterval != (seconds == 30) || !facts.Now.Time.After(facts.FreshUntil.Time) || facts.ReadyPublication {
+				t.Fatal("original binding interval diagnostic", facts, err)
+			}
+		}
+		// The query is diagnostic only. These administrator-controlled row
+		// witnesses do not substitute for a current authorizing observation.
+		if !facts.TargetBasisWithinLimit || !facts.PermissionStream || !facts.InitialACK || !facts.EpochACK || !facts.TargetBasis || !facts.TargetSequence || !facts.TargetLifetime || !facts.TargetMaintainer || !facts.TargetActivationACK {
+			t.Fatal("accepted namespace-wide permission diagnostic", facts)
+		}
+		var originalLease time.Time
+		if err := admin.QueryRow(ctx, "SELECT lease_until FROM permission_stream WHERE id=$1", p.RootID).Scan(&originalLease); err != nil {
+			t.Fatal(err)
+		}
+		for _, observationSeconds := range []int{5, 30} {
+			observed := time.Now().UTC().Truncate(time.Microsecond)
+			freshUntil := observed.Add(time.Duration(observationSeconds) * time.Second)
+			if _, err := admin.Exec(ctx, "UPDATE permission_stream SET observed_at=$2,fresh_until=$3 WHERE id=$1", p.RootID, observed, freshUntil); err != nil {
+				t.Fatal("stored observation interval witness", err)
+			}
+			for _, suspended := range []bool{false, true} {
+				if _, err := admin.Exec(ctx, "UPDATE permission_stream SET suspended=$2 WHERE id=$1", p.RootID, suspended); err != nil {
+					t.Fatal(err)
+				}
+				f, err := readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+				if err != nil || f.PermissionCurrent == suspended || !f.InitialACK || !f.EpochACK {
+					t.Fatal("stored observation lifetime/suspension diagnostic", observationSeconds, f, err)
+				}
+			}
+			if _, err := admin.Exec(ctx, "UPDATE permission_stream SET suspended=false,lease_until=clock_timestamp()-interval '1 second' WHERE id=$1", p.RootID); err != nil {
+				t.Fatal(err)
+			}
+			f, err := readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+			if err != nil || f.PermissionCurrent || !f.InitialACK || !f.EpochACK {
+				t.Fatal("expired original lease diagnostic", f, err)
+			}
+			var storedObserved, storedFresh time.Time
+			if err := admin.QueryRow(ctx, "UPDATE permission_stream SET lease_until=$2 WHERE id=$1 RETURNING observed_at,fresh_until", p.RootID, originalLease).Scan(&storedObserved, &storedFresh); err != nil || !storedObserved.Equal(observed) || !storedFresh.Equal(freshUntil) {
+				t.Fatal("diagnostic changed original stored observation dates", err)
+			}
+		}
+		for _, witness := range []struct {
+			name, statement                       string
+			basis, sequence, lifetime, maintainer bool
+		}{
+			{"exact-workload", "UPDATE permission_basis SET workload_uids=ARRAY[$2]::text[] WHERE stream_id=$1", true, true, true, true},
+			{"wrong-workload", "UPDATE permission_basis SET workload_uids=ARRAY['other-workload']::text[] WHERE stream_id=$1 AND $2::text<>''", false, false, false, false},
+			{"wrong-namespace", "UPDATE permission_basis SET namespace_uid='other-namespace' WHERE stream_id=$1 AND $2::text<>''", false, false, false, false},
+			{"stale-sequence", "UPDATE permission_basis SET seen_sequence=seen_sequence+1 WHERE stream_id=$1 AND $2::text<>''", true, false, false, false},
+			{"expired-scope", "UPDATE permission_basis SET not_after=clock_timestamp()-interval '1 second' WHERE stream_id=$1 AND $2::text<>''", true, true, false, false},
+			{"no-live-maintainer", "UPDATE permission_assignment SET retired_at=clock_timestamp(),retirement_audit_id=activation_audit_id WHERE stream_id=$1 AND role='workload-maintainer' AND $2::text<>''", true, true, true, false},
+		} {
+			t.Run("stored-permission-"+witness.name, func(t *testing.T) {
+				if _, err := admin.Exec(ctx, witness.statement, p.RootID, s.a.Plan.Input.Target.Request.Workload.UID); err != nil {
+					t.Fatal("controlled permission diagnostic witness", err)
+				}
+				f, err := readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+				if err != nil || !f.TargetBasisWithinLimit || f.TargetBasis != witness.basis || f.TargetSequence != witness.sequence || f.TargetLifetime != witness.lifetime || f.TargetMaintainer != witness.maintainer || f.TargetActivationACK != witness.maintainer {
+					t.Fatal("stored permission diagnostic", f, err)
+				}
+			})
+			if _, err := admin.Exec(ctx, "UPDATE permission_basis SET namespace_uid=$2,workload_uids='{}',seen_sequence=(SELECT sequence FROM permission_stream WHERE id=$1),not_after=NULL WHERE stream_id=$1", p.RootID, s.batch.Bases[0].Scope.Namespace.UID); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Use a genuine accepted change for an unacknowledged activation,
+		// retaining the original acknowledged initial and epoch records.
+		batch := s.batch
+		batch.Bases = append([]cfg.PermissionBasis(nil), batch.Bases...)
+		batch.Initial = nil
+		batch.RequestID = custodyID()
+		batch.InputDigest = artifact.Digest{93}
+		batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+		batch.FreshUntil = batch.ObservedAt.Add(5 * time.Second)
+		batch.Bases[0].Resource.Generation++
+		batch.Bases[0].Resource.ResourceVersion = "diagnostic-change"
+		batch.Bases[0].Resource.SpecDigest = artifact.Digest{94}
+		batch.Bases[0].Subjects = []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "changed-maintainers"}}
+		batch.Bases[0].ScopeDigest = configapp.PermissionScopeDigest(batch.Bases[0])
+		if _, err := s.p.AcceptPermissions(ctx, batch); err != nil {
+			t.Fatal("unacknowledged accepted permission witness", err)
+		}
+		facts, err = readInstalledInitialStorage(ctx, admin, p.RootID, p.ID)
+		if err != nil || !facts.PermissionCurrent || !facts.InitialACK || !facts.EpochACK || !facts.TargetSequence || !facts.TargetLifetime || !facts.TargetMaintainer || facts.TargetActivationACK {
+			t.Fatal("unacknowledged activation diagnostic", facts, err)
+		}
+		// This raw-preview fixture has no protected capacity_source/enrollment
+		// parent. Positive demand and Ready-publication diagnostics remain
+		// unqualified here; never bypass their foreign keys to seed witnesses.
 		changed := p.Clone()
 		changed.Deadline = changed.Deadline.Add(time.Second)
 		if err := store.CreateContextPreview(ctx, changed); !errors.Is(err, capture.ErrConflict) {

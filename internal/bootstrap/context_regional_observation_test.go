@@ -304,6 +304,27 @@ func TestRegionalStartReusesPreludeBeforeFirstPreparation(t *testing.T) {
 	// The standby's passive residency outlives the start's own deadline.
 	resident, endResident := context.WithCancel(t.Context())
 	defer endResident()
+	// History uses this same real attachment/capture slot. Closing must join
+	// its original conversation before a replacement can serve StartContext.
+	old, err := router.RegisterStandby(resident, f.receiver, func(ctx context.Context) (fleet.APIContextReceiver, error) { return f.receiver, ctx.Err() })
+	if err != nil {
+		t.Fatal(err)
+	}
+	history, err := router.Attach(ctx, f.work.Target.ClusterID, f.work.Accepted.CaptureID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := make(chan struct{})
+	go func() { history.Close(); close(joined) }()
+	<-old.Context().Done()
+	select {
+	case <-joined:
+		t.Fatal("history capture slot released before conversation joined")
+	default:
+	}
+	old.Finish()
+	<-joined
+	f.receiver.Channel.ExchangeID = regionalObservationID(59)
 	standby, err := router.RegisterStandby(resident, f.receiver, func(ctx context.Context) (fleet.APIContextReceiver, error) { return f.receiver, ctx.Err() })
 	if err != nil {
 		t.Fatal(err)

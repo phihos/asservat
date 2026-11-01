@@ -2,6 +2,7 @@ package evidence
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"time"
 
@@ -151,10 +152,22 @@ func (s *ProjectionWorkerCleanup) retireDownload(ctx context.Context, c Download
 	}
 	retired, err := s.DownloadJobs.RetireDownloadWorker(ctx, t)
 	if err != nil || !retired.Valid(s.Now()) || retired.Termination != t || ctx.Err() != nil {
-		s.failed("download-delete-proof")
+		s.failed("download-delete-proof" + downloadRetirementStep(err))
 		return
 	}
 	if err := s.Downloads.RetireDownloadWorker(ctx, retired); err != nil {
 		s.failed("download-retirement-record")
 	}
+}
+
+// Only fixed adapter retirement predicates survive; provider text never does.
+func downloadRetirementStep(err error) string {
+	var fixed interface{ FixedStep() string }
+	if errors.As(err, &fixed) {
+		switch step := fixed.FixedStep(); step {
+		case "retirement/historical", "retirement/delete", "retirement/current", "retirement/job-present", "retirement/job-read", "retirement/pods-read", "retirement/pods-present", "retirement/pods-changed":
+			return "/" + step
+		}
+	}
+	return ""
 }

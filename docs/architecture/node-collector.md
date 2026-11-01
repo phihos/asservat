@@ -84,3 +84,254 @@ ConfigMap `connector-nodes`, the four attestation reads; ADR decision 9), but no
 installed it yet. Only manual packet captures exist (no rings, policy arming or snapshots);
 budget policy node limits are accepted by the schema but not yet intersected at admission. See the
 ADRs.
+
+## Exact packet source observation foundation
+
+The explicit regional `ResolvePacketSource` operation may return one
+`targets.PacketSourceObservation`: the whole target Pod UID, actual Node UID and
+boot ID, collector Pod UID/process epoch, and original observation interval.
+It reuses the same Pod resolution and authenticated `NodeChannel.NodeView`.
+Existing `ResolvePacketRecorder` metadata answers omit `Source`, preserving old
+strict wire decoders; this slice exposes no new source-query transport.
+Its interval starts at the later original Pod/report observation and ends at the
+earliest original Pod cutoff, report receipt plus the existing 45-second stale
+bound, or caller deadline. A new Pod read cannot renew the node report. The
+ordinary API target pin and metadata availability outcome remain unchanged;
+missing or expired source facts cannot support sensitive dispatch.
+
+`NodeChannel.EnqueuePacketExpected` consumes this single domain target value
+directly. Under the existing queue mutex and clock it checks cancellation,
+original interval, target Pod, Node UID/boot and collector Pod/epoch, current
+recorder availability and the original latest-start bound. Its facts are not a
+grant or permit. Already queued work retains its original latest-start bound
+rather than inheriting the short source-fact deadline. Existing enrollment
+replacement drops the old process queue and pending results; new epochs cannot
+inherit them. Ordinary metadata `EnqueuePacket` keeps its existing behavior.
+
+The shared `collector.ObservationBinding` and `ObservationPermit` own the local
+meter values; bootstrap aliases preserve the existing gate API. The accounting
+rule digest remains identical, represented as a fixed value verified against its
+canonical rule string in tests. This foundation adds no authority issuer,
+SQL/session mutation, sensitive wire permit or raw-predicate enablement.
+
+Cost: zero additional SQL/API/provider calls, watches, timers, goroutines,
+services, configuration, credentials or privileges. Each explicit source
+answer adds one bounded five-string/two-timestamp value (128-byte Go struct on
+amd64, excluding existing referenced strings and JSON encoding). Dispatch copies
+that value and adds fixed comparisons under the existing mutex. These are source
+size/call-count estimates, not installed CPU or end-to-end measurements. SQL
+credit issuance, authenticated permit transport, node enforcement composition and
+installed qualification remain pending in the policy-owned continuation.
+
+Local verification: a controlled regression bypassing expected-source checks
+failed with actual exit 1 (delivery 0.002s), demonstrating forbidden queue effects.
+Restored checks passed the final delivery race (1.049s), target/context-start
+races (1.006s/10.790s) and bootstrap race (56.527s). The unchanged local meter and
+shared accounting-rule test passed the collector race (1.006s). Canonical
+pre-push returned 0, including the actual Go import gate, specification/design
+checks, vet and 231 console tests. Its first new-worktree attempt failed only
+because pinned console dependencies were absent; offline `npm ci` completed
+before the successful run. These are pure/local component checks, not SQL,
+collector, private permit-wire or installed sensitive-observation qualification.
+
+## Conservative prefix proof component
+
+`packets.CheckPrefixProgram` is an unwired prerequisite for a future sensitive
+predicate. It reuses the maintained typed cBPF disassembler and existing opcode/VM
+validation, then checks every instruction, including unreachable instructions.
+Absolute/MSH reads must fit the existing 134-byte prefix. X starts at zero and
+can only be loaded from a constant <=60 or MSH (4 * low nibble <=60); TAX and
+scratch-to-X are refused. Indirect reads use that global bound with uint64
+arithmetic. This intentionally rejects some programs whose path-specific reads
+would fit; there is no new parser, VM, branch interpreter or configuration.
+
+`LD len` retains existing `Filter.vmFor` specialization from original Wire. Raw
+x/net VM `ExtLen` returns slice length, so that unspecialized VM alone is not the
+prefix evaluator. Maintained-VM tests compare full frames with their exact
+min(Wire,134) prefix and the same original wire length, including len >134,
+IPv4 IHL20/60 and the pinned 11-instruction `tcp[13]` program (largest read ends
+at byte88). IPv6/VLAN nonmatches for that IPv4 program are not broader support
+claims. Runtime complete-prefix/length validation, prompt unknown/loss handling,
+SQL/permit composition and native qualification remain separate requirements.
+
+The existing opcode-only check demonstrably permits an out-of-prefix read that
+changes a full-frame match into a silent nonmatch. Component RED exited1
+(0.003s); the new checker and full packets race passed (1.027s). Local amd64
+benchmarks of the complete checker, including existing VM validation, measured
+547–579ns/632B/22 allocations for11 instructions and 9.29–9.36us/11,112B/516
+allocations for256. These are synthetic per-plan checks, not installed CPU or
+packet throughput measurements. There is no added per-frame code, SQL/API/provider
+call, watch, timer, goroutine, service, credential, privilege or runtime knob.
+No compiler/node call site is wired by this component; raw gates remain closed.
+
+## Packet timestamp clock domain
+
+The pinned tcpdump program emits `CLOCK_MONOTONIC` nanoseconds. Each capture
+pairs that clock once with wall reads before/after the sample, before engine
+attachment; valid nonzero records retain their original relative times through
+that immutable UTC mapping. The previous process-global Gadget converter used
+`CLOCK_BOOTTIME`, whose suspend accounting differs. The correction adds one
+MONOTONIC syscall and two wall reads per capture, with no per-packet clock reads,
+wire fields, new authority interval or clock revalidation mechanism.
+
+Sampling failure refuses before attachment. An unrepresentable nonzero packet
+time emits the existing unknown-input notice when present and sets one failure
+flag under the existing callback mutex. After the engine joins, both observed
+and nil-notice capture return `ErrEngineUnavailable`; invalid times are never
+clamped or replaced by arrival time. The existing zero-timestamp arrival fallback
+is deliberately preserved as legacy behavior, not original kernel-time evidence.
+The pair does not qualify wall-clock steps, uncertainty, suspend behavior or
+installed failure causation. Source health, original-window and ongoing-source
+qualification remain separate; this adds no event-time watermark guarantee.
+
+## Unwired sanitized ring and original-window copy component
+
+`adapters/packets.Ring` is a local foundation for REQ-NET-003 and
+REQ-LIF-003/004, not an implemented C-12 SourceManager or Save executor.
+Constructor inputs are normalized caller/admin bounds, with the original context
+and hard memory cutoff retained. No source authority, renewal interval, raw
+observation credit or finite policy twenty-second lease is inferred. The owner
+must drive quiet advancement, observation watermarks, stop and joined closure.
+`ObservedThrough(at)` records consumer-established continuous source operation
+under declared clock, delivered-record cut and loss semantics. It does not
+assert that every future callback has a newer timestamp. The earlier inclusive
+all-future-callback prerequisite was an agent-added restriction, corrected here;
+original window, no-known-gap and explicit uncertainty requirements remain.
+Wall time or a packet-free interval alone proves no coverage. Actual engine
+health, clock mapping and backend backlog qualification remain pending. Parser/filter/control and encoder
+memory are separate from the framed historical arena.
+
+Finite `Snapshot` still copies only available original-time records. The distinct
+`BeginWindowSnapshot` reserves one full `maxCopyBytes` arena and one local snapshot
+slot before pre-copying `[from,t0]` and recording its retained-arrival cut.
+`Complete` copies original-window records not already copied: original time >t0
+or arrival sequence after that cut. This includes buffered late pre records
+available by the final locked cut, without duplicating the pre-copy or shifting
+original timestamps. Later callbacks are outside the sealed delivered-record set,
+not evidence of lossless physical acquisition. It copies once into
+remaining capacity: no allocation growth, second slot, shifted window or general
+extension. Full capacity is retained even for a quiet window and released once on
+Close; aggregate node/workload reservations belong to the future owner. Pending
+iteration refuses. Successful completion seals immutable records; capacity failure
+is terminal and refuses iteration until cleanup. Invalid early/backward completion
+refuses without advancing the source or sealing the handle. Pre/post coverage is
+computed independently: later live prehistory eviction cannot erase the admitted
+copy, while post eviction, gaps and early stop remain partial. First arrival
+sequence fits the existing segment header; record framing/arena size is unchanged.
+A coalesced eviction high-watermark detects post-admission uncopied arrivals:
+these conservatively mark unknown/partial, including evicted late pre records.
+This may also mark partial for unrelated newer arrivals; it is not a measured
+selected-window loss count. Evicting only already-copied pre records does not
+invalidate their independent copy. Sequence exhaustion refuses without refill.
+
+The original processing context/deadline is independent of the ring's source
+memory bound. Completion at or after that memory bound cannot read new post bytes;
+only the existing pre-copy may survive as partial under still-valid processing
+bounds. Cancellation while copying is rechecked before completion: processing
+cancellation refuses output; source cancellation discards the tentative post-copy.
+An after-zero window needs no new acquisition; while source memory remains valid
+it can also include late original-window records already delivered by its final
+cut. With closed source memory it can seal a complete pre-copy only if no newer
+retained arrivals could have been omitted and no newly known unknown input
+affects the original window, otherwise it stays partial. Current unknown-input
+coverage also remains binding when merging late pre records; freezing the
+pre-copy does not hide an intervening Gap. This reads only the existing coverage
+metadata, without importing the current eviction floor into the preserved copy.
+An explicit known Stop timestamp remains in the result, including after-zero
+and Stop followed by Close; Close/cancellation never invents a stop timestamp.
+This adds no stopped-source grace. Snapshot-to-ring lock order matches Close;
+coverage returns a locked value and readers never borrow clearable storage.
+
+This component adds no engine owner, goroutine, timer, SQL/wire/API, configuration
+or permission. Existing source/session admission, actual quiet expiry and callback
+join, replica ceilings, original post-window scheduling, Save, publication, native
+and history/repeat composition remain pending. Ordinary sanitized collection does
+not inherit sensitive raw-predicate credit/session limits.
+
+The private, unused `runPacketRingEngine` bridge now connects the existing finite
+observed-engine callback contract to the real sanitized ring. Its caller supplies
+the same original bounded source context used to create the ring and retains all
+reservations through actual engine join and explicit ring cleanup. Notices mark
+known gaps and cancel acquisition; final loss remains an explicit unknown outcome
+even after source memory expiry. Real engine errors and original cancellation
+remain distinguishable. No callback joins the engine. The bridge asserts no
+`ObservedThrough` or quiet health, and preserves original frame times and the
+processed-arrival window cut; it does not make a new source Ready.
+
+There is no production caller, authority issuer, raw meter, registry, timer,
+goroutine, watch, wire or provider change. Existing finite captures are unchanged.
+Global ring/frozen/CPU/kernel accounting, independently accepted ongoing source
+identity/leases, quiet erasure while a join is delayed, qualified clock/health,
+snapshot processing/encoding/custody and Save remain unwired. Caller-supplied
+objects and synthetic tests cannot replace those owners. The older Gadget clock
+on this branch must compose the independently reviewed MONOTONIC fix before
+actual engine-time qualification. This bridge qualifies callback/ring ownership
+with synthetic finite engines only; it is not an installed ongoing workflow.
+
+A local Linux/amd64 Ryzen7 5700X3D sample (GOMAXPROCS2, three300ms runs) measured
+direct ring callbacks253.8–262.5ns and bridge callbacks258.8–269.2ns, both0B/0alloc
+per callback. Both sample the same owner clock and process synthetic TCP with no
+filter. The sample means differ5.9ns and ranges overlap; this is not installed
+CPU, filter throughput, per-source closure allocation or source-health evidence.
+
+## Protected ongoing-resource projection (not source admission)
+
+`NodeDeployment.Ceilings` now carries aggregate active-source count, input bytes/s
+and input burst alongside the existing separate live-ring/frozen/upload limits.
+The chart renders development references 16 / 16 MiB/s / 16 MiB. All-zero old
+input remains valid for finite work and denies ongoing capacity; partial new node
+caps are invalid. Optional node/workload budget-policy values only lower the
+aggregate limits. `CapacitySource` decoding preserves them in an optional
+`BudgetPolicyObservation.SourceResources`, so complete accepted desired-state digests
+bind edits. Absent optional policy fields retain the original canonical bytes.
+`AcceptedCapacitySource.CurrentSourceResources` returns a value copy only while
+that original accepted source is valid; it is a resource observation, not a
+source permit, team entitlement or permission to read packets.
+
+The closed node decoder is strict. Nonzero new fields sent to an older node or
+connector decoder are rejected; no additive rolling compatibility is claimed.
+Existing finite projections with absent/zero source caps keep their old bytes.
+Use matched versions before relying on these caps; no compatibility fallback or
+new protocol negotiation is introduced. Actual mixed-version deployment behavior
+is not qualified by unit round trips.
+
+This slice adds three 64-bit values to node ceilings/reporting, and an optional
+80-byte pair of node/workload lowering values per decoded policy (plus its pointer
+and ordinary encoding/allocation costs). It adds no API/SQL/provider calls,
+watch, timer, goroutine, permission or source service. At the existing maximum 64 policies per compiled pool,
+the pair values occupy 5 KiB before object/map/encoding overhead; the
+accepted getter returns each optional pair by value. The 500m user-space collector limit
+and 20m request are unchanged. Kernel CPU/perf maps and the full source/snapshot
+memory envelope remain unqualified. Source ledger/current authority, aggregate
+rate/count reservations, lifecycle, quiet erasure and Save remain next.
+
+Proportionality gate: (1) required ordinary resource protection, no new observed
+Native cause; (2) no previously accepted risk reopened; (3) supports ordinary
+ongoing sources across all authorized replicas; (4) reuses existing Kubernetes
+resource/cgroup and protected budget mechanisms, no new registry; (5) zero new
+privileges/credentials/exposure; (6) only existing invalid/absent/current
+projection outcomes, no fallback; (7) three required resource quantities, not
+machinery tuning; (8) existing Kubernetes/Helm/strict codec dependencies only;
+(9) bounded scalars/optional policy pairs, zero extra backend I/O; (10) old absent
+caps preserve finite operation, nonzero strict-wire changes require matched
+versions; (11) extending the existing projection is smaller than a new impact
+profile CRD or pretending ring/upload caps authorize ongoing input. No feature
+completion or installed performance qualification follows from these fields.
+
+The accepted resource projection also retains the EXISTING optional node
+`maxRingBytes`/`maxFrozenBytes` lowering fields, using `collector.PolicyLimits`.
+They were previously discarded by the typed capacity decoder. Future ongoing
+admission must intersect these values with the collector ceilings as well as the
+new source quantities. This patch does not alter finite runtime admission or
+claim that the old finite path already enforces every declared node lowering
+field. Migration104 permits only the one-way same-original-spec lowering enrichment
+specified in [ADR-262](../decisions/262-protected-ongoing-resource-projection.md).
+No administrator source edit is required for the agent projection correction.
+Existing typed values cannot mutate/disappear at the same generation. Storage
+budgets/pool plans/selected-source canonical bytes remain exactly the old shapes;
+complete accepted-resource digests bind the new sibling. Old absent values retain
+the original nil/canonical representation. The owned SQL resource-projection component passed on `e261801d`; see ADR-262
+for actual exits, scope, hashes and rollback limits. No source arming, kernel/CPU
+or safe reference-throughput qualification follows.
+No cached raw CRD bypass is
+needed to retrieve the limits.

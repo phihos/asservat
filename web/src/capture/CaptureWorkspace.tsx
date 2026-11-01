@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import { Investigation, requestablePreview, type State } from './investigation';
-import type { HistoryEntry, Preview, Progress, Target } from './http';
+import type { Data, HistoryEntry, Input, Preview, Progress, Target } from './http';
 import { captureIDFromPath } from '../routes';
 import { WhyAccess } from '../access/WhyAccess';
 import { RecipientsEditor } from '../sharing/SharePanel';
+const RecordingsPanel = lazy(() => import('../recordings/RecordingsPanel').then(module => ({ default: module.RecordingsPanel })));
 
 const phases: Record<Progress['phase'], string> = {
   Pending: 'Waiting to start', Validating: 'Checking the request', AwaitingApproval: 'Waiting for approval',
@@ -77,14 +78,63 @@ const evidenceLabels: Record<HistoryEntry['evidence_state'], string> = {
 function RecentCaptures({ state, controller }: { state: State; controller: Investigation }) {
   return <section className="review-section" aria-labelledby="recent-heading" aria-busy={state.history === undefined && !state.historyMessage}>
     <h2 id="recent-heading">Recent captures</h2>
+    <label>Request origin <select aria-label="Request origin" disabled={state.busy} value={state.historyOrigin ?? 'manual'} onChange={event => void controller.historyOrigin(event.currentTarget.value as NonNullable<State['historyOrigin']>)}><option value="manual">Manual</option><option value="policy">Policy</option><option value="discovery">Discovery</option><option value="all">All origins</option></select></label>
     {state.historyMessage ? <p className="notice">{state.historyMessage}</p>
       : state.history === undefined ? <p role="status">Loading recent captures…</p>
-      : state.history.length === 0 ? <p>No captures of this target in the last 7 days that you can see.</p>
+      : state.history.length === 0 ? <p>No retained captures of this target that you can see.</p>
       : <ul className="recent-captures">{state.history.map(entry => <li key={entry.capture_id}>
         <span><a href={'/captures/' + entry.capture_id}>{new Date(entry.accepted_at).toLocaleString()}</a> · {phases[entry.phase]} · {evidenceLabels[entry.evidence_state]}</span>
-        {entry.repeat_state === 'available' && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.repeat(entry.capture_id)}>Collect again</Button>}
+        <span>{entry.operation === 'recordingSave' ? 'Recording save' : entry.origin} · {entry.action_kinds.map(kind => kind === 'kubernetesSnapshot' ? 'Kubernetes snapshot' : kind.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()).join(', ')}{entry.requester && <> · requested by <span title={entry.requester.issuer}>{entry.requester.subject_id}</span></>}</span>
+        {(entry.repeat_state === 'available' || entry.repeat_state === 'requiresSelection') && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.showSettings(entry.capture_id)}>View settings</Button>}
+        {entry.repeat_state === 'parametersExpired' && <span>Saved settings expired</span>}
+        {entry.repeat_state === 'parametersUnavailable' && <span>Saved settings unavailable</span>}
+        {entry.repeat_state === 'targetUnavailable' && <span>The original target is unavailable</span>}
+        {entry.operation === 'recordingSave' && (entry.repeat_state === 'requiresSelection' || entry.repeat_state === 'available') && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.repeat(entry.capture_id)}>Choose current recordings</Button>}
+        {entry.repeat_state === 'available' && entry.operation !== 'recordingSave' && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.repeat(entry.capture_id)}>Collect again</Button>}
+        {entry.repeat_state === 'requiresSelection' && entry.operation !== 'recordingSave' && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.repeat(entry.capture_id, 'currentEligiblePod')}>Review with a current eligible Pod</Button>}
       </li>)}</ul>}
-    <p className="field-help">Shows the last 7 days of your own requests and of requests your team could access when they were made. Collecting again reviews the same settings with your current access and limits; nothing is collected until you confirm.</p>
+    {state.historyCursor && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.moreHistory()}>Older captures</Button>}
+    {state.history && state.history.length >= 100 && <p>Showing the last 100 entries loaded. Refresh history to return to the newest captures.</p>}
+    <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.historyOrigin(state.historyOrigin ?? 'manual')}>Refresh history</Button>
+    {state.settings && <SavedSettings key={state.settings.settings_digest} settings={state.settings} busy={state.busy} controller={controller} />}
+    <p className="field-help">Shows retained requests you can currently access. Collecting again restores the target, recipe and requested settings for a fresh review of access, limits and approval needs. Nothing is collected until you confirm.</p>
+  </section>;
+}
+
+function SavedSettings({ settings, busy, controller }: { settings: Data<'get_capture_settings'>; busy: boolean; controller: Investigation }) {
+  if (settings.kind === 'recordingSaveSettings') return <section className="review-section saved-settings" aria-label="Saved recording settings"><h3>Saved recording settings</h3><p>Saved at {new Date(settings.accepted_at).toLocaleString()}. These settings identify the original policy and preferred windows; they do not retain source handles or sharing instructions.</p><pre tabIndex={0} role="region" aria-label="Saved recording preferences">{JSON.stringify(settings.settings, null, 2)}</pre><Button className="button secondary" onPress={() => controller.closeSettings()}>Close settings</Button><Button className="button" isDisabled={busy} onPress={() => controller.selectRecordingsAgain(settings)}>Choose current recordings</Button></section>;
+  return <OrdinarySavedSettings settings={settings} busy={busy} controller={controller}/>;
+}
+
+function OrdinarySavedSettings({ settings, busy, controller }: { settings: Exclude<Data<'get_capture_settings'>, { kind: 'recordingSaveSettings' }>; busy: boolean; controller: Investigation }) {
+  const provenance = 'profile_composition' in settings.settings ? settings.settings.profile_composition : undefined;
+  const [composition, setComposition] = useState(provenance?.authored);
+  const [retention, setRetention] = useState('');
+  const selection = settings.settings.target.selection === 'triggeringPod' ? 'currentEligiblePod' : undefined;
+  const edit = (component: number, override: number, value: string | number) => {
+    if (!composition) return;
+    const changed = structuredClone(composition);
+    const field = changed.components[component].overrides![override];
+    // Preserve the existing discriminator and value type; the canonical
+    // validator and fresh server preview check the finite field's bounds.
+    if (typeof field.value === typeof value) field.value = value as typeof field.value;
+    setComposition(changed);
+  };
+  return <section className="review-section saved-settings" aria-label="Saved capture settings">
+    <h3>Saved settings</h3>
+    <p>Requested retention: {'requested_retention' in settings.settings ? settings.settings.requested_retention : 'Installation default'}. Available until {new Date(settings.expires_at).toLocaleString()}.</p>
+    {selection && <p>The original policy selected a triggering Pod. This review selects a current eligible Pod of the same workload.</p>}
+    {provenance && <><h4>Authored profiles and version pins</h4><pre tabIndex={0} role="region" aria-label="Authored profiles JSON">{JSON.stringify(provenance, null, 2)}</pre></>}
+    <h4>Accepted settings</h4><pre tabIndex={0} role="region" aria-label="Accepted settings JSON">{JSON.stringify(settings.settings, null, 2)}</pre>
+    {composition && <fieldset disabled={busy}><legend>Adjust saved recording settings</legend>
+      <label>New requested retention in seconds (optional)<input type="number" min="1" step="1" value={retention} onChange={event => setRetention(event.currentTarget.value)} /></label>
+      <label>Maximum duration <input value={composition.maxDuration} onChange={event => setComposition({ ...composition, maxDuration: event.currentTarget.value })} /></label>
+      <label>Maximum total bytes <input type="number" min="1" step="1" value={composition.maxTotalBytes} onChange={event => setComposition({ ...composition, maxTotalBytes: Number(event.currentTarget.value) })} /></label>
+      {composition.components.flatMap((component, i) => (component.overrides ?? []).map((override, j) => (typeof override.value === 'string' || typeof override.value === 'number') && <label key={component.id + ':' + override.actionID + ':' + override.field}>{component.id} / {override.actionID} / {override.field}<input type={typeof override.value === 'number' ? 'number' : 'text'} value={override.value} onChange={event => edit(i, j, typeof override.value === 'number' ? Number(event.currentTarget.value) : event.currentTarget.value)} /></label>))}
+      <p className="field-help">Profile versions and structured settings remain as saved. Changes need a fresh review of access, limits and approval.</p>
+    </fieldset>}
+    <Button className="button secondary" onPress={() => controller.closeSettings()}>Close settings</Button>
+    <Button className="button" isDisabled={busy} onPress={() => void (composition ? controller.previewComposition(composition as NonNullable<Input<'preview_capture'>['profile_composition']>, settings.capture_id, selection, retention) : controller.repeat(settings.capture_id, selection))}>Review these settings</Button>
   </section>;
 }
 
@@ -96,7 +146,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
   useEffect(() => controller.attach(session, scope, captureIDFromPath(window.location.pathname)), [controller, session, scope]);
   const draft = state.draft;
   const setTarget = (key: keyof Target, value: string) => controller.setDraft({ ...draft, target: { ...draft.target, [key]: value } });
-  const title = state.stage === 'review' ? 'Review collection' : state.stage === 'reviewed' ? 'Continue your reviewed request' : state.stage === 'progress' ? 'Collection progress' : state.stage === 'uncertain' ? 'Confirming your request' : state.stage === 'closed' ? 'Request closed' : 'Collect evidence';
+  const title = state.stage === 'recordings' ? 'Save existing recordings' : state.stage === 'review' ? 'Review collection' : state.stage === 'reviewed' ? 'Continue your reviewed request' : state.stage === 'progress' ? state.progress?.operation === 'recordingSave' ? 'Recording save progress' : 'Collection progress' : state.stage === 'uncertain' ? 'Confirming your request' : state.stage === 'closed' ? 'Request closed' : 'Collect evidence';
   useEffect(() => { heading.current?.focus(); }, [state.stage]);
   return <div className="capture-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>{title}</h1>
@@ -104,7 +154,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
     </div>
     {state.error && <p role="alert" className="notice">{state.error}</p>}
     {state.error && (state.stage === 'target' || state.stage === 'diagnostics' || state.stage === 'review') && draft.target.name && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
-    {state.stage === 'target' && <form onSubmit={event => { event.preventDefault(); void controller.discover(); }} aria-busy={state.busy}>
+    {state.stage === 'target' && <form onSubmit={event => { event.preventDefault(); if ((event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'recordings') controller.showRecordings(); else void controller.discover(); }} aria-busy={state.busy}>
       <fieldset disabled={state.busy}><legend>Target</legend>
         <label>Cluster ID<input name="cluster" value={draft.target.cluster_id} required maxLength={36} pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" placeholder="Registered cluster UUID" onChange={event => setTarget('cluster_id', event.target.value)} autoComplete="off" spellCheck={false}/></label>
         <p className="field-help">Use the cluster ID supplied by your administrator.</p>
@@ -123,6 +173,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
           <p className="field-help">Empty: 24 hours after publication. At most seven days from now, and never past the evidence's access.</p>
         </details>
         <Button type="submit" className="button" isDisabled={state.busy}>{state.busy ? 'Checking diagnostics…' : 'Find diagnostics'}</Button>
+        <Button type="submit" value="recordings" className="button secondary" isDisabled={state.busy}>Save existing recordings now</Button>
       </fieldset>
     </form>}
     {state.stage === 'diagnostics' && <section aria-label="Available diagnostics" aria-busy={state.busy}>
@@ -133,11 +184,13 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         {diagnostic.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
         <Button className="button" isDisabled={state.busy || diagnostic.preset_ref?.name !== 'pod-status'} onPress={() => void controller.preview(diagnostic)}>{state.busy ? 'Preparing review…' : 'Review collection'}</Button>
       </article>)}
+      <Button className="button secondary" isDisabled={state.busy} onPress={controller.showRecordings}>Save existing recordings now</Button>
       <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Change target</Button>
       <RecentCaptures state={state} controller={controller}/>
     </section>}
+    {state.stage === 'recordings' && <><Suspense fallback={<p role="status">Loading recording tools…</p>}><RecordingsPanel session={session} scope={scope} target={draft.target} repeat={state.recordingRepeat} submit={controller.submitRecordingSave}/></Suspense><Button className="button secondary" onPress={controller.edit}>Change target</Button></>}
     {state.stage === 'review' && state.preview && <section aria-label="Collection review" aria-busy={state.busy}>
-      {state.repeatedFrom && <p className="notice">Collecting again with the settings of capture <span className="identifier">{state.repeatedFrom}</span>: the same target and requested retention. The pod, access and limits below are checked now.</p>}
+      {state.repeatedFrom && <p className="notice">Collecting again with the settings of capture <span className="identifier">{state.repeatedFrom}</span>: the original target, recipe and requested settings. The current Pod, access, limits and approval needs are checked below.</p>}
       <Assessment preview={state.preview}/>
       {state.preview.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
       {state.preview.blockers.length > 0 && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
@@ -175,13 +228,21 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
     {state.stage === 'progress' && <section aria-busy={state.busy}>
       <p className="field-help">Capture <span className="identifier">{state.captureID}</span></p>
       {state.progress ? <>
-        <h2 aria-live="polite">{phases[state.progress.phase]}</h2>
+        <h2 aria-live="polite">{state.progress.operation === 'recordingSave' && state.progress.phase === 'Running' ? 'Saving recorded history' : phases[state.progress.phase]}</h2>
+        {state.progress.operation === 'recordingSave' && <p>The saved window ends at its first successful server acceptance. Saved settings show that recorded time; a preview or retry cannot change it. This status does not establish complete historical coverage.</p>}
         {state.progress.phase === 'Pending' && <p>Your request was accepted. Collection has not been confirmed.</p>}
         {state.progress.phase === 'Finalizing' && <p>Uploaded evidence still needs verification and publication before it is available.</p>}
-        <ul className="progress-actions">{state.progress.actions.map(action => <li key={action.action_id}><span>{action.action_id === 'pod-status' ? 'Pod status' : action.action_id}</span><span>{actionLabels[action.phase] ?? action.phase}</span></li>)}</ul>
+        {state.progress.reason_state === 'available' && state.progress.reason !== undefined && <section aria-label="Save reason"><h3>Reason</h3><p className="capture-reason">{state.progress.reason}</p></section>}
+        {state.progress.reason_state === 'unavailable' && <p className="notice">The save reason is unavailable. Capture status remains available.</p>}
+        <ul className="progress-actions">{state.progress.actions.map(action => <li key={action.action_instance_id ?? action.action_id}><span><span>{action.action_id === 'pod-status' ? 'Pod status' : action.action_id}</span>{action.pod_name && <> · <span title={action.pod_uid}>{action.pod_name}</span></>}</span><span>{actionLabels[action.phase] ?? action.phase}</span></li>)}</ul>
+        {(state.progress.cancellation_requested || state.cancellationStatus === 'requested') && !['Succeeded', 'Partial', 'Failed', 'Cancelled', 'Indeterminate'].includes(state.progress.phase) && <p role="status">Cancellation requested. Waiting for unfinished snapshots to stop; stored results remain available.</p>}
+        {state.progress.operation === 'recordingSave' && state.progress.can_cancel && !state.progress.cancellation_requested && !['Succeeded', 'Partial', 'Failed', 'Cancelled', 'Indeterminate'].includes(state.progress.phase) && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.cancelRecordingSave()}>{state.cancellationStatus === 'unconfirmed' ? 'Retry cancellation' : 'Cancel recording save'}</Button>}
         {state.progress.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
         {state.progress.sharing && <p role="status">{sharingLabels[state.progress.sharing.state]}</p>}
         {state.progress.case_id && <p><a className="button" href={"/cases/" + state.progress.case_id}>View evidence</a></p>}
+        {state.progress.history_state === 'available' && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.showSettings(state.progress!.capture_id)}>{state.progress.operation === 'recordingSave' ? 'View saved settings and acceptance time' : 'View settings'}</Button>}
+        {state.progress.history_state === 'unavailable' && <p>Saved settings are unavailable. Start a new investigation to prepare a request with your current settings.</p>}
+        {state.settings && <><p>Reviewing these settings prepares a new request. The original capture is not cancelled.</p><SavedSettings key={state.settings.settings_digest} settings={state.settings} busy={state.busy} controller={controller} /></>}
       </> : !state.error && <p role="status">Checking collection status…</p>}
       {state.canContinue && <div className="actions"><Button className="button" isDisabled={state.busy} onPress={() => void controller.continueAcquisition()}>{state.continuing ? 'Continuing collection…' : 'Continue collection'}</Button><p>Continues the original capture and checks your current access.</p></div>}
       {state.captureID && <p><a href="/captures/new">Start a new investigation</a>. This does not cancel the original collection.</p>}

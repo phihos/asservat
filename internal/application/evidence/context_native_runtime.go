@@ -441,14 +441,9 @@ func (r *ContextNativeRuntime) remote(ctx context.Context, session artifact.Down
 	if observed.Enrollment == nil || observed.Preparation == nil {
 		return nil, ErrDownloadMetadataUnavailable
 	}
-	source, e := r.config.Sources.ReadContextDownloadSource(ctx, a)
-	if e != nil || !source.Valid(r.config.Now()) || source.Scope != session.Scope {
-		return nil, artifact.ErrDownloadUnavailable
-	}
-	if r.bound != nil {
-		if _, e = r.bound.narrow(source.ValidUntil); e != nil {
-			return nil, e
-		}
+	source, e := r.readNativeSource(ctx, session, a)
+	if e != nil {
+		return nil, e
 	}
 	native, e := r.native(*observed.Enrollment)
 	if e != nil {
@@ -457,4 +452,19 @@ func (r *ContextNativeRuntime) remote(ctx context.Context, session artifact.Down
 	// This constructor retains only immutable copies/expectation/preparation. Its
 	// actual Describe/Read use fresh current callbacks and peer proof at each hop.
 	return NewRemoteContextSource(ctx, native, ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: source.Expectation, Copies: source.Copies}, *observed.Preparation)
+}
+
+// readNativeSource consumes the current source observation during setup. Only
+// immutable expectation/copy facts survive it; it grants no delivery authority.
+func (r *ContextNativeRuntime) readNativeSource(ctx context.Context, session artifact.DownloadSession, a artifact.DownloadAuthority) (ContextDownloadSource, error) {
+	source, e := r.config.Sources.ReadContextDownloadSource(ctx, a)
+	if e != nil || ctx.Err() != nil || !source.Valid(r.config.Now()) || source.Scope != session.Scope {
+		return ContextDownloadSource{}, artifact.ErrDownloadUnavailable
+	}
+	if r.bound != nil {
+		if _, e = r.bound.narrow(source.ValidUntil); e != nil {
+			return ContextDownloadSource{}, e
+		}
+	}
+	return source, nil
 }

@@ -19,12 +19,17 @@ var (
 
 // EvidenceReadRequestWindow bounds one public evidence-read request
 // (get_file_excerpt, get_query_result, prepare_artifact_download,
-// get_artifact_download); other public requests keep five seconds. Installed
+// get_artifact_download); ordinary public requests keep five seconds except
+// RecordingSaveRequestWindow composition. Installed
 // native78-80 showed the approved read's audit, authorization, SQL fences,
 // worker wake-up, three key unwraps and the object read cannot complete within
 // five seconds. It bounds only the request itself: every identity, authority,
 // observation and lease inside it keeps its own shorter ValidUntil.
 const EvidenceReadRequestWindow = 20 * time.Second
+
+// RecordingSaveRequestWindow bounds the composed admission/start/history request.
+// Each accepted snapshot retains its original T0+5s StartBy.
+const RecordingSaveRequestWindow = 15 * time.Second
 
 type Kind string
 
@@ -113,6 +118,7 @@ type Policy struct {
 	// recordings then need the same individual approval as sensitive ones.
 	StepUp                   StepUpPolicy
 	RequireRecordingApproval bool
+	PolicyGrants             *PolicyGrantApproval
 }
 
 type Identity struct {
@@ -165,7 +171,7 @@ func Earlier(a, b time.Time) time.Time {
 }
 
 func (p Policy) Validate(now time.Time) error {
-	if !p.Revision.Valid() || !Text(p.Issuer, 2048) || !Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || len(p.Clients) < 1 || len(p.Clients) > 64 || len(p.EligibleSubjects) > 256 || len(p.EligibleGroups) > 256 || len(p.EligibleSubjects)+len(p.EligibleGroups) == 0 || !p.GroupsAtIssueQualified || p.GroupMaxAge <= 0 || p.GroupMaxAge > 5*time.Minute || !Strings(p.EligibleGroups, 256, 256) || !p.StepUp.valid() {
+	if !p.Revision.Valid() || !Text(p.Issuer, 2048) || !Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || len(p.Clients) < 1 || len(p.Clients) > 64 || len(p.EligibleSubjects) > 256 || len(p.EligibleGroups) > 256 || len(p.EligibleSubjects)+len(p.EligibleGroups) == 0 || !p.GroupsAtIssueQualified || p.GroupMaxAge <= 0 || p.GroupMaxAge > 5*time.Minute || !Strings(p.EligibleGroups, 256, 256) || !p.StepUp.valid() || p.PolicyGrants != nil && !p.PolicyGrants.Valid() {
 		return ErrUnavailable
 	}
 	clients := map[string]bool{}

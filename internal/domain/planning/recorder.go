@@ -14,11 +14,12 @@ import (
 // Refusal codes of a composition preview (ADR-243). Each is reported with the
 // authored field path and a remedy; none reserves work or reaches a target.
 const (
-	CompositionInvalid        = "InvalidComposition"
-	CompositionProfileMissing = "ProfileUnavailable"
-	CompositionFilterRejected = "FilterRejected"
-	CompositionApproval       = "ApprovalRequired"
-	CompositionNoCompiler     = "FilterCompilerUnavailable"
+	CompositionInvalid             = "InvalidComposition"
+	CompositionProfileMissing      = "ProfileUnavailable"
+	CompositionFilterRejected      = "FilterRejected"
+	CompositionApproval            = "ApprovalRequired"
+	CompositionNoCompiler          = "FilterCompilerUnavailable"
+	CompositionRecorderUnavailable = "RecorderUnavailable"
 )
 
 // Sensitive-acquisition reasons (ADR-249). Either makes the plan need an

@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 )
 
 type capacitySQLFixture struct {
+	fleetRefreshMu     sync.Mutex
 	ctx                context.Context
 	admin              *pgxpool.Pool
 	root               *capacitySQLRoot
@@ -215,10 +217,13 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 
 func (f *capacitySQLFixture) refreshFleet(t *testing.T) {
 	t.Helper()
+	f.fleetRefreshMu.Lock()
+	defer f.fleetRefreshMu.Unlock()
+	basis := fleetBasisFixture(t, f.ctx, f.observer)
 	a := f.administration
 	a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 	a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
-	if err := f.observer.ObserveAdministration(f.ctx, fleetBasisFixture(t, f.ctx, f.observer), a); err != nil {
+	if err := f.observer.ObserveAdministration(f.ctx, basis, a); err != nil {
 		t.Fatal("current original fleet source", err)
 	}
 }
@@ -226,10 +231,14 @@ func (f *capacitySQLFixture) refreshFleet(t *testing.T) {
 // keepFleetCurrent renews the fixture's fleet observation every second until
 // stopped; it returns the first renewal failure.
 func (f *capacitySQLFixture) keepFleetCurrent() func() error {
-	return keepFixtureFleetCurrent(f.ctx, f.observer, f.administration)
+	return keepFixtureFleetCurrent(f.ctx, f.observer, f.administration, &f.fleetRefreshMu)
 }
 
-func keepFixtureFleetCurrent(ctx context.Context, observer *postgres.FleetObservation, administration fleet.Administration) func() error {
+func keepFixtureFleetCurrent(ctx context.Context, observer *postgres.FleetObservation, administration fleet.Administration, serialized ...*sync.Mutex) func() error {
+	var refreshMu *sync.Mutex
+	if len(serialized) > 0 {
+		refreshMu = serialized[0]
+	}
 	stop, done := make(chan struct{}), make(chan error, 1)
 	go func() {
 		tick := time.NewTicker(time.Second)
@@ -240,13 +249,22 @@ func keepFixtureFleetCurrent(ctx context.Context, observer *postgres.FleetObserv
 				done <- nil
 				return
 			case <-tick.C:
-				b, err := observer.ReadAdministrationBasis(ctx)
-				a := administration
-				a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
-				a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
-				if err == nil {
-					err = observer.ObserveAdministration(ctx, b, a)
-				}
+				err := func() error {
+					if refreshMu != nil {
+						refreshMu.Lock()
+						defer refreshMu.Unlock()
+					}
+					// One fixture producer owns basis, observation clock and persistence.
+					// Sampling outside this lock could backdate against the other refresher.
+					b, err := observer.ReadAdministrationBasis(ctx)
+					if err != nil {
+						return err
+					}
+					a := administration
+					a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+					a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
+					return observer.ObserveAdministration(ctx, b, a)
+				}()
 				if err != nil {
 					done <- err
 					return

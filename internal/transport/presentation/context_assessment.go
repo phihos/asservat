@@ -46,12 +46,13 @@ type Quantity struct {
 	Coverage  string `json:"coverage"`
 }
 type AssessmentAction struct {
-	ActionID      string     `json:"actionID"`
-	ExecutionMode string     `json:"executionMode"`
-	Impact        Impact     `json:"impact"`
-	Data          Exposure   `json:"data"`
-	Retention     Retention  `json:"retention"`
-	Quantities    []Quantity `json:"quantities"`
+	RecordingHandle string     `json:"recording_handle,omitempty"`
+	ActionID        string     `json:"actionID"`
+	ExecutionMode   string     `json:"executionMode"`
+	Impact          Impact     `json:"impact"`
+	Data            Exposure   `json:"data"`
+	Retention       Retention  `json:"retention"`
+	Quantities      []Quantity `json:"quantities"`
 }
 type Interaction struct {
 	ActionIDs []string `json:"actionIDs"`

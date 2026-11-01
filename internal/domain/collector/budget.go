@@ -20,10 +20,48 @@ const (
 	DefaultNodeBurst      int64 = 64 << 20
 )
 
+// SourceLimits bound aggregate ongoing acquisition, independently of ring bytes
+// and incident output. Zero ceilings deny ongoing capacity; zero policy fields
+// are optional lowering limits. These values do not confer observation authority.
+type SourceLimits struct {
+	MaxActiveSources    int64 `json:"maxActiveSources,omitempty"`
+	InputBytesPerSecond int64 `json:"inputBytesPerSecond,omitempty"`
+	InputBurstBytes     int64 `json:"inputBurstBytes,omitempty"`
+}
+
+const (
+	DefaultActiveSources int64 = 16
+	DefaultInputRate     int64 = 16 << 20
+	DefaultInputBurst    int64 = 16 << 20
+	MaxActiveSources     int64 = 1024
+	MaxInputRate         int64 = 10 << 30
+	MaxInputBurst        int64 = 10 << 30
+)
+
+func (s SourceLimits) Valid() bool {
+	return s.MaxActiveSources >= 0 && s.MaxActiveSources <= MaxActiveSources && s.InputBytesPerSecond >= 0 && s.InputBytesPerSecond <= MaxInputRate && s.InputBurstBytes >= 0 && s.InputBurstBytes <= MaxInputBurst
+}
+
+// Enabled requires all quantities; a missing old configuration cannot arm.
+func (s SourceLimits) Enabled() bool {
+	return s.Valid() && s.MaxActiveSources > 0 && s.InputBytesPerSecond > 0 && s.InputBurstBytes > 0
+}
+
+func (s SourceLimits) Intersect(p SourceLimits) SourceLimits {
+	lower := func(a, b int64) int64 {
+		if b > 0 && b < a {
+			return b
+		}
+		return a
+	}
+	return SourceLimits{lower(s.MaxActiveSources, p.MaxActiveSources), lower(s.InputBytesPerSecond, p.InputBytesPerSecond), lower(s.InputBurstBytes, p.InputBurstBytes)}
+}
+
 // Ceilings are one node's byte budgets: memory held by armed source rings,
 // memory held by frozen snapshot copies awaiting upload, and the upload rate
 // with its burst. Zero means nothing of that kind may be reserved.
 type Ceilings struct {
+	SourceLimits
 	RingBytes            int64
 	FrozenBytes          int64
 	UploadBytesPerSecond int64
@@ -31,7 +69,7 @@ type Ceilings struct {
 }
 
 func (c Ceilings) Valid() bool {
-	return c.RingBytes >= 0 && c.RingBytes <= MaxNodeRingBytes &&
+	return c.SourceLimits.Valid() && (c.SourceLimits == (SourceLimits{}) || c.SourceLimits.Enabled()) && c.RingBytes >= 0 && c.RingBytes <= MaxNodeRingBytes &&
 		c.FrozenBytes >= 0 && c.FrozenBytes <= MaxNodeFrozenBytes &&
 		c.UploadBytesPerSecond >= 0 && c.UploadBytesPerSecond <= MaxNodeUploadRate &&
 		c.UploadBurstBytes >= 0 && c.UploadBurstBytes <= MaxNodeUploadBurst &&
@@ -41,10 +79,17 @@ func (c Ceilings) Valid() bool {
 // PolicyLimits are the optional node limits of an EvidenceBudgetPolicy; zero
 // means the policy sets no limit of that kind.
 type PolicyLimits struct {
+	SourceLimits
 	RingBytes            int64
 	FrozenBytes          int64
 	UploadBytesPerSecond int64
 	UploadBurstBytes     int64
+}
+
+// Valid checks optional lowering quantities independently; omitted values do
+// not allocate resources or enable a missing collector ceiling.
+func (p PolicyLimits) Valid() bool {
+	return p.SourceLimits.Valid() && p.RingBytes >= 0 && p.RingBytes <= MaxNodeRingBytes && p.FrozenBytes >= 0 && p.FrozenBytes <= MaxNodeFrozenBytes && p.UploadBytesPerSecond >= 0 && p.UploadBytesPerSecond <= MaxNodeUploadRate && p.UploadBurstBytes >= 0 && p.UploadBurstBytes <= MaxNodeUploadBurst
 }
 
 // Intersect returns the tighter of the collector ceiling and each policy limit.
@@ -55,7 +100,7 @@ func (c Ceilings) Intersect(p PolicyLimits) Ceilings {
 		}
 		return a
 	}
-	return Ceilings{lower(c.RingBytes, p.RingBytes), lower(c.FrozenBytes, p.FrozenBytes), lower(c.UploadBytesPerSecond, p.UploadBytesPerSecond), lower(c.UploadBurstBytes, p.UploadBurstBytes)}
+	return Ceilings{c.SourceLimits.Intersect(p.SourceLimits), lower(c.RingBytes, p.RingBytes), lower(c.FrozenBytes, p.FrozenBytes), lower(c.UploadBytesPerSecond, p.UploadBytesPerSecond), lower(c.UploadBurstBytes, p.UploadBurstBytes)}
 }
 
 // Budget accounts one node's reservations. Ring and frozen bytes are held
@@ -63,10 +108,56 @@ func (c Ceilings) Intersect(p PolicyLimits) Ceilings {
 // to the burst. A reservation that does not fit fails without partial effect.
 // Budget is not safe for concurrent use; its owner serializes access.
 type Budget struct {
-	ceilings     Ceilings
-	ring, frozen int64
-	tokens       int64
-	refilled     time.Time
+	ceilings                       Ceilings
+	ring, frozen                   int64
+	tokens                         int64
+	refilled                       time.Time
+	sources, inputRate, inputBurst int64
+}
+
+// SourceReservation is held once for a live source, across all renewals.
+// The owner releases it only after acquisition joins and its live ring closes.
+// Frozen snapshot copies retain their separate existing reservation.
+type SourceReservation struct{ RingBytes, InputBytesPerSecond, InputBurstBytes int64 }
+
+func (r SourceReservation) Valid() bool {
+	return r.RingBytes > 0 && r.RingBytes <= MaxNodeRingBytes && r.InputBytesPerSecond > 0 && r.InputBytesPerSecond <= MaxInputRate && r.InputBurstBytes > 0 && r.InputBurstBytes <= MaxInputBurst
+}
+
+func (b *Budget) ReserveSource(r SourceReservation) error {
+	return b.ReserveSourceWithin(r, PolicyLimits{})
+}
+func (b *Budget) ReserveSourceWithin(r SourceReservation, p PolicyLimits) error {
+	if !p.Valid() {
+		return ErrInvalid
+	}
+	c := b.ceilings.Intersect(p)
+	if !r.Valid() {
+		return ErrInvalid
+	}
+	if !c.SourceLimits.Enabled() || b.sources >= c.MaxActiveSources || r.RingBytes > c.RingBytes-b.ring || r.InputBytesPerSecond > c.InputBytesPerSecond-b.inputRate || r.InputBurstBytes > c.InputBurstBytes-b.inputBurst {
+		return ErrExceeded
+	}
+	b.sources++
+	b.ring += r.RingBytes
+	b.inputRate += r.InputBytesPerSecond
+	b.inputBurst += r.InputBurstBytes
+	return nil
+}
+
+func (b *Budget) ReleaseSource(r SourceReservation) error {
+	if !r.Valid() || b.sources == 0 || r.RingBytes > b.ring || r.InputBytesPerSecond > b.inputRate || r.InputBurstBytes > b.inputBurst {
+		return ErrInvalid
+	}
+	b.sources--
+	b.ring -= r.RingBytes
+	b.inputRate -= r.InputBytesPerSecond
+	b.inputBurst -= r.InputBurstBytes
+	return nil
+}
+
+func (b *Budget) SourceUsage() (count, inputRate, inputBurst int64) {
+	return b.sources, b.inputRate, b.inputBurst
 }
 
 func NewBudget(c Ceilings, now time.Time) (*Budget, error) {
@@ -100,6 +191,12 @@ func release(held *int64, n int64) error {
 func (b *Budget) ReserveRing(n int64) error   { return reserve(&b.ring, b.ceilings.RingBytes, n) }
 func (b *Budget) ReleaseRing(n int64) error   { return release(&b.ring, n) }
 func (b *Budget) ReserveFrozen(n int64) error { return reserve(&b.frozen, b.ceilings.FrozenBytes, n) }
+func (b *Budget) ReserveFrozenWithin(n int64, p PolicyLimits) error {
+	if !p.Valid() {
+		return ErrInvalid
+	}
+	return reserve(&b.frozen, b.ceilings.Intersect(p).FrozenBytes, n)
+}
 func (b *Budget) ReleaseFrozen(n int64) error { return release(&b.frozen, n) }
 func (b *Budget) refill(now time.Time) {
 	if !now.After(b.refilled) {

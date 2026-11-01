@@ -17,14 +17,16 @@ import (
 // authority port. The concrete receiver checks each actual receiving TLS connection and
 // checks current SQL/key and local token state; this map can only retain/spend the original
 // native operation. No returned ID or locator can construct a replacement.
-// A slot includes preparation, possible delivery, claim, joined closure and the
-// spent marker through the original end. Failed output never refunds it.
+// Active capacity includes preparation, possible delivery, claim and joined
+// closure. The same-ID spent marker remains through its original end under a
+// separate total-retained ceiling; uncertain work never releases active capacity.
 type ownerLocalObservationPending struct {
 	root    context.Context
 	cancel  context.CancelFunc
 	pin     value.OwnerObservationPin
 	binding value.OwnerBinding
 	maximum int
+	active  int
 	now     func() time.Time
 	mu      sync.Mutex
 	closed  bool
@@ -50,7 +52,7 @@ type ownerLocalObservationPendingEntry struct {
 	podUID string
 	token  []byte
 	// retention owns the one original slot interval. Cancelling work early
-	// cannot delete the spent marker or let another request refill that slot.
+	// cannot delete the spent marker or let the same request run again.
 	retention         context.Context
 	retireCancel      context.CancelFunc
 	work              context.Context
@@ -118,7 +120,7 @@ func (s *ownerLocalObservationPending) reserve(get context.Context, q value.Clus
 	key := ownerLocalObservationPendingKey{q.RootID, q.RequestID}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || s.root.Err() != nil || get.Err() != nil || !s.now().Before(end) || len(s.entries) >= s.maximum || s.entries[key] != nil {
+	if s.closed || s.root.Err() != nil || get.Err() != nil || !s.now().Before(end) || s.active >= s.maximum || len(s.entries) >= 2*s.maximum || s.entries[key] != nil {
 		return nil, value.ErrUnavailable
 	}
 	retention, retireCancel := context.WithDeadline(s.root, end)
@@ -127,6 +129,7 @@ func (s *ownerLocalObservationPending) reserve(get context.Context, q value.Clus
 	e.calls.Add(1) // actual GET preparation/output, joined by finishGET
 	e.stopGet = context.AfterFunc(get, func() { cancel(); close(e.getDone) })
 	s.entries[key] = e
+	s.active++
 	s.joined.Add(1)
 	// Restrictive cleanup only: no source reads, renewal, replacement or retry.
 	context.AfterFunc(retention, e.retire)
@@ -186,7 +189,7 @@ func (e *ownerLocalObservationPendingEntry) possibleDelivery() (value.ClusterObs
 
 // finishGET runs after actual output/cancellation work has joined, including
 // failed or unknown writes. A possible write retains the original slot/proof;
-// a pre-output failure closes work but retains the same spent slot to expiry.
+// a pre-output failure joins work but retains its same-ID marker to expiry.
 func (e *ownerLocalObservationPendingEntry) finishGET() {
 	if e == nil {
 		return
@@ -281,6 +284,11 @@ func (e *ownerLocalObservationPendingEntry) closeWork() {
 		e.token = nil
 		e.reservation = nil
 		e.mu.Unlock()
+		// Do not acquire the store mutex while holding the entry mutex:
+		// claim/reserve own the store first. A Spent phase alone is not joined.
+		e.store.mu.Lock()
+		e.store.active--
+		e.store.mu.Unlock()
 		close(e.closed)
 	})
 }

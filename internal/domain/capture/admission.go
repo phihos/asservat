@@ -48,6 +48,10 @@ func (b StorageBinding) Matches(t authorization.Target) bool {
 // Admission is an internal coordinator input, never an HTTP or CRD shape. The
 // authenticated original authored intent has its own digest, distinct from scope.
 type Admission struct {
+	// RecordingSave carries transient independently resolved policy intent and
+	// current initiator eligibility. Neither is inferred from source handles.
+	RecordingSave          *RecordingSaveAdmission
+	RepeatedFrom           *HistoryLineage
 	Recovery               artifact.RecoveryProof
 	RootID, IdempotencyKey string
 	SubmissionDigest       artifact.Digest
@@ -58,9 +62,29 @@ type Admission struct {
 	CaseID, OccurrenceID   string
 }
 
+type RecordingSaveAdmission struct {
+	Authority authorization.AcceptedPolicyAuthority
+	Policy    RestartPolicy
+	Initiator authorization.CaptureEligibility
+}
+
+func (a Admission) Requester() identity.Principal {
+	if a.RecordingSave != nil {
+		return a.RecordingSave.Initiator.Principal
+	}
+	return a.Plan.Input.Executor
+}
+
 // Accepted intentionally contains no "start" method or flag. Intent audit,
 // current execution authority and local effect fencing precede dispatch.
 type Accepted struct {
+	Group           *RecordingSaveGroupAccepted `json:",omitempty"`
+	HistoryRecorded bool                        `json:"-"`
+	RepeatedFrom    *HistoryLineage             `json:"-"`
+	// Optional immutable history draft exists only for this admitted request.
+	HistoryParameters             *HistoryParameters `json:"-"`
+	HistorySource                 *HistoryLineage    `json:"-"`
+	HistoryUnavailable            bool               `json:"-"`
 	CaptureID, State              string
 	ScopeDigest, SubmissionDigest artifact.Digest
 	Expectation                   artifact.ContextExpectation

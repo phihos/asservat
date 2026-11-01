@@ -17,3 +17,7 @@ func Initialize(collector.Facts) collector.Engine { return collector.Engine{} }
 func CapturePackets(context.Context, string, int, func(Frame)) (CaptureStats, error) {
 	return CaptureStats{}, ErrEngineUnavailable
 }
+
+func CaptureObservedPackets(context.Context, string, int, func(Frame), func(InputNotice)) (CaptureStats, error) {
+	return CaptureStats{}, ErrEngineUnavailable
+}

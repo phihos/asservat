@@ -368,6 +368,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		return
 	}
 	create := func(t *testing.T, slots int64) scenario { return createForTarget(t, slots, nil, artifact.Digest{}) }
+	qualifyHistoryParameters(t, ctx, admin, poolFor, store, keys, create)
 	qualifyContextControlCapacity(t, ctx, admin, capturePool, controlPool, ledger, controlBacking, poolFor, createWithControl)
 	t.Run("recovery-blocks-new-context-admission", func(t *testing.T) {
 		s := create(t, 1)
@@ -401,6 +402,13 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		scenarioNativeLimit = artifact.RecordingNativeLimit
 		defer func() { scenarioNativeLimit = 4096 }()
 		return create(t, 1)
+	})
+	t.Run("policy-recorder-team-action-grant-and-occurrence", func(t *testing.T) {
+		qualifyPolicyRecorderAdmission(t, ctx, admin, poolFor, store, keys, func(t *testing.T) scenario {
+			scenarioNativeLimit = artifact.RecordingNativeLimit
+			defer func() { scenarioNativeLimit = 4096 }()
+			return create(t, 1)
+		})
 	})
 	qualifyContextPublications(t, ctx, admin, poolFor, store, keys, create, authorityPool.Reset)
 	qualifyRetentionCatchup(t, ctx, admin, poolFor, store, keys, create)

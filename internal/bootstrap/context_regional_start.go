@@ -15,9 +15,11 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/authorization"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/collector"
 	execution "asservat.local/asservat/internal/domain/execution"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/contextstart"
 )
 
@@ -113,6 +115,15 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	attachment, e := s.Router.Attach(call, target.ClusterID, id)
 	auditapp.MarkStep(ctx, "st-attach", mark)
 	if e != nil {
+		if s.Report != nil {
+			reason := "unavailable"
+			if errors.Is(e, fleetvalue.ErrCapacity) {
+				reason = "capacity"
+			} else if errors.Is(e, fleetvalue.ErrInvalid) {
+				reason = "invalid"
+			}
+			s.Report("attach (" + reason + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound + " " + s.Router.AttachState(target.ClusterID))
+		}
 		return notStarted
 	}
 	defer attachment.Close()
@@ -143,7 +154,9 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		return execution.ErrUnavailable // the original interval ended: not retryable as not-started
 	}
 	mark = time.Now()
+	outer := ctx
 	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
+		ops.Timing = func(method string, d time.Duration) { auditapp.MarkDuration(outer, "op-"+method, d) }
 		r := s.Runner
 		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
 		r.Prepare = gatedPreparer{r.Prepare, gate}
@@ -255,6 +268,18 @@ func (p gatedPreparer) PrepareAPIExecution(ctx context.Context, c executionapp.A
 	return r, first, err
 }
 
+func (p gatedPreparer) PreparePolicyRecording(ctx context.Context, c executionapp.APIExecutionCheck, source targets.PacketSourceObservation) (execution.APIExecution, bool, collector.ObservationPermit, error) {
+	preparer, ok := p.APIExecutionPreparer.(executionapp.PolicyRecordingPreparer)
+	if !ok || !p.gate.enter() {
+		return execution.APIExecution{}, false, collector.ObservationPermit{}, errors.Join(execution.ErrUnavailable, execution.ErrNotStarted)
+	}
+	r, first, permit, err := preparer.PreparePolicyRecording(ctx, c, source)
+	if err != nil && errors.Is(err, execution.ErrNotStarted) {
+		p.gate.rolledBack()
+	}
+	return r, first, permit, err
+}
+
 // Diagnostic only: a retained caller deadline is not a fresh start interval.
 func regionalStartInitialBound(ctx context.Context, started time.Time) string {
 	if deadline, ok := ctx.Deadline(); ok && deadline.Before(started.Add(5*time.Second)) {
@@ -276,7 +301,7 @@ func ServeRegionalAPIContextExchange(exchange *mtls.ContextStartExchange, verifi
 		return e
 	}
 	receiver := exchange.Receiver()
-	stream, e := contextstart.NewOutboundStream(exchange.Context(), receiver.Channel, exchange.Check, local.Source, local.Targets, response, writer, connection, exchange.Close)
+	stream, e := contextstart.NewOutboundStream(exchange.Context(), receiver.Channel, exchange.Check, local.Source, local.Targets, local.Sources, response, writer, connection, exchange.Close)
 	if e != nil {
 		return e
 	}
@@ -320,20 +345,29 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 		return execution.ErrInvalid
 	}
 	defer s.Client.Close()
-	type connection struct{ cancel context.CancelFunc }
-	active := make(map[fleetvalue.OwnerBinding]connection)
-	next := make(map[fleetvalue.OwnerBinding]time.Time)
-	type end struct {
+	// ADR-271: mtls.ContextStartExchangesPerOwner slots per owner. Openings
+	// are staggered (one in flight per owner): concurrent setups refused each
+	// other (installed native 65). Each slot is retried on its own.
+	type slot struct {
 		owner fleetvalue.OwnerBinding
+		n     int
+	}
+	type connection struct{ cancel context.CancelFunc }
+	active := make(map[slot]connection)
+	next := make(map[slot]time.Time)
+	opening := make(map[fleetvalue.OwnerBinding]bool)
+	type end struct {
+		key   slot
 		retry time.Duration
 	}
-	ended := make(chan end, 16)
+	ended := make(chan end, 2*16)
+	opened := make(chan fleetvalue.OwnerBinding, 2*16)
 	defer func() {
 		for _, c := range active {
 			c.cancel()
 		}
 		for len(active) > 0 {
-			delete(active, (<-ended).owner)
+			delete(active, (<-ended).key)
 		}
 	}()
 	ticker := time.NewTicker(time.Second)
@@ -355,37 +389,44 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 			}
 			return false
 		}
-		for b, c := range active {
-			if !contains(b) {
+		for k, c := range active {
+			if !contains(k.owner) {
 				c.cancel()
 			}
 		}
-		for b := range next {
-			if !contains(b) {
-				delete(next, b)
+		for k := range next {
+			if !contains(k.owner) {
+				delete(next, k)
 			}
 		}
 		for _, owner := range observed.Owners {
-			if _, exists := active[owner]; exists || len(active) >= 16 || s.Local.Now().Before(next[owner]) {
-				continue
-			}
-			call, cancel := context.WithTimeout(ctx, 30*time.Second)
-			active[owner] = connection{cancel}
-			owner := owner
-			go func() {
-				defer cancel()
-				retry := time.Second
-				defer func() { ended <- end{owner, retry} }()
-				exchange, e := s.Client.OpenDiscovered(call, owner, observed)
-				retry = openingRetry(e)
-				if e == nil {
-					if e = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local); e != nil {
-						s.reportFailure("exchange", e)
-					}
-				} else {
-					s.reportFailure("open", e)
+			for n := range mtls.ContextStartExchangesPerOwner {
+				key := slot{owner, n}
+				if _, exists := active[key]; exists || opening[owner] || len(active) >= 16 || s.Local.Now().Before(next[key]) {
+					continue
 				}
-			}()
+				call, cancel := context.WithTimeout(ctx, 30*time.Second)
+				active[key], opening[owner] = connection{cancel}, true
+				go func() {
+					defer cancel()
+					retry := time.Second
+					defer func() { ended <- end{key, retry} }()
+					exchange, e := s.Client.OpenDiscovered(call, owner, observed)
+					opened <- owner
+					retry = openingRetry(e)
+					if e == nil {
+						// An opened exchange passed every opening check; the hub
+						// ends a used standby by closing it, so its end is usually
+						// a read error. Either way the slot needs its next standby.
+						retry = 0
+						if e = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local); e != nil {
+							s.reportFailure("exchange", e)
+						}
+					} else {
+						s.reportFailure("open", e)
+					}
+				}()
+			}
 		}
 	}
 	poll()
@@ -393,9 +434,20 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case owner := <-opened:
+			// The owner's other slot may open now.
+			delete(opening, owner)
+			poll()
 		case e := <-ended:
-			delete(active, e.owner)
-			next[e.owner] = s.Local.Now().Add(e.retry)
+			delete(active, e.key)
+			next[e.key] = s.Local.Now().Add(e.retry)
+			if e.retry == 0 {
+				// An ended exchange consumed one of the owner's standbys.
+				// Reopen now, not on the next tick: the hub's following attach
+				// (a Save's start after its history write) waits about two
+				// seconds.
+				poll()
+			}
 		case <-ticker.C:
 			poll()
 		}

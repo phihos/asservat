@@ -1,0 +1,76 @@
+{
+  "Expression": "tcp[13] \u0026 16 != 0",
+  "Compiler": "libpcap version 1.11.0 (64-bit time_t, with TPACKET_V3)",
+  "Filter": {
+    "LinkType": "EN10MB",
+    "Snaplen": 65535,
+    "Program": [
+      {
+        "Code": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Code": 21,
+        "Jt": 0,
+        "Jf": 8,
+        "K": 2048
+      },
+      {
+        "Code": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Code": 21,
+        "Jt": 0,
+        "Jf": 6,
+        "K": 6
+      },
+      {
+        "Code": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Code": 69,
+        "Jt": 4,
+        "Jf": 0,
+        "K": 8191
+      },
+      {
+        "Code": 177,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Code": 80,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 27
+      },
+      {
+        "Code": 69,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 16
+      },
+      {
+        "Code": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Code": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ]
+  }
+}

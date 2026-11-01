@@ -130,3 +130,40 @@ func TestDownloadAdmissionRetiresFinishedWorkerBeforeReservingSlot(t *testing.T)
 		t.Fatal("admission did not free a finished download worker's slot", err, cleanup.calls)
 	}
 }
+
+type refusedRetirementJobs struct {
+	downloadCleanupJobs
+	step string
+}
+
+func (j refusedRetirementJobs) RetireDownloadWorker(context.Context, value.DownloadWorkerTermination) (value.DownloadWorkerRetirement, error) {
+	return value.DownloadWorkerRetirement{}, retirementDiagnosticFixture{j.step}
+}
+
+type retirementDiagnosticFixture struct{ step string }
+
+func (e retirementDiagnosticFixture) Error() string     { return "provider-private-detail" }
+func (e retirementDiagnosticFixture) Unwrap() error     { return artifact.ErrDownloadUnavailable }
+func (e retirementDiagnosticFixture) FixedStep() string { return e.step }
+
+func TestDownloadCleanupRetirementDiagnosticsRemainClosedAndCharged(t *testing.T) {
+	for _, step := range []string{"retirement/delete", "retirement/job-present", "retirement/pods-present", "retirement/current", "provider-private-detail"} {
+		t.Run(step, func(t *testing.T) {
+			now := time.Now
+			w := routeTestWorker(t, 11)
+			f, cleanup := newDownloadCleanup(now, w)
+			f.finished[w.Intent.ID] = true
+			cleanup.DownloadJobs = refusedRetirementJobs{downloadCleanupJobs{f}, step}
+			var logs []string
+			cleanup.Report = func(s string) { logs = append(logs, s) }
+			cleanup.CleanupProjectionWorkers(t.Context())
+			want := "download-delete-proof"
+			if step != "provider-private-detail" {
+				want += "/" + step
+			}
+			if len(logs) != 1 || logs[0] != want || !f.charged[w.Intent.ID] {
+				t.Fatal("retirement refusal leaked or released uncertain capacity", logs, f.charged)
+			}
+		})
+	}
+}

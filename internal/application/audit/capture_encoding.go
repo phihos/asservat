@@ -29,11 +29,23 @@ func EncodeCaptureOperationIntent(in value.OperationIntent) ([]byte, error) {
 	if !in.Valid() || in.Name != value.CaptureOperationName || in.Lifecycle == nil || !value.CaptureOperationPolicy(in.Lifecycle.Policy) {
 		return nil, ErrUnavailable
 	}
+	if in.ReasonEnvelope != nil {
+		if !CaptureReasonEnvelopeMatches(*in.Capture.ReasonRef, *in.ReasonEnvelope) {
+			return nil, ErrUnavailable
+		}
+		return captureEncoding(in, value.CaptureReasonPlainLimit)
+	}
 	return captureEncoding(in, 16<<10)
 }
 func EncodeCaptureOperationOutcome(out value.OperationOutcome) ([]byte, error) {
 	if !out.Valid() || out.Intent.Name != value.CaptureOperationName || out.Intent.Lifecycle == nil || !value.CaptureOperationPolicy(out.Intent.Lifecycle.Policy) {
 		return nil, ErrUnavailable
+	}
+	if out.Intent.ReasonEnvelope != nil {
+		if !CaptureReasonEnvelopeMatches(*out.Intent.Capture.ReasonRef, *out.Intent.ReasonEnvelope) {
+			return nil, ErrUnavailable
+		}
+		return captureEncoding(out, value.CaptureReasonPlainLimit)
 	}
 	return captureEncoding(out, 24<<10)
 }
@@ -45,17 +57,20 @@ func EncodeCaptureOperationOutcome(out value.OperationOutcome) ([]byte, error) {
 func captureCompletionDigest(v any, phase string) artifact.Digest {
 	var b []byte
 	var err error
+	reason := false
 	switch r := v.(type) {
 	case value.OperationIntent:
 		if phase != "intent" {
 			return artifact.Digest{}
 		}
 		b, err = EncodeCaptureOperationIntent(r)
+		reason = r.ReasonEnvelope != nil
 	case value.OperationOutcome:
 		if phase != "outcome" {
 			return artifact.Digest{}
 		}
 		b, err = EncodeCaptureOperationOutcome(r)
+		reason = r.Intent.ReasonEnvelope != nil
 	default:
 		return artifact.Digest{}
 	}
@@ -64,7 +79,11 @@ func captureCompletionDigest(v any, phase string) artifact.Digest {
 	}
 	defer clear(b)
 	h := sha256.New()
-	_, _ = h.Write([]byte("asservat-capture-completion/v1\x00" + phase + "\x00"))
+	domain := "asservat-capture-completion/v1"
+	if reason {
+		domain = "asservat-capture-reason-completion/v1"
+	}
+	_, _ = h.Write([]byte(domain + "\x00" + phase + "\x00"))
 	_, _ = h.Write(b)
 	var out artifact.Digest
 	copy(out[:], h.Sum(nil))

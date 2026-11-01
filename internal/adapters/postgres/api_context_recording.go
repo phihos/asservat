@@ -60,8 +60,11 @@ func (s *APIContextExecutions) ReadRecordingWork(ctx context.Context, captureID 
 		if w, err = apiWork(row); err != nil {
 			return err
 		}
-		if w.Accepted.Expectation.Recording == nil {
+		if w.Accepted.Expectation.Recording == nil && w.Accepted.Expectation.Snapshot == nil {
 			return value.ErrDenied
+		}
+		if err = sourceSnapshotWork(ctx, q, s.root, &w); err != nil {
+			return err
 		}
 		exec, err := q.ReadAPIExecution(ctx, custodydb.ReadAPIExecutionParams{RootID: id(s.root), CaptureID: row.ID})
 		if err != nil {

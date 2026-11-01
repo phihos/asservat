@@ -31,9 +31,9 @@ UPDATE policy_workload_window SET tat=$5 WHERE root_id=$1 AND cluster_id=$2 AND 
 UPDATE policy_acceptance SET executions_spent=executions_spent+1
 WHERE root_id=$1 AND id=$2 AND executions_spent<(record#>>'{Authority,Limits,MaxExecutions}')::bigint;
 
--- name: InsertPolicyOccurrence :execrows
+-- name: InsertPolicyOccurrence :one
 INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts,detector)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(root_id,policy_uid,pod_uid,restarts) DO NOTHING;
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(root_id,policy_uid,pod_uid,restarts) DO NOTHING RETURNING created_at;
 
 -- name: CountPolicySuppression :exec
 INSERT INTO policy_suppression(root_id,policy_uid,reason,first_at,last_at,count) VALUES($1,$2,$3,$4,$4,$5)

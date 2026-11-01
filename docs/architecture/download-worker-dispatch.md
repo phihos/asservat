@@ -41,3 +41,107 @@ Lost delete responses and reconciler restarts reuse the immutable termination re
 Pure shape tests reject changed image/command/account, environment injection, sidecars/init containers, host/privileged settings, token-audience changes, secret-volume injection, different owner and unknown spec fields. The SQL/object-store coordinator suite uses explicit simulated Kubernetes jobs for concurrent claims, encrypted audit, lost-create recovery, immutable bindings, held capacity, expiry after locks and restart-safe retirement. The Kubernetes suite uses an owned synthetic executable, actual Job controller, projected token, API RBAC and foreground cleanup. Its human dispatch authority, SQL identity registry and peer certificate remain fixture inputs. Results and source hashes are recorded in [implementation progress](../implementation-progress.md); neither suite is a production installer or complete public investigation.
 
 [ADR-070](worker-configuration.md) now adds protected profile acceptance/rollout fencing, and [ADR-071](worker-enrollment.md) adds audited acquisition credentials and bounded renewal. Still required: globally backed worker allocations and fair scheduling, complete pending/orphan/cancel cleanup, protected issuer bootstrap/local CA, authenticated control relay/token delivery, the acquisition runtime command and end-to-end browser/MCP/native transfer. No collection or disclosure role is enabled by these components alone.
+
+## Bounded foreground retirement observation (2026-10-28)
+
+Paced Native 40756805440 completed the near-full whole transfers but refused the
+third worker after `download-delete-proof` and `dispatch/reserve (capacity)`.
+The exact deletion subcause was not retained. The existing adapter immediately
+checks absence after an acknowledged foreground DELETE, although Kubernetes
+can retain the same terminating Job and Pods while garbage collection proceeds,
+as described in the [official foreground-deletion contract](https://kubernetes.io/docs/concepts/architecture/garbage-collection/#foreground-cascading-deletion).
+A local real-adapter server-authenticated TLS/client-go HTTP regression
+reproduced this gap (exit 1, package 0.097s); the other eight original
+negative/control cases passed. The synthetic API server presents a CA-verified
+certificate; this test supplies no client certificate and does not qualify
+mutual TLS or production API authentication.
+
+Complexity gate 1–11: (1) one installed cap refusal, asynchronous-deletion cause
+still a candidate; (2) uncertain workers remain charged, existing caps unchanged;
+(3) ordinary sequential downloads benefit; (4) Kubernetes foreground deletion is
+asynchronous; (5) zero new privileges/credentials; (6) one bounded observation
+phase, no fallback or delete retry; (7) zero configuration; (8) existing Kubernetes
+GC only; (9) at most 20 observation rounds at 100ms, each at most one Job
+GET and one bounded Pod LIST, one synchronous timer at a time, zero goroutines,
+SQL/API writes unchanged. Including the initial Job GET and one DELETE, the maximum is 42 requests versus the former four: 38 added reads in the worst case, up to 19 synchronous timers/1.9s intentional waiting, plus request latency. The caller and existing five-second retirement observation
+still cap work earlier; (10) no schema/wire migration, rollback restores immediate
+refusal; (11) observe the one acknowledged exact deletion rather than raising
+worker limits, adding a watcher or replaying reservations. Persisted termination
+is historical evidence; it never grants execution or renews a deadline.
+
+Only the exact UID/spec-matching terminating Job and original terminal Pod may
+remain pending. Replacement/foreign/mutated objects, request cancellation or an
+unavailable read refuse; absence alone without retained termination never frees
+capacity. Fixed delete-proof substeps must preserve the existing public cause.
+The adapter labels fixed retirement substeps (historical/delete/current/Job or
+Pod observation); the coordinator accepts only those finite labels and leaves
+uncertain workers charged. Original sentinel causes remain available through
+Unwrap. Persisted historical termination remains usable after its observation
+expires; no old expiry is imposed retroactively. The new retirement observation
+starts once and is not restarted by any GET/LIST.
+
+The actual adapter regression covers one acknowledged asynchronous deletion,
+already absent historical objects, cancellation, original caller/retirement
+expiry, wrong/replacement Job UID, foreign Pod, denied DELETE and fixed attempt
+exhaustion. This is HTTP simulation of GC transitions, not a real controller or
+installed-capacity qualification. Existing application coverage checks positive
+termination persistence before physical retirement, third-worker slot handling
+and closed diagnostics with uncertain charges retained.
+
+The installed fixture now writes and validates the same authenticated PCAPNG
+control file before later comparison preparations. Its existing tshark port,
+capinfos and packet-overlap checks are unchanged; so are final ranges, owner
+and Complete assertions. Format checks occur after the unpaced phase and
+before prepare-paced; joined-cleanup no longer includes those earlier checks.
+This preserves partial content proof after a late failure without declaring the
+whole experiment complete or inventing missing output/drop measurements.
+
+Owned real-controller selection:
+`^TestDownloadNativeJobsWithRealKubernetes$`, existing 150s test bound. Its old
+outer ten-second retirement loop repeats the adapter call and can mask immediate
+foreground-delete refusal. The fixture now uses one adapter call under one original five-second retirement
+context and retains its elapsed time/proof. No
+new collector, fixture, role, quota or deadline increase is needed. The measured component result below does not establish installed paced
+completion.
+
+
+This single owned selection kept its existing 150-second test context
+and one five-second retirement call. The harness's default Go envelope remains
+30 minutes; an external 1,100-second timeout followed by a ten-second hard-kill
+bounds the complete run below twenty minutes. These three bounds are distinct;
+the local gates alone establish no external or real-controller result.
+
+
+### Owned single-call measurement
+
+One authorized fresh owned selection on immutable
+`6e467f360b9d9646d2bc4e5db3b0716e4cecb448` passed:
+`^TestDownloadNativeJobsWithRealKubernetes$`. The one retirement call completed
+in **115.82032 ms**, with **4.8841782 s** remaining in its original five-second
+context. The exact original observed termination remained bound to the fresh retirement
+proof; the later deleted-worker peer proof was refused. The selected test took
+47.96 s, Go package 49.043 s and complete command 199.314446 s. Actual command,
+Go and qualification exits were all zero; no outer retirement retry occurred.
+
+All 3,391 retained qualification-source hashes matched the frozen commit.
+`sourceUnchangedDuringTest` was true and cleanup failures were empty. The two
+owned clusters, provider containers, networks and worker images were independently
+absent. Outputs were archived before restoration; all 35,983 working files then
+matched their pre-run hashes and the source tree was clean. No collector or BPF
+ran. The fixture uses an actual Restricted product worker, Pod token, TLS/native
+idle exchange and foreground Kubernetes deletion. Dispatch/issuer/registry/audit
+authority remains synthetic; no native evidence transfer or SQL capacity-row
+retirement was qualified by this selection.
+
+The immutable cache archive is
+`codex-bf86-resume/native-worker-retirement-owned-1/`.
+Its `final-report.json` SHA256 is
+`39dc7d1b67dd1dfc0cfae57c4b10d6617f72e0c491817aef1c9d6b08b4235844`;
+`artifacts/context-storage-environment.json` SHA256 is
+`de8e47bafaa8735c7738336bdbdf2afc76f41f5ec6388a99d8e35da490e5a624`.
+The report binds actual commands/exits, all archived source hashes, logs and
+owned-resource readback. Original local RED/GREEN and source manifests remain
+unchanged. This measures the chosen observation bound on this owned controller;
+it neither proves the earlier Native deletion subcause nor completes ranges,
+SQL capacity retirement or the installed paced workflow. No limit, quota,
+authority or deadline was increased to obtain this result.

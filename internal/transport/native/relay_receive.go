@@ -48,7 +48,7 @@ func (q *relayReceive) run() {
 		lease, err := q.gate.TerminalLease(q.ctx)
 		var frame contracts.NativeFrame
 		if err == nil {
-			call, stop := context.WithDeadline(q.ctx, lease.Until)
+			call, stop := context.WithDeadline(q.ctx, attachBound(lease))
 			frame, err = q.Stream.Receive(call)
 			stop()
 		}

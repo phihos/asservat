@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 )
 
@@ -190,5 +191,87 @@ func TestRouterTerminalQueryWithdrawnBeforeJoinedResult(t *testing.T) {
 	case <-f.handled:
 		t.Fatal("terminal query released socket capacity before joined cleanup")
 	default:
+	}
+}
+
+// ADR-270 source work spends queries every tick. A standby whose last query
+// completed is retired while its cluster has another standby, so the region
+// opens a queryable replacement; a lone one stays for an attach (ADR-179).
+func TestRouterRetiresExhaustedStandbyOnlyWithAnother(t *testing.T) {
+	for _, c := range []struct{ last, other bool }{{false, true}, {true, false}, {true, true}} {
+		w := workFixture()
+		cluster := w.Work.Target.ClusterID
+		router, err := NewRouter(RouterLimits{Standby: 2, Captures: 1, Clusters: []ClusterLimit{{cluster, 2, 1}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now()
+		register := func(exchange string) *Standby {
+			channel := w.Work.Channel
+			channel.ExchangeID = exchange
+			receiver := fleet.APIContextReceiver{Channel: channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+			s, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+			if err != nil {
+				t.Fatal(err)
+			}
+			return s
+		}
+		var other *Standby
+		if c.other {
+			other = register("00000000-0000-4000-8000-000000000099")
+		}
+		// Registered last, so the query selects it.
+		standby := register(w.Work.Channel.ExchangeID)
+		if c.last {
+			router.mu.Lock()
+			standby.queries = contracts.APIContextMaximumQueries - 1
+			router.mu.Unlock()
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		done := make(chan error, 1)
+		go func() {
+			_, e := router.Query(ctx, cluster, queryResolvePod, struct{}{}, &struct{}{})
+			done <- e
+		}()
+		(<-standby.query).result <- queryResult{until: now.Add(5 * time.Second)}
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+		cancel()
+		if retired := standby.ctx.Err() != nil; retired != (c.last && c.other) {
+			t.Fatal("exhausted standby retirement", c, retired)
+		}
+		standby.Finish()
+		other.Finish()
+		router.Close()
+	}
+}
+
+// TryAttach never waits: without an idle standby it fails at once.
+func TestRouterTryAttachDoesNotWait(t *testing.T) {
+	w := workFixture()
+	cluster := w.Work.Target.ClusterID
+	router, err := NewRouter(RouterLimits{Standby: 1, Captures: 1, Clusters: []ClusterLimit{{cluster, 1, 1}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer router.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	started := time.Now()
+	if _, err := router.TryAttach(ctx, cluster, w.Work.CaptureID); !errors.Is(err, fleet.ErrUnavailable) || time.Since(started) > 100*time.Millisecond {
+		t.Fatal("try attach waited or succeeded without a standby", err, time.Since(started))
+	}
+	now := time.Now()
+	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	standby, err := router.RegisterStandby(context.Background(), receiver, func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer standby.Finish()
+	call, end := context.WithTimeout(context.Background(), time.Second)
+	defer end()
+	if a, err := router.TryAttach(call, cluster, w.Work.CaptureID); err != nil || a == nil {
+		t.Fatal("try attach refused an idle standby", err)
 	}
 }

@@ -404,7 +404,11 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	// synchronous audit completion is still pending. The deferred final report
 	// retains its original event and includes the completion stages.
 	if s.Timing != nil && (ctx.Err() != nil || !timing.call.IsZero() && (callErr != nil || out.Status != "success")) {
-		timing.report(event+"/service-failed", steps, s.Timing)
+		failed := event + "/service-failed"
+		if reply.failureStep != "" {
+			failed += "/" + reply.failureStep
+		}
+		timing.report(failed, steps, s.Timing)
 	}
 	// Once an outcome exists, completing its audit is allowed without reviving
 	// request authority. This bounded synchronous completion never redispatches.
@@ -522,7 +526,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		}
 		return json.Marshal(in)
 	}
-	if name == "get_grant" || name == "list_reviews" || name == "decide_review" || name == "revoke_grant" {
+	if name == "request_policy_grant" || name == "get_grant" || name == "list_reviews" || name == "decide_review" || name == "revoke_grant" {
 		var in GrantOperationInput
 		if json.Unmarshal(raw, &in) != nil {
 			return nil, contracts.ErrInvestigationWire
@@ -556,7 +560,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 }
 func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationReply, callErr error, effectPossible bool) (audit.OperationOutcome, error) {
 	out := audit.OperationOutcome{Intent: in, Status: "unavailable", Reason: "authority_unavailable", Effect: "none", ClientReceipt: "unknown", MetadataUntil: in.RequestUntil, RecordedAt: s.config.Now().UTC().Truncate(time.Microsecond)}
-	if effectPossible && (in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" || in.Name == "decide_review" || in.Name == "revoke_grant" || queryOperation(in.Name)) {
+	if effectPossible && (in.Name == "cancel_capture" || in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || in.Name == "stop_future_sharing" || in.Name == "decide_review" || in.Name == "revoke_grant" || in.Name == "request_policy_grant" || queryOperation(in.Name)) {
 		out.Effect = "unknown"
 	}
 	if queryOperation(in.Name) {
@@ -583,7 +587,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			body = []byte("invalid")
 		}
 	} else {
-		if len(reply.Body) > audit.OperationOutputLimit || len(reply.Body) == 0 {
+		if len(reply.Body) > reply.preparedOutputLimit(in.Name) || len(reply.Body) == 0 {
 			return out, auditapp.ErrUnavailable
 		}
 		if queryOperation(in.Name) && s.contracts.ValidateOutput(in.Name, reply.Body) != nil {
@@ -619,20 +623,27 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			out.Status = "success"
 			out.Reason = "prepared"
 			var refs struct {
-				CaptureID  string             `json:"capture_id"`
-				ArtifactID string             `json:"artifact_id"`
-				Acceptance string             `json:"acceptance_id"`
-				GrantID    string             `json:"grant_id"`
-				DownloadID string             `json:"download_id"`
-				CaseID     string             `json:"case_id"`
-				State      string             `json:"state"`
-				Case       ContextCaseSummary `json:"case"`
-				Artifacts  []struct {
+				CancellationRequested bool               `json:"cancellation_requested"`
+				CaptureID             string             `json:"capture_id"`
+				ArtifactID            string             `json:"artifact_id"`
+				Acceptance            string             `json:"acceptance_id"`
+				GrantID               string             `json:"grant_id"`
+				DownloadID            string             `json:"download_id"`
+				CaseID                string             `json:"case_id"`
+				State                 string             `json:"state"`
+				Case                  ContextCaseSummary `json:"case"`
+				Artifacts             []struct {
 					ID string `json:"artifact_id"`
 				} `json:"artifacts"`
 			}
 			if json.Unmarshal(envelope.Data, &refs) != nil {
 				return out, auditapp.ErrUnavailable
+			}
+			if in.Name == "cancel_capture" {
+				out.Effect = "none"
+				if refs.CancellationRequested {
+					out.Effect = "accepted"
+				}
 			}
 			if refs.CaptureID != "" {
 				out.CaptureIDs = []string{refs.CaptureID}
@@ -648,7 +659,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			if (in.Name == "activate_policy" || in.Name == "deactivate_policy") && refs.Acceptance != "" {
 				out.Effect = "accepted"
 			}
-			if (in.Name == "decide_review" || in.Name == "revoke_grant") && refs.GrantID != "" {
+			if (in.Name == "request_policy_grant" || in.Name == "decide_review" || in.Name == "revoke_grant") && refs.GrantID != "" {
 				// An acknowledged decision/revocation, including exact idempotent replay,
 				// is an accepted logical mutation. Service uncertainty remains unknown.
 				out.Effect = "accepted"
@@ -679,7 +690,15 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			}
 		}
 	}
-	d, err := s.mac.Digest(domain, body)
+	var d artifact.Digest
+	var err error
+	if callErr == nil && in.Name == "preview_recording_save" {
+		d, err = s.mac.RecordingSavePreviewResultDigest(body)
+	} else if callErr == nil && in.Name == "get_capture_settings" && reply.browserSettings {
+		d, err = s.mac.BrowserSettingsResultDigest(body)
+	} else {
+		d, err = s.mac.Digest(domain, body)
+	}
 	out.OutputDigest = d
 	if err != nil || !out.Valid() {
 		return out, auditapp.ErrUnavailable

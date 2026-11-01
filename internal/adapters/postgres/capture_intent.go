@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"asservat.local/asservat/internal/application/planning"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -111,8 +112,33 @@ func captureIntent(row custodydb.ContextCapture) (audit.CaptureIntent, error) {
 	}
 	e := accepted.Expectation
 	out = audit.CaptureIntent{RootID: uid(row.RootID), CaptureID: accepted.CaptureID, CaseID: e.CaseID, OccurrenceID: e.OccurrenceID, ArtifactID: e.Registration.Location.ArtifactID, AttemptID: e.Registration.Location.AttemptID, Actor: identity.Principal{Issuer: scope.Executor.Issuer, Subject: scope.Executor.Subject, ClientID: scope.Executor.ClientID, Kind: scope.Executor.Kind}, Target: authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}, ScopeDigest: accepted.ScopeDigest, SubmissionDigest: accepted.SubmissionDigest, PermissionEpoch: uid(row.PermissionEpoch), PermissionSequence: row.PermissionSequence, IdentityRevision: identity.Revision{UID: row.IdentityPolicyUid, Generation: row.IdentityPolicyGeneration}, CreatedAt: accepted.CreatedAt, Deadline: accepted.Deadline, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy, ReservedBytes: e.Registration.ReservedBytes()}
+	if e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" {
+		parsed, err := planning.ReadContextScopeIdentity(row.ScopeJson, out.ScopeDigest)
+		if err != nil || parsed.Requester == nil || parsed.Actor != out.Actor {
+			return out, capture.ErrUnavailable
+		}
+		initiator := *parsed.Requester
+		out.Initiator = &initiator
+		if row.GroupID.Valid {
+			if !row.GroupOrdinal.Valid || uid(row.GroupID) != parsed.CaptureID || len(parsed.Targets) < 2 || int(row.GroupOrdinal.Int16) >= len(parsed.Targets) || row.GroupOrdinal.Int16 < 0 || parsed.Targets[row.GroupOrdinal.Int16] != out.Target {
+				return audit.CaptureIntent{}, capture.ErrUnavailable
+			}
+			out.Group = &audit.CaptureGroupBinding{ParentCaptureID: uid(row.GroupID), SelectionDigest: out.ScopeDigest, ChildIndex: int(row.GroupOrdinal.Int16), ChildCount: len(parsed.Targets)}
+		} else if len(parsed.Targets) > 1 {
+			return audit.CaptureIntent{}, capture.ErrUnavailable
+		}
+	}
 	copy(out.IdentityRevision.Digest[:], row.IdentityPolicyDigest)
 	copy(out.ExpectationDigest[:], digest(e))
+	if row.ReasonRef != nil {
+		var ref audit.CaptureReasonRef
+		d := json.NewDecoder(bytes.NewReader(row.ReasonRef))
+		d.DisallowUnknownFields()
+		if d.Decode(&ref) != nil || !ref.Valid() {
+			return out, capture.ErrUnavailable
+		}
+		out.ReasonRef = &ref
+	}
 	if !out.Valid() {
 		return audit.CaptureIntent{}, capture.ErrUnavailable
 	}

@@ -31,3 +31,23 @@ func TestPolicyShareManagementAndManagers(t *testing.T) {
 		t.Fatal("recipient manages the recurring sharing")
 	}
 }
+
+func TestPolicyWorkloadShareNeedsCurrentWholeWorkloadOwner(t *testing.T) {
+	creator, _, p, _, _, now := shareFixture()
+	target := WorkloadTarget{p.Target.ClusterID, p.Target.NamespaceUID, p.Target.WorkloadUID}
+	wp := WorkloadProjection{Target: target, Revision: p.Revision, ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil, DeniesComplete: p.DeniesComplete, DeniesObservedAt: p.DeniesObservedAt, DeniesFreshUntil: p.DeniesFreshUntil, Allows: p.Allows, Denies: p.Denies}
+	r, owners := PolicyWorkloadShareManagement(creator, wp, target, "binding-uid", []string{"team-a"}, now)
+	if !r.Eligible || len(owners) != 1 {
+		t.Fatal("workload owner refused", r, owners)
+	}
+	wp.Allows = append([]CurrentAssignment(nil), wp.Allows...)
+	wp.Allows[0].Reviewed = true
+	if r, _ := PolicyWorkloadShareManagement(creator, wp, target, "binding-uid", []string{"team-a"}, now); r.Eligible {
+		t.Fatal("one Pod review sponsored recurring sharing")
+	}
+	wp.Allows[0].Reviewed = false
+	wp.Denies = append([]CurrentAssignment(nil), wp.Allows...)
+	if r, _ := PolicyWorkloadShareManagement(creator, wp, target, "binding-uid", []string{"team-a"}, now); r.Eligible || r.Reason != "ExplicitDeny" {
+		t.Fatal("whole-workload deny ignored", r)
+	}
+}

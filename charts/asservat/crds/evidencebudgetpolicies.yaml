@@ -261,6 +261,21 @@
                           "DeleteOldestEligibleInAccount"
                         ],
                         "type": "string"
+                      },
+                      "maxActiveSources": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1024
+                      },
+                      "inputBytesPerSecond": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10737418240
+                      },
+                      "inputBurstBytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10737418240
                       }
                     },
                     "required": [
@@ -343,6 +358,21 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 3600
+                      },
+                      "maxActiveSources": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1024
+                      },
+                      "inputBytesPerSecond": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10737418240
+                      },
+                      "inputBurstBytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10737418240
                       }
                     },
                     "required": [

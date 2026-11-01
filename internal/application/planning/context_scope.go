@@ -14,12 +14,21 @@ import (
 // ContextScopeIdentity is historical routing/ownership only. It cannot grant
 // current collection or disclose a record without an independent current check.
 type ContextScopeIdentity struct {
+	Requester          *identity.Principal
 	Actor              identity.Principal
+	Targets            []authorization.Target
 	Target             authorization.Target
 	CaptureID          string
 	ExecutionClass     artifact.ContextExecutionClass
 	Deadline           time.Time
 	ApprovedAcceptance bool
+}
+
+func (s ContextScopeIdentity) RequestingPrincipal() identity.Principal {
+	if s.Requester != nil {
+		return *s.Requester
+	}
+	return s.Actor
 }
 
 // ReadContextScopeIdentity accepts only the exact canonical private compiler
@@ -31,6 +40,12 @@ func ReadContextScopeIdentity(b []byte, want artifact.Digest) (ContextScopeIdent
 	}
 	if bytes.Contains(b, []byte(`"schemaVersion":"`+value.RecorderPlanVersion+`"`)) {
 		return readRecorderScopeIdentity(b, want)
+	}
+	if bytes.Contains(b, []byte(`"schemaVersion":"recording-save/v1"`)) {
+		return readRecordingSaveScopeIdentity(b, want)
+	}
+	if bytes.Contains(b, []byte(`"schemaVersion":"source-window/v1"`)) {
+		return readSourceWindowScopeIdentity(b, want)
 	}
 	var s scope
 	d := json.NewDecoder(bytes.NewReader(b))

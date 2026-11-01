@@ -42,7 +42,7 @@ func (r *RelayConversation) forward(ctx context.Context, from, to Stream, kind c
 	if err != nil {
 		return err
 	}
-	call, stop := context.WithDeadline(ctx, lease.Until)
+	call, stop := context.WithDeadline(ctx, attachBound(lease))
 	defer stop()
 	frame, err := from.Receive(call)
 	if err != nil {
@@ -94,7 +94,7 @@ func (r *RelayConversation) Serve(ctx context.Context, worker Stream) error {
 		}
 		var op value.NativeOperation
 		until, e := time.Parse(time.RFC3339Nano, command.Until)
-		if e != nil || nativeDecode(command.Operation, &op) != nil || !op.Equal(lease.Operation) || command.Reference != nativeReference(op) || command.Format != contracts.NativeExchangeFormat || !contracts.ValidWorkerNonce(command.Nonce) || command.Kind != string(op.Kind) || command.ParentID != op.ParentID || command.Generation != op.Generation || command.LeaseSequence != lease.Sequence || until.After(lease.Until) || !time.Now().Before(until) {
+		if e != nil || nativeDecode(command.Operation, &op) != nil || !op.Equal(lease.Operation) || command.Reference != nativeReference(op) || command.Format != contracts.NativeExchangeFormat || !contracts.ValidWorkerNonce(command.Nonce) || command.Kind != string(op.Kind) || command.ParentID != op.ParentID || command.Generation != op.Generation || command.LeaseSequence != lease.Sequence || until.After(attachBound(lease)) || !time.Now().Before(until) {
 			return contracts.ErrNativeProtocol
 		}
 		return nil

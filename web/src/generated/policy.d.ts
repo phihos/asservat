@@ -4,6 +4,11 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         McpInput_activate_policy: {
+            /**
+             * Format: uuid
+             * @description Explicit approved grant to attach as a current team manager after acceptance audit; never reissues authority or refills spend.
+             */
+            grant_id?: string;
             policy_name: string;
             idempotency_key: string;
             /** @description Accept the reviewed recurring sharing of a DebugPolicy with spec.sharing (ADR-239). Without it such a policy is not activated; the reply SharingReviewRequired states that repeated collections will be shared, with whom, how many captures and until when. */
@@ -181,6 +186,26 @@ export interface components {
                     /** Format: date-time */
                     stopped_at?: string;
                 };
+                /** @description Conservative native-output reservations shared by this acceptance; uncertain spend remains charged. Not measured bytes. */
+                collected_bytes_spent: number;
+                /** @description Original accepted cumulative native-output ceiling, shared across grant replacements and controls. */
+                max_collected_bytes: number;
+                /** @description Conservative pre-filter observation charges shared by this acceptance, including uncertain legacy spend. Not collected output. */
+                observed_bytes_spent: number;
+                /** @description Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition. */
+                max_observed_bytes: number;
+                /**
+                 * @description Accepted collection action; controls available approval commands, not acquisition authority.
+                 * @enum {unknown}
+                 */
+                collection_kind: "podStatus" | "packetCapture";
+                /**
+                 * Format: uuid
+                 * @description Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection.
+                 */
+                attached_grant_id?: string;
+                /** @description Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter. */
+                max_grant_starts?: number;
             };
         } | {
             /** @constant */

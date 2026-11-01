@@ -47,7 +47,7 @@ func previewTestRow(t *testing.T, p value.ContextPreview) custodydb.ContextPrevi
 		t.Fatal(err)
 	}
 	h := sha256.Sum256(encoded)
-	return custodydb.ContextPreview{ID: id(p.ID), RootID: id(p.RootID), CaptureID: id(p.CaptureID), AttemptID: id(p.AttemptID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)}
+	return custodydb.ContextPreview{PreviewKind: "context", ID: id(p.ID), RootID: id(p.RootID), CaptureID: id(p.CaptureID), AttemptID: id(p.AttemptID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)}
 }
 
 func TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption(t *testing.T) {
@@ -57,6 +57,7 @@ func TestContextPreviewRecordPreservesImmutableReviewAndRejectsCorruption(t *tes
 		t.Fatal("valid historical passive preview changed", err)
 	}
 	for name, mutate := range map[string]func(*custodydb.ContextPreview){
+		"wrong-kind":      func(r *custodydb.ContextPreview) { r.PreviewKind = "recordingSaveGroup" },
 		"digest":          func(r *custodydb.ContextPreview) { r.BlueprintSha256[0]++ },
 		"root":            func(r *custodydb.ContextPreview) { r.RootID = id(p.CaptureID) },
 		"capture":         func(r *custodydb.ContextPreview) { r.CaptureID = id(p.ArtifactID) },

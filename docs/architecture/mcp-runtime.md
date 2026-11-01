@@ -86,12 +86,17 @@ These are local transport limits, not distributed collection or disclosure
 budgets. Listener connection/header limits and fleet-wide abuse controls remain
 separate composition work.
 
-Responses are buffered to a hard 64 KiB before the final identity check. Flushing
+Responses are buffered to a hard 64 KiB before the final identity check. Only the
+composed `preview_recording_save` tool uses a fixed 256 KiB SDK frame for its
+128 KiB canonical metadata result, preserving both text and structured forms.
+The named producer marks that private delivery budget; every other tool,
+discovery response and owned evidence reply retains its original ceiling. Flushing
 cannot disclose buffered bytes early. The SDK cannot relax HTTP `no-store,
 private` or publish session identifiers; its cacheable protocol results receive
 zero lifetime and private scope. Once evidence tools exist, their stricter
 24 KiB default/32 KiB hard structured envelope and combined representation bounds
-must be enforced before this final transport ceiling. No native evidence is
+must be enforced before this final transport ceiling; the named recording-save
+preview uses its dedicated bound. No native evidence is
 returned inline through an invented download tool.
 
 ## Qualification and dependency review
@@ -145,3 +150,14 @@ identity is necessary but is not workload/evidence authority. Tool schemas,
 structured/text envelopes, cursor authorization, mutation idempotency, raw grants,
 authenticated native-download navigation and real provider/resource mapping need
 their own qualification before declaring an investigation flow available.
+
+## Grouped recording Save request window
+
+[ADR-268](../decisions/268-grouped-save-dispatch-window.md) gives `request_capture`
+a prospective fifteen-second transport/audit envelope, selected while routing
+the original owned bearer request. Other ordinary operations keep five seconds;
+evidence-read windows keep twenty. All earlier caller/credential/session ends
+remain binding. Group admission keeps its original five-second facts phase and
+new manual groups select a fixed StartBy within original ingress end and SQL t0+15s, with all source/processing limits (ADR-269). Old accepted dates and ordinary/singleton five-second builders remain unchanged. Optional encrypted history
+follows mandatory start attempts. Continue uses the same operation window and
+never changes accepted dates; passive replay does not dispatch.

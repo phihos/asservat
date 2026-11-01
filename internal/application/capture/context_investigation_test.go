@@ -477,37 +477,12 @@ func TestContextRequiresProtectedAuthorityAndNoDetachedContext(t *testing.T) {
 	})
 }
 
-type fixtureReasonReader struct {
-	f          *investigationFixture
-	substitute bool
-}
-
-func (r fixtureReasonReader) ContextReason(_ context.Context, _ identities.CurrentIdentity, target authorization.Target, ref value.ProtectedReasonRef) (ContextReasonObservation, error) {
-	if r.substitute {
-		ref.CiphertextDigest[0]++
-	}
-	return ContextReasonObservation{Reference: ref, Actor: r.f.actor, Target: target, ObservedAt: r.f.now, ValidUntil: identity.Earlier(ref.ExpiresAt, r.f.now.Add(5*time.Second))}, nil
-}
-func TestContextProtectedReasonReference(t *testing.T) {
-	for _, mode := range []string{"missing reader", "substitution", "protected"} {
-		t.Run(mode, func(t *testing.T) {
-			f := newInvestigationFixture()
-			in := f.intent()
-			in.Reason = &value.ProtectedReasonRef{ID: fixtureID(40), CiphertextDigest: artifact.Digest{4}, ExpiresAt: f.now.Add(time.Minute)}
-			if mode != "missing reader" {
-				f.svc.Reasons = fixtureReasonReader{f, mode == "substitution"}
-			}
-			r, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), in)
-			if mode != "protected" {
-				if err == nil {
-					t.Fatal("unverified reason accepted")
-				}
-				return
-			}
-			if err != nil || r.Preview.Intent.Reason == nil || !r.Preview.Deadline.Equal(in.Reason.ExpiresAt) {
-				t.Fatal("reason silently lost or deadline extended", err)
-			}
-		})
+func TestContextProtectedReasonReferenceRequiresProducedEnvelope(t *testing.T) {
+	f := newInvestigationFixture()
+	in := f.intent()
+	in.Reason = &value.ProtectedReasonRef{ID: fixtureID(40), CiphertextDigest: artifact.Digest{4}}
+	if _, err := f.svc.Preview(context.Background(), f.source(t, context.Background()), in); err == nil || len(f.previews) != 0 {
+		t.Fatal("unproduced reference accepted or persisted")
 	}
 }
 

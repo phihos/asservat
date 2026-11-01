@@ -43,6 +43,7 @@ type ownerOperationFixture struct {
 	entered, exited     chan struct{}
 	blockOnce           sync.Once
 	podReads            int
+	podReadChange       func(int, *core.Pod)
 	changeDuringInitial bool
 	lastNamespaceExpiry bool
 	namespaceReads      int
@@ -175,8 +176,12 @@ func (f *ownerOperationFixture) serve(w http.ResponseWriter, r *http.Request) {
 		permissionReply(w, v.list)
 	case "/api/v1/namespaces/owners/pods/hub-rs-pod":
 		f.podReads++
+		if f.podReadChange != nil {
+			f.podReadChange(f.podReads, &v.pod)
+		}
 		if f.changeDuringInitial && f.podReads == 2 {
-			v.pod.ResourceVersion = "changed"
+			v.pod.ResourceVersion = "104"
+			v.pod.Spec.Containers[0].Args = append(v.pod.Spec.Containers[0].Args, "--changed")
 		}
 		permissionReply(w, v.pod)
 	case "/api/v1/namespaces/owners/pods/hub-rs-other":

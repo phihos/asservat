@@ -166,13 +166,14 @@ func TestDownloadPeerAttestationChecks(t *testing.T) {
 			if mode == "cancelled" {
 				cancel()
 			}
-			proof, e := source.ReadDownloadPeerProof(ctx, session, peer)
+			result, e := source.ReadNativeResponsePeerProof(ctx, session, peer)
+			proof := result.Proof
 			if mode == "valid" || mode == "short-token" {
 				until := now.Add(5 * time.Second)
 				if mode == "short-token" {
 					until = now.Add(time.Second)
 				}
-				if e != nil || !proof.Valid(now) || proof.Binding != b || !proof.FreshUntil.Equal(until) || reviews != 2 {
+				if e != nil || !result.TokenNotAfter.Equal(time.Unix(expiry, 0)) || !proof.Valid(now) || proof.Binding != b || !proof.FreshUntil.Equal(until) || reviews != 2 {
 					t.Fatal("valid worker rejected", e, reviews)
 				}
 				out, _ := json.Marshal(proof)

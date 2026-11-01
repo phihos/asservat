@@ -489,6 +489,12 @@
                 },
                 "minItems": 0,
                 "maxItems": 4
+              },
+              "recording_handle": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "For an existing-source save, identifies the selected source row whose incremental snapshot assessment this is. It conveys no acquisition authority."
               }
             },
             "required": [

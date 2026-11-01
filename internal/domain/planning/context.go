@@ -41,6 +41,54 @@ type ContextInput struct {
 	// pod status: the authored composition with its filters frozen at
 	// preview, so the plan never depends on a compiler being present later.
 	Recorder *RecorderContext `json:",omitempty"`
+	// Snapshot selects one existing-source window, independently of finite recording.
+	Snapshot *SourceSnapshotContext `json:",omitempty"`
+	// SnapshotSource is a current exact-source observation, never persisted in passive preview.
+	SnapshotSource *targets.SourceSnapshotResolution `json:",omitempty"`
+}
+
+// SourceSnapshotContext binds a saved window to its original policy executor
+// and source definition. It cannot start or renew the separately owned source.
+// RecordingSaveGroupBinding is immutable membership supplied by the protected
+// parent preview/admission. It cannot select a replacement source or confer authority.
+type RecordingSaveGroupBinding struct {
+	ParentCaptureID        string
+	SelectionDigest        artifact.Digest
+	ChildIndex, ChildCount int
+}
+
+type SourceSnapshotContext struct {
+	Group      *RecordingSaveGroupBinding `json:",omitzero"`
+	PolicyName string                     `json:",omitempty"`
+	// RecordingSaveScope is the immutable typed manual selection, independently
+	// constructed before acceptance. Policy snapshots leave it empty.
+	RecordingSaveScope               []byte          `json:",omitempty"`
+	SourceDefinitionDigest           artifact.Digest `json:",omitzero"`
+	Request                          artifact.SourceSnapshotRequest
+	ActionID, PolicyUID, TriggerKind string
+	ExecutionDigest                  artifact.Digest
+	RecipeDigest                     artifact.Digest
+	SourceAudience                   []artifact.AudienceAssignment
+	SourceAudienceDigest             artifact.Digest
+	SourceTarget                     *targets.SourceSnapshotTarget
+}
+
+func (s *SourceSnapshotContext) Clone() *SourceSnapshotContext {
+	if s == nil {
+		return nil
+	}
+	out := *s
+	if s.Group != nil {
+		group := *s.Group
+		out.Group = &group
+	}
+	out.RecordingSaveScope = append(s.RecordingSaveScope[:0:0], s.RecordingSaveScope...)
+	out.SourceAudience = append(s.SourceAudience[:0:0], s.SourceAudience...)
+	if s.SourceTarget != nil {
+		target := *s.SourceTarget
+		out.SourceTarget = &target
+	}
+	return &out
 }
 
 // RecorderContext is the authored composition of a recorder capture and the

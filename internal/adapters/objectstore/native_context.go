@@ -69,15 +69,20 @@ func (r *NativeContextReader) OpenNativeArtifact(ctx context.Context, source evi
 	if e != nil {
 		return nil, e
 	}
-	return v.OpenNative(ctx, source.Expectation, source.Copies, end)
+	// Initial storage/key opening retains its own short bound. The cursor
+	// belongs to the original response context, not the canceled opening call.
+	opening, stop := context.WithDeadline(ctx, end)
+	defer stop()
+	return v.openNative(ctx, opening, source.Expectation, source.Copies, until)
 }
 
 func (r *NativeContextReader) opener(ctx context.Context, source evidence.NativeContextSource, o value.NativeOperation, window string, until time.Time) (time.Time, *kms.RemoteOpener, error) {
 	if r == nil || ctx == nil || ctx.Err() != nil || !o.Valid() || o.Reference.InstallationID != r.scope.InstallationID || !source.Valid(o.SourceVersion) {
 		return time.Time{}, nil, artifact.ErrInvalid
 	}
+	started := time.Now()
 	end, ok := ctx.Deadline()
-	if !ok || end.After(time.Now().Add(5*time.Second)) || !time.Now().Before(end) || end.After(until) {
+	if !ok || end.After(time.Now().Add(value.NativeConversationWindow(o.Kind))) || !time.Now().Before(end) || end.After(until) {
 		return time.Time{}, nil, artifact.ErrDownloadExpired
 	}
 	authority := ""
@@ -99,5 +104,5 @@ func (r *NativeContextReader) opener(ctx context.Context, source evidence.Native
 	if e != nil {
 		return time.Time{}, nil, e
 	}
-	return end, opener, nil
+	return minDeadline(end, started.Add(5*time.Second)), opener, nil
 }

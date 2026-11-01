@@ -33,6 +33,7 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 	bootstrapFile := flags.String("bootstrap", "", "the bootstrap record read from the channel")
 	inCluster := flags.Bool("in-cluster", false, "Helm hook only: use the Pod's installer account as the guards' administrator")
 	evidenceFile := flags.String("evidence-credential", "", "the operator's write-only regional evidence credential (required when the offer names the regional executor)")
+	historyFile := flags.String("history-credential", "", "the separate history-prefix storage capability (required with the regional executor; never the evidence writer)")
 	alertmanager := flags.String("alertmanager", "", "optional in-cluster Alertmanager base URL for alert policies (ADR-231; regional executor only)")
 	mappingsJSON := flags.String("identity-mappings", "", "optional JSON array of identity mapping records for decision-time PermissionSources (ADR-245; regional executor only)")
 	collectorNamespace := flags.String("collector-namespace", "", "optional existing collector namespace whose DaemonSet this connector attests (ADR-246)")
@@ -90,9 +91,16 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 		}
 		defer clear(evidence)
 	}
+	var history []byte
+	if *historyFile != "" {
+		if history, err = os.ReadFile(*historyFile); err != nil || len(history) > 32<<10 {
+			return mounts.ErrUnavailable
+		}
+		defer clear(history)
+	}
 	// The output includes the public join record of an installed executor
 	// (ADR-196 decision 2); it holds no credential.
-	installed, err := kube.InstallRegionalConnector(ctx, config, kube.RegionalInstallPlan{Offer: offer, Bootstrap: envelope, Namespace: *namespace, AccountAdministrator: *inCluster, Evidence: evidence, Alertmanager: *alertmanager, IdentityMappings: mappings, Collector: collector})
+	installed, err := kube.InstallRegionalConnector(ctx, config, kube.RegionalInstallPlan{Offer: offer, Bootstrap: envelope, Namespace: *namespace, AccountAdministrator: *inCluster, Evidence: evidence, History: history, Alertmanager: *alertmanager, IdentityMappings: mappings, Collector: collector})
 	if err != nil {
 		return err
 	}

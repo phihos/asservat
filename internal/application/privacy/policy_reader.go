@@ -39,7 +39,19 @@ func (r AcceptedRetentionReader) RetainedRetentionPolicies(ctx context.Context, 
 	return r.read(ctx, t, slices.Clone(origins))
 }
 func stableDigest(v any) artifact.Digest { b, _ := json.Marshal(v); return sha256.Sum256(b) }
+func (r AcceptedRetentionReader) CaseMetadataPolicies(ctx context.Context, t authorization.Target) (value.PolicySet, error) {
+	return r.readKind(ctx, t, nil, true)
+}
+func (r AcceptedRetentionReader) RetainedCaseMetadataPolicies(ctx context.Context, t authorization.Target, origins []artifact.RetentionRule) (value.PolicySet, error) {
+	if !value.ValidPolicyOrigins(origins) {
+		return value.PolicySet{}, value.ErrInvalid
+	}
+	return r.readKind(ctx, t, slices.Clone(origins), true)
+}
 func (r AcceptedRetentionReader) read(ctx context.Context, t authorization.Target, origins []artifact.RetentionRule) (value.PolicySet, error) {
+	return r.readKind(ctx, t, origins, false)
+}
+func (r AcceptedRetentionReader) readKind(ctx context.Context, t authorization.Target, origins []artifact.RetentionRule, caseMetadata bool) (value.PolicySet, error) {
 	var out value.PolicySet
 	if !t.Valid() {
 		return out, value.ErrInvalid
@@ -134,6 +146,22 @@ func (r AcceptedRetentionReader) read(ctx context.Context, t authorization.Targe
 	if err != nil {
 		return out, err
 	}
+	if caseMetadata {
+		byUID := map[string]value.ScopedPolicy{}
+		for _, snapshot := range snapshots {
+			for _, p := range snapshot.Policies {
+				byUID[p.Policy.Revision.UID] = p
+			}
+		}
+		for i, p := range policies {
+			source, ok := byUID[p.Revision.UID]
+			if !ok {
+				return out, value.ErrUnavailable
+			}
+			p = value.CaseMetadataPolicy(source)
+			policies[i] = p
+		}
+	}
 	until = identity.Earlier(until, sourceUntil)
 	observed = identity.Earlier(observed, facts.ObservedAt)
 	// Re-read after metadata I/O; a new source acceptance/guard/topology revision
@@ -175,13 +203,18 @@ func (r AcceptedRetentionReader) read(ctx context.Context, t authorization.Targe
 		}
 		return 0
 	})
+	kind := ""
+	if caseMetadata {
+		kind = "case-metadata"
+	}
 	digest := stableDigest(struct {
 		Topology  identity.Revision
 		Sources   []checkpoint
 		Target    authorization.Target
 		Selectors identity.Revision
 		Origins   []artifact.RetentionRule
-	}{topology.Revision, points, t, facts.Revision, origins})
+		Kind      string `json:",omitempty"`
+	}{topology.Revision, points, t, facts.Revision, origins, kind})
 	revision := identity.Revision{UID: topology.Revision.UID, Generation: topology.Revision.Generation, Digest: digest}
 	proof := artifact.RetentionProof{RootID: topology.RootID, ClusterID: t.ClusterID, NamespaceUID: t.NamespaceUID, WorkloadUID: t.WorkloadUID, PodUID: t.PodUID, Topology: topology.Revision, Policy: revision, Selectors: facts.Revision, SourceCount: len(points), ObservedAt: observed, ValidUntil: until}
 	for i, p := range points {

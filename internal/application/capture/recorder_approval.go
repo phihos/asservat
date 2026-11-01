@@ -31,8 +31,28 @@ type ApprovalSettings interface {
 // requireRecordingApproval reads the installation's REQ-SYS-002 switch for
 // the caller's issuer. Without a configured reader the installation adds no
 // requirement; a failing reader refuses the preview.
-func (s ContextInvestigation) requireRecordingApproval(ctx context.Context, issuer string) (bool, error) {
+func (s ContextInvestigation) requireRecordingApproval(ctx context.Context, current identities.CurrentIdentity, actor identity.Principal) (bool, error) {
+	issuer := actor.Issuer
+	_, _, policy := authorization.PolicyExecutor(actor)
+	if policy {
+		// Only the package-private request-owned policy identity supplies accepted
+		// issuer provenance. A token or policy-shaped principal cannot select it.
+		accepted, ok := current.(interface {
+			acceptedSettingsIssuer(context.Context) (string, error)
+		})
+		if !ok {
+			return false, value.ErrUnavailable
+		}
+		var err error
+		issuer, err = accepted.acceptedSettingsIssuer(ctx)
+		if err != nil {
+			return false, value.ErrUnavailable
+		}
+	}
 	if s.Approvals == nil {
+		if policy {
+			return false, value.ErrUnavailable
+		}
 		return false, nil
 	}
 	p, err := s.Approvals.IdentityPolicy(ctx, issuer)
@@ -87,21 +107,30 @@ func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, sourc
 // identity while the preview is current, and is refused with
 // ApprovalRequired until an approved, current grant covers this exact plan
 // for the requesting human; only then does it pass to the recorder check
-// (ADR-248). A plan with REQ-AUT-006 observation limits (a raw byte
-// predicate) stays RecorderUnavailable: the node recorder does not charge
-// observation spend. Nothing is armed, reserved or charged here.
+// (ADR-248). Manual raw predicates stay unavailable. Finite policy raw actions
+// pass only to their original atomic policy admission and observation companion;
+// this gate itself never arms a source, reserves input or grants acquisition.
 func (s ContextInvestigation) recorderRequest(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, access *authorization.ResultAccess) (authorization.Grant, error) {
 	actions, approval, err := compiler.RecorderScopeSummary(p.CanonicalScope)
 	if err != nil {
 		return authorization.Grant{}, value.ErrUnavailable
 	}
-	required, err := s.requireRecordingApproval(ctx, p.Actor.Issuer)
+	required, err := s.requireRecordingApproval(ctx, source, p.Actor)
 	if err != nil {
 		return authorization.Grant{}, err
 	}
 	frozen := approval != nil && slices.ContainsFunc(approval.Reasons, func(r authorization.SensitiveReason) bool { return r.Code == "recordingApprovalRequired" })
 	if required != frozen {
 		return authorization.Grant{}, s.requestChanged("approval/settings")
+	}
+	if _, _, policy := authorization.PolicyExecutor(p.Actor); policy {
+		if access != nil {
+			return authorization.Grant{}, value.ErrInvalid
+		}
+		// Team grant scope is the accepted policy, not this per-Pod manual preview.
+		// The existing admission transaction locks and spends its actual attachment;
+		// no human ad hoc request, grant timing refresh or new debit happens here.
+		return authorization.Grant{}, nil
 	}
 	if approval == nil {
 		if access != nil {

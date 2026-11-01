@@ -1,3 +1,4 @@
+import { operations as grantOperations, type Operations as GrantOperations, type Input as GrantInput, type Grant } from '../approvals/http';
 import type { Session } from '../auth/session';
 import { OperationFailure, operationMessage } from '../capture/http';
 import { operations, type Data, type Input, type Operation, type Operations, type Output, type Status } from './http';
@@ -5,7 +6,7 @@ import { operations as shareOperations, type Operations as ShareOperations } fro
 
 // review is the server's recurring-sharing review (ADR-239), shown before the
 // user activates a policy that shares its captures.
-export type Entry = { name: string; status?: Status; message?: string; review?: string; busy: boolean };
+export type Entry = { name: string; status?: Status; message?: string; review?: string; grant?: Grant; requestPending?: boolean; attachmentPending?: string; busy: boolean };
 export type State = { entries: Entry[] };
 
 // UI coordination is not authority: the server rechecks every operation. The
@@ -20,9 +21,11 @@ export class Policies {
   private session?: Session;
   private scope?: AbortSignal;
   private keys = new Map<string, string>();
+ private requests = new Map<string, GrantInput<'request_policy_grant'>>();
+ private attachments = new Map<string, string>();
   readonly snapshot = () => this.state;
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
-  constructor(private client: Operations = operations, private newID: () => string = () => crypto.randomUUID(), private shares: ShareOperations = shareOperations) {}
+  constructor(private client: Operations = operations, private newID: () => string = () => crypto.randomUUID(), private shares: ShareOperations = shareOperations, private grants: GrantOperations = grantOperations) {}
 
   private update(name: string, patch: Partial<Entry>) {
     this.state = { entries: this.state.entries.map(entry => entry.name === name ? { ...entry, ...patch } : entry) };
@@ -37,7 +40,7 @@ export class Policies {
   }
 
   reset = () => {
-    this.identity = undefined; this.session = undefined; this.scope = undefined; this.keys.clear();
+    this.identity = undefined; this.session = undefined; this.scope = undefined; this.keys.clear(); this.requests.clear();this.attachments.clear();
     this.state = { entries: [] };
     for (const listener of this.listeners) listener();
   };
@@ -77,17 +80,35 @@ export class Policies {
     if (data) this.update(name, { status: data });
   };
 
-  private async command(name: string, operation: 'activate_policy' | 'deactivate_policy', reviewed = false) {
-    const slot = operation + '\n' + name;
+  private async command(name: string, operation: 'activate_policy' | 'deactivate_policy', reviewed = false, grantID?: string) {
+    const slot = operation + '\n' + name + (grantID ? '\nattachment' : '');
     const key = this.keys.get(slot) ?? this.newID();
     this.keys.set(slot, key);
     this.update(name, { review: undefined });
-    const input = operation === 'activate_policy' && reviewed ? { policy_name: name, idempotency_key: key, sharing_reviewed: true } : { policy_name: name, idempotency_key: key };
+    const pinnedGrant = grantID ? this.attachments.get(name) ?? grantID : undefined;
+    if (pinnedGrant) { this.attachments.set(name, pinnedGrant);this.update(name,{attachmentPending:pinnedGrant}); }
+    const input = pinnedGrant ? {policy_name:name,idempotency_key:key,grant_id:pinnedGrant} : operation === 'activate_policy' && reviewed ? { policy_name: name, idempotency_key: key, sharing_reviewed: true } : { policy_name: name, idempotency_key: key };
     const data = await this.run(name, operation, input);
     if (!data) return;
-    this.keys.delete(slot);
+    this.keys.delete(slot);if (pinnedGrant) {this.attachments.delete(name);this.update(name,{attachmentPending:undefined});}
     await this.refresh(name);
   }
+  requestGrant = async (name: string, choices: Omit<GrantInput<'request_policy_grant'>, 'policy_uid' | 'policy_name' | 'idempotency_key'>) => {
+    const session = this.session, scope = this.scope, status = this.state.entries.find(e => e.name === name)?.status;
+    if (!session || !scope || scope.aborted || !status || status.collection_kind !== 'packetCapture') return;
+    const input = this.requests.get(name) ?? { ...structuredClone(choices), policy_uid: status.policy_uid,policy_name:name, idempotency_key: this.newID() };
+    this.requests.set(name, input);
+    this.update(name, { busy: true, message: undefined, requestPending: true });
+    try {
+      const reply = await this.grants.call('request_policy_grant', input, session.csrf_token, scope);
+      if (scope.aborted) return;
+      if (reply.status !== 'ok') throw new OperationFailure(503, reply.status === 'error' ? reply.data.code : 'Pending', reply.status === 'error' ? reply.data.message : 'The request is pending.');
+      this.requests.delete(name);this.update(name,{ grant:reply.data, requestPending:false });
+    } catch(error) {
+      if (!scope.aborted) { if (error instanceof OperationFailure && error.code==='InvalidApprovalRequest') { this.requests.delete(name);this.update(name,{requestPending:false}); }this.update(name,{message:operationMessage(error)}); }
+    } finally { if (!scope.aborted) this.update(name,{busy:false}); }
+  };
+  attachGrant = (name: string, id: string) => this.command(name,'activate_policy',false,id);
   activate = (name: string) => this.command(name, 'activate_policy');
   // ADR-239: activation after the user reviewed the recurring sharing.
   activateSharing = (name: string) => this.command(name, 'activate_policy', true);

@@ -162,7 +162,7 @@ func flowServerReporting(t *testing.T, path string, a native.Admission, refused 
 func flowOperation(t *testing.T, ctx context.Context, source evidence.NativeContextSource, kind value.NativeOperationKind, fence int64, delivery artifact.DownloadDeliveryLease) (*native.HubOperation, *mtls.NativeClient, value.NativeOperation) {
 	return flowOperationWithConnector(t, ctx, source, kind, fence, delivery, nil)
 }
-func flowOperationWithConnector(t *testing.T, ctx context.Context, source evidence.NativeContextSource, kind value.NativeOperationKind, fence int64, delivery artifact.DownloadDeliveryLease, construct func(*flowAdmission) native.Admission) (*native.HubOperation, *mtls.NativeClient, value.NativeOperation) {
+func flowOperationWithConnector(t *testing.T, ctx context.Context, source evidence.NativeContextSource, kind value.NativeOperationKind, fence int64, delivery artifact.DownloadDeliveryLease, construct func(*flowAdmission) native.Admission, observations ...func(value.NativeLease) value.NativeLease) (*native.HubOperation, *mtls.NativeClient, value.NativeOperation) {
 	now := time.Now()
 	until := now.Add(4 * time.Second)
 	if d, ok := ctx.Deadline(); ok && d.Before(until) {
@@ -172,13 +172,22 @@ func flowOperationWithConnector(t *testing.T, ctx context.Context, source eviden
 	if kind == value.NativeResponse {
 		until = delivery.Until
 		o.Until = until
+		if len(observations) > 0 {
+			o.Until = now.Add(identity.EvidenceReadRequestWindow)
+		}
 	}
 	o = syntheticProcessingPath(o)
 	o.Processing.Location = source.Expectation.Registration.Location
 	o.Path.TargetClusterID = o.Processing.Location.ClusterID
 	o.Path.StoreID = source.Expectation.Registration.StoreID
 	l := value.NativeLease{Operation: o, Certificate: artifact.Digest{3}, Sequence: 1, ObservedAt: now, Until: until}
-	gate, e := evidence.NewNativeFrameGate(ctx, func(context.Context) (value.NativeLease, error) { return l, nil }, time.Now)
+	check := func(context.Context) (value.NativeLease, error) {
+		if len(observations) > 0 {
+			return observations[0](l), nil
+		}
+		return l, nil
+	}
+	gate, e := evidence.NewNativeFrameGate(ctx, check, time.Now)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -190,6 +199,9 @@ func flowOperationWithConnector(t *testing.T, ctx context.Context, source eviden
 	command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: contracts.NativeReference{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, OperationID: nativeID, Fence: fence}, Kind: string(kind), Source: b, Operation: wire, ParentID: nativeID, Generation: 1, LeaseSequence: 1, Until: until.UTC().Format(time.RFC3339Nano)}
 	var operation *native.HubOperation
 	if kind == value.NativeResponse {
+		if len(observations) > 0 {
+			command.Until = o.Until.UTC().Format(time.RFC3339Nano)
+		}
 		command.WindowID = delivery.WindowID
 		command.Offset = delivery.Offset
 		command.Length = delivery.Length
@@ -203,7 +215,7 @@ func flowOperationWithConnector(t *testing.T, ctx context.Context, source eviden
 	t.Cleanup(func() { operation.Close() })
 	hub := &flowAdmission{t: t, owner: ctx, operation: operation, lease: l}
 	upstream := flowServer(t, contracts.NativeOwnerPath, hub)
-	connector := &flowAdmission{t: t, owner: ctx, lease: l, upstream: upstream}
+	connector := &flowAdmission{t: t, owner: ctx, lease: l, upstream: upstream, check: check}
 	var admission native.Admission = connector
 	if construct != nil {
 		admission = construct(connector)

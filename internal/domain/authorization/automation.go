@@ -67,6 +67,9 @@ type AcceptedPolicyAuthority struct {
 // AcceptedPolicySnapshot carries the original source/recovery read deadline;
 // a delayed preflight must not turn an old source observation into fresh proof.
 type AcceptedPolicySnapshot struct {
+	// Immutable source provenance for private parameter history, never additional authority.
+	IntentVersion          int64
+	SourceRevision         identity.Revision
 	Authority              AcceptedPolicyAuthority
 	ObservedAt, FreshUntil time.Time
 	// SourceUntil is the policy's own bound (source observation and expiry)
@@ -83,6 +86,17 @@ type AutomationProjection struct {
 	NotAfter               time.Time // Optional AccessBinding expiry, never extended by a read.
 	Disabled               bool
 	Permissions            Projection // Exact pod, complete current denies and assignments.
+}
+
+// WorkloadAutomationProjection is activation/review preflight for current
+// whole-workload assignments. It grants no concrete-Pod execution permission.
+type WorkloadAutomationProjection struct {
+	InstallationID                   string
+	Delegation                       identity.Revision
+	Envelope                         AutomationEnvelope
+	ObservedAt, FreshUntil, NotAfter time.Time
+	Disabled                         bool
+	Permissions                      WorkloadProjection
 }
 
 type PolicyPurpose string
@@ -134,8 +148,12 @@ func (p AcceptedPolicyAuthority) Valid(now time.Time) bool {
 // dispatch, current action grants, atomic quota/audit/recovery/privacy admission
 // and a signed short permit before any observation, collection or saved output.
 func EvaluatePolicy(a AcceptedPolicyAuthority, p AutomationProjection, use PolicyUse, now time.Time) PolicyEligibility {
+	return evaluatePolicyTarget(a, p, use, now, use.Target.Valid())
+}
+
+func evaluatePolicyTarget(a AcceptedPolicyAuthority, p AutomationProjection, use PolicyUse, now time.Time, targetValid bool) PolicyEligibility {
 	deny := func(reason string) PolicyEligibility { return PolicyEligibility{Reason: reason} }
-	if !use.Target.Valid() || use.PolicyUID != a.PolicyUID || use.ScopeDigest != a.ScopeDigest {
+	if !targetValid || use.PolicyUID != a.PolicyUID || use.ScopeDigest != a.ScopeDigest {
 		return deny("InvalidPolicyUse")
 	}
 	switch use.Purpose {
@@ -230,6 +248,47 @@ func ValidatePolicyAcceptance(author identity.Identity, a AcceptedPolicyAuthorit
 		return PolicyEligibility{Reason: "NoDelegationMembership"}
 	}
 	result := EvaluatePolicy(a, p, use, now)
+	if result.Eligible {
+		result.ValidUntil = identity.Earlier(result.ValidUntil, rights.ValidUntil)
+	}
+	return result
+}
+
+// EvaluatePolicyWorkload is typed activation/review preflight only. Every
+// incident/source effect still resolves and admits a concrete authorized Pod.
+func EvaluatePolicyWorkload(a AcceptedPolicyAuthority, p WorkloadAutomationProjection, now time.Time) PolicyEligibility {
+	target := WorkloadTarget{a.ClusterID, a.NamespaceUID, a.WorkloadUID}
+	if !target.Valid() || p.Permissions.Target != target {
+		return PolicyEligibility{Reason: "InvalidPolicyUse"}
+	}
+	for _, row := range p.Permissions.Allows {
+		if row.Reviewed {
+			return PolicyEligibility{Reason: "PermissionUnavailable"}
+		}
+	}
+	q := p.Permissions.projection()
+	ordinary := AutomationProjection{InstallationID: p.InstallationID, Delegation: p.Delegation, Envelope: p.Envelope, ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil, NotAfter: p.NotAfter, Disabled: p.Disabled, Permissions: q}
+	return evaluatePolicyTarget(a, ordinary, PolicyUse{PolicyUID: a.PolicyUID, ScopeDigest: a.ScopeDigest, Target: q.Target, Purpose: PolicyIncident}, now, true)
+}
+
+func ValidatePolicyWorkloadAcceptance(author identity.Identity, a AcceptedPolicyAuthority, p WorkloadAutomationProjection, now time.Time) PolicyEligibility {
+	if author.Principal.Kind != identity.Human {
+		return PolicyEligibility{Reason: "IdentityUnavailable"}
+	}
+	rights := WorkloadScopeEligibility(author, p.Permissions, CollectContext, p.Permissions.Target, now)
+	if !rights.Eligible {
+		return PolicyEligibility{Reason: rights.Reason}
+	}
+	member := false
+	for _, owner := range a.Owners {
+		if matches(owner, author) {
+			member = true
+		}
+	}
+	if !member {
+		return PolicyEligibility{Reason: "NoDelegationMembership"}
+	}
+	result := EvaluatePolicyWorkload(a, p, now)
 	if result.Eligible {
 		result.ValidUntil = identity.Earlier(result.ValidUntil, rights.ValidUntil)
 	}

@@ -42,6 +42,13 @@ the HttpOnly cookie; JavaScript never receives provider tokens. Automatic
 redirect following is disabled for these fetches. Responses have a ten-second
 deadline, a 32 KiB decoded-body ceiling and schema validation before display.
 
+Investigation operation responses retain their existing bounds. The passive
+`preview_recording_save` result has a dedicated 128 KiB decoded-body ceiling for
+16 complete source assessments; `get_capture_settings` retains its existing
+160 KiB browser view. The server validates these named result bounds, preserves
+original identity/deadline checks and buffers writes before disclosure. Inventory
+and other metadata requests keep their existing budgets.
+
 Session, CSRF and the five implemented investigation operation types/validators
 are generated from the existing canonical OpenAPI files. The build-only adapter
 resolves external schema identifiers and fragments against the closed local
@@ -164,3 +171,10 @@ accessibility checks, protected deployment, or the complete investigation
 workflow. These fixtures do not qualify SQL admission, Kubernetes collection,
 evidence publication or protected installation. Missing backend composition
 remains an explicit unavailable operation in the UI.
+
+The browser uses the same prospective fifteen-second `request_capture` envelope
+as MCP for grouped recording saves ([ADR-268](../decisions/268-grouped-save-dispatch-window.md)).
+It is selected before session request ownership; origin, CSRF, current identity
+and every shorter original session/caller bound remain unchanged. Grouped start
+attempts precede optional history. New manual groups select StartBy once within the original request end and t0+15s, clipped by source/processing bounds (ADR-269); old accepted dates and ordinary/singleton five-second builders remain unchanged. No
+browser provider token, new approval page or client-supplied deadline is added.

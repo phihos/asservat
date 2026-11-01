@@ -3,6 +3,7 @@ package contextstart
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -38,6 +39,9 @@ type Router struct {
 	// registered is closed and replaced when a standby registers or a query
 	// releases it, so a waiting query can retry within its original reserve.
 	registered chan struct{}
+	// lastAttach is when each cluster's latest attachment took a standby;
+	// diagnostic only (AttachState).
+	lastAttach map[string]time.Time
 }
 
 // queryReserve is the part of a query's original deadline kept for the query
@@ -123,8 +127,9 @@ type captureJob struct {
 	work   fleet.APIContextWork
 	signed []byte
 	// run is the ADR-171 hub-run execution over this exchange's operations.
-	run    func(context.Context, *HubOperations) (string, error)
-	result chan jobResult
+	run        func(context.Context, *HubOperations) (string, error)
+	historyRun func(context.Context, Stream) (string, error)
+	result     chan jobResult
 }
 type jobResult struct {
 	state string
@@ -196,6 +201,16 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	return s, nil
 }
 func (s *Standby) Context() context.Context { return s.ctx }
+
+// otherLiveLocked reports another live standby of s's cluster.
+func (r *Router) otherLiveLocked(s *Standby) bool {
+	for _, o := range r.standby {
+		if o != s && o.channel.Connector.Binding.ClusterID == s.channel.Connector.Binding.ClusterID && o.liveLocked() {
+			return true
+		}
+	}
+	return false
+}
 
 // retireIdleLocked ends an idle standby that can no longer cover any work, so
 // its handler returns and the region opens a replacement. Attached or querying
@@ -271,7 +286,13 @@ func (s *Standby) Serve(stream Stream, now func() time.Time) error {
 			// waits for this handler and its socket owner before the capture slot frees.
 			call, cancel := context.WithCancel(job.ctx)
 			stop := context.AfterFunc(s.ctx, cancel)
-			state, e := ServeHubOperations(call, stream, job.work, job.signed, job.run, now)
+			var state string
+			var e error
+			if job.historyRun != nil {
+				state, e = job.historyRun(call, stream)
+			} else {
+				state, e = ServeHubOperations(call, stream, job.work, job.signed, job.run, now)
+			}
 			stop()
 			cancel()
 			clear(job.signed)
@@ -358,7 +379,15 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	defer func() {
 		r.mu.Lock()
 		selected.queryBusy = false
-		selected.retireIdleLocked()
+		if selected.queries >= contracts.APIContextMaximumQueries && r.otherLiveLocked(selected) {
+			// An exhausted standby can answer no further query (ADR-270
+			// source work spends them every tick). While the cluster has
+			// another standby, retire it so the region opens a queryable
+			// replacement; a lone one stays for an attach (ADR-179).
+			selected.cancel()
+		} else {
+			selected.retireIdleLocked()
+		}
 		if !r.closed && selected.liveLocked() {
 			close(r.registered)
 			r.registered = make(chan struct{})
@@ -379,31 +408,86 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	return result.until, result.err
 }
 func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachment, error) {
+	return r.attach(ctx, cluster, capture, true, 5*time.Second)
+}
+
+// TryAttach is Attach without waiting for a standby: it fails at once when
+// none is idle, so the caller's whole bound remains for its exchange. A
+// caller with its own retry loop uses it (ADR-272 advisory history); its
+// attachment may last up to TryAttachLimit.
+func (r *Router) TryAttach(ctx context.Context, cluster, capture string) (*Attachment, error) {
+	return r.attach(ctx, cluster, capture, false, TryAttachLimit)
+}
+
+// TryAttachLimit bounds a TryAttach attachment: a history write's receiver
+// check, SQL claim and three-copy exchange exceeded five seconds on CI
+// (native run 41215337179).
+const TryAttachLimit = 10 * time.Second
+
+func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool, limit time.Duration) (*Attachment, error) {
 	if r == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(cluster) || !authorization.UUID(capture) {
 		return nil, fleet.ErrInvalid
 	}
 	// Even a miscomposed caller cannot hold a live capture slot indefinitely.
 	deadline, ok := ctx.Deadline()
-	if !ok || !time.Now().Before(deadline) || deadline.After(time.Now().Add(5*time.Second)) {
+	if !ok || !time.Now().Before(deadline) || deadline.After(time.Now().Add(limit)) {
 		return nil, fleet.ErrInvalid
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	c := r.clusters[cluster]
-	if r.closed || c == nil || len(r.captures) >= r.limits.Captures || c.captures >= c.limit.Captures || r.captures[capture] != nil {
-		return nil, fleet.ErrCapacity
+	// A completed history exchange consumes its standby. Its next empty
+	// conversation may still be opening. Wait only before selecting any work,
+	// within this caller's original bound and the existing query reserve.
+	var timer *time.Timer
+	defer func() {
+		if timer != nil {
+			timer.Stop()
+		}
+	}()
+	for {
+		r.mu.Lock()
+		c := r.clusters[cluster]
+		if r.closed || c == nil || len(r.captures) >= r.limits.Captures || c.captures >= c.limit.Captures || r.captures[capture] != nil {
+			r.mu.Unlock()
+			return nil, fleet.ErrCapacity
+		}
+		if ctx.Err() != nil || !time.Now().Before(deadline) || timer != nil && !time.Now().Before(deadline.Add(-queryReserve)) {
+			r.mu.Unlock()
+			return nil, fleet.ErrUnavailable
+		}
+		r.pruneLocked(cluster)
+		selected := r.selectLocked(cluster, deadline, func(*Standby) bool { return true })
+		if selected != nil {
+			selected.attached = true
+			if r.lastAttach == nil {
+				r.lastAttach = map[string]time.Time{}
+			}
+			r.lastAttach[cluster] = time.Now()
+			call, cancel := context.WithDeadline(ctx, deadline)
+			a := &Attachment{router: r, standby: selected, capture: capture, ctx: call, cancel: cancel}
+			r.captures[capture] = a
+			c.captures++
+			r.mu.Unlock()
+			return a, nil
+		}
+		registered := r.registered
+		r.mu.Unlock()
+		if !wait {
+			return nil, fleet.ErrUnavailable
+		}
+		if timer == nil {
+			wait := time.Until(deadline.Add(-queryReserve))
+			if wait <= 0 {
+				return nil, fleet.ErrUnavailable
+			}
+			timer = time.NewTimer(wait)
+		}
+		select {
+		case <-registered:
+		case <-ctx.Done():
+			return nil, fleet.ErrUnavailable
+		case <-timer.C:
+			return nil, fleet.ErrUnavailable
+		}
 	}
-	r.pruneLocked(cluster)
-	selected := r.selectLocked(cluster, deadline, func(*Standby) bool { return true })
-	if selected == nil {
-		return nil, fleet.ErrUnavailable
-	}
-	selected.attached = true
-	call, cancel := context.WithDeadline(ctx, deadline)
-	a := &Attachment{router: r, standby: selected, capture: capture, ctx: call, cancel: cancel}
-	r.captures[capture] = a
-	c.captures++
-	return a, nil
 }
 func (a *Attachment) Receiver(ctx context.Context) (fleet.APIContextReceiver, error) {
 	if a == nil || ctx == nil || ctx.Err() != nil {
@@ -529,4 +613,44 @@ func (r *Router) Close() {
 	for _, a := range active {
 		a.Close()
 	}
+}
+
+// AttachState is a content-free diagnostic of one cluster's standbys for
+// attach refusal reports: live, idle, attached and query-busy counts and how
+// long ago the latest attachment consumed a standby. It grants nothing.
+func (r *Router) AttachState(cluster string) string {
+	if r == nil {
+		return "router=none"
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var live, idle, attached, busy int
+	for _, s := range r.standby {
+		if s.channel.Connector.Binding.ClusterID != cluster || !s.liveLocked() {
+			continue
+		}
+		live++
+		switch {
+		case s.attached:
+			attached++
+		case s.queryBusy:
+			busy++
+		default:
+			idle++
+		}
+	}
+	since := "never"
+	if at, ok := r.lastAttach[cluster]; ok {
+		since = attachAgeBucket(time.Since(at))
+	}
+	return fmt.Sprintf("standbys live=%d idle=%d attached=%d query-busy=%d last-attach=%s", live, idle, attached, busy, since)
+}
+
+func attachAgeBucket(d time.Duration) string {
+	for _, b := range []time.Duration{time.Second, 2 * time.Second, 5 * time.Second, 15 * time.Second, 30 * time.Second} {
+		if d < b {
+			return "<" + b.String()
+		}
+	}
+	return ">=30s"
 }

@@ -189,6 +189,14 @@ def check_bootstrap(directory):
     assert settings["origin"] == "https://asservat.example" and settings["groupMaxAgeSeconds"] == 300
     assert "permissionDelegations" not in settings, "empty delegations changed existing installer identities"
     assert "approvals" not in settings, "absent approval settings changed existing installer identities"
+    assert "captureHistory" not in settings, "absent history limits changed existing installer identities"
+    bounded = copy.deepcopy(public)
+    bounded["bootstrap"]["continuation"]["public"]["captureHistory"] = {"perSelector": 200, "perInstallation": 10000}
+    bdocs = render(bounded)
+    binput, = [r for r in bdocs if "continuation.json" in r.get("data", {})]
+    assert json.loads(binput["data"]["continuation.json"])["public"]["captureHistory"] == {"perSelector": 200, "perInstallation": 10000}
+    for limits in ({"perSelector": 0,"perInstallation":1000},{"perSelector":1001,"perInstallation":1000},{"perSelector":1,"perInstallation":100001},{"perSelector":1}):
+        bad=copy.deepcopy(public);bad["bootstrap"]["continuation"]["public"]["captureHistory"]=limits;render(bad,ok=False)
     approved = copy.deepcopy(public)
     approvals = {"requireRecordingApproval": True, "stepUp": {"acrValues": ["2"], "maxAgeSeconds": 300}}
     approved["bootstrap"]["continuation"]["public"]["approvals"] = approvals
@@ -308,8 +316,8 @@ def check_cluster(directory):
     render(executor, ok=False)
     executor["cluster"]["evidenceSecret"] = "operator-evidence"
     pod = next(r for r in render(executor) if r["kind"] == "Job")["spec"]["template"]["spec"]
-    assert pod["containers"][0]["command"][-2:] == ["--evidence-credential", "/run/asservat/cluster/evidence-storage.json"]
-    assert pod["volumes"][0]["projected"]["sources"][2]["secret"] == {"name": "operator-evidence", "items": [{"key": "evidence-storage.json", "path": "evidence-storage.json"}]}
+    assert pod["containers"][0]["command"][-2:] == ["--history-credential", "/run/asservat/cluster/history-storage.json"]
+    assert pod["volumes"][0]["projected"]["sources"][2]["secret"] == {"name": "operator-evidence", "items": [{"key": "evidence-storage.json", "path": "evidence-storage.json"}, {"key": "history-storage.json", "path": "history-storage.json"}]}
     # ADR-231: the optional Alertmanager URL is passed to an executor's
     # installer only; without an executor offer it is refused.
     executor["cluster"]["alertmanager"] = "http://alertmanager-operated.monitoring.svc:9093"
@@ -380,7 +388,12 @@ def check_collector(directory):
     data = next(r for r in collector if r["kind"] == "ConfigMap")
     assert data["immutable"] is True
     node = json.loads(data["data"]["node.json"])
-    assert node["format"] == "asservat-node-deployment/v1" and node["ceilings"] == {"ringBytes": 268435456, "frozenBytes": 268435456, "uploadBytesPerSecond": 33554432, "uploadBurstBytes": 67108864}
+    assert node["format"] == "asservat-node-deployment/v1" and node["ceilings"] == {"maxActiveSources": 16, "inputBytesPerSecond": 16777216, "inputBurstBytes": 16777216, "ringBytes": 268435456, "frozenBytes": 268435456, "uploadBytesPerSecond": 33554432, "uploadBurstBytes": 67108864}
+    zero = json.loads(json.dumps(base))
+    zero["collector"]["ceilings"] = {"maxActiveSources": 0, "inputBytesPerSecond": 0, "inputBurstBytes": 0}
+    zero_docs = render(zero)
+    zero_node = json.loads(next(r for r in zero_docs if r["kind"] == "ConfigMap")["data"]["node.json"])
+    assert all(name not in zero_node["ceilings"] for name in ("maxActiveSources", "inputBytesPerSecond", "inputBurstBytes")), "zero source caps must preserve the canonical old absent-field representation"
     assert data["metadata"]["name"] == "asservat-node-input." + hashlib.sha256(data["data"]["node.json"].encode()).hexdigest()[:32]
     ds = next(r for r in collector if r["kind"] == "DaemonSet")
     pod = ds["spec"]["template"]["spec"]
@@ -391,6 +404,7 @@ def check_collector(directory):
     assert container["securityContext"] == {"privileged": False, "runAsUser": 0, "runAsNonRoot": False, "allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
                                              "capabilities": {"drop": ["ALL"], "add": ["BPF", "NET_ADMIN", "SYS_RESOURCE", "PERFMON", "SYS_ADMIN", "SYS_PTRACE"]},
                                              "seccompProfile": {"type": "RuntimeDefault"}}
+    assert container["resources"]["requests"]["cpu"] == "20m" and container["resources"]["limits"]["cpu"] == "500m"
     assert container["resources"]["limits"]["memory"] == str(268435456 * 2 + 134217728)
     volumes = {v["name"]: v for v in pod["volumes"]}
     assert volumes["disposable-host"]["hostPath"] == {"path": "/etc/asservat-disposable-host", "type": "File"}, "disposable-host guard missing"
@@ -411,6 +425,8 @@ def check_collector(directory):
                    {"collector": {"connector": {"endpoint": "http://connector:8444", "serverName": "x", "rootsPEM": roots}}},
                    {"collector": {"connector": {"endpoint": "https://connector:8444", "serverName": "x", "rootsPEM": ""}}},
                    {"collector": {"ceilings": {"ringBytes": 8589934592, "frozenBytes": 1, "uploadBytesPerSecond": 1, "uploadBurstBytes": 1}}},
+                   {"collector": {"ceilings": {"maxActiveSources": 0, "inputBytesPerSecond": 1, "inputBurstBytes": 1}}},
+                   {"collector": {"ceilings": {"maxActiveSources": 1, "inputBytesPerSecond": 0, "inputBurstBytes": 1}}},
                    {"collector": {"privileged": True}}]:
         v = json.loads(json.dumps(base))
         for key, value in change.items():

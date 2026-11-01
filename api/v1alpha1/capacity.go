@@ -43,6 +43,9 @@ type CapacityDumpLimits struct {
 	MaxProcessesPerEpisode      *int64 `json:"maxProcessesPerEpisode,omitempty"`
 }
 type CapacityWorkloadLimits struct {
+	MaxActiveSources           int64              `json:"maxActiveSources,omitempty"`
+	InputBytesPerSecond        int64              `json:"inputBytesPerSecond,omitempty"`
+	InputBurstBytes            int64              `json:"inputBurstBytes,omitempty"`
 	Protected                  CapacityAmount     `json:"protected"`
 	HardLimit                  CapacityAmount     `json:"hardLimit"`
 	ContextReserve             CapacityAmount     `json:"contextReserve"`
@@ -56,6 +59,9 @@ type CapacityWorkloadLimits struct {
 	OnFull                     string             `json:"onFull"`
 }
 type CapacityNodeLimits struct {
+	MaxActiveSources       int64          `json:"maxActiveSources,omitempty"`
+	InputBytesPerSecond    int64          `json:"inputBytesPerSecond,omitempty"`
+	InputBurstBytes        int64          `json:"inputBurstBytes,omitempty"`
 	MaxConcurrentExpensive int64          `json:"maxConcurrentExpensive"`
 	MaxQueuedExpensive     int64          `json:"maxQueuedExpensive"`
 	Upload                 CapacityUpload `json:"upload"`

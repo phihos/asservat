@@ -1,6 +1,8 @@
 package kubernetes
 
 import (
+	"net/http"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 )
@@ -23,6 +25,13 @@ func WithOpeningBurst(config *rest.Config) *rest.Config {
 		return nil
 	}
 	c := rest.CopyConfig(config)
-	c.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(OpeningQPS, OpeningBurst)
+	c.RateLimiter = measuredLimiter{flowcontrol.NewTokenBucketRateLimiter(OpeningQPS, OpeningBurst)}
+	wrap := c.WrapTransport
+	c.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+		if wrap != nil {
+			rt = wrap(rt)
+		}
+		return measuredTransport{rt}
+	}
 	return c
 }

@@ -169,6 +169,10 @@ func (c *PolicySourceClient) read(ctx context.Context, name, uid string, colocat
 	if raw, ok := fields["suspended"]; ok && json.Unmarshal(raw, &suspended) != nil {
 		return zero, nil, value.ErrUnavailable
 	}
+	var grantRef string
+	if raw, ok := fields["grantRef"]; ok && json.Unmarshal(raw, &grantRef) != nil {
+		return zero, nil, value.ErrUnavailable
+	}
 	full := jsontext.Value(bytes.Clone(o.Spec))
 	if full.Canonicalize() != nil {
 		return zero, nil, value.ErrUnavailable
@@ -187,7 +191,7 @@ func (c *PolicySourceClient) read(ctx context.Context, name, uid string, colocat
 	if canonical.Canonicalize() != nil {
 		return zero, nil, value.ErrUnavailable
 	}
-	out := value.PolicySource{InstallationID: c.installation, ClusterID: c.client.clusterID, NamespaceUID: c.namespace.UID, Name: m.Name, Revision: identity.Revision{UID: m.UID, Generation: m.Generation, Digest: artifact.Digest(sha256.Sum256(full))}, ResourceVersion: m.RV, ObservedAt: started, FreshUntil: started.Add(value.PolicySourceInterval), CollectionDigest: artifact.Digest(sha256.Sum256(canonical)), Suspended: suspended, Deleted: m.Deleting}
+	out := value.PolicySource{InstallationID: c.installation, ClusterID: c.client.clusterID, NamespaceUID: c.namespace.UID, Name: m.Name, Revision: identity.Revision{UID: m.UID, Generation: m.Generation, Digest: artifact.Digest(sha256.Sum256(full))}, ResourceVersion: m.RV, ObservedAt: started, FreshUntil: started.Add(value.PolicySourceInterval), CollectionDigest: artifact.Digest(sha256.Sum256(canonical)), Suspended: suspended, Deleted: m.Deleting, AuthoredGrantRef: grantRef}
 	if c.client.current(ctx, started, 5*time.Second) != nil || !out.Valid(c.client.now()) {
 		return zero, nil, value.ErrUnavailable
 	}

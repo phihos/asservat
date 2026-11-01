@@ -2,12 +2,34 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, expect, it, vi } from 'vitest';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import { Investigation } from './investigation';
-import { SyntheticOperations, session, target, previewResult, progressResult, id, resolvedClosedResult, resolvedAcceptedResult, recordingPreviewResult, approvalPendingResult } from './test-fixtures';
+import { SyntheticOperations, session, target, result, previewResult, progressResult, id, resolvedClosedResult, resolvedAcceptedResult, recordingPreviewResult, approvalPendingResult, historyResult, settingsResult, catalogResult } from './test-fixtures';
 import { returnPath } from '../routes';
 import { BrowserSession } from '../auth/session';
 import { SessionGate } from '../auth/SessionGate';
 
 const controllers: Investigation[] = [];
+it('opens saved recorder settings, edits the filter and window, and prepares a fresh review without collecting', async () => {
+  const { client } = mount();
+  const recording = recordingPreviewResult(); const saved = settingsResult();
+  if (recording.status !== 'ok' || saved.status !== 'ok' || !('recipe_spec' in saved.data.settings)) throw new Error();
+  saved.data.settings.profile_composition = recording.data.profile_composition;
+  saved.data.settings.profile_composition!.authored.components[0].overrides!.push({ actionID: 'http', field: 'packetAfter', value: '3s' });
+  client.responder = name => name === 'list_diagnostics' ? catalogResult() : name === 'list_capture_history' ? historyResult([id(41)]) : name === 'get_capture_settings' ? saved : recordingPreviewResult(id(41));
+  fireEvent.change(screen.getByLabelText('Cluster ID'), { target: { value: target.cluster_id } });
+  fireEvent.change(screen.getByLabelText('Namespace'), { target: { value: target.namespace } });
+  fireEvent.change(screen.getByLabelText('Workload or pod name'), { target: { value: target.name } });
+  fireEvent.click(screen.getByRole('button', { name: 'Find diagnostics' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'View settings' }));
+  await screen.findByRole('heading', { name: 'Saved settings' });
+  fireEvent.change(screen.getByLabelText('http / http / packetFilter'), { target: { value: 'tcp port 8443' } });
+  fireEvent.change(screen.getByLabelText('http / http / packetAfter'), { target: { value: '5s' } });
+  fireEvent.change(screen.getByLabelText('Maximum duration'), { target: { value: '20s' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Review these settings' }));
+  await screen.findByRole('heading', { name: 'Review collection' });
+  const sent = client.calls.find(call => call.name === 'preview_capture')!.input;
+  expect(sent).toMatchObject({ repeated_from_capture_id: id(41), profile_composition: { maxDuration: '20s', components: [{ id: 'http', profileRef: { version: 'v1' }, overrides: [{ field: 'packetFilter', value: 'tcp port 8443' }, { field: 'packetAfter', value: '5s' }] }, {}, {}] } });
+  expect(client.calls.some(call => call.name === 'request_capture')).toBe(false);
+});
 afterEach(() => { cleanup(); for (const controller of controllers) controller.reset(); controllers.length = 0; vi.useRealTimers(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
 function mount() {
   const client = new SyntheticOperations(); const controller = new Investigation(client, () => id(6)); controllers.push(controller);
@@ -187,4 +209,52 @@ it('renders the reviewed recorder assessment and requests approval without claim
   expect(await screen.findByRole('link', { name: 'View approval' })).toHaveProperty('pathname', '/approvals/' + id(41));
   expect(screen.getByRole('button', { name: 'Continue after approval' })).toBeTruthy();
   expect(controller.snapshot().captureID).toBeUndefined();
+});
+
+it('renders grouped recording actions with exact child identity and retained Pod labels', async () => {
+  window.history.replaceState(null, '', '/captures/' + id(8));
+  const client = new SyntheticOperations(); const controller = new Investigation(client); controllers.push(controller);
+  const reported = { reason: '  grouped reason\n<&>  ', reason_state: 'available', capture_id: id(8), revision: 1, phase: 'Partial', operation: 'recordingSave', can_cancel: false, blockers: [], navigation_uri: 'https://asservat.invalid/captures/' + id(8), actions: [
+    { action_id: 'traffic', action_instance_id: id(101), pod_uid: 'original-pod-a', pod_name: 'api-a', phase: 'Succeeded' },
+    { action_id: 'traffic', action_instance_id: id(102), pod_uid: 'original-pod-b', pod_name: 'api-b', phase: 'Cancelled' },
+  ] };
+  client.responder = () => result<'get_capture'>(reported);
+  const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    render(<CaptureWorkspace session={session} scope={new AbortController().signal} controller={controller}/>);
+    await screen.findByRole('heading', { name: 'Recording save progress' });
+    expect(screen.getByText('api-a')).toBeTruthy(); expect(screen.getByText('api-b')).toBeTruthy();
+    expect(screen.getAllByText('traffic')).toHaveLength(2);
+    expect(document.querySelectorAll('.progress-actions li')).toHaveLength(2);
+    expect(screen.getAllByRole('region', {name:'Save reason'})).toHaveLength(1);
+    expect(screen.getByRole('region', {name:'Save reason'}).querySelector('p')!.textContent).toBe(reported.reason);
+    expect(errors.mock.calls.some(call => call.some(value => String(value).includes('same key')))).toBe(false);
+    expect(client.calls.every(call => call.name === 'get_capture' && !!call.input && typeof call.input === 'object' && 'capture_id' in call.input && call.input.capture_id === id(8))).toBe(true);
+    expect(document.querySelector('a[href="/captures/' + id(101) + '"]')).toBeNull();
+  } finally { errors.mockRestore(); }
+});
+
+it('requests grouped cancellation once on the parent while stored results remain visible', async () => {
+ window.history.replaceState(null,'','/captures/'+id(8));const client=new SyntheticOperations();const controller=new Investigation(client);controllers.push(controller);let requested=false;
+ client.responder=name=>{
+  if(name==='cancel_capture'){requested=true;return result<'cancel_capture'>({capture_id:id(8),revision:2,phase:'Running',cancellation_requested:true,navigation_uri:'https://asservat.invalid/captures/'+id(8)});}
+  return result<'get_capture'>({capture_id:id(8),revision:requested?2:1,phase:'Running',operation:'recordingSave',can_cancel:!requested,cancellation_requested:requested,blockers:[],case_id:id(50),navigation_uri:'https://asservat.invalid/captures/'+id(8),actions:[
+   {action_id:'traffic',action_instance_id:id(101),pod_uid:'pod-a',pod_name:'api-a',phase:'Succeeded'},
+   {action_id:'traffic',action_instance_id:id(102),pod_uid:'pod-b',pod_name:'api-b',phase:'Running'},
+  ]});
+ };
+ render(<CaptureWorkspace session={session} scope={new AbortController().signal} controller={controller}/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Cancel recording save'}));
+ await screen.findByText(/Cancellation requested. Waiting for unfinished snapshots/);
+ expect(screen.getByRole('link',{name:'View evidence'}).getAttribute('href')).toBe('/cases/'+id(50));expect(screen.getByRole('heading',{name:'Saving recorded history'})).toBeTruthy();
+ expect(screen.queryByText('Collection cancelled')).toBeNull();expect(screen.queryByRole('button',{name:'Cancel recording save'})).toBeNull();
+ expect(client.calls.filter(call=>call.name==='cancel_capture')).toHaveLength(1);expect(client.calls.every(call=>!!call.input&&typeof call.input==='object'&&'capture_id'in call.input&&call.input.capture_id===id(8))).toBe(true);
+});
+
+it('keeps parent capture progress available when descriptive reason has retired',async()=>{
+ window.history.replaceState(null,'','/captures/'+id(8));const client=new SyntheticOperations();const controller=new Investigation(client);controllers.push(controller);
+ client.responder=()=>{const response=progressResult();if(response.status==='ok'){response.data.reason_state='unavailable';response.data.operation='recordingSave';}return response;};
+ render(<CaptureWorkspace session={session} scope={new AbortController().signal} controller={controller}/>);
+ expect(await screen.findByText(/The save reason is unavailable/)).toBeTruthy();
+ expect(document.querySelector('.progress-actions')).toBeTruthy();expect(screen.queryByRole('region',{name:'Save reason'})).toBeNull();
 });

@@ -2,6 +2,7 @@ package capture
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	fleetapp "asservat.local/asservat/internal/application/fleet"
@@ -34,6 +35,7 @@ type ContextCaseNavigation interface {
 }
 
 type ContextProgressService struct {
+	Reasons                CaptureReasonReader
 	RootID, InstallationID string
 	Reader                 ContextProgressReader
 	Recovery               fleetapp.RecoveryReader
@@ -82,7 +84,16 @@ func (s ContextProgressService) Get(ctx context.Context, source identities.Curre
 		return zero, value.ErrUnavailable
 	}
 	until := identity.Earlier(identity.Earlier(p.ValidUntil, i.ValidUntil), r.FreshUntil)
-	out := value.ContextProgress{CaptureID: p.CaptureID, Revision: p.Revision, Phase: p.Phase, ActionPhase: p.ActionPhase, ReasonCode: p.ReasonCode, CreatedAt: p.CreatedAt, Deadline: p.Deadline}
+	out := value.ContextProgress{Actions: slices.Clone(p.Actions), CanCancel: p.CanCancel, CancellationRequested: p.CancellationRequested, Operation: p.Operation, ActionID: p.ActionID, RepeatedFrom: p.RepeatedFrom, HistoryState: p.HistoryState, CaptureID: p.CaptureID, Revision: p.Revision, Phase: p.Phase, ActionPhase: p.ActionPhase, ReasonCode: p.ReasonCode, CreatedAt: p.CreatedAt, Deadline: p.Deadline}
+	if p.ReasonMetadata != nil {
+		out.ReasonState = "unavailable"
+		if s.Reasons != nil && p.ReasonMetadata.Valid() {
+			text, reasonErr := s.Reasons.ReadCaptureReason(ctx, *p.ReasonMetadata)
+			if reasonErr == nil && validOptionalReason(&text) {
+				out.Reason, out.ReasonState = &text, "available"
+			}
+		}
+	}
 	if p.Phase == "Pending" || p.Phase == "Running" || p.Phase == "Finalizing" {
 		out.RetryAfterSeconds = 2
 	}
@@ -99,6 +110,9 @@ func (s ContextProgressService) Get(ctx context.Context, source identities.Curre
 	fresh, err := source.ResolveIdentity(ctx)
 	if err != nil || fresh.Principal != i.Principal || fresh.Policy != i.Policy || !fresh.Valid(s.Now()) || !s.Now().Before(until) || !p.Valid(s.Now()) || ctx.Err() != nil {
 		return zero, value.ErrDenied
+	}
+	if out.RepeatedFrom != nil && !out.RepeatedFrom.Valid(s.Now()) {
+		out.RepeatedFrom = nil
 	}
 	out.ValidUntil = until
 	return out, nil

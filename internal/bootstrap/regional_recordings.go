@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/application/evidence"
 	compiler "asservat.local/asservat/internal/application/planning"
@@ -52,14 +53,19 @@ type recordingNodes interface {
 }
 
 type heldRecording struct {
-	expectation artifact.ContextExpectation
-	digest      artifact.Digest
-	prepared    *objectstore.PreparedArtifact
-	nodeUID     string
-	workID      string
-	queued      time.Time
-	expires     time.Time
-	outcome     evidence.RecordingCollection
+	storing         bool
+	cancelID        string
+	cancelRequested bool
+	cancelOnly      bool
+	expectation     artifact.ContextExpectation
+	digest          artifact.Digest
+	prepared        *objectstore.PreparedArtifact
+	nodeUID         string
+	workID          string
+	queued          time.Time
+	expires         time.Time
+	snapshot        *collector.SourceSnapshot
+	outcome         evidence.RecordingCollection
 }
 
 type ConnectorRecordings struct {
@@ -82,7 +88,7 @@ func NewConnectorRecordings(nodes recordingNodes, pods podNodes, now func() time
 // dropped unused (the attempt stays charged until custody cleanup).
 func (h *ConnectorRecordings) expireLocked(now time.Time) {
 	for id, r := range h.held {
-		if !now.Before(r.expires) {
+		if !r.storing && !now.Before(r.expires) {
 			delete(h.held, id)
 		}
 	}
@@ -165,6 +171,18 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		_, _ = io.Copy(io.Discard, pcapng)
 		return value.ErrConflict
 	}
+	if held.snapshot != nil {
+		x := held.snapshot
+		if r.Snapshot == nil || node.BootID != x.Binding.BootID || node.PodUID != x.Binding.CollectorPodUID || node.Epoch != x.Binding.CollectorEpoch || r.ProgramDigest != x.Binding.ProgramDigest || !r.Snapshot.Request.Equal(x.Request) || r.Snapshot.AcceptedExpectationDigest != artifact.Digest(x.ExpectationDigest) {
+			h.mu.Unlock()
+			_, _ = io.Copy(io.Discard, pcapng)
+			return value.ErrDenied
+		}
+	} else if r.Snapshot != nil {
+		h.mu.Unlock()
+		_, _ = io.Copy(io.Discard, pcapng)
+		return value.ErrDenied
+	}
 	if r.Failure != "" {
 		held.prepared, held.outcome = nil, evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "captureFailed"}
 		h.mu.Unlock()
@@ -178,28 +196,49 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		return value.ErrUnavailable
 	}
 	h.storing += r.CapturedBytes
+	held.storing = true
 	prepared, e := held.prepared, held.expectation
 	held.prepared = nil // single use, also after a failed store
 	h.mu.Unlock()
 	defer func() {
 		h.mu.Lock()
 		h.storing -= r.CapturedBytes
+		held.storing = false
 		h.mu.Unlock()
 	}()
-	// The manifest's acquisition interval is the node's recording interval,
-	// never before the queue instant.
-	started := r.StartedAt.UTC().Truncate(time.Microsecond)
-	if started.Before(held.queued) {
-		started = held.queued
+	// Finite recordings cannot predate queueing. An independently admitted
+	// source snapshot retains its original acquisition window instead.
+	started, completed := r.StartedAt.UTC(), r.EndedAt.UTC()
+	if held.snapshot == nil {
+		started = started.Truncate(time.Microsecond)
+		if started.Before(held.queued) {
+			started = held.queued
+		}
+		completed = completed.Truncate(time.Microsecond)
+		if completed.Before(started) {
+			completed = started
+		}
 	}
-	completed := r.EndedAt.UTC().Truncate(time.Microsecond)
-	if completed.Before(started) {
-		completed = started
+	var copies artifact.Copies
+	var err error
+	if held.snapshot != nil {
+		copies, err = prepared.StoreSnapshot(ctx, pcapng, started, completed, *r.Snapshot)
+	} else {
+		copies, err = prepared.Store(ctx, pcapng, started, completed)
 	}
-	copies, err := prepared.Store(ctx, pcapng, started, completed)
 	stored := h.now().UTC().Truncate(time.Microsecond)
 	outcome := evidence.RecordingCollection{State: evidence.RecordingStored, Acquired: held.queued,
 		Completion: artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: held.digest, Copies: copies, StoredAt: stored, ClosedAt: stored}}
+	if held.snapshot != nil && err == nil {
+		coverage := r.Snapshot.SourceSnapshotCoverage
+		outcome.SnapshotCoverage = &coverage
+		final, projectionErr := artifact.ProjectSourceSnapshotCoverage(e, held.digest, coverage)
+		if projectionErr != nil {
+			err = projectionErr
+		} else {
+			outcome.Completion.ExpectationDigest = evidence.ContextExpectationDigest(final)
+		}
+	}
 	if err != nil || !outcome.Valid(e.Registration) {
 		outcome = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
 		h.log("connector recording " + r.CaptureID + " store unconfirmed")
@@ -224,6 +263,15 @@ func (h *ConnectorRecordings) Collect(w fleet.APIContextWork) (evidence.Recordin
 	if held == nil || held.expectation.Registration.Location.AttemptID != w.AttemptID || held.digest != w.ExpectationDigest {
 		return evidence.RecordingCollection{}, value.ErrUnavailable
 	}
+	if held.cancelRequested && held.outcome.State != evidence.RecordingStored {
+		if !held.storing {
+			if receipt, ok := h.snapshotCancellation(held); ok {
+				held.outcome = evidence.RecordingCollection{State: evidence.RecordingCancelled, SnapshotCancellation: &receipt}
+				return held.outcome, nil
+			}
+		}
+		return evidence.RecordingCollection{State: evidence.RecordingPending}, nil
+	}
 	return held.outcome, nil
 }
 
@@ -236,8 +284,9 @@ type preparedRecording struct {
 }
 
 var (
-	_ evidence.PreparedContext = (*preparedRecording)(nil)
-	_ evidence.ContextRecorder = (*preparedRecording)(nil)
+	_ evidence.PreparedContext       = (*preparedRecording)(nil)
+	_ evidence.ContextRecorder       = (*preparedRecording)(nil)
+	_ evidence.PolicyContextRecorder = (*preparedRecording)(nil)
 )
 
 func (p *preparedRecording) StoreContext(context.Context, []byte, time.Time, time.Time) (artifact.Copies, error) {
@@ -252,6 +301,12 @@ func (p *preparedRecording) Close() {
 }
 
 func (p *preparedRecording) StartRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time) (time.Time, error) {
+	// The legacy operation carries no committed input permit. Refuse before
+	// transferring prepared ownership; only the future typed policy start may
+	// carry a current exact source and the original SQL observation reservation.
+	if r := p.expectation.Recording; r != nil && r.Filter != nil && compiler.RawBytePredicate(r.Filter.Expression) {
+		return time.Time{}, value.ErrUnavailable
+	}
 	p.mu.Lock()
 	prepared := p.prepared
 	p.prepared = nil
@@ -268,4 +323,55 @@ type noJournal struct{}
 
 func (noJournal) AdvanceStreaming(context.Context, artifact.StreamingPlan, artifact.StreamingStep) (artifact.StreamingState, bool, error) {
 	return artifact.StreamingState{}, false, errors.New("streaming journal unavailable on the connector")
+}
+
+// StartPolicyRecording consumes the original receipt only after all immutable
+// preflight checks. The expected-source queue rechecks the same facts against
+// its independently authenticated live node entry under the queue mutex.
+func (p *preparedRecording) StartPolicyRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time, source targets.PacketSourceObservation, permit collector.ObservationPermit) (time.Time, error) {
+	h, e := p.holder, p.expectation
+	r, b := e.Recording, permit.Binding
+	now := h.now()
+	if ctx == nil || ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || started.After(now) || started.Before(permit.StartedAt) || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID || source.PodUID != e.PodUID || r == nil || !r.Valid() || r.Filter == nil || !compiler.RawBytePredicate(r.Filter.Expression) || b.CaptureID != e.CaptureUID || b.ActionID != e.ActionID || b.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch || b.ExpectationDigest != [32]byte(evidence.ContextExpectationDigest(e)) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || permit.SessionUntil.After(e.Registration.WriteUntil) {
+		return time.Time{}, value.ErrDenied
+	}
+	work := collector.PacketCapture{CaptureID: e.CaptureUID, PodUID: e.PodUID, Duration: permit.Duration, MaxBytes: r.MaxBytes, Observation: &permit}
+	work.Program = make([]planning.BPFInstruction, len(r.Filter.Program))
+	for i, ins := range r.Filter.Program {
+		work.Program[i] = planning.BPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
+	}
+	work.ProgramDigest = [32]byte(compiler.FilterProgramDigest(work.Program))
+	if work.ProgramDigest != b.ProgramDigest || packets.CheckPrefixProgram(work.Program) != nil || !work.Valid() {
+		return time.Time{}, value.ErrDenied
+	}
+	queue, ok := h.nodes.(interface {
+		EnqueuePacketExpected(context.Context, targets.PacketSourceObservation, collector.PacketCapture, time.Time) (collector.Work, error)
+	})
+	if !ok {
+		return time.Time{}, value.ErrUnavailable
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.prepared == nil {
+		return time.Time{}, value.ErrDenied
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	now = h.now()
+	h.expireLocked(now)
+	if ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || len(h.held) >= maxHeldRecordings {
+		return time.Time{}, value.ErrUnavailable
+	}
+	if _, exists := h.held[e.CaptureUID]; exists {
+		return time.Time{}, value.ErrUnavailable
+	}
+	prepared := p.prepared
+	p.prepared = nil // entering the queue effect is single-use, including unknown replies
+	w, err := queue.EnqueuePacketExpected(ctx, source, work, permit.StartBy)
+	if err != nil {
+		return time.Time{}, value.ErrUnavailable
+	}
+	queued := now.UTC().Truncate(time.Microsecond)
+	h.held[e.CaptureUID] = &heldRecording{expectation: e, digest: evidence.ContextExpectationDigest(e), prepared: prepared, nodeUID: source.NodeUID, workID: w.ID, queued: queued, expires: e.Registration.WriteUntil.Add(recordingRetain), outcome: evidence.RecordingCollection{State: evidence.RecordingPending}}
+	return queued, nil
 }

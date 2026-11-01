@@ -71,12 +71,15 @@ scope bytes to 64 KiB. Domain validation is structural; shared application
 validation additionally checks JSON, scope checksum and actual serialized size.
 The PostgreSQL adapter owns durable enforcement and bounded cleanup separately.
 
-The reason value can identify only separately encrypted, scope-bound control
-data by ID, ciphertext digest and expiry. A configured protected reader must
-recheck its current actor/client, target and exact ciphertext identity. No raw
-reason text enters this blueprint or SQL. Missing support is an error, not a
-silently discarded reason. The encrypted control writer remains required before
-a public form accepting ordinary free-text reasons can use this service.
+ADR-267 implements recording-save reasons as encrypted descriptive control data.
+The immutable blueprint carries only the ciphertext reference; a separate
+preview ciphertext column is erased after atomic copy to all mandatory child
+audit journals. Scope/grants/repeat remain reason-free. The existing control key
+ports seal once per reason preview; opaque bytes pass through both audit phases
+without a reason unwrap. A zero reference expiry follows audit retirement; a
+nonzero legacy metadata expiry is never collection authority. Missing/retired
+text affects its display only. No plaintext reason enters SQL. Ordinary
+`preview_capture` still has no raw-reason input producer.
 
 ## Fresh acceptance and original retries
 
@@ -99,8 +102,10 @@ require a new review. Updated observation times do not change reviewed scope or
 extend a prior observation's deadline.
 
 Each call owns at most one non-authoritative capacity readiness wait.
-Request starts it beside exact-Pod resolution using the preview's pinned
-target; Preview and CheckDiagnostic start it after target resolution. The
+For a packet preview with a storage selection, Request starts it after accepted
+replay misses and the actor-matching preview read, before recording grant I/O.
+Other requests retain their existing start beside exact-Pod resolution. Preview
+and CheckDiagnostic start it after target resolution. The
 same wait overlaps eligibility, capability and retention reads in their
 existing order, then joins before the authoritative storage read. Early
 failure cancels and joins it before returning. Under
@@ -128,12 +133,19 @@ opportunity to finish; slow reads or audit can still exhaust the request.
 
 Request pins the preview's exact storage selection; Preview and
 CheckDiagnostic pin their first valid authoritative selection. Read errors,
-invalid/expired bindings, changed selections and cancellation refuse
-consumption. Missing refresh or a failed demand prevents polling for a thin
+invalid bindings, changed selections and cancellation refuse
+consumption. An explicitly typed, naturally expired source may retain its original
+binding/selection metadata solely for comparison. After validating its original
+interval and exact reviewed selection, consumption may use the same bounded
+readiness owner and sole demand attempt as a thin result. No expired value
+authorizes admission: an independently fresh successful read is required.
+Generic read failures and malformed, future or mismatched expired metadata
+remain terminal. Expired metadata does not validate capacity/control; the fresh
+successful read must still pass those unchanged checks. Missing refresh or a failed demand prevents polling for a thin
 result; a valid final read with sufficient margin can still succeed.
 The wait uses the earliest original
 caller, initial identity/recovery, preview, target, eligibility/identity,
-capability, retention/proof/expiry and optional reason cutoff. It never
+capability and retention/proof/expiry; reason metadata is not an authority cutoff. It never
 refreshes those facts or extends a binding's timestamps. Target resolution,
 ordered initial fact reads and admission remain single operations, with the
 existing final eligibility recheck retained. The bounded early hint behavior
@@ -182,7 +194,7 @@ qualification. Neither mistake was worked around by relaxing authority checks.
 Public transports must project only the relevant preview/assessment and capture
 navigation fields. Before target entitlement is established, named resolver
 errors must not reveal whether another team's workload exists. Production
-protected capability and storage-configuration producers, encrypted reason creation,
+protected capability and storage-configuration producers, encrypted reason runtime/provider qualification,
 public contracts/UI composition and the later audit/execution/publication/download
 path remain required. The existing 1024 historical-capture ceiling still needs
 finite idempotency retirement and fair admission; passive preview cleanup does

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant"]
+NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant"]
 
 RECORDER_EDITS = ["packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode"]
 
@@ -34,15 +34,15 @@ def history_subset(name, tool):
     if name == "list_capture_history":
         for key in ("target_handle", "cluster_id", "target"):
             props.pop(key)
-        props["origin"] = {"enum": ["manual", "policy", "all"]}
+        props["origin"] = {"enum": ["manual", "policy", "discovery", "all"]}
         schema.pop("oneOf")
         schema["required"] = ["target_ref"]
         description["description"] = ("List recent accepted pod-status captures of a currently authorized named workload, newest first, for seven days after acceptance: "
-                                      "your own requests and those whose retained audience you currently belong to. Origin manual (default), policy or all; "
+                                      "your own requests and those whose retained audience you currently belong to. Origin manual (default), policy, discovery or all; "
                                       "at most limit entries (default 20, maximum 100) and next_cursor for more. A recreated workload starts a new history. "
                                       "Repeat one with preview_capture history_capture_id. No evidence or settings are read.")
     else:
-        success["properties"]["data"] = {"$ref": PREFIX + "capture-history.schema.json#/$defs/record"}
+        success["properties"]["data"] = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"][0]["properties"]["data"])
         description["description"] = ("Read the repeatable settings of one visible capture-history entry: its authored target, recipe, dependency pins and requested retention. "
                                        "No reason, recipients, grants, credentials or old pod selection. Repeat it with preview_capture history_capture_id.")
     return description, [success, error]
@@ -200,7 +200,7 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name in ("activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant"):
+        if name in ("cancel_capture", "list_recordings", "preview_recording_save", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant"):
             # ADR-228: the runtime implements the whole canonical contract.
             # ADR-232: the share tools implement a bounded subset.
             # ADR-234: explain_access implements the whole canonical contract.
@@ -211,6 +211,16 @@ def main():
             description = copy.deepcopy(tool)
             description.pop("enabledByDefault", None)
             branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
+            if name == "preview_recording_save":
+                # Protected recording-save reasons use the accepted opaque audit path.
+                # Keep the same bounded capture-time sharing subset.
+                sharing = copy.deepcopy(documents["sharing-request.schema.json"]["$defs"]["capture"])
+                for k in ("outputSelection", "maxArtifactsPerCapture", "reason", "management"):
+                    sharing["properties"].pop(k)
+                sharing["properties"]["recipients"]["maxItems"] = 8
+                description["inputSchema"]["properties"]["sharing"] = sharing
+            if name in ("cancel_capture", "list_recordings", "preview_recording_save"):
+                branches = [b for b in branches if b["properties"]["status"].get("const") != "pending"]
             if name in ("create_share", "list_shares", "revoke_share", "transfer_share"):
                 description, branches = share_subset(name, tool)
             if name in ("list_capture_history", "get_capture_settings"):
@@ -227,7 +237,7 @@ def main():
                 output["properties"]["next_cursor"] = {"type": "null"}
             output["properties"]["narrowing_hint"] = {"type": "null"}
             output["properties"]["data_class"] = {"const": "metadata"}
-            if name == "list_capture_history":
+            if name in ("list_capture_history", "list_recordings"):
                 output["properties"]["next_cursor"] = copy.deepcopy(common["properties"]["next_cursor"])  # a cursor or null
             if name == "get_capture_settings":
                 output["properties"]["data_class"] = {"enum": ["metadata", "extract"]}  # extract on success
@@ -238,7 +248,7 @@ def main():
             continue
         keys = {
             "list_diagnostics": ["target_ref"],
-            "preview_capture": ["target_ref", "preset_ref", "requested_retention_seconds", "sharing", "history_capture_id", "profile_composition"],
+            "preview_capture": ["target_ref", "preset_ref", "requested_retention_seconds", "sharing", "history_capture_id", "repeated_from_capture_id", "history_selection", "profile_composition"],
             "request_capture": ["preview_id", "idempotency_key", "continue_acquisition", "result_access"],
             "resolve_capture_request": ["preview_id", "idempotency_key"],
             "get_capture": ["capture_id"],
@@ -270,7 +280,7 @@ def main():
             sharing["properties"]["recipients"]["maxItems"] = 8
             props["sharing"] = sharing
         input_schema = {"type": "object", "additionalProperties": False, "properties": props,
-                        "required": [k for k in keys if k not in ("requested_retention_seconds", "continue_acquisition", "sharing", "history_capture_id", "profile_composition", "result_access")]}
+                        "required": [k for k in keys if k not in ("requested_retention_seconds", "continue_acquisition", "sharing", "history_capture_id", "repeated_from_capture_id", "history_selection", "profile_composition", "result_access")]}
         if name == "preview_capture":
             # ADR-236: either a named target with the preset, or one history
             # entry whose target and requested retention are restored.
@@ -282,6 +292,8 @@ def main():
                 {"required": ["target_ref", "profile_composition"], "not": {"anyOf": [{"required": [k]} for k in ("history_capture_id", "preset_ref", "sharing")]}},
                 {"required": ["history_capture_id"], "not": {"anyOf": [{"required": [k]} for k in ("target_ref", "preset_ref", "requested_retention_seconds", "profile_composition")]}},
             ]
+        if name=="preview_capture":
+            input_schema["allOf"]=[{"if":{"required":["history_selection"]},"then":{"anyOf":[{"required":["history_capture_id"]},{"required":["repeated_from_capture_id"]}]}}]
         branches = tool["outputSchema"]["allOf"][1]["oneOf"]
         success = copy.deepcopy(next(b for b in branches if b["properties"]["status"].get("const") == "ok"))
         error = copy.deepcopy(next(b for b in branches if b["properties"]["status"].get("const") == "error"))
@@ -289,9 +301,9 @@ def main():
         output_keys = {
             "list_diagnostics": ["diagnostics"],
             "preview_capture": ["preview_id", "expires_at", "execution_digest", "pod_count", "max_bytes", "max_process_starts", "approval_required", "capture_enabled", "blockers", "warnings", "navigation_uri", "lifecycle_plan", "capture_assessment", "preset_ref", "target_ref", "selected_pods", "pod_selection"],
-            "request_capture": ["capture_id", "phase", "navigation_uri", "operation"],
+            "request_capture": ["capture_id", "phase", "navigation_uri", "operation", "repeated_from_capture_id", "history_state"],
             "resolve_capture_request": None,
-            "get_capture": ["capture_id", "revision", "phase", "actions", "case_id", "navigation_uri", "retry_after_seconds", "can_cancel", "blockers", "operation", "sharing"],
+            "get_capture": ["capture_id", "revision", "phase", "actions", "case_id", "navigation_uri", "retry_after_seconds", "can_cancel", "blockers", "operation", "sharing", "repeated_from_capture_id", "history_state", "cancellation_requested", "reason", "reason_state"],
             "get_case": ["case", "artifacts", "timeline"],
  "prepare_artifact_download": None,
  "get_artifact_download": None,
@@ -309,7 +321,7 @@ def main():
             data["required"] = [k for k in output_keys if k not in ("preset_ref", "pod_selection")]
             data["oneOf"] = [
                 {"required": ["preset_ref", "pod_selection"], "not": {"required": ["profile_composition"]}},
-                {"required": ["profile_composition"], "not": {"anyOf": [{"required": ["preset_ref"]}, {"required": ["pod_selection"]}, {"required": ["repeated_from_capture_id"]}]},
+                {"required": ["profile_composition"], "not": {"anyOf": [{"required": ["preset_ref"]}, {"required": ["pod_selection"]}]},
                  # ADR-248: a manual network-header plan whose node recorder is
                  # available and that needs no approval can be requested; every
                  # other plan stays blocked (ApprovalRequired, RecorderUnavailable).
@@ -367,7 +379,7 @@ def main():
             "name": name,
             "description": {
                 "list_diagnostics": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
-                "preview_capture": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 can be collected by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately. Collect again: pass history_capture_id from list_capture_history (optionally with sharing) to restore its target and requested retention into a fresh preview with every current check. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. A manual network-header capture (packet headers only, at most 8 MiB, recorded by the target node's collector) can be requested when that node's recorder is available; a plan that needs approval first has the ApprovalRequired blocker, and every plan no recorder can run has the RecorderUnavailable blocker.",
+                "preview_capture": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
                 "request_capture": "Submit the reviewed pod-status preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet/syscall plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads; submit the same preview again after approval.",
                 "resolve_capture_request": tool["description"],
                 "get_capture": "Read authorized pod-status capture progress. No evidence bytes. Finalizing is not publication; Indeterminate must not be automatically recaptured.",

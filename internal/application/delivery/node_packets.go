@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // ADR-248: manual packet captures over the node channel. The connector queues
@@ -25,8 +26,13 @@ type PacketSink interface {
 }
 
 type pendingCapture struct {
-	captureID string
-	until     time.Time
+	cancelOnly     bool
+	cancelID       string
+	cancelSeq      uint64
+	cancelJoinedAt time.Time
+	snapshot       *collector.SourceSnapshot
+	captureID      string
+	until          time.Time
 }
 
 // SetPacketSink installs the receiver of capture results. It is set once
@@ -68,16 +74,32 @@ func (v NodeView) PacketRecorderAvailable() bool {
 // bounds when the node may still start it; the result is accepted until
 // startBy plus the duration plus PacketUploadMargin.
 func (c *NodeChannel) EnqueuePacket(nodeUID string, p collector.PacketCapture, startBy time.Time) (collector.Work, error) {
+	if !p.Valid() || p.Observation != nil {
+		return collector.Work{}, ErrNodeInvalid
+	}
+	packet := p
+	packet.Program = append(packet.Program[:0:0], p.Program...)
+	w, err := c.enqueue(nodeUID, collector.WorkPacketCapture, startBy, &packet, nil, nil)
+	if err != nil {
+		return w, err
+	}
+	return w, nil
+}
+
+// EnqueuePacketExpected queues only for the exact observed whole-Pod source.
+// Freshness applies at enqueue; already-issued work retains its original start
+// bound. The observation itself supplies no grant or sensitive-input authority.
+func (c *NodeChannel) EnqueuePacketExpected(ctx context.Context, expected targets.PacketSourceObservation, p collector.PacketCapture, startBy time.Time) (collector.Work, error) {
 	if !p.Valid() {
 		return collector.Work{}, ErrNodeInvalid
 	}
 	packet := p
 	packet.Program = append(packet.Program[:0:0], p.Program...)
-	w, err := c.enqueue(nodeUID, collector.WorkPacketCapture, startBy, &packet)
-	if err != nil {
-		return w, err
+	if p.Observation != nil {
+		permit := *p.Observation
+		packet.Observation = &permit
 	}
-	return w, nil
+	return c.enqueue(expected.NodeUID, collector.WorkPacketCapture, startBy, &packet, ctx, &expected)
 }
 
 // DeliverPacket hands one node's result for a queued capture to the sink.
@@ -94,11 +116,28 @@ func (c *NodeChannel) DeliverPacket(ctx context.Context, p NodePeer, epoch strin
 		return err
 	}
 	pending, ok := e.captures[r.WorkID]
-	if !ok || pending.captureID != r.CaptureID || !c.now().Before(pending.until) || c.sink == nil {
+	if !ok || pending.cancelOnly || pending.captureID != r.CaptureID || !c.now().Before(pending.until) || c.sink == nil {
+		c.mu.Unlock()
+		return ErrNodeConflict
+	}
+	if expected := pending.snapshot; expected != nil {
+		if !c.now().Before(expected.Request.ProcessingUntil) || !pending.cancelJoinedAt.IsZero() {
+			c.mu.Unlock()
+			return ErrNodeConflict
+		}
+		if r.Snapshot == nil || !r.Snapshot.Request.Equal(expected.Request) || r.Snapshot.AcceptedExpectationDigest != expected.ExpectationDigest || r.ProgramDigest != expected.Binding.ProgramDigest {
+			c.mu.Unlock()
+			return ErrNodeConflict
+		}
+	} else if r.Snapshot != nil {
 		c.mu.Unlock()
 		return ErrNodeConflict
 	}
 	delete(e.captures, r.WorkID)
+	if pending.cancelID != "" {
+		pending.cancelOnly = true
+		e.captures[pending.cancelID] = pending
+	}
 	id, sink := e.id, c.sink
 	c.mu.Unlock()
 	if err := sink.DeliverPacket(ctx, id, r, io.LimitReader(body, r.CapturedBytes)); err != nil {

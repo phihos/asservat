@@ -382,11 +382,18 @@ func capacitySourceReporter(prefix string) func(error) {
 	}
 }
 
-// capacityDemandReporter logs every ADR-200 demand-lane outcome with the
-// guarded read's freshness left on return: the lane runs only while a demand
-// lasts (sixty seconds), so this is about twenty lines per demand.
+// capacityDemandReporter logs ADR-200 demand-lane outcomes. Candidate outcomes
+// retain numeric freshness left; pre-candidate failures have no proof budget.
+// It emits at most once per existing serial iteration, including read failure.
 func capacityDemandReporter() func(error, time.Duration, time.Duration, string) {
 	return func(err error, elapsed, left time.Duration, stages string) {
-		fmt.Fprintf(os.Stderr, "capacity demand refresh: %s after %s, read left %s [%s]\n", regionalOutcome(err), elapsed.Round(10*time.Millisecond), left.Round(10*time.Millisecond), stages)
+		readLeft := "not-applicable"
+		switch stages {
+		case "read", "read-deadline", "cluster-unmatched":
+			// The generic callback's zero is a placeholder before any proof.
+		default:
+			readLeft = left.Round(10 * time.Millisecond).String()
+		}
+		fmt.Fprintf(os.Stderr, "capacity demand refresh: %s after %s, read left %s [%s]\n", regionalOutcome(err), elapsed.Round(10*time.Millisecond), readLeft, stages)
 	}
 }

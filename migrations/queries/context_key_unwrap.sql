@@ -1,7 +1,7 @@
 -- name: ShareContextKeyUnwrapExecution :one
 -- ADR-181: the stored execution, its accepted expectation and whether its
 -- capture is already published, held for one verification unwrap decision.
-SELECT e.capture_id, e.root_id, e.attempt_id, e.expectation_digest, e.phase, c.expectation_json,
+SELECT e.capture_id, e.root_id, e.attempt_id, e.expectation_digest, e.phase, c.expectation_json, c.snapshot_coverage, c.snapshot_coverage_digest, c.snapshot_expectation_digest,
  EXISTS(SELECT 1 FROM context_catalog k WHERE k.capture_id=e.capture_id) AS published
 FROM context_execution e
 JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id

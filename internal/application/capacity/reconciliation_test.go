@@ -345,12 +345,21 @@ func TestCapacityReconcilerDemandLaneReconcilesDemandedWorkload(t *testing.T) {
 		if !known {
 			demand.ClusterID = "00000000-0000-4000-8000-0000000000ff"
 		}
-		var reports atomic.Int32
+		var reports, unmatched atomic.Int32
 		runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{{ClusterID: cluster, Workloads: reader, Guard: reader, Pace: time.Hour}},
-			Demands: staticCapacityDemands{demand}, DemandReport: func(error, time.Duration, time.Duration, string) { reports.Add(1) }}
+			Demands: staticCapacityDemands{demand}, DemandReport: func(_ error, _, _ time.Duration, stage string) {
+				if stage == "cluster-unmatched" {
+					unmatched.Add(1)
+					return
+				}
+				reports.Add(1)
+			}}
 		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
 		_ = runner.Run(ctx)
 		cancel()
+		if !known && unmatched.Load() < 2 {
+			t.Fatal("unknown cluster refusal not reported")
+		}
 		if n := reports.Load(); known && n < 2 || !known && n != 0 {
 			t.Fatal("demand lane reconciliations", known, n)
 		}

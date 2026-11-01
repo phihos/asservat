@@ -99,6 +99,9 @@ func TestPolicySourceBoundedObservationAndIntent(t *testing.T) {
 			if e != nil || got.CollectionDigest != base.CollectionDigest || got.Revision.Digest == base.Revision.Digest {
 				t.Fatalf("control edit changed collection intent: %v", e)
 			}
+			if mode == "grant" && got.AuthoredGrantRef != "11111111-1111-4111-8111-111111111119" || mode != "grant" && got.AuthoredGrantRef != "" {
+				t.Fatal("authored attachment control lost or invented", got.AuthoredGrantRef)
+			}
 		})
 	}
 	got, e := read("threshold")

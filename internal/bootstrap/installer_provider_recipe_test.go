@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -51,5 +53,58 @@ func TestInstallerProviderRecipeIsFinitePublicAndDeterministic(t *testing.T) {
 		if RunInstallerProviderRecipe(context.Background(), args, &out) == nil || out.Len() != 0 {
 			t.Fatal("invalid prerequisites emitted", args)
 		}
+	}
+}
+
+func TestInstallerProviderRecipeHistoryBindsInputsWithoutEmittingCredential(t *testing.T) {
+	dir := t.TempDir()
+	id := "10000000-0000-4000-8000-000000000002"
+	cluster := "10000000-0000-4000-8000-000000000003"
+	epoch := "10000000-0000-4000-8000-000000000005"
+	secret := strings.Repeat("C", 42) + "A"
+	offer := map[string]any{"format": "asservat-regional-offer/v1", "installationID": id, "permissionRootID": id, "issuerEpoch": epoch, "evidenceStore": map[string]any{"bucket": "history-fixture"}}
+	binding := map[string]any{"format": "asservat-bootstrap-secret/v1", "installationID": id, "bootstrapID": id, "clusterID": cluster, "peerID": id, "issuerEpoch": epoch, "deliveryProfile": "regional-installer", "requestSHA256": strings.Repeat("1", 64), "notBefore": "2026-10-27T00:00:00Z", "notAfter": "2026-10-27T00:05:00Z"}
+	offerPath, bootstrapPath := filepath.Join(dir, "offer.json"), filepath.Join(dir, "bootstrap.json")
+	write := func(path string, value any) {
+		t.Helper()
+		b, e := json.Marshal(value)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = os.WriteFile(path, b, 0600); e != nil {
+			t.Fatal(e)
+		}
+	}
+	write(offerPath, offer)
+	write(bootstrapPath, map[string]any{"binding": binding, "secret": secret})
+	var out bytes.Buffer
+	args := []string{"--history-offer", offerPath, "--history-bootstrap", bootstrapPath}
+	if e := RunInstallerProviderRecipe(context.Background(), args, &out); e != nil {
+		t.Fatal(e)
+	}
+	var result struct {
+		History struct {
+			Prefix  string          `json:"prefix"`
+			Actions []string        `json:"seaweedIdentityActions"`
+			Policy  json.RawMessage `json:"s3BucketPolicy"`
+		} `json:"regionalHistory"`
+	}
+	if json.Unmarshal(out.Bytes(), &result) != nil || result.History.Prefix != "history/v1/"+id+"/"+cluster+"/" || len(result.History.Actions) != 3 || len(result.History.Policy) == 0 {
+		t.Fatal("history proposal lost exact installed scope", out.String())
+	}
+	if strings.Contains(out.String(), secret) || strings.Contains(out.String(), "requestSHA256") {
+		t.Fatal("bootstrap credential leaked")
+	}
+	for _, bad := range [][]string{{"--history-offer", offerPath}, {"--history-bootstrap", bootstrapPath}} {
+		out.Reset()
+		if RunInstallerProviderRecipe(context.Background(), bad, &out) == nil || out.Len() != 0 {
+			t.Fatal("partial proposal emitted")
+		}
+	}
+	binding["installationID"] = cluster
+	write(bootstrapPath, map[string]any{"binding": binding, "secret": secret})
+	out.Reset()
+	if RunInstallerProviderRecipe(context.Background(), args, &out) == nil || out.Len() != 0 {
+		t.Fatal("different installation proposal emitted")
 	}
 }

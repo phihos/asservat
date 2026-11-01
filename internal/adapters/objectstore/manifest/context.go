@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore/framed"
+	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 )
 
@@ -112,6 +113,7 @@ type lifecycleDTO struct {
 	After               string        `json:"after,omitempty"`
 	HistoryCoverage     string        `json:"historyCoverage,omitempty"`
 	GapReasons          *[]string     `json:"gapReasons,omitempty"`
+	SourceClosedAt      time.Time     `json:"sourceClosedAt,omitzero"`
 	SourceStoppedAt     time.Time     `json:"sourceStoppedAt,omitzero"`
 	WindowCoverage      string        `json:"windowCoverage,omitempty"`
 	RecordingSaveOrigin *originRefDTO `json:"recordingSaveOrigin,omitempty"`
@@ -124,6 +126,9 @@ func lifecycle(e artifact.ContextExpectation) lifecycleDTO {
 	}
 	gaps := append([]string{}, l.GapReasons...)
 	d := lifecycleDTO{ExecutionMode: "ongoing", TriggeredAt: e.TriggeredAt.UTC(), TriggerKind: l.TriggerKind, SourceSessionID: l.SourceSessionID, SourceStartedAt: l.SourceStartedAt.UTC(), SnapshotID: l.SnapshotID, RequestedBefore: artifact.LifecycleDuration(l.RequestedBefore), After: artifact.LifecycleDuration(l.After), HistoryCoverage: l.HistoryCoverage, GapReasons: &gaps, WindowCoverage: l.WindowCoverage}
+	if !l.SourceClosedAt.IsZero() {
+		d.SourceClosedAt = l.SourceClosedAt.UTC()
+	}
 	if !l.SourceStoppedAt.IsZero() {
 		d.SourceStoppedAt = l.SourceStoppedAt.UTC()
 	}
@@ -153,30 +158,31 @@ type storageDTO struct {
 	Index identityDTO `json:"index"`
 }
 type contextDTO struct {
-	SchemaVersion        string          `json:"schemaVersion"`
-	ArtifactID           string          `json:"artifactID"`
-	CaseID               string          `json:"caseID"`
-	OccurrenceID         string          `json:"occurrenceID"`
-	Target               targetDTO       `json:"target"`
-	Kind                 string          `json:"kind"`
-	MediaType            string          `json:"mediaType"`
-	Format               string          `json:"format"`
-	DataClass            string          `json:"dataClass"`
-	Collector            collectorDTO    `json:"collector"`
-	StartedAt            time.Time       `json:"startedAt"`
-	CompletedAt          time.Time       `json:"completedAt"`
-	ExpiresAt            time.Time       `json:"expiresAt"`
-	Completeness         completenessDTO `json:"completeness"`
-	Sizes                sizesDTO        `json:"sizes"`
-	Hashes               hashesDTO       `json:"hashes"`
-	Encryption           json.RawMessage `json:"encryption"`
-	Provenance           provenanceDTO   `json:"provenance"`
-	AccessProvenance     accessDTO       `json:"accessProvenance"`
-	Privacy              privacyDTO      `json:"privacy"`
-	Retention            retentionDTO    `json:"retention"`
-	CollectionProvenance originDTO       `json:"collectionProvenance"`
-	ActionLifecycle      lifecycleDTO    `json:"actionLifecycle"`
-	StorageObjects       storageDTO      `json:"storageObjects"`
+	SourceSnapshotManifest *sourceSnapshotManifestDTO `json:"sourceSnapshotManifest,omitempty"`
+	SchemaVersion          string                     `json:"schemaVersion"`
+	ArtifactID             string                     `json:"artifactID"`
+	CaseID                 string                     `json:"caseID"`
+	OccurrenceID           string                     `json:"occurrenceID"`
+	Target                 targetDTO                  `json:"target"`
+	Kind                   string                     `json:"kind"`
+	MediaType              string                     `json:"mediaType"`
+	Format                 string                     `json:"format"`
+	DataClass              string                     `json:"dataClass"`
+	Collector              collectorDTO               `json:"collector"`
+	StartedAt              time.Time                  `json:"startedAt"`
+	CompletedAt            time.Time                  `json:"completedAt"`
+	ExpiresAt              time.Time                  `json:"expiresAt"`
+	Completeness           completenessDTO            `json:"completeness"`
+	Sizes                  sizesDTO                   `json:"sizes"`
+	Hashes                 hashesDTO                  `json:"hashes"`
+	Encryption             json.RawMessage            `json:"encryption"`
+	Provenance             provenanceDTO              `json:"provenance"`
+	AccessProvenance       accessDTO                  `json:"accessProvenance"`
+	Privacy                privacyDTO                 `json:"privacy"`
+	Retention              retentionDTO               `json:"retention"`
+	CollectionProvenance   originDTO                  `json:"collectionProvenance"`
+	ActionLifecycle        lifecycleDTO               `json:"actionLifecycle"`
+	StorageObjects         storageDTO                 `json:"storageObjects"`
 }
 
 func hash(h artifact.Digest) string { return hex.EncodeToString(h[:]) }
@@ -199,7 +205,7 @@ func decode(b []byte, out any) error {
 
 func contextDocument(e artifact.ContextExpectation, l artifact.Layout, c artifact.Copies, started, completed time.Time) (contextDTO, error) {
 	t := e.Type()
-	if e.Validate() != nil || l.Validate() != nil || l.Binding != e.Binding() || l.NativeBytes > e.Registration.NativeLimit || l.NativeBytes > t.MaxBytes {
+	if e.Validate() != nil || !evidence.ValidSourceSnapshotManifest(e) || l.Validate() != nil || l.Binding != e.Binding() || l.NativeBytes > e.Registration.NativeLimit || l.NativeBytes > t.MaxBytes {
 		return contextDTO{}, artifact.ErrInvalid
 	}
 	for i := 0; i < 2; i++ {
@@ -220,6 +226,12 @@ func contextDocument(e artifact.ContextExpectation, l artifact.Layout, c artifac
 	if e.Lifecycle == nil && e.TriggeredAt.After(started) || e.Lifecycle != nil && started.Before(e.Lifecycle.SourceStartedAt) {
 		return contextDTO{}, artifact.ErrInvalid
 	}
+	if e.Snapshot != nil {
+		a, b := artifact.SourceSnapshotAcquisition(artifact.SourceSnapshotCoverage{Request: *e.Snapshot, SourceStoppedAt: e.Lifecycle.SourceStoppedAt, SourceClosedAt: e.Lifecycle.SourceClosedAt})
+		if !started.Equal(a) || !completed.Equal(b) {
+			return contextDTO{}, artifact.ErrInvalid
+		}
+	}
 	encryption, err := framed.MarshalLayout(l)
 	if err != nil {
 		return contextDTO{}, err
@@ -239,7 +251,8 @@ func contextDocument(e artifact.ContextExpectation, l artifact.Layout, c artifac
 		projection = hash(artifact.Digest(sha256.Sum256([]byte(artifact.ContextProjectionDefinition))))
 	}
 	return contextDTO{
-		SchemaVersion: "artifact/v1", ArtifactID: r.Location.ArtifactID, CaseID: e.CaseID, OccurrenceID: e.OccurrenceID,
+		SourceSnapshotManifest: snapshotManifest(e),
+		SchemaVersion:          "artifact/v1", ArtifactID: r.Location.ArtifactID, CaseID: e.CaseID, OccurrenceID: e.OccurrenceID,
 		Target: targetDTO{ExecutionClass: e.ExecutionClass, ClusterID: r.Location.ClusterID, NodeUID: e.NodeUID, NodeBootID: e.NodeBootID, PodUID: e.PodUID, Namespace: e.Namespace, WorkloadUID: e.WorkloadUID, Scope: "pod"},
 		Kind:   t.Kind, MediaType: t.MediaType, Format: t.Format, DataClass: e.DataClass,
 		Collector: collectorDTO{e.CollectorVersion, hash(e.CollectorImageDigest), hash(e.RecipeDigest)}, StartedAt: started.UTC(), CompletedAt: completed.UTC(), ExpiresAt: r.ExpiresAt.UTC(),
@@ -257,6 +270,13 @@ func (v *Validator) MarshalContext(e artifact.ContextExpectation, l artifact.Lay
 		return nil, err
 	}
 	b, err := json.Marshal(d)
+	if e.SourceSnapshotManifest != nil {
+		var out bytes.Buffer
+		encoder := json.NewEncoder(&out)
+		encoder.SetEscapeHTML(false)
+		err = encoder.Encode(d)
+		b = bytes.TrimSuffix(out.Bytes(), []byte("\n"))
+	}
 	if err != nil {
 		return nil, artifact.ErrInvalid
 	}
@@ -302,6 +322,7 @@ func (v *Validator) ParseContext(b []byte, e artifact.ContextExpectation, c arti
 	actual.Retention.DeleteBy = actual.Retention.DeleteBy.UTC()
 	actual.ActionLifecycle.TriggeredAt = actual.ActionLifecycle.TriggeredAt.UTC()
 	actual.ActionLifecycle.SourceStartedAt = actual.ActionLifecycle.SourceStartedAt.UTC()
+	actual.ActionLifecycle.SourceClosedAt = actual.ActionLifecycle.SourceClosedAt.UTC()
 	actual.ActionLifecycle.SourceStoppedAt = actual.ActionLifecycle.SourceStoppedAt.UTC()
 	if !reflect.DeepEqual(actual, expected) {
 		return result, artifact.ErrIntegrity
@@ -341,4 +362,16 @@ func (v *Validator) ValidateNative(b []byte, e artifact.ContextExpectation, m Co
 		return artifact.ErrIntegrity
 	}
 	return nil
+}
+
+type sourceSnapshotManifestDTO struct {
+	CanonicalScope json.RawMessage `json:"canonicalScope"`
+	Binding        json.RawMessage `json:"binding"`
+}
+
+func snapshotManifest(e artifact.ContextExpectation) *sourceSnapshotManifestDTO {
+	if e.SourceSnapshotManifest == nil {
+		return nil
+	}
+	return &sourceSnapshotManifestDTO{json.RawMessage(e.SourceSnapshotManifest.CanonicalScope), json.RawMessage(e.SourceSnapshotManifest.Binding)}
 }

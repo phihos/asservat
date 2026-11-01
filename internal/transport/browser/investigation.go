@@ -32,7 +32,8 @@ type InvestigationHandler struct {
 	mu         sync.Mutex
 	active     map[identity.Principal]int
 	stopActive map[identity.Principal]int
-	// Report receives a fixed stage label for every 503 (diagnostics only).
+	// Report receives fixed failure stages, including errors after response output
+	// started. It never supplies public response content (diagnostics only).
 	Report func(string)
 }
 
@@ -113,6 +114,20 @@ func (h *InvestigationHandler) unavailable(w http.ResponseWriter, stage string) 
 		h.Report(stage)
 	}
 	sessionProblem(w, 503)
+}
+
+// Only the audited call's finite outer stages survive. Nested adapter steps
+// and arbitrary error text are neither retained nor rendered here.
+func noOutcomeStage(err error) string {
+	var fixed interface{ FixedStep() string }
+	if errors.As(err, &fixed) {
+		step, _, _ := strings.Cut(fixed.FixedStep(), "/")
+		switch step {
+		case "identity", "busy", "audit-begin", "audit-result", "audit-finish", "result-acknowledgement", "request-expired", "final-identity", "reply-expired", "final-disclosure":
+			return step
+		}
+	}
+	return "other"
 }
 
 // failure is sessionFailure, reporting the stage when it answers 503.
@@ -208,7 +223,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		h.rejectIngress(w, r, current, name, body, 404)
 		return
 	}
-	if name == "request_capture" || name == "resolve_capture_request" || name == "prepare_artifact_download" || name == "cancel_artifact_download" || name == "activate_policy" || name == "deactivate_policy" || name == "create_share" || name == "revoke_share" || name == "transfer_share" || name == "stop_future_sharing" || name == "decide_review" || name == "revoke_grant" {
+	if name == "cancel_capture" || name == "request_capture" || name == "resolve_capture_request" || name == "prepare_artifact_download" || name == "cancel_artifact_download" || name == "activate_policy" || name == "deactivate_policy" || name == "create_share" || name == "revoke_share" || name == "transfer_share" || name == "stop_future_sharing" || name == "decide_review" || name == "revoke_grant" || name == "request_policy_grant" {
 		var input struct {
 			Key string `json:"idempotency_key"`
 		}
@@ -258,13 +273,16 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		}
 	}()
 	var out presentation.OperationReply
+	if name == "get_capture_settings" {
+		ctx = presentation.AuthenticatedBrowserSettingsView(ctx)
+	}
 	out, err = h.operations.Call(ctx, current, name, body)
 	defer func() { _ = out.Close(ctx); clear(out.Body) }()
 	if err != nil {
 		if h.audited != nil {
 			if out.ValidUntil.IsZero() {
 				h.security.Add(presentation.IngressAuditUnavailable)
-				h.unavailable(w, "call-no-outcome")
+				h.unavailable(w, "call-no-outcome/"+noOutcomeStage(err))
 				return
 			}
 			final, e := current.ResolveIdentity(ctx)
@@ -300,7 +318,12 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	writeCtx, finishWrite := out.ResponseContext(ctx)
 	defer finishWrite()
-	if sent, err := presentation.WriteOperationReplyResponse(writeCtx, w, http.StatusOK, out.Body, out, deadline, out.CheckDisclosure); err != nil && !sent {
-		h.unavailable(w, "response-write")
+	if sent, err := presentation.WriteBrowserOperationResponse(writeCtx, w, http.StatusOK, name, out, deadline); err != nil {
+		if !sent {
+			h.unavailable(w, "response-write")
+		} else if h.Report != nil {
+			// Output already started: report without appending another response.
+			h.Report("response-write-started")
+		}
 	}
 }

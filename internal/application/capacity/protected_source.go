@@ -7,6 +7,7 @@ import (
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/collector"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -44,11 +45,20 @@ type PoolObservation struct {
 	// so a different pool can still be selected from the complete list.
 	Budget *PoolBudgetInput
 }
+
+// SourceResourceLimits are optional administrator lowering observations. They
+// remain separate from the immutable storage budget and never grant acquisition.
+type SourceResourceLimits struct {
+	Node     collector.PolicyLimits
+	Workload collector.SourceLimits
+}
+
 type BudgetPolicyObservation struct {
-	Resource cfg.Resource
-	Scope    *BudgetScope
-	Pool     string
-	Budget   *PolicyBudgetInput
+	SourceResources *SourceResourceLimits `json:",omitempty"`
+	Resource        cfg.Resource
+	Scope           *BudgetScope
+	Pool            string
+	Budget          *PolicyBudgetInput
 }
 
 // Snapshot preserves complete per-kind LIST revisions. It is not an atomic
@@ -86,6 +96,9 @@ func (s CapacitySnapshot) Valid(now time.Time) bool {
 	}
 	names = map[string]bool{}
 	for _, p := range s.Policies {
+		if p.SourceResources != nil && (!p.SourceResources.Node.Valid() || !p.SourceResources.Workload.Valid()) {
+			return false
+		}
 		if !capacityResource(p.Resource, s, "EvidenceBudgetPolicy") || ids[p.Resource.UID] || names[p.Resource.Name] {
 			return false
 		}

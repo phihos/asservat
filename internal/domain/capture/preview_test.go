@@ -68,7 +68,12 @@ func TestContextPreviewCloneAndReasonDeadline(t *testing.T) {
 	if !p.Valid() {
 		t.Fatal("valid protected reference rejected")
 	}
+	p.Intent.RepeatedFrom = &HistoryLineage{CaptureID: "00000000-0000-4000-8000-000000000098", ExpiresAt: p.Deadline}
 	copy := p.Clone()
+	copy.Intent.RepeatedFrom.CaptureID = "00000000-0000-4000-8000-000000000097"
+	if p.Intent.RepeatedFrom.CaptureID == copy.Intent.RepeatedFrom.CaptureID {
+		t.Fatal("clone aliases repeat source")
+	}
 	copy.CanonicalScope[0] = '!'
 	copy.Audience[0].SubjectID = "other"
 	copy.Retention.Policies[0].UID = "other"
@@ -77,8 +82,8 @@ func TestContextPreviewCloneAndReasonDeadline(t *testing.T) {
 		t.Fatal("clone aliases mutable state")
 	}
 	p.Intent.Reason.ExpiresAt = p.CreatedAt.Add(time.Minute)
-	if p.Valid() {
-		t.Fatal("review exceeds protected reason lifetime")
+	if !p.Valid() {
+		t.Fatal("descriptive reason expiry changed capture review lifetime")
 	}
 }
 

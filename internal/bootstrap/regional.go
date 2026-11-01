@@ -90,6 +90,8 @@ const (
 )
 
 func RunRegional(ctx context.Context, podUID string) error {
+	// The test diagnostics keep connector lines prefixed "regional".
+	logOpeningStats(ctx, "regional kube opening")
 	files, err := os.OpenRoot(contracts.RegionalDeploymentRoot)
 	if err != nil {
 		return errors.Join(mounts.ErrUnavailable, err)

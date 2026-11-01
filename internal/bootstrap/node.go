@@ -154,11 +154,13 @@ func RunNode(ctx context.Context, podUID string) error {
 		return mounts.ErrUnavailable
 	}
 	defer client.CloseIdle()
-	p := &nodeProcess{client: client, creds: creds, token: readNodeToken, bootID: boot, epoch: uuid.NewString(), facts: facts, mechanisms: mechanisms,
+	p := &nodeProcess{client: client, creds: creds, token: readNodeToken, podUID: podUID, bootID: boot, epoch: uuid.NewString(), facts: facts, mechanisms: mechanisms,
 		budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr}
-	p.packets = &nodePackets{engine: gadget.CapturePackets, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
+	p.packets = &nodePackets{engine: gadget.CapturePackets, observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
+	p.sources = &nodeSources{upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
 	err = p.Run(ctx)
+	p.sources.Close()
 	p.packets.wg.Wait()
 	return err
 }
@@ -207,6 +209,8 @@ type nodeProcess struct {
 	creds      nodeKey
 	token      func(context.Context) ([]byte, error)
 	bootID     string
+	podUID     string // validated startup input, never chosen by a work item
+	nodeUID    string // last successful authenticated enrollment response
 	epoch      string
 	facts      collector.Facts
 	mechanisms []collector.Availability
@@ -215,6 +219,7 @@ type nodeProcess struct {
 	log        io.Writer
 	// packets runs packet captures (ADR-248); nil refuses every item.
 	packets *nodePackets
+	sources *nodeSources
 	// root is the process context: captures outlive a re-enrollment.
 	root context.Context
 
@@ -224,6 +229,12 @@ type nodeProcess struct {
 	sequence uint64
 	cadence  collector.StatusCadence
 	last     string
+}
+
+func (p *nodeProcess) packetIdentity() collector.Identity {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return collector.Identity{NodeUID: p.nodeUID, PodUID: p.podUID, BootID: p.bootID, Epoch: p.epoch}
 }
 
 var errNodeReenroll = errors.New("node channel: enroll again")
@@ -263,7 +274,15 @@ func (p *nodeProcess) enroll(ctx context.Context) (time.Time, error) {
 			clear(token)
 			if err == nil {
 				var notAfter time.Time
-				if notAfter, err = p.creds.Install(resp.Certificate, p.now()); err == nil {
+				// Certificate installation is local crypto. Keep it and its
+				// authenticated source identity atomic to packet start snapshots.
+				p.mu.Lock()
+				notAfter, err = p.creds.Install(resp.Certificate, p.now())
+				if err == nil {
+					p.nodeUID = resp.NodeUID
+				}
+				p.mu.Unlock()
+				if err == nil {
 					p.client.CloseIdle()
 					p.note("")
 					fmt.Fprintf(p.log, "node collector enrolled: node %s, epoch %s, certificate until %s\n", resp.NodeName, p.epoch, notAfter.UTC().Format(time.RFC3339))
@@ -279,6 +298,11 @@ func (p *nodeProcess) enroll(ctx context.Context) (time.Time, error) {
 }
 
 func (p *nodeProcess) report() collector.Report {
+	var sources []collector.SourceStatus
+	var sourceAsOf time.Time
+	if p.sources != nil {
+		sources, sourceAsOf = p.sources.Status()
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.sequence++
@@ -287,7 +311,10 @@ func (p *nodeProcess) report() collector.Report {
 		n = collector.MaxReceipts
 	}
 	now := p.now()
-	return collector.Report{Sequence: p.sequence, ObservedAt: now.UTC(), Facts: p.facts, Mechanisms: p.mechanisms, Budget: p.budget.Usage(now), Receipts: append([]collector.Receipt{}, p.receipts[:n]...)}
+	if !sourceAsOf.IsZero() {
+		now = sourceAsOf
+	}
+	return collector.Report{Sequence: p.sequence, ObservedAt: now.UTC(), Facts: p.facts, Mechanisms: p.mechanisms, Budget: p.budget.Usage(now), Receipts: append([]collector.Receipt{}, p.receipts[:n]...), Sources: sources}
 }
 
 // statusLoop sends the first report at once and then one every
@@ -391,6 +418,13 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 					root = ctx
 				}
 				r = p.packets.start(root, p.epoch, w)
+			}
+			if (w.Kind == collector.WorkPacketSource || w.Kind == collector.WorkStopPacketSource || w.Kind == collector.WorkPacketSourceSnapshot || w.Kind == collector.WorkCancelSourceSnapshot) && p.sources != nil {
+				root := p.root
+				if root == nil {
+					root = ctx
+				}
+				r = p.sources.decide(root, p.epoch, w)
 			}
 			p.mu.Lock()
 			p.receipts = append(p.receipts, r)

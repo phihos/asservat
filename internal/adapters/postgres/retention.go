@@ -75,11 +75,7 @@ func (s *Retention) RetainedArtifact(ctx context.Context, loc artifact.Location)
 		if a.ClusterID != id(loc.ClusterID) || a.ArtifactID != id(loc.ArtifactID) {
 			return app.ErrConflict
 		}
-		c, err := q.ReadRetainedContext(ctx, custodydb.ReadRetainedContextParams{RootID: id(s.root), AttemptID: a.ID})
-		if err != nil {
-			return err
-		}
-		out, err = retainedContextOrigins(ctx, q, s.root, c, a)
+		out, err = retainedCustodyOrigins(ctx, q, s.root, a)
 		return err
 	})
 	if err != nil {
@@ -134,11 +130,7 @@ func (s *Retention) tightenRetention(ctx context.Context, q *custodydb.Queries, 
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
-	c, err := q.ReadRetainedContext(ctx, custodydb.ReadRetainedContextParams{RootID: id(s.root), AttemptID: a.ID})
-	if err != nil {
-		return err
-	}
-	r, err := retainedContextOrigins(ctx, q, s.root, c, a)
+	r, err := retainedCustodyOrigins(ctx, q, s.root, a)
 	if err != nil {
 		return err
 	}

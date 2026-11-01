@@ -275,3 +275,50 @@ func TestBrowserRequestWithinMatchesEvidenceReadWindow(t *testing.T) {
 		t.Fatal("browser window beyond the evidence-read maximum accepted")
 	}
 }
+
+func TestRecordingSaveRequestWindowPreservesInitialIdentityAndOwner(t *testing.T) {
+	for _, mode := range []string{"prospective", "initial-shorter", "later-shorter", "owner-cancelled"} {
+		t.Run(mode, func(t *testing.T) {
+			now := time.Now()
+			original := now
+			calls := 0
+			owner, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			resolver := requestResolver(func(ctx context.Context, _ string) (value.Identity, error) {
+				calls++
+				i := requestIdentity(now)
+				i.ValidUntil = original.Add(time.Minute)
+				if mode == "initial-shorter" || mode == "later-shorter" && calls > 1 {
+					i.ValidUntil = original.Add(4 * time.Second)
+				}
+				return i, ctx.Err()
+			})
+			current, initial, err := NewBearerRequestWithin(owner, resolver, "synthetic", func() time.Time { return now }, value.RecordingSaveRequestWindow)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := original.Add(value.RecordingSaveRequestWindow)
+			if mode == "initial-shorter" {
+				want = original.Add(4 * time.Second)
+			}
+			if !initial.ValidUntil.Equal(want) {
+				t.Fatal("initial identity widened", initial.ValidUntil, want)
+			}
+			if mode == "later-shorter" {
+				if _, err = current.ResolveIdentity(owner); err != nil {
+					t.Fatal(err)
+				}
+				want = original.Add(4 * time.Second)
+			}
+			if mode == "owner-cancelled" {
+				cancel()
+			} else {
+				now = want
+			}
+			before := calls
+			if _, err = current.ResolveIdentity(context.Background()); err == nil || calls != before {
+				t.Fatal("expired/cancelled original request consulted provider or renewed", err, calls, before)
+			}
+		})
+	}
+}

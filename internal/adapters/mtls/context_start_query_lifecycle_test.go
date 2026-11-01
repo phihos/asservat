@@ -2,9 +2,8 @@ package mtls
 
 import (
 	"context"
-	"io"
+	"errors"
 	"net/http"
-	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -15,58 +14,25 @@ import (
 	"asservat.local/asservat/internal/transport/contextstart"
 )
 
-// The hub's HTTP/2 write deadline is an active stream timer, even when the
-// handler is idle. This differs from the region's raw socket write deadline.
-func TestContextStartHTTP2WriteDeadlineEndsIdleStream(t *testing.T) {
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		controller := http.NewResponseController(w)
-		if err := controller.SetWriteDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
-			t.Error(err)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		if err := controller.Flush(); err != nil {
-			t.Error(err)
-			return
-		}
-		<-r.Context().Done()
-	}))
-	server.EnableHTTP2 = true
-	server.StartTLS()
-	defer server.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	response, err := server.Client().Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer response.Body.Close()
-	if response.ProtoMajor != 2 {
-		t.Fatal("fixture did not use HTTP/2")
-	}
-	_, err = io.ReadAll(response.Body)
-	if err == nil || ctx.Err() != nil {
-		t.Fatal("idle stream did not end at its independent write deadline", err, ctx.Err())
-	}
-	t.Logf("idle HTTP/2 stream ended with no read deadline: %v", err)
-}
-
 // ADR-179 allows independent pre-work queries on the same passive standby.
 // The first query completes under its short original caller bound. Its retained
 // socket deadline must not cancel a later caller during a fresh peer check.
 func TestContextStartCompletedQueryDeadlineDoesNotCancelNextQuery(t *testing.T) {
-	for _, phase := range []string{"current-check", "idle-gap", "work"} {
+	for _, phase := range []string{"current-check", "idle-gap", "work", "history-list", "history-stream-cutoff", "history-read-cutoff"} {
 		t.Run(phase, func(t *testing.T) { contextStartCompletedQueryLifecycle(t, phase) })
 	}
 }
 
 func contextStartCompletedQueryLifecycle(t *testing.T, phase string) {
 	f := newContextStartTLSFixture(t)
-	regional := &regionalOperationsFixture{t: t, process: f.api}
+	controller := make(chan *http.ResponseController, 1)
+	if phase == "history-stream-cutoff" || phase == "history-read-cutoff" {
+		f.intercept = func(w http.ResponseWriter, _ *http.Request) bool {
+			controller <- http.NewResponseController(w)
+			return false
+		}
+	}
+	regional := &restartRegion{regionalOperationsFixture: &regionalOperationsFixture{t: t, process: f.api}}
 	f.targets = regional
 	originalRoutes := f.owners.Routes
 	var hold atomic.Bool
@@ -101,7 +67,8 @@ func contextStartCompletedQueryLifecycle(t *testing.T, phase string) {
 			t.Error("regional query owner did not join")
 		}
 	})
-	hub := contextstart.Targets{Router: f.router, Now: time.Now, Report: func(event, timing string) { t.Log(event, timing) }}
+	var lastEvent string
+	hub := contextstart.Targets{Router: f.router, Now: time.Now, Report: func(event, timing string) { lastEvent = event; t.Log(event, timing) }}
 	first, stopFirst := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer stopFirst()
 	firstUntil, _ := first.Deadline()
@@ -150,19 +117,62 @@ func contextStartCompletedQueryLifecycle(t *testing.T, phase string) {
 	second, stopSecond := context.WithTimeout(context.Background(), 4*time.Second)
 	defer stopSecond()
 	secondUntil, _ := second.Deadline()
-	hold.Store(phase == "current-check")
+	history := phase == "history-list" || phase == "history-stream-cutoff" || phase == "history-read-cutoff"
+	hold.Store(phase == "current-check" || history)
 	result := make(chan error, 1)
 	go func() {
-		_, err := hub.ResolvePod(second, resolved.Request)
+		var err error
+		if history {
+			// Actual browser discovery first resolves diagnostics, then asks
+			// history for the named workload (including when scaled to zero).
+			var observation targets.RestartObservation
+			observation, err = hub.ObserveWorkloadRestarts(second, targets.RestartRequest{WorkloadRequest: targets.WorkloadRequest{ClusterID: work.Target.ClusterID, Namespace: "app", Kind: "Deployment", Name: "app"}})
+			if err == nil && (observation.Workload.UID != work.Target.WorkloadUID || len(observation.Pods) != 0) {
+				err = targets.ErrUnavailable
+			}
+		} else {
+			_, err = hub.ResolvePod(second, resolved.Request)
+		}
 		result <- err
 	}()
-	if phase == "current-check" {
+	if phase == "current-check" || history {
 		select {
 		case <-entered:
 		case err := <-result:
 			t.Fatal("second query did not reach its fresh peer check", err)
 		case <-time.After(time.Second):
 			t.Fatal("second query peer check did not start")
+		}
+		if phase == "history-stream-cutoff" || phase == "history-read-cutoff" {
+			// Induce a real HTTP/2 write cutoff while the second query owns
+			// its current route check. This identifies a diagnostic boundary;
+			// it does not establish why the installed stream was interrupted.
+			owner := <-controller
+			deadline := owner.SetWriteDeadline
+			want := "restarts/read/http2-deadline"
+			if phase == "history-read-cutoff" {
+				// Go1.27 wraps the read-timeout sentinel; it has neither
+				// Timeout nor As and requires the standard Is/Unwrap path.
+				deadline = owner.SetReadDeadline
+				want = "restarts/read/deadline"
+			}
+			if err := deadline(time.Now().Add(20 * time.Millisecond)); err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case err := <-result:
+				// A write timeout closes the HTTP2 stream and cancels its
+				// request context concurrently with delivering the body error.
+				// Either owner cancellation or the read can win first; a read
+				// timeout only closes the body pipe, so its read class is exact.
+				matched := lastEvent == want || phase == "history-stream-cutoff" && lastEvent == "restarts/owner/canceled"
+				if !errors.Is(err, value.ErrUnavailable) || !matched || second.Err() != nil {
+					t.Fatal("history stream cutoff was not a closed target refusal within original caller time", lastEvent, err, second.Err())
+				}
+			case <-second.Done():
+				t.Fatal("cutoff did not cancel and join the current route read")
+			}
+			return
 		}
 		// Cross only the completed first query's bound. The current query, its
 		// current proof, and the original passive residence still have time.

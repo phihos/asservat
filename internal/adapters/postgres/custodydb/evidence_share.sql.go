@@ -330,7 +330,7 @@ func (q *Queries) ListReceivedShares(ctx context.Context, arg ListReceivedShares
 }
 
 const lockPolicySharingAcceptance = `-- name: LockPolicySharingAcceptance :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing' FOR UPDATE
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key, collected_bytes_spent, observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing' FOR UPDATE
 `
 
 type LockPolicySharingAcceptanceParams struct {
@@ -362,6 +362,8 @@ func (q *Queries) LockPolicySharingAcceptance(ctx context.Context, arg LockPolic
 		&i.SharingRevokeKey,
 		&i.SharingStoppedAt,
 		&i.SharingStopKey,
+		&i.CollectedBytesSpent,
+		&i.ObservedBytesSpent,
 	)
 	return i, err
 }
@@ -380,7 +382,7 @@ func (q *Queries) LockShareArtifact(ctx context.Context, artifactKey string) err
 
 const readPolicySharingAcceptance = `-- name: ReadPolicySharingAcceptance :one
 
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing'
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key, collected_bytes_spent, observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing'
 `
 
 type ReadPolicySharingAcceptanceParams struct {
@@ -411,6 +413,8 @@ func (q *Queries) ReadPolicySharingAcceptance(ctx context.Context, arg ReadPolic
 		&i.SharingRevokeKey,
 		&i.SharingStoppedAt,
 		&i.SharingStopKey,
+		&i.CollectedBytesSpent,
+		&i.ObservedBytesSpent,
 	)
 	return i, err
 }

@@ -13,11 +13,38 @@ package postgres
 var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 	// ADR-217: exact union of the former read, prepare and record credentials.
 	"api-execution": {
+		{"table", "recording_save_group", "", "SELECT"},
+		{"table", "recording_save_group", "progress_revision", "UPDATE"},
+		{"table", "recording_save_group", "cancel_requested_at", "UPDATE"},
+		{"table", "recording_save_group", "cancel_request_key", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_key", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_actor", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_requested_at", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_joined_at", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_proof", "UPDATE"},
+		{"table", "context_capture", "snapshot_cancel_proof_digest", "UPDATE"},
+		{"table", "recording_save_reservation", "", "SELECT"},
+		{"table", "policy_recording_source", "", "SELECT"},
+		{"table", "policy_recording_source", "root_id", "UPDATE"}, // retained source row lock only
+		// Original policy reservation and grant are rechecked before effects.
+		{"table", "policy_occurrence", "", "SELECT"},
+		{"table", "policy_acceptance", "", "SELECT"},
+		{"table", "policy_source", "", "SELECT"},
+		{"table", "access_grant", "", "SELECT"},
+		{"table", "access_grant", "id", "UPDATE"},
+		// ADR-261 finite policy-only once-only input reservation, not renewals.
+		{"table", "access_grant", "policy_observed_bytes_spent", "UPDATE"},
+		{"table", "policy_acceptance", "observed_bytes_spent", "UPDATE"},
+		{"table", "policy_observation_session", "", "SELECT"},
+		{"table", "policy_observation_session", "", "INSERT"},
 		{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"},
 		{"schema", "public", "", "USAGE"},
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_capture", "id", "UPDATE"},
+		{"table", "context_capture", "snapshot_coverage", "UPDATE"},
+		{"table", "context_capture", "snapshot_coverage_digest", "UPDATE"},
+		{"table", "context_capture", "snapshot_expectation_digest", "UPDATE"},
 		{"table", "context_execution", "", "SELECT"},
 		{"table", "context_execution", "acquired_at", "UPDATE"},
 		{"table", "context_execution", "attempt_id", "INSERT"},

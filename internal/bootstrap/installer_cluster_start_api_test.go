@@ -230,6 +230,7 @@ func installerClusterStartAPIArgs(t *testing.T, server *httptest.Server, executo
 	args := []string{"--kubeconfig", kubeconfig, "--offer", writeJSON("offer.json", offer), "--bootstrap", writeJSON("bootstrap.json", record)}
 	if executor {
 		args = append(args, "--evidence-credential", writeJSON("evidence.json", map[string]string{"accessKeyID": "synthetic", "secretAccessKey": "synthetic-secret", "sessionToken": ""}))
+		args = append(args, "--history-credential", writeJSON("history.json", map[string]string{"accessKeyID": "synthetic-history", "secretAccessKey": "synthetic-history-secret", "sessionToken": ""}))
 	}
 	return args
 }

@@ -1,6 +1,6 @@
 {
   "name": "list_capture_history",
-  "description": "List recent accepted pod-status captures of a currently authorized named workload, newest first, for seven days after acceptance: your own requests and those whose retained audience you currently belong to. Origin manual (default), policy or all; at most limit entries (default 20, maximum 100) and next_cursor for more. A recreated workload starts a new history. Repeat one with preview_capture history_capture_id. No evidence or settings are read.",
+  "description": "List recent accepted pod-status captures of a currently authorized named workload, newest first, for seven days after acceptance: your own requests and those whose retained audience you currently belong to. Origin manual (default), policy, discovery or all; at most limit entries (default 20, maximum 100) and next_cursor for more. A recreated workload starts a new history. Repeat one with preview_capture history_capture_id. No evidence or settings are read.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -47,6 +47,7 @@
         "enum": [
           "manual",
           "policy",
+          "discovery",
           "all"
         ]
       },
@@ -314,6 +315,34 @@
             "enum": [
               "collect",
               "recordingSave"
+            ]
+          },
+          "requester": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "issuer": {
+                "type": "string",
+                "format": "uri",
+                "maxLength": 2048
+              },
+              "subject_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "identity_type": {
+                "enum": [
+                  "human",
+                  "service",
+                  "policy"
+                ]
+              }
+            },
+            "required": [
+              "issuer",
+              "subject_id",
+              "identity_type"
             ]
           }
         },
