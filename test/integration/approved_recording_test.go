@@ -179,7 +179,7 @@ func qualifyCompositionGroup(t *testing.T, ctx context.Context, admin *pgxpool.P
 	composition := planvalue.ProfileComposition{Components: []planvalue.ProfileComponent{
 		{ID: "net", Profile: planvalue.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}, Edits: []planvalue.ProfileEdit{{ActionID: "sample", Field: "packetAfter", Text: "2s"}}},
 		{ID: "calls", Profile: planvalue.ProfileRef{Catalog: "builtin", Name: "syscall-activity", Version: "v1"}, Edits: []planvalue.ProfileEdit{{ActionID: "syscalls", Field: "actionExecutionMode", Text: "onTrigger"}, {ActionID: "syscalls", Field: "syscallBefore", Text: "0s"}, {ActionID: "syscalls", Field: "syscallAfter", Text: "2s"}}},
-	}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
+	}, MaxTotalBytes: 32 << 20, MaxDuration: "30s"}
 	parts, err := planning.SplitComposition(composition, recordingCompiler{})
 	if err != nil || len(parts) != 2 {
 		t.Fatal("split", err)
