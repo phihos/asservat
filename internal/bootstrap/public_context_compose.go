@@ -403,6 +403,13 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		// ADR-243: libpcap only in a hub build with the libpcap tag; otherwise a stub.
 		Filters:  pcap.NewCompiler(),
 		Lifetime: time.Duration(p.PreviewSeconds) * time.Second}
+	// REQ-CPR-001: organization capture profiles are published in the
+	// protected hub namespace; the hub reads them with its observer client.
+	profiles, err := kube.NewCaptureProfileCatalog(observer, control)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.investigation.Profiles = profiles
 
 	completed, err := postgres.NewCaptureOperationIntents(ctx, sql["capture-intent-read"], root)
 	if err != nil {
