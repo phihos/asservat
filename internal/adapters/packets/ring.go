@@ -261,7 +261,11 @@ func (r *Ring) Add(frame []byte, wire uint32, at, observedAt time.Time) error {
 	}
 	s := r.segment(r.write)
 	used := int(ringEndian.Uint32(s))
-	if used+size > len(s)-ringSegmentHeader {
+	// A segment also spans at most MaxAge/MaxSegments, so age eviction of its
+	// oldest record never takes much newer sparse records with it: the ring
+	// keeps at least MaxAge minus one slice of history.
+	slice := int64(r.limits.MaxAge / time.Duration(r.limits.MaxSegments))
+	if used+size > len(s)-ringSegmentHeader || used > 0 && at.UnixNano()-int64(ringEndian.Uint64(s[8:])) >= slice {
 		r.write = (r.write + 1) % r.limits.MaxSegments
 		r.evict(r.write)
 		s = r.segment(r.write)

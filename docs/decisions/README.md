@@ -1065,3 +1065,4 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-271: two context-start standbys per cluster](271-two-standbys-per-cluster.md): maintainer reopened ADR-209; join reserves two per cluster, the region keeps two staggered exchanges per owner and an exhausted standby retires only beside another; installed qualification pending.
 
 - [ADR-272: advisory history after the start](272-advisory-history-after-start.md): starts take priority; history follows with its own at-most-five-second budget inside the original request window; unit tests pass, installed qualification pending.
+- [ADR-274: time-sliced ring segments](274-time-sliced-ring-segments.md): segments also rotate after MaxAge/MaxSegments, so sparse recent records never age out with an old one; at least MaxAge minus one slice of history.
