@@ -81,7 +81,7 @@ func (f *recorderFixture) groupPreview(in value.ContextIntent, target targets.Po
 		if err != nil {
 			return app.RecorderPreviewResult{}, err
 		}
-		plan, err := compiler.CompileRecorder(planning.RecorderInput{CaptureID: "00000000-0000-4000-8000-00000000005" + string(rune('0'+n)), Executor: f.i.Principal, Target: target, Composition: c, Retention: r, Deadline: now.Add(time.Minute), NodeRecorder: true}, oneInstruction{}, now)
+		plan, err := compiler.CompileRecorder(planning.RecorderInput{CaptureID: "00000000-0000-4000-8000-00000000005" + string(rune('0'+n)), Executor: f.i.Principal, Target: target, Composition: c, Retention: r, Deadline: now.Add(time.Minute), NodeRecorder: true, RequireApproval: true}, oneInstruction{}, now)
 		if err != nil {
 			return app.RecorderPreviewResult{}, err
 		}
@@ -107,7 +107,7 @@ func (f *recorderFixture) groupPreview(in value.ContextIntent, target targets.Po
 // contract with both actions in one review.
 func TestCompositionGroupPreviewWire(t *testing.T) {
 	s, f := recorderOperations(t, true)
-	in := `{` + wireTarget + `,"requested_retention_seconds":3600,"profile_composition":{"components":[{"id":"net","profileRef":{"catalog":"builtin","name":"network-connections","version":"v1"},"overrides":[{"actionID":"sample","field":"packetAfter","value":"5s"}]},{"id":"calls","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"},"overrides":[{"actionID":"syscalls","field":"actionExecutionMode","value":"onTrigger"},{"actionID":"syscalls","field":"syscallBefore","value":"0s"},{"actionID":"syscalls","field":"syscallAfter","value":"5s"}]}],"maxTotalBytes":33554432,"maxDuration":"30s"}}`
+	in := `{` + wireTarget + `,"requested_retention_seconds":3600,"profile_composition":{"components":[{"id":"net","profileRef":{"catalog":"builtin","name":"network-connections","version":"v1"},"overrides":[{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"},{"actionID":"sample","field":"packetAfter","value":"5s"},{"actionID":"sample","field":"actionTimeout","value":"15s"}]},{"id":"calls","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"},"overrides":[{"actionID":"syscalls","field":"actionExecutionMode","value":"onTrigger"},{"actionID":"syscalls","field":"syscallBefore","value":"0s"},{"actionID":"syscalls","field":"syscallAfter","value":"5s"},{"actionID":"syscalls","field":"actionTimeout","value":"15s"}]}],"maxTotalBytes":33554432,"maxDuration":"15s"}}`
 	reply, err := s.Call(t.Context(), f, "preview_capture", []byte(in))
 	if err != nil {
 		t.Fatal(err)

@@ -173,7 +173,11 @@ func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResu
 		// ADR-249: an individual approval precedes any observation.
 		view := &recorderApprovalView{}
 		for _, r := range result.Plan.Approval.Reasons {
-			view.reasons = append(view.reasons, r.Code+" ("+r.ActionID+")")
+			// Codes only, once each: the blocker message is bounded and an
+			// ADR-276 group repeats a code per action; the review lists actions.
+			if !slices.Contains(view.reasons, r.Code) {
+				view.reasons = append(view.reasons, r.Code)
+			}
 		}
 		blockers = append([]OperationBlocker{approvalRequiredBlocker(view)}, blockers...)
 		if l := result.Plan.Approval.ObservationLimits; l != nil {
