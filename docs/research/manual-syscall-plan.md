@@ -23,9 +23,10 @@ reusing the ongoing syscall engine (ADR-273).
 - The node runs the existing `syscallEngine` for the duration with a local
   events-per-second limiter (no source permit exists for a finite run) and
   encodes JSON Lines with `syscalls.AppendEvent`.
-- A quiet interval succeeds with an empty file: zero calls is a valid result
-  of an explicit manual request (source windows keep their own rule). The
-  manifest already accepts an empty syscall file.
+- A quiet interval (no retained call) reports failure for now, like an empty
+  source window: a result needs bytes (`PacketResult.Valid`) and an empty
+  native upload is unqualified. Revisit with native evidence if quiet Pods
+  matter.
 - Availability: `targets.RecorderRequest` gains `Syscall`; the region selects
   the syscall mechanism. An older region answering for packets still fails
   safe at start (its `Recording.Valid` refuses the kind).
