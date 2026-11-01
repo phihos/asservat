@@ -2,6 +2,7 @@ package capture
 
 import (
 	"context"
+	"errors"
 
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -32,6 +33,12 @@ func (t PolicyTrigger) captureSourceSnapshot(ctx context.Context, current identi
 	}
 	preview, err := t.SourceSnapshots.PreviewPolicySnapshot(ctx, current, PolicySnapshotSelection{Policy: p, Authority: a, Source: *selected, Target: selected.Target.Request, TriggeredAt: occurrence.TriggeredAt})
 	if err != nil {
+		// The closed refusal is the recorded outcome; the fixed preview
+		// stage only names where it failed.
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			t.report("occurrence-preview/" + fixed.FixedStep())
+		}
 		return "", refusalFor(err)
 	}
 	if preview.Preview.Target.PodUID != occurrence.PodUID || preview.Preview.Actor != a.Executor || preview.Preview.Intent.Snapshot == nil || !preview.Preview.Intent.Snapshot.Request.T0.Equal(occurrence.TriggeredAt) {
