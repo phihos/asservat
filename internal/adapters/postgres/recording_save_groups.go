@@ -206,7 +206,7 @@ func (s *ContextAdmissions) AdmitRecordingSaveGroup(ctx context.Context, in valu
 			ids[n] = id(children[n].Plan.Input.CaptureID)
 		}
 		first := reservations[0].manual
-		header, err := q.InsertRecordingSaveGroup(ctx, custodydb.InsertRecordingSaveGroupParams{ID: id(p.CaptureID), RootID: id(s.root), PreviewID: id(p.ID), RequestKey: contextRequestKey(p.Actor, in.IdempotencyKey), SubmissionDigest: in.SubmissionDigest[:], ScopeDigest: p.ScopeDigest[:], ScopeJson: p.CanonicalScope, PolicyUid: p.Group.PolicyUID, AcceptanceID: first.acceptanceID, AllocationID: id(p.Storage.AllocationID), ChildIds: ids, AcceptedAt: ts(acceptedAt), Deadline: ts(deadline)})
+		header, err := q.InsertRecordingSaveGroup(ctx, custodydb.InsertRecordingSaveGroupParams{ID: id(p.CaptureID), RootID: id(s.root), PreviewID: id(p.ID), RequestKey: contextRequestKey(p.Actor, in.IdempotencyKey), SubmissionDigest: in.SubmissionDigest[:], ScopeDigest: p.ScopeDigest[:], ScopeJson: p.CanonicalScope, PolicyUid: pgtype.Text{String: p.Group.PolicyUID, Valid: true}, AcceptanceID: first.acceptanceID, AllocationID: id(p.Storage.AllocationID), ChildIds: ids, AcceptedAt: ts(acceptedAt), Deadline: ts(deadline)})
 		if err != nil {
 			return err
 		}

@@ -12,7 +12,7 @@ import (
 )
 
 const findRecordingSaveGroup = `-- name: FindRecordingSaveGroup :one
-SELECT id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key FROM recording_save_group WHERE root_id=$1 AND request_key=$2
+SELECT id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key, group_kind FROM recording_save_group WHERE root_id=$1 AND request_key=$2
 `
 
 type FindRecordingSaveGroupParams struct {
@@ -40,12 +40,13 @@ func (q *Queries) FindRecordingSaveGroup(ctx context.Context, arg FindRecordingS
 		&i.ProgressRevision,
 		&i.CancelRequestedAt,
 		&i.CancelRequestKey,
+		&i.GroupKind,
 	)
 	return i, err
 }
 
 const findRecordingSaveGroupByPreview = `-- name: FindRecordingSaveGroupByPreview :one
-SELECT id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key FROM recording_save_group WHERE root_id=$1 AND preview_id=$2
+SELECT id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key, group_kind FROM recording_save_group WHERE root_id=$1 AND preview_id=$2
 `
 
 type FindRecordingSaveGroupByPreviewParams struct {
@@ -73,6 +74,7 @@ func (q *Queries) FindRecordingSaveGroupByPreview(ctx context.Context, arg FindR
 		&i.ProgressRevision,
 		&i.CancelRequestedAt,
 		&i.CancelRequestKey,
+		&i.GroupKind,
 	)
 	return i, err
 }
@@ -113,7 +115,7 @@ func (q *Queries) InsertRecordingGroupPreview(ctx context.Context, arg InsertRec
 
 const insertRecordingSaveGroup = `-- name: InsertRecordingSaveGroup :one
 INSERT INTO recording_save_group(id,root_id,preview_id,request_key,submission_digest,scope_digest,scope_json,policy_uid,acceptance_id,allocation_id,child_ids,accepted_at,deadline)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key, group_kind
 `
 
 type InsertRecordingSaveGroupParams struct {
@@ -124,7 +126,7 @@ type InsertRecordingSaveGroupParams struct {
 	SubmissionDigest []byte
 	ScopeDigest      []byte
 	ScopeJson        []byte
-	PolicyUid        string
+	PolicyUid        pgtype.Text
 	AcceptanceID     pgtype.UUID
 	AllocationID     pgtype.UUID
 	ChildIds         []pgtype.UUID
@@ -166,12 +168,13 @@ func (q *Queries) InsertRecordingSaveGroup(ctx context.Context, arg InsertRecord
 		&i.ProgressRevision,
 		&i.CancelRequestedAt,
 		&i.CancelRequestKey,
+		&i.GroupKind,
 	)
 	return i, err
 }
 
 const lockRecordingSaveGroup = `-- name: LockRecordingSaveGroup :one
-SELECT id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key FROM recording_save_group WHERE root_id=$1 AND id=$2 FOR UPDATE
+SELECT id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key, group_kind FROM recording_save_group WHERE root_id=$1 AND id=$2 FOR UPDATE
 `
 
 type LockRecordingSaveGroupParams struct {
@@ -199,6 +202,7 @@ func (q *Queries) LockRecordingSaveGroup(ctx context.Context, arg LockRecordingS
 		&i.ProgressRevision,
 		&i.CancelRequestedAt,
 		&i.CancelRequestKey,
+		&i.GroupKind,
 	)
 	return i, err
 }
@@ -237,7 +241,7 @@ func (q *Queries) ReadRecordingGroupHistoryFacts(ctx context.Context, arg ReadRe
 }
 
 const readRecordingSaveGroup = `-- name: ReadRecordingSaveGroup :one
-SELECT id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key FROM recording_save_group WHERE root_id=$1 AND id=$2
+SELECT id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key, group_kind FROM recording_save_group WHERE root_id=$1 AND id=$2
 `
 
 type ReadRecordingSaveGroupParams struct {
@@ -265,6 +269,7 @@ func (q *Queries) ReadRecordingSaveGroup(ctx context.Context, arg ReadRecordingS
 		&i.ProgressRevision,
 		&i.CancelRequestedAt,
 		&i.CancelRequestKey,
+		&i.GroupKind,
 	)
 	return i, err
 }
@@ -349,7 +354,7 @@ func (q *Queries) ReadRecordingSaveGroupChildren(ctx context.Context, arg ReadRe
 
 const requestRecordingSaveGroupCancellation = `-- name: RequestRecordingSaveGroupCancellation :one
 UPDATE recording_save_group SET cancel_requested_at=clock_timestamp(),cancel_request_key=$3,progress_revision=progress_revision+1
-WHERE root_id=$1 AND id=$2 AND cancel_requested_at IS NULL AND progress_revision=$4 RETURNING id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key
+WHERE root_id=$1 AND id=$2 AND cancel_requested_at IS NULL AND progress_revision=$4 RETURNING id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key, group_kind
 `
 
 type RequestRecordingSaveGroupCancellationParams struct {
@@ -384,6 +389,7 @@ func (q *Queries) RequestRecordingSaveGroupCancellation(ctx context.Context, arg
 		&i.ProgressRevision,
 		&i.CancelRequestedAt,
 		&i.CancelRequestKey,
+		&i.GroupKind,
 	)
 	return i, err
 }
