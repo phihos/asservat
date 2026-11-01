@@ -2,6 +2,7 @@ package capture
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"asservat.local/asservat/internal/domain/authorization"
@@ -46,5 +47,27 @@ func TestTriggerRecordsOutcomeAfterRunCancellation(t *testing.T) {
 	PolicyTrigger{Ledger: l}.run(ctx, authorization.AcceptedPolicyAuthority{}, value.RestartPolicy{}, targets.RestartObservation{}, []value.PolicyOccurrence{{ID: "occurrence", PodUID: "gone"}})
 	if len(l.recorded) != 1 || l.recorded[0] != "unavailable" || l.err != nil {
 		t.Fatal("outcome not recorded after cancellation", l.recorded, l.err)
+	}
+}
+
+// REQ-LIF-002: a failed ongoing-source maintenance (for example a restart
+// that closed the source) never hides the occurrence it accompanies.
+func TestOccurrencesAfterMaintainFailureStillAdmitted(t *testing.T) {
+	maintain := errors.New("maintain: source closed")
+	ticked := 0
+	tick := func() ([]value.PolicyOccurrence, error) {
+		ticked++
+		return []value.PolicyOccurrence{{ID: "occurrence"}}, nil
+	}
+	got, err := occurrencesAfterMaintain(maintain, false, tick)
+	if ticked != 1 || len(got) != 1 || !errors.Is(err, maintain) {
+		t.Fatal("maintenance failure hid the occurrence", got, err)
+	}
+	if got, err = occurrencesAfterMaintain(maintain, true, tick); ticked != 1 || got != nil || !errors.Is(err, maintain) {
+		t.Fatal("busy policy evaluated a new occurrence", got, err)
+	}
+	ledger := errors.New("ledger")
+	if got, err = occurrencesAfterMaintain(maintain, false, func() ([]value.PolicyOccurrence, error) { return nil, ledger }); got != nil || !errors.Is(err, maintain) || !errors.Is(err, ledger) {
+		t.Fatal("ledger failure lost an error", got, err)
 	}
 }

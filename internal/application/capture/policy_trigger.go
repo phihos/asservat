@@ -289,16 +289,12 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 		if t.SourceSnapshots == nil {
 			return value.ErrRecorderUnavailable
 		}
-		if r != nil && r.running(p.PolicyUID) {
-			return maintainErr
-		}
 	}
-	occurrences, err := t.Ledger.Tick(tick, value.PolicyTick{Policy: compiled, Authority: a, Observation: observation})
-	if err != nil {
-		return errors.Join(maintainErr, err)
-	}
+	occurrences, err := occurrencesAfterMaintain(maintainErr, ongoing && r != nil && r.running(p.PolicyUID), func() ([]value.PolicyOccurrence, error) {
+		return t.Ledger.Tick(tick, value.PolicyTick{Policy: compiled, Authority: a, Observation: observation})
+	})
 	if len(occurrences) == 0 {
-		return maintainErr
+		return err
 	}
 	var authored struct {
 		Target json.RawMessage `json:"target"`
@@ -316,6 +312,21 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 		r.start(p.PolicyUID, func() { t.run(ctx, a, compiled, observation, occurrences) })
 	}
 	return maintainErr
+}
+
+// occurrencesAfterMaintain evaluates occurrences whether or not ongoing source
+// maintenance failed (REQ-LIF-002), unless the policy's previous incident is
+// still running. A maintenance error is reported with, never instead of, the
+// admitted occurrences.
+func occurrencesAfterMaintain(maintainErr error, busy bool, tick func() ([]value.PolicyOccurrence, error)) ([]value.PolicyOccurrence, error) {
+	if busy {
+		return nil, maintainErr
+	}
+	occurrences, err := tick()
+	if err != nil {
+		return nil, errors.Join(maintainErr, err)
+	}
+	return occurrences, maintainErr
 }
 
 // run captures each admitted occurrence once, in order, and records it.
