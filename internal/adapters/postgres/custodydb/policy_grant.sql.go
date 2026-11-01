@@ -265,6 +265,47 @@ func (q *Queries) LockPolicyCaptureOccurrence(ctx context.Context, arg LockPolic
 	return i, err
 }
 
+const lockPolicyCaptureOccurrenceAt = `-- name: LockPolicyCaptureOccurrenceAt :one
+SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector, reserved_capture_id, grant_id, reserved_bytes FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND created_at=$4 FOR UPDATE
+`
+
+type LockPolicyCaptureOccurrenceAtParams struct {
+	RootID    pgtype.UUID
+	PolicyUid string
+	PodUid    string
+	CreatedAt pgtype.Timestamptz
+}
+
+// ADR-275: a further recorder's capture names its occurrence by the
+// occurrence's own trigger time (the snapshot T0), policy and Pod.
+func (q *Queries) LockPolicyCaptureOccurrenceAt(ctx context.Context, arg LockPolicyCaptureOccurrenceAtParams) (PolicyOccurrence, error) {
+	row := q.db.QueryRow(ctx, lockPolicyCaptureOccurrenceAt,
+		arg.RootID,
+		arg.PolicyUid,
+		arg.PodUid,
+		arg.CreatedAt,
+	)
+	var i PolicyOccurrence
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.PolicyUid,
+		&i.AcceptanceID,
+		&i.ClusterID,
+		&i.WorkloadUid,
+		&i.PodUid,
+		&i.Restarts,
+		&i.CreatedAt,
+		&i.CaptureID,
+		&i.Outcome,
+		&i.Detector,
+		&i.ReservedCaptureID,
+		&i.GrantID,
+		&i.ReservedBytes,
+	)
+	return i, err
+}
+
 const readPolicyCaptureReservation = `-- name: ReadPolicyCaptureReservation :one
 SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector, reserved_capture_id, grant_id, reserved_bytes FROM policy_occurrence WHERE root_id=$1 AND reserved_capture_id=$2
 `

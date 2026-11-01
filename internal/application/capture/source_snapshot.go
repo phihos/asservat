@@ -49,8 +49,6 @@ type PolicySnapshotSelection struct {
 	Source      PolicySourceState
 	Target      targets.Request
 	TriggeredAt time.Time
-	// OccurrenceID marks a further recorder's incident capture (ADR-275).
-	OccurrenceID string
 }
 
 // PreviewPolicySnapshot prepares only the requested existing-source window.
@@ -137,7 +135,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	if !request.Valid() {
 		return zero, planning.ContextPlan{}, value.ErrAcquisitionClosed
 	}
-	selected := &planning.SourceSnapshotContext{Request: request, ActionID: source.Binding.ActionID, PolicyUID: a.PolicyUID, TriggerKind: "policy", ActionKind: snapshotActionKind(rec.Action.Kind), OccurrenceID: selection.OccurrenceID, ExecutionDigest: a.ScopeDigest, RecipeDigest: rec.RecipeDigest, SourceAudience: slices.Clone(source.Audience), SourceAudienceDigest: audienceDigest, SourceTarget: source.Target}
+	selected := &planning.SourceSnapshotContext{Request: request, ActionID: source.Binding.ActionID, PolicyUID: a.PolicyUID, TriggerKind: "policy", ActionKind: snapshotActionKind(rec.Action.Kind), ExecutionDigest: a.ScopeDigest, RecipeDigest: rec.RecipeDigest, SourceAudience: slices.Clone(source.Audience), SourceAudienceDigest: audienceDigest, SourceTarget: source.Target}
 	if manual != nil {
 		selected.PolicyName = selection.PolicyName
 	}

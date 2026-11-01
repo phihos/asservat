@@ -65,6 +65,11 @@ WHERE root_id=sqlc.arg(root_id)::uuid AND policy_uid=sqlc.arg(policy_uid)::text 
 -- name: LockPolicyCaptureOccurrence :one
 SELECT * FROM policy_occurrence WHERE root_id=$1 AND id=$2 FOR UPDATE;
 
+-- name: LockPolicyCaptureOccurrenceAt :one
+-- ADR-275: a further recorder's capture names its occurrence by the
+-- occurrence's own trigger time (the snapshot T0), policy and Pod.
+SELECT * FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND created_at=$4 FOR UPDATE;
+
 -- name: ReadPolicyCaptureReservation :one
 SELECT * FROM policy_occurrence WHERE root_id=$1 AND reserved_capture_id=$2;
 

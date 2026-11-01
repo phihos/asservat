@@ -64,9 +64,9 @@ func TestPolicySourceSnapshotDispatchKeepsOccurrenceAnchorAndUnknownReceipt(t *t
 }
 
 // ADR-275: an incident of a packet + syscall policy captures each recorder's
-// window of the triggering Pod. The first is the occurrence's capture under
-// the occurrence key; the further one names its occurrence and uses the
-// derived key, so a retry never takes a second execution.
+// window of the triggering Pod at the same T0. The first is the occurrence's
+// capture under the occurrence key; the further one uses the derived key
+// (SQL finds its occurrence by T0), so a retry never takes a second execution.
 func TestPolicySourceSnapshotCapturesEveryRecorder(t *testing.T) {
 	cohort := newSourceCohortFixture(t, 1)
 	composition := networkComposition()
@@ -95,8 +95,8 @@ func TestPolicySourceSnapshotCapturesEveryRecorder(t *testing.T) {
 		t.Fatal("incident did not capture every recorder", id, refusal, service.requests)
 	}
 	first, further := service.selections[0], service.selections[1]
-	if first.OccurrenceID != "" || service.keys[0] != occurrence.ID || first.Source.Binding.ActionID != all[0].Action.ID ||
-		further.OccurrenceID != occurrence.ID || service.keys[1] != value.OccurrenceCaptureKey(occurrence.ID, all[1].Action.ID) || further.Source.Binding.ActionID != all[1].Action.ID {
+	if service.keys[0] != occurrence.ID || first.Source.Binding.ActionID != all[0].Action.ID || !first.TriggeredAt.Equal(occurrence.TriggeredAt) ||
+		service.keys[1] != value.OccurrenceCaptureKey(occurrence.ID, all[1].Action.ID) || further.Source.Binding.ActionID != all[1].Action.ID || !further.TriggeredAt.Equal(occurrence.TriggeredAt) {
 		t.Fatal("recorder captures not keyed per occurrence and action", service.keys)
 	}
 }

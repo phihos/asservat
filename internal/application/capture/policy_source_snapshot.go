@@ -20,9 +20,9 @@ func (t PolicyTrigger) captureSourceSnapshot(ctx context.Context, current identi
 	}
 	// ADR-275: the first recorder's capture is the occurrence's outcome; each
 	// further recorder's capture is its own idempotent child of the occurrence.
-	captureID, refusal := t.snapshotRecorder(ctx, current, a, p, o, pod, occurrence, rows, p.Recorder.Action.ID, "", occurrence.ID)
+	captureID, refusal := t.snapshotRecorder(ctx, current, a, p, o, pod, occurrence, rows, p.Recorder.Action.ID, occurrence.ID)
 	for _, r := range p.MoreRecorders {
-		if _, childRefusal := t.snapshotRecorder(ctx, current, a, p, o, pod, occurrence, rows, r.Action.ID, occurrence.ID, value.OccurrenceCaptureKey(occurrence.ID, r.Action.ID)); childRefusal != "" {
+		if _, childRefusal := t.snapshotRecorder(ctx, current, a, p, o, pod, occurrence, rows, r.Action.ID, value.OccurrenceCaptureKey(occurrence.ID, r.Action.ID)); childRefusal != "" {
 			t.report("occurrence-child/" + childRefusal)
 		}
 	}
@@ -30,8 +30,8 @@ func (t PolicyTrigger) captureSourceSnapshot(ctx context.Context, current identi
 }
 
 // snapshotRecorder captures one recorder's source window of the triggering
-// Pod; parent names the occurrence of a further recorder's capture.
-func (t PolicyTrigger) snapshotRecorder(ctx context.Context, current identities.CurrentIdentity, a authorization.AcceptedPolicyAuthority, p value.RestartPolicy, o targets.RestartObservation, pod string, occurrence value.PolicyOccurrence, rows []PolicySourceState, action, parent, key string) (string, string) {
+// Pod under key: the occurrence ID, or a further recorder's derived key.
+func (t PolicyTrigger) snapshotRecorder(ctx context.Context, current identities.CurrentIdentity, a authorization.AcceptedPolicyAuthority, p value.RestartPolicy, o targets.RestartObservation, pod string, occurrence value.PolicyOccurrence, rows []PolicySourceState, action, key string) (string, string) {
 	var selected *PolicySourceState
 	for n := range rows {
 		row := &rows[n]
@@ -45,7 +45,7 @@ func (t PolicyTrigger) snapshotRecorder(ctx context.Context, current identities.
 	if selected == nil || selected.Target == nil || selected.Target.Request.PodName != pod || selected.Target.Request.ClusterID != o.ClusterID || selected.Target.Request.Namespace != o.Namespace || selected.Target.Request.Workload != o.Workload {
 		return "", "unavailable"
 	}
-	preview, err := t.SourceSnapshots.PreviewPolicySnapshot(ctx, current, PolicySnapshotSelection{Policy: p, Authority: a, Source: *selected, Target: selected.Target.Request, TriggeredAt: occurrence.TriggeredAt, OccurrenceID: parent})
+	preview, err := t.SourceSnapshots.PreviewPolicySnapshot(ctx, current, PolicySnapshotSelection{Policy: p, Authority: a, Source: *selected, Target: selected.Target.Request, TriggeredAt: occurrence.TriggeredAt})
 	if err != nil {
 		// The closed refusal is the recorded outcome; the fixed preview
 		// stage only names where it failed.

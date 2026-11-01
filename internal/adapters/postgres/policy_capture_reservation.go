@@ -12,6 +12,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -56,16 +57,18 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 			return nil, err
 		}
 	} else {
-		key := a.IdempotencyKey
-		if s := a.Plan.Input.Snapshot; s != nil && s.OccurrenceID != "" {
-			// ADR-275: a further recorder's capture of the same occurrence,
-			// idempotent on a key derived from occurrence and action.
-			if !authorization.UUID(s.OccurrenceID) || a.IdempotencyKey != value.OccurrenceCaptureKey(s.OccurrenceID, s.ActionID) {
+		occurrence, err = q.LockPolicyCaptureOccurrence(ctx, custodydb.LockPolicyCaptureOccurrenceParams{RootID: id(a.RootID), ID: id(a.IdempotencyKey)})
+		if errors.Is(err, pgx.ErrNoRows) && a.Plan.Input.Snapshot != nil && a.Plan.Input.Snapshot.TriggerKind == "policy" {
+			// ADR-275: a further recorder's capture of the occurrence whose
+			// trigger time is this snapshot's T0, idempotent on a key derived
+			// from that occurrence and the action; the plan is unchanged.
+			s := a.Plan.Input.Snapshot
+			occurrence, err = q.LockPolicyCaptureOccurrenceAt(ctx, custodydb.LockPolicyCaptureOccurrenceAtParams{RootID: id(a.RootID), PolicyUid: policy, PodUid: target.PodUID, CreatedAt: ts(s.Request.T0)})
+			if err == nil && a.IdempotencyKey != value.OccurrenceCaptureKey(uid(occurrence.ID), s.ActionID) {
 				return nil, value.ErrDenied
 			}
-			key, childAction = s.OccurrenceID, s.ActionID
+			childAction = s.ActionID
 		}
-		occurrence, err = q.LockPolicyCaptureOccurrence(ctx, custodydb.LockPolicyCaptureOccurrenceParams{RootID: id(a.RootID), ID: id(key)})
 		if err != nil {
 			return nil, err
 		}
