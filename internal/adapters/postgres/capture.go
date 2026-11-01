@@ -271,6 +271,18 @@ type contextAdmissionGroupOptions struct {
 	PolicyReservation *policyCaptureReservation
 	RequestBounds     *value.GroupRequestBounds
 	Permissions       *recordingGroupFacts
+	// Composition admits child ChildIndex of a manual composition group
+	// (ADR-276): no policy reservation; the parent preview's grant binds it.
+	Composition bool
+	ChildIndex  int
+}
+
+// reviewedGroupChild is the group's per-child review check of its kind.
+func (g *contextAdmissionGroupOptions) reviewedGroupChild(a value.Admission) bool {
+	if g.Composition {
+		return captureapp.ReviewedCompositionGroupChild(g.Preview, g.ChildIndex, a)
+	}
+	return captureapp.ReviewedRecordingSaveGroupChild(g.Preview, a)
 }
 
 func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *custodydb.Queries, previewID string, a value.Admission, topology privacyvalue.PolicyTopology, group *contextAdmissionGroupOptions) (value.Accepted, error) {
@@ -294,7 +306,7 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			}
 		} else {
 			recovery, stream = group.Recovery, group.Stream
-			if group.PolicyReservation == nil || !captureapp.ReviewedRecordingSaveGroupChild(group.Preview, a) {
+			if (group.PolicyReservation == nil) != group.Composition || !group.reviewedGroupChild(a) {
 				return value.ErrChanged
 			}
 		}
@@ -544,8 +556,13 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			}
 			if previewID != "" {
 				if group != nil {
-					if !group.Preview.Current(n.Time) || !captureapp.ReviewedRecordingSaveGroupChild(group.Preview, a) {
+					if !group.Preview.Current(n.Time) || !group.reviewedGroupChild(a) {
 						return value.ErrChanged
+					}
+					if group.Composition {
+						if err := currentReviewedComposition(ctx, q, group.Preview, a); err != nil {
+							return err
+						}
 					}
 				} else if err := currentReviewedContext(ctx, q, reviewed, a); err != nil {
 					return err
@@ -578,8 +595,13 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 
 			if previewID != "" {
 				if group != nil {
-					if !group.Preview.Current(n.Time) || !captureapp.ReviewedRecordingSaveGroupChild(group.Preview, a) {
+					if !group.Preview.Current(n.Time) || !group.reviewedGroupChild(a) {
 						return value.ErrChanged
+					}
+					if group.Composition {
+						if err := currentReviewedComposition(ctx, q, group.Preview, a); err != nil {
+							return err
+						}
 					}
 				} else if err := currentReviewedContext(ctx, q, reviewed, a); err != nil {
 					return err
@@ -620,6 +642,9 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 				return value.ErrInvalid
 			}
 			expected.NativeType, expected.ActionID, expected.Recording = artifact.PCAPNGArtifact, actionID, &recording
+			if group != nil && group.Composition {
+				expected.CompositionGroup = &artifact.CompositionGroupBinding{ParentCaptureID: group.Preview.CaptureID, ChildIndex: group.ChildIndex, ChildCount: len(group.Preview.CompositionGroup.Children)}
+			}
 			if recording.Kind == "syscallTrace" {
 				expected.NativeType = artifact.SyscallRecordsArtifact // B3 manual syscall metadata
 			}
@@ -701,7 +726,11 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		childRequestKey := requestKey(a)
 		if group != nil {
 			groupID = id(group.Preview.CaptureID)
-			ordinal = pgtype.Int2{Int16: int16(a.Plan.Input.Snapshot.Group.ChildIndex), Valid: true}
+			if group.Composition {
+				ordinal = pgtype.Int2{Int16: int16(group.ChildIndex), Valid: true}
+			} else {
+				ordinal = pgtype.Int2{Int16: int16(a.Plan.Input.Snapshot.Group.ChildIndex), Valid: true}
+			}
 			childPreviewID = ""
 			childRequestKey = recordingGroupChildRequestKey(group.Preview.CaptureID, int(ordinal.Int16))
 		}

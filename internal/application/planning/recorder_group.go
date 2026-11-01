@@ -1,7 +1,11 @@
 package planning
 
 import (
+	"bytes"
+	"encoding/hex"
 	"encoding/json"
+
+	"asservat.local/asservat/internal/domain/identity"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/planning"
@@ -60,4 +64,32 @@ func CompileRecorderGroup(captureID string, children []value.RecorderPlan) ([]by
 		return bad()
 	}
 	return b, d, nil
+}
+
+// RecorderGroupScope is the read view of a recorder-group/v1 parent scope.
+type RecorderGroupScope struct {
+	CaptureID    string
+	Executor     identity.Principal
+	ChildCapture []string
+	ChildScope   []artifact.Digest
+}
+
+// ReadRecorderGroupScope strictly reads a canonical parent scope whose
+// digest is d.
+func ReadRecorderGroupScope(scope []byte, d artifact.Digest) (RecorderGroupScope, error) {
+	var out RecorderGroupScope
+	var s recorderGroupScope
+	if c, digest, err := canonical(scope); err != nil || digest != d || !bytes.Equal(c, scope) || strict(scope, &s) != nil || s.Version != RecorderGroupVersion || len(s.Children) < 2 || len(s.Children) > 16 {
+		return out, value.ErrInvalid
+	}
+	out = RecorderGroupScope{CaptureID: s.CaptureID, Executor: identity.Principal{Issuer: s.Executor.Issuer, Subject: s.Executor.Subject, ClientID: s.Executor.ClientID, Kind: identity.Kind(s.Executor.Kind)}}
+	for _, c := range s.Children {
+		b, err := hex.DecodeString(c.ScopeDigest)
+		if err != nil || len(b) != len(artifact.Digest{}) {
+			return RecorderGroupScope{}, value.ErrInvalid
+		}
+		out.ChildCapture = append(out.ChildCapture, c.CaptureID)
+		out.ChildScope = append(out.ChildScope, artifact.Digest(b))
+	}
+	return out, nil
 }

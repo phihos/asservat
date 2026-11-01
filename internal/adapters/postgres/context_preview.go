@@ -55,7 +55,7 @@ func previewRecord(row custodydb.ContextPreview) (value.ContextPreview, error) {
 	}
 	d := json.NewDecoder(bytes.NewReader(row.BlueprintJson))
 	d.DisallowUnknownFields()
-	if d.Decode(&out) != nil || !app.ValidContextPreview(withPreviewReasonEnvelope(out, row.ReasonEnvelope)) || (out.Group == nil && row.PreviewKind != "context") || (out.Group != nil && row.PreviewKind != "recordingSaveGroup") {
+	if d.Decode(&out) != nil || !app.ValidContextPreview(withPreviewReasonEnvelope(out, row.ReasonEnvelope)) || (out.Group == nil && out.CompositionGroup == nil && row.PreviewKind != "context") || (out.Group != nil && row.PreviewKind != "recordingSaveGroup") || (out.CompositionGroup != nil && row.PreviewKind != "compositionGroup") {
 		return value.ContextPreview{}, value.ErrUnavailable
 	}
 	canonical, err := json.Marshal(out)
@@ -144,7 +144,9 @@ func (s *ContextPreviews) CreateContextPreview(ctx context.Context, p value.Cont
 		if count >= value.MaxPreviewsPerPrincipal {
 			return value.ErrCapacity
 		}
-		if p.Group != nil {
+		if p.CompositionGroup != nil {
+			err = q.InsertCompositionGroupPreview(ctx, custodydb.InsertCompositionGroupPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), ReasonEnvelope: p.ReasonEnvelope, BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
+		} else if p.Group != nil {
 			err = q.InsertRecordingGroupPreview(ctx, custodydb.InsertRecordingGroupPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), ReasonEnvelope: p.ReasonEnvelope, BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})
 		} else {
 			err = q.InsertContextPreview(ctx, custodydb.InsertContextPreviewParams{ID: id(p.ID), RootID: id(s.root), CaptureID: id(p.CaptureID), AttemptID: id(p.AttemptID), ActorKey: previewActorKey(p.Actor), PrincipalKey: principalKey(p.Actor), ReasonEnvelope: p.ReasonEnvelope, BlueprintJson: encoded, BlueprintSha256: h[:], CreatedAt: ts(p.CreatedAt), Deadline: ts(p.Deadline)})

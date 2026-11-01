@@ -30,3 +30,12 @@ WHERE root_id=$1 AND id=$2 AND cancel_requested_at IS NULL AND progress_revision
 SELECT h.state,h.visible,h.summary_expires_at,a.state AS custody_state,a.effective_expires_at
 FROM capture_history_parameter h JOIN custody_attempt a ON a.id=h.attempt_id
 WHERE h.root_id=$1 AND h.capture_id=$2;
+
+-- name: InsertCompositionGroupPreview :exec
+-- ADR-276: the reviewed parent of a manual composition group.
+INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline,preview_kind,reason_envelope)
+VALUES($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,'compositionGroup',sqlc.narg(reason_envelope)::bytea);
+
+-- name: InsertCompositionGroup :one
+INSERT INTO recording_save_group(id,root_id,preview_id,request_key,submission_digest,scope_digest,scope_json,policy_uid,acceptance_id,allocation_id,child_ids,accepted_at,deadline,group_kind)
+VALUES($1,$2,$3,$4,$5,$6,$7,NULL,NULL,$8,$9,$10,$11,'composition') RETURNING *;

@@ -79,6 +79,97 @@ func (q *Queries) FindRecordingSaveGroupByPreview(ctx context.Context, arg FindR
 	return i, err
 }
 
+const insertCompositionGroup = `-- name: InsertCompositionGroup :one
+INSERT INTO recording_save_group(id,root_id,preview_id,request_key,submission_digest,scope_digest,scope_json,policy_uid,acceptance_id,allocation_id,child_ids,accepted_at,deadline,group_kind)
+VALUES($1,$2,$3,$4,$5,$6,$7,NULL,NULL,$8,$9,$10,$11,'composition') RETURNING id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key, group_kind
+`
+
+type InsertCompositionGroupParams struct {
+	ID               pgtype.UUID
+	RootID           pgtype.UUID
+	PreviewID        pgtype.UUID
+	RequestKey       []byte
+	SubmissionDigest []byte
+	ScopeDigest      []byte
+	ScopeJson        []byte
+	AllocationID     pgtype.UUID
+	ChildIds         []pgtype.UUID
+	AcceptedAt       pgtype.Timestamptz
+	Deadline         pgtype.Timestamptz
+}
+
+func (q *Queries) InsertCompositionGroup(ctx context.Context, arg InsertCompositionGroupParams) (RecordingSaveGroup, error) {
+	row := q.db.QueryRow(ctx, insertCompositionGroup,
+		arg.ID,
+		arg.RootID,
+		arg.PreviewID,
+		arg.RequestKey,
+		arg.SubmissionDigest,
+		arg.ScopeDigest,
+		arg.ScopeJson,
+		arg.AllocationID,
+		arg.ChildIds,
+		arg.AcceptedAt,
+		arg.Deadline,
+	)
+	var i RecordingSaveGroup
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.PreviewID,
+		&i.RequestKey,
+		&i.SubmissionDigest,
+		&i.ScopeDigest,
+		&i.ScopeJson,
+		&i.PolicyUid,
+		&i.AcceptanceID,
+		&i.AllocationID,
+		&i.ChildIds,
+		&i.AcceptedAt,
+		&i.Deadline,
+		&i.ProgressRevision,
+		&i.CancelRequestedAt,
+		&i.CancelRequestKey,
+		&i.GroupKind,
+	)
+	return i, err
+}
+
+const insertCompositionGroupPreview = `-- name: InsertCompositionGroupPreview :exec
+INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline,preview_kind,reason_envelope)
+VALUES($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,'compositionGroup',$10::bytea)
+`
+
+type InsertCompositionGroupPreviewParams struct {
+	ID              pgtype.UUID
+	RootID          pgtype.UUID
+	CaptureID       pgtype.UUID
+	ActorKey        []byte
+	PrincipalKey    []byte
+	BlueprintJson   []byte
+	BlueprintSha256 []byte
+	CreatedAt       pgtype.Timestamptz
+	Deadline        pgtype.Timestamptz
+	ReasonEnvelope  []byte
+}
+
+// ADR-276: the reviewed parent of a manual composition group.
+func (q *Queries) InsertCompositionGroupPreview(ctx context.Context, arg InsertCompositionGroupPreviewParams) error {
+	_, err := q.db.Exec(ctx, insertCompositionGroupPreview,
+		arg.ID,
+		arg.RootID,
+		arg.CaptureID,
+		arg.ActorKey,
+		arg.PrincipalKey,
+		arg.BlueprintJson,
+		arg.BlueprintSha256,
+		arg.CreatedAt,
+		arg.Deadline,
+		arg.ReasonEnvelope,
+	)
+	return err
+}
+
 const insertRecordingGroupPreview = `-- name: InsertRecordingGroupPreview :exec
 INSERT INTO context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline,preview_kind,reason_envelope)
 VALUES($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,'recordingSaveGroup',$10::bytea)

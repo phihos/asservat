@@ -80,3 +80,27 @@ func currentReviewedContext(ctx context.Context, q *custodydb.Queries, p value.C
 	}
 	return ctx.Err()
 }
+
+// currentReviewedComposition is currentReviewedContext for a composition
+// group child (ADR-276): one review approved the parent, so the grant binds
+// the parent preview, capture and scope digest; the child's own deadline
+// still has to fit inside it.
+func currentReviewedComposition(ctx context.Context, q *custodydb.Queries, parent value.ContextPreview, a value.Admission) error {
+	if !approvedContextPlan(a) {
+		return currentPreview(ctx, q, parent)
+	}
+	actor := a.Plan.Input.Executor
+	until, err := q.LockApprovedContextGrant(ctx, custodydb.LockApprovedContextGrantParams{RootID: id(a.RootID), PreviewID: id(parent.ID), CaptureID: id(parent.CaptureID), Issuer: actor.Issuer, Subject: actor.Subject, ClientID: actor.ClientID, ExecutionDigest: parent.ScopeDigest[:]})
+	if err != nil {
+		return err
+	}
+	now, err := q.CurrentTime(ctx)
+	if err != nil {
+		return err
+	}
+	deadline := a.Plan.Input.Deadline
+	if !until.Valid || !now.Time.Before(until.Time) || !now.Time.Before(deadline) || deadline.After(until.Time) || deadline.After(now.Time.Add(5*time.Minute)) || a.Plan.CompiledAt.Before(parent.CreatedAt) {
+		return value.ErrChanged
+	}
+	return ctx.Err()
+}
