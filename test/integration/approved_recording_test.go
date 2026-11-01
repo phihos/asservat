@@ -301,13 +301,18 @@ func qualifyCompositionGroup(t *testing.T, ctx context.Context, admin *pgxpool.P
 	if err != nil || !again.Replay || again.CaptureID != parentID || len(again.Group.Children) != 2 {
 		t.Fatal("group replay", err)
 	}
-	// The grant binds the parent: revoking it closes new admissions.
+	// After revocation the accepted group stays a passive replay, also under
+	// another key for the same preview; nothing new is admitted.
 	other := request
 	other.IdempotencyKey = "another-key"
 	if _, _, err = grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: p.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke"}, s.a.Recovery); err != nil {
 		t.Fatal("revoke", err)
 	}
-	if _, err = s.s.AdmitRecordingCompositionGroup(ctx, other); err == nil {
-		t.Fatal("a second admission under a revoked grant")
+	if again, err = s.s.AdmitRecordingCompositionGroup(ctx, other); err != nil || !again.Replay || again.CaptureID != parentID {
+		t.Fatal("revoked group replay", err)
+	}
+	var count int
+	if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_capture WHERE group_id=$1", parentID).Scan(&count); err != nil || count != 2 {
+		t.Fatal("group children", count, err)
 	}
 }
