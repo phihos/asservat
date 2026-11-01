@@ -353,6 +353,9 @@ func (s ContextSubmission) dispatchCompositionGroup(ctx context.Context, current
 		return value.ErrUnavailable
 	}
 	var failures []error
+	// Every intent is acknowledged before any start: an intent's write window
+	// is short from admission and must not wait for a sibling's start.
+	ready := make([]bool, len(a.Group.Children))
 	for n, child := range a.Group.Children {
 		call, until, err := check()
 		if err != nil {
@@ -365,19 +368,34 @@ func (s ContextSubmission) dispatchCompositionGroup(ctx context.Context, current
 		}
 		childCall, cancel := context.WithDeadline(call, end)
 		r, err := s.Intents.AcknowledgedCaptureIntent(childCall, child.CaptureID)
+		cancel()
 		if err != nil {
-			cancel()
 			s.reportGroupFailure("request/intent/" + auditapp.CaptureOperationFailureStage(err))
 			failures = append(failures, value.ErrUnavailable)
 			continue
 		}
 		raw, encodeErr := json.Marshal(child.Expectation)
 		if encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != child.CaptureID || r.Requester() != i.Principal || r.Initiator != nil || r.ScopeDigest != child.ScopeDigest || r.SubmissionDigest != child.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(raw)) || !r.Deadline.Equal(child.Deadline) || r.Group == nil || r.Group.ParentCaptureID != a.CaptureID || r.Group.ChildIndex != n || r.Group.ChildCount != len(a.Group.Children) {
-			cancel()
 			s.reportGroupFailure("request/intent/record")
 			failures = append(failures, value.ErrUnavailable)
 			continue
 		}
+		ready[n] = true
+	}
+	for n, child := range a.Group.Children {
+		if !ready[n] {
+			continue
+		}
+		call, until, err := check()
+		if err != nil {
+			return errors.Join(append(failures, err)...)
+		}
+		end := identity.Earlier(until, identity.Earlier(child.Deadline, child.Expectation.Registration.WriteUntil))
+		if !s.Now().Before(end) {
+			failures = append(failures, value.ErrAcquisitionClosed)
+			continue
+		}
+		childCall, cancel := context.WithDeadline(call, end)
 		err = s.Start.StartContext(childCall, current, child.CaptureID)
 		cancel()
 		if err != nil {
