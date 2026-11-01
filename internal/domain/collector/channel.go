@@ -131,7 +131,7 @@ func (p PacketCapture) Valid() bool {
 	if o := p.Observation; o != nil && (!o.ValidFinite(o.StartedAt) || o.Duration != p.Duration || o.Binding.CaptureID != p.CaptureID || o.Binding.PodUID != p.PodUID || o.Binding.ProgramDigest != p.ProgramDigest) {
 		return false
 	}
-	if p.Syscalls != nil && (!p.Syscalls.Valid() || len(p.Program) != 0 || p.ProgramDigest != [32]byte{} || p.Observation != nil || p.Duration > MaxSyscallCaptureDuration || p.MaxEventsPerSecond < 1 || p.MaxEventsPerSecond > 1<<16) ||
+	if p.Syscalls != nil && (!p.Syscalls.Valid() || len(p.Program) != 0 || p.ProgramDigest != [32]byte{} || p.Observation != nil || p.Duration > MaxSyscallCaptureDuration || p.MaxEventsPerSecond < 1 || p.MaxEventsPerSecond > artifact.MaxRecordingEventsPerSecond) ||
 		p.Syscalls == nil && p.MaxEventsPerSecond != 0 {
 		return false
 	}

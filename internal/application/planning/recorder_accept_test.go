@@ -200,6 +200,13 @@ func TestManualSyscallRecordingRoundTrips(t *testing.T) {
 	if err != nil || cp.ScopeDigest != plan.ScopeDigest || !VerifyFrozenContextPlan(cp) {
 		t.Fatal("the syscall context plan differs from the reviewed plan", err)
 	}
+	// The compiler's highest rate is still a recording admission accepts.
+	fast, now := recorderInput(t, syscalls(text("syscalls", "actionExecutionMode", "onTrigger"), text("syscalls", "syscallBefore", "0s"), value.ProfileEdit{ActionID: "syscalls", Field: "syscallRate", Number: 100_000}), "syscallTrace")
+	if p, err := CompileRecorder(fast, nil, now); err != nil || !AcceptableRecorder(p).Acceptable() {
+		t.Fatal("highest compiled rate", err)
+	} else if r, _, err := RecordingFor(p); err != nil || r.Syscalls.MaxEventsPerSecond != 100_000 {
+		t.Fatal("highest compiled rate refused by the recording", err)
+	}
 	long, now := recorderInput(t, syscalls(text("syscalls", "syscallAfter", "2m"), text("syscalls", "actionTimeout", "3m")), "syscallTrace")
 	if p, err := CompileRecorder(long, nil, now); err == nil && AcceptableRecorder(p).Acceptable() {
 		t.Fatal("a manual syscall recording over a minute was acceptable")

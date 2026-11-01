@@ -13,6 +13,10 @@ const RecordingNativeLimit = FrameBytes
 // Ethernet (14) + the largest IPv4 header (60) + the largest TCP header (60).
 const RecordingSnaplen = 14 + 60 + 60
 
+// MaxRecordingEventsPerSecond is the compiler's syscall rate bound
+// (maxEventsPerSecond 1 to 100,000), shared by the node payload.
+const MaxRecordingEventsPerSecond = 100_000
+
 // RecordingSyscallSnaplen is the fixed per-call metadata record size of a
 // syscall recording (internal/adapters/syscalls.RecordSize).
 const RecordingSyscallSnaplen = 32
@@ -72,7 +76,7 @@ type RecordingSyscalls struct {
 }
 
 func (s *RecordingSyscalls) valid() bool {
-	if s == nil || len(s.Names) > 128 || s.MaxEvents < 1 || s.MaxEvents > 1_000_000 || s.MaxEventsPerSecond < 1 || s.MaxEventsPerSecond > 1<<16 || s.MaxTrackedThreads < 1 || s.MaxTrackedThreads > 16_384 {
+	if s == nil || len(s.Names) > 128 || s.MaxEvents < 1 || s.MaxEvents > 1_000_000 || s.MaxEventsPerSecond < 1 || s.MaxEventsPerSecond > MaxRecordingEventsPerSecond || s.MaxTrackedThreads < 1 || s.MaxTrackedThreads > 16_384 {
 		return false
 	}
 	for i, n := range s.Names {
