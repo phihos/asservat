@@ -254,8 +254,10 @@ func traceNamespaces(ctx context.Context, proc, podUID string, outer *ebpf.Map, 
 	}()
 	scan := func() {
 		current, err := podMountNamespaces(proc, podUID)
-		if err != nil {
-			current = map[uint64]bool{}
+		if errors.Is(err, ErrTargetNotFound) {
+			current = map[uint64]bool{} // every pod process is gone
+		} else if err != nil {
+			return // transient /proc failure: keep the existing readers
 		}
 		for ns, t := range active {
 			if !current[ns] {
