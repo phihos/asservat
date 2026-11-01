@@ -443,3 +443,24 @@ func TestMixedCompositionExpandsButManualRefuses(t *testing.T) {
 	_, err = RecorderEvidenceType(mixed(32 << 20))
 	refusal(t, err, value.CompositionRecorderUnavailable, "profile_composition.components")
 }
+
+// ADR-276: a manual packet + syscall composition splits into one child per
+// component after whole-composition validation; each child resolves alone
+// to its own evidence type, and a conflicting composition is not split.
+func TestSplitCompositionPerComponent(t *testing.T) {
+	children, err := SplitComposition(mixed(32<<20), &fakeCompiler{program: fixtureProgram})
+	if err != nil || len(children) != 2 {
+		t.Fatal(err, len(children))
+	}
+	for i, want := range []string{"packetCapture", "syscallTrace"} {
+		if got, err := RecorderEvidenceType(children[i]); err != nil || got != want {
+			t.Fatal(i, got, err)
+		}
+	}
+	if _, err = SplitComposition(twoNetworks(), &fakeCompiler{program: fixtureProgram}); err == nil {
+		t.Fatal("a conflicting composition was split")
+	}
+	if one, err := SplitComposition(network(), &fakeCompiler{program: fixtureProgram}); err != nil || len(one) != 1 {
+		t.Fatal("one component", err)
+	}
+}
