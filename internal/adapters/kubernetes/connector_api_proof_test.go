@@ -309,7 +309,7 @@ func TestConnectorAPIProofNearExpiryIsProducedAgain(t *testing.T) {
 	for _, c := range []struct {
 		at                time.Duration
 		producers, checks int64
-	}{{0, 1, 0}, {2 * time.Second, 1, 1}, {3*time.Second + time.Millisecond, 2, 1}} {
+	}{{0, 1, 0}, {time.Second, 1, 1}, {2*time.Second + time.Millisecond, 2, 1}} {
 		clock = start.Add(c.at)
 		if _, e := state.read(context.Background(), now, produce, check); e != nil && c.producers == 1 {
 			t.Fatal(c.at, e)
