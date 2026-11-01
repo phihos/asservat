@@ -59,7 +59,7 @@ func previewRecord(row custodydb.ContextPreview) (value.ContextPreview, error) {
 		return value.ContextPreview{}, value.ErrUnavailable
 	}
 	canonical, err := json.Marshal(out)
-	if err != nil || !bytes.Equal(canonical, row.BlueprintJson) || out.ID != uid(row.ID) || out.RootID != uid(row.RootID) || out.CaptureID != uid(row.CaptureID) || out.AttemptID != uid(row.AttemptID) || !out.CreatedAt.Equal(row.CreatedAt.Time) || !out.Deadline.Equal(row.Deadline.Time) || !bytes.Equal(previewActorKey(out.Actor), row.ActorKey) || !bytes.Equal(principalKey(out.Actor), row.PrincipalKey) {
+	if err != nil || !bytes.Equal(canonical, row.BlueprintJson) || out.ID != uid(row.ID) || out.RootID != uid(row.RootID) || out.CaptureID != uid(row.CaptureID) || (row.PreviewKind != "compositionGroup" && out.AttemptID != uid(row.AttemptID)) || !out.CreatedAt.Equal(row.CreatedAt.Time) || !out.Deadline.Equal(row.Deadline.Time) || !bytes.Equal(previewActorKey(out.Actor), row.ActorKey) || !bytes.Equal(principalKey(out.Actor), row.PrincipalKey) {
 		return value.ContextPreview{}, value.ErrUnavailable
 	}
 	return withPreviewReasonEnvelope(out, row.ReasonEnvelope), nil
