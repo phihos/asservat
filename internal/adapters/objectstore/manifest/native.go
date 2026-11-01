@@ -261,6 +261,7 @@ type syscallCheck struct {
 	pod         string
 	from, until time.Time
 	line        []byte
+	events      uint64
 }
 
 func (c *syscallCheck) Write(p []byte) error {
@@ -303,8 +304,13 @@ func (c *syscallCheck) event(b []byte) error {
 	if err != nil || m["identity"].(map[string]any)["pod_uid"] != c.pod || at.Before(c.from) || at.After(c.until) {
 		return artifact.ErrIntegrity
 	}
+	c.events++
 	return nil
 }
+
+// PacketCount is the validated event count, which a saved source window
+// matches against its retained records (ADR-273).
+func (c *syscallCheck) PacketCount() uint64 { return c.events }
 
 func (c *syscallCheck) Close() error {
 	defer clear(c.line)

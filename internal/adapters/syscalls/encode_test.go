@@ -87,6 +87,10 @@ func TestEncodeJSONLinesMatchesSchema(t *testing.T) {
 		if err := c.Close(); err != nil {
 			t.Fatal("native check close:", err)
 		}
+		// A saved window's retained count is checked against this count.
+		if n, ok := c.(interface{ PacketCount() uint64 }); !ok || n.PacketCount() != uint64(len(calls)) {
+			t.Fatal("native check does not count validated events", ok)
+		}
 	}
 	// The validator is live: the same calls for another pod are rejected.
 	var foreign bytes.Buffer

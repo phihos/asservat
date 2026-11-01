@@ -245,7 +245,11 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 	}
 	if err != nil || !outcome.Valid(e.Registration) {
 		outcome = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
-		h.log("connector recording " + r.CaptureID + " store unconfirmed")
+		reason := "invalid outcome"
+		if err != nil {
+			reason = err.Error() // fixed artifact error classes, no content
+		}
+		h.log("connector recording " + r.CaptureID + " store unconfirmed: " + reason)
 	} else {
 		h.log("connector recording " + r.CaptureID + " stored")
 	}
