@@ -55,14 +55,28 @@ try {
   await readOperation('list_capture_history', historyResponse);
   const row = page.getByRole('listitem').filter({ has: page.locator('a[href="/captures/' + config.sourceCaptureID + '"]') });
   await expect(row).toHaveCount(1);
-  const [settingsResponse] = await Promise.all([waitOperation('get_capture_settings'), row.getByRole('button', { name: 'View settings', exact: true }).click()]);
-  const settings = await readOperation('get_capture_settings', settingsResponse);
-  assert.equal(settings.data.capture_id, config.sourceCaptureID);
-  await expect(page.getByRole('heading', { name: 'Saved settings', exact: true })).toBeVisible();
-  await page.getByLabel('network / sample / packetFilter', { exact: true }).fill('tcp dst port 8080');
-  await page.getByLabel('network / sample / packetAfter', { exact: true }).fill('3s');
-  const [previewResponse] = await Promise.all([waitOperation('preview_capture'), page.getByRole('button', { name: 'Review these settings', exact: true }).click()]);
-  const preview = await readOperation('preview_capture', previewResponse);
+  // A transient 503 on the repeat preview (a standby reopening right after
+  // the source capture) is retried like a user would: the failed review
+  // clears the loaded settings, so reopen them, re-enter the edits and
+  // review again. The MCP paths retry this as well. At most three attempts.
+  let settings;
+  let preview;
+  for (let attempt = 1; ; attempt++) {
+    const [settingsResponse] = await Promise.all([waitOperation('get_capture_settings'), row.getByRole('button', { name: 'View settings', exact: true }).click()]);
+    settings = await readOperation('get_capture_settings', settingsResponse);
+    assert.equal(settings.data.capture_id, config.sourceCaptureID);
+    await expect(page.getByRole('heading', { name: 'Saved settings', exact: true })).toBeVisible();
+    await page.getByLabel('network / sample / packetFilter', { exact: true }).fill('tcp dst port 8080');
+    await page.getByLabel('network / sample / packetAfter', { exact: true }).fill('3s');
+    const [previewResponse] = await Promise.all([waitOperation('preview_capture'), page.getByRole('button', { name: 'Review these settings', exact: true }).click()]);
+    if (attempt < 3 && previewResponse && previewResponse.status() === 503) {
+      process.stderr.write(`installed history preview_capture http=503 attempt=${attempt}; retrying\n`);
+      await page.waitForTimeout(2000);
+      continue;
+    }
+    preview = await readOperation('preview_capture', previewResponse);
+    break;
+  }
   assert.equal(preview.data.repeated_from_capture_id, config.sourceCaptureID);
   assert.equal(preview.data.approval_required, true);
   assert.deepEqual(preview.data.profile_composition.authored.components.map(component => component.profileRef), settings.data.settings.profile_composition.authored.components.map(component => component.profileRef));
