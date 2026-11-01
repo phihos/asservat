@@ -74,7 +74,9 @@ func TestPolicyRecorderRejectsUnsupportedLifecycleAndAmbiguousSelection(t *testi
 	}
 }
 
-func testPolicyRecorderCompiler(raw json.RawMessage) (planningvalue.PolicyRecorderConfiguration, error) {
+var testPolicyRecorderCompiler = SingleRecorder(testPolicyRecorderCompilerOne)
+
+func testPolicyRecorderCompilerOne(raw json.RawMessage) (planningvalue.PolicyRecorderConfiguration, error) {
 	var wire contracts.CaptureComposition
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		return planningvalue.PolicyRecorderConfiguration{}, err

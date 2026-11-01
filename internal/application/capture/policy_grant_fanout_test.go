@@ -118,10 +118,10 @@ func TestPolicyStatusGrantStartsUsesExistingAcceptedInputsAndOneLocalCompile(t *
 	a := f.accepted[0].Authority
 	f.status = value.PolicyStatus{PolicyUID: a.PolicyUID, ActiveID: accepted.AcceptanceID, AcceptedIntentVersion: 1, Authority: a, NotAfter: a.NotAfter, MaxExecutions: a.Limits.MaxExecutions}
 	calls := 0
-	service := PolicyStatusService{RootID: activationRoot, InstallationID: activationInstallation, Documents: f, Ledger: f, Permissions: f.activationFixture, Recovery: f, Now: func() time.Time { return f.now }, RecipeName: "builtin-pod-status-v1", RecipeDigest: testRecipe, CompileRecorder: func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+	service := PolicyStatusService{RootID: activationRoot, InstallationID: activationInstallation, Documents: f, Ledger: f, Permissions: f.activationFixture, Recovery: f, Now: func() time.Time { return f.now }, RecipeName: "builtin-pod-status-v1", RecipeDigest: testRecipe, CompileRecorder: SingleRecorder(func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
 		calls++
-		return ongoingSaveCompiler(raw)
-	}}
+		return ongoingSaveCompilerOne(raw)
+	})}
 	originalObservations, originalAcceptances := len(f.observed), len(f.accepted)
 	status, _, err := service.Get(t.Context(), f, "restarts")
 	if err != nil || status.MaxGrantStarts != 2 || status.MaxExecutions != 1 || calls != 1 || len(f.observed) != originalObservations || len(f.accepted) != originalAcceptances {

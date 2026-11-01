@@ -63,9 +63,13 @@ type RestartPolicy struct {
 	Resource *targets.ResourceCondition `json:",omitempty"`
 	// Sharing is the optional spec.sharing block (ADR-239). It is nil for a
 	// policy without one, so such a policy's scope digest is unchanged.
-	Sharing        *PolicySharing                        `json:",omitempty"`
-	Recorder       *planning.PolicyRecorderConfiguration `json:",omitempty"`
-	RecordingSaves bool                                  `json:",omitempty"`
+	Sharing  *PolicySharing                        `json:",omitempty"`
+	Recorder *planning.PolicyRecorderConfiguration `json:",omitempty"`
+	// MoreRecorders are a composition's further recorder actions (ADR-275),
+	// each its own source; nil for one recorder, so existing scope digests
+	// are unchanged.
+	MoreRecorders  []planning.PolicyRecorderConfiguration `json:",omitempty"`
+	RecordingSaves bool                                   `json:",omitempty"`
 	// GrantRef is explicit control outside collection identity; it never resets spend.
 	GrantRef string `json:"-"`
 }
@@ -123,12 +127,44 @@ func (p RestartPolicy) Request() targets.RestartRequest {
 	return r
 }
 
+// Recorders are the policy's recorder actions in authored order (ADR-275).
+func (p RestartPolicy) Recorders() []planning.PolicyRecorderConfiguration {
+	if p.Recorder == nil {
+		return nil
+	}
+	return append([]planning.PolicyRecorderConfiguration{*p.Recorder}, p.MoreRecorders...)
+}
+
+// RecorderFor is the recorder of one expanded action ID, or nil.
+func (p RestartPolicy) RecorderFor(actionID string) *planning.PolicyRecorderConfiguration {
+	for _, r := range p.Recorders() {
+		if r.Action.ID == actionID {
+			return &r
+		}
+	}
+	return nil
+}
+
+// WithRecorder is p reduced to one of its recorders, for per-source work.
+func (p RestartPolicy) WithRecorder(r planning.PolicyRecorderConfiguration) RestartPolicy {
+	p.Recorder, p.MoreRecorders = &r, nil
+	return p
+}
+
 func (p RestartPolicy) Valid() bool {
 	if p.IncidentPods < 0 || p.IncidentPods > 100 || p.IncidentPods > 1 && (!p.RecordingSaves || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing") {
 		return false
 	}
 	if p.RecordingSaves && (p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing") {
 		return false
+	}
+	if p.Recorder == nil && len(p.MoreRecorders) > 0 || len(p.MoreRecorders) > 1 {
+		return false // ADR-275: at most one packet and one syscall recorder
+	}
+	for _, r := range p.MoreRecorders {
+		if !r.Valid() || r.Action.ExecutionMode != "ongoing" || p.Recorder.Action.ExecutionMode != "ongoing" || r.Action.Kind == p.Recorder.Action.Kind || r.Action.ID == p.Recorder.Action.ID {
+			return false
+		}
 	}
 	if p.Recorder != nil && !p.Recorder.Valid() || p.GrantRef != "" && !authorization.UUID(p.GrantRef) {
 		return false

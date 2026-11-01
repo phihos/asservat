@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	planvalue "asservat.local/asservat/internal/domain/planning"
 	"context"
 	"slices"
 	"time"
@@ -45,17 +46,21 @@ func lockManualPolicySave(ctx context.Context, q *custodydb.Queries, source cust
 		return nil, value.ErrDenied
 	}
 	p, authority := in.Policy, record.Authority
+	rec := p.RecorderFor(saved.ActionID)
+	if rec == nil {
+		return nil, value.ErrDenied
+	}
 	if app.RecorderPolicyScopeDigest(source.PolicyUid, record.IntentVersion, policySource(source).CollectionDigest, p, authority.NamespaceUID, authority.WorkloadUID, authority.Delegation, authority.Owners, authority.Actions, authority.Limits) != authority.ScopeDigest {
 		return nil, value.ErrChanged
 	}
 	// The exact protected record, not a caller-selected policy, fixes execution.
-	if in.Authority.Executor != authority.Executor || in.Authority.ScopeDigest != authority.ScopeDigest || saved.ExecutionDigest != authority.ScopeDigest || saved.PolicyUID != authority.PolicyUID || saved.ActionID != p.Recorder.Action.ID || saved.Request.After != 0 || saved.Request.MaxBytes > p.Recorder.Action.MaxBytes {
+	if in.Authority.Executor != authority.Executor || in.Authority.ScopeDigest != authority.ScopeDigest || saved.ExecutionDigest != authority.ScopeDigest || saved.PolicyUID != authority.PolicyUID || saved.ActionID != rec.Action.ID || saved.Request.After != 0 || saved.Request.MaxBytes > rec.Action.MaxBytes {
 		return nil, value.ErrDenied
 	}
-	if !manualPolicySaveFinalizeCurrent(p, a.Plan) {
+	if !manualPolicySaveFinalizeCurrent(rec, a.Plan) {
 		return nil, value.ErrDenied
 	}
-	before, e := time.ParseDuration(p.Recorder.Action.Before)
+	before, e := time.ParseDuration(rec.Action.Before)
 	if e != nil || saved.Request.Before <= 0 || saved.Request.Before > before {
 		return nil, value.ErrDenied
 	}
@@ -124,12 +129,12 @@ func (r *manualPolicyReservation) insertReservation(ctx context.Context, q *cust
 
 // The canonical reviewed timeout is bounded again against the independently
 // locked policy definition, before admission clocks or charge effects.
-func manualPolicySaveFinalizeCurrent(p value.RestartPolicy, plan planning.ContextPlan) bool {
-	if p.Recorder == nil {
+func manualPolicySaveFinalizeCurrent(rec *planvalue.PolicyRecorderConfiguration, plan planning.ContextPlan) bool {
+	if rec == nil {
 		return false
 	}
 	timeout, err := compiler.RecordingSaveFinalizeTimeout(plan.CanonicalScope, plan.ScopeDigest)
-	action, actionErr := time.ParseDuration(p.Recorder.Action.Timeout)
-	recipe, recipeErr := time.ParseDuration(p.Recorder.Composition.MaxDuration)
+	action, actionErr := time.ParseDuration(rec.Action.Timeout)
+	recipe, recipeErr := time.ParseDuration(rec.Composition.MaxDuration)
 	return err == nil && actionErr == nil && recipeErr == nil && timeout > 0 && timeout <= min(action, recipe)
 }

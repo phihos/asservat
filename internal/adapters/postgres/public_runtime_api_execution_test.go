@@ -31,6 +31,7 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		{"table", "policy_recording_source", "", "SELECT"},
 		{"table", "policy_recording_source", "root_id", "UPDATE"},
 		{"table", "policy_occurrence", "", "SELECT"},
+		{"table", "policy_occurrence_capture", "", "SELECT"},
 		{"table", "policy_acceptance", "", "SELECT"},
 		{"table", "policy_source", "", "SELECT"},
 		{"table", "access_grant", "", "SELECT"},

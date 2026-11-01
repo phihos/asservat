@@ -45,7 +45,10 @@ func (publicPolicyFilters) CompileFilter(expression string) (planvalue.CompiledF
 	}
 	return (recordingCompiler{}).CompileFilter(expression)
 }
-func publicPolicyCompile(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+
+var publicPolicyCompile = captureapp.SingleRecorder(publicPolicyCompileOne)
+
+func publicPolicyCompileOne(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
 	var wire contracts.CaptureComposition
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		return planvalue.PolicyRecorderConfiguration{}, err

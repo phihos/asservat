@@ -18,10 +18,24 @@ func (t PolicyTrigger) captureSourceSnapshot(ctx context.Context, current identi
 	if err != nil {
 		return "", refusalFor(err)
 	}
+	// ADR-275: the first recorder's capture is the occurrence's outcome; each
+	// further recorder's capture is its own idempotent child of the occurrence.
+	captureID, refusal := t.snapshotRecorder(ctx, current, a, p, o, pod, occurrence, rows, p.Recorder.Action.ID, occurrence.ID)
+	for _, r := range p.MoreRecorders {
+		if _, childRefusal := t.snapshotRecorder(ctx, current, a, p, o, pod, occurrence, rows, r.Action.ID, value.OccurrenceCaptureKey(occurrence.ID, r.Action.ID)); childRefusal != "" {
+			t.report("occurrence-child/" + childRefusal)
+		}
+	}
+	return captureID, refusal
+}
+
+// snapshotRecorder captures one recorder's source window of the triggering
+// Pod under key: the occurrence ID, or a further recorder's derived key.
+func (t PolicyTrigger) snapshotRecorder(ctx context.Context, current identities.CurrentIdentity, a authorization.AcceptedPolicyAuthority, p value.RestartPolicy, o targets.RestartObservation, pod string, occurrence value.PolicyOccurrence, rows []PolicySourceState, action, key string) (string, string) {
 	var selected *PolicySourceState
 	for n := range rows {
 		row := &rows[n]
-		if row.Binding.PodUID == occurrence.PodUID && row.Binding.ActionID == p.Recorder.Action.ID && row.Binding.Scope == [32]byte(a.ScopeDigest) {
+		if row.Binding.PodUID == occurrence.PodUID && row.Binding.ActionID == action && row.Binding.Scope == [32]byte(a.ScopeDigest) {
 			if selected != nil {
 				return "", "unavailable"
 			}
@@ -42,7 +56,7 @@ func (t PolicyTrigger) captureSourceSnapshot(ctx context.Context, current identi
 		t.report("occurrence-preview/mismatch")
 		return "", "unavailable"
 	}
-	admitted, err := t.SourceSnapshots.Request(ctx, current, preview.Preview.ID, occurrence.ID)
+	admitted, err := t.SourceSnapshots.Request(ctx, current, preview.Preview.ID, key)
 	if authorization.UUID(admitted.CaptureID) {
 		return admitted.CaptureID, ""
 	}

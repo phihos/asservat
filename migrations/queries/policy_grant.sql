@@ -65,6 +65,11 @@ WHERE root_id=sqlc.arg(root_id)::uuid AND policy_uid=sqlc.arg(policy_uid)::text 
 -- name: LockPolicyCaptureOccurrence :one
 SELECT * FROM policy_occurrence WHERE root_id=$1 AND id=$2 FOR UPDATE;
 
+-- name: LockPolicyCaptureOccurrenceAt :one
+-- ADR-275: a further recorder's capture names its occurrence by the
+-- occurrence's own trigger time (the snapshot T0), policy and Pod.
+SELECT * FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND created_at=$4 FOR UPDATE;
+
 -- name: ReadPolicyCaptureReservation :one
 SELECT * FROM policy_occurrence WHERE root_id=$1 AND reserved_capture_id=$2;
 
@@ -90,3 +95,15 @@ FROM policy_source s
 LEFT JOIN policy_grant_attachment a ON a.root_id=s.root_id AND a.id=s.grant_attachment_id
  AND a.policy_uid=s.policy_uid AND a.acceptance_id=s.active_id AND a.authored_grant_ref=s.authored_grant_ref
 WHERE s.root_id=$1 AND s.policy_uid=$2;
+
+-- name: ReservePolicyOccurrenceCapture :execrows
+-- ADR-275: a further recorder's capture of an open occurrence.
+INSERT INTO policy_occurrence_capture(root_id,occurrence_id,action_id,capture_id,grant_id,reserved_bytes)
+SELECT $1,$2,$3,$4,$5,$6 FROM policy_occurrence o
+WHERE o.root_id=$1 AND o.id=$2 AND o.outcome IS NULL
+ON CONFLICT DO NOTHING;
+
+-- name: ReadPolicyOccurrenceCaptureReservation :one
+SELECT o.policy_uid, o.acceptance_id, c.grant_id FROM policy_occurrence_capture c
+JOIN policy_occurrence o ON o.id=c.occurrence_id AND o.root_id=c.root_id
+WHERE c.root_id=$1 AND c.capture_id=$2;

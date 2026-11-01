@@ -240,7 +240,7 @@ func (s RecordingInventory) List(ctx context.Context, current identities.Current
 			policies[b.PolicyUID] = p
 		}
 		a := p.Accepted.Authority
-		if a.ClusterID != target.ClusterID || a.NamespaceUID != target.NamespaceUID || a.WorkloadUID != target.WorkloadUID || b.Scope != [32]byte(a.ScopeDigest) || b.AudienceDigest == ([32]byte{}) || len(source.Audience) == 0 || p.Policy.Recorder == nil || b.ActionID != p.Policy.Recorder.Action.ID {
+		if a.ClusterID != target.ClusterID || a.NamespaceUID != target.NamespaceUID || a.WorkloadUID != target.WorkloadUID || b.Scope != [32]byte(a.ScopeDigest) || b.AudienceDigest == ([32]byte{}) || len(source.Audience) == 0 || p.Policy.RecorderFor(b.ActionID) == nil {
 			continue
 		}
 		executor := newPolicyIdentity(call, s.Accepted, a, identity.Earlier(until, p.Accepted.SourceUntil), s.Now)
@@ -249,11 +249,12 @@ func (s RecordingInventory) List(ctx context.Context, current identities.Current
 			continue
 		}
 		until = identity.Earlier(until, policyRights.ValidUntil)
-		before, e := time.ParseDuration(p.Policy.Recorder.Action.Before)
+		rec := p.Policy.RecorderFor(b.ActionID)
+		before, e := time.ParseDuration(rec.Action.Before)
 		if e != nil {
 			return zero, value.ErrUnavailable
 		}
-		row := RecordingRow{IncidentPodCap: recordingSaveIncidentPodCap(p.Policy), PolicyUID: b.PolicyUID, PodUID: b.PodUID, PodName: source.Target.Request.PodName, ActionID: b.ActionID, Kind: p.Policy.Recorder.Action.Kind, State: "Unknown", History: "Unknown", MaximumBefore: before}
+		row := RecordingRow{IncidentPodCap: recordingSaveIncidentPodCap(p.Policy), PolicyUID: b.PolicyUID, PodUID: b.PodUID, PodName: source.Target.Request.PodName, ActionID: b.ActionID, Kind: rec.Action.Kind, State: "Unknown", History: "Unknown", MaximumBefore: before}
 		if before <= 0 {
 			row.Blocker = "NoHistoryConfigured"
 		} else if !s.Now().Before(source.HardUntil) {

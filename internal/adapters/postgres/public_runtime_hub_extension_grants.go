@@ -28,6 +28,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "policy_recording_source", "root_id", "UPDATE"}, // retained source row lock only
 		// Original policy reservation and grant are rechecked before effects.
 		{"table", "policy_occurrence", "", "SELECT"},
+		{"table", "policy_occurrence_capture", "", "SELECT"},
 		{"table", "policy_acceptance", "", "SELECT"},
 		{"table", "policy_source", "", "SELECT"},
 		{"table", "access_grant", "", "SELECT"},

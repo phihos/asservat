@@ -265,6 +265,47 @@ func (q *Queries) LockPolicyCaptureOccurrence(ctx context.Context, arg LockPolic
 	return i, err
 }
 
+const lockPolicyCaptureOccurrenceAt = `-- name: LockPolicyCaptureOccurrenceAt :one
+SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector, reserved_capture_id, grant_id, reserved_bytes FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND created_at=$4 FOR UPDATE
+`
+
+type LockPolicyCaptureOccurrenceAtParams struct {
+	RootID    pgtype.UUID
+	PolicyUid string
+	PodUid    string
+	CreatedAt pgtype.Timestamptz
+}
+
+// ADR-275: a further recorder's capture names its occurrence by the
+// occurrence's own trigger time (the snapshot T0), policy and Pod.
+func (q *Queries) LockPolicyCaptureOccurrenceAt(ctx context.Context, arg LockPolicyCaptureOccurrenceAtParams) (PolicyOccurrence, error) {
+	row := q.db.QueryRow(ctx, lockPolicyCaptureOccurrenceAt,
+		arg.RootID,
+		arg.PolicyUid,
+		arg.PodUid,
+		arg.CreatedAt,
+	)
+	var i PolicyOccurrence
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.PolicyUid,
+		&i.AcceptanceID,
+		&i.ClusterID,
+		&i.WorkloadUid,
+		&i.PodUid,
+		&i.Restarts,
+		&i.CreatedAt,
+		&i.CaptureID,
+		&i.Outcome,
+		&i.Detector,
+		&i.ReservedCaptureID,
+		&i.GrantID,
+		&i.ReservedBytes,
+	)
+	return i, err
+}
+
 const readPolicyCaptureReservation = `-- name: ReadPolicyCaptureReservation :one
 SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector, reserved_capture_id, grant_id, reserved_bytes FROM policy_occurrence WHERE root_id=$1 AND reserved_capture_id=$2
 `
@@ -470,6 +511,30 @@ func (q *Queries) ReadPolicyGrantSettings(ctx context.Context, rootID pgtype.UUI
 	return i, err
 }
 
+const readPolicyOccurrenceCaptureReservation = `-- name: ReadPolicyOccurrenceCaptureReservation :one
+SELECT o.policy_uid, o.acceptance_id, c.grant_id FROM policy_occurrence_capture c
+JOIN policy_occurrence o ON o.id=c.occurrence_id AND o.root_id=c.root_id
+WHERE c.root_id=$1 AND c.capture_id=$2
+`
+
+type ReadPolicyOccurrenceCaptureReservationParams struct {
+	RootID    pgtype.UUID
+	CaptureID pgtype.UUID
+}
+
+type ReadPolicyOccurrenceCaptureReservationRow struct {
+	PolicyUid    string
+	AcceptanceID pgtype.UUID
+	GrantID      pgtype.UUID
+}
+
+func (q *Queries) ReadPolicyOccurrenceCaptureReservation(ctx context.Context, arg ReadPolicyOccurrenceCaptureReservationParams) (ReadPolicyOccurrenceCaptureReservationRow, error) {
+	row := q.db.QueryRow(ctx, readPolicyOccurrenceCaptureReservation, arg.RootID, arg.CaptureID)
+	var i ReadPolicyOccurrenceCaptureReservationRow
+	err := row.Scan(&i.PolicyUid, &i.AcceptanceID, &i.GrantID)
+	return i, err
+}
+
 const readPolicyStatusSource = `-- name: ReadPolicyStatusSource :one
 SELECT s.root_id, s.policy_uid, s.installation_id, s.cluster_id, s.namespace_uid, s.name, s.generation, s.spec_digest, s.resource_version, s.observed_at, s.fresh_until, s.deleted, s.suspended, s.collection_digest, s.intent_version, s.active_id, s.creator_json, s.authored_grant_ref, s.grant_attachment_id, a.grant_id AS attached_grant_id, a.authority_digest AS attached_authority_digest
 FROM policy_source s
@@ -517,6 +582,38 @@ func (q *Queries) ReadPolicyStatusSource(ctx context.Context, arg ReadPolicyStat
 		&i.AttachedAuthorityDigest,
 	)
 	return i, err
+}
+
+const reservePolicyOccurrenceCapture = `-- name: ReservePolicyOccurrenceCapture :execrows
+INSERT INTO policy_occurrence_capture(root_id,occurrence_id,action_id,capture_id,grant_id,reserved_bytes)
+SELECT $1,$2,$3,$4,$5,$6 FROM policy_occurrence o
+WHERE o.root_id=$1 AND o.id=$2 AND o.outcome IS NULL
+ON CONFLICT DO NOTHING
+`
+
+type ReservePolicyOccurrenceCaptureParams struct {
+	RootID        pgtype.UUID
+	OccurrenceID  pgtype.UUID
+	ActionID      string
+	CaptureID     pgtype.UUID
+	GrantID       pgtype.UUID
+	ReservedBytes int64
+}
+
+// ADR-275: a further recorder's capture of an open occurrence.
+func (q *Queries) ReservePolicyOccurrenceCapture(ctx context.Context, arg ReservePolicyOccurrenceCaptureParams) (int64, error) {
+	result, err := q.db.Exec(ctx, reservePolicyOccurrenceCapture,
+		arg.RootID,
+		arg.OccurrenceID,
+		arg.ActionID,
+		arg.CaptureID,
+		arg.GrantID,
+		arg.ReservedBytes,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const reservePolicyOccurrenceOutput = `-- name: ReservePolicyOccurrenceOutput :execrows

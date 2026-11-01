@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -26,14 +27,16 @@ func TestOngoingPolicyCompilerParityAcrossPublicConsumers(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw := ongoingCompilerComposition(t, tc.mode, tc.before)
-			current, err := recordingSavePolicyCompiler(ongoingCompilerFilters{})(raw)
-			if err != nil || current.Action.ExecutionMode != "ongoing" {
+			all, err := recordingSavePolicyCompiler(ongoingCompilerFilters{})(raw)
+			if err != nil || len(all) != 1 || all[0].Action.ExecutionMode != "ongoing" {
 				t.Fatal("private original-source compiler", err)
 			}
-			got, err := publicPolicyRecorderCompiler(ongoingCompilerFilters{})(raw)
-			if err != nil {
+			current := all[0]
+			gotAll, err := publicPolicyRecorderCompiler(ongoingCompilerFilters{})(raw)
+			if err != nil || len(gotAll) != 1 {
 				t.Fatal("public lifecycle compiler refused accepted ongoing definition", err)
 			}
+			got := gotAll[0]
 			if got.Action.ExecutionMode != "ongoing" || got.Digest != current.Digest || got.RecipeDigest != current.RecipeDigest || !bytes.Equal(got.Scope, current.Scope) || !bytes.Equal(got.Recipe, current.Recipe) {
 				t.Fatal("compiler changed original ongoing collection intent")
 			}
@@ -44,7 +47,7 @@ func TestOngoingPolicyCompilerParityAcrossPublicConsumers(t *testing.T) {
 
 func TestExplicitFinitePolicyCompilerScopeRemainsUnchanged(t *testing.T) {
 	raw := ongoingCompilerComposition(t, "onTrigger", "0s")
-	finite, err := publicPolicyRecorderCompiler(ongoingCompilerFilters{})(raw)
+	finite, err := firstRecorder(publicPolicyRecorderCompiler(ongoingCompilerFilters{})(raw))
 	if err != nil || finite.Action.ExecutionMode != "onTrigger" {
 		t.Fatal("explicit finite compilation", err)
 	}
@@ -60,11 +63,11 @@ func TestExplicitFinitePolicyCompilerScopeRemainsUnchanged(t *testing.T) {
 	if err != nil || original.Digest != finite.Digest || original.RecipeDigest != finite.RecipeDigest || !bytes.Equal(original.Scope, finite.Scope) || !bytes.Equal(original.Recipe, finite.Recipe) {
 		t.Fatal("candidate changed original finite compiler bytes", err)
 	}
-	reader, err := recordingSavePolicyCompiler(ongoingCompilerFilters{})(raw)
+	reader, err := firstRecorder(recordingSavePolicyCompiler(ongoingCompilerFilters{})(raw))
 	if err != nil || reader.Digest != finite.Digest || reader.RecipeDigest != finite.RecipeDigest || !bytes.Equal(reader.Scope, finite.Scope) || !bytes.Equal(reader.Recipe, finite.Recipe) {
 		t.Fatal("source-capable compiler reinterpreted finite accepted scope", err)
 	}
-	ongoing, err := recordingSavePolicyCompiler(ongoingCompilerFilters{})(ongoingCompilerComposition(t, "ongoing", "0s"))
+	ongoing, err := firstRecorder(recordingSavePolicyCompiler(ongoingCompilerFilters{})(ongoingCompilerComposition(t, "ongoing", "0s")))
 	if err != nil || ongoing.Digest == finite.Digest || bytes.Equal(ongoing.Scope, finite.Scope) {
 		t.Fatal("lifecycle change reused original acceptance digest", err)
 	}
@@ -162,8 +165,8 @@ func TestTrustedOngoingCompositionBindsRuntimeAndSaveWithoutEffects(t *testing.T
 		t.Fatal("source incident replaced real admitted runner")
 	}
 	raw := ongoingCompilerComposition(t, "ongoing", "0s")
-	actual, err := trigger.CompileRecorder(raw)
-	expected, readerErr := recordingSavePolicyCompiler(ongoingCompilerFilters{})(raw)
+	actual, err := firstRecorder(trigger.CompileRecorder(raw))
+	expected, readerErr := firstRecorder(recordingSavePolicyCompiler(ongoingCompilerFilters{})(raw))
 	if err != nil || readerErr != nil || actual.Digest != expected.Digest || !bytes.Equal(actual.Scope, expected.Scope) {
 		t.Fatal("actual trigger compiler diverged from source reader", err, readerErr)
 	}
@@ -208,4 +211,12 @@ func TestTrustedOngoingCompositionBindsRuntimeAndSaveWithoutEffects(t *testing.T
 	if packetSourceCompositionReady(c, s) {
 		t.Fatal("missing source dispatch enabled acquisition")
 	}
+}
+
+// firstRecorder is the one recorder of a one-component composition.
+func firstRecorder(all []value.PolicyRecorderConfiguration, err error) (value.PolicyRecorderConfiguration, error) {
+	if err != nil || len(all) != 1 {
+		return value.PolicyRecorderConfiguration{}, errors.Join(err, value.ErrInvalid)
+	}
+	return all[0], nil
 }

@@ -39,7 +39,7 @@ func BenchmarkPolicyRecorderPollCompilation(b *testing.B) {
 			spec := bytes.ReplaceAll(original, []byte("tcp dst port 80"), []byte(item.filter))
 			b.ReportAllocs()
 			for b.Loop() {
-				p, err := captureapp.CompilePolicyWithRecorders(spec, planningapp.ContextRecipeName, planningapp.RecipeDigest(), compile)
+				p, err := captureapp.CompilePolicyWithRecorders(spec, planningapp.ContextRecipeName, planningapp.RecipeDigest(), captureapp.SingleRecorder(compile))
 				if err != nil || p.Recorder == nil {
 					b.Fatal("real policy compilation", err)
 				}

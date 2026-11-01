@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
+	captureapp "asservat.local/asservat/internal/application/capture"
 	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
@@ -50,7 +51,10 @@ func (policyRawFilters) CompileFilter(expression string) (value.CompiledFilter, 
 	}
 	return value.CompiledFilter{LinkType: value.FilterLinkType, Snaplen: value.FilterSnaplen, Program: append([]value.BPFInstruction(nil), policyRawProgram...)}, nil
 }
-func policyRawCompile(raw json.RawMessage) (value.PolicyRecorderConfiguration, error) {
+
+var policyRawCompile = captureapp.SingleRecorder(policyRawCompileOne)
+
+func policyRawCompileOne(raw json.RawMessage) (value.PolicyRecorderConfiguration, error) {
 	var wire contracts.CaptureComposition
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		return value.PolicyRecorderConfiguration{}, err

@@ -47,7 +47,7 @@ func NewPolicySources(ctx context.Context, pool *pgxpool.Pool, root, installatio
 }
 
 func sourceCheckCurrent(in app.PolicySourceCheck, now time.Time) bool {
-	p := in.Policy.Recorder
+	p := in.Recorder()
 	if p == nil {
 		return false
 	}
@@ -186,7 +186,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			if err != nil {
 				return err
 			}
-			if row.PolicyAcceptanceID != policy.ActiveID || g.Policy == nil || g.Policy.Observation != nil || g.Policy.RecipeDigest != in.Policy.Recorder.RecipeDigest || authorization.CheckPolicyGrantAttachment(g, a, policy.AuthoredGrantRef, now.Time) != nil {
+			if row.PolicyAcceptanceID != policy.ActiveID || g.Policy == nil || g.Policy.Observation != nil || g.Policy.RecipeDigest != in.Recorder().RecipeDigest || authorization.CheckPolicyGrantAttachment(g, a, policy.AuthoredGrantRef, now.Time) != nil {
 				return value.ErrDenied
 			}
 			hard = identity.Earlier(hard, identity.Earlier(g.PolicyNotAfter, g.ExpiresAt))
@@ -235,7 +235,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 		}
 		lower(limits.Node.InputBytesPerSecond, slots)
 		lower(limits.Node.InputBurstBytes, slots)
-		workloadSlots := int64(in.Policy.ObservedPods)
+		workloadSlots := int64(in.Policy.ObservedPods * len(in.Policy.Recorders()))
 		if limits.Workload.MaxActiveSources > 0 {
 			workloadSlots = min(workloadSlots, limits.Workload.MaxActiveSources)
 		}
@@ -284,7 +284,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			}
 			// Original policy lock serializes the logical slot; account lock
 			// serializes aggregate workload count/rate/burst across policies.
-			if _, err = q.FindPolicyRecordingSource(call, custodydb.FindPolicyRecordingSourceParams{RootID: id(s.root), PolicyUid: a.PolicyUID, ActionID: in.Policy.Recorder.Action.ID, PodUid: in.Node.PodUID}); err == nil {
+			if _, err = q.FindPolicyRecordingSource(call, custodydb.FindPolicyRecordingSourceParams{RootID: id(s.root), PolicyUid: a.PolicyUID, ActionID: in.Recorder().Action.ID, PodUid: in.Node.PodUID}); err == nil {
 				return value.ErrConflict
 			} else if !errors.Is(err, pgx.ErrNoRows) {
 				return err
@@ -318,12 +318,12 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			if err != nil {
 				return err
 			}
-			b := collector.SourceBinding{RootID: s.root, PolicyUID: a.PolicyUID, AcceptanceID: record.ID, SourceID: in.SourceID, Fence: in.Fence, ActionID: in.Policy.Recorder.Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(a.ScopeDigest), ExpectationDigest: [32]byte(in.Policy.Recorder.Digest), ResourceDigest: resourceDigest, AudienceDigest: [32]byte(originalAudienceDigest)}
-			if in.Policy.Recorder.Filter != nil {
-				b.ProgramDigest = [32]byte(compiler.FilterProgramDigest(in.Policy.Recorder.Filter.Program))
+			b := collector.SourceBinding{RootID: s.root, PolicyUID: a.PolicyUID, AcceptanceID: record.ID, SourceID: in.SourceID, Fence: in.Fence, ActionID: in.Recorder().Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(a.ScopeDigest), ExpectationDigest: [32]byte(in.Recorder().Digest), ResourceDigest: resourceDigest, AudienceDigest: [32]byte(originalAudienceDigest)}
+			if in.Recorder().Filter != nil {
+				b.ProgramDigest = [32]byte(compiler.FilterProgramDigest(in.Recorder().Filter.Program))
 			}
-			if in.Policy.Recorder.Action.Kind == "syscallTrace" {
-				b.ProgramDigest = deliveryapp.SyscallFilterDigest(compiler.SyscallSource(*in.Policy.Recorder))
+			if in.Recorder().Action.Kind == "syscallTrace" {
+				b.ProgramDigest = deliveryapp.SyscallFilterDigest(compiler.SyscallSource(*in.Recorder()))
 			}
 			if !b.Valid() {
 				return value.ErrInvalid
@@ -387,7 +387,7 @@ func (s *PolicySources) AdmitSource(ctx context.Context, in app.PolicySourceChec
 			return err
 		}
 		b := state.Binding
-		if b.PolicyUID != a.PolicyUID || b.ActionID != in.Policy.Recorder.Action.ID || b.Scope != [32]byte(a.ScopeDigest) || b.ExpectationDigest != [32]byte(in.Policy.Recorder.Digest) || b.ResourceDigest != resourceDigest || b.NodeUID != in.Node.NodeUID || b.BootID != in.Node.BootID || b.CollectorPodUID != in.Node.CollectorPodUID || b.CollectorEpoch != in.Node.CollectorEpoch {
+		if b.PolicyUID != a.PolicyUID || b.ActionID != in.Recorder().Action.ID || b.Scope != [32]byte(a.ScopeDigest) || b.ExpectationDigest != [32]byte(in.Recorder().Digest) || b.ResourceDigest != resourceDigest || b.NodeUID != in.Node.NodeUID || b.BootID != in.Node.BootID || b.CollectorPodUID != in.Node.CollectorPodUID || b.CollectorEpoch != in.Node.CollectorEpoch {
 			return value.ErrChanged
 		}
 		now, err = q.CurrentTime(call)

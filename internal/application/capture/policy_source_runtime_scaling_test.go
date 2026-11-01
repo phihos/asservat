@@ -77,6 +77,9 @@ func newSourceCohortFixtureWith(t *testing.T, replicas int, composition *plannin
 	return s
 }
 
+// sourceKey is one source per (Pod, recorder action), as in SQL.
+func sourceKey(pod, action string) string { return pod + "/" + action }
+
 func (s *sourceCohortFixture) maintain(tick int) error {
 	s.tickStart = s.base.Add(time.Duration(tick) * value.TriggerPollInterval)
 	s.tickEnd = s.tickStart.Add(5 * time.Second)
@@ -152,14 +155,16 @@ func (s *sourceCohortFixture) AdmitSource(ctx context.Context, in PolicySourceCh
 	}
 	s.admissions = append(s.admissions, in)
 	resource := collector.SourceResources{PolicyUID: "accepted-resource-policy"}
-	row, known := s.rows[in.Node.PodUID]
+	rec := in.Recorder()
+	key := sourceKey(in.Node.PodUID, rec.Action.ID)
+	row, known := s.rows[key]
 	if !known {
 		if !in.Initial {
 			return PolicySourceAdmission{}, value.ErrConflict
 		}
-		b := collector.SourceBinding{RootID: s.f.svc.RootID, PolicyUID: s.authority.PolicyUID, AcceptanceID: fixtureID(800), SourceID: in.SourceID, Fence: in.Fence, ActionID: s.policy.Recorder.Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(s.authority.ScopeDigest), ExpectationDigest: [32]byte(s.policy.Recorder.Digest), ResourceDigest: deliveryapp.SourceResourcesDigest(resource)}
-		if s.policy.Recorder.Action.Kind == "syscallTrace" {
-			b.ProgramDigest = deliveryapp.SyscallFilterDigest(compiler.SyscallSource(*s.policy.Recorder))
+		b := collector.SourceBinding{RootID: s.f.svc.RootID, PolicyUID: s.authority.PolicyUID, AcceptanceID: fixtureID(800), SourceID: in.SourceID, Fence: in.Fence, ActionID: rec.Action.ID, PodUID: in.Node.PodUID, NodeUID: in.Node.NodeUID, BootID: in.Node.BootID, CollectorPodUID: in.Node.CollectorPodUID, CollectorEpoch: in.Node.CollectorEpoch, Scope: [32]byte(s.authority.ScopeDigest), ExpectationDigest: [32]byte(rec.Digest), ResourceDigest: deliveryapp.SourceResourcesDigest(resource)}
+		if rec.Action.Kind == "syscallTrace" {
+			b.ProgramDigest = deliveryapp.SyscallFilterDigest(compiler.SyscallSource(*rec))
 		}
 		row = PolicySourceState{Binding: b, ClusterID: s.authority.ClusterID, NamespaceUID: s.authority.NamespaceUID, WorkloadUID: s.authority.WorkloadUID, StartedAt: s.f.now, HardUntil: s.authority.NotAfter, StartBy: s.tickEnd, InitialLeafUntil: s.f.now.Add(collector.SourceLeafLifetime), Credit: in.InitialCredit, InitialCredit: in.InitialCredit, BytesPerSecond: in.BytesPerSecond}
 	} else if !row.EndedAt.IsZero() || row.Binding.SourceID != in.SourceID || row.Binding.Fence != in.Fence {
@@ -175,7 +180,7 @@ func (s *sourceCohortFixture) AdmitSource(ctx context.Context, in PolicySourceCh
 	if !permit.Dispatchable(s.f.now) {
 		return PolicySourceAdmission{}, value.ErrUnavailable
 	}
-	s.rows[in.Node.PodUID] = row
+	s.rows[key] = row
 	return PolicySourceAdmission{Permit: permit, Resources: resource, First: !known}, nil
 }
 func (s *sourceCohortFixture) DispatchSource(ctx context.Context, _ targets.PodResolution, _ targets.PacketSourceObservation, source collector.PacketSource) error {
@@ -394,5 +399,41 @@ func TestPolicySourceEffectiveRetentionShorteningStopsKnownRing(t *testing.T) {
 	err := f.maintain(1)
 	if !errors.Is(err, value.ErrChanged) || f.ended != 1 || f.stops != 1 || f.dispatches != 1 || len(f.admissions) != 1 {
 		t.Fatal("administrator content-age shortening did not stop original ring before further admission", err, f.ended, f.stops, f.dispatches, len(f.admissions))
+	}
+}
+
+// ADR-275: a packet + syscall policy arms one source per (Pod, recorder),
+// each bound to its own action and expectation, under one policy scope.
+func TestPolicySourceArmsOneSourcePerRecorder(t *testing.T) {
+	s := newSourceCohortFixture(t, 2)
+	composition := networkComposition()
+	composition.Components = append(composition.Components, planning.ProfileComponent{ID: "calls", Profile: planning.ProfileRef{Catalog: "builtin", Name: "syscall-activity", Version: "v1"}})
+	composition.MaxTotalBytes, composition.MaxDuration = 32<<20, "30s"
+	all, err := compiler.CompileOngoingPolicyRecorders(*composition, &stubFilters{})
+	if err != nil || len(all) != 2 {
+		t.Fatal(err)
+	}
+	s.policy.Recorder, s.policy.MoreRecorders = &all[0], all[1:]
+	if !s.policy.Valid() {
+		t.Fatal("invalid two-recorder policy")
+	}
+	if err = s.maintain(0); err != nil {
+		t.Fatal(err)
+	}
+	kinds := map[string]int{}
+	for _, row := range s.rows {
+		r := s.policy.RecorderFor(row.Binding.ActionID)
+		if r == nil || row.Binding.ExpectationDigest != [32]byte(r.Digest) {
+			t.Fatal("source bound to the wrong recorder", row.Binding.ActionID)
+		}
+		kinds[r.Action.Kind]++
+	}
+	if len(s.rows) != 4 || kinds["packetCapture"] != 2 || kinds["syscallTrace"] != 2 {
+		t.Fatalf("sources %d %v", len(s.rows), kinds)
+	}
+	for _, in := range s.admissions {
+		if in.SourceSlots != 4 {
+			t.Fatal("recorders did not share the policy's source slots", in.SourceSlots)
+		}
 	}
 }

@@ -79,3 +79,21 @@ func TestOngoingPolicyRecorderCompilesSyscallMetadata(t *testing.T) {
 		t.Fatal("finite syscall policy armed", err)
 	}
 }
+
+// ADR-275: a packet + syscall composition compiles into one complete source
+// configuration per recorder, each pinned to its own profile and action,
+// while a one-component composition keeps its existing digest.
+func TestOngoingPolicyRecordersOnePerAction(t *testing.T) {
+	all, err := CompileOngoingPolicyRecorders(mixed(32<<20), &fakeCompiler{program: fixtureProgram})
+	if err != nil || len(all) != 2 {
+		t.Fatal("mixed policy recorders", err, len(all))
+	}
+	if !all[0].Valid() || !all[1].Valid() || all[0].Action.Kind != "packetCapture" || all[1].Action.Kind != "syscallTrace" || all[0].Profile.ComponentID != "net" || all[1].Profile.ComponentID != "calls" || all[0].Digest == all[1].Digest {
+		t.Fatalf("recorders %+v %+v", all[0].Action, all[1].Action)
+	}
+	single, err := CompileOngoingPolicyRecorder(network(), &fakeCompiler{program: fixtureProgram})
+	alone, err2 := CompileOngoingPolicyRecorders(network(), &fakeCompiler{program: fixtureProgram})
+	if err != nil || err2 != nil || len(alone) != 1 || alone[0].Digest != single.Digest {
+		t.Fatal("one-component digest changed", err, err2)
+	}
+}

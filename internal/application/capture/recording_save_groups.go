@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"math"
 	"slices"
 	"sort"
 	"time"
@@ -173,11 +174,20 @@ func (s RecordingSaves) previewRecordingSaveGroup(ctx context.Context, current i
 		if parent.Deadline.Before(part.Deadline) {
 			parent.Deadline = part.Deadline
 		}
-		approved, _ := time.ParseDuration(p.Recorder.Action.Before)
-		sources = append(sources, compiler.RecordingSaveScopeSource{PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest, Original: *row.Source.Target, ActionID: saved.ActionID, Kind: p.Recorder.Action.Kind, DefinitionDigest: saved.SourceDefinitionDigest, AudienceDigest: saved.SourceAudienceDigest, ApprovedBefore: approved, Before: saved.Request.Before, MaxBytes: saved.Request.MaxBytes, CeilingDigest: artifact.Digest(plan.Input.Capability.Revision.Digest), RetentionDigest: artifact.Digest(plan.Input.Retention.PolicyRevision.Digest)})
+		rec := p.RecorderFor(saved.ActionID)
+		if rec == nil {
+			return zero, value.ErrChanged
+		}
+		approved, _ := time.ParseDuration(rec.Action.Before)
+		sources = append(sources, compiler.RecordingSaveScopeSource{PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest, Original: *row.Source.Target, ActionID: saved.ActionID, Kind: rec.Action.Kind, DefinitionDigest: saved.SourceDefinitionDigest, AudienceDigest: saved.SourceAudienceDigest, ApprovedBefore: approved, Before: saved.Request.Before, MaxBytes: saved.Request.MaxBytes, CeilingDigest: artifact.Digest(plan.Input.Capability.Revision.Digest), RetentionDigest: artifact.Digest(plan.Input.Retention.PolicyRevision.Digest)})
 	}
 	parent.SelectionUntil = identity.Earlier(parent.SelectionUntil, parent.Deadline)
-	actionTimeout, _ := time.ParseDuration(p.Recorder.Action.Timeout)
+	// The group finalizes within the shortest of its recorders' timeouts.
+	actionTimeout := time.Duration(math.MaxInt64)
+	for _, r := range p.Recorders() {
+		t, _ := time.ParseDuration(r.Action.Timeout)
+		actionTimeout = min(actionTimeout, t)
+	}
 	recipeTimeout, _ := time.ParseDuration(p.Recorder.Composition.MaxDuration)
 	parent.CanonicalScope, parent.ScopeDigest, err = compiler.CompileRecordingSaveScope(compiler.RecordingSaveScopeInput{CaptureID: parent.CaptureID, Requester: i.Principal, Authority: a, Sources: sources, CeilingDigest: sources[0].CeilingDigest, RetentionDigest: sources[0].RetentionDigest, IncidentPodLimit: recordingSaveIncidentPodCap(p), FinalizeTimeout: min(actionTimeout, recipeTimeout)}, s.Inventory.Now())
 	if err != nil {

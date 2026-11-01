@@ -1,6 +1,7 @@
 package capture
 
 import (
+	planvalue "asservat.local/asservat/internal/domain/planning"
 	"context"
 	"time"
 
@@ -30,6 +31,17 @@ type PolicySourceCheck struct {
 	SourceSlots                                                     int64
 	Initial                                                         bool
 	ObservedAt, ValidUntil                                          time.Time
+	// ActionID selects one of the policy's recorders (ADR-275); empty is
+	// the policy's only recorder.
+	ActionID string
+}
+
+// Recorder is the checked source's recorder configuration, or nil.
+func (c PolicySourceCheck) Recorder() *planvalue.PolicyRecorderConfiguration {
+	if c.ActionID == "" {
+		return c.Policy.Recorder
+	}
+	return c.Policy.RecorderFor(c.ActionID)
 }
 
 // PolicySourceAdmission is an original committed source grant. Node lowering
