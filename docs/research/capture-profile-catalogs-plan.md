@@ -28,8 +28,10 @@ with S-05. It is therefore slice B, after slice A:
 1. CRD `captureprofiles.asservat.io` generated from
    `specs/contracts/capture-profile.schema.json` (new `scripts/profile-crd.py`
    modelled on `policy-crd.py`); chart RBAC read-only for the hub.
-2. Builtin availability: protected installation setting listing disabled /
-   deprecated builtin versions; checked at preview, start and history repeat.
+2. ~~Builtin availability setting.~~ Dropped under the complexity gate:
+   REQ-CPR-001 gives builtins no availability field and routes prohibition
+   through collection ceilings or engine/pack disablement, so a separate
+   setting would be agent-added machinery with no requirement behind it.
 3. Resolver port in planning (`ProfileSource`): `builtin` stays embedded;
    `organization` reads the hub namespace, `namespace` reads the target
    workload's namespace only. One bounded LIST per preview, one GET per start;
@@ -37,7 +39,9 @@ with S-05. It is therefore slice B, after slice A:
    into `wireResolved` and the `captureProfile` history dependency. Disabled
    versions refuse new previews/starts; deprecated ones warn.
 4. Tools: runtime schemas via `scripts/investigation-schemas.py`, use case,
-   presentation and MCP registration; browser/MCP parity.
+   presentation and MCP registration; browser/MCP parity. Both tools take
+   `target_ref` (like `list_diagnostics`; no target-handle store) and return
+   one page of at most 100 rows narrowed by `catalog`.
 5. Tests: unit (resolver confinement, no shadowing, availability), real
    Kubernetes CRD test (immutability by version, namespace confinement,
    builtin-name impersonation refused, disabled version blocks starts).
