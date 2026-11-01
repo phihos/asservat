@@ -725,11 +725,21 @@ func currentRecordingGrant(ctx context.Context, q *custodydb.Queries, row custod
 	if a.Expectation.Recording == nil || !a.Expectation.Recording.RequireApproval {
 		return nil
 	}
-	if !row.PreviewID.Valid {
+	previewID, captureID, scopeDigest := row.PreviewID, row.ID, row.ScopeDigest
+	if b := a.Expectation.CompositionGroup; b != nil {
+		// ADR-276: one review approved the parent; its header names the
+		// preview and scope digest the grant binds (as at admission).
+		g, err := q.ReadRecordingSaveGroup(ctx, custodydb.ReadRecordingSaveGroupParams{RootID: row.RootID, ID: row.GroupID})
+		if err != nil || !row.GroupID.Valid || g.GroupKind != "composition" || uid(g.ID) != b.ParentCaptureID {
+			return value.ErrDenied
+		}
+		previewID, captureID, scopeDigest = g.PreviewID, g.ID, g.ScopeDigest
+	}
+	if !previewID.Valid {
 		return value.ErrDenied
 	}
 	actor := intent.Actor
-	until, err := q.LockApprovedContextGrant(ctx, custodydb.LockApprovedContextGrantParams{RootID: row.RootID, PreviewID: row.PreviewID, CaptureID: row.ID, Issuer: actor.Issuer, Subject: actor.Subject, ClientID: actor.ClientID, ExecutionDigest: row.ScopeDigest})
+	until, err := q.LockApprovedContextGrant(ctx, custodydb.LockApprovedContextGrantParams{RootID: row.RootID, PreviewID: previewID, CaptureID: captureID, Issuer: actor.Issuer, Subject: actor.Subject, ClientID: actor.ClientID, ExecutionDigest: scopeDigest})
 	if err != nil {
 		return err
 	}
