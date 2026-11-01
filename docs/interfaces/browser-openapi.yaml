@@ -13224,7 +13224,7 @@ components:
           type: string
           minLength: 1
           maxLength: 512
-          description: Optional Unicode scalars preserved verbatim; omit when absent. Empty is invalid. Repeat does not restore it.
+          description: Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat.
         sharing:
           $ref: https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture
         repeated_from_capture_id:
