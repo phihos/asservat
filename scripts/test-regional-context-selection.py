@@ -178,7 +178,7 @@ class RegionalContextSelection(unittest.TestCase):
                 self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
 
     def test_installed_focus_topology_and_flags_reach_the_go_consumer(self):
-        for focus, expected in (("approved-recording", 2), ("policy-recording", 2), ("ongoing-save", 2), ("ongoing-incident", 2), ("ongoing-syscall", "ongoing-mixed", 2), ("native-paced", 2), ("journey", 2), ("browser", 2),
+        for focus, expected in (("approved-recording", 2), ("policy-recording", 2), ("ongoing-save", 2), ("ongoing-incident", 2), ("ongoing-syscall", 2), ("ongoing-mixed", 2), ("native-paced", 2), ("journey", 2), ("browser", 2),
                                 ("policy", 2), ("alert", 2), ("logresource", 2),
                                 ("restart", 2), ("upgrade", 2), ("share", 2),
                                 ("chain", 2), ("clusters", 3), ("", 3), ("unknown", 3)):
