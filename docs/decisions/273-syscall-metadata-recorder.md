@@ -57,7 +57,9 @@ docs/research/syscall-recorder-plan.md.
    `SourceSnapshotContext.ActionKind` (omitted for packets, so existing packet
    plan digests are unchanged) selects the expected native type, the policy
    action and the retention evidence type. The download policy accepts
-   `syscallTrace` (three evidence types).
+   `syscallTrace` (three evidence types). Migration 00113 widens the
+   publication lineage predicate and the hub's collect query to
+   `syscallRecords`; the artifact manifest schema gains its syscall variant.
 6. **Availability.** The hub requests the syscall recorder explicitly
    (`OngoingRecorderRequest.Syscall`) and checks the node's syscall mechanism,
    not the packet one.
