@@ -25,6 +25,9 @@ type policyCaptureReservation struct {
 	grant           pgtype.UUID
 	bytes           int64
 	until           time.Time
+	// childAction is a further recorder's action (ADR-275): its capture
+	// reserves a policy_occurrence_capture row, not the occurrence's own.
+	childAction string
 }
 
 func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, trust custodydb.FleetCurrentTrust, a value.Admission, installation string) (*policyCaptureReservation, error) {
@@ -46,17 +49,27 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 	target := a.Plan.Input.Target.Target()
 	var occurrence custodydb.PolicyOccurrence
 	var manual *manualPolicyReservation
+	var childAction string
 	if a.RecordingSave != nil {
 		manual, err = lockManualPolicySave(ctx, q, source, record, a)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		occurrence, err = q.LockPolicyCaptureOccurrence(ctx, custodydb.LockPolicyCaptureOccurrenceParams{RootID: id(a.RootID), ID: id(a.IdempotencyKey)})
+		key := a.IdempotencyKey
+		if s := a.Plan.Input.Snapshot; s != nil && s.OccurrenceID != "" {
+			// ADR-275: a further recorder's capture of the same occurrence,
+			// idempotent on a key derived from occurrence and action.
+			if !authorization.UUID(s.OccurrenceID) || a.IdempotencyKey != value.OccurrenceCaptureKey(s.OccurrenceID, s.ActionID) {
+				return nil, value.ErrDenied
+			}
+			key, childAction = s.OccurrenceID, s.ActionID
+		}
+		occurrence, err = q.LockPolicyCaptureOccurrence(ctx, custodydb.LockPolicyCaptureOccurrenceParams{RootID: id(a.RootID), ID: id(key)})
 		if err != nil {
 			return nil, err
 		}
-		if occurrence.PolicyUid != policy || occurrence.AcceptanceID != id(record.ID) || occurrence.ClusterID != id(target.ClusterID) || occurrence.WorkloadUid != target.WorkloadUID || occurrence.PodUid != target.PodUID || occurrence.Outcome.Valid || occurrence.ReservedCaptureID.Valid {
+		if occurrence.PolicyUid != policy || occurrence.AcceptanceID != id(record.ID) || occurrence.ClusterID != id(target.ClusterID) || occurrence.WorkloadUid != target.WorkloadUID || occurrence.PodUid != target.PodUID || occurrence.Outcome.Valid || childAction == "" && occurrence.ReservedCaptureID.Valid {
 			return nil, value.ErrConflict
 		}
 	}
@@ -92,7 +105,7 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 			required = required || raw
 		}
 	}
-	r := &policyCaptureReservation{occurrence: occurrence, manual: manual, processingLimit: record.Authority.NotAfter, bytes: output, until: snapshot.FreshUntil}
+	r := &policyCaptureReservation{childAction: childAction, occurrence: occurrence, manual: manual, processingLimit: record.Authority.NotAfter, bytes: output, until: snapshot.FreshUntil}
 	if source.GrantAttachmentID.Valid {
 		row, err := q.ReadPolicyGrantAttachment(ctx, custodydb.ReadPolicyGrantAttachmentParams{RootID: id(a.RootID), ID: source.GrantAttachmentID})
 		if err != nil {
@@ -173,7 +186,11 @@ func (r *policyCaptureReservation) spend(ctx context.Context, q *custodydb.Queri
 	if r.manual != nil {
 		return ctx.Err()
 	}
-	n, err = q.ReservePolicyOccurrenceOutput(ctx, custodydb.ReservePolicyOccurrenceOutputParams{RootID: id(root), ID: r.occurrence.ID, ReservedCaptureID: id(capture), GrantID: r.grant, ReservedBytes: r.bytes})
+	if r.childAction != "" {
+		n, err = q.ReservePolicyOccurrenceCapture(ctx, custodydb.ReservePolicyOccurrenceCaptureParams{RootID: id(root), OccurrenceID: r.occurrence.ID, ActionID: r.childAction, CaptureID: id(capture), GrantID: r.grant, ReservedBytes: r.bytes})
+	} else {
+		n, err = q.ReservePolicyOccurrenceOutput(ctx, custodydb.ReservePolicyOccurrenceOutputParams{RootID: id(root), ID: r.occurrence.ID, ReservedCaptureID: id(capture), GrantID: r.grant, ReservedBytes: r.bytes})
+	}
 	if err != nil {
 		return err
 	}
@@ -211,10 +228,16 @@ func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, ro
 		reservation = policyGrantReservation{PolicyUid: manual.PolicyUid, AcceptanceID: manual.AcceptanceID, GrantID: manual.GrantID}
 	} else {
 		occurrence, err := q.ReadPolicyCaptureReservation(ctx, custodydb.ReadPolicyCaptureReservationParams{RootID: row.RootID, ReservedCaptureID: row.ID})
-		if err != nil {
-			return nil, value.ErrDenied
+		if err == nil {
+			reservation = policyGrantReservation{PolicyUid: occurrence.PolicyUid, AcceptanceID: occurrence.AcceptanceID, GrantID: occurrence.GrantID}
+		} else {
+			// ADR-275: a further recorder's capture of an occurrence.
+			child, e := q.ReadPolicyOccurrenceCaptureReservation(ctx, custodydb.ReadPolicyOccurrenceCaptureReservationParams{RootID: row.RootID, CaptureID: row.ID})
+			if e != nil {
+				return nil, value.ErrDenied
+			}
+			reservation = policyGrantReservation{PolicyUid: child.PolicyUid, AcceptanceID: child.AcceptanceID, GrantID: child.GrantID}
 		}
-		reservation = policyGrantReservation{PolicyUid: occurrence.PolicyUid, AcceptanceID: occurrence.AcceptanceID, GrantID: occurrence.GrantID}
 	}
 	source, err := q.ReadPolicySourceRow(ctx, custodydb.ReadPolicySourceRowParams{RootID: row.RootID, PolicyUid: reservation.PolicyUid})
 	if err != nil {

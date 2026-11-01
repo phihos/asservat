@@ -68,7 +68,10 @@ type SourceSnapshotContext struct {
 	ActionID, PolicyUID, TriggerKind string
 	// ActionKind is "syscallTrace" for a syscall source (ADR-273); empty is
 	// the packet source, so existing packet plans keep their digests.
-	ActionKind           string `json:",omitempty"`
+	ActionKind string `json:",omitempty"`
+	// OccurrenceID is set on a further recorder's incident capture (ADR-275):
+	// the policy occurrence whose first capture holds its execution spend.
+	OccurrenceID         string `json:",omitempty"`
 	ExecutionDigest      artifact.Digest
 	RecipeDigest         artifact.Digest
 	SourceAudience       []artifact.AudienceAssignment

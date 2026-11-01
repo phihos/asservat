@@ -2163,6 +2163,15 @@ type PolicyOccurrence struct {
 	ReservedBytes     int64
 }
 
+type PolicyOccurrenceCapture struct {
+	RootID        pgtype.UUID
+	OccurrenceID  pgtype.UUID
+	ActionID      string
+	CaptureID     pgtype.UUID
+	GrantID       pgtype.UUID
+	ReservedBytes int64
+}
+
 type PolicyPodWatermark struct {
 	RootID    pgtype.UUID
 	PolicyUid string

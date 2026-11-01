@@ -190,9 +190,10 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// storage binding and quota/source configuration remain read-only.
 		// ADR-228: a policy executor re-checks its acceptance after locks.
 		read("policy_source", "policy_acceptance")
-		read("policy_occurrence", "policy_grant_attachment", "access_grant")
+		read("policy_occurrence", "policy_occurrence_capture", "policy_grant_attachment", "access_grant")
 		add("policy_source", "UPDATE", "policy_uid") // row lock only
 		add("policy_occurrence", "UPDATE", "reserved_capture_id", "grant_id", "reserved_bytes")
+		add("policy_occurrence_capture", "INSERT") // ADR-275 further recorder captures
 		add("policy_acceptance", "UPDATE", "collected_bytes_spent")
 		add("access_grant", "UPDATE", "id", "policy_executions_spent", "policy_bytes_spent")
 		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_storage_binding", "context_preview", "context_preview_fence", "context_control_pool", "context_control_account", "context_control_charge", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "custody_event", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
