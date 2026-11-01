@@ -255,22 +255,29 @@ func evidenceType(kind string) string {
 	return ""
 }
 
-// RecorderEvidenceType resolves the single evidence type of a one-component
+// RecorderEvidenceType resolves the one evidence type of a manual
 // composition, so the caller can resolve its retention before compilation.
+// A manual capture is one artifact: mixing packet and syscall components is
+// refused until manual captures can become a group (slice B3).
 func RecorderEvidenceType(c value.ProfileComposition) (string, error) {
 	if err := compositionShape(c); err != nil {
 		return "", err
 	}
-	p, err := resolveProfile(0, c.Components[0].Profile, c.Resolved)
-	if err != nil {
-		return "", err
-	}
 	kind := ""
-	for _, a := range p.Definition.Recipe.Actions {
-		if kind != "" && a.Kind != kind || evidenceType(a.Kind) == "" {
-			return "", value.ErrInvalid
+	for i, component := range c.Components {
+		p, err := resolveProfile(i, component.Profile, c.Resolved)
+		if err != nil {
+			return "", err
 		}
-		kind = a.Kind
+		for _, a := range p.Definition.Recipe.Actions {
+			if evidenceType(a.Kind) == "" {
+				return "", value.ErrInvalid
+			}
+			if kind != "" && a.Kind != kind {
+				return "", refuse(value.CompositionRecorderUnavailable, "profile_composition.components", "a manual capture records one evidence type; capture packets and syscalls separately, or record both with a policy")
+			}
+			kind = a.Kind
+		}
 	}
 	return evidenceType(kind), nil
 }
@@ -278,9 +285,6 @@ func RecorderEvidenceType(c value.ProfileComposition) (string, error) {
 func compositionShape(c value.ProfileComposition) error {
 	if !c.Valid() {
 		return refuse(value.CompositionInvalid, "profile_composition", "the composition is malformed")
-	}
-	if len(c.Components) != 1 {
-		return refuse(value.CompositionInvalid, "profile_composition.components", "this release previews exactly one capture profile; composing several profiles follows with the profile catalogs")
 	}
 	return nil
 }
@@ -336,6 +340,8 @@ type expandedAction struct {
 	syscall *syscallParameters
 	filter  *value.CompiledFilter
 	localID string
+	// componentID is the authoring component of this action.
+	componentID string
 	// sensitive names why this action needs individual approval (ADR-249).
 	sensitive []string
 }
@@ -584,80 +590,107 @@ func generatedID(prefix, component, local string) string {
 	return prefix + hex.EncodeToString(h[:])[:24]
 }
 
-// expand resolves the single builtin, applies the typed edits and normalizes
-// every action. Edits are applied first; the plan is validated as a whole.
-func expand(c value.ProfileComposition, compiler FilterCompiler) ([]expandedAction, resolvedProfile, error) {
+// expand resolves every component's profile, applies its typed edits and
+// normalizes every action (REQ-CPR-003). Edits are applied first; the plan
+// is then validated as a whole: generated IDs are unique, at most 16 actions,
+// aggregate bounds cover the sum of outputs and the longest timeout, and
+// recorder sources do not overlap on one Pod.
+func expand(c value.ProfileComposition, compiler FilterCompiler) ([]expandedAction, []resolvedProfile, error) {
 	if err := compositionShape(c); err != nil {
-		return nil, resolvedProfile{}, err
+		return nil, nil, err
 	}
-	component := c.Components[0]
-	p, err := resolveProfile(0, component.Profile, c.Resolved)
-	if err != nil {
-		return nil, resolvedProfile{}, err
-	}
-	actions := make([]expandedAction, 0, len(p.Definition.Recipe.Actions))
-	index := map[string]int{}
-	for _, a := range p.Definition.Recipe.Actions {
-		x := expandedAction{action: a, localID: a.ID}
-		switch a.Kind {
-		case "packetCapture":
-			x.packet = &packetParameters{}
-			err = strict(a.Parameters, x.packet)
-		case "syscallTrace":
-			x.syscall = &syscallParameters{}
-			err = strict(a.Parameters, x.syscall)
-		default:
-			err = value.ErrInvalid
-		}
+	var actions []expandedAction
+	var profiles []resolvedProfile
+	ids := map[string]string{}
+	for ci, component := range c.Components {
+		base := pathf("profile_composition.components[%d]", ci)
+		p, err := resolveProfile(ci, component.Profile, c.Resolved)
 		if err != nil {
-			return nil, resolvedProfile{}, value.ErrInvalid
+			return nil, nil, err
 		}
-		index[a.ID] = len(actions)
-		actions = append(actions, x)
-	}
-	exposed := map[[2]string]bool{}
-	for _, f := range p.Definition.EditableFields {
-		exposed[[2]string{f.ActionID, f.Field}] = true
-	}
-	seen := map[[2]string]bool{}
-	for j, e := range component.Edits {
-		path := pathf("profile_composition.components[0].overrides[%d]", j)
-		key := [2]string{e.ActionID, e.Field}
-		at, found := index[e.ActionID]
-		switch {
-		case !found:
-			return nil, resolvedProfile{}, refuse(value.CompositionInvalid, path+".actionID", "profile "+p.Name+"/v1 has no action "+strconv.Quote(e.ActionID))
-		case seen[key]:
-			return nil, resolvedProfile{}, refuse(value.CompositionInvalid, path, "duplicate edit of "+e.Field+" for action "+e.ActionID)
-		case !exposed[key]:
-			if _, registered := editBinding[e.Field]; !registered {
-				return nil, resolvedProfile{}, refuse(value.CompositionInvalid, path+".field", "unknown field "+strconv.Quote(e.Field))
+		profiles = append(profiles, p)
+		first := len(actions)
+		index := map[string]int{}
+		for _, a := range p.Definition.Recipe.Actions {
+			x := expandedAction{action: a, localID: a.ID, componentID: component.ID}
+			switch a.Kind {
+			case "packetCapture":
+				x.packet = &packetParameters{}
+				err = strict(a.Parameters, x.packet)
+			case "syscallTrace":
+				x.syscall = &syscallParameters{}
+				err = strict(a.Parameters, x.syscall)
+			default:
+				err = value.ErrInvalid
 			}
-			return nil, resolvedProfile{}, refuse(value.CompositionInvalid, path+".field", p.Name+"/v1 does not expose "+e.Field+" for action "+e.ActionID+"; choose Customize to author a new recipe")
+			if err != nil {
+				return nil, nil, value.ErrInvalid
+			}
+			id := generatedID("a", component.ID, a.ID)
+			if other, taken := ids[id]; taken {
+				return nil, nil, refuse(value.CompositionInvalid, base+".id", "the generated action ID of "+component.ID+"/"+a.ID+" collides with "+other+"; rename the component")
+			}
+			ids[id] = component.ID + "/" + a.ID
+			index[a.ID] = len(actions)
+			actions = append(actions, x)
 		}
-		seen[key] = true
-		if err := applyEdit(path, e, &actions[at]); err != nil {
-			return nil, resolvedProfile{}, err
+		if len(actions) > 16 {
+			return nil, nil, refuse(value.CompositionInvalid, "profile_composition.components", "the composition expands to more than 16 actions; remove a component")
+		}
+		exposed := map[[2]string]bool{}
+		for _, f := range p.Definition.EditableFields {
+			exposed[[2]string{f.ActionID, f.Field}] = true
+		}
+		seen := map[[2]string]bool{}
+		for j, e := range component.Edits {
+			path := pathf("%s.overrides[%d]", base, j)
+			key := [2]string{e.ActionID, e.Field}
+			at, found := index[e.ActionID]
+			switch {
+			case !found:
+				return nil, nil, refuse(value.CompositionInvalid, path+".actionID", "profile "+p.Name+"/"+p.Version+" has no action "+strconv.Quote(e.ActionID))
+			case seen[key]:
+				return nil, nil, refuse(value.CompositionInvalid, path, "duplicate edit of "+e.Field+" for action "+e.ActionID)
+			case !exposed[key]:
+				if _, registered := editBinding[e.Field]; !registered {
+					return nil, nil, refuse(value.CompositionInvalid, path+".field", "unknown field "+strconv.Quote(e.Field))
+				}
+				return nil, nil, refuse(value.CompositionInvalid, path+".field", p.Name+"/"+p.Version+" does not expose "+e.Field+" for action "+e.ActionID+"; choose Customize to author a new recipe")
+			}
+			seen[key] = true
+			if err := applyEdit(path, e, &actions[at]); err != nil {
+				return nil, nil, err
+			}
+		}
+		for i := first; i < len(actions); i++ {
+			if err := normalize(pathf("%s action %s", base, actions[i].localID), &actions[i], compiler); err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 	var total int64
 	var longest time.Duration
-	for i := range actions {
-		path := pathf("profile_composition.components[0] action %s", actions[i].localID)
-		if err := normalize(path, &actions[i], compiler); err != nil {
-			return nil, resolvedProfile{}, err
-		}
-		total += actions[i].action.Limits.MaxBytes
-		t, _ := durationValue(actions[i].action.Limits.Timeout, false)
+	kinds := map[string]string{}
+	for _, x := range actions {
+		total += x.action.Limits.MaxBytes
+		t, _ := durationValue(x.action.Limits.Timeout, false)
 		longest = max(longest, t)
+		// One packet and one syscall source per Pod: no coexistence profile
+		// qualifies two sources of one kind, and identical ones would acquire
+		// the same evidence twice.
+		alias := x.componentID + "/" + x.localID
+		if other, dup := kinds[x.action.Kind]; dup {
+			return nil, nil, refuse(value.CompositionConflict, "profile_composition.components", alias+" and "+other+" are both "+x.action.Kind+" recorders on the same Pods; keep one and adjust its filter or windows")
+		}
+		kinds[x.action.Kind] = alias
 	}
 	if total > c.MaxTotalBytes {
-		return nil, resolvedProfile{}, refuse(value.CompositionInvalid, "profile_composition.maxTotalBytes", "the actions may write "+strconv.FormatInt(total, 10)+" bytes; raise maxTotalBytes explicitly or lower the action output limit")
+		return nil, nil, refuse(value.CompositionInvalid, "profile_composition.maxTotalBytes", "the actions may write "+strconv.FormatInt(total, 10)+" bytes; raise maxTotalBytes explicitly or lower the action output limit")
 	}
 	if d, ok := durationValue(c.MaxDuration, false); !ok || d < longest {
-		return nil, resolvedProfile{}, refuse(value.CompositionInvalid, "profile_composition.maxDuration", "maxDuration must cover the longest action timeout ("+longest.String()+")")
+		return nil, nil, refuse(value.CompositionInvalid, "profile_composition.maxDuration", "maxDuration must cover the longest action timeout ("+longest.String()+")")
 	}
-	return actions, p, nil
+	return actions, profiles, nil
 }
 
 // ValidateComposition compiles an authored composition without target facts,
@@ -884,7 +917,7 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 	if !authorization.UUID(in.CaptureID) || !in.Executor.Valid() || !in.Target.Valid(now) || in.Deadline.Nanosecond()%1000 != 0 || !now.Before(in.Deadline) || in.Deadline.After(now.Add(5*time.Minute)) {
 		return bad()
 	}
-	actions, profile, err := expand(in.Composition, filters)
+	actions, profiles, err := expand(in.Composition, filters)
 	if err != nil {
 		return value.RecorderPlan{}, err
 	}
@@ -911,18 +944,22 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 	}
 	slices.SortFunc(refs, func(a, b policyRef) int { return strings.Compare(a.UID, b.UID) })
 
-	component := in.Composition.Components[0]
 	expanded := recipeSpec{Description: ExpandedRecipeDescription, MaxTotalBytes: in.Composition.MaxTotalBytes, MaxDuration: in.Composition.MaxDuration}
 	scope := recorderScope{Version: value.RecorderPlanVersion, Deadline: in.Deadline.UTC().Format(time.RFC3339Nano), Interim: "recorderUnavailable"}
 	if in.NodeRecorder {
 		scope.Interim = "nodeRecorder"
 	}
-	scope.Provenance = wireProvenance{Authored: authored(in.Composition), ResolvedProfiles: []wireResolved{profile.wire(component.ID)}}
+	scope.Provenance = wireProvenance{Authored: authored(in.Composition)}
 	scope.Lifecycle = lifecyclePlan{SchemaVersion: "action-lifecycle/v1", RequestKind: "DebugCapture", OngoingPodScope: "none"}
 	scope.Filters = []compiledFilterRecord{}
-	out := value.RecorderPlan{Input: in, Profiles: []value.ResolvedProfile{{ComponentID: component.ID, Ref: component.Profile, DefinitionDigest: profile.Digest, SourceClusterID: profile.SourceClusterID, SourceNamespaceUID: profile.SourceNamespaceUID, SourceUID: profile.SourceUID, Deprecated: profile.Deprecated}}, CompiledAt: now}
+	out := value.RecorderPlan{Input: in, CompiledAt: now}
+	for i, profile := range profiles {
+		component := in.Composition.Components[i]
+		scope.Provenance.ResolvedProfiles = append(scope.Provenance.ResolvedProfiles, profile.wire(component.ID))
+		out.Profiles = append(out.Profiles, value.ResolvedProfile{ComponentID: component.ID, Ref: component.Profile, DefinitionDigest: profile.Digest, SourceClusterID: profile.SourceClusterID, SourceNamespaceUID: profile.SourceNamespaceUID, SourceUID: profile.SourceUID, Deprecated: profile.Deprecated})
+	}
 	for _, x := range actions {
-		a, summary, filter, err := normalizedRecorderAction(x, component.ID)
+		a, summary, filter, err := normalizedRecorderAction(x, x.componentID)
 		if err != nil {
 			return bad()
 		}
@@ -958,7 +995,7 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 				approval.ObservationLimits.MaxSessionSeconds = max(approval.ObservationLimits.MaxSessionSeconds, limits.MaxSessionSeconds)
 			}
 		}
-		scope.Provenance.ActionMap = append(scope.Provenance.ActionMap, wireAlias{component.ID, x.localID, id, false})
+		scope.Provenance.ActionMap = append(scope.Provenance.ActionMap, wireAlias{x.componentID, x.localID, id, false})
 		scope.Retention = append(scope.Retention, effectiveRetention{id, r.PurposeRef, r.PrivacyClass, r.EvidenceType, r.RequestedSeconds, r.MaximumSeconds, r.DeletionBudgetSeconds, refs})
 		expanded.Actions = append(expanded.Actions, a)
 		out.Actions = append(out.Actions, summary)

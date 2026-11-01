@@ -20,6 +20,8 @@ const (
 	CompositionApproval            = "ApprovalRequired"
 	CompositionNoCompiler          = "FilterCompilerUnavailable"
 	CompositionRecorderUnavailable = "RecorderUnavailable"
+	// CompositionConflict is a duplicate or overlapping acquisition (REQ-CPR-003).
+	CompositionConflict = "AcquisitionConflict"
 )
 
 // Sensitive-acquisition reasons (ADR-249). Either makes the plan need an

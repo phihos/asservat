@@ -25,10 +25,11 @@ func CompileOngoingPolicyRecorder(c value.ProfileComposition, filters FilterComp
 
 func compilePolicyRecorder(c value.ProfileComposition, filters FilterCompiler, sources bool) (value.PolicyRecorderConfiguration, error) {
 	var out value.PolicyRecorderConfiguration
-	actions, profile, err := expand(c, filters)
+	actions, profiles, err := expand(c, filters)
 	if err != nil {
 		return out, err
 	}
+	profile := profiles[0]
 	if len(actions) != 1 || actions[0].packet == nil && actions[0].syscall == nil {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "policy execution supports one network-header packet or syscall metadata action")
 	}

@@ -51,3 +51,32 @@ with S-05. It is therefore slice B, after slice A:
 Everything listed under slices B and C above, plus the three unshipped builtins
 (process-context, go-cpu, http-headers), which are listed as unavailable
 entries until their increments land.
+
+## Slice B plan (2026-11-01, from a code map of main 8c3ab742)
+
+One capture is strictly one attempt, one artifact and one expectation
+(`context_capture.attempt_id` UNIQUE, `custody_attempt.artifact_id` UNIQUE,
+`context_catalog.capture_id` UNIQUE, verification keyed by capture). Giving a
+capture N artifacts would break all of these and every `ContextExpectation`
+consumer. The ADR-266 recording save group already provides N child captures
+under one shared scope digest and case, with mixed kinds allowed. Slice B
+therefore maps an N-component composition onto **one shared review and scope
+with one child capture per recorder action**, not one capture with N
+artifacts. That satisfies REQ-CPR-003's "one recipe and one current execution
+scope contain every action and budget".
+
+1. **B1 compile.** `expand` loops over components with one global alias and
+   generated-ID map (`a` + 24 hex of sha256(componentID NUL localID); reject
+   collisions), at most 16 actions, aggregate `maxTotalBytes`/`maxDuration`.
+   Identical expensive actions (packet/syscall) are a duplicate conflict; two
+   non-identical packet or two syscall sources on one Pod have no qualified
+   coexistence profile and are refused with a remedy. Packet + syscall is the
+   one mixed pair. Retention is resolved per evidence type.
+2. **B2 policies.** `PolicyRecorderConfiguration` carries one entry per
+   action; one policy arms one source per action on each Pod (sources are
+   already independent per `SourceID` on the node and per action in SQL).
+   Saves become one group child per (Pod, action). Gate: a native test runs a
+   packet and a syscall source on the same Pod at the same time.
+3. **B3 manual.** A manual syscall `Recording` (processing trigger accepts
+   `syscallRecords` on the recording branch, new migration) and a manual
+   group preview kind, so a manual N-component capture becomes a group.
