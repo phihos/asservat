@@ -108,3 +108,18 @@ func TestSourceCeilingsSurviveClosedNodeProjection(t *testing.T) {
 		t.Fatal("missing old caps enabled ongoing capacity")
 	}
 }
+
+// B3: a finite syscall recording keeps its kind, selection and rate limit
+// across the closed node wire, so the node runs it instead of refusing it.
+func TestSyscallCaptureWorkRoundTrips(t *testing.T) {
+	p := collector.PacketCapture{CaptureID: "22222222-2222-4222-8222-222222222222", PodUID: "11111111-1111-4111-8111-111111111111", Duration: 5 * time.Second, MaxBytes: 1 << 20,
+		Syscalls: &collector.SyscallFilter{Names: []string{"openat", "read"}, ErrorsOnly: true, MaxEvents: 1000, MaxTrackedThreads: 64}, MaxEventsPerSecond: 100}
+	w := collector.Work{ID: "33333333-3333-4333-8333-333333333333", Sequence: 1, Kind: collector.WorkSyscallCapture, NotAfter: time.Now().Add(time.Minute).UTC().Truncate(time.Millisecond), Packet: &p}
+	got, ok := DomainWork(WireWork(w))
+	if !ok || got.Kind != collector.WorkSyscallCapture || got.Packet == nil || got.Packet.Syscalls == nil || !reflect.DeepEqual(*got.Packet.Syscalls, *p.Syscalls) || got.Packet.MaxEventsPerSecond != 100 || !got.Packet.Valid() {
+		t.Fatalf("%+v", got.Packet)
+	}
+	if r := collector.Decide(got, time.Now()); r.Reason == collector.ReasonWorkUnknown {
+		t.Fatal("the node would refuse the decoded syscall capture")
+	}
+}
