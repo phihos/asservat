@@ -2,8 +2,8 @@ package bootstrap
 
 import (
 	"context"
-	"fmt"
 	"crypto/sha256"
+	"fmt"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/packets"

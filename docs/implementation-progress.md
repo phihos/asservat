@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Installed automatic incident snapshot from an ongoing packet source (2026-11-01)
+
+New native suite `continuation-ongoing-incident`: an exit-detector DebugPolicy
+arms one ordinary ongoing networkHeaders source; a real SIGKILL of the armed
+Pod's container (`Error`, exit 137) admits one policy occurrence whose
+snapshot the policy executor saves from the running source, published and
+downloaded natively (tshark finds the pre-restart retained-port marker).
+Passes: 41281000170, 41283562049, 41283563632 (plus the runs dispatched with
+this PR); `continuation-ongoing-save` regression 41279894610 and 41283567320
+pass. 41283565566 failed in installer bootstrap before the focus started.
+
+Findings on the way:
+- Save, its repeat and an incident share the workload trigger budget (two per
+  five minutes); a third occurrence is correctly suppressed as `cooldown`
+  (41278608533/41278610152), so the incident has its own focus.
+- ADR-274: sparse traffic let one ring segment span beyond MaxAge, so an old
+  record's age eviction took the recent pre-incident markers with it
+  (41282477857/41282479595, `failed at empty ... evicted true`). Segments now
+  also rotate after MaxAge/MaxSegments.
+- Policy occurrences are evaluated even when source maintenance fails
+  (REQ-LIF-002); the node logs why a snapshot reports absence.
+- The root installer fixture profile carries eight control records per
+  account (source, re-arms, Saves and incident snapshots all charge it).
+
 ## Installed ongoing packet + Save focus: first full pass (2026-10-31)
 
 Native run 41244506441 passed `continuation-ongoing-save` end to end on the
