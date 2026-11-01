@@ -457,10 +457,20 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		// running source (no manual request, no finite recipe). The retained-port
 		// marker just before the restart must be in the saved window.
 		incidentSent := marker(ongoingSaveRetainedPort)
+		if installedJourneyFocus() == "ongoing-syscall" {
+			// An idle Go workload parks without syscalls; serving a few
+			// requests gives the window real pre-restart calls.
+			for range 5 {
+				call, stop := context.WithTimeout(ctx, 2*time.Second)
+				_, _ = f.region.CoreV1().RESTClient().Get().AbsPath("/api/v1/namespaces/"+f.namespace+"/pods/"+podName+":8080/proxy/log").Param("line", "asservat syscall window").DoRaw(call)
+				stop()
+			}
+		}
 		pod, err := f.region.CoreV1().Pods(f.namespace).Get(ctx, podName, meta.GetOptions{})
 		if err != nil || string(pod.UID) != podUID {
 			t.Fatal("ongoing incident Pod before restart", err)
 		}
+		killedAt := time.Now()
 		kill, stopKill := context.WithTimeout(ctx, 15*time.Second)
 		killed := installedKillContainer(t, kill, *pod)
 		stopKill()
@@ -489,7 +499,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		incidentMarkers := 0
 		if installedJourneyFocus() == "ongoing-syscall" {
 			incidentNative, _ = fetchNative(published(incidentID), "native-ongoing-syscall-download", "ongoing-syscall.jsonl")
-			incidentMarkers = ongoingSyscallEvents(t, incidentNative, podUID)
+			incidentMarkers = ongoingSyscallEvents(t, incidentNative, podUID, killedAt)
 		} else {
 			var incidentFile string
 			incidentNative, incidentFile = fetchNative(published(incidentID), "native-ongoing-incident-download", "ongoing-incident.pcapng")
@@ -655,9 +665,9 @@ func installedOngoingFocus() bool {
 
 // ongoingSyscallEvents checks a downloaded syscall window (ADR-273): JSON
 // Lines of metadata-only events of the armed Pod, and returns their count.
-func ongoingSyscallEvents(t *testing.T, native []byte, podUID string) int {
+func ongoingSyscallEvents(t *testing.T, native []byte, podUID string, before time.Time) int {
 	t.Helper()
-	n := 0
+	n, early := 0, 0
 	for _, line := range strings.Split(strings.TrimSuffix(string(native), "\n"), "\n") {
 		var e struct {
 			Identity struct {
@@ -674,7 +684,13 @@ func ongoingSyscallEvents(t *testing.T, native []byte, podUID string) int {
 				t.Fatalf("syscall event carries %s: %s", banned, line)
 			}
 		}
+		if at, err := time.Parse(time.RFC3339Nano, e.Timestamp); err == nil && at.Before(before) {
+			early++
+		}
 		n++
+	}
+	if early == 0 {
+		t.Fatalf("syscall window has %d events but none from the requests before the restart", n)
 	}
 	return n
 }
