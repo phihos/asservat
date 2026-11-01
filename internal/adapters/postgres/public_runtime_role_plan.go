@@ -297,7 +297,11 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// ADR-200: a refresh demand for an enrolled workload; no authority.
 		out = append(out, publicRuntimeGrant{"function", "demand_capacity_refresh(uuid,uuid,text,text,text,text,text)", "", "EXECUTE"})
 	case "capture-resolution":
-		read("recording_save_group")
+		// Fencing counts the caller's live previews, which include selections.
+		read("recording_save_group", "recording_selection_set")
+		// Closing a preview runs context_preview_immutable, whose reason check
+		// calls this SECURITY DEFINER predicate (00110 revoked it from PUBLIC).
+		out = append(out, publicRuntimeGrant{"function", "capture_preview_reason_copied(context_preview)", "", "EXECUTE"})
 		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
 		// Current same-actor request resolution may only close a passive draft
 		// or fence its absent original ID. It cannot admit/cancel accepted work.
