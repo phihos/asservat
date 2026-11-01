@@ -31,7 +31,19 @@ is already modelled as an ADR-266 recording save group.
 3. Incident snapshots and Save create one child capture per (Pod, recorder)
    in one save group, so every artifact keeps its own attempt, manifest and
    download, and the group shares one review, scope and case.
-4. B1's conflict rule stands: at most one packet and one syscall recorder per
+4. Incidents (step 3). An occurrence stays one execution and keeps its one
+   `capture_id`/`reserved_capture_id` (migrations 00082, 00102) for the
+   first recorder. A new child table `policy_occurrence_capture`
+   (occurrence, action ID, unique capture ID, reserved bytes) holds the
+   further recorders' captures, each idempotent on a key derived from the
+   occurrence ID and action ID. Every child reservation is charged to the
+   same acceptance output pool as the first capture, so the authored
+   `MaxBytes` bounds the whole incident; the execution is spent once. A
+   refused child does not refuse the occurrence: its outcome is recorded
+   per child, and the first recorder's outcome remains the occurrence's.
+   Qualified with `make custody-integration` (concurrent reservation, pool
+   exhaustion between children, replay).
+5. B1's conflict rule stands: at most one packet and one syscall recorder per
    policy, so the only mixed pair is packet + syscall.
 
 ## Gate before enabling
