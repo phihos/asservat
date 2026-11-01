@@ -85,7 +85,13 @@ func (c *NodeChannel) EnqueuePacket(nodeUID string, p collector.PacketCapture, s
 	}
 	packet := p
 	packet.Program = append(packet.Program[:0:0], p.Program...)
-	w, err := c.enqueue(nodeUID, collector.WorkPacketCapture, startBy, &packet, nil, nil)
+	kind := collector.WorkPacketCapture
+	if p.Syscalls != nil {
+		filter := *p.Syscalls
+		filter.Names = append([]string(nil), p.Syscalls.Names...)
+		packet.Syscalls, kind = &filter, collector.WorkSyscallCapture
+	}
+	w, err := c.enqueue(nodeUID, kind, startBy, &packet, nil, nil)
 	if err != nil {
 		return w, err
 	}

@@ -130,11 +130,20 @@ func (h *ConnectorRecordings) start(ctx context.Context, p *objectstore.Prepared
 	if err != nil {
 		return time.Time{}, value.ErrUnavailable
 	}
+	mechanism := collector.MechanismPacket
+	if rec.Kind == "syscallTrace" {
+		mechanism = collector.MechanismSyscall
+	}
 	v, ok := h.nodes.NodeByName(name)
-	if !ok || !v.PacketRecorderAvailable() {
+	if !ok || !v.RecorderAvailable(mechanism) {
 		return time.Time{}, value.ErrUnavailable
 	}
 	work := collector.PacketCapture{CaptureID: e.CaptureUID, PodUID: e.PodUID, Duration: time.Duration(rec.DurationMillis) * time.Millisecond, MaxBytes: rec.MaxBytes}
+	if s := rec.Syscalls; s != nil {
+		// B3: a finite syscall metadata recording of the same Pod.
+		work.Syscalls = &collector.SyscallFilter{Names: append([]string(nil), s.Names...), ErrorsOnly: s.ErrorsOnly, MaxEvents: s.MaxEvents, MaxTrackedThreads: s.MaxTrackedThreads}
+		work.MaxEventsPerSecond = s.MaxEventsPerSecond
+	}
 	if f := rec.Filter; f != nil {
 		work.Program = make([]planning.BPFInstruction, len(f.Program))
 		for i, ins := range f.Program {
@@ -187,7 +196,7 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 			_, _ = io.Copy(io.Discard, pcapng)
 			return value.ErrDenied
 		}
-	} else if r.Snapshot != nil || nativeType != artifact.PCAPNGArtifact {
+	} else if r.Snapshot != nil || nativeType != held.expectation.NativeType {
 		h.mu.Unlock()
 		_, _ = io.Copy(io.Discard, pcapng)
 		return value.ErrDenied

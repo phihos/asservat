@@ -68,10 +68,14 @@ const (
 	WorkPacketSourceSnapshot WorkKind = "packetSourceSnapshot"
 	WorkPacketSource         WorkKind = "packetSource"
 	WorkStopPacketSource     WorkKind = "stopPacketSource"
+	// WorkSyscallCapture is one finite manual syscall metadata recording
+	// (B3), with the PacketCapture payload carrying Syscalls. A node that
+	// predates it refuses the unknown kind instead of running tcpdump.
+	WorkSyscallCapture WorkKind = "syscallCapture"
 )
 
 func (k WorkKind) Valid() bool {
-	return k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource
+	return k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource || k == WorkSyscallCapture
 }
 
 // Work is one item the connector queued for one node process. Sequence is
@@ -112,12 +116,23 @@ type PacketCapture struct {
 	Duration      time.Duration
 	MaxBytes      int64
 	Observation   *ObservationPermit
+	// Syscalls and MaxEventsPerSecond make this a finite syscall metadata
+	// recording (B3, WorkSyscallCapture): no program, at most a minute.
+	Syscalls           *SyscallFilter `json:",omitempty"`
+	MaxEventsPerSecond int64          `json:",omitempty"`
 }
+
+// MaxSyscallCaptureDuration is a manual syscall recording's longest window.
+const MaxSyscallCaptureDuration = time.Minute
 
 // Valid checks the payload's own bounds; the node checks the digest against
 // the program it received.
 func (p PacketCapture) Valid() bool {
 	if o := p.Observation; o != nil && (!o.ValidFinite(o.StartedAt) || o.Duration != p.Duration || o.Binding.CaptureID != p.CaptureID || o.Binding.PodUID != p.PodUID || o.Binding.ProgramDigest != p.ProgramDigest) {
+		return false
+	}
+	if p.Syscalls != nil && (!p.Syscalls.Valid() || len(p.Program) != 0 || p.ProgramDigest != [32]byte{} || p.Observation != nil || p.Duration > MaxSyscallCaptureDuration || p.MaxEventsPerSecond < 1 || p.MaxEventsPerSecond > 1<<16) ||
+		p.Syscalls == nil && p.MaxEventsPerSecond != 0 {
 		return false
 	}
 	return validUUID(p.CaptureID) && validUUID(p.PodUID) && len(p.Program) <= planning.MaxFilterInstructions && (len(p.Program) == 0) == (p.ProgramDigest == [32]byte{}) &&
@@ -206,7 +221,7 @@ type Receipt struct {
 func Decide(w Work, now time.Time) Receipt {
 	r := Receipt{WorkID: w.ID, Sequence: w.Sequence, Outcome: OutcomeRefused, Reason: ReasonRecorderNotImplemented}
 	switch {
-	case !w.Kind.Valid() || (w.Kind == WorkPacketCapture) != (w.Packet != nil) || w.Packet != nil && !w.Packet.Valid() ||
+	case !w.Kind.Valid() || (w.Kind == WorkPacketCapture || w.Kind == WorkSyscallCapture) != (w.Packet != nil) || w.Packet != nil && (!w.Packet.Valid() || (w.Kind == WorkSyscallCapture) != (w.Packet.Syscalls != nil)) ||
 		(w.Kind == WorkPacketSource) != (w.Source != nil) || w.Source != nil && (!w.Source.Valid() || w.NotAfter.After(w.Source.Permit.DispatchUntil)) ||
 		(w.Kind == WorkCancelSourceSnapshot) != (w.CancelSnapshot != nil) || w.CancelSnapshot != nil && !w.CancelSnapshot.Valid() ||
 		(w.Kind == WorkPacketSourceSnapshot) != (w.Snapshot != nil) || w.Snapshot != nil && (!w.Snapshot.Valid() || w.NotAfter.After(w.Snapshot.Request.StartBy)) ||

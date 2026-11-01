@@ -72,7 +72,7 @@ type RecordingSyscalls struct {
 }
 
 func (s *RecordingSyscalls) valid() bool {
-	if s == nil || len(s.Names) > 128 || s.MaxEvents < 1 || s.MaxEvents > 1<<20 || s.MaxEventsPerSecond < 1 || s.MaxEventsPerSecond > 1<<16 || s.MaxTrackedThreads < 1 || s.MaxTrackedThreads > 1<<16 {
+	if s == nil || len(s.Names) > 128 || s.MaxEvents < 1 || s.MaxEvents > 1_000_000 || s.MaxEventsPerSecond < 1 || s.MaxEventsPerSecond > 1<<16 || s.MaxTrackedThreads < 1 || s.MaxTrackedThreads > 16_384 {
 		return false
 	}
 	for i, n := range s.Names {
