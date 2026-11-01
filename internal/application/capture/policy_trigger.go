@@ -268,6 +268,11 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 		// A replaced namespace or workload is outside the accepted scope.
 		return value.ErrChanged
 	}
+	// REQ-LIF-002: detectors run even when the ongoing recorder is degraded.
+	// A maintenance failure (for example a restart that closed the source) is
+	// reported but never hides the occurrence it accompanies; the snapshot
+	// then reports its actual coverage.
+	var maintainErr error
 	if ongoing {
 		if t.OngoingSources == nil {
 			return value.ErrRecorderUnavailable
@@ -276,7 +281,7 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 			if sourceStageOf(err) == "" {
 				err = staged("maintain", err)
 			}
-			return err
+			maintainErr = err
 		}
 		// Arming remains independent of occurrence admission. Only an explicitly
 		// composed snapshot service can spend an incident; it cannot rerun
@@ -285,15 +290,15 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 			return value.ErrRecorderUnavailable
 		}
 		if r != nil && r.running(p.PolicyUID) {
-			return nil
+			return maintainErr
 		}
 	}
 	occurrences, err := t.Ledger.Tick(tick, value.PolicyTick{Policy: compiled, Authority: a, Observation: observation})
 	if err != nil {
-		return err
+		return errors.Join(maintainErr, err)
 	}
 	if len(occurrences) == 0 {
-		return nil
+		return maintainErr
 	}
 	var authored struct {
 		Target json.RawMessage `json:"target"`
@@ -310,7 +315,7 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	} else {
 		r.start(p.PolicyUID, func() { t.run(ctx, a, compiled, observation, occurrences) })
 	}
-	return nil
+	return maintainErr
 }
 
 // run captures each admitted occurrence once, in order, and records it.
