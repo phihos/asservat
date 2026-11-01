@@ -38,7 +38,11 @@ func snapshotContext(w APIContextWork) (*planning.SourceSnapshotContext, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &planning.SourceSnapshotContext{Group: group, RecordingSaveScope: manualScope, SourceDefinitionDigest: definitionDigest, Request: *e.Snapshot, ActionID: e.ActionID, PolicyUID: b.PolicyUID, TriggerKind: e.Lifecycle.TriggerKind, ExecutionDigest: artifact.Digest(b.Scope), RecipeDigest: e.RecipeDigest, SourceAudience: w.SourceAudience, SourceAudienceDigest: artifact.Digest(b.AudienceDigest), SourceTarget: w.SourceTarget}, nil
+	kind := ""
+	if e.NativeType == artifact.SyscallRecordsArtifact {
+		kind = "syscallTrace"
+	}
+	return &planning.SourceSnapshotContext{Group: group, RecordingSaveScope: manualScope, SourceDefinitionDigest: definitionDigest, Request: *e.Snapshot, ActionID: e.ActionID, PolicyUID: b.PolicyUID, TriggerKind: e.Lifecycle.TriggerKind, ActionKind: kind, ExecutionDigest: artifact.Digest(b.Scope), RecipeDigest: e.RecipeDigest, SourceAudience: w.SourceAudience, SourceAudienceDigest: artifact.Digest(b.AudienceDigest), SourceTarget: w.SourceTarget}, nil
 }
 
 // SQL's accepted-work reader already checks immutable group membership against

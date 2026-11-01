@@ -4,7 +4,8 @@ import "testing"
 
 // ADR-248: a client may be approved for packet captures (PCAPNG) besides
 // context; each evidence type still needs its own explicit client listing,
-// and types without a download path (syscall traces) stay invalid.
+// and types without a download path (core dumps) stay invalid. Syscall
+// metadata has one since ADR-273.
 func TestDownloadPolicyPacketCaptureNeedsExplicitClientType(t *testing.T) {
 	p, a, n := downloadPolicyFixture()
 	sel := func(p DownloadPolicy, evidenceType string) bool {
@@ -25,6 +26,10 @@ func TestDownloadPolicyPacketCaptureNeedsExplicitClientType(t *testing.T) {
 		t.Fatal("packet capture approval disclosed context")
 	}
 	q.Clients[0].EvidenceTypes = []string{"syscallTrace"}
+	if !q.Valid(n) || !sel(q, "syscallTrace") {
+		t.Fatal("explicitly approved syscall metadata client refused")
+	}
+	q.Clients[0].EvidenceTypes = []string{"coreDump"}
 	if q.Valid(n) {
 		t.Fatal("evidence type without a download path accepted")
 	}

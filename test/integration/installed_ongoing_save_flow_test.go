@@ -42,17 +42,27 @@ const (
 
 func installedOngoingSaveSpec(cluster, namespace, workload string) map[string]any {
 	return map[string]any{
-		"target":    map[string]any{"cluster": cluster, "namespace": namespace, "workloadRef": map[string]any{"apiVersion": "apps/v1", "kind": "Deployment", "name": workload}, "maxPods": 1, "selection": "triggeringPod", "adoption": "pinUID"},
-		"detectors": []any{map[string]any{"id": "crashed", "kind": "exit", "options": map[string]any{"reasons": []any{"Error", "OOMKilled"}}}},
-		"when":      map[string]any{"detector": "crashed"},
-		"profileComposition": map[string]any{"components": []any{map[string]any{"id": "network", "profileRef": map[string]string{"catalog": "builtin", "name": "network-connections", "version": "v1"}, "overrides": []any{
-			map[string]any{"actionID": "sample", "field": "packetFilter", "value": installedOngoingSaveFilter},
-		}}}, "maxTotalBytes": 16 << 20, "maxDuration": "20s"},
-		"budgets":   map[string]any{"cooldown": "5s", "burst": 2, "maxOccurrencesPerHour": 12, "maxConcurrentActions": 1},
-		"retention": "10m", "suspended": false, "observation": map[string]any{"mode": "allAuthorized"},
+		"target":             map[string]any{"cluster": cluster, "namespace": namespace, "workloadRef": map[string]any{"apiVersion": "apps/v1", "kind": "Deployment", "name": workload}, "maxPods": 1, "selection": "triggeringPod", "adoption": "pinUID"},
+		"detectors":          []any{map[string]any{"id": "crashed", "kind": "exit", "options": map[string]any{"reasons": []any{"Error", "OOMKilled"}}}},
+		"when":               map[string]any{"detector": "crashed"},
+		"profileComposition": installedOngoingComposition(),
+		"budgets":            map[string]any{"cooldown": "5s", "burst": 2, "maxOccurrencesPerHour": 12, "maxConcurrentActions": 1},
+		"retention":          "10m", "suspended": false, "observation": map[string]any{"mode": "allAuthorized"},
 		"evaluation":     map[string]any{"scope": "pod", "fireOnActivation": false, "rearmFor": "10s"},
 		"recordingSaves": map[string]any{"enabled": true},
 	}
+}
+
+// installedOngoingComposition is the builtin ongoing networkHeaders recorder,
+// or for the ongoing-syscall focus the builtin syscall metadata recorder
+// (ADR-273) with its defaults.
+func installedOngoingComposition() map[string]any {
+	if installedJourneyFocus() == "ongoing-syscall" {
+		return map[string]any{"components": []any{map[string]any{"id": "calls", "profileRef": map[string]string{"catalog": "builtin", "name": "syscall-activity", "version": "v1"}}}, "maxTotalBytes": 16 << 20, "maxDuration": "30s"}
+	}
+	return map[string]any{"components": []any{map[string]any{"id": "network", "profileRef": map[string]string{"catalog": "builtin", "name": "network-connections", "version": "v1"}, "overrides": []any{
+		map[string]any{"actionID": "sample", "field": "packetFilter", "value": installedOngoingSaveFilter},
+	}}}, "maxTotalBytes": 16 << 20, "maxDuration": "20s"}
 }
 
 type ongoingSaveSource struct {
@@ -155,7 +165,11 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 	}
 
-	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "ongoing-packet-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "installed ongoing packet Save qualification", "automation": map[string]any{"allowedActions": []any{"packetCapture"}, "maxLifetimeSeconds": ongoingSaveLifetime, "maxExecutions": 8, "maxBytes": 64 << 20, "maxObservedBytes": 128 << 20}}}
+	ongoingAction := "packetCapture"
+	if installedJourneyFocus() == "ongoing-syscall" {
+		ongoingAction = "syscallTrace"
+	}
+	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "ongoing-packet-automation"}, "spec": map[string]any{"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "installed ongoing packet Save qualification", "automation": map[string]any{"allowedActions": []any{ongoingAction}, "maxLifetimeSeconds": ongoingSaveLifetime, "maxExecutions": 8, "maxBytes": 64 << 20, "maxObservedBytes": 128 << 20}}}
 	body, _ := json.Marshal(binding)
 	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
 		t.Fatal("operator packet automation envelope", err)
@@ -437,7 +451,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	// (two per five minutes) on the incident alone: in ongoing-save, Save and
 	// repeat already spend it, so a third occurrence is correctly suppressed
 	// as cooldown (runs 41278608533/41278610152).
-	if installedJourneyFocus() == "ongoing-incident" {
+	if installedJourneyFocus() == "ongoing-incident" || installedJourneyFocus() == "ongoing-syscall" {
 		// Automatic incident: a real restart of the armed Pod's container admits
 		// one policy occurrence, whose snapshot the policy executor saves from the
 		// running source (no manual request, no finite recipe). The retained-port
@@ -471,20 +485,27 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		wait("automatic incident snapshot occurrence", 2*time.Minute, func(call context.Context) bool {
 			return admin.QueryRow(call, `SELECT coalesce(capture_id::text,'') FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND capture_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`, root, active.PolicyUID, podUID).Scan(&incidentID) == nil && incidentID != ""
 		})
-		incidentNative, incidentFile := fetchNative(published(incidentID), "native-ongoing-incident-download", "ongoing-incident.pcapng")
-		incidentOut, err := exec.CommandContext(ctx, "tshark", ongoingSaveFieldArgs(incidentFile)...).Output()
-		if err != nil {
-			t.Fatal("offline incident Wireshark read", err)
-		}
+		var incidentNative []byte
 		incidentMarkers := 0
-		for _, line := range strings.Split(strings.TrimSpace(string(incidentOut)), "\n") {
-			fields := strings.Split(line, "\t")
-			if len(fields) >= 3 && (fields[1] == strconv.Itoa(ongoingSaveRetainedPort) || fields[2] == strconv.Itoa(ongoingSaveRetainedPort)) {
-				incidentMarkers++
+		if installedJourneyFocus() == "ongoing-syscall" {
+			incidentNative, _ = fetchNative(published(incidentID), "native-ongoing-syscall-download", "ongoing-syscall.jsonl")
+			incidentMarkers = ongoingSyscallEvents(t, incidentNative, podUID)
+		} else {
+			var incidentFile string
+			incidentNative, incidentFile = fetchNative(published(incidentID), "native-ongoing-incident-download", "ongoing-incident.pcapng")
+			incidentOut, err := exec.CommandContext(ctx, "tshark", ongoingSaveFieldArgs(incidentFile)...).Output()
+			if err != nil {
+				t.Fatal("offline incident Wireshark read", err)
+			}
+			for _, line := range strings.Split(strings.TrimSpace(string(incidentOut)), "\n") {
+				fields := strings.Split(line, "\t")
+				if len(fields) >= 3 && (fields[1] == strconv.Itoa(ongoingSaveRetainedPort) || fields[2] == strconv.Itoa(ongoingSaveRetainedPort)) {
+					incidentMarkers++
+				}
 			}
 		}
 		if incidentMarkers == 0 {
-			t.Fatal("automatic incident snapshot lacks the pre-restart marker", incidentSent, len(incidentNative))
+			t.Fatal("automatic incident snapshot lacks pre-restart evidence", incidentSent, len(incidentNative))
 		}
 		// A container restart may legitimately re-attach the source; record it.
 		afterIncident, incidentCount, _ := current(ctx)
@@ -492,13 +513,13 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		report := map[string]any{
 			"policyUID": active.PolicyUID, "podUID": podUID, "sourceID": src.ID, "armLatencySeconds": armLatency.Seconds(), "rearmsBeforeIncident": rearms,
 			"incidentCaptureID": incidentID, "incidentMarkerSent": incidentSent, "incidentMarkerPackets": incidentMarkers, "incidentNativeBytes": len(incidentNative), "sourceAfterIncident": afterIncident.ID,
-			"scope": "one automatic exit-detector incident snapshot from one active ordinary ongoing networkHeaders source on one installed Pod; no Save in the same trigger budget window",
+			"scope": "one automatic exit-detector incident snapshot from one active ordinary ongoing " + ongoingAction + " source on one installed Pod; no Save in the same trigger budget window",
 		}
 		raw, err := json.MarshalIndent(report, "", "  ")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = os.WriteFile("../results/ongoing-incident-report.json", append(raw, '\n'), 0600); err != nil {
+		if err = os.WriteFile("../results/"+installedJourneyFocus()+"-report.json", append(raw, '\n'), 0600); err != nil {
 			t.Fatal(err)
 		}
 		_ = outsideSent
@@ -628,7 +649,34 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 // installedOngoingFocus selects the installed ongoing packet source flow:
 // Save qualification or the automatic incident snapshot.
 func installedOngoingFocus() bool {
-	return installedJourneyFocus() == "ongoing-save" || installedJourneyFocus() == "ongoing-incident"
+	f := installedJourneyFocus()
+	return f == "ongoing-save" || f == "ongoing-incident" || f == "ongoing-syscall"
+}
+
+// ongoingSyscallEvents checks a downloaded syscall window (ADR-273): JSON
+// Lines of metadata-only events of the armed Pod, and returns their count.
+func ongoingSyscallEvents(t *testing.T, native []byte, podUID string) int {
+	t.Helper()
+	n := 0
+	for _, line := range strings.Split(strings.TrimSuffix(string(native), "\n"), "\n") {
+		var e struct {
+			Identity struct {
+				PodUID string `json:"pod_uid"`
+			} `json:"identity"`
+			Syscall, ABI, Timestamp, Outcome string
+		}
+		dec := json.NewDecoder(strings.NewReader(line))
+		if err := dec.Decode(&e); err != nil || e.Identity.PodUID != podUID || e.Syscall == "" || e.ABI != "x86_64" || e.Timestamp == "" || e.Outcome == "" {
+			t.Fatalf("syscall event %q: %v", line, err)
+		}
+		for _, banned := range []string{"args", "arguments", "buffer", "comm", "path"} {
+			if strings.Contains(line, `"`+banned+`"`) {
+				t.Fatalf("syscall event carries %s: %s", banned, line)
+			}
+		}
+		n++
+	}
+	return n
 }
 
 func ongoingSaveFieldArgs(file string) []string {

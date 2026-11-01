@@ -626,7 +626,11 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if err != nil {
 				return value.ErrInvalid
 			}
-			expected.NativeType, expected.ActionID, expected.Snapshot, expected.Lifecycle, expected.TriggeredAt = artifact.PCAPNGArtifact, in.Snapshot.ActionID, in.Snapshot.Request.Clone(), lifecycle, in.Snapshot.Request.T0
+			nativeType := artifact.PCAPNGArtifact
+			if in.Snapshot.ActionKind == "syscallTrace" {
+				nativeType = artifact.SyscallRecordsArtifact
+			}
+			expected.NativeType, expected.ActionID, expected.Snapshot, expected.Lifecycle, expected.TriggeredAt = nativeType, in.Snapshot.ActionID, in.Snapshot.Request.Clone(), lifecycle, in.Snapshot.Request.T0
 			if retainedSource == nil {
 				return value.ErrInvalid
 			}

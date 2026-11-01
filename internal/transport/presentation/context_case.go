@@ -132,8 +132,8 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 		data := ContextCaseData{Case: ContextCaseSummary{CaseID: view.CaseID, Status: "Ready", Access: "ordinary"}, Artifacts: make([]ContextCaseArtifactData, 0, len(view.Artifacts)), Timeline: []any{}}
 		for _, a := range view.Artifacts {
 			kind := "pod-status"
-			if a.Recording {
-				kind = "packetCapture"
+			if a.EvidenceType == "packetCapture" || a.EvidenceType == "syscallTrace" {
+				kind = a.EvidenceType
 			}
 			if a.Shared {
 				// ADR-232: the view contains an artifact admitted by a share.

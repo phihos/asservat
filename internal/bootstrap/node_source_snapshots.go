@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/packets"
+	"asservat.local/asservat/internal/adapters/syscalls"
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
@@ -112,27 +113,39 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	}
 	if err := copy.Complete(n.now()); err != nil {
 		n.snapshotFailed(x, "complete", err)
-		n.uploadSnapshotFailure(ctx, epoch, workID, x)
+		n.uploadSnapshotFailure(ctx, epoch, workID, x, copy.records)
 		return
 	}
 	coverage, pre := copy.Coverage(), copy.HistoryCoverage()
 	acquiredFrom, acquiredUntil := artifact.SourceSnapshotAcquisition(artifact.SourceSnapshotCoverage{Request: q, SourceStoppedAt: coverage.SourceStoppedAt, SourceClosedAt: coverage.SourceClosedAt})
-	native, counters, err := packets.EncodeWindow(ctx, copy, int(q.MaxBytes), acquiredFrom, acquiredUntil)
+	var native []byte
+	var counters packets.Counters
+	var err error
+	nativeType, snaplen := "", packets.Snaplen
+	if copy.records {
+		nativeType, snaplen = artifact.SyscallRecordsArtifact, syscalls.RecordSize
+		native, counters, err = encodeSyscallWindow(ctx, copy, int(q.MaxBytes), copy.maxEvents, x.Binding.PodUID, x.Binding.SourceID, acquiredFrom, acquiredUntil)
+	} else {
+		native, counters, err = packets.EncodeWindow(ctx, copy, int(q.MaxBytes), acquiredFrom, acquiredUntil)
+	}
 	if err != nil {
 		n.snapshotFailed(x, "encode", err)
-		n.uploadSnapshotFailure(ctx, epoch, workID, x)
+		n.uploadSnapshotFailure(ctx, epoch, workID, x, copy.records)
 		return
 	}
 	defer clear(native[:cap(native)])
 	// Empty unknown history is absence, not fabricated successful evidence.
-	if counters.Retained == 0 && !coverage.Complete {
+	// ponytail: an empty syscall window has no bytes to upload, so even a
+	// complete quiet one reports absence; add a zero-byte result if pods
+	// with no syscalls in a whole window turn out to matter.
+	if counters.Retained == 0 && (!coverage.Complete || copy.records) {
 		n.snapshotFailed(x, "empty", fmt.Errorf("window %s..%s available from %s, stopped %s, closed %s, evicted %t, input unknown %t", coverage.Requested.From.Format(time.RFC3339Nano), coverage.Requested.Until.Format(time.RFC3339Nano), coverage.AvailableFrom.Format(time.RFC3339Nano), coverage.SourceStoppedAt.Format(time.RFC3339Nano), coverage.SourceClosedAt.Format(time.RFC3339Nano), coverage.HistoryEvicted, coverage.InputUnknown))
-		n.uploadSnapshotFailure(ctx, epoch, workID, x)
+		n.uploadSnapshotFailure(ctx, epoch, workID, x, copy.records)
 		return
 	}
 	completed := n.now().UTC()
 	outcome := artifact.SourceSnapshotOutcome{NativeSHA256: artifact.Digest(sha256.Sum256(native)), SourceSnapshotCoverage: artifact.SourceSnapshotCoverage{Request: q, AcceptedExpectationDigest: artifact.Digest(x.ExpectationDigest), NativeBytes: int64(len(native)), Retained: counters.Retained, OutputFull: counters.OutputFull, AvailableFrom: coverage.AvailableFrom, ObservedUntil: coverage.ObservedUntil, SourceStoppedAt: coverage.SourceStoppedAt.UTC(), SourceClosedAt: coverage.SourceClosedAt.UTC(), CompletedAt: completed, HistoryComplete: pre.Complete && !coverage.InputUnknown && !coverage.HistoryEvicted, WindowComplete: coverage.Complete && counters.OutputFull == 0, HistoryEvicted: coverage.HistoryEvicted, InputUnknown: coverage.InputUnknown}}
-	result := collector.PacketResult{Snapshot: &outcome, WorkID: workID, CaptureID: x.CaptureID, StartedAt: acquiredFrom, EndedAt: acquiredUntil, Seen: counters.Seen, Retained: counters.Retained, OutputFull: counters.OutputFull, WireBytes: counters.WireBytes, CapturedBytes: int64(len(native)), Snaplen: packets.Snaplen, EngineVersion: n.version, ProgramDigest: x.Binding.ProgramDigest}
+	result := collector.PacketResult{Snapshot: &outcome, WorkID: workID, CaptureID: x.CaptureID, StartedAt: acquiredFrom, EndedAt: acquiredUntil, Seen: counters.Seen, Retained: counters.Retained, OutputFull: counters.OutputFull, WireBytes: counters.WireBytes, CapturedBytes: int64(len(native)), Snaplen: snaplen, EngineVersion: n.version, ProgramDigest: x.Binding.ProgramDigest, NativeType: nativeType}
 	if result.Valid() && n.takeUpload(ctx, result.CapturedBytes) {
 		_ = n.upload(ctx, epoch, result, native)
 	}
@@ -140,7 +153,9 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 
 // A wholly absent window reports terminal failure through the existing result
 // path. The connector discards this placeholder and never creates an artifact.
-func (n *nodeSources) uploadSnapshotFailure(ctx context.Context, epoch, workID string, x collector.SourceSnapshot) {
+// The connector checks the native type before the failure, so a syscall
+// source's failure carries its type (the placeholder bytes are discarded).
+func (n *nodeSources) uploadSnapshotFailure(ctx context.Context, epoch, workID string, x collector.SourceSnapshot, records bool) {
 	if ctx.Err() != nil {
 		return
 	}
@@ -155,6 +170,9 @@ func (n *nodeSources) uploadSnapshotFailure(ctx context.Context, epoch, workID s
 	defer clear(native[:cap(native)])
 	outcome := artifact.SourceSnapshotOutcome{NativeSHA256: artifact.Digest(sha256.Sum256(native)), SourceSnapshotCoverage: artifact.SourceSnapshotCoverage{Request: x.Request, AcceptedExpectationDigest: artifact.Digest(x.ExpectationDigest), NativeBytes: int64(len(native)), CompletedAt: ended}}
 	result := collector.PacketResult{Snapshot: &outcome, WorkID: workID, CaptureID: x.CaptureID, StartedAt: started, EndedAt: ended, CapturedBytes: int64(len(native)), Snaplen: packets.Snaplen, EngineVersion: n.version, ProgramDigest: x.Binding.ProgramDigest, Failure: collector.ReasonCaptureFailed}
+	if records {
+		result.NativeType = artifact.SyscallRecordsArtifact
+	}
 	if result.Valid() && n.takeUpload(ctx, result.CapturedBytes) {
 		_ = n.upload(ctx, epoch, result, native)
 	}

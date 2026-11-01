@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/adapters/syscalls"
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"context"
 	"sync"
@@ -28,11 +29,13 @@ type nodeSources struct {
 	plans      map[string]collector.SourceRingLimits
 	stops      map[string]sourceStop
 	engine     observedPacketEngine
-	identity   func() collector.Identity
-	now        func() time.Time
-	budget     *collector.Budget
-	budgetMu   *sync.Mutex
-	available  bool
+	// syscallEngine runs syscall sources; nil when the recorder is unavailable.
+	syscallEngine syscallTraceEngine
+	identity      func() collector.Identity
+	now           func() time.Time
+	budget        *collector.Budget
+	budgetMu      *sync.Mutex
+	available     bool
 }
 
 type sourceStop struct {
@@ -101,11 +104,11 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 		r.Outcome, r.Reason = collector.OutcomeAccepted, ""
 		return r
 	}
-	if !n.available || n.engine == nil {
+	source := w.Source
+	if source.Syscalls == nil && (!n.available || n.engine == nil) || source.Syscalls != nil && n.syscallEngine == nil {
 		r.Reason = collector.ReasonEngineUnavailable
 		return r
 	}
-	source := w.Source
 	if deliveryapp.SourceResourcesDigest(source.Resources) != b.ResourceDigest {
 		r.Reason = collector.ReasonWorkUnknown
 		return r
@@ -114,13 +117,27 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 		r.Reason = collector.ReasonWorkUnknown
 		return r
 	}
-	var actual [32]byte
-	if len(source.Program) > 0 {
-		actual = [32]byte(compiler.FilterProgramDigest(source.Program))
-	}
-	if actual != b.ProgramDigest || packets.CheckPrefixProgram(source.Program) != nil {
-		r.Reason = collector.ReasonFilterUnsupported
-		return r
+	engine := n.engine
+	if source.Syscalls != nil {
+		if len(source.Program) > 0 || !source.Syscalls.Valid() || deliveryapp.SyscallFilterDigest(*source.Syscalls) != b.ProgramDigest {
+			r.Reason = collector.ReasonFilterUnsupported
+			return r
+		}
+		numbers, ok := syscalls.Numbers(source.Syscalls.Names)
+		if !ok {
+			r.Reason = collector.ReasonFilterUnsupported
+			return r
+		}
+		engine = syscallEngine(n.syscallEngine, numbers, source.Syscalls.ErrorsOnly, int(source.Syscalls.MaxTrackedThreads))
+	} else {
+		var actual [32]byte
+		if len(source.Program) > 0 {
+			actual = [32]byte(compiler.FilterProgramDigest(source.Program))
+		}
+		if actual != b.ProgramDigest || packets.CheckPrefixProgram(source.Program) != nil {
+			r.Reason = collector.ReasonFilterUnsupported
+			return r
+		}
 	}
 	if n.sources == nil {
 		n.sources = make(map[string]*packetSource)
@@ -152,7 +169,7 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 	}
 	p := source.Ring
 	limits := packets.RingLimits{MaxAge: p.MaxAge, MaxBytes: p.MaxBytes, SegmentBytes: p.SegmentBytes, MaxFrozenBytes: p.MaxFrozenBytes, MaxSegments: p.MaxSegments, MaxConcurrentSnapshots: p.MaxConcurrentSnapshots}
-	s, err := newPacketSource(parent, source.Permit, source.Resources.Node, limits, source.Program, n.engine, n.now, n.budget, n.budgetMu)
+	s, err := newPacketSource(parent, source.Permit, source.Resources.Node, limits, source.Program, source.Syscalls, engine, n.now, n.budget, n.budgetMu, n.log)
 	if err != nil {
 		r.Reason = collector.ReasonCaptureBusy
 		return r

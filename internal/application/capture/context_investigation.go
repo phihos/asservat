@@ -227,6 +227,9 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 	}
 	if intent.Snapshot != nil {
 		evidence = "packetCapture"
+		if intent.Snapshot.ActionKind == "syscallTrace" {
+			evidence = intent.Snapshot.ActionKind
+		}
 	}
 	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: evidence, RequestedSeconds: intent.RequestedSeconds, AnchorAt: anchor})
 	auditapp.MarkStep(ctx, "p-retention", mark)

@@ -256,7 +256,7 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 func WirePacketResult(epoch string, r collector.PacketResult) contracts.NodePacketResult {
 	out := contracts.NodePacketResult{Format: contracts.NodeCaptureFormat, Epoch: epoch, WorkID: r.WorkID, CaptureID: r.CaptureID, StartedAt: r.StartedAt.UTC(), EndedAt: r.EndedAt.UTC(),
 		Seen: r.Seen, Retained: r.Retained, Filtered: r.Filtered, Unsupported: r.Unsupported, Fragment: r.Fragment, Extension: r.Extension, Malformed: r.Malformed,
-		OutputFull: r.OutputFull, LostSamples: r.LostSamples, WireBytes: r.WireBytes, CapturedBytes: r.CapturedBytes, Snaplen: r.Snaplen, EngineVersion: r.EngineVersion, Failure: string(r.Failure)}
+		OutputFull: r.OutputFull, LostSamples: r.LostSamples, WireBytes: r.WireBytes, CapturedBytes: r.CapturedBytes, Snaplen: r.Snaplen, EngineVersion: r.EngineVersion, Failure: string(r.Failure), NativeType: r.NativeType}
 	if r.ProgramDigest != ([32]byte{}) {
 		out.ProgramDigest = hex.EncodeToString(r.ProgramDigest[:])
 	}
@@ -275,7 +275,7 @@ func DomainPacketResult(w contracts.NodePacketResult) (collector.PacketResult, b
 	}
 	r := collector.PacketResult{WorkID: w.WorkID, CaptureID: w.CaptureID, StartedAt: w.StartedAt.UTC().Truncate(time.Microsecond), EndedAt: w.EndedAt.UTC().Truncate(time.Microsecond),
 		Seen: w.Seen, Retained: w.Retained, Filtered: w.Filtered, Unsupported: w.Unsupported, Fragment: w.Fragment, Extension: w.Extension, Malformed: w.Malformed,
-		OutputFull: w.OutputFull, LostSamples: w.LostSamples, WireBytes: w.WireBytes, CapturedBytes: w.CapturedBytes, Snaplen: w.Snaplen, EngineVersion: w.EngineVersion, ProgramDigest: d, Failure: collector.Reason(w.Failure)}
+		OutputFull: w.OutputFull, LostSamples: w.LostSamples, WireBytes: w.WireBytes, CapturedBytes: w.CapturedBytes, Snaplen: w.Snaplen, EngineVersion: w.EngineVersion, ProgramDigest: d, Failure: collector.Reason(w.Failure), NativeType: w.NativeType}
 	if w.Snapshot != nil {
 		o, valid := DomainSnapshotOutcome(*w.Snapshot)
 		if !valid {

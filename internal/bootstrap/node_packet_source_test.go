@@ -46,7 +46,7 @@ func TestPacketSourceQuietExpiryAndStaleTimerJoinBeforeRelease(t *testing.T) {
 		<-join
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, engine, clock.now, b, bmu)
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, clock.now, b, bmu, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestPacketSourceQuietRingExpiryAndWireDebitBeforeDiscard(t *testing.T) {
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, engine, clock.now, b, bmu)
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, clock.now, b, bmu, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,9 +155,9 @@ func TestPacketSourceNaturalStopRetainsBoundedHistoryButCannotRenew(t *testing.T
 	clock := &packetRingClock{at: now}
 	p := sourceOwnerPermit(now)
 	b, bmu := sourceOwnerBudget(t, now)
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, func(context.Context, string, int, func(gadget.Frame), func(gadget.InputNotice)) (gadget.CaptureStats, error) {
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, func(context.Context, string, int, func(gadget.Frame), func(gadget.InputNotice)) (gadget.CaptureStats, error) {
 		return gadget.CaptureStats{}, nil
-	}, clock.now, b, bmu)
+	}, clock.now, b, bmu, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,14 +192,14 @@ func TestPacketSourceCopiedWindowKeepsIndependentFrozenReservation(t *testing.T)
 	p := sourceOwnerPermit(now)
 	b, bmu := sourceOwnerBudget(t, now)
 	ready := make(chan struct{})
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, func(ctx context.Context, _ string, _ int, add func(gadget.Frame), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, func(ctx context.Context, _ string, _ int, add func(gadget.Frame), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
 		frame := syntheticTCP(80, "secret-user-data")
 		add(gadget.Frame{Data: frame, Wire: uint32(len(frame)), At: now})
 		clear(frame)
 		close(ready)
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
-	}, clock.now, b, bmu)
+	}, clock.now, b, bmu, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestPacketSourceRejectsUnknownTimestampAfterWireDebit(t *testing.T) {
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, engine, func() time.Time { return now }, b, bmu)
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, func() time.Time { return now }, b, bmu, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +288,7 @@ func TestPacketSourceUnknownNoticeInvalidatesAdmittedSnapshotCoverage(t *testing
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, engine, func() time.Time { return now }, b, bmu)
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, func() time.Time { return now }, b, bmu, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

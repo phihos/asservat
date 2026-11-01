@@ -119,6 +119,7 @@ def packet(work, report):
     # The pinned tcpdump gadget blobs (digest-checked) at the collector's
     # fixed path; nothing is pulled at runtime.
     subprocess.run([str(ROOT / "scripts/fetch-gadget.sh"), str(image_dir / "gadgets/tcpdump")], check=True)
+    subprocess.run([str(ROOT / "scripts/fetch-gadget.sh"), str(image_dir / "gadgets/traceloop"), "traceloop"], check=True)
     (image_dir / "Dockerfile").write_text("FROM scratch\nCOPY asservat /asservat\nCOPY gadgets /usr/lib/asservat/gadgets\n")
     # The hub's filter compiler for the test process: static libpcap 1.11.0.
     subprocess.run(["make", "libpcap"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)

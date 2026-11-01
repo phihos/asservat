@@ -171,14 +171,18 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		_, _ = io.Copy(io.Discard, pcapng)
 		return value.ErrConflict
 	}
+	nativeType := r.NativeType
+	if nativeType == "" {
+		nativeType = artifact.PCAPNGArtifact
+	}
 	if held.snapshot != nil {
 		x := held.snapshot
-		if r.Snapshot == nil || node.BootID != x.Binding.BootID || node.PodUID != x.Binding.CollectorPodUID || node.Epoch != x.Binding.CollectorEpoch || r.ProgramDigest != x.Binding.ProgramDigest || !r.Snapshot.Request.Equal(x.Request) || r.Snapshot.AcceptedExpectationDigest != artifact.Digest(x.ExpectationDigest) {
+		if r.Snapshot == nil || nativeType != held.expectation.NativeType || node.BootID != x.Binding.BootID || node.PodUID != x.Binding.CollectorPodUID || node.Epoch != x.Binding.CollectorEpoch || r.ProgramDigest != x.Binding.ProgramDigest || !r.Snapshot.Request.Equal(x.Request) || r.Snapshot.AcceptedExpectationDigest != artifact.Digest(x.ExpectationDigest) {
 			h.mu.Unlock()
 			_, _ = io.Copy(io.Discard, pcapng)
 			return value.ErrDenied
 		}
-	} else if r.Snapshot != nil {
+	} else if r.Snapshot != nil || nativeType != artifact.PCAPNGArtifact {
 		h.mu.Unlock()
 		_, _ = io.Copy(io.Discard, pcapng)
 		return value.ErrDenied

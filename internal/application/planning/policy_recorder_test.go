@@ -56,3 +56,26 @@ func TestPolicyRecorderKeepsOngoingAndOtherMechanismsUnavailable(t *testing.T) {
 		})
 	}
 }
+
+// ADR-273: a syscall metadata composition compiles into an ongoing policy
+// source with its include list sorted for the source filter digest; a finite
+// onTrigger syscall policy stays unavailable.
+func TestOngoingPolicyRecorderCompilesSyscallMetadata(t *testing.T) {
+	include := value.ProfileEdit{ActionID: "syscalls", Field: "syscallFilter", Syscalls: &value.SyscallSelection{Mode: "include", Names: []string{"read", "openat"}}}
+	p, err := CompileOngoingPolicyRecorder(syscalls(include), &fakeCompiler{program: fixtureProgram})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.Valid() || p.Action.Kind != "syscallTrace" || p.Filter != nil || len(p.SyscallInclude) != 2 || p.SyscallInclude[0] != "openat" || p.SyscallInclude[1] != "read" {
+		t.Fatalf("syscall policy recorder %+v", p.Action)
+	}
+	all, err := CompileOngoingPolicyRecorder(syscalls(), &fakeCompiler{program: fixtureProgram})
+	if err != nil || !all.Valid() || len(all.SyscallInclude) != 0 || all.Digest == p.Digest {
+		t.Fatal("all-syscalls policy recorder", err)
+	}
+	_, err = CompileOngoingPolicyRecorder(syscalls(text("syscalls", "actionExecutionMode", "onTrigger"), text("syscalls", "syscallBefore", "0s")), &fakeCompiler{program: fixtureProgram})
+	var e value.CompositionError
+	if !errors.As(err, &e) || e.Code != value.CompositionRecorderUnavailable {
+		t.Fatal("finite syscall policy armed", err)
+	}
+}

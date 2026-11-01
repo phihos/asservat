@@ -66,11 +66,14 @@ type SourceSnapshotContext struct {
 	SourceDefinitionDigest           artifact.Digest `json:",omitzero"`
 	Request                          artifact.SourceSnapshotRequest
 	ActionID, PolicyUID, TriggerKind string
-	ExecutionDigest                  artifact.Digest
-	RecipeDigest                     artifact.Digest
-	SourceAudience                   []artifact.AudienceAssignment
-	SourceAudienceDigest             artifact.Digest
-	SourceTarget                     *targets.SourceSnapshotTarget
+	// ActionKind is "syscallTrace" for a syscall source (ADR-273); empty is
+	// the packet source, so existing packet plans keep their digests.
+	ActionKind           string `json:",omitempty"`
+	ExecutionDigest      artifact.Digest
+	RecipeDigest         artifact.Digest
+	SourceAudience       []artifact.AudienceAssignment
+	SourceAudienceDigest artifact.Digest
+	SourceTarget         *targets.SourceSnapshotTarget
 }
 
 func (s *SourceSnapshotContext) Clone() *SourceSnapshotContext {

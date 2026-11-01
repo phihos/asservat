@@ -316,5 +316,8 @@ func historyActionKinds(expected artifact.ContextExpectation) []string {
 	if expected.Recording == nil && expected.Snapshot == nil {
 		return []string{"kubernetesSnapshot"}
 	}
+	if expected.NativeType == artifact.SyscallRecordsArtifact {
+		return []string{"syscallTrace"}
+	}
 	return []string{"packetCapture"}
 }

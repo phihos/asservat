@@ -260,8 +260,8 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 	if facts.HostProcesses != collector.Supported || facts.Runtime != collector.RuntimeContainerd || !facts.Engine.Linked || facts.Engine.Version != "v0.57.0" {
 		t.Fatalf("host processes %s, runtime %s, engine %+v", facts.HostProcesses, facts.Runtime, facts.Engine)
 	}
-	// ADR-248: the packet recorder (the gadget's tc hook) is available; the
-	// syscall recorder is not implemented yet.
+	// ADR-248/273: the packet recorder (the gadget's tc hook) and the syscall
+	// metadata recorder (traceloop) are available.
 	for _, m := range view.Report.Mechanisms {
 		switch m.Mechanism {
 		case collector.MechanismPacket:
@@ -269,12 +269,13 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 				t.Fatalf("packet recorder: %+v", m)
 			}
 		default:
-			if m.Adapter != collector.AdapterUnavailable || m.Reasons[len(m.Reasons)-1] != collector.ReasonRecorderNotImplemented {
-				t.Fatalf("no syscall recorder exists yet: %+v", m)
+			if m.Adapter != collector.AdapterAvailable || len(m.Reasons) != 0 {
+				t.Fatalf("syscall recorder: %+v", m)
 			}
 		}
 	}
-	if view.Report.Budget.Ceilings != (collector.Ceilings{RingBytes: 256 << 20, FrozenBytes: 256 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}) || view.Report.Budget.RingReserved != 0 {
+	// The chart's default collector ceilings, including ongoing sources.
+	if view.Report.Budget.Ceilings != (collector.Ceilings{SourceLimits: collector.SourceLimits{MaxActiveSources: 16, InputBytesPerSecond: 16 << 20, InputBurstBytes: 16 << 20}, RingBytes: 256 << 20, FrozenBytes: 256 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}) || view.Report.Budget.RingReserved != 0 {
 		t.Fatalf("budget %+v", view.Report.Budget)
 	}
 
@@ -296,6 +297,10 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 
 	// 3b. ADR-248: manual networkHeaders captures through the real gadget.
 	packetCaptureNative(t, ctx, k, admin, s.Channel, second, workload, f.Busybox, f.Work, f.S3, results)
+
+	// 3c. ADR-273: an ongoing syscall metadata source and one saved window.
+	current, _ := s.Channel.NodeByUID(second.Identity.NodeUID)
+	syscallSourceNative(t, ctx, k, s.Channel, current, workload, f.Busybox, f.Work, results)
 
 	if b, err := k.CoreV1().Pods(f.CollectorNamespace).GetLogs(first.Name, &core.PodLogOptions{LimitBytes: ptr.To[int64](8 << 10)}).DoRaw(ctx); err == nil {
 		results["collectorLog"] = strings.Split(strings.TrimSpace(string(b)), "\n")

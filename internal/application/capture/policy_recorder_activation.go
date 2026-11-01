@@ -53,7 +53,7 @@ func (s PolicyActivation) activateRecorderPolicy(ctx context.Context, author ide
 		creator = *status.Creator
 	}
 	issued := s.Now().UTC().Truncate(time.Second)
-	authority := authorization.AcceptedPolicyAuthority{InstallationID: s.InstallationID, PolicyUID: source.Revision.UID, Creator: creator, Executor: authorization.PolicyPrincipal(s.InstallationID, source.Revision.UID), ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: delegation, Owners: owners, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: envelope.Envelope.MaxExecutions, MaxBytes: envelope.Envelope.MaxBytes, MaxObservedBytes: envelope.Envelope.MaxObservedBytes}, IssuedAt: issued, NotAfter: issued.Add(time.Duration(envelope.Envelope.MaxLifetimeSeconds) * time.Second)}
+	authority := authorization.AcceptedPolicyAuthority{InstallationID: s.InstallationID, PolicyUID: source.Revision.UID, Creator: creator, Executor: authorization.PolicyPrincipal(s.InstallationID, source.Revision.UID), ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: delegation, Owners: owners, Actions: []string{compiled.Recorder.Action.Kind}, Limits: authorization.AutomationLimits{MaxExecutions: envelope.Envelope.MaxExecutions, MaxBytes: envelope.Envelope.MaxBytes, MaxObservedBytes: envelope.Envelope.MaxObservedBytes}, IssuedAt: issued, NotAfter: issued.Add(time.Duration(envelope.Envelope.MaxLifetimeSeconds) * time.Second)}
 	if !envelope.NotAfter.IsZero() {
 		authority.NotAfter = identity.Earlier(authority.NotAfter, envelope.NotAfter.UTC().Truncate(time.Second))
 	}

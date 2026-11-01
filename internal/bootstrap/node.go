@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -140,6 +141,14 @@ func RunNode(ctx context.Context, podUID string) error {
 	}
 	facts := probeNode()
 	mechanisms := collector.Assess(facts)
+	// The syscall recorder decodes x86_64 numbers only (ADR-273).
+	if runtime.GOARCH != "amd64" {
+		for i := range mechanisms {
+			if mechanisms[i].Mechanism == collector.MechanismSyscall && mechanisms[i].Adapter == collector.AdapterAvailable {
+				mechanisms[i].Adapter, mechanisms[i].Reasons = collector.AdapterUnavailable, append(mechanisms[i].Reasons, collector.ReasonRecorderNotImplemented)
+			}
+		}
+	}
 	fmt.Fprintln(os.Stderr, "node collector probe: "+describeNode(facts, mechanisms))
 	budget, err := collector.NewBudget(node.DomainCeilings(d.Ceilings), time.Now())
 	if err != nil {
@@ -158,7 +167,7 @@ func RunNode(ctx context.Context, podUID string) error {
 		budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr}
 	p.packets = &nodePackets{engine: gadget.CapturePackets, observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
-	p.sources = &nodeSources{log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
+	p.sources = &nodeSources{log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
 	err = p.Run(ctx)
 	p.sources.Close()
 	p.packets.wg.Wait()
@@ -166,12 +175,25 @@ func RunNode(ctx context.Context, podUID string) error {
 }
 
 func packetAvailable(m []collector.Availability) bool {
+	return mechanismAvailable(m, collector.MechanismPacket)
+}
+
+func mechanismAvailable(m []collector.Availability, mechanism collector.Mechanism) bool {
 	for _, a := range m {
-		if a.Mechanism == collector.MechanismPacket {
+		if a.Mechanism == mechanism {
 			return a.Adapter == collector.AdapterAvailable
 		}
 	}
 	return false
+}
+
+// syscallTraceIfAvailable is the syscall engine when this node's assessment
+// offers the recorder, else nil (sources then report EngineUnavailable).
+func syscallTraceIfAvailable(m []collector.Availability) syscallTraceEngine {
+	if !mechanismAvailable(m, collector.MechanismSyscall) {
+		return nil
+	}
+	return gadget.TraceSyscalls
 }
 
 func nodeSleep(ctx context.Context, d time.Duration, kick <-chan struct{}) error {

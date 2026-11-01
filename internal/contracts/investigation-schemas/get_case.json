@@ -137,7 +137,8 @@
                         "kind": {
                           "enum": [
                             "pod-status",
-                            "packetCapture"
+                            "packetCapture",
+                            "syscallTrace"
                           ]
                         },
                         "data_class": {

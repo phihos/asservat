@@ -14,13 +14,17 @@ func (t reportedTargets) ResolveOngoingRecorder(ctx context.Context, r targets.O
 	if err != nil {
 		return targets.OngoingRecorderResolution{}, err
 	}
-	out := targets.OngoingRecorderResolution{Recorder: t.packetTargetAvailability(ctx, p, node, true)}
+	mechanism := collector.MechanismPacket
+	if r.Syscall {
+		mechanism = collector.MechanismSyscall
+	}
+	out := targets.OngoingRecorderResolution{Recorder: t.packetTargetAvailability(ctx, p, node, true, mechanism)}
 	if t.recordings == nil || !out.Recorder.ValidSource(t.recordings.now()) {
 		return targets.OngoingRecorderResolution{}, targets.ErrUnavailable
 	}
 	v, ok := t.recordings.nodes.NodeByName(node)
 	s := out.Recorder.Recorder.Source
-	if !ok || !v.PacketRecorderAvailable() || v.Report == nil || v.Identity.NodeUID != s.NodeUID || v.Identity.BootID != s.BootID || v.Identity.PodUID != s.CollectorPodUID || v.Identity.Epoch != s.CollectorEpoch {
+	if !ok || !v.RecorderAvailable(mechanism) || v.Report == nil || v.Identity.NodeUID != s.NodeUID || v.Identity.BootID != s.BootID || v.Identity.PodUID != s.CollectorPodUID || v.Identity.Epoch != s.CollectorEpoch {
 		return targets.OngoingRecorderResolution{}, targets.ErrUnavailable
 	}
 	c := v.Report.Budget.Ceilings

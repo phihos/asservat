@@ -72,6 +72,9 @@ type OngoingRecorderResolution struct {
 type OngoingRecorderRequest struct {
 	Target          Request
 	SourceID, Fence string
+	// Syscall asks for the syscall recorder instead of the packet recorder
+	// (ADR-273); older regions decode a packet request.
+	Syscall bool `json:",omitempty"`
 }
 
 // Sixteen maximum legal-name replies measured45,985 bytes, exceeding the

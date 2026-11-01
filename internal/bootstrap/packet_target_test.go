@@ -48,7 +48,7 @@ func TestPacketTargetAvailabilityUsesOnlyObservedNodeWithoutChangingTargetBound(
 				r.recordings = nil
 			}
 			p := targets.PodResolution{Pin: artifact.PinnedPod{UID: "target"}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
-			got := r.packetTargetAvailability(context.Background(), p, node, false)
+			got := r.packetTargetAvailability(context.Background(), p, node, false, collector.MechanismPacket)
 			want := targets.RecorderUnavailable
 			if mode == "available" {
 				want = targets.RecorderAvailable
@@ -107,7 +107,7 @@ func TestPacketSourceObservationRetainsOriginalIntervals(t *testing.T) {
 				cancel()
 			}
 			resolver := reportedTargets{recordings: &ConnectorRecordings{nodes: nodes, now: func() time.Time { return now }}}
-			got := resolver.packetTargetAvailability(ctx, p, "worker", true)
+			got := resolver.packetTargetAvailability(ctx, p, "worker", true, collector.MechanismPacket)
 			if got.Target != p || got.Recorder.Outcome != targets.RecorderAvailable || len(nodes.names) != 1 {
 				t.Fatal("metadata path or discovery changed", got, nodes.names)
 			}

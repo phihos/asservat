@@ -29,6 +29,7 @@ func TestNativePacingTargetResourceProfileIsExplicit(t *testing.T) {
 		{"policy-recording", "policy-recording", false, 5, 100},
 		{"ongoing-save", "ongoing-save", false, 5, 100},
 		{"ongoing-incident", "ongoing-incident", false, 5, 100},
+		{"ongoing-syscall", "ongoing-syscall", false, 5, 100},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Setenv("ASSERVAT_JOURNEY_FOCUS", c.focus)

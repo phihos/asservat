@@ -65,7 +65,7 @@ func PolicyContextEligibility(i identity.Identity, a AcceptedPolicyAuthority, p 
 	}
 	// This is current metadata/preflight eligibility. The admission transaction
 	// separately matches its actual snapshot or recorder plan to accepted actions.
-	if !slices.Contains(a.Actions, PolicyContextAction) && !slices.Contains(a.Actions, "packetCapture") {
+	if !slices.Contains(a.Actions, PolicyContextAction) && !slices.Contains(a.Actions, "packetCapture") && !slices.Contains(a.Actions, "syscallTrace") {
 		return deny("OutsideDelegation")
 	}
 	r := EvaluatePolicy(a, p, PolicyUse{PolicyUID: a.PolicyUID, ScopeDigest: a.ScopeDigest, Target: target, Purpose: PolicyIncident}, now)
