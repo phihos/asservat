@@ -793,6 +793,9 @@ func ongoingSaveControlDiagnostics(t *testing.T, ctx context.Context, admin *pgx
 		`SELECT concat('suppressed policy=',policy_uid,' ',reason,'=',count,' last=',last_at) FROM policy_suppression WHERE root_id=$1`,
 		`SELECT concat('acceptance policy=',policy_uid,' executions=',executions_spent,'/',coalesce(record#>>'{Authority,Limits,MaxExecutions}','?')) FROM policy_acceptance WHERE root_id=$1`,
 		`SELECT concat('sources unreleased=',count(*) FILTER (WHERE slot_released_at IS NULL),' ended=',count(*) FILTER (WHERE ended_at IS NOT NULL),' total=',count(*)) FROM policy_recording_source WHERE root_id=$1`,
+		// ADR-275: each incident capture (occurrence or child), its state,
+		// execution phase and catalog publication.
+		`SELECT concat('capture ',c.id,' child=',EXISTS(SELECT 1 FROM policy_occurrence_capture o WHERE o.capture_id=c.id),' state=',c.state,' deadline=',c.deadline,' execution=',coalesce(e.phase,'-'),' completed=',coalesce(e.completed_at::text,'-'),' published=',EXISTS(SELECT 1 FROM context_catalog k WHERE k.capture_id=c.id)) FROM context_capture c LEFT JOIN context_execution e ON e.capture_id=c.id WHERE c.root_id=$1 AND c.created_at>clock_timestamp()-interval '15 minutes'`,
 	} {
 		rows, err := admin.Query(call, q, root)
 		if err != nil {
