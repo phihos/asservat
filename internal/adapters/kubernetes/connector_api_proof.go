@@ -71,7 +71,11 @@ func (s *connectorAPIProofState) finish(ctx context.Context, now func() time.Tim
 
 // proofReuseMargin is the least remaining validity a cached proof needs to
 // be reused rather than produced again.
-const proofReuseMargin = 2 * time.Second
+// Three seconds, like the owner route: a start's receiver/recovery bound is
+// the earliest reused observation, and with two seconds a start could begin
+// with under one second left for preparation headroom (installed incident
+// runs 41301126897, 41299848255, 41284876053).
+const proofReuseMargin = 3 * time.Second
 
 // The initiating caller owns producer/recheck execution synchronously. Waiters
 // may cancel independently, but can neither detach a producer nor prolong its

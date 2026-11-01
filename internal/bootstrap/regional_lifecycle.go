@@ -43,7 +43,11 @@ type RegionalLifecycle struct {
 
 // recoveryReuseMargin is the least remaining validity a cached recovery
 // observation needs to be reused instead of fetched again.
-const recoveryReuseMargin = 2 * time.Second
+// Three seconds, like the owner route: a start's receiver/recovery bound is
+// the earliest reused observation, and with two seconds a start could begin
+// with under one second left for preparation headroom (installed incident
+// runs 41301126897, 41299848255, 41284876053).
+const recoveryReuseMargin = 3 * time.Second
 
 type regionalLeaf struct {
 	certificate value.ConnectorCredentialCertificate

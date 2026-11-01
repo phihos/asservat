@@ -51,7 +51,11 @@ type ConnectorIdentitySource struct {
 // check; each read took two admission-guard checks and two configuration
 // snapshots (native run 41224874137: about 870 of the region's guard
 // checks).
-const sourceReuseMargin = 2 * time.Second
+// Three seconds, like the owner route: a start's receiver/recovery bound is
+// the earliest reused observation, and with two seconds a start could begin
+// with under one second left for preparation headroom (installed incident
+// runs 41301126897, 41299848255, 41284876053).
+const sourceReuseMargin = 3 * time.Second
 
 var _ app.ConnectorIdentitySourceReader = (*ConnectorIdentitySource)(nil)
 var _ app.ConnectorIdentityConfigurationReader = (*ConnectorIdentitySource)(nil)
