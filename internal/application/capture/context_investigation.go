@@ -553,6 +553,15 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	// charged. An acceptable manual networkHeaders plan continues like pod
 	// status.
 	recording := p.Intent.Composition != nil
+	if recording && p.Intent.Composition.Resolved == nil {
+		// A stored preview carries no catalog documents (REQ-CPR-001): read
+		// the pinned versions once; recordingPlan requires them unchanged.
+		c, err := s.withCatalogProfiles(ctx, p.Intent.Composition, targets.PodResolution{Request: p.Target})
+		if err != nil {
+			return zero, previewFailure("profiles", err)
+		}
+		p.Intent.Composition = c
+	}
 	rules := compiler.ContextAssessmentRulesDigestForClass(p.ExecutionClass)
 	if p.Intent.Snapshot != nil {
 		rules = compiler.SourceSnapshotAssessmentRulesDigest()

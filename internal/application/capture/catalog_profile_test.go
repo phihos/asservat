@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -78,5 +79,38 @@ func TestCompositionPreviewResolvesOrganizationProfiles(t *testing.T) {
 	reads := catalog.reads
 	if _, err = f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition())); err != nil || catalog.reads != reads {
 		t.Fatal("builtin composition read the catalog", err)
+	}
+}
+
+// REQ-CPR-001: a stored preview carries no catalog documents, so a start
+// re-reads the pinned organization version and compiles with it; a changed
+// version refuses before admission.
+func TestCatalogProfileStartFromStoredPreview(t *testing.T) {
+	base := newInvestigationFixture()
+	f := &retainedRecording{investigationFixture: base}
+	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
+	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{base}
+	base.svc.Filters = &stubFilters{}
+	ref := planning.ProfileRef{Catalog: "organization", Name: "team-network", Version: "v3"}
+	catalog := &catalogFixture{profiles: []planning.CatalogProfile{{Ref: ref, SourceClusterID: fixtureID(4), SourceNamespaceUID: "hub-ns", SourceUID: "org-profile", Document: organizationDocument(t, "team-network", "v3"), Enabled: true}}}
+	base.svc.Profiles = catalog
+	ctx := context.Background()
+	c := networkComposition()
+	c.Components[0].Profile = ref
+	preview, err := base.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(c))
+	if err != nil || !preview.Recordable {
+		t.Fatal("preview", err, preview.Recordable)
+	}
+	p := preview.Preview
+	stored := f.previews[p.ID]
+	stored.Intent.Composition.Resolved = nil // as persisted (json:"-")
+	f.previews[p.ID] = stored
+	if _, err = f.request(t, p, "start"); !errors.Is(err, reachedRecordingAdmission) || len(f.seen) != 1 || catalog.reads != 2 {
+		t.Fatal("start from stored preview", err, catalog.reads)
+	}
+	catalog.profiles[0].SourceUID = "republished"
+	if _, err = f.request(t, p, "changed"); errors.Is(err, reachedRecordingAdmission) || len(f.seen) != 1 {
+		t.Fatal("changed version reached admission", err)
 	}
 }
