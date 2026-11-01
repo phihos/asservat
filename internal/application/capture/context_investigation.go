@@ -620,6 +620,12 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	var snapshotObserved *targets.SourceSnapshotResolution
 	if p.Intent.Snapshot != nil {
 		target, snapshotObserved, err = s.resolveSourceSnapshot(ctx, p.Intent.Snapshot)
+	} else if recording && s.Recorders != nil && syscallRecorderInput(p.Intent) {
+		if syscalls, ok := s.Recorders.(SyscallRecorders); ok {
+			target, err = syscalls.ResolveSyscallRecorder(ctx, p.Target)
+		} else {
+			err = targets.ErrUnsupported
+		}
 	} else if recording && s.Recorders != nil {
 		target, err = s.Recorders.ResolvePacketRecorder(ctx, p.Target)
 	} else {

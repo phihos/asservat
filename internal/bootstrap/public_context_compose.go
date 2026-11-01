@@ -441,6 +441,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.investigation.ReasonCipher = reasonCipher
 	// ADR-248: node recorder availability is a regional pre-work query.
 	out.investigation.Recorders = queries
+	var _ captureapp.SyscallRecorders = queries // B3 finite syscall recordings
 	// Passive existing-source services reuse current protected ports. The later
 	// trusted composition requires collection capability and the complete source
 	// runtime; this unmerged candidate still requires installed qualification.

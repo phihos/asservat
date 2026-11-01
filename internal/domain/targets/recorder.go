@@ -13,6 +13,9 @@ import (
 type RecorderRequest struct {
 	Target Request
 	Pin    artifact.PinnedPod
+	// Syscall asks for the syscall recorder (B3); an older region refuses
+	// the unknown field, which fails closed.
+	Syscall bool `json:",omitempty"`
 }
 
 func (r RecorderRequest) Valid() bool {

@@ -104,8 +104,12 @@ func (h *ConnectorRecordings) PacketRecorder(ctx context.Context, r targets.Reco
 	if err != nil {
 		return targets.RecorderAnswer{Outcome: targets.RecorderNoNode}, nil
 	}
+	mechanism := collector.MechanismPacket
+	if r.Syscall {
+		mechanism = collector.MechanismSyscall
+	}
 	v, ok := h.nodes.NodeByName(name)
-	if !ok || !v.PacketRecorderAvailable() {
+	if !ok || !v.RecorderAvailable(mechanism) {
 		return targets.RecorderAnswer{Outcome: targets.RecorderUnavailable}, nil
 	}
 	return targets.RecorderAnswer{Outcome: targets.RecorderAvailable}, nil
