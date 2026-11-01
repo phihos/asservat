@@ -268,6 +268,11 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 		// A replaced namespace or workload is outside the accepted scope.
 		return value.ErrChanged
 	}
+	// REQ-LIF-002: detectors run even when the ongoing recorder is degraded.
+	// A maintenance failure (for example a restart that closed the source) is
+	// reported but never hides the occurrence it accompanies; the snapshot
+	// then reports its actual coverage.
+	var maintainErr error
 	if ongoing {
 		if t.OngoingSources == nil {
 			return value.ErrRecorderUnavailable
@@ -276,7 +281,7 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 			if sourceStageOf(err) == "" {
 				err = staged("maintain", err)
 			}
-			return err
+			maintainErr = err
 		}
 		// Arming remains independent of occurrence admission. Only an explicitly
 		// composed snapshot service can spend an incident; it cannot rerun
@@ -284,16 +289,12 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 		if t.SourceSnapshots == nil {
 			return value.ErrRecorderUnavailable
 		}
-		if r != nil && r.running(p.PolicyUID) {
-			return nil
-		}
 	}
-	occurrences, err := t.Ledger.Tick(tick, value.PolicyTick{Policy: compiled, Authority: a, Observation: observation})
-	if err != nil {
-		return err
-	}
+	occurrences, err := occurrencesAfterMaintain(maintainErr, ongoing && r != nil && r.running(p.PolicyUID), func() ([]value.PolicyOccurrence, error) {
+		return t.Ledger.Tick(tick, value.PolicyTick{Policy: compiled, Authority: a, Observation: observation})
+	})
 	if len(occurrences) == 0 {
-		return nil
+		return err
 	}
 	var authored struct {
 		Target json.RawMessage `json:"target"`
@@ -310,7 +311,22 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	} else {
 		r.start(p.PolicyUID, func() { t.run(ctx, a, compiled, observation, occurrences) })
 	}
-	return nil
+	return maintainErr
+}
+
+// occurrencesAfterMaintain evaluates occurrences whether or not ongoing source
+// maintenance failed (REQ-LIF-002), unless the policy's previous incident is
+// still running. A maintenance error is reported with, never instead of, the
+// admitted occurrences.
+func occurrencesAfterMaintain(maintainErr error, busy bool, tick func() ([]value.PolicyOccurrence, error)) ([]value.PolicyOccurrence, error) {
+	if busy {
+		return nil, maintainErr
+	}
+	occurrences, err := tick()
+	if err != nil {
+		return nil, errors.Join(maintainErr, err)
+	}
+	return occurrences, maintainErr
 }
 
 // run captures each admitted occurrence once, in order, and records it.

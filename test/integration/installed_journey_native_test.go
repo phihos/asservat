@@ -713,6 +713,10 @@ type installedJourneyCaptureProgress struct {
 	CaptureID string `json:"capture_id"`
 	Phase     string `json:"phase"`
 	CaseID    string `json:"case_id"`
+	Actions   []struct {
+		Phase      string `json:"phase"`
+		ReasonCode string `json:"reason_code"`
+	} `json:"actions"`
 }
 
 // A terminal failure ends the passive wait. Successful collection must also
@@ -732,7 +736,7 @@ func installedJourneyCaptureCaseReady(ctx context.Context, captureID string, pro
 		}
 		return true, nil
 	case "Partial", "Failed", "Cancelled", "Indeterminate":
-		return false, fmt.Errorf("installed capture was not collected: %s", progress.Phase)
+		return false, fmt.Errorf("installed capture was not collected: %s %+v", progress.Phase, progress.Actions)
 	default:
 		return false, nil
 	}
@@ -1141,7 +1145,7 @@ func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS")
 // 20-minute limit; docs/implementation-progress.md records the split.
 func installedFastFixture() bool {
 	switch installedJourneyFocus() {
-	case "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "native-paced", "policy-recording", "ongoing-save":
+	case "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share", "approved-recording", "native-paced", "policy-recording", "ongoing-save", "ongoing-incident":
 		return true
 	}
 	return false

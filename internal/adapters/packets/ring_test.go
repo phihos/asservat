@@ -131,12 +131,19 @@ func TestRingOriginalRecordDoesNotAliasInputOrLiveRotation(t *testing.T) {
 }
 func TestRingQuietAgingNeverRestampsOldSegments(t *testing.T) {
 	r, now := ringFixture(t, nil)
+	// Within one slice (MaxAge/MaxSegments = 7.5s) records share a segment,
+	// which expires whole with its oldest record; a record beyond the slice
+	// starts a new segment and survives.
 	ringAdd(t, r, now, now)
+	ringAdd(t, r, now.Add(5*time.Second), now.Add(5*time.Second))
 	ringAdd(t, r, now.Add(10*time.Second), now.Add(10*time.Second))
 	if err := r.Advance(now.Add(31 * time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	s := ringCopy(t, r, now, now.Add(31*time.Second), now.Add(31*time.Second))
+	if p, err := ringNext(s); err != nil || !p.At.Equal(now.Add(10*time.Second)) {
+		t.Fatal("expected only the later-slice record", p.At, err)
+	}
 	if _, err := ringNext(s); !errors.Is(err, io.EOF) {
 		t.Fatal("oldest record did not expire whole segment", err)
 	}
@@ -1071,5 +1078,32 @@ func TestRingWindowRetainsKnownCloseWithoutNaturalStop(t *testing.T) {
 	var p RingPacket
 	if err = w.Next(&p); err != nil || !p.At.Equal(now) {
 		t.Fatal("lost preadmitted packet", p, err)
+	}
+}
+
+// Sparse traffic never evicts recent records with an aged-out segment: each
+// segment spans at most MaxAge/MaxSegments, so after expiry the ring keeps at
+// least MaxAge minus one slice of history (native runs 41282477857/41282479595
+// lost the pre-incident markers to an old record sharing their segment).
+func TestRingSparseRecordsSurviveOlderRecordsAgingOut(t *testing.T) {
+	r, now := ringFixture(t, func(l *RingLimits) { l.MaxAge = 30 * time.Second; l.MaxBytes = 4096; l.SegmentBytes = 1024 })
+	for i := 0; i <= 40; i += 4 { // one packet every 4s for 40s
+		at := now.Add(time.Duration(i) * time.Second)
+		ringAdd(t, r, at, at)
+	}
+	end := now.Add(40 * time.Second)
+	if err := r.Advance(end); err != nil {
+		t.Fatal(err)
+	}
+	s := ringCopy(t, r, end.Add(-22*time.Second), end, end)
+	n := 0
+	for {
+		if _, err := ringNext(s); err != nil {
+			break
+		}
+		n++
+	}
+	if n < 6 { // records at 20,24,...,40s: within MaxAge minus one 7.5s slice
+		t.Fatalf("recent sparse history lost: %d records, coverage %+v", n, s.Coverage())
 	}
 }

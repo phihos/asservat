@@ -883,21 +883,22 @@ func (b *regionalBudget) addPolicy() {
 	b.t.Helper()
 	// The operator's regional budget: a policy for the joined cluster and its
 	// slot in the existing pool, with the pool's capacity raised to fit.
-	reserveBytes := int64(4 * 1544192)
+	// Eight records/32 objects match the root profile (Records: 8): an
+	// ongoing source, its re-arms, Saves and incident snapshots all charge it.
+	reserveBytes := int64(8 * 1544192)
 	if installedRecordingFocus() {
-		// Four records/16 objects remain the existing root protocol limit;
-		// the operator reserves the actual packet ciphertext size, rather than
+		// The operator reserves the actual packet ciphertext size, rather than
 		// the smaller pod-status bytes of the original journey.
-		reserveBytes = 4 * (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
+		reserveBytes = 8 * (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
 	}
 	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": b.policyName}, "spec": map[string]any{
 		"poolRef": "capacity", "scope": map[string]any{"clusterID": b.cluster, "namespaceSelector": map[string]any{"matchLabels": map[string]string{"team": "regional"}}},
 		"namespaceEnvelope": map[string]int64{"maxWorkloadAccounts": 1, "maxStoredBytes": 2147483648, "maxObjects": 2000},
-		// The context reserve fits the root's qualified protocol (Records: 4):
-		// records = min(bytes/1544192, objects/4, 512) = 4, which is also the
+		// The context reserve fits the root's qualified protocol (Records: 8):
+		// records = min(bytes/1544192, objects/4, 512) = 8, which is also the
 		// workload's download sessions (MCP, browser, Stop). A larger reserve is
 		// refused at reservation as above the qualified protocol ceiling.
-		"workload": map[string]any{"protected": b.amount(1073741824, 1000), "hardLimit": b.amount(2147483648, 2000), "contextReserve": b.amount(reserveBytes, 16),
+		"workload": map[string]any{"protected": b.amount(1073741824, 1000), "hardLimit": b.amount(2147483648, 2000), "contextReserve": b.amount(reserveBytes, 32),
 			"dump":                   map[string]int64{"burst": 1, "minimumIntervalSeconds": 900, "maxStartsPerRollingHour": 2, "maxInputBytesPerRollingHour": 4294967296},
 			"maxConcurrentExpensive": 1, "maxQueuedExpensive": 1, "maxQueueAgeSeconds": 30, "upload": map[string]int64{"bytesPerSecond": 33554432, "burstBytes": 4194304}, "maxUploadRequestsPerSecond": 20, "maxSpoolBytes": 2147483648, "onFull": "RejectNewExpensive"},
 		"node": map[string]any{"maxConcurrentExpensive": 2, "maxQueuedExpensive": 10, "upload": map[string]int64{"bytesPerSecond": 67108864, "burstBytes": 8388608}, "maxSpoolBytes": 4294967296, "impactProfileRef": "standard-node", "unhealthySamples": 3, "sampleIntervalSeconds": 5, "recoveryHealthySeconds": 60}}}

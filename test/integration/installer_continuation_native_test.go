@@ -111,7 +111,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 	if installedRecordingFocus() {
 		// Real fresh password authentication at the reference provider's LoA1;
 		// this fixture does not configure or claim MFA/LoA2.
-		approvals = &contracts.IdentityApprovals{RequireRecordingApproval: installedJourneyFocus() != "policy-recording" && installedJourneyFocus() != "ongoing-save", StepUp: &contracts.IdentityStepUp{ACRValues: []string{"1"}, MaxAgeSeconds: 300}}
+		approvals = &contracts.IdentityApprovals{RequireRecordingApproval: installedJourneyFocus() != "policy-recording" && !installedOngoingFocus(), StepUp: &contracts.IdentityStepUp{ACRValues: []string{"1"}, MaxAgeSeconds: 300}}
 	}
 	document, _ := json.Marshal(contracts.InstallerContinuation{Format: contracts.InstallerContinuationFormat, Namespace: namespace,
 		WorkerProvider:      contracts.InstallerProviderSelection{AuthMount: providers.worker.AuthMount, AuthMountAccessor: providers.worker.AuthMountAccessor},
@@ -530,8 +530,8 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			})
 			return
 		}
-		if installedJourneyFocus() == "ongoing-save" {
-			t.Run("ongoing-save", func(t *testing.T) {
+		if installedOngoingFocus() {
+			t.Run(installedJourneyFocus(), func(t *testing.T) {
 				qualifyInstalledOngoingSave(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose)
 			})
 			return
@@ -955,7 +955,7 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
-	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 4, AdmissionSeconds: 86400,
+	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 8, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 128), Resolution: lane(4, 8), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
