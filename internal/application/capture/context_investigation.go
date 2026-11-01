@@ -910,6 +910,9 @@ func targetFailureClass(err error) string {
 // versions with a field error.
 type CatalogProfiles interface {
 	ReadCatalogProfiles(ctx context.Context, target targets.PodResolution, refs []planning.ProfileRef) ([]planning.CatalogProfile, error)
+	// ListCatalogProfiles lists the organization and target namespace
+	// catalogs, or only catalog's when it is not empty.
+	ListCatalogProfiles(ctx context.Context, target targets.PodResolution, catalog string) ([]planning.CatalogProfile, error)
 }
 
 // withCatalogProfiles attaches the current catalog versions to a copy of c.

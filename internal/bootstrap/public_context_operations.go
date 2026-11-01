@@ -57,6 +57,9 @@ type publicContextUseCases struct {
 	stop       evidence.ContextDownloadStopCoordinator
 }
 
+// REQ-CPR-001: the composed submission serves the capture profile tools.
+var _ presentation.ContextProfiles = captureapp.ContextSubmission{}
+
 // NewPublicContextOperations constructs the one complete browser/MCP operation
 // set. In particular request_capture uses ContextSubmission, including its
 // explicit accepted-only Continue path, rather than admission without start.

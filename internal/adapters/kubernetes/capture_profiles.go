@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
 
 	app "asservat.local/asservat/internal/application/capture"
@@ -29,6 +30,7 @@ type CaptureProfileCatalog struct {
 // NamespaceProfiles is the hub's regional query for namespace catalogs.
 type NamespaceProfiles interface {
 	ReadCaptureProfiles(context.Context, targets.ProfileCatalogRequest) (targets.ProfileCatalogAnswer, error)
+	ListCaptureProfiles(context.Context, targets.ProfileListRequest) (targets.ProfileCatalogAnswer, error)
 }
 
 var _ app.CatalogProfiles = (*CaptureProfileCatalog)(nil)
@@ -59,6 +61,48 @@ type captureProfileObject struct {
 	} `json:"spec"`
 }
 
+// decodeCaptureProfile strictly checks one object read from namespace.
+func decodeCaptureProfile(raw captureProfileObject, namespace string) (targets.CaptureProfileObject, error) {
+	v := targets.ProfileVersion{Name: raw.Spec.Name, Version: raw.Spec.Version}
+	if raw.Metadata.Name != v.Name+"."+v.Version || raw.Metadata.Namespace != namespace || raw.Metadata.UID == "" || len(raw.Metadata.UID) > 64 ||
+		len(v.Name) == 0 || len(v.Name) > 63 || len(v.Version) == 0 || len(v.Version) > 32 || len(bytes.TrimSpace(raw.Spec.Definition)) == 0 {
+		return targets.CaptureProfileObject{}, value.ErrInvalid
+	}
+	return targets.CaptureProfileObject{Name: v.Name, Version: v.Version, UID: raw.Metadata.UID, Definition: raw.Spec.Definition,
+		Enabled: raw.Spec.Availability.Enabled, Deprecated: raw.Spec.Availability.Deprecated}, nil
+}
+
+// listCaptureProfiles is one bounded LIST of namespace; more than
+// MaxListedProfiles versions is ErrProfileLimit, never a silent truncation.
+func listCaptureProfiles(ctx context.Context, client *PermissionClient, namespace string) ([]targets.CaptureProfileObject, error) {
+	b, err := client.raw(ctx, "/apis/asservat.io/v1alpha1/namespaces/"+namespace+"/captureprofiles", map[string]string{"limit": strconv.Itoa(targets.MaxListedProfiles + 1)})
+	if err != nil {
+		return nil, err
+	}
+	var list struct {
+		Metadata struct {
+			Continue           string `json:"continue"`
+			RemainingItemCount *int64 `json:"remainingItemCount"`
+		} `json:"metadata"`
+		Items []captureProfileObject `json:"items"`
+	}
+	if json.Unmarshal(b, &list) != nil {
+		return nil, value.ErrInvalid
+	}
+	if list.Metadata.Continue != "" || len(list.Items) > targets.MaxListedProfiles || list.Metadata.RemainingItemCount != nil && *list.Metadata.RemainingItemCount != 0 {
+		return nil, targets.ErrProfileLimit
+	}
+	out := []targets.CaptureProfileObject{}
+	for _, item := range list.Items {
+		o, err := decodeCaptureProfile(item, namespace)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, nil
+}
+
 // readCaptureProfile GETs one exact version; ok is false when it is not
 // published.
 func readCaptureProfile(ctx context.Context, client *PermissionClient, namespace string, v targets.ProfileVersion) (o targets.CaptureProfileObject, ok bool, err error) {
@@ -71,12 +115,68 @@ func readCaptureProfile(ctx context.Context, client *PermissionClient, namespace
 		return o, false, err
 	}
 	var raw captureProfileObject
-	if json.Unmarshal(b, &raw) != nil || raw.Metadata.Name != name || raw.Metadata.Namespace != namespace || raw.Metadata.UID == "" || len(raw.Metadata.UID) > 64 ||
-		raw.Spec.Name != v.Name || raw.Spec.Version != v.Version || len(bytes.TrimSpace(raw.Spec.Definition)) == 0 {
+	if json.Unmarshal(b, &raw) != nil || raw.Spec.Name != v.Name || raw.Spec.Version != v.Version {
 		return o, false, value.ErrInvalid
 	}
-	return targets.CaptureProfileObject{Name: v.Name, Version: v.Version, UID: raw.Metadata.UID, Definition: raw.Spec.Definition,
-		Enabled: raw.Spec.Availability.Enabled, Deprecated: raw.Spec.Availability.Deprecated}, true, nil
+	o, err = decodeCaptureProfile(raw, namespace)
+	return o, err == nil, err
+}
+
+// catalogProfile is the compiler's view of one read object.
+func catalogProfile(ref planning.ProfileRef, cluster, namespaceUID string, o targets.CaptureProfileObject) (planning.CatalogProfile, error) {
+	// The compiler strictly decodes and digests exactly this document.
+	document, err := json.Marshal(struct {
+		Name       string          `json:"name"`
+		Version    string          `json:"version"`
+		Definition json.RawMessage `json:"definition"`
+	}{o.Name, o.Version, json.RawMessage(o.Definition)})
+	if err != nil {
+		return planning.CatalogProfile{}, value.ErrInvalid
+	}
+	return planning.CatalogProfile{Ref: ref, SourceClusterID: cluster, SourceNamespaceUID: namespaceUID, SourceUID: o.UID,
+		Document: document, Enabled: o.Enabled, Deprecated: o.Deprecated}, nil
+}
+
+// ListCatalogProfiles lists the organization catalog (one hub LIST) and the
+// target namespace's catalog (one regional LIST), or only catalog's.
+func (c *CaptureProfileCatalog) ListCatalogProfiles(ctx context.Context, target targets.PodResolution, catalog string) ([]planning.CatalogProfile, error) {
+	var out []planning.CatalogProfile
+	add := func(name, cluster, namespaceUID string, objects []targets.CaptureProfileObject) error {
+		for _, o := range objects {
+			p, err := catalogProfile(planning.ProfileRef{Catalog: name, Name: o.Name, Version: o.Version}, cluster, namespaceUID, o)
+			if err != nil {
+				return err
+			}
+			out = append(out, p)
+		}
+		return nil
+	}
+	if catalog == "" || catalog == "organization" {
+		objects, err := listCaptureProfiles(ctx, c.client, c.namespace.Name)
+		if err != nil {
+			return nil, err
+		}
+		if err = add("organization", c.client.clusterID, c.namespace.UID, objects); err != nil {
+			return nil, err
+		}
+	}
+	if (catalog == "" || catalog == "namespace") && c.Regions != nil {
+		r := targets.ProfileListRequest{ClusterID: target.Request.ClusterID, Namespace: target.Request.Namespace}
+		if !r.Valid() {
+			return nil, value.ErrInvalid
+		}
+		answer, err := c.Regions.ListCaptureProfiles(ctx, r)
+		if err != nil {
+			return nil, err
+		}
+		if !answer.Lists(r) {
+			return nil, value.ErrInvalid
+		}
+		if err = add("namespace", r.ClusterID, r.Namespace.UID, answer.Profiles); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func (c *CaptureProfileCatalog) ReadCatalogProfiles(ctx context.Context, target targets.PodResolution, refs []planning.ProfileRef) ([]planning.CatalogProfile, error) {
@@ -84,18 +184,9 @@ func (c *CaptureProfileCatalog) ReadCatalogProfiles(ctx context.Context, target 
 	seen := map[planning.ProfileRef]bool{}
 	local := targets.ProfileCatalogRequest{ClusterID: target.Request.ClusterID, Namespace: target.Request.Namespace}
 	add := func(ref planning.ProfileRef, cluster, namespaceUID string, o targets.CaptureProfileObject) error {
-		// The compiler strictly decodes and digests exactly this document.
-		document, err := json.Marshal(struct {
-			Name       string          `json:"name"`
-			Version    string          `json:"version"`
-			Definition json.RawMessage `json:"definition"`
-		}{o.Name, o.Version, json.RawMessage(o.Definition)})
-		if err != nil {
-			return value.ErrInvalid
-		}
-		out = append(out, planning.CatalogProfile{Ref: ref, SourceClusterID: cluster, SourceNamespaceUID: namespaceUID, SourceUID: o.UID,
-			Document: document, Enabled: o.Enabled, Deprecated: o.Deprecated})
-		return nil
+		p, err := catalogProfile(ref, cluster, namespaceUID, o)
+		out = append(out, p)
+		return err
 	}
 	for _, ref := range refs {
 		if ref.Catalog == "builtin" || seen[ref] || !ref.Valid() {
@@ -137,6 +228,33 @@ func (c *CaptureProfileCatalog) ReadCatalogProfiles(ctx context.Context, target 
 		}
 	}
 	return out, nil
+}
+
+// ListCaptureProfiles is the region's namespace catalog listing: one
+// namespace GET binding the target's namespace UID, then one bounded LIST
+// (`list` on captureprofiles).
+func (c *PodTargets) ListCaptureProfiles(ctx context.Context, r targets.ProfileListRequest) (targets.ProfileCatalogAnswer, error) {
+	var zero targets.ProfileCatalogAnswer
+	if !r.Valid() || r.ClusterID != c.client.clusterID || len(validation.IsDNS1123Label(r.Namespace.Name)) != 0 {
+		return zero, targets.ErrInvalid
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	ns, err := c.namedNamespace(ctx, r.Namespace.Name)
+	if err != nil {
+		return zero, err
+	}
+	if ns != r.Namespace {
+		return zero, targets.ErrChanged
+	}
+	objects, err := listCaptureProfiles(ctx, c.client, ns.Name)
+	if errors.Is(err, targets.ErrProfileLimit) {
+		return zero, err
+	}
+	if err != nil {
+		return zero, targetReadError(err)
+	}
+	return targets.ProfileCatalogAnswer{ClusterID: r.ClusterID, Namespace: ns, Profiles: objects}, nil
 }
 
 // ReadCaptureProfiles is the region's namespace catalog read: one namespace

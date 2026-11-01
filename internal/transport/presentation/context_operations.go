@@ -102,6 +102,11 @@ func (s *ContextOperations) ToolNames() []string {
 	if s != nil && s.history != nil {
 		out = append(out, "list_capture_history", "get_capture_settings")
 	}
+	if s != nil {
+		if _, ok := s.captures.(ContextProfiles); ok {
+			out = append(out, "list_capture_profiles", "get_capture_profile")
+		}
+	}
 	return out
 }
 func (s *ContextOperations) Tool(name string) (contracts.InvestigationTool, bool) {
@@ -143,8 +148,11 @@ type ContextOperationInput struct {
 	// ADR-243: one builtin packet or syscall capture profile with typed edits.
 	Composition *CompositionInput `json:"profile_composition,omitempty"`
 	Origin      string            `json:"origin,omitempty"`
-	Cursor      string            `json:"cursor,omitempty"`
-	Limit       int               `json:"limit,omitempty"`
+	// REQ-CPR-001: list_capture_profiles / get_capture_profile.
+	Catalog    string          `json:"catalog,omitempty"`
+	ProfileRef *ProfileRefData `json:"profile_ref,omitempty"`
+	Cursor     string          `json:"cursor,omitempty"`
+	Limit      int             `json:"limit,omitempty"`
 	// ADR-249: the same-human result access of a reviewed recorder plan.
 	ResultAccess *ResultAccessInput `json:"result_access,omitempty"`
 }
@@ -314,6 +322,10 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 		return OperationFailure{"SettingsTooLarge", "Saved settings exceed the response limit. Open the capture in the browser or repeat by reference.", false}
 	case errors.Is(err, value.ErrSettingsUnavailable):
 		return OperationFailure{"ParametersUnavailable", "Saved settings are unavailable. Start a new preview with your current settings.", true}
+	case errors.Is(err, value.ErrProfileNotFound):
+		return OperationFailure{"ProfileNotFound", "This profile version is not published in that catalog. List the catalog and choose an exact version.", false}
+	case errors.Is(err, errProfileListLimit), errors.Is(err, targets.ErrProfileLimit):
+		return OperationFailure{"TooManyProfiles", "More profiles than one page. Narrow the list with catalog.", false}
 	case errors.Is(err, value.ErrRecorderUnavailable):
 		return OperationFailure{"RecorderUnavailable", "No recorder is available for this reviewed plan. No capture was started and nothing was reserved.", false}
 	case errors.Is(err, value.ErrSharingDenied):
@@ -526,6 +538,17 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 				selection = "explicitPod"
 			}
 			out.Data = ContextPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: result.Assessment.OutputLimit, CaptureEnabled: s.config.CollectionEnabled, Blockers: collectionBlockers(s.config.CollectionEnabled), Warnings: sharingWarning(p.Intent.Sharing), NavigationURI: s.config.PublicOrigin + "/captures/new", Lifecycle: ContextLifecycle(), Assessment: ContextAssessment(result.Assessment), Preset: PresetReference{"pod-status", "v1"}, Target: target, SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}, PodSelection: selection, RepeatedFrom: repeated}
+		}
+	case "list_capture_profiles", "get_capture_profile":
+		if _, ok := s.captures.(ContextProfiles); !ok {
+			return OperationReply{}, contracts.ErrInvestigationWire
+		}
+		var profileUntil time.Time
+		var class string
+		out.Data, class, profileUntil, operationErr = s.profileCall(ctx, current, name, in)
+		if operationErr == nil {
+			until = identity.Earlier(until, profileUntil)
+			out.DataClass = class
 		}
 	case "list_capture_history", "get_capture_settings":
 		if s.history == nil {

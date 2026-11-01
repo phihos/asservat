@@ -109,7 +109,7 @@ func TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings(t *testin
 	if e != nil {
 		t.Fatal(e)
 	}
-	want := []string{"cancel_artifact_download", "get_artifact_download", "get_capture", "get_case", "list_diagnostics", "prepare_artifact_download", "preview_capture", "request_capture", "resolve_capture_request"}
+	want := []string{"cancel_artifact_download", "get_artifact_download", "get_capture", "get_capture_profile", "get_case", "list_capture_profiles", "list_diagnostics", "prepare_artifact_download", "preview_capture", "request_capture", "resolve_capture_request"}
 	if operations.PublicOrigin() != c.PublicOrigin || !slices.Equal(operations.ToolNames(), want) {
 		t.Fatal("incomplete shared operation set", operations.ToolNames())
 	}
@@ -240,6 +240,8 @@ func TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency(t *testin
 	const id = "10000000-0000-4000-8000-000000000003"
 	inputs := map[string]string{
 		"list_diagnostics":          `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"}}`,
+		"list_capture_profiles":     `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"}}`,
+		"get_capture_profile":       `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"},"profile_ref":{"catalog":"builtin","name":"network-connections","version":"v1"}}`,
 		"preview_capture":           `{"target_ref":{"cluster_id":"` + id + `","namespace":"payments","kind":"Deployment","name":"api"},"preset_ref":{"name":"pod-status","version":"v1"},"requested_retention_seconds":60}`,
 		"request_capture":           `{"preview_id":"` + id + `","idempotency_key":"same-original-key"}`,
 		"resolve_capture_request":   `{"preview_id":"` + id + `","idempotency_key":"same-original-key"}`,

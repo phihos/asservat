@@ -126,9 +126,9 @@ def main():
                 # structural one (ADR-228) would make that create collide.
                 chart_crds = sorted(p for p in (ROOT/"charts/asservat/crds").glob("*.yaml") if p.name != "debugpolicies.yaml")
                 run(k+["apply", "--server-side", "--force-conflicts", "--field-manager=asservat-owned-fixture"]+[a for p in chart_crds for a in ("-f", str(p))])
-                run(k+["wait", "--for=condition=Established", "--timeout=30s", "crd/evidenceretentionpolicies.asservat.io"])
+                run(k+["wait", "--for=condition=Established", "--timeout=30s", "crd/evidenceretentionpolicies.asservat.io", "crd/captureprofiles.asservat.io"])
                 with (results/"permission-admission.log").open("w") as log:
-                    result = subprocess.run(["go", "test", "-race", "-v", "-count=1", "-run", "TestPermissionAdmissionWithRealKubernetes|TestLocalStartWithRealKubernetes|TestRetentionWithRealKubernetes", "./test/integration"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=420)
+                    result = subprocess.run(["go", "test", "-race", "-v", "-count=1", "-run", "TestPermissionAdmissionWithRealKubernetes|TestLocalStartWithRealKubernetes|TestRetentionWithRealKubernetes|TestCaptureProfilesWithRealKubernetes", "./test/integration"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=420)
                 exit_code = result.returncode
                 report["admissionExit"] = exit_code
             report["sourceUnchangedDuringTest"] = sources() == report["sourceHashes"]

@@ -78,7 +78,7 @@ rules:
   # REQ-CPR-001: the connector reads namespace CaptureProfile versions.
   - apiGroups: [asservat.io]
     resources: [captureprofiles]
-    verbs: [get]
+    verbs: [get, list]
   - apiGroups: [apps]
     resources: [deployments, deployments/scale]
     verbs: [get, create, update]

@@ -1,0 +1,331 @@
+{
+  "name": "list_capture_profiles",
+  "description": "List versioned capture building blocks for an authorized target, with publisher/catalog, capability and approval status. Does not acquire evidence.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "catalog": {
+        "enum": [
+          "builtin",
+          "organization",
+          "namespace"
+        ]
+      },
+      "target_ref": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "kind": {
+            "enum": [
+              "Deployment",
+              "StatefulSet",
+              "Pod"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          }
+        },
+        "required": [
+          "cluster_id",
+          "namespace",
+          "kind",
+          "name"
+        ]
+      }
+    },
+    "required": [
+      "target_ref"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "type": "null"
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "profiles": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "profile_ref": {
+                          "$ref": "#/$defs/d0"
+                        },
+                        "display_name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 512
+                        },
+                        "available": {
+                          "type": "boolean"
+                        },
+                        "deprecated": {
+                          "type": "boolean"
+                        },
+                        "approval_required": {
+                          "type": "boolean"
+                        },
+                        "blockers": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/d1"
+                          },
+                          "minItems": 0,
+                          "maxItems": 16
+                        },
+                        "execution_modes": {
+                          "type": "array",
+                          "items": {
+                            "enum": [
+                              "onTrigger",
+                              "ongoing"
+                            ]
+                          },
+                          "minItems": 1,
+                          "maxItems": 2,
+                          "uniqueItems": true
+                        }
+                      },
+                      "required": [
+                        "profile_ref",
+                        "display_name",
+                        "description",
+                        "available",
+                        "deprecated",
+                        "approval_required",
+                        "blockers",
+                        "execution_modes"
+                      ]
+                    },
+                    "minItems": 0,
+                    "maxItems": 100
+                  }
+                },
+                "required": [
+                  "profiles"
+                ]
+              },
+              "data_class": {
+                "const": "metadata"
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "catalog": {
+            "enum": [
+              "builtin",
+              "organization",
+              "namespace"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^v[1-9][0-9]*$",
+            "maxLength": 32
+          }
+        },
+        "required": [
+          "catalog",
+          "name",
+          "version"
+        ]
+      },
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "responsible_role": {
+            "enum": [
+              "maintainer",
+              "approver",
+              "administrator",
+              "none"
+            ]
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "responsible_role",
+          "retryable"
+        ]
+      }
+    }
+  }
+}

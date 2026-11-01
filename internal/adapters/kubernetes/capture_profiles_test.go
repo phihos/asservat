@@ -19,6 +19,9 @@ type regionProfiles struct{ targets *PodTargets }
 func (r regionProfiles) ReadCaptureProfiles(ctx context.Context, q value.ProfileCatalogRequest) (value.ProfileCatalogAnswer, error) {
 	return r.targets.ReadCaptureProfiles(ctx, q)
 }
+func (r regionProfiles) ListCaptureProfiles(ctx context.Context, q value.ProfileListRequest) (value.ProfileCatalogAnswer, error) {
+	return r.targets.ListCaptureProfiles(ctx, q)
+}
 
 // REQ-CPR-001: namespace profiles are read by the target's region from the
 // target's own namespace after binding its UID; a missing version is absent,

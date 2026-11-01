@@ -56,7 +56,7 @@ rules:
   # grants it, so it must hold it).
   - apiGroups: [asservat.io]
     resources: [captureprofiles]
-    verbs: [get]
+    verbs: [get, list]
   # ADR-195: the hub-worker's retention reader and guard probe, and the
   # installation administrator's baseline policy and its later edits.
   - apiGroups: [asservat.io]
