@@ -50,6 +50,12 @@ func qualifyCaptureHistory(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		if _, err = s.s.AdmitContext(ctx, a); err != nil {
 			t.Fatal(err)
 		}
+		// Visibility is checked on legacy-form rows (no history parameters,
+		// listed from the migration on); ADR-272 parameter rows are
+		// qualified separately in qualifyHistoryParameters.
+		if _, err = admin.Exec(ctx, `UPDATE context_capture SET history_parameters_required=false WHERE id=$1`, in.CaptureID); err != nil {
+			t.Fatal("legacy history form", err)
+		}
 		return in.CaptureID
 	}
 	first := admit("history-1")
