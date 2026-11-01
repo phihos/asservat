@@ -780,7 +780,7 @@
               "$ref": "#/$defs/d3"
             },
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 8
           },
           "maxTotalBytes": {
             "type": "integer",
@@ -1912,7 +1912,7 @@
               "$ref": "#/$defs/d2"
             },
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 8
           },
           "maxTotalBytes": {
             "type": "integer",

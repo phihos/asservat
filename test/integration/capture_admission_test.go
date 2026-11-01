@@ -401,7 +401,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	qualifyRecordingTransactions(t, ctx, admin, poolFor, store, keys, func(t *testing.T) scenario {
 		scenarioNativeLimit = artifact.RecordingNativeLimit
 		defer func() { scenarioNativeLimit = 4096 }()
-		return create(t, 1)
+		return create(t, recordingScenarioSlots)
 	})
 	t.Run("policy-recorder-team-action-grant-and-occurrence", func(t *testing.T) {
 		qualifyPolicyRecorderAdmission(t, ctx, admin, poolFor, store, keys, func(t *testing.T) scenario {

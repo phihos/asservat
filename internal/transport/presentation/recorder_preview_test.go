@@ -39,6 +39,9 @@ func (f *recorderFixture) PreviewComposition(_ context.Context, _ identities.Cur
 	f.composition = in.Composition
 	now := f.i.VerifiedAt
 	target := targets.PodResolution{Request: targets.Request{ClusterID: in.Target.ClusterID, Namespace: configuration.NamespaceRef{Name: in.Target.Namespace, UID: "ns"}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload"}, PodName: "api-a", PodUID: "pod"}, Pin: artifact.PinnedPod{Namespace: in.Target.Namespace, NamespaceUID: "ns", Name: "api-a", UID: "pod", NodeName: "worker", ControllerUID: "rs"}, NodeUID: "node", NodeBootID: "00000000-0000-4000-8000-000000000006", PodResourceVersion: "1", WorkloadResourceVersion: "2", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	if len(in.Composition.Components) > 1 {
+		return f.groupPreview(in, target)
+	}
 	evidence, err := compiler.RecorderEvidenceType(*in.Composition)
 	if err != nil {
 		return app.RecorderPreviewResult{}, err
@@ -57,6 +60,70 @@ func (f *recorderFixture) PreviewComposition(_ context.Context, _ identities.Cur
 	}
 	p := value.ContextPreview{ID: "00000000-0000-4000-8000-000000000020", Intent: in, Deadline: now.Add(5 * time.Minute), ScopeDigest: plan.ScopeDigest, Target: target.Request}
 	return app.RecorderPreviewResult{Preview: p, Plan: plan, Assessment: a, ValidUntil: f.metadataUntil}, f.compileErr
+}
+
+// groupPreview builds an ADR-276 group preview the way the application does:
+// one plan per component, the recorder-group/v1 parent and its display merge.
+func (f *recorderFixture) groupPreview(in value.ContextIntent, target targets.PodResolution) (app.RecorderPreviewResult, error) {
+	now := f.i.VerifiedAt
+	parts, err := compiler.SplitComposition(*in.Composition, oneInstruction{})
+	if err != nil {
+		return app.RecorderPreviewResult{}, err
+	}
+	var plans []planning.RecorderPlan
+	var assessments []planning.RecorderAssessment
+	for n, c := range parts {
+		evidence, err := compiler.RecorderEvidenceType(c)
+		if err != nil {
+			return app.RecorderPreviewResult{}, err
+		}
+		r, err := privacy.Resolve(privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "set", Generation: 1, Digest: [32]byte{7}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Complete: true, Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: [32]byte{4}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 3600, MaximumSeconds: 86400, DeletionBudgetSeconds: 300}}}, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: evidence, AnchorAt: now}, now)
+		if err != nil {
+			return app.RecorderPreviewResult{}, err
+		}
+		plan, err := compiler.CompileRecorder(planning.RecorderInput{CaptureID: "00000000-0000-4000-8000-00000000005" + string(rune('0'+n)), Executor: f.i.Principal, Target: target, Composition: c, Retention: r, Deadline: now.Add(time.Minute), NodeRecorder: true}, oneInstruction{}, now)
+		if err != nil {
+			return app.RecorderPreviewResult{}, err
+		}
+		a, err := compiler.AssessRecorder(plan, "00000000-0000-4000-8000-00000000017"+string(rune('0'+n)), now)
+		if err != nil {
+			return app.RecorderPreviewResult{}, err
+		}
+		plans, assessments = append(plans, plan), append(assessments, a)
+	}
+	scope, digest, err := compiler.CompileRecorderGroup("00000000-0000-4000-8000-000000000045", plans)
+	if err != nil {
+		return app.RecorderPreviewResult{}, err
+	}
+	plan, a, err := compiler.RecorderGroupDisplay(scope, digest, "00000000-0000-4000-8000-000000000161", plans, assessments)
+	if err != nil {
+		return app.RecorderPreviewResult{}, err
+	}
+	p := value.ContextPreview{ID: "00000000-0000-4000-8000-000000000020", Intent: in, Deadline: now.Add(5 * time.Minute), ScopeDigest: digest, Target: target.Request}
+	return app.RecorderPreviewResult{Preview: p, Plan: plan, Assessment: a, ValidUntil: f.metadataUntil, Recordable: true}, nil
+}
+
+// ADR-276: a packet + syscall group preview passes the public output
+// contract with both actions in one review.
+func TestCompositionGroupPreviewWire(t *testing.T) {
+	s, f := recorderOperations(t, true)
+	in := `{` + wireTarget + `,"requested_retention_seconds":3600,"profile_composition":{"components":[{"id":"net","profileRef":{"catalog":"builtin","name":"network-connections","version":"v1"},"overrides":[{"actionID":"sample","field":"packetAfter","value":"5s"}]},{"id":"calls","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"},"overrides":[{"actionID":"syscalls","field":"actionExecutionMode","value":"onTrigger"},{"actionID":"syscalls","field":"syscallBefore","value":"0s"},{"actionID":"syscalls","field":"syscallAfter","value":"5s"}]}],"maxTotalBytes":33554432,"maxDuration":"30s"}}`
+	reply, err := s.Call(t.Context(), f, "preview_capture", []byte(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out struct {
+		Status string `json:"status"`
+		Data   struct {
+			Lifecycle struct {
+				Actions []map[string]string `json:"actions"`
+			} `json:"lifecycle_plan"`
+			Assessment CaptureAssessment `json:"capture_assessment"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || len(out.Data.Lifecycle.Actions) != 2 || len(out.Data.Assessment.Actions) != 2 {
+		t.Fatalf("group preview: %s", reply.Body)
+	}
 }
 
 func recorderOperations(t *testing.T, enabled bool) (*ContextOperations, *recorderFixture) {
@@ -150,12 +217,13 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	if err != nil || !strings.Contains(string(reply.Body), `"code":"InvalidComposition"`) || !strings.Contains(string(reply.Body), "does not expose actionMaxBytes") {
 		t.Fatalf("unexposed: %v %s", err, reply.Body)
 	}
-	// Schema subset: sharing, a second component and peer edits are not accepted.
+	// Schema subset: sharing, presets and peer edits are not accepted; more than
+	// eight components exceed the canonical bound (ADR-276 groups are below it).
 	for name, bad := range map[string]string{
 		"sharing":  strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"requested_retention_seconds":3600,"sharing":{"recipients":[{"kind":"User","issuer":"https://id.invalid","id":"x"}]},`, 1),
 		"preset":   strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"preset_ref":{"name":"pod-status","version":"v1"},`, 1),
 		"peers":    strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8"]}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
-		"two":      strings.Replace(wireComposition, `"components":[{`, `"components":[{"id":"other","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"}},{`, 1),
+		"nine":     strings.Replace(wireComposition, `"components":[{`, `"components":[`+strings.Repeat(`{"id":"other","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"}},`, 8)+`{`, 1),
 		"no field": strings.Replace(wireComposition, `"field":"packetFilter"`, `"field":"impact"`, 1),
 	} {
 		if _, err := s.Call(t.Context(), f, "preview_capture", []byte(bad)); err == nil {

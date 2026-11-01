@@ -19,11 +19,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// recordingScenarioSlots is how many recordings a recording scenario's
+// allocation holds.
+var recordingScenarioSlots int64 = 1
+
 // Uses real SQL with explicit synthetic bootstrap and a synthetic approved
 // reviewer; independent reviewer/step-up qualification belongs to ADR-249.
 func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, create func(*testing.T) captureAdmissionScenario) {
 	t.Helper()
 	t.Run("recording-composition-group", func(t *testing.T) {
+		// Both recordings reserve storage in one allocation.
+		recordingScenarioSlots = 2
+		defer func() { recordingScenarioSlots = 1 }()
 		qualifyCompositionGroup(t, ctx, admin, poolFor, create(t))
 	})
 	t.Run("recording-approved-plan-after-preview-expiry", func(t *testing.T) {
