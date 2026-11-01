@@ -1,6 +1,8 @@
 package targets
 
 import (
+	"errors"
+
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -71,6 +73,10 @@ func (a ProfileCatalogAnswer) Answers(r ProfileCatalogRequest) bool {
 
 // MaxListedProfiles bounds one catalog listing (list_capture_profiles limit).
 const MaxListedProfiles = 100
+
+// ErrProfileLimit is a catalog with more than MaxListedProfiles versions. It is
+// distinct from ErrLimit so other target limits keep their own meaning.
+var ErrProfileLimit = errors.New("capture profile catalog exceeds one page")
 
 // ProfileListRequest asks the target's region to list the CaptureProfile
 // versions in the target's own namespace with one bounded LIST.

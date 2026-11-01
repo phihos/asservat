@@ -73,7 +73,7 @@ func decodeCaptureProfile(raw captureProfileObject, namespace string) (targets.C
 }
 
 // listCaptureProfiles is one bounded LIST of namespace; more than
-// MaxListedProfiles versions is ErrLimit, never a silent truncation.
+// MaxListedProfiles versions is ErrProfileLimit, never a silent truncation.
 func listCaptureProfiles(ctx context.Context, client *PermissionClient, namespace string) ([]targets.CaptureProfileObject, error) {
 	b, err := client.raw(ctx, "/apis/asservat.io/v1alpha1/namespaces/"+namespace+"/captureprofiles", map[string]string{"limit": strconv.Itoa(targets.MaxListedProfiles + 1)})
 	if err != nil {
@@ -90,7 +90,7 @@ func listCaptureProfiles(ctx context.Context, client *PermissionClient, namespac
 		return nil, value.ErrInvalid
 	}
 	if list.Metadata.Continue != "" || len(list.Items) > targets.MaxListedProfiles || list.Metadata.RemainingItemCount != nil && *list.Metadata.RemainingItemCount != 0 {
-		return nil, targets.ErrLimit
+		return nil, targets.ErrProfileLimit
 	}
 	out := []targets.CaptureProfileObject{}
 	for _, item := range list.Items {
@@ -248,7 +248,7 @@ func (c *PodTargets) ListCaptureProfiles(ctx context.Context, r targets.ProfileL
 		return zero, targets.ErrChanged
 	}
 	objects, err := listCaptureProfiles(ctx, c.client, ns.Name)
-	if errors.Is(err, targets.ErrLimit) {
+	if errors.Is(err, targets.ErrProfileLimit) {
 		return zero, err
 	}
 	if err != nil {

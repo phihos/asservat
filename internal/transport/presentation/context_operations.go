@@ -324,7 +324,7 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 		return OperationFailure{"ParametersUnavailable", "Saved settings are unavailable. Start a new preview with your current settings.", true}
 	case errors.Is(err, value.ErrProfileNotFound):
 		return OperationFailure{"ProfileNotFound", "This profile version is not published in that catalog. List the catalog and choose an exact version.", false}
-	case errors.Is(err, errProfileListLimit), errors.Is(err, targets.ErrLimit):
+	case errors.Is(err, errProfileListLimit), errors.Is(err, targets.ErrProfileLimit):
 		return OperationFailure{"TooManyProfiles", "More profiles than one page. Narrow the list with catalog.", false}
 	case errors.Is(err, value.ErrRecorderUnavailable):
 		return OperationFailure{"RecorderUnavailable", "No recorder is available for this reviewed plan. No capture was started and nothing was reserved.", false}

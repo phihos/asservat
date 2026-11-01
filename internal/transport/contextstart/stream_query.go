@@ -104,6 +104,7 @@ var queryFailures = []struct {
 	{"changed", targets.ErrChanged},
 	{"denied", targets.ErrDenied},
 	{"invalid", targets.ErrInvalid},
+	{"profile-limit", targets.ErrProfileLimit},
 	{"unscheduled", targets.ErrUnscheduled},
 	{"unsupported", targets.ErrUnsupported},
 	{"unavailable", targets.ErrUnavailable},
