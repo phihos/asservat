@@ -89,7 +89,7 @@ func (c *CaptureProfileCatalog) ReadCatalogProfiles(ctx context.Context, target 
 			Name       string          `json:"name"`
 			Version    string          `json:"version"`
 			Definition json.RawMessage `json:"definition"`
-		}{o.Name, o.Version, o.Definition})
+		}{o.Name, o.Version, json.RawMessage(o.Definition)})
 		if err != nil {
 			return value.ErrInvalid
 		}

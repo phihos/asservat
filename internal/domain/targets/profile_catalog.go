@@ -1,8 +1,6 @@
 package targets
 
 import (
-	"encoding/json"
-
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -41,7 +39,7 @@ func (r ProfileCatalogRequest) Valid() bool {
 // compiler's strict decode.
 type CaptureProfileObject struct {
 	Name, Version, UID  string
-	Definition          json.RawMessage
+	Definition          []byte
 	Enabled, Deprecated bool
 }
 
