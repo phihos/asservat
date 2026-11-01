@@ -641,5 +641,6 @@ GRANT SELECT(root_id,capture_id),DELETE ON policy_observation_session TO context
 -- production capture-admit, capture-history and preview cleanup purposes
 -- (public_runtime_role_plan.go).
 GRANT SELECT,INSERT ON recording_save_group TO capture_runtime;
-GRANT SELECT ON recording_save_group TO context_progress_read_runtime;
+GRANT SELECT ON recording_save_group TO context_progress_read_runtime,context_deadline_runtime;
+GRANT UPDATE(id) ON recording_save_group TO context_progress_read_runtime; -- row lock (production hub-metadata-read)
 GRANT SELECT,DELETE ON recording_selection_set TO context_preview_cleanup_runtime;
