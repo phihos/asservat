@@ -394,6 +394,45 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	if err = installedJourneyPause(ctx, ongoingSaveBefore+7*time.Second); err != nil {
 		t.Fatal(err)
 	}
+	// fetchNative downloads a case's single PCAPNG artifact natively, checks
+	// its size and SHA-256 against the download record and stores it under
+	// test/results.
+	fetchNative := func(caseID, key, name string) ([]byte, string) {
+		t.Helper()
+		var investigation struct {
+			Artifacts []struct {
+				ID string `json:"artifact_id"`
+			} `json:"artifacts"`
+		}
+		must("get_case", map[string]any{"case_id": caseID}, &investigation)
+		if len(investigation.Artifacts) != 1 {
+			t.Fatal("ongoing PCAPNG case", name, len(investigation.Artifacts))
+		}
+		var download installedJourneyDownload
+		prepare := map[string]any{"artifact_id": investigation.Artifacts[0].ID, "idempotency_key": key}
+		wait("ongoing native download "+name, 2*time.Minute, func(call context.Context) bool {
+			op, args := "get_artifact_download", any(map[string]any{"download_id": download.DownloadID})
+			if download.DownloadID == "" || download.ContinuePreparation {
+				op, args = "prepare_artifact_download", prepare
+			}
+			return read(call, op, args, &download) && download.State != "Preparing"
+		})
+		if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil {
+			t.Fatal("ongoing native download unavailable", name, download.State)
+		}
+		response := installedJourneyContent(t, ctx, &http.Client{Transport: transport, Timeout: 2 * time.Minute}, strings.TrimSuffix(origin, "/")+download.ContentPath, identity.downloadToken(), nil)
+		native, err := io.ReadAll(io.LimitReader(response.Body, artifact.RecordingNativeLimit+1))
+		response.Body.Close()
+		digest := sha256.Sum256(native)
+		if err != nil || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
+			t.Fatal("ongoing native bytes", name, response.StatusCode, len(native), err)
+		}
+		file := filepath.Join("..", "results", name)
+		if err = os.WriteFile(file, native, 0600); err != nil {
+			t.Fatal(err)
+		}
+		return native, file
+	}
 	retainedSent := marker(ongoingSaveRetainedPort)
 	selected := selectNow("fresh Save")
 	captureID, t0 := save(map[string]any{"recording_handles": []string{selected.Handle}, "before": "15s"}, "native-ongoing-save")
@@ -407,38 +446,8 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("Save changed, stopped or re-armed the original source", same, count)
 	}
 	caseID := published(captureID)
-	var investigation struct {
-		Artifacts []struct {
-			ID string `json:"artifact_id"`
-		} `json:"artifacts"`
-	}
-	must("get_case", map[string]any{"case_id": caseID}, &investigation)
-	if len(investigation.Artifacts) != 1 {
-		t.Fatal("ongoing Save PCAPNG case", len(investigation.Artifacts))
-	}
-	var download installedJourneyDownload
-	prepare := map[string]any{"artifact_id": investigation.Artifacts[0].ID, "idempotency_key": "native-ongoing-pcap-download"}
-	wait("ongoing Save native download", 2*time.Minute, func(call context.Context) bool {
-		name, args := "get_artifact_download", any(map[string]any{"download_id": download.DownloadID})
-		if download.DownloadID == "" || download.ContinuePreparation {
-			name, args = "prepare_artifact_download", prepare
-		}
-		return read(call, name, args, &download) && download.State != "Preparing"
-	})
-	if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil {
-		t.Fatal("ongoing Save native download unavailable", download.State)
-	}
-	response := installedJourneyContent(t, ctx, &http.Client{Transport: transport, Timeout: 2 * time.Minute}, strings.TrimSuffix(origin, "/")+download.ContentPath, identity.downloadToken(), nil)
-	native, err := io.ReadAll(io.LimitReader(response.Body, artifact.RecordingNativeLimit+1))
-	response.Body.Close()
+	native, file := fetchNative(caseID, "native-ongoing-pcap-download", "ongoing-save.pcapng")
 	digest := sha256.Sum256(native)
-	if err != nil || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
-		t.Fatal("ongoing Save native bytes", response.StatusCode, len(native), err)
-	}
-	file := filepath.Join("..", "results", "ongoing-save.pcapng")
-	if err = os.WriteFile(file, native, 0600); err != nil {
-		t.Fatal(err)
-	}
 	out, err := exec.CommandContext(ctx, "tshark", ongoingSaveFieldArgs(file)...).Output()
 	if err != nil {
 		t.Fatal("offline native Wireshark read", err)
@@ -460,6 +469,44 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("repeat changed or re-armed the original source", same, count)
 	}
 
+	// Automatic incident: a real restart of the armed Pod's container admits
+	// one policy occurrence, whose snapshot the policy executor saves from the
+	// running source (no manual request, no finite recipe). The retained-port
+	// marker just before the restart must be in the saved window.
+	incidentSent := marker(ongoingSaveRetainedPort)
+	pod, err := f.region.CoreV1().Pods(f.namespace).Get(ctx, podName, meta.GetOptions{})
+	if err != nil || string(pod.UID) != podUID {
+		t.Fatal("ongoing incident Pod before restart", err)
+	}
+	kill, stopKill := context.WithTimeout(ctx, 15*time.Second)
+	killed := installedKillContainer(t, kill, *pod)
+	stopKill()
+	if !killed {
+		t.Fatal("ongoing incident workload did not stop")
+	}
+	var incidentID string
+	wait("automatic incident snapshot occurrence", 2*time.Minute, func(call context.Context) bool {
+		return admin.QueryRow(call, `SELECT coalesce(capture_id::text,'') FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND capture_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`, root, active.PolicyUID, podUID).Scan(&incidentID) == nil && incidentID != ""
+	})
+	incidentNative, incidentFile := fetchNative(published(incidentID), "native-ongoing-incident-download", "ongoing-incident.pcapng")
+	incidentOut, err := exec.CommandContext(ctx, "tshark", ongoingSaveFieldArgs(incidentFile)...).Output()
+	if err != nil {
+		t.Fatal("offline incident Wireshark read", err)
+	}
+	incidentMarkers := 0
+	for _, line := range strings.Split(strings.TrimSpace(string(incidentOut)), "\n") {
+		fields := strings.Split(line, "\t")
+		if len(fields) >= 3 && (fields[1] == strconv.Itoa(ongoingSaveRetainedPort) || fields[2] == strconv.Itoa(ongoingSaveRetainedPort)) {
+			incidentMarkers++
+		}
+	}
+	if incidentMarkers == 0 {
+		t.Fatal("automatic incident snapshot lacks the pre-restart marker", incidentSent, len(incidentNative))
+	}
+	// A container restart may legitimately re-attach the source; record it.
+	afterIncident, incidentCount, _ := current(ctx)
+	t.Logf("automatic incident %s retained %d marker packets; source after restart %s (sources %d)", incidentID, incidentMarkers, afterIncident.ID, incidentCount)
+
 	byID := func(call context.Context, id string) (ongoingSaveSource, bool) {
 		all, err := sources(call)
 		if err != nil {
@@ -472,14 +519,20 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 		return ongoingSaveSource{}, false
 	}
-	// Natural expiry at the original authority-bounded hard deadline, no stop call.
+	// Natural expiry at the original authority-bounded hard deadline, no stop
+	// call, for the source active after the incident (a re-attached source
+	// keeps the same acceptance and hard deadline).
+	natural := src
+	if afterIncident.ID != "" {
+		natural = afterIncident
+	}
 	var expired ongoingSaveSource
-	wait("natural source expiry", time.Until(src.HardUntil)+time.Minute, func(call context.Context) bool {
+	wait("natural source expiry", time.Until(natural.HardUntil)+time.Minute, func(call context.Context) bool {
 		var ok bool
-		expired, ok = byID(call, src.ID)
+		expired, ok = byID(call, natural.ID)
 		return ok && expired.EndedAt != nil
 	})
-	if expired.ID != src.ID || expired.EndedAt.Before(src.HardUntil) || expired.Credit < src.Credit {
+	if expired.ID != natural.ID || expired.EndedAt.Before(natural.HardUntil) || expired.Credit < natural.Credit {
 		t.Fatal("natural expiry ended early, changed source or refunded credit", expired)
 	}
 	if _, ok := selection(ctx); ok {
@@ -531,6 +584,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		"armLatencySeconds": armLatency.Seconds(), "rearmsBeforeSave": rearms, "saveCaptureID": captureID, "saveAcceptedAt": t0, "repeatCaptureID": repeatID,
 		"outsideMarkerSent": outsideSent, "retainedMarkerSent": retainedSent, "afterMarkerSent": afterSent,
 		"retainedMarkerPackets": markers, "nativeBytes": len(native), "nativeSHA256": hex.EncodeToString(digest[:]),
+		"incidentCaptureID": incidentID, "incidentMarkerSent": incidentSent, "incidentMarkerPackets": incidentMarkers, "incidentNativeBytes": len(incidentNative), "sourceAfterIncident": afterIncident.ID,
 		"secondSourceID": replacement.ID, "explicitStopRequested": stopped, "secondSourceEndedAt": ended.EndedAt,
 		"scope": "one active ordinary ongoing networkHeaders source on one installed Pod; history labels are as reported (Unknown/Partial are not upgraded); no quiet-Full, clock-step, loss, multi-node or syscall claim",
 	}
