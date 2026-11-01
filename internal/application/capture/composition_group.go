@@ -395,9 +395,22 @@ func (s ContextSubmission) dispatchCompositionGroup(ctx context.Context, current
 			failures = append(failures, value.ErrAcquisitionClosed)
 			continue
 		}
-		childCall, cancel := context.WithDeadline(call, end)
-		err = s.Start.StartContext(childCall, current, child.CaptureID)
-		cancel()
+		// A sibling's start can leave this one a nearly expired regional
+		// exchange; a start that prepared nothing may be retried within the
+		// original window once that exchange has ended (ponytail: three
+		// attempts half a second apart).
+		for attempt := 0; ; attempt++ {
+			childCall, cancel := context.WithDeadline(call, end)
+			err = s.Start.StartContext(childCall, current, child.CaptureID)
+			cancel()
+			if err == nil || attempt == 2 || !errors.Is(err, value.ErrAcquisitionNotStarted) || !s.Now().Before(end) {
+				break
+			}
+			select {
+			case <-call.Done():
+			case <-time.After(500 * time.Millisecond):
+			}
+		}
 		if err != nil {
 			s.reportGroupFailure("request/start/" + failureClass(err))
 			failures = append(failures, err)
