@@ -102,6 +102,9 @@ type ContextInvestigation struct {
 	// It is optional: without it a packet filter edit is refused with
 	// FilterCompilerUnavailable; it never affects pod-status previews.
 	Filters compiler.FilterCompiler
+	// Profiles reads published organization/namespace capture profile
+	// versions (REQ-CPR-001); nil leaves only builtin profiles available.
+	Profiles CatalogProfiles
 	// Grants is the ADR-249 approval service. Without it a packet/syscall
 	// plan that needs approval is refused with ApprovalRequired, never armed.
 	Grants RecorderGrants
@@ -889,4 +892,34 @@ func targetFailureClass(err error) string {
 		}
 	}
 	return "other"
+}
+
+// CatalogProfiles reads the exact published CaptureProfile versions a
+// composition references for one target: organization versions from the
+// protected hub catalog, namespace versions only from the target workload's
+// namespace. It returns what exists; the compiler refuses missing or disabled
+// versions with a field error.
+type CatalogProfiles interface {
+	ReadCatalogProfiles(ctx context.Context, target targets.PodResolution, refs []planning.ProfileRef) ([]planning.CatalogProfile, error)
+}
+
+// withCatalogProfiles attaches the current catalog versions to a copy of c.
+// A composition of builtins only reads nothing.
+func (s ContextInvestigation) withCatalogProfiles(ctx context.Context, c *planning.ProfileComposition, target targets.PodResolution) (*planning.ProfileComposition, error) {
+	var refs []planning.ProfileRef
+	for _, component := range c.Components {
+		if component.Profile.Catalog != "builtin" {
+			refs = append(refs, component.Profile)
+		}
+	}
+	out := c.Clone()
+	if len(refs) == 0 || s.Profiles == nil {
+		return out, nil
+	}
+	resolved, err := s.Profiles.ReadCatalogProfiles(ctx, target, refs)
+	if err != nil {
+		return nil, err
+	}
+	out.Resolved = resolved
+	return out, nil
 }

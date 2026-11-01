@@ -77,6 +77,13 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 	if !target.Valid(s.Now()) {
 		return zero, previewFailure("facts/target", value.ErrChanged)
 	}
+	mark = time.Now()
+	composition, err := s.withCatalogProfiles(ctx, intent.Composition, target)
+	auditapp.MarkStep(ctx, "p-profiles", mark)
+	if err != nil {
+		return zero, previewFailure("profiles", err)
+	}
+	intent.Composition = composition
 	if original != nil && (original.ClusterID != target.Request.ClusterID || original.NamespaceUID != target.Request.Namespace.UID || original.WorkloadUID != target.Request.Workload.UID || (original.PodUID != "" && target.Request.PodUID != original.PodUID)) {
 		eligible := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
 		if !eligible.Eligible {

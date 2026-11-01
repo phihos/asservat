@@ -260,7 +260,7 @@ func RecorderEvidenceType(c value.ProfileComposition) (string, error) {
 	if err := compositionShape(c); err != nil {
 		return "", err
 	}
-	p, err := resolveBuiltin(0, c.Components[0].Profile)
+	p, err := resolveProfile(0, c.Components[0].Profile, c.Resolved)
 	if err != nil {
 		return "", err
 	}
