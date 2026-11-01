@@ -57,7 +57,11 @@ type APIContextWorkTrustSource struct {
 // read is a guarded ConfigMap observation with its own proofs (native run
 // 41208314967: the first work operation spent up to two seconds there and
 // source work was refused at its second read).
-const trustReuseMargin = 2 * time.Second
+// Three seconds, like the owner route: a start's receiver/recovery bound is
+// the earliest reused observation, and with two seconds a start could begin
+// with under one second left for preparation headroom (installed incident
+// runs 41301126897, 41299848255, 41284876053).
+const trustReuseMargin = 3 * time.Second
 
 var _ app.APIContextWorkTrustReader = (*APIContextWorkTrustSource)(nil)
 
