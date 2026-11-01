@@ -648,6 +648,8 @@ func ongoingSaveControlDiagnostics(t *testing.T, ctx context.Context, admin *pgx
 		`SELECT concat('pool configured=',configured,' paused=',paused,' valid=',clock_timestamp()<valid_until,' full=',full_limit,' replay=',replay_limit) FROM context_control_pool WHERE root_id=$1`,
 		`SELECT concat('account configured=',configured,' paused=',paused,' valid=',clock_timestamp()<valid_until,' full=',charged_full,'/',full_limit,' replay=',charged_replay,'/',replay_limit) FROM context_control_account WHERE root_id=$1`,
 		`SELECT concat('binding fresh=',clock_timestamp()<fresh_until) FROM context_storage_binding WHERE root_id=$1`,
+		`SELECT concat('occurrences=',count(*),' captured=',count(capture_id),' outcomes=',string_agg(DISTINCT coalesce(outcome,'-'),',')) FROM policy_occurrence WHERE root_id=$1`,
+		`SELECT concat('policy restarts watermark=',max(restarts)) FROM policy_occurrence WHERE root_id=$1`,
 		`SELECT concat('sources unreleased=',count(*) FILTER (WHERE slot_released_at IS NULL),' ended=',count(*) FILTER (WHERE ended_at IS NOT NULL),' total=',count(*)) FROM policy_recording_source WHERE root_id=$1`,
 	} {
 		rows, err := admin.Query(call, q, root)
