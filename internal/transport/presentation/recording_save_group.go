@@ -21,7 +21,7 @@ func recordingProgressActions(p value.ContextProgress) ([]ContextActionData, err
 		}
 		return []ContextActionData{{ActionID: action, Phase: p.ActionPhase, ReasonCode: p.ReasonCode}}, nil
 	}
-	if (p.Operation != "recordingSave" && p.Operation != "collect") || len(p.Actions) > value.MaxRecordingSaveGroupChildren {
+	if (p.Operation != "recordingSave" && (p.Operation != "collect" || len(p.Actions) < 2)) || len(p.Actions) > value.MaxRecordingSaveGroupChildren {
 		return nil, value.ErrUnavailable
 	}
 	out := make([]ContextActionData, 0, len(p.Actions))
