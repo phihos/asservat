@@ -1,0 +1,118 @@
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "kind": "CustomResourceDefinition",
+  "metadata": {
+    "name": "captureprofiles.asservat.io"
+  },
+  "spec": {
+    "group": "asservat.io",
+    "scope": "Namespaced",
+    "names": {
+      "kind": "CaptureProfile",
+      "plural": "captureprofiles",
+      "singular": "captureprofile",
+      "categories": [
+        "asservat"
+      ]
+    },
+    "versions": [
+      {
+        "name": "v1alpha1",
+        "served": true,
+        "storage": true,
+        "additionalPrinterColumns": [
+          {
+            "name": "Profile",
+            "type": "string",
+            "jsonPath": ".spec.name"
+          },
+          {
+            "name": "Version",
+            "type": "string",
+            "jsonPath": ".spec.version"
+          },
+          {
+            "name": "Enabled",
+            "type": "boolean",
+            "jsonPath": ".spec.availability.enabled"
+          },
+          {
+            "name": "Deprecated",
+            "type": "boolean",
+            "jsonPath": ".spec.availability.deprecated"
+          }
+        ],
+        "schema": {
+          "openAPIV3Schema": {
+            "type": "object",
+            "required": [
+              "spec"
+            ],
+            "properties": {
+              "apiVersion": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "spec": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "version",
+                  "definition",
+                  "availability"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,62}$"
+                  },
+                  "version": {
+                    "type": "string",
+                    "pattern": "^v[1-9][0-9]*$",
+                    "maxLength": 32
+                  },
+                  "definition": {
+                    "type": "object",
+                    "x-kubernetes-preserve-unknown-fields": true
+                  },
+                  "availability": {
+                    "type": "object",
+                    "required": [
+                      "enabled",
+                      "deprecated"
+                    ],
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "deprecated": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
+                "x-kubernetes-validations": [
+                  {
+                    "rule": "self.name == oldSelf.name && self.version == oldSelf.version && self.definition == oldSelf.definition",
+                    "message": "A published profile version is immutable; publish a new version instead."
+                  }
+                ]
+              }
+            },
+            "x-kubernetes-validations": [
+              {
+                "rule": "self.metadata.name == self.spec.name + \".\" + self.spec.version",
+                "message": "The object name is <name>.<version>."
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

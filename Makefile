@@ -48,7 +48,7 @@ investigation-check:
 
 # Product component gates. The integration target creates/removes owned fixtures.
 .PHONY: go-check go-architecture-check context-integration
-go-check: manifest-schema-check permission-schema-check policy-schema-check permission-crd-check control-schema-check start-crd-check retention-crd-check capacity-crd-check investigation-schema-check
+go-check: manifest-schema-check permission-schema-check policy-schema-check permission-crd-check control-schema-check start-crd-check retention-crd-check capacity-crd-check profile-crd-check investigation-schema-check
 	go vet ./...
 	# Preserve race/count/deadline checks with exact sequential Kubernetes groups.
 	$(PYTHON) scripts/test-go-shards.py
@@ -174,6 +174,10 @@ start-crd-check:
 fleet-integration:
 	$(PYTHON) scripts/test-custody.py --fleet
 
+.PHONY: profile-crd-check
+profile-crd-check:
+	$(PYTHON) scripts/profile-crd.py
+
 .PHONY: retention-crd-check
 retention-crd-check:
 	$(PYTHON) scripts/retention-crd.py
@@ -187,7 +191,7 @@ identity-integration:
 	$(PYTHON) scripts/test-identity.py
 
 .PHONY: helm-check helm-integration
-helm-check: permission-crd-check policy-crd-check start-crd-check retention-crd-check
+helm-check: permission-crd-check policy-crd-check start-crd-check retention-crd-check profile-crd-check
 	$(PYTHON) scripts/check-helm.py
 
 helm-integration: helm-check

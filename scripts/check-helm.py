@@ -298,6 +298,7 @@ def check_cluster(directory):
     # connector (RBAC escalation check), read-only.
     assert {"apiGroups": [""], "resources": ["pods/log"], "verbs": ["get"]} in role["rules"]
     assert {"apiGroups": ["metrics.k8s.io"], "resources": ["pods"], "verbs": ["list"]} in role["rules"]
+    assert {"apiGroups": ["asservat.io"], "resources": ["captureprofiles"], "verbs": ["get"]} in role["rules"]
     for change in [{"mode": "hub"}, {"cluster": {"image": "registry.example/asservat:latest"}}, {"cluster": {"bootstrapSecret": ""}},
                    {"cluster": {"offer": json.dumps({"format": "other"})}}, {"cluster": {"namespace": "kube-system"}}]:
         v = json.loads(json.dumps(base))
@@ -474,7 +475,8 @@ def main():
     assert not metadata.get("dependencies"), "foundation must not install dependency charts"
     expected = {p.name: yaml.safe_load(p.read_text()) for p in (CHART / "crds").glob("*.yaml")}
     # ADR-228 adds the hub-held DebugPolicy CRD (structural accepted subset).
-    assert len(expected) == 7, "review newly added installation resources"
+    # S-04 increment 11 adds the CaptureProfile catalog CRD (REQ-CPR-001).
+    assert len(expected) == 8, "review newly added installation resources"
     for mode in ["hub", "cluster", "combined"]:
         run(["lint", "--strict", str(CHART), "--set", "mode=" + mode])
         args = ["template", "asservat", str(CHART), "--namespace", "asservat-system", "--include-crds", "--kube-version", "1.35.0", "--set", "mode=" + mode]

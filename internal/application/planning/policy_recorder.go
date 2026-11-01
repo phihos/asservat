@@ -77,7 +77,7 @@ func compilePolicyRecorder(c value.ProfileComposition, filters FilterCompiler, s
 		Profile  wireResolved          `json:"profile"`
 		Recipe   json.RawMessage       `json:"recipe"`
 		Filter   *compiledFilterRecord `json:"filter,omitempty"`
-	}{"policy-recorder/v1", authored(c), wireResolved{component.ID, wireRef{component.Profile.Catalog, component.Profile.Name, component.Profile.Version}, hexDigest(profile.Digest)}, recipe, filter}
+	}{"policy-recorder/v1", authored(c), profile.wire(component.ID), recipe, filter}
 	scope, err := json.Marshal(record)
 	if err != nil {
 		return out, value.ErrInvalid

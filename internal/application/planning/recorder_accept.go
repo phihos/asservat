@@ -3,6 +3,7 @@ package planning
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"strconv"
 	"time"
 
@@ -242,4 +243,33 @@ func RecorderFiltersOf(plan value.RecorderPlan) ([]value.CompiledExpression, err
 func RecorderApprovedAcceptance(scope []byte) bool {
 	var s recorderScope
 	return strict(scope, &s) == nil && s.Version == value.RecorderPlanVersion && s.Timing == "approvedAcceptance/v1" && s.Deadline == "" && s.Approval != nil
+}
+
+// CatalogProfilesCurrent reports whether every organization or namespace
+// profile version pinned in an accepted recorder scope is still published,
+// enabled and unchanged in c.Resolved, the caller's current read
+// (REQ-CPR-001): a disabled, deleted or replaced version cannot authorize a
+// start from a stored preview.
+func CatalogProfilesCurrent(c value.ProfileComposition, canonicalScope []byte) error {
+	var scope recorderScope
+	if json.Unmarshal(canonicalScope, &scope) != nil {
+		return value.ErrInvalid
+	}
+	for _, pinned := range scope.Provenance.ResolvedProfiles {
+		if pinned.ProfileRef.Catalog == "builtin" {
+			continue
+		}
+		index := slices.IndexFunc(c.Components, func(component value.ProfileComponent) bool { return component.ID == pinned.ComponentID })
+		if index < 0 {
+			return value.ErrInvalid
+		}
+		p, err := resolveProfile(index, c.Components[index].Profile, c.Resolved)
+		if err != nil {
+			return err
+		}
+		if hexDigest(p.Digest) != pinned.DefinitionDigest || p.SourceUID != pinned.SourceUID {
+			return refuse(value.CompositionProfileMissing, pathf("profile_composition.components[%d].profileRef", index), "the profile version changed since the preview; preview again")
+		}
+	}
+	return nil
 }

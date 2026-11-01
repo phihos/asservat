@@ -127,6 +127,10 @@ type ResolvedProfile struct {
 	ComponentID      string
 	Ref              ProfileRef
 	DefinitionDigest artifact.Digest
+	// Catalog (non-builtin) versions name their source (REQ-CPR-001).
+	SourceClusterID, SourceNamespaceUID, SourceUID string `json:",omitempty"`
+	// Deprecated versions stay usable but are visibly discouraged.
+	Deprecated bool `json:",omitempty"`
 }
 
 // RecorderPlan is a compiled, reviewable packet/syscall plan (ADR-243). Only a

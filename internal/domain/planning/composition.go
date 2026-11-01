@@ -73,6 +73,23 @@ type ProfileComposition struct {
 	Components    []ProfileComponent
 	MaxTotalBytes int64
 	MaxDuration   string
+	// Resolved holds the organization and namespace profile versions the
+	// caller read for this compilation (one bounded read per preview, one per
+	// start). It is never authored or persisted: every compilation reads the
+	// current published versions again, so a disabled or deleted version
+	// cannot authorize a new start from a stored preview or history.
+	Resolved []CatalogProfile `json:"-"`
+}
+
+// CatalogProfile is one published CaptureProfile version (REQ-CPR-001): its
+// immutable document {name, version, definition}, its current availability
+// and its source identity. The compiler verifies the document and pins its
+// digest; the source identity enters the resolved provenance.
+type CatalogProfile struct {
+	Ref                                            ProfileRef
+	SourceClusterID, SourceNamespaceUID, SourceUID string
+	Document                                       []byte
+	Enabled, Deprecated                            bool
 }
 
 func (c *ProfileComposition) Valid() bool {
@@ -143,6 +160,13 @@ func (c *ProfileComposition) clone() *ProfileComposition {
 			}
 		}
 		out.Components[i] = component
+	}
+	if c.Resolved != nil {
+		out.Resolved = make([]CatalogProfile, len(c.Resolved))
+		for i, r := range c.Resolved {
+			r.Document = append([]byte(nil), r.Document...)
+			out.Resolved[i] = r
+		}
 	}
 	return &out
 }

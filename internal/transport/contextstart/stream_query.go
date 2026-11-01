@@ -26,6 +26,8 @@ const (
 	// ADR-245: one decision-time SubjectAccessReview of one principal for one
 	// exact Pod by the target cluster's connector.
 	queryReviewAccess = "review-access"
+	// REQ-CPR-001: exact CaptureProfile versions in the target's namespace.
+	queryCaptureProfiles = "capture-profiles"
 	// ADR-248: whether the target Pod's node collector offers the packet
 	// recorder now.
 	queryPacketRecorder          = "packet-recorder"
@@ -51,6 +53,13 @@ type RecorderTargets interface {
 // grants nothing.
 type ReviewTargets interface {
 	ReviewAccess(context.Context, targets.AccessReviewRequest) (targets.AccessReviewAnswer, error)
+}
+
+// ProfileTargets is the region's optional namespace catalog read
+// (REQ-CPR-001). A region without it answers unsupported, which leaves
+// namespace profiles unavailable.
+type ProfileTargets interface {
+	ReadCaptureProfiles(context.Context, targets.ProfileCatalogRequest) (targets.ProfileCatalogAnswer, error)
 }
 
 // PacketTargetResolver composes exact target and recorder readiness. A region
@@ -363,6 +372,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if reviewer, ok := s.targets.(ReviewTargets); ok {
 			out, e = reviewer.ReviewAccess(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryCaptureProfiles:
+		var r targets.ProfileCatalogRequest
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if reader, ok := s.targets.(ProfileTargets); ok {
+			out, e = reader.ReadCaptureProfiles(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}
