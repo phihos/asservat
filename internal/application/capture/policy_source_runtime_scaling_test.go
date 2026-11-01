@@ -10,10 +10,10 @@ import (
 
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	compiler "asservat.local/asservat/internal/application/planning"
-	planning "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/collector"
+	planning "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 )
