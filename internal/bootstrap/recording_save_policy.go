@@ -14,23 +14,25 @@ import (
 // Shared inert lifecycle compilation for the accepted-source reader and this
 // unmerged native candidate. It grants no source/manual acquisition authority.
 func recordingSavePolicyCompiler(filters planningapp.FilterCompiler) captureapp.PolicyRecorderCompiler {
-	return func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+	return func(raw json.RawMessage) ([]planvalue.PolicyRecorderConfiguration, error) {
 		var wire contracts.CaptureComposition
 		if err := json.Unmarshal(raw, &wire); err != nil {
-			return planvalue.PolicyRecorderConfiguration{}, err
+			return nil, err
 		}
 		composition, err := conversion.CompositionFromWire(wire)
 		if err != nil || composition == nil {
-			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
+			return nil, planvalue.ErrInvalid
 		}
-		cfg, err := planningapp.CompileOngoingPolicyRecorder(*composition, filters)
+		all, err := planningapp.CompileOngoingPolicyRecorders(*composition, filters)
 		if err != nil {
-			return cfg, err
+			return nil, err
 		}
-		if cfg.Filter != nil && planningapp.RawBytePredicate(cfg.Action.Filter) && packets.CheckPrefixProgram(cfg.Filter.Program) != nil {
-			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
+		for _, cfg := range all {
+			if cfg.Filter != nil && planningapp.RawBytePredicate(cfg.Action.Filter) && packets.CheckPrefixProgram(cfg.Filter.Program) != nil {
+				return nil, planvalue.ErrInvalid
+			}
 		}
-		return cfg, nil
+		return all, nil
 	}
 }
 

@@ -227,7 +227,7 @@ func TestInstalledPolicyRecordingAuthoredInputs(t *testing.T) {
 		}
 		return compiler.CompilePolicyRecorder(*in, installedPolicyRecordingFilters{})
 	}
-	plan, err := captureapp.CompilePolicyWithRecorders(raw, compiler.ContextRecipeName, compiler.RecipeDigest(), compile)
+	plan, err := captureapp.CompilePolicyWithRecorders(raw, compiler.ContextRecipeName, compiler.RecipeDigest(), captureapp.SingleRecorder(compile))
 	if err != nil || plan.Recorder == nil || plan.Recorder.Action.ExecutionMode != "onTrigger" || plan.Recorder.Action.Before != "0s" || plan.Recorder.Action.After != "2s" || plan.Recorder.Action.Filter != installedPolicyRecordingFilter || plan.Recorder.Filter == nil {
 		t.Fatal("native authored finite policy plan", err)
 	}

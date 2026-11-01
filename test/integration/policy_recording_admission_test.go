@@ -587,8 +587,8 @@ func policyRecorderOfflineAdmission(t testing.TB, now time.Time) capture.Admissi
 	return capture.Admission{RootID: root, IdempotencyKey: custodyID(), Plan: planvalue.ContextPlan{Input: in}, Eligibility: eligible, Recovery: artifact.RecoveryProof{InstallationID: installation, IssuerEpoch: custodyID(), Revision: identity.Revision{UID: "recovery", Generation: 1, Digest: artifact.Digest{6}}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, Storage: capture.StorageBinding{RootID: root, ClusterID: cluster, NamespaceUID: target.Target().NamespaceUID, WorkloadUID: target.Target().WorkloadUID, AllocationID: allocation, Revision: identity.Revision{UID: "storage", Generation: 1, Digest: artifact.Digest{7}}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second)}, Registration: artifact.Registration{Location: artifact.Location{ClusterID: cluster, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: custodyID(), AllocationID: allocation, PoolRevision: 1, AllocationRevision: 1, NativeLimit: artifact.RecordingNativeLimit, AnchorAt: retained.AnchorAt}, CaseID: custodyID(), OccurrenceID: custodyID()}
 }
 
-func policyMetadataCompile(filters planning.FilterCompiler) func(json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
-	return func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+func policyMetadataCompile(filters planning.FilterCompiler) captureapp.PolicyRecorderCompiler {
+	return captureapp.SingleRecorder(func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
 		var wire contracts.CaptureComposition
 		if err := json.Unmarshal(raw, &wire); err != nil {
 			return planvalue.PolicyRecorderConfiguration{}, err
@@ -598,7 +598,7 @@ func policyMetadataCompile(filters planning.FilterCompiler) func(json.RawMessage
 			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
 		}
 		return planning.CompilePolicyRecorder(*c, filters)
-	}
+	})
 }
 
 func policyRecorderSponsor(author identity.Identity, projection authorization.Projection, delegation string) artifact.AudienceAssignment {
@@ -618,8 +618,8 @@ func policyRecorderCloneBatch(b cfg.PermissionBatch) cfg.PermissionBatch {
 	return b
 }
 
-func policySourceCompile(filters planning.FilterCompiler) func(json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
-	return func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+func policySourceCompile(filters planning.FilterCompiler) captureapp.PolicyRecorderCompiler {
+	return captureapp.SingleRecorder(func(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
 		var wire contracts.CaptureComposition
 		if err := json.Unmarshal(raw, &wire); err != nil {
 			return planvalue.PolicyRecorderConfiguration{}, err
@@ -629,7 +629,7 @@ func policySourceCompile(filters planning.FilterCompiler) func(json.RawMessage) 
 			return planvalue.PolicyRecorderConfiguration{}, planvalue.ErrInvalid
 		}
 		return planning.CompileOngoingPolicyRecorder(*c, filters)
-	}
+	})
 }
 
 // Set reviewed intent before raw source hashing/observation/acceptance. The same

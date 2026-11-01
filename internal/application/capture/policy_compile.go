@@ -23,7 +23,18 @@ import (
 
 // PolicyRecorderCompiler converts/compiles a source composition at the
 // composition root. Shared DTO decoding stays outside application/domain layers.
-type PolicyRecorderCompiler func(json.RawMessage) (planvalue.PolicyRecorderConfiguration, error)
+type PolicyRecorderCompiler func(json.RawMessage) ([]planvalue.PolicyRecorderConfiguration, error)
+
+// SingleRecorder adapts a one-recorder compiler.
+func SingleRecorder(f func(json.RawMessage) (planvalue.PolicyRecorderConfiguration, error)) PolicyRecorderCompiler {
+	return func(raw json.RawMessage) ([]planvalue.PolicyRecorderConfiguration, error) {
+		cfg, err := f(raw)
+		if err != nil {
+			return nil, err
+		}
+		return []planvalue.PolicyRecorderConfiguration{cfg}, nil
+	}
+}
 
 // CompileRestartPolicy compiles a schema-valid DebugPolicy spec. The recipe
 // is the installation's exact context recipe, supplied by the caller.
@@ -158,11 +169,21 @@ func compilePolicy(spec []byte, recipeName string, recipeDigest artifact.Digest,
 		if err != nil {
 			return value.RestartPolicy{}, err
 		}
-		if !compiled.Valid() {
+		if len(compiled) < 1 {
 			return reject(".profileComposition", "invalid resolved recording")
 		}
-
-		out.Recorder = &compiled
+		for _, r := range compiled {
+			if !r.Valid() {
+				return reject(".profileComposition", "invalid resolved recording")
+			}
+		}
+		// ponytail: ADR-275 step 2 arms one source per recorder; until then
+		// a policy records one action so nothing arms partially.
+		if len(compiled) > 1 {
+			return reject(".profileComposition", "one policy records one action in this release; split the composition")
+		}
+		out.Recorder = &compiled[0]
+		out.MoreRecorders = compiled[1:]
 	} else {
 		var recipe struct{ Name, Digest string }
 		if strict(s["recipeRef"], &recipe) != nil {

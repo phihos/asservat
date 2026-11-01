@@ -13,7 +13,9 @@ import (
 	"asservat.local/asservat/internal/transport/conversion"
 )
 
-func ongoingSaveCompiler(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
+var ongoingSaveCompiler = SingleRecorder(ongoingSaveCompilerOne)
+
+func ongoingSaveCompilerOne(raw json.RawMessage) (planvalue.PolicyRecorderConfiguration, error) {
 	var wire contracts.CaptureComposition
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		return planvalue.PolicyRecorderConfiguration{}, err

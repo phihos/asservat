@@ -63,9 +63,13 @@ type RestartPolicy struct {
 	Resource *targets.ResourceCondition `json:",omitempty"`
 	// Sharing is the optional spec.sharing block (ADR-239). It is nil for a
 	// policy without one, so such a policy's scope digest is unchanged.
-	Sharing        *PolicySharing                        `json:",omitempty"`
-	Recorder       *planning.PolicyRecorderConfiguration `json:",omitempty"`
-	RecordingSaves bool                                  `json:",omitempty"`
+	Sharing  *PolicySharing                        `json:",omitempty"`
+	Recorder *planning.PolicyRecorderConfiguration `json:",omitempty"`
+	// MoreRecorders are a composition's further recorder actions (ADR-275),
+	// each its own source; nil for one recorder, so existing scope digests
+	// are unchanged.
+	MoreRecorders  []planning.PolicyRecorderConfiguration `json:",omitempty"`
+	RecordingSaves bool                                   `json:",omitempty"`
 	// GrantRef is explicit control outside collection identity; it never resets spend.
 	GrantRef string `json:"-"`
 }
