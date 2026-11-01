@@ -56,7 +56,11 @@ func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q
 	if err != nil || len(rows) != len(accepted.Group.Children) {
 		return zero, value.ErrUnavailable
 	}
-	out := value.ContextProgressObservation{CaptureID: uid(header.ID), CandidateCaseID: accepted.Group.CaseID, Operation: "recordingSave", Revision: header.ProgressRevision, CreatedAt: header.AcceptedAt.Time.UTC(), Deadline: header.Deadline.Time.UTC(), ObservedAt: observedAt, ValidUntil: identity.Earlier(observedAt.Add(5*time.Second), request.Recovery.FreshUntil), CancellationRequested: header.CancelRequestedAt.Valid, HistoryState: "unavailable"}
+	operation := "recordingSave"
+	if header.GroupKind == "composition" {
+		operation = "collect" // ADR-276: one Pod, several recorders
+	}
+	out := value.ContextProgressObservation{CaptureID: uid(header.ID), CandidateCaseID: accepted.Group.CaseID, Operation: operation, Revision: header.ProgressRevision, CreatedAt: header.AcceptedAt.Time.UTC(), Deadline: header.Deadline.Time.UTC(), ObservedAt: observedAt, ValidUntil: identity.Earlier(observedAt.Add(5*time.Second), request.Recovery.FreshUntil), CancellationRequested: header.CancelRequestedAt.Valid, HistoryState: "unavailable"}
 	for n, row := range rows {
 		childRequest := request
 		childRequest.CaptureID = uid(row.ID)
@@ -71,7 +75,9 @@ func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q
 		}
 		if n == 0 {
 			out.Target = child.Target
-			out.Target.PodUID = ""
+			if header.GroupKind != "composition" {
+				out.Target.PodUID = ""
+			}
 		}
 		out.ValidUntil = identity.Earlier(out.ValidUntil, child.ValidUntil)
 		out.CanCancel = out.CanCancel || child.CanCancel

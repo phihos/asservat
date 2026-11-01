@@ -55,19 +55,26 @@ func requestRecordScope(row custodydb.ContextCapture) (planning.ContextScopeIden
 		return planning.ContextScopeIdentity{}, value.ErrUnavailable
 	}
 	copy(want[:], row.ScopeDigest)
+	a, err := admittedRecord(row)
+	if err != nil {
+		return planning.ContextScopeIdentity{}, err
+	}
 	s, err := planning.ReadContextScopeIdentity(row.ScopeJson, want)
 	if err == nil && row.GroupID.Valid {
 		if !row.GroupOrdinal.Valid {
 			return planning.ContextScopeIdentity{}, value.ErrUnavailable
 		}
-		s, err = planning.ReadRecordingSaveChildScopeIdentity(row.ScopeJson, want, planvalue.RecordingSaveGroupBinding{ParentCaptureID: uid(row.GroupID), SelectionDigest: want, ChildIndex: int(row.GroupOrdinal.Int16), ChildCount: len(s.Targets)}, uid(row.ID))
+		// An ADR-276 composition child keeps its own single-recording scope.
+		if b := a.Expectation.CompositionGroup; b != nil {
+			if b.ParentCaptureID != uid(row.GroupID) || b.ChildIndex != int(row.GroupOrdinal.Int16) {
+				err = value.ErrUnavailable
+			}
+		} else {
+			s, err = planning.ReadRecordingSaveChildScopeIdentity(row.ScopeJson, want, planvalue.RecordingSaveGroupBinding{ParentCaptureID: uid(row.GroupID), SelectionDigest: want, ChildIndex: int(row.GroupOrdinal.Int16), ChildCount: len(s.Targets)}, uid(row.ID))
+		}
 	}
 	if err != nil {
 		return planning.ContextScopeIdentity{}, value.ErrUnavailable
-	}
-	a, err := admittedRecord(row)
-	if err != nil {
-		return planning.ContextScopeIdentity{}, err
 	}
 	e := a.Expectation
 	target := authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}
@@ -206,16 +213,9 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 			return err
 		}
 		if groupFound {
-			var digest artifact.Digest
-			copy(digest[:], group.ScopeDigest)
-			scope, err := planning.ReadContextScopeIdentity(group.ScopeJson, digest)
-			if err != nil || scope.Requester == nil || *scope.Requester != in.Identity.Principal || len(scope.Targets) < 2 {
+			requester, err := groupRequester(group)
+			if err != nil || requester != in.Identity.Principal {
 				return value.ErrDenied
-			}
-			for _, target := range scope.Targets {
-				if err := authorize(target); err != nil {
-					return err
-				}
 			}
 			if !bytes.Equal(group.SubmissionDigest, in.SubmissionDigest[:]) {
 				return value.ErrConflict
@@ -223,6 +223,12 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 			a, err := recordingGroupAccepted(ctx, q, group)
 			if err != nil {
 				return err
+			}
+			for _, child := range a.Group.Children {
+				e := child.Expectation
+				if err := authorize(authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}); err != nil {
+					return err
+				}
 			}
 			a.Replay, a.MetadataValidUntil = true, deadline()
 			for n := range a.Group.Children {

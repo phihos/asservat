@@ -24,13 +24,16 @@ type recorderGroupChild struct {
 }
 
 type recorderGroupScope struct {
-	Version   string               `json:"schemaVersion"`
-	CaptureID string               `json:"captureID"`
-	Executor  principal            `json:"executor"`
-	Target    recorderTarget       `json:"target"`
-	Source    source               `json:"source"`
-	Approval  bool                 `json:"approvalRequired"`
-	Children  []recorderGroupChild `json:"children"`
+	Version   string         `json:"schemaVersion"`
+	CaptureID string         `json:"captureID"`
+	Executor  principal      `json:"executor"`
+	Target    recorderTarget `json:"target"`
+	Source    source         `json:"source"`
+	Approval  bool           `json:"approvalRequired"`
+	// Timing is the children's shared approved-timing marker; the parent
+	// grant carries it like a single recorder's (lock_approved_context_grant).
+	Timing   string               `json:"timing,omitempty"`
+	Children []recorderGroupChild `json:"children"`
 }
 
 // CompileRecorderGroup binds already compiled single-action child plans of
@@ -48,8 +51,8 @@ func CompileRecorderGroup(captureID string, children []value.RecorderPlan) ([]by
 			return bad()
 		}
 		if i == 0 {
-			out = recorderGroupScope{Version: RecorderGroupVersion, CaptureID: captureID, Executor: s.Executor, Target: s.Target, Source: source{s.Source.ClusterID, s.Source.NamespaceUID, captureID}, Approval: s.Approval != nil}
-		} else if s.Executor != out.Executor || s.Target != out.Target || s.Source.ClusterID != out.Source.ClusterID || s.Source.NamespaceUID != out.Source.NamespaceUID || (s.Approval != nil) != out.Approval {
+			out = recorderGroupScope{Version: RecorderGroupVersion, CaptureID: captureID, Executor: s.Executor, Target: s.Target, Source: source{s.Source.ClusterID, s.Source.NamespaceUID, captureID}, Approval: s.Approval != nil, Timing: s.Timing}
+		} else if s.Timing != out.Timing || s.Executor != out.Executor || s.Target != out.Target || s.Source.ClusterID != out.Source.ClusterID || s.Source.NamespaceUID != out.Source.NamespaceUID || (s.Approval != nil) != out.Approval {
 			return bad()
 		}
 		a := p.Actions[0]

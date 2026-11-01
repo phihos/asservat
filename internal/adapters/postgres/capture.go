@@ -273,8 +273,10 @@ type contextAdmissionGroupOptions struct {
 	Permissions       *recordingGroupFacts
 	// Composition admits child ChildIndex of a manual composition group
 	// (ADR-276): no policy reservation; the parent preview's grant binds it.
+	// AcceptedAt is the header's acceptance time every child is created at.
 	Composition bool
 	ChildIndex  int
+	AcceptedAt  time.Time
 }
 
 // reviewedGroupChild is the group's per-child review check of its kind.
@@ -459,6 +461,9 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if !validAdmission(a) {
 				return value.ErrChanged
 			}
+		}
+		if group != nil && group.Composition {
+			acceptedAt = ts(group.AcceptedAt)
 		}
 		var auditAccount audit.CaptureAuditAccount
 		var auditUntil, auditHardUntil time.Time

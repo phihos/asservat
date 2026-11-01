@@ -13,6 +13,9 @@ import (
 
 func (s *APIContextExecutions) requestGroupCancellation(ctx context.Context, q *custodydb.Queries, trust custodydb.FleetCurrentTrust, stream custodydb.PermissionStream, header custodydb.RecordingSaveGroup, in value.CancellationCheck) (app.SnapshotCancellationWork, error) {
 	var zero app.SnapshotCancellationWork
+	if header.GroupKind == "composition" {
+		return zero, value.ErrDenied // ADR-276: finite children run to their deadline
+	}
 	accepted, err := recordingGroupAccepted(ctx, q, header)
 	if err != nil {
 		return zero, err
