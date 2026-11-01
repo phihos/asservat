@@ -1,6 +1,7 @@
 package capture
 
 import (
+	planvalue "asservat.local/asservat/internal/domain/planning"
 	"context"
 	"errors"
 	"slices"
@@ -155,8 +156,26 @@ func (s *PolicySourceRuntime) StopPolicy(ctx context.Context, policy string) err
 	return failed
 }
 
+// Maintain arms, renews and stops one source per (Pod, recorder) of an
+// accepted ongoing policy (ADR-275); each recorder keeps its own rows.
 func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolicy, a authorization.AcceptedPolicyAuthority, o targets.RestartObservation) error {
-	if !s.configured() || ctx == nil || ctx.Err() != nil || !p.Valid() || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing" || !a.Valid(s.Now()) || !o.Valid(s.Now()) || !o.Answers(p.Request()) || o.ClusterID != a.ClusterID || o.Namespace.UID != a.NamespaceUID || o.Workload.UID != a.WorkloadUID || len(o.Pods) > p.ObservedPods {
+	recorders := p.Recorders()
+	if len(recorders) == 0 {
+		return staged("precheck", value.ErrUnavailable)
+	}
+	actions := map[string]bool{}
+	for _, r := range recorders {
+		actions[r.Action.ID] = true
+	}
+	var failed error
+	for i := range recorders {
+		failed = errors.Join(failed, s.maintain(ctx, p, &recorders[i], actions, i == 0, a, o))
+	}
+	return failed
+}
+
+func (s *PolicySourceRuntime) maintain(ctx context.Context, p value.RestartPolicy, rec *planvalue.PolicyRecorderConfiguration, actions map[string]bool, first bool, a authorization.AcceptedPolicyAuthority, o targets.RestartObservation) error {
+	if !s.configured() || ctx == nil || ctx.Err() != nil || !p.Valid() || rec == nil || rec.Action.ExecutionMode != "ongoing" || !a.Valid(s.Now()) || !o.Valid(s.Now()) || !o.Answers(p.Request()) || o.ClusterID != a.ClusterID || o.Namespace.UID != a.NamespaceUID || o.Workload.UID != a.WorkloadUID || len(o.Pods) > p.ObservedPods {
 		return staged("precheck", value.ErrUnavailable)
 	}
 	cohortStarted := s.Now().UTC().Truncate(time.Microsecond)
@@ -176,6 +195,18 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 	}
 	var failed error
 	for _, row := range rows {
+		if row.Binding.ActionID != rec.Action.ID {
+			// Another recorder's source; the first pass also ends sources of
+			// actions the accepted policy no longer has.
+			if first && !actions[row.Binding.ActionID] {
+				if e := s.Ledger.EndSource(ctx, row.Binding.SourceID); e != nil {
+					failed = errors.Join(failed, e)
+				} else {
+					failed = errors.Join(failed, s.Dispatcher.StopSource(ctx, row.ClusterID, row.Binding))
+				}
+			}
+			continue
+		}
 		if !present[row.Binding.PodUID] || row.Binding.Scope != [32]byte(a.ScopeDigest) || !s.Now().Before(row.HardUntil) {
 			if e := s.Ledger.EndSource(ctx, row.Binding.SourceID); e != nil {
 				failed = errors.Join(failed, e)
@@ -213,7 +244,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 			if known && !old.EndedAt.IsZero() {
 				continue
 			}
-			request := targets.OngoingRecorderRequest{Target: targets.Request{ClusterID: o.ClusterID, Namespace: o.Namespace, Workload: o.Workload, PodName: pod.Name, PodUID: pod.UID}, Syscall: p.Recorder.Action.Kind == "syscallTrace"}
+			request := targets.OngoingRecorderRequest{Target: targets.Request{ClusterID: o.ClusterID, Namespace: o.Namespace, Workload: o.Workload, PodName: pod.Name, PodUID: pod.UID}, Syscall: rec.Action.Kind == "syscallTrace"}
 			if known {
 				request.SourceID, request.Fence = old.Binding.SourceID, old.Binding.Fence
 			}
@@ -245,7 +276,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 		if known && !old.EndedAt.IsZero() {
 			continue
 		} // original quarantine owns the slot
-		request := targets.OngoingRecorderRequest{Target: targets.Request{ClusterID: o.ClusterID, Namespace: o.Namespace, Workload: o.Workload, PodName: pod.Name, PodUID: pod.UID}, Syscall: p.Recorder.Action.Kind == "syscallTrace"}
+		request := targets.OngoingRecorderRequest{Target: targets.Request{ClusterID: o.ClusterID, Namespace: o.Namespace, Workload: o.Workload, PodName: pod.Name, PodUID: pod.UID}, Syscall: rec.Action.Kind == "syscallTrace"}
 		if known {
 			request.SourceID, request.Fence = old.Binding.SourceID, old.Binding.Fence
 		}
@@ -288,26 +319,27 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 			continue
 		}
 		ceiling := resolved.Ceilings
-		slots := min(int64(p.ObservedPods), ceiling.MaxActiveSources)
+		// Every recorder's source shares the policy's ceiling (ADR-275).
+		slots := min(int64(p.ObservedPods*len(actions)), ceiling.MaxActiveSources)
 		if slots < 1 || ceiling.MaxActiveSources > collector.MaxActiveSources || ceiling.InputBytesPerSecond < 1 || ceiling.InputBytesPerSecond > collector.MaxInputRate || ceiling.InputBurstBytes < 1 || ceiling.InputBurstBytes > collector.MaxInputBurst {
 			failed = errors.Join(failed, staged("ceilings", value.ErrCapacity))
 			continue
 		}
 		rate := min(ceiling.InputBytesPerSecond, ceiling.InputBurstBytes) / slots
-		if p.Recorder.Action.Kind == "syscallTrace" && p.Recorder.Action.MaxEventsPerSecond > 0 {
+		if rec.Action.Kind == "syscallTrace" && rec.Action.MaxEventsPerSecond > 0 {
 			// Each syscall event spends collector.SyscallEventCredit (ADR-273).
-			rate = min(rate, p.Recorder.Action.MaxEventsPerSecond*collector.SyscallEventCredit)
+			rate = min(rate, rec.Action.MaxEventsPerSecond*collector.SyscallEventCredit)
 		}
 		if rate < 1 {
 			failed = errors.Join(failed, value.ErrCapacity)
 			continue
 		}
-		retention, e := s.Retention.Resolve(call, privacy.Input{Target: resolved.Recorder.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: p.Recorder.Action.EvidenceType, RequestedSeconds: p.RetentionSeconds, AnchorAt: started})
+		retention, e := s.Retention.Resolve(call, privacy.Input{Target: resolved.Recorder.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: rec.Action.EvidenceType, RequestedSeconds: p.RetentionSeconds, AnchorAt: started})
 		if e != nil {
 			failed = errors.Join(failed, staged("retention", e))
 			continue
 		}
-		age, ageErr := time.ParseDuration(p.Recorder.Action.RingMaxAge)
+		age, ageErr := time.ParseDuration(rec.Action.RingMaxAge)
 		if ageErr != nil {
 			return errors.Join(failed, value.ErrInvalid)
 		}
@@ -328,7 +360,7 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 			}
 			continue
 		}
-		check := PolicySourceCheck{Policy: p, Authority: a, Target: resolved.Recorder.Target, Node: node, Recovery: recovery, Retention: retention, Settings: settings, BytesPerSecond: rate, SourceSlots: slots, ObservedAt: started, ValidUntil: until}
+		check := PolicySourceCheck{Policy: p, ActionID: rec.Action.ID, Authority: a, Target: resolved.Recorder.Target, Node: node, Recovery: recovery, Retention: retention, Settings: settings, BytesPerSecond: rate, SourceSlots: slots, ObservedAt: started, ValidUntil: until}
 		if !known {
 			check.SourceID, check.Fence = s.NewID(), s.NewID()
 			check.Initial = true
@@ -390,12 +422,12 @@ func (s *PolicySourceRuntime) Maintain(ctx context.Context, p value.RestartPolic
 			continue
 		}
 
-		source := collector.PacketSource{Permit: admission.Permit, Resources: admission.Resources, Ring: collector.SourceRingLimits{MaxAge: age, MaxBytes: p.Recorder.Action.RingMaxBytes, SegmentBytes: p.Recorder.Action.SegmentBytes, MaxSegments: p.Recorder.Action.MaxSegments, MaxFrozenBytes: p.Recorder.Action.MaxFrozenBytes, MaxConcurrentSnapshots: p.Recorder.Action.MaxConcurrentSnapshots}}
-		if p.Recorder.Filter != nil {
-			source.Program = slices.Clone(p.Recorder.Filter.Program)
+		source := collector.PacketSource{Permit: admission.Permit, Resources: admission.Resources, Ring: collector.SourceRingLimits{MaxAge: age, MaxBytes: rec.Action.RingMaxBytes, SegmentBytes: rec.Action.SegmentBytes, MaxSegments: rec.Action.MaxSegments, MaxFrozenBytes: rec.Action.MaxFrozenBytes, MaxConcurrentSnapshots: rec.Action.MaxConcurrentSnapshots}}
+		if rec.Filter != nil {
+			source.Program = slices.Clone(rec.Filter.Program)
 		}
-		if p.Recorder.Action.Kind == "syscallTrace" {
-			f := compiler.SyscallSource(*p.Recorder)
+		if rec.Action.Kind == "syscallTrace" {
+			f := compiler.SyscallSource(*rec)
 			source.Syscalls = &f
 		}
 		if !source.Valid() {

@@ -46,13 +46,13 @@ func TestManualSaveCanonicalTimeoutCannotExceedProtectedAuthoredCaps(t *testing.
 				}
 				return planning.ContextPlan{CanonicalScope: raw, ScopeDigest: digest}
 			}
-			if !manualPolicySaveFinalizeCurrent(p, compile(maximum)) {
+			if !manualPolicySaveFinalizeCurrent(p.Recorder, compile(maximum)) {
 				t.Fatal("valid authored cap refused", maximum)
 			}
-			if manualPolicySaveFinalizeCurrent(p, compile(test.larger)) {
+			if manualPolicySaveFinalizeCurrent(p.Recorder, compile(test.larger)) {
 				t.Fatal("canonical timeout exceeded independently protected authored cap", test.larger, maximum)
 			}
-			if !manualPolicySaveFinalizeCurrent(p, compile(time.Second)) {
+			if !manualPolicySaveFinalizeCurrent(p.Recorder, compile(time.Second)) {
 				t.Fatal("shorter manual timeout refused")
 			}
 		})

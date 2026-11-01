@@ -43,7 +43,7 @@ func TestPolicySourceSnapshotDispatchKeepsOccurrenceAnchorAndUnknownReceipt(t *t
 	original := cohort.f.target.Request
 	original.PodUID = source.Binding.PodUID
 	source.Target = &targets.SourceSnapshotTarget{Request: original}
-	cohort.rows[source.Binding.PodUID] = source
+	cohort.rows[sourceKey(source.Binding.PodUID, source.Binding.ActionID)] = source
 	service := &policySnapshotServiceFixture{}
 	trigger := PolicyTrigger{OngoingSources: cohort.runtime, SourceSnapshots: service}
 	occurrence := value.PolicyOccurrence{ID: fixtureID(912), PolicyUID: cohort.authority.PolicyUID, PodUID: source.Binding.PodUID, TriggeredAt: cohort.f.now.Add(-2 * time.Second)}

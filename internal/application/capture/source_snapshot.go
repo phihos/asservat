@@ -92,14 +92,15 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	defer end()
 	now := s.Now().UTC().Truncate(time.Microsecond)
 	p, a, source := selection.Policy, selection.Authority, selection.Source
-	if !p.Valid() || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing" || !a.Valid(now) || selection.TriggeredAt.IsZero() || selection.TriggeredAt.After(now) || source.Binding.Scope != [32]byte(a.ScopeDigest) || source.Binding.PodUID != selection.Target.PodUID || source.Binding.PolicyUID != a.PolicyUID || source.ClusterID != a.ClusterID || source.NamespaceUID != a.NamespaceUID || source.WorkloadUID != a.WorkloadUID {
+	rec := p.RecorderFor(source.Binding.ActionID)
+	if !p.Valid() || rec == nil || rec.Action.ExecutionMode != "ongoing" || !a.Valid(now) || selection.TriggeredAt.IsZero() || selection.TriggeredAt.After(now) || source.Binding.Scope != [32]byte(a.ScopeDigest) || source.Binding.PodUID != selection.Target.PodUID || source.Binding.PolicyUID != a.PolicyUID || source.ClusterID != a.ClusterID || source.NamespaceUID != a.NamespaceUID || source.WorkloadUID != a.WorkloadUID {
 		return zero, planning.ContextPlan{}, previewFailure("snapshot/selection", value.ErrChanged)
 	}
 	step = "action"
-	before, e1 := time.ParseDuration(p.Recorder.Action.Before)
-	after, e2 := time.ParseDuration(p.Recorder.Action.After)
-	actionTimeout, e3 := time.ParseDuration(p.Recorder.Action.Timeout)
-	recipeTimeout, e4 := time.ParseDuration(p.Recorder.Composition.MaxDuration)
+	before, e1 := time.ParseDuration(rec.Action.Before)
+	after, e2 := time.ParseDuration(rec.Action.After)
+	actionTimeout, e3 := time.ParseDuration(rec.Action.Timeout)
+	recipeTimeout, e4 := time.ParseDuration(rec.Composition.MaxDuration)
 	if e1 != nil || e2 != nil || e3 != nil || e4 != nil || actionTimeout <= 0 || recipeTimeout <= 0 {
 		return zero, planning.ContextPlan{}, value.ErrInvalid
 	}
@@ -123,7 +124,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	if err != nil {
 		return zero, planning.ContextPlan{}, err
 	}
-	request := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(sha256.Sum256(raw)), SourceID: source.Binding.SourceID, Fence: source.Binding.Fence, SnapshotID: s.NewID(), SourceStartedAt: source.StartedAt.UTC(), SourceHardUntil: source.HardUntil.UTC(), T0: selection.TriggeredAt.UTC(), IssuedAt: now, StartBy: identity.Earlier(now.Add(5*time.Second), identity.Earlier(source.HardUntil, deadline.Add(-time.Microsecond))), ProcessingUntil: deadline, Before: before, After: after, MaxBytes: min(p.Recorder.Action.MaxBytes, int64(artifact.RecordingNativeLimit))}
+	request := artifact.SourceSnapshotRequest{SourceBindingDigest: artifact.Digest(sha256.Sum256(raw)), SourceID: source.Binding.SourceID, Fence: source.Binding.Fence, SnapshotID: s.NewID(), SourceStartedAt: source.StartedAt.UTC(), SourceHardUntil: source.HardUntil.UTC(), T0: selection.TriggeredAt.UTC(), IssuedAt: now, StartBy: identity.Earlier(now.Add(5*time.Second), identity.Earlier(source.HardUntil, deadline.Add(-time.Microsecond))), ProcessingUntil: deadline, Before: before, After: after, MaxBytes: min(rec.Action.MaxBytes, int64(artifact.RecordingNativeLimit))}
 	if manual != nil && manual.GroupParent != nil {
 		g := manual.GroupParent
 		if g.Group == nil || manual.GroupIndex < 0 || manual.GroupIndex >= len(g.Group.Children) {
@@ -134,7 +135,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 	if !request.Valid() {
 		return zero, planning.ContextPlan{}, value.ErrAcquisitionClosed
 	}
-	selected := &planning.SourceSnapshotContext{Request: request, ActionID: source.Binding.ActionID, PolicyUID: a.PolicyUID, TriggerKind: "policy", ActionKind: snapshotActionKind(p.Recorder.Action.Kind), ExecutionDigest: a.ScopeDigest, RecipeDigest: p.Recorder.RecipeDigest, SourceAudience: slices.Clone(source.Audience), SourceAudienceDigest: audienceDigest, SourceTarget: source.Target}
+	selected := &planning.SourceSnapshotContext{Request: request, ActionID: source.Binding.ActionID, PolicyUID: a.PolicyUID, TriggerKind: "policy", ActionKind: snapshotActionKind(rec.Action.Kind), ExecutionDigest: a.ScopeDigest, RecipeDigest: rec.RecipeDigest, SourceAudience: slices.Clone(source.Audience), SourceAudienceDigest: audienceDigest, SourceTarget: source.Target}
 	if manual != nil {
 		selected.PolicyName = selection.PolicyName
 	}
@@ -230,7 +231,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 			selected.Group = &planning.RecordingSaveGroupBinding{ParentCaptureID: g.CaptureID, SelectionDigest: g.ScopeDigest, ChildIndex: manual.GroupIndex, ChildCount: len(g.Group.Children)}
 			selected.RecordingSaveScope = slices.Clone(g.CanonicalScope)
 		} else {
-			selected.RecordingSaveScope, _, err = compiler.CompileRecordingSaveScope(compiler.RecordingSaveScopeInput{CaptureID: preview.CaptureID, Requester: actor, Authority: a, Sources: []compiler.RecordingSaveScopeSource{{PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest, Original: *source.Target, ActionID: source.Binding.ActionID, Kind: p.Recorder.Action.Kind, DefinitionDigest: selected.SourceDefinitionDigest, AudienceDigest: audienceDigest, ApprovedBefore: approvedBefore, Before: before, MaxBytes: selected.Request.MaxBytes}}, IncidentPodLimit: recordingSaveIncidentPodCap(p), FinalizeTimeout: min(actionTimeout, recipeTimeout), CeilingDigest: artifact.Digest(f.capability.Revision.Digest), RetentionDigest: artifact.Digest(f.retention.PolicyRevision.Digest)}, s.Now())
+			selected.RecordingSaveScope, _, err = compiler.CompileRecordingSaveScope(compiler.RecordingSaveScopeInput{CaptureID: preview.CaptureID, Requester: actor, Authority: a, Sources: []compiler.RecordingSaveScopeSource{{PolicyUID: a.PolicyUID, ExecutionDigest: a.ScopeDigest, Original: *source.Target, ActionID: source.Binding.ActionID, Kind: rec.Action.Kind, DefinitionDigest: selected.SourceDefinitionDigest, AudienceDigest: audienceDigest, ApprovedBefore: approvedBefore, Before: before, MaxBytes: selected.Request.MaxBytes}}, IncidentPodLimit: recordingSaveIncidentPodCap(p), FinalizeTimeout: min(actionTimeout, recipeTimeout), CeilingDigest: artifact.Digest(f.capability.Revision.Digest), RetentionDigest: artifact.Digest(f.retention.PolicyRevision.Digest)}, s.Now())
 		}
 		if err != nil {
 			return zero, planning.ContextPlan{}, err
@@ -294,7 +295,7 @@ func (s ContextInvestigation) prepareSourceSnapshotPreview(ctx context.Context, 
 		if observed.State.Stopped {
 			state = "Stopped"
 		}
-		result.RecordingSave = &RecordingSavePreviewMetadata{Before: before, IncidentPodCap: recordingSaveIncidentPodCap(p), Selected: []RecordingRow{{IncidentPodCap: recordingSaveIncidentPodCap(p), PolicyUID: a.PolicyUID, PodUID: source.Binding.PodUID, PodName: source.Target.Request.PodName, ActionID: source.Binding.ActionID, Kind: p.Recorder.Action.Kind, State: state, History: "Unknown", MaximumBefore: approvedBefore}}}
+		result.RecordingSave = &RecordingSavePreviewMetadata{Before: before, IncidentPodCap: recordingSaveIncidentPodCap(p), Selected: []RecordingRow{{IncidentPodCap: recordingSaveIncidentPodCap(p), PolicyUID: a.PolicyUID, PodUID: source.Binding.PodUID, PodName: source.Target.Request.PodName, ActionID: source.Binding.ActionID, Kind: rec.Action.Kind, State: state, History: "Unknown", MaximumBefore: approvedBefore}}}
 	}
 	if manual != nil {
 		if manual.Prepared != nil {
