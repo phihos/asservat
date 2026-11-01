@@ -67,11 +67,10 @@ func TestAcceptedRecorderPlanRoundTripsThroughTheContextPlan(t *testing.T) {
 
 func TestOnlyManualNetworkHeadersPlansAreAcceptable(t *testing.T) {
 	for name, c := range map[string]value.ProfileComposition{
-		"syscalls":   syscalls(),
 		"too long":   network(text("sample", "packetAfter", "6m"), text("sample", "actionTimeout", "7m")),
 		"retrospect": network(text("sample", "packetAfter", "0s")),
 	} {
-		in, now := recorderInput(t, c, map[bool]string{true: "syscallTrace", false: "packetCapture"}[name == "syscalls"])
+		in, now := recorderInput(t, c, "packetCapture")
 		plan, err := CompileRecorder(in, nil, now)
 		if err != nil {
 			continue // refused earlier: never acceptable either
@@ -171,5 +170,38 @@ func TestApprovedRecorderPlanSeparatesPreviewFromExecutionDeadline(t *testing.T)
 	ctxIn.Target.Request.PodUID = "replacement"
 	if changed, err := CompileContext(ctxIn, later); err == nil && changed.ScopeDigest == reviewed.ScopeDigest {
 		t.Fatal("a replacement Pod inherited approval")
+	}
+}
+
+// B3: a manual syscall metadata plan is a finite recording of its after
+// window with the selected names and budgets frozen from the recipe; it
+// round-trips through the accepted context plan like a packet recording.
+func TestManualSyscallRecordingRoundTrips(t *testing.T) {
+	include := value.ProfileEdit{ActionID: "syscalls", Field: "syscallFilter", Syscalls: &value.SyscallSelection{Mode: "include", Names: []string{"read", "openat"}}}
+	in, now := recorderInput(t, syscalls(include, text("syscalls", "actionExecutionMode", "onTrigger"), text("syscalls", "syscallBefore", "0s"), text("syscalls", "syscallAfter", "20s"), text("syscalls", "actionTimeout", "30s")), "syscallTrace")
+	in.NodeRecorder = true
+	in.Target.ExecutionClass, in.Target.NodeUID, in.Target.NodeBootID, in.Target.Pin.NodeName = artifact.ContextAPIExecution, "", "", ""
+	plan, err := CompileRecorder(in, nil, now)
+	if err != nil || !AcceptableRecorder(plan).Acceptable() {
+		t.Fatal(err, AcceptableRecorder(plan))
+	}
+	rec, actionID, err := RecordingFor(plan)
+	if err != nil || actionID != plan.Actions[0].ID || rec.Kind != "syscallTrace" || rec.DurationMillis != 20000 || rec.Filter != nil || rec.Syscalls == nil || len(rec.Syscalls.Names) != 2 || rec.Syscalls.Names[0] != "openat" || rec.Syscalls.MaxEvents < 1 {
+		t.Fatalf("%+v %v", rec, err)
+	}
+	recorder, err := RecorderContextFor(&rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctxIn, _ := contextInput(t)
+	ctxIn.Retention, ctxIn.Recorder, ctxIn.CaseID, ctxIn.Target = in.Retention, recorder, "", in.Target
+	ctxIn.Capability.ExecutionClass = artifact.ContextAPIExecution
+	cp, err := CompileContext(ctxIn, now)
+	if err != nil || cp.ScopeDigest != plan.ScopeDigest || !VerifyFrozenContextPlan(cp) {
+		t.Fatal("the syscall context plan differs from the reviewed plan", err)
+	}
+	long, now := recorderInput(t, syscalls(text("syscalls", "syscallAfter", "2m"), text("syscalls", "actionTimeout", "3m")), "syscallTrace")
+	if p, err := CompileRecorder(long, nil, now); err == nil && AcceptableRecorder(p).Acceptable() {
+		t.Fatal("a manual syscall recording over a minute was acceptable")
 	}
 }
