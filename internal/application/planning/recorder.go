@@ -104,12 +104,25 @@ type profileDefinition struct {
 	Description    string          `json:"description"`
 	Recipe         recipeSpec      `json:"recipe"`
 	EditableFields []editableField `json:"editableFields"`
+	// Origins are non-executable attribution of a derived profile (≤8).
+	Origins []wireResolved `json:"origins,omitempty"`
 }
 
-type builtinProfile struct {
-	Name, Version string
-	Definition    profileDefinition
-	Digest        artifact.Digest
+// resolvedProfile is one verified profile version: an embedded builtin, or a
+// published catalog version with its source identity (REQ-CPR-001).
+type resolvedProfile struct {
+	Ref                                            value.ProfileRef
+	Name, Version                                  string
+	Definition                                     profileDefinition
+	Digest                                         artifact.Digest
+	SourceClusterID, SourceNamespaceUID, SourceUID string
+	Deprecated                                     bool
+}
+
+// wire is the pinned provenance entry of this profile for componentID.
+func (p resolvedProfile) wire(componentID string) wireResolved {
+	return wireResolved{ComponentID: componentID, ProfileRef: wireRef{p.Ref.Catalog, p.Name, p.Version}, DefinitionDigest: hexDigest(p.Digest),
+		SourceUID: p.SourceUID, SourceClusterID: p.SourceClusterID, SourceNamespaceUID: p.SourceNamespaceUID}
 }
 
 // Builtin evidence kinds available as composition components in this release.
@@ -129,28 +142,42 @@ func strict(b []byte, out any) error {
 	return nil
 }
 
-func loadBuiltin(name string) (builtinProfile, error) {
+func loadBuiltin(name string) (resolvedProfile, error) {
 	b, err := builtinFiles.ReadFile("profiles/" + name + "-v1.json")
 	if err != nil {
-		return builtinProfile{}, err
+		return resolvedProfile{}, err
 	}
+	p, err := parseProfileDocument(b)
+	if err != nil || p.Name != name || p.Version != "v1" {
+		return resolvedProfile{}, value.ErrInvalid
+	}
+	p.Ref = value.ProfileRef{Catalog: "builtin", Name: name, Version: "v1"}
+	return p, nil
+}
+
+// parseProfileDocument strictly decodes one {name, version, definition}
+// document and pins its definition digest (SHA-256 of the canonical object).
+func parseProfileDocument(b []byte) (resolvedProfile, error) {
 	var doc struct {
 		Name       string          `json:"name"`
 		Version    string          `json:"version"`
 		Definition json.RawMessage `json:"definition"`
 	}
 	if err := strict(b, &doc); err != nil {
-		return builtinProfile{}, err
+		return resolvedProfile{}, err
 	}
 	var def profileDefinition
 	if err := strict(doc.Definition, &def); err != nil {
-		return builtinProfile{}, err
+		return resolvedProfile{}, err
+	}
+	if len(def.Origins) > 8 || def.DisplayName == "" || len(def.DisplayName) > 128 || len(def.Description) > 2048 {
+		return resolvedProfile{}, value.ErrInvalid
 	}
 	_, digest, err := canonical(b)
-	if err != nil || doc.Name != name || doc.Version != "v1" {
-		return builtinProfile{}, value.ErrInvalid
+	if err != nil || !(value.ProfileRef{Catalog: "builtin", Name: doc.Name, Version: doc.Version}).Valid() {
+		return resolvedProfile{}, value.ErrInvalid
 	}
-	return builtinProfile{Name: doc.Name, Version: doc.Version, Definition: def, Digest: digest}, nil
+	return resolvedProfile{Name: doc.Name, Version: doc.Version, Definition: def, Digest: digest}, nil
 }
 
 // BuiltinProfileDigest returns the definition digest of one embedded builtin
@@ -166,20 +193,53 @@ func refuse(code, path, reason string) error {
 	return value.CompositionError{Code: code, Path: path, Reason: reason}
 }
 
-func resolveBuiltin(i int, ref value.ProfileRef) (builtinProfile, error) {
-	path := pathf("profile_composition.components[%d].profileRef", i)
-	if ref.Catalog != "builtin" {
-		return builtinProfile{}, refuse(value.CompositionProfileMissing, path, "organization and namespace capture profile catalogs are not available in this release; select a builtin profile")
+// resolveProfile resolves one reference without precedence or shadowing:
+// builtins from the release binary, organization and namespace versions only
+// from the caller's current read of that exact catalog (c.Resolved).
+func resolveProfile(i int, ref value.ProfileRef, resolved []value.CatalogProfile) (resolvedProfile, error) {
+	if ref.Catalog == "builtin" {
+		return resolveBuiltin(i, ref)
 	}
+	path := pathf("profile_composition.components[%d].profileRef", i)
+	var found *value.CatalogProfile
+	for n := range resolved {
+		if resolved[n].Ref == ref {
+			if found != nil {
+				return resolvedProfile{}, value.ErrInvalid
+			}
+			found = &resolved[n]
+		}
+	}
+	name := ref.Catalog + " profile " + strconv.Quote(ref.Name) + " " + ref.Version
+	if found == nil {
+		return resolvedProfile{}, refuse(value.CompositionProfileMissing, path, name+" is not published in the "+ref.Catalog+" catalog")
+	}
+	if !found.Enabled {
+		return resolvedProfile{}, refuse(value.CompositionProfileMissing, path, name+" is disabled; select another version")
+	}
+	p, err := parseProfileDocument(found.Document)
+	if err != nil {
+		return resolvedProfile{}, refuse(value.CompositionProfileMissing, path, name+" has an invalid definition")
+	}
+	if p.Name != ref.Name || p.Version != ref.Version || found.SourceUID == "" || len(found.SourceUID) > 64 || found.SourceNamespaceUID == "" || len(found.SourceNamespaceUID) > 64 || found.SourceClusterID == "" {
+		return resolvedProfile{}, value.ErrInvalid
+	}
+	p.Ref, p.Deprecated = ref, found.Deprecated
+	p.SourceClusterID, p.SourceNamespaceUID, p.SourceUID = found.SourceClusterID, found.SourceNamespaceUID, found.SourceUID
+	return p, nil
+}
+
+func resolveBuiltin(i int, ref value.ProfileRef) (resolvedProfile, error) {
+	path := pathf("profile_composition.components[%d].profileRef", i)
 	if !slices.Contains(builtinNames, ref.Name) {
-		return builtinProfile{}, refuse(value.CompositionProfileMissing, path, "builtin profile "+strconv.Quote(ref.Name)+" is not available in this release; available: network-connections/v1, syscall-activity/v1")
+		return resolvedProfile{}, refuse(value.CompositionProfileMissing, path, "builtin profile "+strconv.Quote(ref.Name)+" is not available in this release; available: network-connections/v1, syscall-activity/v1")
 	}
 	if ref.Version != "v1" {
-		return builtinProfile{}, refuse(value.CompositionProfileMissing, path, "version "+strconv.Quote(ref.Version)+" of builtin "+ref.Name+" does not exist; available: v1")
+		return resolvedProfile{}, refuse(value.CompositionProfileMissing, path, "version "+strconv.Quote(ref.Version)+" of builtin "+ref.Name+" does not exist; available: v1")
 	}
 	p, err := loadBuiltin(ref.Name)
 	if err != nil {
-		return builtinProfile{}, value.ErrInvalid
+		return resolvedProfile{}, value.ErrInvalid
 	}
 	return p, nil
 }
@@ -525,14 +585,14 @@ func generatedID(prefix, component, local string) string {
 
 // expand resolves the single builtin, applies the typed edits and normalizes
 // every action. Edits are applied first; the plan is validated as a whole.
-func expand(c value.ProfileComposition, compiler FilterCompiler) ([]expandedAction, builtinProfile, error) {
+func expand(c value.ProfileComposition, compiler FilterCompiler) ([]expandedAction, resolvedProfile, error) {
 	if err := compositionShape(c); err != nil {
-		return nil, builtinProfile{}, err
+		return nil, resolvedProfile{}, err
 	}
 	component := c.Components[0]
-	p, err := resolveBuiltin(0, component.Profile)
+	p, err := resolveProfile(0, component.Profile, c.Resolved)
 	if err != nil {
-		return nil, builtinProfile{}, err
+		return nil, resolvedProfile{}, err
 	}
 	actions := make([]expandedAction, 0, len(p.Definition.Recipe.Actions))
 	index := map[string]int{}
@@ -549,7 +609,7 @@ func expand(c value.ProfileComposition, compiler FilterCompiler) ([]expandedActi
 			err = value.ErrInvalid
 		}
 		if err != nil {
-			return nil, builtinProfile{}, value.ErrInvalid
+			return nil, resolvedProfile{}, value.ErrInvalid
 		}
 		index[a.ID] = len(actions)
 		actions = append(actions, x)
@@ -565,18 +625,18 @@ func expand(c value.ProfileComposition, compiler FilterCompiler) ([]expandedActi
 		at, found := index[e.ActionID]
 		switch {
 		case !found:
-			return nil, builtinProfile{}, refuse(value.CompositionInvalid, path+".actionID", "profile "+p.Name+"/v1 has no action "+strconv.Quote(e.ActionID))
+			return nil, resolvedProfile{}, refuse(value.CompositionInvalid, path+".actionID", "profile "+p.Name+"/v1 has no action "+strconv.Quote(e.ActionID))
 		case seen[key]:
-			return nil, builtinProfile{}, refuse(value.CompositionInvalid, path, "duplicate edit of "+e.Field+" for action "+e.ActionID)
+			return nil, resolvedProfile{}, refuse(value.CompositionInvalid, path, "duplicate edit of "+e.Field+" for action "+e.ActionID)
 		case !exposed[key]:
 			if _, registered := editBinding[e.Field]; !registered {
-				return nil, builtinProfile{}, refuse(value.CompositionInvalid, path+".field", "unknown field "+strconv.Quote(e.Field))
+				return nil, resolvedProfile{}, refuse(value.CompositionInvalid, path+".field", "unknown field "+strconv.Quote(e.Field))
 			}
-			return nil, builtinProfile{}, refuse(value.CompositionInvalid, path+".field", p.Name+"/v1 does not expose "+e.Field+" for action "+e.ActionID+"; choose Customize to author a new recipe")
+			return nil, resolvedProfile{}, refuse(value.CompositionInvalid, path+".field", p.Name+"/v1 does not expose "+e.Field+" for action "+e.ActionID+"; choose Customize to author a new recipe")
 		}
 		seen[key] = true
 		if err := applyEdit(path, e, &actions[at]); err != nil {
-			return nil, builtinProfile{}, err
+			return nil, resolvedProfile{}, err
 		}
 	}
 	var total int64
@@ -584,17 +644,17 @@ func expand(c value.ProfileComposition, compiler FilterCompiler) ([]expandedActi
 	for i := range actions {
 		path := pathf("profile_composition.components[0] action %s", actions[i].localID)
 		if err := normalize(path, &actions[i], compiler); err != nil {
-			return nil, builtinProfile{}, err
+			return nil, resolvedProfile{}, err
 		}
 		total += actions[i].action.Limits.MaxBytes
 		t, _ := durationValue(actions[i].action.Limits.Timeout, false)
 		longest = max(longest, t)
 	}
 	if total > c.MaxTotalBytes {
-		return nil, builtinProfile{}, refuse(value.CompositionInvalid, "profile_composition.maxTotalBytes", "the actions may write "+strconv.FormatInt(total, 10)+" bytes; raise maxTotalBytes explicitly or lower the action output limit")
+		return nil, resolvedProfile{}, refuse(value.CompositionInvalid, "profile_composition.maxTotalBytes", "the actions may write "+strconv.FormatInt(total, 10)+" bytes; raise maxTotalBytes explicitly or lower the action output limit")
 	}
 	if d, ok := durationValue(c.MaxDuration, false); !ok || d < longest {
-		return nil, builtinProfile{}, refuse(value.CompositionInvalid, "profile_composition.maxDuration", "maxDuration must cover the longest action timeout ("+longest.String()+")")
+		return nil, resolvedProfile{}, refuse(value.CompositionInvalid, "profile_composition.maxDuration", "maxDuration must cover the longest action timeout ("+longest.String()+")")
 	}
 	return actions, p, nil
 }
@@ -647,9 +707,12 @@ type wireComposition struct {
 }
 
 type wireResolved struct {
-	ComponentID      string  `json:"componentID"`
-	ProfileRef       wireRef `json:"profileRef"`
-	DefinitionDigest string  `json:"definitionDigest"`
+	ComponentID        string  `json:"componentID"`
+	ProfileRef         wireRef `json:"profileRef"`
+	DefinitionDigest   string  `json:"definitionDigest"`
+	SourceUID          string  `json:"sourceUID,omitempty"`
+	SourceClusterID    string  `json:"sourceClusterID,omitempty"`
+	SourceNamespaceUID string  `json:"sourceNamespaceUID,omitempty"`
 }
 
 type wireAlias struct {
@@ -853,10 +916,10 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 	if in.NodeRecorder {
 		scope.Interim = "nodeRecorder"
 	}
-	scope.Provenance = wireProvenance{Authored: authored(in.Composition), ResolvedProfiles: []wireResolved{{component.ID, wireRef{"builtin", profile.Name, profile.Version}, hexDigest(profile.Digest)}}}
+	scope.Provenance = wireProvenance{Authored: authored(in.Composition), ResolvedProfiles: []wireResolved{profile.wire(component.ID)}}
 	scope.Lifecycle = lifecyclePlan{SchemaVersion: "action-lifecycle/v1", RequestKind: "DebugCapture", OngoingPodScope: "none"}
 	scope.Filters = []compiledFilterRecord{}
-	out := value.RecorderPlan{Input: in, Profiles: []value.ResolvedProfile{{ComponentID: component.ID, Ref: component.Profile, DefinitionDigest: profile.Digest}}, CompiledAt: now}
+	out := value.RecorderPlan{Input: in, Profiles: []value.ResolvedProfile{{ComponentID: component.ID, Ref: component.Profile, DefinitionDigest: profile.Digest, SourceClusterID: profile.SourceClusterID, SourceNamespaceUID: profile.SourceNamespaceUID, SourceUID: profile.SourceUID, Deprecated: profile.Deprecated}}, CompiledAt: now}
 	for _, x := range actions {
 		a, summary, filter, err := normalizedRecorderAction(x, component.ID)
 		if err != nil {
