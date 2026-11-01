@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"crypto/sha256"
 	"time"
 
@@ -109,7 +110,8 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 		case <-timer.C:
 		}
 	}
-	if copy.Complete(n.now()) != nil {
+	if err := copy.Complete(n.now()); err != nil {
+		n.snapshotFailed(x, "complete", err)
 		n.uploadSnapshotFailure(ctx, epoch, workID, x)
 		return
 	}
@@ -117,12 +119,14 @@ func (n *nodeSources) runSnapshot(ctx context.Context, epoch, workID string, own
 	acquiredFrom, acquiredUntil := artifact.SourceSnapshotAcquisition(artifact.SourceSnapshotCoverage{Request: q, SourceStoppedAt: coverage.SourceStoppedAt, SourceClosedAt: coverage.SourceClosedAt})
 	native, counters, err := packets.EncodeWindow(ctx, copy, int(q.MaxBytes), acquiredFrom, acquiredUntil)
 	if err != nil {
+		n.snapshotFailed(x, "encode", err)
 		n.uploadSnapshotFailure(ctx, epoch, workID, x)
 		return
 	}
 	defer clear(native[:cap(native)])
 	// Empty unknown history is absence, not fabricated successful evidence.
 	if counters.Retained == 0 && !coverage.Complete {
+		n.snapshotFailed(x, "empty", fmt.Errorf("window %s..%s available from %s, stopped %s, closed %s, evicted %t, input unknown %t", coverage.Requested.From.Format(time.RFC3339Nano), coverage.Requested.Until.Format(time.RFC3339Nano), coverage.AvailableFrom.Format(time.RFC3339Nano), coverage.SourceStoppedAt.Format(time.RFC3339Nano), coverage.SourceClosedAt.Format(time.RFC3339Nano), coverage.HistoryEvicted, coverage.InputUnknown))
 		n.uploadSnapshotFailure(ctx, epoch, workID, x)
 		return
 	}
@@ -153,5 +157,13 @@ func (n *nodeSources) uploadSnapshotFailure(ctx context.Context, epoch, workID s
 	result := collector.PacketResult{Snapshot: &outcome, WorkID: workID, CaptureID: x.CaptureID, StartedAt: started, EndedAt: ended, CapturedBytes: int64(len(native)), Snaplen: packets.Snaplen, EngineVersion: n.version, ProgramDigest: x.Binding.ProgramDigest, Failure: collector.ReasonCaptureFailed}
 	if result.Valid() && n.takeUpload(ctx, result.CapturedBytes) {
 		_ = n.upload(ctx, epoch, result, native)
+	}
+}
+
+// snapshotFailed logs why a saved window reports absence; the result itself
+// carries only CaptureFailed.
+func (n *nodeSources) snapshotFailed(x collector.SourceSnapshot, stage string, err error) {
+	if n.log != nil {
+		n.log(fmt.Sprintf("node collector: source %s snapshot %s failed at %s: %v", x.Binding.SourceID, x.Request.SnapshotID, stage, err))
 	}
 }

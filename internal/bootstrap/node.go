@@ -158,7 +158,7 @@ func RunNode(ctx context.Context, podUID string) error {
 		budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr}
 	p.packets = &nodePackets{engine: gadget.CapturePackets, observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
-	p.sources = &nodeSources{upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
+	p.sources = &nodeSources{log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
 	err = p.Run(ctx)
 	p.sources.Close()
 	p.packets.wg.Wait()

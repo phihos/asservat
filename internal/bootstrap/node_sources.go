@@ -18,6 +18,7 @@ import (
 type nodeSources struct {
 	snapshots  map[string]*nodeSourceSnapshot
 	snapshotWG sync.WaitGroup
+	log        func(string)
 	upload     packetUploader
 	takeUpload func(context.Context, int64) bool
 	version    string
