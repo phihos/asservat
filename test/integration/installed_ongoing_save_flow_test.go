@@ -484,6 +484,20 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 	if !killed {
 		t.Fatal("ongoing incident workload did not stop")
 	}
+	before := int32(0)
+	if len(pod.Status.ContainerStatuses) == 1 {
+		before = pod.Status.ContainerStatuses[0].RestartCount
+	}
+	wait("the incident container restart", time.Minute, func(call context.Context) bool {
+		p, err := f.region.CoreV1().Pods(f.namespace).Get(call, podName, meta.GetOptions{})
+		if err != nil || len(p.Status.ContainerStatuses) != 1 || p.Status.ContainerStatuses[0].RestartCount <= before {
+			return false
+		}
+		if term := p.Status.ContainerStatuses[0].LastTerminationState.Terminated; term != nil {
+			t.Logf("incident container restart %d: reason %q exit %d", p.Status.ContainerStatuses[0].RestartCount, term.Reason, term.ExitCode)
+		}
+		return true
+	})
 	var incidentID string
 	wait("automatic incident snapshot occurrence", 2*time.Minute, func(call context.Context) bool {
 		return admin.QueryRow(call, `SELECT coalesce(capture_id::text,'') FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND capture_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`, root, active.PolicyUID, podUID).Scan(&incidentID) == nil && incidentID != ""
@@ -649,7 +663,9 @@ func ongoingSaveControlDiagnostics(t *testing.T, ctx context.Context, admin *pgx
 		`SELECT concat('account configured=',configured,' paused=',paused,' valid=',clock_timestamp()<valid_until,' full=',charged_full,'/',full_limit,' replay=',charged_replay,'/',replay_limit) FROM context_control_account WHERE root_id=$1`,
 		`SELECT concat('binding fresh=',clock_timestamp()<fresh_until) FROM context_storage_binding WHERE root_id=$1`,
 		`SELECT concat('occurrences=',count(*),' captured=',count(capture_id),' outcomes=',string_agg(DISTINCT coalesce(outcome,'-'),',')) FROM policy_occurrence WHERE root_id=$1`,
-		`SELECT concat('policy restarts watermark=',max(restarts)) FROM policy_occurrence WHERE root_id=$1`,
+		`SELECT concat('watermark policy=',policy_uid,' pod=',pod_uid,' restarts=',restarts,' seen=',last_seen) FROM policy_pod_watermark WHERE root_id=$1`,
+		`SELECT concat('suppressed policy=',policy_uid,' ',reason,'=',count,' last=',last_at) FROM policy_suppression WHERE root_id=$1`,
+		`SELECT concat('acceptance policy=',policy_uid,' executions=',executions_spent,'/',coalesce(record#>>'{Authority,Limits,MaxExecutions}','?')) FROM policy_acceptance WHERE root_id=$1`,
 		`SELECT concat('sources unreleased=',count(*) FILTER (WHERE slot_released_at IS NULL),' ended=',count(*) FILTER (WHERE ended_at IS NOT NULL),' total=',count(*)) FROM policy_recording_source WHERE root_id=$1`,
 	} {
 		rows, err := admin.Query(call, q, root)
