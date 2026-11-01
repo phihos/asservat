@@ -26,6 +26,13 @@ type ContextRecorders interface {
 	ResolvePacketRecorder(context.Context, targets.Request) (targets.PodResolution, error)
 }
 
+// SyscallRecorders is the optional finite syscall recorder of the target's
+// node (B3); without it a syscall plan stays plan-only.
+type SyscallRecorders interface {
+	SyscallRecorder(context.Context, targets.PodResolution) error
+	ResolveSyscallRecorder(context.Context, targets.Request) (targets.PodResolution, error)
+}
+
 // packetRecorderAvailable reports whether this composition could be recorded
 // on the target's node now. Only a known unsupported result is plan-only;
 // operational failures must not create an inert reviewed scope.
@@ -34,7 +41,16 @@ func (s ContextInvestigation) packetRecorderAvailable(ctx context.Context, inten
 		return false, nil
 	}
 	mark := time.Now()
-	err := s.Recorders.PacketRecorder(ctx, target)
+	var err error
+	if syscallRecorderInput(intent) {
+		syscalls, ok := s.Recorders.(SyscallRecorders)
+		if !ok {
+			return false, nil
+		}
+		err = syscalls.SyscallRecorder(ctx, target)
+	} else {
+		err = s.Recorders.PacketRecorder(ctx, target)
+	}
 	auditapp.MarkStep(ctx, "p-recorder", mark)
 	if errors.Is(err, targets.ErrUnsupported) {
 		return false, nil
@@ -49,7 +65,16 @@ func packetRecorderInput(intent value.ContextIntent, class artifact.ContextExecu
 		return false
 	}
 	evidence, err := compiler.RecorderEvidenceType(*intent.Composition)
-	return err == nil && evidence == "packetCapture"
+	return err == nil && (evidence == "packetCapture" || evidence == "syscallTrace")
+}
+
+// syscallRecorderInput reports a finite syscall metadata recording (B3).
+func syscallRecorderInput(intent value.ContextIntent) bool {
+	if intent.Composition == nil {
+		return false
+	}
+	evidence, err := compiler.RecorderEvidenceType(*intent.Composition)
+	return err == nil && evidence == "syscallTrace"
 }
 
 // recordingPlan compiles the accepted context plan of an acceptable

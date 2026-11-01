@@ -13,7 +13,18 @@ const RecordingNativeLimit = FrameBytes
 // Ethernet (14) + the largest IPv4 header (60) + the largest TCP header (60).
 const RecordingSnaplen = 14 + 60 + 60
 
+// MaxRecordingEventsPerSecond is the compiler's syscall rate bound
+// (maxEventsPerSecond 1 to 100,000), shared by the node payload.
+const MaxRecordingEventsPerSecond = 100_000
+
+// RecordingSyscallSnaplen is the fixed per-call metadata record size of a
+// syscall recording (internal/adapters/syscalls.RecordSize).
+const RecordingSyscallSnaplen = 32
+
 const (
+	// maxSyscallRecordingMillis matches the compiler's finite syscall
+	// after-window bound (ADR-273, specs/syscalls.md).
+	maxSyscallRecordingMillis  = 60 * 1000
 	maxRecordingDurationMillis = 5 * 60 * 1000
 	minRecordingBytes          = 64 << 10
 	maxRecordingProgram        = 256
@@ -38,8 +49,8 @@ type RecordingFilter struct {
 // the canonical JSON of the authored profile composition (the planning layer
 // owns its type), so the hub can recompile the exact accepted plan.
 type Recording struct {
-	Kind           string // "packetCapture"
-	Profile        string // "networkHeaders"
+	Kind           string // "packetCapture" or "syscallTrace"
+	Profile        string // "networkHeaders" or "metadata"
 	Composition    []byte
 	Filter         *RecordingFilter `json:",omitempty"`
 	DurationMillis int64
@@ -48,12 +59,43 @@ type Recording struct {
 	// RequireApproval records that the installation required approval of
 	// this recording (ADR-249); the recompiled plan binds it.
 	RequireApproval bool `json:",omitempty"`
+	// Syscalls is a finite syscall metadata recording's selection and
+	// budgets (B3); nil for packets, so packet expectation digests are
+	// unchanged.
+	Syscalls *RecordingSyscalls `json:",omitempty"`
+}
+
+// RecordingSyscalls mirrors the source collector.SyscallFilter for a finite
+// manual run: sorted names (empty records every call) and its budgets.
+type RecordingSyscalls struct {
+	Names              []string `json:",omitempty"`
+	ErrorsOnly         bool     `json:",omitempty"`
+	MaxEvents          int64
+	MaxEventsPerSecond int64
+	MaxTrackedThreads  int64
+}
+
+func (s *RecordingSyscalls) valid() bool {
+	if s == nil || len(s.Names) > 128 || s.MaxEvents < 1 || s.MaxEvents > 1_000_000 || s.MaxEventsPerSecond < 1 || s.MaxEventsPerSecond > MaxRecordingEventsPerSecond || s.MaxTrackedThreads < 1 || s.MaxTrackedThreads > 16_384 {
+		return false
+	}
+	for i, n := range s.Names {
+		if n == "" || len(n) > 64 || i > 0 && s.Names[i-1] >= n {
+			return false
+		}
+	}
+	return true
 }
 
 // Valid checks the recording's own bounds.
 func (r *Recording) Valid() bool {
-	if r == nil || r.Kind != "packetCapture" || r.Profile != "networkHeaders" || len(r.Composition) < 2 || len(r.Composition) > maxRecordingComposition ||
-		r.DurationMillis < 1000 || r.DurationMillis > maxRecordingDurationMillis || r.MaxBytes < minRecordingBytes || r.MaxBytes > RecordingNativeLimit || r.Snaplen != RecordingSnaplen {
+	if r == nil || len(r.Composition) < 2 || len(r.Composition) > maxRecordingComposition || r.DurationMillis < 1000 || r.MaxBytes < minRecordingBytes || r.MaxBytes > RecordingNativeLimit {
+		return false
+	}
+	switch {
+	case r.Kind == "syscallTrace":
+		return r.Profile == "metadata" && r.Filter == nil && r.Snaplen == RecordingSyscallSnaplen && r.DurationMillis <= maxSyscallRecordingMillis && r.Syscalls.valid()
+	case r.Kind != "packetCapture" || r.Profile != "networkHeaders" || r.Syscalls != nil || r.DurationMillis > maxRecordingDurationMillis || r.Snaplen != RecordingSnaplen:
 		return false
 	}
 	if f := r.Filter; f != nil {
@@ -75,6 +117,11 @@ func (r *Recording) Clone() *Recording {
 		f := *r.Filter
 		f.Program = append([]FilterInstruction(nil), r.Filter.Program...)
 		out.Filter = &f
+	}
+	if r.Syscalls != nil {
+		s := *r.Syscalls
+		s.Names = append([]string(nil), r.Syscalls.Names...)
+		out.Syscalls = &s
 	}
 	return &out
 }

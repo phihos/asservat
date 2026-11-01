@@ -1,6 +1,7 @@
 package syscalls
 
 import (
+	"asservat.local/asservat/internal/domain/artifact"
 	"bytes"
 	"encoding/binary"
 	"errors"
@@ -261,5 +262,12 @@ func TestPairerFullTableStaysBounded(t *testing.T) {
 	}
 	if p.Stats().Overflow != 10_000-4 {
 		t.Fatalf("overflow %d", p.Stats().Overflow)
+	}
+}
+
+// The hub's recording snaplen is this record size (B3).
+func TestRecordingSnaplenIsRecordSize(t *testing.T) {
+	if artifact.RecordingSyscallSnaplen != RecordSize {
+		t.Fatal(artifact.RecordingSyscallSnaplen, RecordSize)
 	}
 }

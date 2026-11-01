@@ -165,7 +165,7 @@ func RunNode(ctx context.Context, podUID string) error {
 	defer client.CloseIdle()
 	p := &nodeProcess{client: client, creds: creds, token: readNodeToken, podUID: podUID, bootID: boot, epoch: uuid.NewString(), facts: facts, mechanisms: mechanisms,
 		budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr}
-	p.packets = &nodePackets{engine: gadget.CapturePackets, observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
+	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
 	p.sources = &nodeSources{log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
 	err = p.Run(ctx)
@@ -440,6 +440,13 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 					root = ctx
 				}
 				r = p.packets.start(root, p.epoch, w)
+			}
+			if w.Kind == collector.WorkSyscallCapture && p.packets != nil {
+				root := p.root
+				if root == nil {
+					root = ctx
+				}
+				r = p.packets.startSyscall(root, p.epoch, w)
 			}
 			if (w.Kind == collector.WorkPacketSource || w.Kind == collector.WorkStopPacketSource || w.Kind == collector.WorkPacketSourceSnapshot || w.Kind == collector.WorkCancelSourceSnapshot) && p.sources != nil {
 				root := p.root

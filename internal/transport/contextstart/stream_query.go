@@ -31,8 +31,10 @@ const (
 	queryListCaptureProfiles = "list-capture-profiles"
 	// ADR-248: whether the target Pod's node collector offers the packet
 	// recorder now.
-	queryPacketRecorder          = "packet-recorder"
-	queryResolvePacketRecorder   = "resolve-packet-recorder"
+	queryPacketRecorder        = "packet-recorder"
+	queryResolvePacketRecorder = "resolve-packet-recorder"
+	// B3: the exact Pod with the syscall recorder's availability.
+	queryResolveSyscallRecorder  = "resolve-syscall-recorder"
 	queryResolveOngoingRecorders = "resolve-ongoing-recorders"
 	// One signed source arm/renewal/stop. The only query that verifies and
 	// queues work; it keeps the standby waiting like any other query.
@@ -62,6 +64,11 @@ type ReviewTargets interface {
 type ProfileTargets interface {
 	ReadCaptureProfiles(context.Context, targets.ProfileCatalogRequest) (targets.ProfileCatalogAnswer, error)
 	ListCaptureProfiles(context.Context, targets.ProfileListRequest) (targets.ProfileCatalogAnswer, error)
+}
+
+// SyscallTargetResolver is PacketTargetResolver for the syscall recorder.
+type SyscallTargetResolver interface {
+	ResolveSyscallRecorder(context.Context, targets.Request) (targets.RecorderResolution, error)
 }
 
 // PacketTargetResolver composes exact target and recorder readiness. A region
@@ -405,6 +412,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if resolver, ok := s.targets.(PacketTargetResolver); ok {
 			out, e = resolver.ResolvePacketRecorder(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryResolveSyscallRecorder:
+		var r targets.Request
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(SyscallTargetResolver); ok {
+			out, e = resolver.ResolveSyscallRecorder(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}

@@ -337,6 +337,16 @@ func (t reportedTargets) ResolvePacketRecorder(ctx context.Context, r targets.Re
 	return t.resolvePacketRecorder(ctx, r, false)
 }
 
+// ResolveSyscallRecorder is ResolvePacketRecorder for a finite syscall
+// recording (B3): the same exact Pod with the syscall mechanism's answer.
+func (t reportedTargets) ResolveSyscallRecorder(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {
+	p, node, err := t.PodTargets.ResolvePacketPod(ctx, r)
+	if err != nil {
+		return targets.RecorderResolution{}, err
+	}
+	return t.packetTargetAvailability(ctx, p, node, false, collector.MechanismSyscall), nil
+}
+
 // ResolvePacketSource explicitly requests the source incarnation for a future
 // sensitive dispatch. Existing metadata wire answers never include these facts.
 func (t reportedTargets) ResolvePacketSource(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {

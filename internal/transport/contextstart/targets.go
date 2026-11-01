@@ -198,7 +198,15 @@ func (t Targets) ReviewAccess(ctx context.Context, r targets.AccessReviewRequest
 // offers the packet recorder now (ADR-248). Anything but an "available"
 // answer, including an unsupported region, refuses.
 func (t Targets) PacketRecorder(ctx context.Context, p targets.PodResolution) error {
-	r := targets.RecorderRequest{Target: p.Request, Pin: p.Pin}
+	return t.recorder(ctx, targets.RecorderRequest{Target: p.Request, Pin: p.Pin})
+}
+
+// SyscallRecorder asks whether the node offers the syscall recorder (B3).
+func (t Targets) SyscallRecorder(ctx context.Context, p targets.PodResolution) error {
+	return t.recorder(ctx, targets.RecorderRequest{Target: p.Request, Pin: p.Pin, Syscall: true})
+}
+
+func (t Targets) recorder(ctx context.Context, r targets.RecorderRequest) error {
 	if !r.Valid() || t.Router == nil || t.Now == nil || ctx == nil || ctx.Err() != nil {
 		return targets.ErrInvalid
 	}
@@ -223,6 +231,15 @@ func (t Targets) PacketRecorder(ctx context.Context, p targets.PodResolution) er
 // ResolvePacketRecorder shares target and packet readiness under one original
 // receiver check. No second query or refreshed deadline is introduced.
 func (t Targets) ResolvePacketRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
+	return t.resolveRecorder(ctx, r, queryResolvePacketRecorder)
+}
+
+// ResolveSyscallRecorder is ResolvePacketRecorder for the syscall recorder.
+func (t Targets) ResolveSyscallRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
+	return t.resolveRecorder(ctx, r, queryResolveSyscallRecorder)
+}
+
+func (t Targets) resolveRecorder(ctx context.Context, r targets.Request, method string) (targets.PodResolution, error) {
 	if !r.Valid() || t.Router == nil || t.Now == nil || ctx == nil || ctx.Err() != nil {
 		return targets.PodResolution{}, targets.ErrInvalid
 	}
@@ -236,7 +253,7 @@ func (t Targets) ResolvePacketRecorder(ctx context.Context, r targets.Request) (
 		t.report("recorder-target/"+step, "start"+start+" end"+fleetapp.RemainingBucket(ctx, time.Now())+" ["+marks.String()+"]")
 	}
 	var out targets.RecorderResolution
-	until, err := t.Router.Query(call, r.ClusterID, queryResolvePacketRecorder, r, &out)
+	until, err := t.Router.Query(call, r.ClusterID, method, r, &out)
 	if err != nil {
 		report(queryStep(err, diagnostics))
 		return targets.PodResolution{}, err

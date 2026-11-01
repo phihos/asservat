@@ -49,8 +49,16 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only a single packet capture action can be recorded in this release"}
 	}
 	a := plan.Actions[0]
+	if a.Kind == "syscallTrace" {
+		// B3: one finite syscall metadata recording of the after window.
+		after, ok := durationValue(a.After, true)
+		if a.SyscallMode != "metadata" || !ok || after < time.Second || after > maxSyscallAfter {
+			return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.after", "a manual syscall recording records metadata for 1 to 60 seconds after it starts"}
+		}
+		return maxBytesAcceptance(plan)
+	}
 	if a.Kind != "packetCapture" || a.PacketProfile != "networkHeaders" {
-		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only network-header packet captures can be recorded in this release"}
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only network-header packet and syscall metadata captures can be recorded in this release"}
 	}
 	if plan.Approval != nil && plan.Approval.ObservationLimits != nil && !policy {
 		// Manual raw recording has no observation issuer; the finite policy
@@ -68,6 +76,10 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 			return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a policy raw predicate needs one finite on-trigger action with original observation limits"}
 		}
 	}
+	return maxBytesAcceptance(plan)
+}
+
+func maxBytesAcceptance(plan value.RecorderPlan) RecorderAcceptance {
 	for _, c := range plan.Input.Composition.Components {
 		for i, e := range c.Edits {
 			if e.Field == "actionMaxBytes" && e.Number > artifact.RecordingNativeLimit {
@@ -96,6 +108,24 @@ func RecordingFor(plan value.RecorderPlan) (artifact.Recording, string, error) {
 	var scope recorderScope
 	if json.Unmarshal(plan.CanonicalScope, &scope) != nil || len(scope.Filters) > 1 {
 		return artifact.Recording{}, "", value.ErrInvalid
+	}
+	if a.Kind == "syscallTrace" {
+		// The selected names live in the frozen recipe (the summary keeps
+		// only their count); the node checks them against its table.
+		var recipe recipeSpec
+		var params syscallParameters
+		if len(scope.Filters) != 0 || strict(scope.Recipe, &recipe) != nil || len(recipe.Actions) != 1 || recipe.Actions[0].ID != a.ID || strict(recipe.Actions[0].Parameters, &params) != nil {
+			return artifact.Recording{}, "", value.ErrInvalid
+		}
+		s := &artifact.RecordingSyscalls{ErrorsOnly: params.Result == "errors", MaxEvents: params.MaxEvents, MaxEventsPerSecond: params.MaxEventsPerSecond, MaxTrackedThreads: params.MaxTrackedThreads}
+		if params.Syscalls.Mode == "include" {
+			s.Names = slices.Sorted(slices.Values(params.Syscalls.Names))
+		}
+		r.Kind, r.Profile, r.Snaplen, r.Syscalls = "syscallTrace", "metadata", artifact.RecordingSyscallSnaplen, s
+		if !r.Valid() || r.MaxBytes < 64<<10 {
+			return artifact.Recording{}, "", value.ErrInvalid
+		}
+		return r, a.ID, nil
 	}
 	for _, f := range scope.Filters {
 		if f.ActionID != a.ID || f.Expression != a.Filter {

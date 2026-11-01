@@ -204,6 +204,10 @@ type NodePacketCapture struct {
 	DurationMillis int64                  `json:"durationMillis"`
 	MaxBytes       int64                  `json:"maxBytes"`
 	Observation    *NodeObservationPermit `json:"observation,omitempty"`
+	// Syscalls and MaxEventsPerSecond make this a finite syscall metadata
+	// recording (B3, work kind syscallCapture).
+	Syscalls           *NodeSyscallFilter `json:"syscalls,omitempty"`
+	MaxEventsPerSecond int64              `json:"maxEventsPerSecond,omitempty"`
 }
 
 // NodeObservationPermit carries one committed finite original allowance over

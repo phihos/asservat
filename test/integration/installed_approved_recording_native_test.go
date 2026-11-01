@@ -62,6 +62,27 @@ func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code str
 // approvedRecordingArguments is the actual public request, validated offline
 // before the expensive installed qualification. It is never authority.
 func approvedRecordingArguments(cluster, namespace, workload string) map[string]any {
+	if installedJourneyFocus() == "manual-syscall" {
+		// B3: one finite manual syscall metadata recording of 5 seconds.
+		return map[string]any{
+			"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
+			"requested_retention_seconds": 600,
+			"profile_composition": map[string]any{
+				"components": []any{map[string]any{
+					"id":         "calls",
+					"profileRef": map[string]string{"catalog": "builtin", "name": "syscall-activity", "version": "v1"},
+					"overrides": []any{
+						map[string]any{"actionID": "syscalls", "field": "actionExecutionMode", "value": "onTrigger"},
+						map[string]any{"actionID": "syscalls", "field": "syscallBefore", "value": "0s"},
+						map[string]any{"actionID": "syscalls", "field": "syscallAfter", "value": "5s"},
+						map[string]any{"actionID": "syscalls", "field": "actionTimeout", "value": "15s"},
+					},
+				}},
+				"maxTotalBytes": 16 << 20,
+				"maxDuration":   "15s",
+			},
+		}
+	}
 	return map[string]any{
 		"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
 		"requested_retention_seconds": 600,
@@ -620,7 +641,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	unpacedStarted := time.Now()
 	response := installedJourneyContent(t, ctx, &http.Client{Transport: transport, Timeout: time.Minute}, strings.TrimSuffix(origin, "/")+download.ContentPath, identity.downloadToken(), nil)
 	_, disposition, dispositionErr := mime.ParseMediaType(response.Header.Get("Content-Disposition"))
-	if dispositionErr != nil || disposition["filename"] != "artifact-"+evidence.Artifacts[0].ID+".pcapng" {
+	extension := ".pcapng"
+	if installedJourneyFocus() == "manual-syscall" {
+		extension = ".jsonl"
+	}
+	if dispositionErr != nil || disposition["filename"] != "artifact-"+evidence.Artifacts[0].ID+extension {
 		response.Body.Close()
 		t.Fatal("native download lacks its PCAPNG filename", dispositionErr)
 	}
@@ -638,6 +663,20 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if err := finishUnpaced(); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if installedJourneyFocus() == "manual-syscall" {
+		// B3: metadata-only JSON Lines of the one recorded Pod.
+		var first struct {
+			Identity struct {
+				PodUID string `json:"pod_uid"`
+			} `json:"identity"`
+		}
+		if err := os.WriteFile("../results/manual-syscall.jsonl", native, 0600); err != nil || json.Unmarshal(native[:bytes.IndexByte(native, '\n')+1], &first) != nil || first.Identity.PodUID == "" {
+			t.Fatal("manual syscall recording has no readable first event", err)
+		}
+		events := ongoingSyscallEvents(t, native, first.Identity.PodUID, time.Now())
+		t.Logf("manual syscall recording %s: %d metadata events, %d bytes", receipt.CaptureID, events, len(native))
+		return
 	}
 	path := "../results/approved-recording.pcapng"
 	if err := os.WriteFile(path, native, 0600); err != nil {
