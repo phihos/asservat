@@ -54,7 +54,7 @@ func (s *APIContextExecutions) preparePolicyObservation(ctx context.Context, q *
 	existing, err := q.ReadPolicyObservation(ctx, custodydb.ReadPolicyObservationParams{RootID: capture.RootID, CaptureID: capture.ID})
 	if err == nil {
 		if first || existing.GrantID != original.reservation.GrantID || existing.AcceptanceID != original.reservation.AcceptanceID ||
-			existing.PolicyUid != original.reservation.PolicyUid || existing.AttemptID != capture.AttemptID ||
+			existing.PolicyUid != (pgtype.Text{String: original.reservation.PolicyUid, Valid: true}) || existing.AttemptID != capture.AttemptID ||
 			existing.NodeUid != p.source.NodeUID || existing.BootID != p.source.BootID || existing.CollectorPodUid != p.source.CollectorPodUID || existing.CollectorEpoch != p.source.CollectorEpoch ||
 			existing.ActionID != e.ActionID || existing.PodUid != e.PodUID || !bytes.Equal(existing.ExpectationDigest, expectedDigest[:]) {
 			return value.ErrConflict
@@ -89,7 +89,7 @@ func (s *APIContextExecutions) preparePolicyObservation(ctx context.Context, q *
 	}
 	ed := evidence.ContextExpectationDigest(e)
 	row := custodydb.PolicyObservationSession{
-		ID: id(uuid.NewString()), RootID: capture.RootID, PolicyUid: a.PolicyUid, AcceptanceID: a.ID, GrantID: original.reservation.GrantID, CaptureID: capture.ID, AttemptID: capture.AttemptID, Fence: id(uuid.NewString()),
+		ID: id(uuid.NewString()), RootID: capture.RootID, PolicyUid: pgtype.Text{String: a.PolicyUid, Valid: true}, AcceptanceID: a.ID, GrantID: original.reservation.GrantID, CaptureID: capture.ID, AttemptID: capture.AttemptID, Fence: id(uuid.NewString()),
 		ActionID: e.ActionID, PodUid: e.PodUID, NodeUid: p.source.NodeUID, BootID: p.source.BootID, CollectorPodUid: p.source.CollectorPodUID, CollectorEpoch: p.source.CollectorEpoch,
 		ExpectationDigest: ed[:], ProgramDigest: policyObservationProgramDigest(e.Recording.Filter.Program), AccountingRule: observationRuleBytes(),
 		SourceObservedAt: ts(p.source.ObservedAt.UTC().Truncate(time.Microsecond)), SourceFreshUntil: ts(p.source.FreshUntil.UTC().Truncate(time.Microsecond)), StartedAt: ts(finite.StartedAt), SessionUntil: ts(finite.Until), LeaseUntil: ts(finite.Until), StartBy: ts(finite.LatestStart), DurationMillis: e.Recording.DurationMillis,

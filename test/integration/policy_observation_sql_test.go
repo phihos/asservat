@@ -58,7 +58,7 @@ func qualifyFinitePolicyObservationSQL(t *testing.T, ctx context.Context, admin,
 	programDigest := planning.FilterProgramDigest(program)
 	const credit = int64(32 << 20) // R*(one-second recording + one-second burst)
 	params := func(now time.Time) custodydb.InsertPolicyObservationParams {
-		return custodydb.InsertPolicyObservationParams{ID: asID(custodyID()), RootID: asID(root), PolicyUid: "", AcceptanceID: asID(acceptance), GrantID: asID(grant), CaptureID: asID(accepted.CaptureID), AttemptID: asID(accepted.Expectation.Registration.Location.AttemptID), Fence: asID(custodyID()), ActionID: accepted.Expectation.ActionID, PodUid: accepted.Expectation.PodUID, NodeUid: "synthetic-node", BootID: "synthetic-boot", CollectorPodUid: "synthetic-collector", CollectorEpoch: "synthetic-process", ExpectationDigest: ed[:], ProgramDigest: programDigest[:], BindingScope: marker[:], AccountingRule: rule[:], SourceObservedAt: ts(now), SourceFreshUntil: ts(now.Add(5 * time.Second)), StartedAt: ts(now), SessionUntil: ts(now.Add(10 * time.Second)), StartBy: ts(now.Add(5 * time.Second)), DurationMillis: 1000, Credit: credit, MaxBytesPerSecond: 16 << 20}
+		return custodydb.InsertPolicyObservationParams{ID: asID(custodyID()), RootID: asID(root), PolicyUid: pgtype.Text{String: "", Valid: true}, AcceptanceID: asID(acceptance), GrantID: asID(grant), CaptureID: asID(accepted.CaptureID), AttemptID: asID(accepted.Expectation.Registration.Location.AttemptID), Fence: asID(custodyID()), ActionID: accepted.Expectation.ActionID, PodUid: accepted.Expectation.PodUID, NodeUid: "synthetic-node", BootID: "synthetic-boot", CollectorPodUid: "synthetic-collector", CollectorEpoch: "synthetic-process", ExpectationDigest: ed[:], ProgramDigest: programDigest[:], BindingScope: marker[:], AccountingRule: rule[:], SourceObservedAt: ts(now), SourceFreshUntil: ts(now.Add(5 * time.Second)), StartedAt: ts(now), SessionUntil: ts(now.Add(10 * time.Second)), StartBy: ts(now.Add(5 * time.Second)), DurationMillis: 1000, Credit: credit, MaxBytesPerSecond: 16 << 20}
 	}
 	var policy string
 	if err := admin.QueryRow(ctx, "SELECT policy_uid FROM policy_acceptance WHERE root_id=$1 AND id=$2", root, acceptance).Scan(&policy); err != nil {
@@ -127,7 +127,7 @@ func qualifyFinitePolicyObservationSQL(t *testing.T, ctx context.Context, admin,
 		t.Fatal(err)
 	}
 	expired := params(now.Time)
-	expired.PolicyUid = policy
+	expired.PolicyUid = pgtype.Text{String: policy, Valid: true}
 	expired.SourceFreshUntil = ts(now.Time.Add(300 * time.Millisecond))
 	done := make(chan error, 1)
 	pid := tx.Conn().PgConn().PID()
@@ -202,7 +202,7 @@ func qualifyFinitePolicyObservationSQL(t *testing.T, ctx context.Context, admin,
 		t.Fatal(err)
 	}
 	original := params(now.Time)
-	original.PolicyUid = policy
+	original.PolicyUid = pgtype.Text{String: policy, Valid: true}
 	row, err := query.InsertPolicyObservation(ctx, original)
 	if err != nil {
 		t.Fatal("finite original SQL tuple", err)
@@ -231,7 +231,7 @@ func qualifyFinitePolicyObservationSQL(t *testing.T, ctx context.Context, admin,
 		t.Fatal(err)
 	}
 	duplicate := params(now.Time) // fresh dates/new session/fence cannot rearm this capture
-	duplicate.PolicyUid = policy
+	duplicate.PolicyUid = pgtype.Text{String: policy, Valid: true}
 	_, err = q.InsertPolicyObservation(ctx, duplicate)
 	checkCode(err, "23505")
 	_, err = admin.Exec(ctx, "UPDATE policy_observation_session SET credit=credit+1 WHERE id=$1", original.ID)

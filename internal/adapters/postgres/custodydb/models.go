@@ -95,6 +95,12 @@ type AccessGrantUse struct {
 	CreatedAt  pgtype.Timestamptz
 }
 
+type AdhocObservationSpend struct {
+	RootID  pgtype.UUID
+	GrantID pgtype.UUID
+	Spent   int64
+}
+
 type ArtifactDownload struct {
 	ID                    pgtype.UUID
 	RootID                pgtype.UUID
@@ -2116,7 +2122,7 @@ type PolicyGrantSetting struct {
 type PolicyObservationSession struct {
 	ID                pgtype.UUID
 	RootID            pgtype.UUID
-	PolicyUid         string
+	PolicyUid         pgtype.Text
 	AcceptanceID      pgtype.UUID
 	GrantID           pgtype.UUID
 	CaptureID         pgtype.UUID
@@ -2143,6 +2149,7 @@ type PolicyObservationSession struct {
 	Credit            int64
 	MaxBytesPerSecond int64
 	EndedAt           pgtype.Timestamptz
+	AdhocCaptureID    pgtype.UUID
 }
 
 type PolicyOccurrence struct {
