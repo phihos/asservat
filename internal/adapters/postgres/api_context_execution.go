@@ -388,7 +388,9 @@ func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.AP
 				return sqlStep{"expired", value.ErrExpired}
 			}
 			if observation != nil {
-				prepare := func() error { return s.preparePolicyObservation(ctx, q, c, accepted, policyGrant, now.Time, first, observation) }
+				prepare := func() error {
+					return s.preparePolicyObservation(ctx, q, c, accepted, policyGrant, now.Time, first, observation)
+				}
 				if sensitiveManualRawRecording(c) {
 					prepare = func() error { return s.prepareAdHocObservation(ctx, q, c, accepted, now.Time, first, observation) }
 				}
