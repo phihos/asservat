@@ -137,9 +137,6 @@ func observationRuleBytes() []byte { r := collector.ObservationAccountingRule();
 func policyObservationScope(row custodydb.PolicyObservationSession) []byte {
 	row.BindingScope = nil
 	row.EndedAt = pgtype.Timestamptz{}
-	// Generated from capture_id/acceptance_id, both bound below; absent on
-	// the inserted row the digest is first computed from.
-	row.AdhocCaptureID = pgtype.UUID{}
 	// pgx's timestamptz binary scan preserves instants but may return
 	// time.Local. Canonical scope binds those exact instants, not a receiver's
 	// zone representation; never change or renew an original cutoff here.
@@ -148,10 +145,17 @@ func policyObservationScope(row custodydb.PolicyObservationSession) []byte {
 			field.Time = field.Time.UTC()
 		}
 	}
+	// adhoc_capture_id is generated from capture_id/acceptance_id, both bound
+	// here, and is absent on the inserted row the scope is first computed
+	// from. Shadowing it keeps the pre-117 v1 encoding of policy sessions.
+	type v1Row struct {
+		custodydb.PolicyObservationSession
+		AdhocCaptureID *struct{} `json:",omitempty"`
+	}
 	return digest(struct {
 		Format string
-		Row    custodydb.PolicyObservationSession
-	}{"finite-policy-observation/v1", row})
+		Row    v1Row
+	}{"finite-policy-observation/v1", v1Row{PolicyObservationSession: row}})
 }
 
 func policyObservationPermit(row custodydb.PolicyObservationSession) (collector.ObservationPermit, error) {

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 	"time"
@@ -267,6 +268,11 @@ func TestAdHocObservationPermitIgnoresGeneratedCaptureKey(t *testing.T) {
 	row.AdhocCaptureID = row.CaptureID
 	if _, err := policyObservationPermit(row); err != nil {
 		t.Fatal("read-back ad hoc session denied", err)
+	}
+	// A policy session's scope keeps its pre-117 v1 digest (computed by the
+	// schema 116 code for this fixture), so upgrade never denies its replay.
+	if got := hex.EncodeToString(policyObservationRowFixture().BindingScope); got != "47e261e1dacbd285bcdd790d9dd5c942f36270ab345fd06c0857961a21001c07" {
+		t.Fatal("policy session v1 scope changed", got)
 	}
 	limits := adHocObservationLimits([]byte(`{"approval":{"dataClass":"raw","observationLimits":{"maxSessionSeconds":60,"maxObservedBytes":1073741824,"maxBytesPerSecond":16777216,"maxConcurrentSessions":1}}}`))
 	if limits != (authorization.ObservationLimits{MaxSessionSeconds: 60, MaxObservedBytes: 1 << 30, MaxBytesPerSecond: 16 << 20, MaxConcurrentSessions: 1}) || adHocObservationLimits([]byte(`{"approval":{}}`)).Valid() {
