@@ -112,7 +112,7 @@ func TestProjectionReaderVerifiesEntirePinnedSourceBeforeTypedOutput(t *testing.
 	until, _ := ctx.Deadline()
 	keys := &projectionTestOpener{}
 	p, err := reader.ReadProjectionNative(ctx, source, scope, keys, until)
-	if err != nil || !p.Valid() || p.PodUID != e.PodUID || p.ResourceVersion != "1" || keys.calls != 3 {
+	if err != nil || !p.Valid(scope) || p.PodStatus.PodUID != e.PodUID || p.PodStatus.ResourceVersion != "1" || keys.calls != 3 {
 		t.Fatal("full verified projection", p, err, keys.calls)
 	}
 	for role := 0; role < 4; role++ {
@@ -121,7 +121,7 @@ func TestProjectionReaderVerifiesEntirePinnedSourceBeforeTypedOutput(t *testing.
 			changed = "/fixture/" + e.Registration.Location.Prefix() + artifact.Role(role)
 			mu.Unlock()
 			p, err := reader.ReadProjectionNative(ctx, source, scope, &projectionTestOpener{}, until)
-			if err == nil || p != (value.PodStatusProjection{}) {
+			if err == nil || p.PodStatus != (value.PodStatusProjection{}) || p.Headers.Records != nil {
 				t.Fatal("tampered pinned source released projection")
 			}
 		})

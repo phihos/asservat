@@ -10,7 +10,6 @@ import (
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/identity"
 )
 
 // get_http_headers (REQ-NET-004, ADR-282 slice 4) pages the approved records
@@ -145,12 +144,14 @@ type HTTPHeaderPage struct {
 	CoverageGaps                  []string
 }
 
-// Valid requires exactly the selected records (never silently fewer), in
-// time order, and a bounded gap report.
+// Valid requires a non-empty prefix of the selected records (empty only at
+// the end of the projection), in time order, and a bounded gap report. A
+// shorter page is never silent: Next continues at its first omitted record.
 func (p HTTPHeaderPage) Valid(s HTTPHeaderSelection) bool {
+	selected := min(s.Limit, p.Total-p.Start)
 	if !s.Valid() || p.ProjectionDigest == (artifact.Digest{}) || !s.Matches(p.ProjectionDigest) || p.Start != s.Start ||
 		p.Total < 0 || p.Total > HTTPHeaderMaxRecords || p.Start > p.Total || s.Start > 0 && s.Start >= p.Total ||
-		len(p.Records) != min(s.Limit, p.Total-p.Start) || p.DroppedFlows > HTTPHeaderMaxCount || p.IncompleteFlows > HTTPHeaderMaxCount ||
+		len(p.Records) > selected || len(p.Records) < min(1, selected) || p.DroppedFlows > HTTPHeaderMaxCount || p.IncompleteFlows > HTTPHeaderMaxCount ||
 		len(p.CoverageGaps) > HTTPHeaderMaxGaps {
 		return false
 	}
@@ -174,32 +175,4 @@ func (p HTTPHeaderPage) Next(n int) string {
 		return ""
 	}
 	return HTTPHeaderCursor(p.Start+n, p.ProjectionDigest)
-}
-
-// HTTPHeaderReadAuthority is C-03's current ordinary read decision for one
-// published httpHeaders extract: ReadApproved under evidence:read, the
-// original audience and every retained policy origin. Version is the
-// verified ciphertext-copy version reported as provenance. It is an internal
-// decision with its original interval, not a stored or renewable permit.
-type HTTPHeaderReadAuthority struct {
-	CaseID, ArtifactID, CaptureID string
-	NativeType, Format, DataClass string
-	Version                       artifact.Digest
-	Principal                     identity.Principal
-	AccessUntil                   time.Time
-	ObservedAt, ValidUntil        time.Time
-}
-
-func (a HTTPHeaderReadAuthority) Valid(now time.Time) bool {
-	return authorization.UUID(a.CaseID) && authorization.UUID(a.ArtifactID) && authorization.UUID(a.CaptureID) &&
-		a.NativeType == artifact.HTTPHeadersArtifact && a.Format == artifact.HTTPHeadersFormat && a.DataClass == "extract" &&
-		a.Version != (artifact.Digest{}) && a.Principal.Valid() && !now.Before(a.ObservedAt) && now.Before(a.ValidUntil) &&
-		now.Before(a.AccessUntil)
-}
-
-// SameSource reports whether a later decision covers the same published
-// source and caller; its own interval may differ.
-func (a HTTPHeaderReadAuthority) SameSource(b HTTPHeaderReadAuthority) bool {
-	return a.CaseID == b.CaseID && a.ArtifactID == b.ArtifactID && a.CaptureID == b.CaptureID && a.NativeType == b.NativeType &&
-		a.Format == b.Format && a.DataClass == b.DataClass && a.Version == b.Version && a.Principal == b.Principal
 }

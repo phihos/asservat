@@ -18,7 +18,12 @@ import (
 // ContextProjectionReader belongs only in the regional query worker. Its
 // opener is already bound to that query/batch and independently checked key
 // provider. No hub constructor receives this reader or a generic unwrap key.
-type ContextProjectionReader struct{ store *CustodyStore }
+// An httpHeaders page (ADR-282) additionally needs the installed pager; a
+// reader without one serves pod status only.
+type ContextProjectionReader struct {
+	store *CustodyStore
+	pages evidence.HTTPHeaderPager
+}
 
 func NewContextProjectionReader(store *CustodyStore) (*ContextProjectionReader, error) {
 	if store == nil {
@@ -27,7 +32,20 @@ func NewContextProjectionReader(store *CustodyStore) (*ContextProjectionReader, 
 	return &ContextProjectionReader{store: store}, nil
 }
 
-func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, source evidence.NativeContextSource, scope value.ContextProjectionScope, keys evidence.KeyOpener, until time.Time) (value.PodStatusProjection, error) {
+// ReadProjectionNative returns the scope's one result: the pod-status DTO, or
+// one rechecked httpHeaders page.
+func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, source evidence.NativeContextSource, scope value.ContextProjectionScope, keys evidence.KeyOpener, until time.Time) (value.ProjectionResult, error) {
+	if r != nil && scope.NativeType == artifact.HTTPHeadersArtifact {
+		return r.readHeaderPage(ctx, source, scope, keys, until)
+	}
+	p, err := r.readPodStatus(ctx, source, scope, keys, until)
+	if err != nil {
+		return value.ProjectionResult{}, err
+	}
+	return value.ProjectionResult{PodStatus: p}, nil
+}
+
+func (r *ContextProjectionReader) readPodStatus(ctx context.Context, source evidence.NativeContextSource, scope value.ContextProjectionScope, keys evidence.KeyOpener, until time.Time) (value.PodStatusProjection, error) {
 	if r == nil || r.store == nil || ctx == nil || ctx.Err() != nil || keys == nil || !scope.Valid() || !source.Valid(scope.Version) ||
 		source.Expectation.Registration.NativeLimit != artifact.MaxContextBytes || source.Expectation.DataClass != "metadata" || source.Expectation.ActionID != "pod-status" ||
 		source.Expectation.CaseID != scope.CaseID || source.Expectation.CaptureUID != scope.CaptureID || source.Expectation.NamespaceUID != scope.NamespaceUID ||
@@ -66,6 +84,45 @@ func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, sour
 		return value.PodStatusProjection{}, &readRefusal{value.ErrUnavailable, readStage(ctx, "parse", errors.Join(value.ErrUnavailable, err))}
 	}
 	return p, nil
+}
+
+// readHeaderPage opens the extract with the batch's keys, reads its single
+// frame, rechecks and pages it (evidence.ReadHTTPHeaderPage). A cursor that
+// does not fit the rechecked document is the invalid-cursor result.
+func (r *ContextProjectionReader) readHeaderPage(ctx context.Context, source evidence.NativeContextSource, scope value.ContextProjectionScope, keys evidence.KeyOpener, until time.Time) (value.ProjectionResult, error) {
+	var zero value.ProjectionResult
+	if r.store == nil || r.pages == nil || ctx == nil || ctx.Err() != nil || keys == nil || !scope.Valid() || !source.Valid(scope.Version) {
+		return zero, value.ErrUnavailable
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok || deadline.After(until) || deadline.After(time.Now().Add(identity.EvidenceReadRequestWindow)) || !time.Now().Before(deadline) {
+		return zero, value.ErrUnavailable
+	}
+	source.Expectation.Audience = slices.Clone(source.Expectation.Audience)
+	source.Expectation.RetentionRules = slices.Clone(source.Expectation.RetentionRules)
+	source.Expectation.SourceSnapshotManifest = source.Expectation.SourceSnapshotManifest.Clone()
+	timed := &timedKeyOpener{inner: keys}
+	verifier, err := NewContextVerifier(r.store, timed)
+	if err != nil {
+		return zero, value.ErrUnavailable
+	}
+	started := time.Now()
+	opened, err := verifier.openNative(ctx, ctx, source.Expectation, source.Copies, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
+	if err != nil || ctx.Err() != nil {
+		if opened != nil {
+			opened.Close()
+		}
+		return zero, &readRefusal{value.ErrUnavailable, err}
+	}
+	page, err := evidence.ReadHTTPHeaderPage(ctx, opened, source, scope, r.pages)
+	app.MarkDuration(ctx, "object-decrypt", time.Since(started)-timed.total())
+	if errors.Is(err, value.ErrInvalidCursor) {
+		return value.ProjectionResult{InvalidCursor: true}, nil
+	}
+	if err != nil || ctx.Err() != nil || !time.Now().Before(deadline) {
+		return zero, &readRefusal{value.ErrUnavailable, readStage(ctx, "page", errors.Join(value.ErrUnavailable, err))}
+	}
+	return value.ProjectionResult{Headers: page}, nil
 }
 
 var _ evidence.ContextProjectionNativeRead = (*ContextProjectionReader)(nil)

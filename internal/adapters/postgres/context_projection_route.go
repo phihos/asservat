@@ -5,7 +5,6 @@ import (
 	"time"
 
 	analysisapp "asservat.local/asservat/internal/application/analysis"
-	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -14,8 +13,8 @@ import (
 )
 
 var (
-	_ analysisapp.ContextProjectionRoutes = (*ContextCaseReads)(nil)
-	_ authapp.ProjectionRouteReader       = (*ContextCaseReads)(nil)
+	_ analysisapp.ContextProjectionRoutes      = (*ContextCaseReads)(nil)
+	_ analysisapp.ContextProjectionRouteReader = (*ContextCaseReads)(nil)
 )
 
 // ResolveContextProjection uses only the bounded private case locator. It does

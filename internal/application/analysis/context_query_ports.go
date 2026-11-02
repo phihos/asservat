@@ -43,6 +43,7 @@ type ContextQueryInvocation interface {
 // neither computes another MAC nor accepts an unrelated acknowledged intent.
 type ContextQueryInput struct {
 	Selection value.ContextExcerptSelection
+	Headers   value.HTTPHeaderSelection
 	QueryID   string
 }
 
@@ -100,7 +101,9 @@ type ContextProjectionRequestOwner interface {
 // errors/EOF/lease expiry never fabricate positive closure. Returning a handle
 // alongside an error still transfers its cleanup obligation to C-18.
 type ContextProjectionRead interface {
-	Projection(context.Context) (value.PodStatusProjection, error)
+	// Projection is the scope's one result: the pod-status DTO or one
+	// httpHeaders page (or its invalid-cursor refusal), ADR-282.
+	Projection(context.Context) (value.ProjectionResult, error)
 	CheckCurrent(context.Context) error
 	Close(context.Context) error
 	ContextProjectionClosed

@@ -128,3 +128,15 @@ func TestReadHTTPHeaderPageRefusesOtherSourcesAndTampering(t *testing.T) {
 		})
 	}
 }
+
+// ADR-282 slice 5: one page read is one recording frame window; it exceeds
+// one accepted pod-status query unit and fits the two units an extract
+// query reserves (migration 121).
+func TestHTTPHeaderPageReadFitsItsQueryUnits(t *testing.T) {
+	native, ok := artifact.LookupNativeType(artifact.HTTPHeadersArtifact)
+	work := NativeWindowReadWork(native)
+	unit := int64(query.ContextMaxReadBatches * query.ContextBatchReadWork)
+	if !ok || work <= unit || work > query.HTTPHeaderQueryUnits*unit {
+		t.Fatal("extract page read does not fit two query units", work, unit)
+	}
+}

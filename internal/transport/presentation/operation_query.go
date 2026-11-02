@@ -7,10 +7,26 @@ import (
 )
 
 func queryOperation(name string) bool {
-	return name == "get_file_excerpt" || name == "get_query_result"
+	return name == "get_file_excerpt" || name == "get_http_headers" || name == "get_query_result"
 }
 
 func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
+	if name == "get_http_headers" {
+		// The cursor is bound as supplied; a malformed one is still audited
+		// and answered as InvalidCursor without any lookup. An omitted limit
+		// is the canonical default page.
+		var in HTTPHeaderOperationInput
+		if err := json.Unmarshal(raw, &in); err != nil {
+			return nil, err
+		}
+		if in.Limit == 0 {
+			in.Limit = analysis.HTTPHeaderPageRecords
+		}
+		return json.Marshal(struct {
+			Tool, DisplayVersion, CaseID, ArtifactID, Cursor string
+			Limit                                            int
+		}{name, analysis.HTTPHeadersDisplayVersion, in.CaseID, in.ArtifactID, in.Cursor, in.Limit})
+	}
 	if name == "get_query_result" {
 		var in struct {
 			QueryHandle string `json:"query_handle"`

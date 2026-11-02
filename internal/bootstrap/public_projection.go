@@ -114,7 +114,7 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	reader := publicProjectionReader{ledger, runtime}
 	service := &analysisapp.ContextProjectionService{Results: analysisapp.ContextProjectionResults{RootID: root, InstallationID: installation, HubProcessEpoch: d.Runtime.binding.ProcessEpoch,
 		Authority: authority, Ledger: ledger, Reader: reader, Now: time.Now, NewID: ownerRandomID,
-		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "query refused"), time.Now)}, Recovery: recovery, Routes: routes, Plans: plans,
+		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "query refused"), time.Now)}, Recovery: recovery, Routes: routes, HeaderRoutes: routes, Plans: plans,
 		Workers: publicProjectionAdmission{&evidence.ProjectionWorkerAdmission{Cleanup: cleanup, Ledger: workers, Jobs: jobs, Audit: audit.projectionWorkerObjects(), Now: time.Now}}}
 	// The peer adapter is retained by both native admissions. Configure it only
 	// during startup, before any listener/goroutine can observe the pointer.

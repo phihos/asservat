@@ -19,6 +19,7 @@ type NativeContextReader struct {
 	scope    value.KeyScope
 	endpoint string
 	client   *http.Client
+	pages    evidence.HTTPHeaderPager
 }
 
 var _ evidence.NativeContextRead = (*NativeContextReader)(nil)
@@ -33,7 +34,7 @@ func NewNativeContextReader(store *CustodyStore, scope value.KeyScope, endpoint 
 		return nil, e
 	}
 	check.Close()
-	return &NativeContextReader{store, scope, endpoint, client}, nil
+	return &NativeContextReader{store: store, scope: scope, endpoint: endpoint, client: client}, nil
 }
 
 // ReadNativeContext reads one pod-status artifact whole.

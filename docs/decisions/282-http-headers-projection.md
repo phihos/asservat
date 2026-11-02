@@ -197,3 +197,69 @@ delivered, so the worker sends the longest fitting prefix) and hub decode,
 `HTTPHeaderReads` as Begin (`pending` + query id) plus a `get_query_result`
 branch, the restored canonical `pending` branch in the generated schema with
 browser OpenAPI parity, and composition in `newPublicProjection`.
+
+## Implementation (slice 5, part 2: query ledger, wire and composition)
+
+`get_http_headers` is now an approved query of one page in the existing
+ADR-206 ledger instead of the slice 4 synchronous read. Begin
+(`HTTPHeaderReads.Begin`) resolves the case route (`ResolveProjectionRoute`),
+sets the extract source and the requested record window on the candidate,
+lets C-03 `ResolveProjectionCurrent` decide ReadApproved for that exact
+scope and admits the query, dispatching its worker; the reply is the
+canonical `pending` branch (handle and `retry_after_seconds` only).
+`get_query_result` serves the page as its nested `get_http_headers` result
+(`tool_name: get_http_headers`, `data_class: extract`, handling notice);
+pod-status queries keep their DTO, payload and outputs unchanged. Each page
+is its own query, so a cursor reauthorizes completely. The slice 4
+synchronous service and the separate `HTTPHeaderReadAuthority` are removed.
+
+Migration 00121 (schema 121) changes functions only: `get_http_headers`
+audits as `context-query-input/v1` with the 20 s evidence-read request
+window; the intent/outcome facets accept it; the call guard requires it as
+the begin tool of an `httpHeaders` scope (polls stay `get_query_result`); a
+stored extract scope needs its record window and no line selection; an
+extract query starts at most one read batch and reserves two accepted query
+units (`context_query_units`), because its single read of one recording
+frame (`NativeWindowReadWork`, 8 MiB plus cipher overhead and one index page)
+exceeds the two 4 MiB batches of one pod-status unit while two units cover it
+in every cost dimension. No accepted profile, envelope or pod-status value
+changes. Down refuses while extract queries exist and restores the previous
+bodies; the real-PostgreSQL upgrade test checks the exact restoration.
+
+One result type (`analysis.ProjectionResult`: pod status, a page or an
+invalid-cursor refusal) passes through `RegionalProjectionRead`,
+`RegionalContextResult.ReadApproved`, the native exchange and the hub
+`Projection`. On the wire pod status keeps its bare DTO payload byte for
+byte; an extract scope carries `{"Page":…}` or `{"InvalidCursor":true}`,
+bounded by `HTTPHeaderPageWireBytes` (46 KiB, inside the 64 KiB control
+frame). The worker sends the longest record prefix within that bound; a page
+is valid as a non-empty prefix of its selection (empty only for an empty
+projection), still bound to the projection digest, and `next_cursor`
+continues at the first omitted record. The response then trims further to
+24 KiB the same way. A cursor the worker judges invalid against the
+rechecked document returns `InvalidCursor` after current read rights; the
+read stays charged and nothing is disclosed. A malformed cursor is answered
+before any lookup.
+
+`newPublicProjection` composes the case route reader as `HeaderRoutes`, and
+the public operations advertise `get_http_headers` whenever the approved read
+path is composed. The acquisition worker installs `httpheaders.RecordingPage`
+as the pager.
+
+Complexity gate (cumulative with part 1): 1. A specified first-release read.
+2. No reopened risk. 3. Typical HTTP/1 investigations. 4. Reuses the
+get_file_excerpt query path. 5. No new privilege, credential or network
+access. 6. One added refusal (InvalidCursor) and no fallback. 7. No
+configuration. 8. None outside Asservat. 9. Per page one worker read of one
+frame, charged as two accepted query units; no SQL row or profile added.
+10. Down restores the previous functions; the tool disappears with the
+composition. 11. A synchronous read without the ledger would bypass the
+query accounting and worker key custody.
+
+Remaining: the installed manual-http focus now reads up to three pages over
+MCP and compares them with `httpheaders.ReadPage` on the downloaded bytes
+(not yet run natively); real-PostgreSQL admission of an extract query (its
+two-unit charge through the guards) is covered only by the function checks
+of the upgrade test and the native focus; worker transient memory for one
+page (about three frame-sized buffers) is within the 256 MiB Job limit but
+above the profile's declared 8 MiB per unit.

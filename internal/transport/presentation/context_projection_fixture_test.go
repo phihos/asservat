@@ -36,6 +36,8 @@ type bridgeFixture struct {
 	routeHook, planHook, claimHook                                               func(context.Context)
 	workerUntil                                                                  time.Time
 	lastRead                                                                     *bridgeReadFake
+	// result, when set, is the read's result instead of the pod-status DTO.
+	result *value.ProjectionResult
 }
 
 func (f *bridgeFixture) next() string {
@@ -107,6 +109,11 @@ func (f *bridgeFixture) ResolveContextProjection(ctx context.Context, _ value.Co
 	}
 	return f.a.Scope.Candidate(), nil
 }
+func (f *bridgeFixture) ResolveProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+	c := f.a.Scope.Candidate()
+	c.Selection, c.NativeType, c.Headers = value.LineSelection{}, "", value.HTTPHeaderWindow{}
+	return c, nil
+}
 func (f *bridgeFixture) ResolveProjectionCurrent(context.Context, identities.CurrentIdentity, value.ContextProjectionCandidate) (value.ContextProjectionAuthority, error) {
 	return f.a, nil
 }
@@ -141,7 +148,7 @@ func (f *bridgeFixture) PermitQuery(context.Context, value.ContextQuery, value.C
 	return f.permitErr
 }
 func (f *bridgeFixture) BeginReadBatch(_ context.Context, q value.ContextQuery, r value.ContextQueryRequest, w value.ContextQueryWorker, id string, a value.ContextProjectionAuthority) (analysisapp.ContextQueryBatchAdmission, error) {
-	if f.active || f.batches >= value.ContextMaxReadBatches {
+	if f.active || int64(f.batches) >= q.Scope.ReadBatches() {
 		return analysisapp.ContextQueryBatchAdmission{}, value.ErrUnavailable
 	}
 	f.batches++
@@ -184,20 +191,24 @@ func (f *bridgeFixture) ObserveProjectionWorker(_ context.Context, q value.Conte
 }
 func (f *bridgeFixture) ReadProjection(_ context.Context, start value.ContextReadStart, _ analysisapp.ContextProjectionRequestOwner) (analysisapp.ContextProjectionRead, error) {
 	f.reads++
-	f.lastRead = &bridgeReadFake{batch: start.Batch, projection: bridgeProjection(f.now), closeErr: f.closeErr}
+	f.lastRead = &bridgeReadFake{batch: start.Batch, projection: bridgeProjection(f.now), result: f.result, closeErr: f.closeErr}
 	return f.lastRead, f.errorAfterRead
 }
 
 type bridgeReadFake struct {
 	batch        value.ContextReadBatch
 	projection   value.PodStatusProjection
+	result       *value.ProjectionResult
 	closed       bool
 	closeErr     error
 	cleanupUntil time.Time
 }
 
-func (r *bridgeReadFake) Projection(context.Context) (value.PodStatusProjection, error) {
-	return r.projection, nil
+func (r *bridgeReadFake) Projection(context.Context) (value.ProjectionResult, error) {
+	if r.result != nil {
+		return *r.result, nil
+	}
+	return value.ProjectionResult{PodStatus: r.projection}, nil
 }
 func (r *bridgeReadFake) CheckCurrent(context.Context) error {
 	if r.closed {

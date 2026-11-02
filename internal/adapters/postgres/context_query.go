@@ -234,7 +234,7 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 
 func (s *ContextQueries) AdmitQuery(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) (app.ContextQueryAdmission, error) {
 	var out app.ContextQueryAdmission
-	if !q.Plan.Valid(q.Scope, time.Now()) || q.OperationID != r.Call.ID || r.Call.Tool != "get_file_excerpt" || q.CreatedAt.Before(r.Call.StartedAt) {
+	if !q.Plan.Valid(q.Scope, time.Now()) || q.OperationID != r.Call.ID || r.Call.Tool != q.Scope.BeginTool() || q.CreatedAt.Before(r.Call.StartedAt) {
 		return out, value.ErrUnavailable
 	}
 	e := s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, b custodydb.ContextQueryBacking, allocation custodydb.ContextQueryAllocation) error {

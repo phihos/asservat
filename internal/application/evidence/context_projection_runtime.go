@@ -229,8 +229,8 @@ func (s *ProjectionRuntime) ReadProjection(ctx context.Context, q query.ContextQ
 	fail = false
 	return h, nil
 }
-func (h *projectionRead) Projection(ctx context.Context) (query.PodStatusProjection, error) {
-	var zero query.PodStatusProjection
+func (h *projectionRead) Projection(ctx context.Context) (query.ProjectionResult, error) {
+	var zero query.ProjectionResult
 	if h == nil || h.exchange == nil || ctx == nil || ctx.Err() != nil {
 		return zero, query.ErrUnavailable
 	}
@@ -244,16 +244,23 @@ func (h *projectionRead) Projection(ctx context.Context) (query.PodStatusProject
 	if e != nil {
 		return zero, e
 	}
+	if !p.Valid(h.query.Scope) {
+		p.Clear()
+		return zero, query.ErrUnavailable
+	}
 	if e = h.exchange.AcknowledgeProjection(ctx); e != nil {
+		p.Clear()
 		return zero, e
 	}
 	a, e := h.owner.CheckCurrent(ctx)
 	if e != nil || !h.start.Batch.Current(h.query, a, h.runtime.Now()) || ctx.Err() != nil {
+		p.Clear()
 		return zero, query.ErrUnavailable
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.closed {
+		p.Clear()
 		return zero, query.ErrUnavailable
 	}
 	h.positive = true

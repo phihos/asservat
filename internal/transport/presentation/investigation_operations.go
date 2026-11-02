@@ -37,7 +37,7 @@ func NewInvestigationProjectionOperations(base *InvestigationOperations, project
 	}
 	out := *base
 	out.names = append([]string(nil), base.names...)
-	for _, name := range []string{"get_file_excerpt", "get_query_result"} {
+	for _, name := range projection.toolNames() {
 		if _, exists := base.Tool(name); exists {
 			return nil, ErrOperationsConfiguration
 		}
@@ -100,15 +100,6 @@ func NewInvestigationGrantOperations(base *InvestigationOperations, grants *Gran
 		return nil, ErrOperationsConfiguration
 	}
 	return withOperations(base, grants)
-}
-
-// NewInvestigationHTTPHeaderOperations adds the ADR-282 get_http_headers
-// read the same way, only when its read service is composed.
-func NewInvestigationHTTPHeaderOperations(base *InvestigationOperations, headers *HTTPHeaderOperations) (*InvestigationOperations, error) {
-	if headers == nil {
-		return nil, ErrOperationsConfiguration
-	}
-	return withOperations(base, headers)
 }
 
 func withOperations(base *InvestigationOperations, policies Operations) (*InvestigationOperations, error) {
@@ -183,7 +174,7 @@ func (s *InvestigationOperations) Tool(name string) (contracts.InvestigationTool
 	if s == nil {
 		return contracts.InvestigationTool{}, false
 	}
-	if s.projection != nil && queryOperation(name) {
+	if s.projection.serves(name) {
 		return s.projection.contracts.Tool(name)
 	}
 	part, ok := s.routes[name]
@@ -219,7 +210,7 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 	if s == nil {
 		return OperationReply{}, ErrOperationsConfiguration
 	}
-	if s.projection != nil && queryOperation(name) {
+	if s.projection.serves(name) {
 		return s.projection.CallWithContext(ctx, current, call, name, raw)
 	}
 	part := s.routes[name]
@@ -246,8 +237,6 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 	case *RetentionPreviewOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *GrantOperations:
-		return p.CallWithContext(ctx, current, call, name, raw)
-	case *HTTPHeaderOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	default:
 		return OperationReply{}, contracts.ErrInvestigationWire

@@ -189,6 +189,9 @@ def main():
             output = copy.deepcopy(common)
             output.pop("$id", None)
             output["properties"]["data_class"] = {"const": "metadata"}
+            if name == "get_query_result":
+                # ADR-282: a get_http_headers page result is an extract.
+                output["properties"]["data_class"] = {"enum": ["metadata", "extract"]}
             output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
             for key, fixed in (("truncated", False), ("next_cursor", None), ("narrowing_hint", None)):
                 output["properties"][key] = {"const": fixed}
@@ -198,7 +201,7 @@ def main():
                 data["properties"]["logical_path"] = {"const": "pod-status.txt"}
                 data["properties"]["lines"]["maxItems"] = 14
             else:
-                data["properties"]["tool_name"] = {"const": "get_file_excerpt"}
+                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers"]}
                 # The Go validator additionally applies the original output
                 # schema and relational request/timing checks to this object.
             output["allOf"] = [{"oneOf": branches}]
@@ -207,12 +210,13 @@ def main():
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
         if name == "get_http_headers":
-            # ADR-282 slice 4: the whole canonical input; one synchronous page
-            # (no pending query handle). The cursor is the next record index
-            # bound to the projection digest; provenance names the one artifact.
+            # ADR-282: the whole canonical input and output. Each page is an
+            # approved query: pending with its handle, the page served by
+            # get_query_result. The cursor is the next record index bound to
+            # the projection digest; provenance names the one artifact.
             description = copy.deepcopy(tool)
             description.pop("enabledByDefault", None)
-            branches = [b for b in copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"]) if b["properties"]["status"].get("const") != "pending"]
+            branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
             output = copy.deepcopy(common)
             output.pop("$id", None)
             output["properties"]["truncated"] = {"const": False}

@@ -205,7 +205,7 @@ type ContextQueryCall struct {
 func (r ContextQueryCall) Valid(now time.Time) bool {
 	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.InputFormat == "context-query-input/v1" &&
 		identity.Text(r.MACVersion, 64) && r.InputDigest != (artifact.Digest{}) && r.PrincipalDigest != (artifact.Digest{}) &&
-		(r.Tool == "get_file_excerpt" || r.Tool == "get_query_result") && r.Principal.Valid() &&
+		(r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_query_result") && r.Principal.Valid() &&
 		identity.Fresh(r.StartedAt, r.Until, now, identity.EvidenceReadRequestWindow) && !r.WriteUntil.Before(r.Until) &&
 		!r.WriteUntil.After(r.StartedAt.Add(30*time.Second))
 }
@@ -232,7 +232,7 @@ type ContextReadBatch struct {
 func (b ContextReadBatch) Matches(q ContextQuery) bool {
 	return q.Valid() && b.QueryID == q.ID && authorization.UUID(b.ID) && b.OperationID == b.Request.Call.ID &&
 		b.Worker.Matches(q) && b.Request.Valid(b.StartedAt) && b.Request.Call.RootID == q.Scope.RootID && b.Request.Call.Principal == q.Scope.Principal &&
-		b.Generation >= 1 && b.Generation <= ContextMaxReadBatches && !b.StartedAt.Before(q.CreatedAt) &&
+		b.Generation >= 1 && b.Generation <= q.Scope.ReadBatches() && !b.StartedAt.Before(q.CreatedAt) &&
 		b.Until.After(b.StartedAt) && !b.Until.After(q.Deadline) && !b.Until.After(b.Request.Call.Until) &&
 		b.CleanupUntil.Equal(q.CleanupUntil)
 }

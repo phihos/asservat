@@ -11,9 +11,10 @@ import (
 
 // NativeApprovedContextRead is the closed acquisition-worker projection branch.
 // It uses the query batch's independently bound one-use keys, never a download
-// session. The hub receives only the fixed approved DTO, not native plaintext.
+// session. The hub receives only the fixed approved DTO or one httpHeaders
+// page (ADR-282), never native plaintext.
 type NativeApprovedContextRead interface {
-	ReadApprovedContext(context.Context, NativeContextSource, value.NativeOperation, query.ContextProjectionScope, time.Time) (query.PodStatusProjection, error)
+	ReadApprovedContext(context.Context, NativeContextSource, value.NativeOperation, query.ContextProjectionScope, time.Time) (query.ProjectionResult, error)
 }
 
 // Both purposes share the same process owner, active-read exclusion, joined
@@ -29,9 +30,12 @@ func NewRegionalApprovedResult(ctx context.Context, worker value.WorkerCredentia
 	return r, nil
 }
 
-func (r *RegionalContextResult) ReadApproved(ctx context.Context, o value.NativeOperation, source NativeContextSource, scope query.ContextProjectionScope) (query.PodStatusProjection, error) {
-	var zero query.PodStatusProjection
-	if o.Kind != value.NativeProjection || !scope.Valid() || scope.Version != o.SourceVersion || o.Generation < 1 || o.Generation > query.ContextMaxReadBatches || !source.Valid(scope.Version) || !source.podStatus() || o.Processing.Location != source.Expectation.Registration.Location || o.Path.StoreID != source.Expectation.Registration.StoreID {
+func (r *RegionalContextResult) ReadApproved(ctx context.Context, o value.NativeOperation, source NativeContextSource, scope query.ContextProjectionScope) (query.ProjectionResult, error) {
+	var zero query.ProjectionResult
+	// Pod status keeps its historical source check; an httpHeaders scope
+	// requires exactly its published extract (ADR-282).
+	kind := scope.NativeType == artifact.PodStatusArtifact && source.podStatus() || scope.NativeType == artifact.HTTPHeadersArtifact && projectionExpectation(source.Expectation, scope)
+	if o.Kind != value.NativeProjection || !scope.Valid() || scope.Version != o.SourceVersion || o.Generation < 1 || o.Generation > scope.ReadBatches() || !source.Valid(scope.Version) || !kind || o.Processing.Location != source.Expectation.Registration.Location || o.Path.StoreID != source.Expectation.Registration.StoreID {
 		return zero, query.ErrUnavailable
 	}
 	call, leave, e := r.enter(ctx, o)
@@ -54,12 +58,14 @@ func (r *RegionalContextResult) ReadApproved(ctx context.Context, o value.Native
 	if e != nil {
 		return zero, collapsed("approved", query.ErrUnavailable, e)
 	}
-	if call.Err() != nil || !r.now().Before(o.Until) || !p.Valid() || p.NamespaceUID != scope.NamespaceUID || p.PodUID != scope.PodUID {
+	if call.Err() != nil || !r.now().Before(o.Until) || !p.Valid(scope) {
+		p.Clear()
 		return zero, stepped("approved-result", query.ErrUnavailable)
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.closed || r.ctx.Err() != nil {
+		p.Clear()
 		return zero, query.ErrUnavailable
 	}
 	return p, nil

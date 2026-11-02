@@ -89,7 +89,7 @@ func projectionWorkerState(row custodydb.DownloadWorker, q query.ContextQuery) (
 }
 func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, a query.ContextProjectionAuthority) (evidence.ProjectionWorkerState, error) {
 	var out evidence.ProjectionWorkerState
-	if r.Call.ID != q.OperationID || r.Call.Tool != "get_file_excerpt" {
+	if r.Call.ID != q.OperationID || r.Call.Tool != q.Scope.BeginTool() {
 		return out, query.ErrUnavailable
 	}
 	err := s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries) error {
@@ -141,7 +141,7 @@ func (s *ProjectionWorkers) ReadProjectionWorker(ctx context.Context, q query.Co
 }
 func (s *ProjectionWorkers) ClaimProjectionWorker(ctx context.Context, i query.ContextProjectionWorkerIntent, r query.ContextQueryRequest, a query.ContextProjectionAuthority, receipt audit.Receipt) (value.AcquisitionWorkerLaunch, error) {
 	var out value.AcquisitionWorkerLaunch
-	if !i.Valid() || !receipt.ValidProjectionWorker(i) || r.Call.ID != i.Query.OperationID || r.Call.Tool != "get_file_excerpt" {
+	if !i.Valid() || !receipt.ValidProjectionWorker(i) || r.Call.ID != i.Query.OperationID || r.Call.Tool != i.Query.Scope.BeginTool() {
 		return out, query.ErrUnavailable
 	}
 	e := s.current(ctx, i.Query, r, a, func(ctx context.Context, tx *custodydb.Queries) error {

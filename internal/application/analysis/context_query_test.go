@@ -218,8 +218,8 @@ type projectionReadFake struct {
 	cleanupUntil time.Time
 }
 
-func (r *projectionReadFake) Projection(context.Context) (value.PodStatusProjection, error) {
-	return r.projection, nil
+func (r *projectionReadFake) Projection(context.Context) (value.ProjectionResult, error) {
+	return value.ProjectionResult{PodStatus: r.projection}, nil
 }
 func (r *projectionReadFake) CheckCurrent(context.Context) error {
 	if r.closed {

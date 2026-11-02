@@ -866,6 +866,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-http" {
 		s := qualifyManualHTTPProjection(t, native)
 		t.Logf("manual HTTP header recording %s: %d records (%d GET with status), %d bytes; counters %+v", receipt.CaptureID, s.Records, s.Answered, len(native), s.Counters)
+		qualifyManualHTTPQuery(t, ctx, session, wire, progress.CaseID, evidence.Artifacts[0].ID, native)
 		return
 	}
 	if installedJourneyFocus() == "manual-peers" {

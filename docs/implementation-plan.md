@@ -171,7 +171,7 @@ Exit: EXP-08/12/16 and authorization/permission-management scenarios pass. Intru
 
 ### TASK-08 — Analysis and MCP vertical slice
 
-- [ ] Implement get_http_headers over approved structured extracts, bounded records/cursors and capture-mode metadata; qualify sharing/client/privacy controls for this output. ADR-282 slice 4 adds the audited operation boundary, contract, cursor paging and rechecked page reader; the regional read composition remains.
+- [ ] Implement get_http_headers over approved structured extracts, bounded records/cursors and capture-mode metadata; qualify sharing/client/privacy controls for this output. ADR-282 slice 4 adds the audited operation boundary, contract, cursor paging and rechecked page reader; slice 5 composes it as an approved query per page (migration 00121, pending handle, get_query_result page, worker read and bounded wire); native qualification of the installed manual-http read remains.
 
 - [ ] Implement acquisition/offline-analysis/publication Jobs, trusted pcap/basic file/log analyzers and exact-image staging.
 - [ ] Implement discovery/extract MCP tools plus list_targets/list_diagnostics/preview_capture/get_capture/cancel_capture, expiring handles and idempotent capture-by-preview; result bounds/cursors/query handles and both client protocol paths.

@@ -2,6 +2,7 @@ package evidence
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -35,9 +36,10 @@ type ContextProjectionSources interface {
 }
 
 // This regional adapter performs full authenticated source verification before
-// returning the fixed DTO. Native bytes and the scoped opener stay in A-ACQUIRE.
+// returning the fixed DTO or one httpHeaders page (ADR-282). Native bytes and
+// the scoped opener stay in A-ACQUIRE.
 type ContextProjectionNativeRead interface {
-	ReadProjectionNative(context.Context, NativeContextSource, value.ContextProjectionScope, KeyOpener, time.Time) (value.PodStatusProjection, error)
+	ReadProjectionNative(context.Context, NativeContextSource, value.ContextProjectionScope, KeyOpener, time.Time) (value.ProjectionResult, error)
 }
 
 // ContextProjectionKeyOperations is a query-only private key effect boundary.
@@ -120,7 +122,7 @@ type RegionalProjectionRead struct {
 	mu                       sync.Mutex
 	until                    time.Time
 	timer                    *time.Timer
-	projection               value.PodStatusProjection
+	projection               value.ProjectionResult
 	ready, closed, uncertain bool
 	checking                 chan struct{}
 	once                     sync.Once
@@ -175,13 +177,13 @@ func (w *RegionalContextProjection) ExecuteProjection(ctx context.Context, start
 		if r.timer != nil {
 			r.timer.Stop()
 		}
-		r.projection = value.PodStatusProjection{}
+		r.projection.Clear()
 		r.mu.Unlock()
 	}
 	defer close(r.done)
 	// Cancellation drops retained DTO references; joining is an explicit local
 	// obligation and remains distinct from the future remote protocol's proof.
-	stopClear := context.AfterFunc(owned, func() { r.mu.Lock(); r.projection = value.PodStatusProjection{}; r.mu.Unlock() })
+	stopClear := context.AfterFunc(owned, func() { r.mu.Lock(); r.projection.Clear(); r.mu.Unlock() })
 	defer func() {
 		if r.ctx.Err() != nil {
 			stopClear()
@@ -226,17 +228,20 @@ func (w *RegionalContextProjection) ExecuteProjection(ctx context.Context, start
 	}
 	opener := &projectionKeyOpener{read: r, binding: binding, artifact: source.Expectation.Binding()}
 	projection, err := w.native.ReadProjectionNative(r.ctx, source, w.query.Scope, opener, keyUntil)
-	if err != nil || !projection.Valid() || projection.NamespaceUID != w.query.Scope.NamespaceUID || projection.PodUID != w.query.Scope.PodUID || !opener.complete() {
+	if err != nil || !projection.Valid(w.query.Scope) || !opener.complete() {
+		projection.Clear()
 		r.cancel()
 		return r, value.ErrUnavailable
 	}
 	if _, err = r.check(r.ctx); err != nil {
+		projection.Clear()
 		r.cancel()
 		return r, err
 	}
 	r.mu.Lock()
 	if r.ctx.Err() != nil || r.closed {
 		r.mu.Unlock()
+		projection.Clear()
 		r.cancel()
 		return r, value.ErrUnavailable
 	}
@@ -309,30 +314,32 @@ func sameProjectionAuthority(a, b value.ContextProjectionAuthority) bool {
 	return strip(a) == strip(b)
 }
 
-// Projection returns only the fixed approved DTO while this same local read's
-// original owner, worker, SQL start and authority remain current.
-func (r *RegionalProjectionRead) Projection(ctx context.Context) (value.PodStatusProjection, error) {
+// Projection returns only the fixed approved result while this same local
+// read's original owner, worker, SQL start and authority remain current.
+func (r *RegionalProjectionRead) Projection(ctx context.Context) (value.ProjectionResult, error) {
 	if r == nil {
-		return value.PodStatusProjection{}, value.ErrUnavailable
+		return value.ProjectionResult{}, value.ErrUnavailable
 	}
 	r.mu.Lock()
 	if r.closed || !r.ready || r.checking != nil {
 		r.mu.Unlock()
-		return value.PodStatusProjection{}, value.ErrUnavailable
+		return value.ProjectionResult{}, value.ErrUnavailable
 	}
 	joined := make(chan struct{})
 	r.checking = joined
 	r.mu.Unlock()
 	defer func() { r.mu.Lock(); r.checking = nil; close(joined); r.mu.Unlock() }()
 	if _, err := r.check(ctx); err != nil {
-		return value.PodStatusProjection{}, err
+		return value.ProjectionResult{}, err
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.closed || !r.ready || ctx.Err() != nil || r.ctx.Err() != nil || !r.projection.Valid() {
-		return value.PodStatusProjection{}, value.ErrUnavailable
+	if r.closed || !r.ready || ctx.Err() != nil || r.ctx.Err() != nil || !r.projection.Valid(r.worker.query.Scope) {
+		return value.ProjectionResult{}, value.ErrUnavailable
 	}
-	return r.projection, nil
+	out := r.projection
+	out.Headers.Records, out.Headers.CoverageGaps = slices.Clone(out.Headers.Records), slices.Clone(out.Headers.CoverageGaps)
+	return out, nil
 }
 
 // CloseLocal joins only this exact regional process's work and control handle.
@@ -349,7 +356,7 @@ func (r *RegionalProjectionRead) CloseLocal(ctx context.Context) error {
 		r.cancel()
 		r.mu.Lock()
 		r.closed = true
-		r.projection = value.PodStatusProjection{}
+		r.projection.Clear()
 		checking := r.checking
 		r.mu.Unlock()
 		select {
