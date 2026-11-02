@@ -1,0 +1,5 @@
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres
+    upgrade_schema_test.go:209: upgrade schema: 117 to 118 by the schema owner, idempotent, floor "asservat:oldest-binary-schema=102", unknown history refused
+--- PASS: TestCustodyUpgradeSchemaWithRealPostgres (2.69s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.763s

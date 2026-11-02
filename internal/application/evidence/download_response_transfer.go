@@ -29,6 +29,9 @@ type DownloadResponseTransfer struct {
 	// Bootstrap supplies an exact-response ordinary-entitlement owner. Other
 	// authority implementations retain their existing fresh-check behavior.
 	NewResponseAuthority func(context.Context, artifact.DownloadScope) (CurrentDownloadAuthority, func(), error)
+	// RawResults reserves every raw window against its grant (ADR-279);
+	// nil refuses raw artifacts.
+	RawResults RawResultUses
 }
 
 func (t DownloadResponseTransfer) valid() bool {
@@ -295,6 +298,10 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		return artifact.ErrDownloadUnavailable
 	}
 	until = identityvalue.Earlier(until, metadata.ReadUntil)
+	raw := metadata.Format == artifact.RawPCAPNGFormat
+	if raw && t.RawResults == nil {
+		return artifact.ErrDownloadUnavailable
+	}
 	stage = "select"
 	selection, e := destination.SelectDownloadResponse(metadata)
 	if e != nil {
@@ -387,6 +394,14 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		}
 		if !intent.Valid() || intent.Response.ID != r.ID || intent.Window.Ordinal != ordinal || intent.Window.Offset != offset || intent.Window.Authority.Scope != session.Scope {
 			return artifact.ErrIntegrity
+		}
+		// A raw window's bytes are charged to the grant's shared pool under
+		// the window ID before any of them is read (ADR-279).
+		if raw && intent.Window.Length > 0 {
+			stage = "result-use"
+			if e = t.RawResults.ReserveRawResult(work, current.batch, session.Scope, windowID, authorization.GrantUse{Operation: authorization.GrantDownloadOperation, Bytes: intent.Window.Length}); e != nil {
+				return e
+			}
 		}
 		stage = "window-audit"
 		result, e := t.Objects.CreateDownloadWindowIntent(work, intent)

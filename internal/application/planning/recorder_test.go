@@ -566,14 +566,19 @@ func TestRawPacketsPlan(t *testing.T) {
 	if err != nil || !slices.Contains(a.Actions[0].Exposure.RetainedPossible, "userContent") {
 		t.Fatal("raw exposure", err)
 	}
-	if AcceptableRecorder(p).Acceptable() {
-		t.Fatal("manual raw acceptable before observation authority")
+	if !AcceptableRecorder(p).Acceptable() {
+		t.Fatal("approved finite manual raw refused", AcceptableRecorder(p))
 	}
-	if recorderAcceptance(p, true).Acceptable() || contextRecorderAcceptance(p).Acceptable() {
+	if recorderAcceptance(p, true).Acceptable() {
 		t.Fatal("policy raw acceptable")
 	}
-	if _, _, err := RecordingFor(p); err == nil {
-		t.Fatal("raw recording derived without acceptance")
+	r, _, err := RecordingFor(p)
+	if err != nil || r.Profile != "rawPackets" || r.Snaplen != 96 || r.ProtocolSnaplen == nil || r.ProtocolSnaplen.TCP != 200 || r.Filter == nil || !r.Valid() {
+		t.Fatalf("raw recording %+v %v", r, err)
+	}
+	in, now = recorderInput(t, raw(`{"kind":"rawPackets","snaplen":96}`, filter, text("sample", "packetAfter", "20s")), "packetCapture")
+	if long, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now); err == nil && AcceptableRecorder(long).Acceptable() {
+		t.Fatal("raw recording over 15 seconds acceptable")
 	}
 	for name, c := range map[string]value.ProfileComposition{
 		"snaplen over engine": raw(`{"kind":"rawPackets","snaplen":4000}`, filter),

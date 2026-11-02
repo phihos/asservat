@@ -100,7 +100,7 @@ func (q *Queries) InsertAPIExecution(ctx context.Context, arg InsertAPIExecution
 
 const listStartedRecordings = `-- name: ListStartedRecordings :many
 SELECT e.capture_id FROM context_execution e JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id
-WHERE e.root_id=$1 AND e.phase='started' AND e.started_at<=$2 AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType' IN ('pcapng','syscallRecords')
+WHERE e.root_id=$1 AND e.phase='started' AND e.started_at<=$2 AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType' IN ('pcapng','rawPcapng','syscallRecords')
 ORDER BY e.started_at LIMIT $3
 `
 
@@ -110,7 +110,7 @@ type ListStartedRecordingsParams struct {
 	Limit     int32
 }
 
-// ADR-248/273: started recordings (pcapng or syscallRecords expectations) whose start is at
+// ADR-248/273/279: started recordings (pcapng, rawPcapng or syscallRecords expectations) whose start is at
 // or before the given instant, oldest first, for the hub's collect loop.
 func (q *Queries) ListStartedRecordings(ctx context.Context, arg ListStartedRecordingsParams) ([]pgtype.UUID, error) {
 	rows, err := q.db.Query(ctx, listStartedRecordings, arg.RootID, arg.StartedAt, arg.Limit)

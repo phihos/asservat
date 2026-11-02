@@ -65,7 +65,7 @@ func historicalPublication(row custodydb.ContextCapture) (artifact.ContextExpect
 		return artifact.ContextExpectation{}, err
 	}
 	intent, err := captureIntent(row)
-	if err != nil || row.State != capture.IntentAudited || !row.IntentAcknowledgedAt.Valid || !bytes.Equal(row.IntentDigest, digest(intent)) || accepted.Expectation.DataClass != "metadata" {
+	if err != nil || row.State != capture.IntentAudited || !row.IntentAcknowledgedAt.Valid || !bytes.Equal(row.IntentDigest, digest(intent)) || !accepted.Expectation.ServedClass() {
 		return artifact.ContextExpectation{}, privacy.ErrFence
 	}
 	return storedSnapshotProjection(accepted.Expectation, row.SnapshotCoverage, row.SnapshotCoverageDigest, row.SnapshotExpectationDigest)
@@ -407,7 +407,7 @@ func (s *ContextPublications) ContextDownloadEvidence(ctx context.Context, artif
 		if !identity.Fresh(started.Time, until, now.Time, 5*time.Second) {
 			return privacy.ErrExpired
 		}
-		out = authorizationapp.ContextDownloadEvidence{CaptureID: e.CaptureUID, CaseID: e.CaseID, PurposeRef: e.PurposeRef, Audience: e.Audience, Retained: retained, ObservedAt: started.Time, ValidUntil: until}
+		out = authorizationapp.ContextDownloadEvidence{CaptureID: e.CaptureUID, CaseID: e.CaseID, DataClass: e.DataClass, ActionID: e.ActionID, PurposeRef: e.PurposeRef, Audience: e.Audience, Retained: retained, ObservedAt: started.Time, ValidUntil: until}
 		copy(out.Version[:], row.ContextVerification.CopiesDigest)
 		return nil
 	})

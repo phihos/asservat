@@ -460,11 +460,13 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		if err := decodeOperationBody(q.Body, &r); err != nil {
 			return nil, err
 		}
-		_, _, policy := authorization.PolicyExecutor(s.work.Actor)
+		// A source observation grants nothing: a policy raw predicate (ADR-261)
+		// or a manual rawPackets recording (ADR-279) asks for it, and only a
+		// verified metered expectation can start with it (policyRecordingMatches).
 		resolver, ok := l.Targets.(interface {
 			ResolvePacketSource(context.Context, targets.Request) (targets.RecorderResolution, error)
 		})
-		if !policy || !ok || s.resolved != nil {
+		if !ok || s.resolved != nil {
 			return nil, value.ErrDenied
 		}
 		out, err := resolver.ResolvePacketSource(ctx, r)
@@ -570,8 +572,11 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		}
 		d := s.consumed
 		recorder, ok := s.prepared.(evidence.PolicyContextRecorder)
+		// A policy raw predicate (ADR-261) or a human's approved rawPackets
+		// recording (ADR-279), judged on the verified expectation.
 		_, _, policy := authorization.PolicyExecutor(s.work.Actor)
-		if s.acquired || !policy || !ok || s.resolved == nil || s.packetSource == nil || s.expectation == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || !r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !samePacketSource(r.Source, *s.packetSource) || !r.Source.Valid(l.Now()) || !r.Permit.ValidFinite(l.Now()) || r.Permit.Binding.ExpectationDigest != [32]byte(s.work.ExpectationDigest) || r.Permit.Binding.CaptureID != s.work.CaptureID || r.Permit.Binding.ActionID != s.expectation.ActionID || !policyRecordingMatches(*s.expectation, r.Source, r.Permit) || !l.Now().Before(r.Until) {
+		metered := policy || s.expectation != nil && s.expectation.Recording != nil && s.expectation.Recording.Profile == "rawPackets"
+		if s.acquired || !metered || !ok || s.resolved == nil || s.packetSource == nil || s.expectation == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || !r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !samePacketSource(r.Source, *s.packetSource) || !r.Source.Valid(l.Now()) || !r.Permit.ValidFinite(l.Now()) || r.Permit.Binding.ExpectationDigest != [32]byte(s.work.ExpectationDigest) || r.Permit.Binding.CaptureID != s.work.CaptureID || r.Permit.Binding.ActionID != s.expectation.ActionID || !policyRecordingMatches(*s.expectation, r.Source, r.Permit) || !l.Now().Before(r.Until) {
 			return nil, value.ErrDenied
 		}
 		s.acquired = true

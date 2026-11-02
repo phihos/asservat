@@ -21,10 +21,10 @@ type NativeContextSource struct {
 
 // Valid admits pod status (the historical 4 KiB type) and any registered
 // native type whose registered size bound fits the installed download path
-// (ADR-248: at most one 8 MiB frame). Only "metadata" artifacts are served.
+// (ADR-248: at most one 8 MiB frame). Only metadata and raw packet captures are served.
 func (s NativeContextSource) Valid(version artifact.Digest) bool {
 	e := s.Expectation
-	return e.Validate() == nil && (e.NativeType == artifact.PodStatusArtifact || e.Registration.NativeLimit <= e.Type().DownloadLimit()) && e.DataClass == "metadata" && s.Copies.Validate(e.Registration) == nil && ContextCopiesDigest(s.Copies) == version
+	return e.Validate() == nil && (e.NativeType == artifact.PodStatusArtifact || e.Registration.NativeLimit <= e.Type().DownloadLimit()) && e.ServedClass() && s.Copies.Validate(e.Registration) == nil && ContextCopiesDigest(s.Copies) == version
 }
 
 // podStatus reports the historical single-buffer type. Every other type is

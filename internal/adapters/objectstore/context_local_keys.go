@@ -42,7 +42,7 @@ func NewLocalKeyContextReader(store *CustodyStore, grants evidence.DownloadKeyGr
 }
 
 func (r *LocalKeyContextReader) ReadContextBatch(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, i audit.DownloadIntent, a artifact.DownloadAuthority) ([]byte, error) {
-	if r == nil || ctx == nil || ctx.Err() != nil || !i.Valid() || e.Validate() != nil || e.DataClass != "metadata" || !a.Valid(time.Now()) || i.Batch.Authority.Scope != a.Scope || a.Scope.ArtifactID != e.Registration.Location.ArtifactID || a.Scope.CaptureID != e.CaptureUID || a.Scope.Version != evidence.ContextCopiesDigest(c) {
+	if r == nil || ctx == nil || ctx.Err() != nil || !i.Valid() || e.Validate() != nil || !e.ServedClass() || !a.Valid(time.Now()) || i.Batch.Authority.Scope != a.Scope || a.Scope.ArtifactID != e.Registration.Location.ArtifactID || a.Scope.CaptureID != e.CaptureUID || a.Scope.Version != evidence.ContextCopiesDigest(c) {
 		return nil, artifact.ErrInvalid
 	}
 	deadline := minDeadline(i.Batch.LeaseUntil, a.ValidUntil)

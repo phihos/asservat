@@ -134,7 +134,7 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 			until = identity.Earlier(until, at)
 		}
 		retained.ExpiresAt = resolved.ExpiresAt
-		records = append(records, authorizedContext{artifact: value.ContextCaseArtifact{ArtifactID: route.ArtifactID, CaptureID: route.CaptureID, Target: route.Target, Version: record.Version, ExpiresAt: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Shared: share != nil, EvidenceType: r.Input.EvidenceType}, retained: retained, permission: p.Revision, record: record, processing: processing, share: share})
+		records = append(records, authorizedContext{artifact: value.ContextCaseArtifact{ArtifactID: route.ArtifactID, CaptureID: route.CaptureID, Target: route.Target, Version: record.Version, ExpiresAt: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Shared: share != nil, EvidenceType: r.Input.EvidenceType, DataClass: record.DataClass}, retained: retained, permission: p.Revision, record: record, processing: processing, share: share})
 	}
 	if len(records) == 0 {
 		return zero, value.ErrUnavailable

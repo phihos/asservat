@@ -42,7 +42,12 @@ type installedApprovedRecordingPreview struct {
 	Blockers []struct {
 		Code string `json:"code"`
 	} `json:"blockers"`
-	Pods []struct{ UID, Name string } `json:"selected_pods"`
+	Pods      []struct{ UID, Name string } `json:"selected_pods"`
+	Lifecycle struct {
+		Actions []struct {
+			ActionID string `json:"actionID"`
+		} `json:"actions"`
+	} `json:"lifecycle_plan"`
 }
 
 func (p installedApprovedRecordingPreview) readyForApproval(now time.Time) bool {
@@ -62,6 +67,10 @@ func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code str
 // approvedRecordingArguments is the actual public request, validated offline
 // before the expensive installed qualification. It is never authority.
 func approvedRecordingArguments(cluster, namespace, workload string) map[string]any {
+	if installedJourneyFocus() == "manual-raw" {
+		// ADR-279: one finite raw packet recording from a namespace profile.
+		return manualRawArguments(cluster, namespace, workload)
+	}
 	if installedJourneyFocus() == "manual-mixed" {
 		// ADR-276: packet and syscall finite recordings of one Pod at once.
 		return map[string]any{
@@ -335,11 +344,23 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if measurement != nil {
 		arguments = nativePacingArguments(cluster, namespace, workload)
 	}
+	if installedJourneyFocus() == "manual-raw" {
+		publishManualRawProfile(t, ctx, regionalConfig, namespace)
+	}
 	read("preview_capture", arguments, &preview)
 	if !preview.readyForApproval(time.Now()) {
 		t.Fatal("approved recording preview lacks its original window or has a non-approval blocker", preview.Blockers)
 	}
 	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "approved-preview-" + preview.ID}
+	if installedJourneyFocus() == "manual-raw" {
+		// ADR-279: raw output downloads only through result-access children of
+		// the requesting human's own client.
+		if len(preview.Lifecycle.Actions) != 1 {
+			t.Fatal("raw preview lacks its one action", preview.Lifecycle)
+		}
+		original["result_access"] = map[string]any{"actionIds": []string{preview.Lifecycle.Actions[0].ActionID}, "operations": []string{"download_artifact"}, "clientIDs": []string{"mcp"},
+			"maxArtifacts": 1, "maxBytes": 64 << 20, "maxOperations": 100, "notAfter": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}
+	}
 	pending, code := invoke("request_capture", original)
 	var refused struct {
 		URI string `json:"navigation_uri"`
@@ -410,8 +431,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Fatal("signed independent decision", code)
 	}
 	var grant struct {
-		Phase    string `json:"phase"`
-		Digest   string `json:"execution_digest"`
+		Phase       string `json:"phase"`
+		Digest      string `json:"execution_digest"`
+		DataClass   string `json:"data_class"`
+		Observation *struct {
+			MaxSessionSeconds int64 `json:"max_session_seconds"`
+			MaxObservedBytes  int64 `json:"max_observed_bytes"`
+		} `json:"observation_limits"`
 		Decision struct {
 			By struct {
 				Subject string `json:"subject"`
@@ -421,6 +447,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	read("get_grant", map[string]string{"grant_id": grantID}, &grant)
 	if grant.Phase != "Approved" || grant.Digest != preview.Digest || grant.Decision.By.Subject != reviewer.ReviewerSubject {
 		t.Fatal("independent decision or exact plan changed", grant)
+	}
+	if installedJourneyFocus() == "manual-raw" {
+		// ADR-279: payload approval names the raw class and observation limits.
+		if grant.DataClass != "raw" || grant.Observation == nil || grant.Observation.MaxObservedBytes < 1 || grant.Observation.MaxSessionSeconds < 1 {
+			t.Fatal("raw recording approval lacks raw class or observation limits", grant.DataClass, grant.Observation)
+		}
+		t.Logf("raw approval: observation limits %d bytes over %d seconds", grant.Observation.MaxObservedBytes, grant.Observation.MaxSessionSeconds)
 	}
 	if code := browserCall(self, "get_grant", map[string]string{"grant_id": grantID}, &own); code != "" || own.CanResume || own.CanResolve || !own.ResumeRequiresOriginalClient {
 		t.Fatal("approved original human lacks precise original-client guidance", code)
@@ -536,6 +569,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 	}
 	continuation := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"], "continue_acquisition": true}
+	resolution := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"]}
 	initialStoragePreview = preview.ID
 	initialCode := requestCapture(original)
 	// ADR-277: nothing was accepted while storage refreshed; the contract
@@ -550,7 +584,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	t.Logf("approved submission initial public code=%q", initialCode)
 	closed, err := installedJourneyRecoverCapture(ctx, initialCode, func() (installedJourneyDisposition, error) {
 		var disposition installedJourneyDisposition
-		read("resolve_capture_request", original, &disposition)
+		read("resolve_capture_request", resolution, &disposition)
 		t.Logf("approved submission resolution state=%q", disposition.State)
 		if disposition.State == "accepted" {
 			receipt.CaptureID = disposition.CaptureID
@@ -558,7 +592,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		return disposition, nil
 	}, func() (string, string) { code := requestCapture(continuation); return code, receipt.CaptureID }, func() error {
 		var disposition installedJourneyDisposition
-		read("resolve_capture_request", original, &disposition)
+		read("resolve_capture_request", resolution, &disposition)
 		if receipt.CaptureID == "" || disposition.State != "accepted" || disposition.CaptureID != receipt.CaptureID {
 			return errors.New("original approved request was not accepted once")
 		}
@@ -614,8 +648,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	var evidence struct {
 		Artifacts []struct {
-			ID      string    `json:"artifact_id"`
-			Expires time.Time `json:"expires_at"`
+			ID        string    `json:"artifact_id"`
+			DataClass string    `json:"data_class"`
+			Expires   time.Time `json:"expires_at"`
 		} `json:"artifacts"`
 	}
 	read("get_case", map[string]string{"case_id": progress.CaseID}, &evidence)
@@ -655,6 +690,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	if len(evidence.Artifacts) != 1 || evidence.Artifacts[0].Expires.Before(submitted.Add(590*time.Second)) || evidence.Artifacts[0].Expires.After(time.Now().Add(600*time.Second)) {
 		t.Fatal("manual recording retention did not start at submission", evidence)
+	}
+	wantClass := "metadata"
+	if installedJourneyFocus() == "manual-raw" {
+		wantClass = "raw"
+	}
+	if evidence.Artifacts[0].DataClass != wantClass {
+		t.Fatal("case lists the recording with another data class", evidence.Artifacts[0].DataClass, wantClass)
 	}
 	if measurement != nil {
 		if err := finishRecording(); err != nil {
@@ -751,6 +793,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		events := ongoingSyscallEvents(t, native, first.Identity.PodUID, time.Now())
 		t.Logf("manual syscall recording %s: %d metadata events, %d bytes", receipt.CaptureID, events, len(native))
+		return
+	}
+	if installedJourneyFocus() == "manual-raw" {
+		s := qualifyManualRawPCAP(t, ctx, native)
+		t.Logf("manual raw recording %s: %d packets on port 8080, %d kept payload beyond %d header bytes, largest %d (cap %d), %d bytes", receipt.CaptureID, s.Packets, s.Payload, artifact.RecordingSnaplen, s.MaxCaptured, manualRawTCPCap, len(native))
 		return
 	}
 	path := "../results/approved-recording.pcapng"

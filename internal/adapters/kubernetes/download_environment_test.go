@@ -21,7 +21,7 @@ func TestDownloadEnvironmentClosedPolicyCannotInventInstalledPlacement(t *testin
 	path := privacy.DownloadPath{ID: ownerID(3), TargetClusterID: permissionCluster, StoreID: ownerID(4), StorageRegion: "storage", AcquisitionClusterID: ownerID(5), AcquisitionRegion: "regional", ConnectorClusterID: ownerID(5), ConnectorRegion: "regional", HubClusterID: ownerID(6), HubRegion: "hub", WorkerConfiguration: rev, HubConfiguration: rev}
 	wr := contracts.DownloadEnvironmentRevision{UID: rev.UID, Generation: rev.Generation, SHA256: hex.EncodeToString(rev.Digest[:])}
 	w := contracts.DownloadEnvironmentSettings{Format: contracts.DownloadEnvironmentFormat, RootID: ownerID(1), InstallationID: ownerID(1), RecoveryEpoch: ownerID(7), Revision: 1, PermittedRegions: []string{"storage", "regional", "hub"}, Paths: []contracts.DownloadEnvironmentPath{{ID: path.ID, TargetClusterID: path.TargetClusterID, StoreID: path.StoreID, StorageRegion: path.StorageRegion, AcquisitionClusterID: path.AcquisitionClusterID, AcquisitionRegion: path.AcquisitionRegion, ConnectorClusterID: path.ConnectorClusterID, ConnectorRegion: path.ConnectorRegion, HubClusterID: path.HubClusterID, HubRegion: path.HubRegion, WorkerConfiguration: wr, HubConfiguration: wr}}, Clients: []contracts.DownloadEnvironmentClient{{Issuer: "https://id.example.test", ID: "browser", Kind: "human", DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}}}, Operators: []contracts.ProcessingOperator{{Issuer: "https://id.example.test", ClientID: "browser", Kind: "Group", ID: "privacy"}}}
-	for _, mode := range []string{"valid", "missing-client-decision", "null-paths", "missing-suspension", "unknown", "duplicate", "alias", "trailing", "uninstalled-path", "substituted-acquisition", "substituted-hub", "invented-region", "foreign-installation", "bad-issuer", "raw-class", "replaced-source"} {
+	for _, mode := range []string{"valid", "missing-client-decision", "null-paths", "missing-suspension", "unknown", "duplicate", "alias", "trailing", "uninstalled-path", "substituted-acquisition", "substituted-hub", "invented-region", "foreign-installation", "bad-issuer", "unknown-class", "replaced-source"} {
 		t.Run(mode, func(t *testing.T) {
 			encoded, _ := json.Marshal(w)
 			var m map[string]any
@@ -50,8 +50,8 @@ func TestDownloadEnvironmentClosedPolicyCannotInventInstalledPlacement(t *testin
 				m["installationID"] = ownerID(99)
 			case "bad-issuer":
 				m["clients"].([]any)[0].(map[string]any)["issuer"] = "http://id.example.test"
-			case "raw-class":
-				m["clients"].([]any)[0].(map[string]any)["dataClasses"] = []string{"raw"}
+			case "unknown-class":
+				m["clients"].([]any)[0].(map[string]any)["dataClasses"] = []string{"syscallArguments"}
 			}
 			b, _ := json.Marshal(m)
 			raw := string(b)

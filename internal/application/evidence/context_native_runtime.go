@@ -27,8 +27,10 @@ type ContextNativeRuntimeConfig struct {
 	Audit            auditapp.DownloadWriter
 	Acknowledgements DownloadAuditAcknowledger
 	Native           NativeAttachmentConfig
-	Now              func() time.Time
-	NewID            func() string
+	// RawResults reserves raw preparations against their grant (ADR-279).
+	RawResults RawResultUses
+	Now        func() time.Time
+	NewID      func() string
 }
 type ContextNativeServing interface {
 	ContextNativeReady(context.Context) (time.Time, error)
@@ -263,7 +265,7 @@ func (r *ContextNativeRuntime) continueContextDownloadAuthority(ctx context.Cont
 	if e != nil {
 		return zero, stepped("native", e)
 	}
-	preparation := ContextDownloadWorker{Sessions: r.config.Preparation, AuditAcknowledgements: r.config.Acknowledgements, Audit: r.config.Audit, CurrentAuthority: r.config.Authority, RegionalPreparation: native, Now: r.config.Now, NewID: r.config.NewID}
+	preparation := ContextDownloadWorker{Sessions: r.config.Preparation, AuditAcknowledgements: r.config.Acknowledgements, Audit: r.config.Audit, CurrentAuthority: r.config.Authority, RegionalPreparation: native, RawResults: r.config.RawResults, Now: r.config.Now, NewID: r.config.NewID}
 	var retained *artifact.PreparedDownload
 	m, e := preparation.prepareCurrentRetained(call, current, ContextDownloadRequest{SessionID: session.ID, Scope: session.Scope, Expectation: source.Expectation, Copies: source.Copies}, func(p artifact.PreparedDownload) error {
 		retained = &p

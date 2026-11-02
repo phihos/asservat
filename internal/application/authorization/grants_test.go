@@ -218,6 +218,17 @@ func (m *memoryGrants) GrantChild(_ context.Context, id string) (value.GrantChil
 	return c, nil
 }
 
+func (m *memoryGrants) GrantChildFor(_ context.Context, parent, artifactID, client string) (value.GrantChild, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, c := range m.children {
+		if c.ParentID == parent && c.Output.ArtifactID == artifactID && c.ClientID == client {
+			return c, nil
+		}
+	}
+	return value.GrantChild{}, ErrGrantNotFound
+}
+
 func (m *memoryGrants) ReserveGrantUse(_ context.Context, in GrantUseRequest, _ artifact.RecoveryProof) (value.Grant, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -78,6 +78,9 @@ type ContextCaseArtifact struct {
 	// "packetCapture" (headers-only PCAPNG, ADR-248) or "syscallTrace"
 	// (syscall metadata JSON Lines, ADR-273).
 	EvidenceType string
+	// DataClass is metadata, or raw for an approved raw packet capture whose
+	// download needs the grant's result-access child (ADR-279).
+	DataClass string
 }
 
 func (c ContextCase) Valid(now time.Time) bool {

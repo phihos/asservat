@@ -362,12 +362,15 @@ def main():
             artifacts["minItems"] = 1
             row = artifacts["items"]["properties"]
             row["kind"] = {"enum": ["pod-status", "packetCapture", "syscallTrace"]}
-            row["data_class"] = {"const": "metadata"}
+            # ADR-279: a raw packet capture is listed as raw; its download
+            # needs the approved grant's result-access child.
+            row["data_class"] = {"enum": ["metadata", "raw"]}
             row["completeness"] = {"const": "complete"}
             notice = copy.deepcopy(documents["capture-assessment.schema.json"]["$defs"]["artifactNotice"])
             notice["properties"].pop("handlingPolicyRef", None)
             notice["properties"]["classification"] = {"const": "potentialPersonalData"}
-            notice["properties"]["mayContain"] = {"const": ["personalIdentifiers", "networkAddresses", "paths"]}
+            notice["properties"]["mayContain"] = {"enum": [["personalIdentifiers", "networkAddresses", "paths"],
+                                                           ["userContent", "credentials", "personalIdentifiers", "networkAddresses", "unknownApplicationData"]]}
             notice["properties"]["deletionState"] = {"const": "scheduled"}
             notice["properties"]["preservationException"] = {"const": False}
             row["handling_notice"] = notice
@@ -393,7 +396,7 @@ def main():
                 "prepare_artifact_download": "Prepare an ordinary pod-status native download with a stable idempotency key. Retry unknown replies with the same key. Only an explicit acknowledged continuation may repeat preparation automatically.",
  "cancel_artifact_download": tool["description"],
  "get_artifact_download": "Read current authorized download status and verified native metadata. Never starts, repairs or decrypts evidence. Native file bytes use the authenticated content path, not MCP.",
- "get_case": "Read a currently authorized case of verified pod-status artifacts and effective handling dates: ordinary access, or artifacts an evidence owner shared with you (access shared). Artifact digest is the verified ciphertext-copy version, not native file SHA-256. No native bytes or raw access; shared artifacts cannot be downloaded.",
+ "get_case": "Read a currently authorized case of verified pod-status artifacts and effective handling dates: ordinary access, or artifacts an evidence owner shared with you (access shared). Artifact digest is the verified ciphertext-copy version, not native file SHA-256. No native bytes; a raw packet capture (data_class raw) downloads only through your approved grant; shared artifacts cannot be downloaded.",
             }[name],
             "annotations": tool["annotations"],
             "inputSchema": localize(input_schema),

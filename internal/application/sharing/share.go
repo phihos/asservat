@@ -173,6 +173,11 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 		// A share is a concrete snapshot of the version the creator reviewed.
 		return zero, false, capture.ErrChanged
 	}
+	// ADR-279: raw output is never shared until the S-06 raw-share approval
+	// exists; it is disclosed only through its approved grant's child.
+	if record.DataClass != "metadata" {
+		return zero, false, capture.ErrDenied
+	}
 	retained := value.Retained{ArtifactID: route.ArtifactID, Target: route.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
 	eligible, owners := value.SelectShareManagement(i, p, route.Target, &retained, in.Management, s.Now())
 	if eligible.Reason == "ManagementNotHeld" && in.Management.Mode == "teams" && s.administrator(ctx, i) {
@@ -545,7 +550,7 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 		return zero, false, capture.ErrUnavailable
 	}
 	r := record.Retained
-	if !r.Valid() || r.RootID != s.RootID || r.Registration.Location.ArtifactID != share.ArtifactID || r.Input.Target != share.Target || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
+	if !r.Valid() || r.RootID != s.RootID || r.Registration.Location.ArtifactID != share.ArtifactID || r.Input.Target != share.Target || record.DataClass != "metadata" || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
 		return zero, false, capture.ErrUnavailable
 	}
 	retained := value.Retained{ArtifactID: share.ArtifactID, Target: share.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}

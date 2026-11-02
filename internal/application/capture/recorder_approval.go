@@ -66,39 +66,46 @@ func (s ContextInvestigation) requireRecordingApproval(ctx context.Context, curr
 // optional same-human result-access instruction (REQ-INV-001). A pod-status
 // preview needs no review and refuses the instruction.
 func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, source identities.CurrentIdentity, previewID, key string, access *authorization.ResultAccess) (value.Accepted, error) {
-	var zero value.Accepted
 	if access == nil {
 		return s.Request(ctx, source, previewID, key)
 	}
+	if err := s.reviewResultAccess(ctx, source, previewID, key, access); err != nil {
+		return value.Accepted{}, err
+	}
+	return s.Request(ctx, source, previewID, key)
+}
+
+// reviewResultAccess passes only when an approved, current grant covers this
+// exact plan and binds this exact result access (its digest); the ordinary
+// submission then rechecks the same covering grant (ADR-279: a raw
+// recording downloads only through these children). It has its own bound;
+// the submission keeps the caller's context and phases.
+func (s ContextInvestigation) reviewResultAccess(ctx context.Context, source identities.CurrentIdentity, previewID, key string, access *authorization.ResultAccess) error {
 	if !s.configured() || ctx == nil || source == nil || ctx.Err() != nil {
-		return zero, value.ErrUnavailable
+		return value.ErrUnavailable
 	}
 	if !authorization.UUID(previewID) || !identity.Text(key, 128) {
-		return zero, value.ErrInvalid
+		return value.ErrInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	i, err := source.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) {
-		return zero, value.ErrDenied
+		return value.ErrDenied
 	}
 	p, err := s.Previews.ReadContextPreview(ctx, s.RootID, previewID, i.Principal)
 	if err != nil {
-		return zero, err
+		return err
 	}
 	p = p.Clone()
 	if !ValidContextPreview(p) || p.ID != previewID || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.Actor != i.Principal {
-		return zero, value.ErrDenied
+		return value.ErrDenied
 	}
 	if p.Intent.Composition == nil {
-		return zero, value.ErrInvalid
+		return value.ErrInvalid
 	}
-	if _, err := s.recorderRequest(ctx, source, p, key, access); err != nil {
-		return zero, err
-	}
-	// ADR-248: the node recorder does not deliver results under a result-access
-	// instruction yet.
-	return zero, value.ErrRecorderUnavailable
+	_, err = s.recorderRequest(ctx, source, p, key, access)
+	return err
 }
 
 // recorderRequest decides the approval gate of a reviewed packet/syscall
@@ -164,12 +171,19 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		if err != nil {
 			return authorization.Grant{}, authorization.ApprovalPendingError{GrantID: g.ID}
 		}
-		if approval.ObservationLimits != nil {
+		// Only a single manual rawPackets action has an observation issuer:
+		// its approved grant's pool (ADR-279).
+		if approval.ObservationLimits != nil && (approval.DataClass != "raw" || len(actions) != 1) {
 			return authorization.Grant{}, value.ErrRecorderUnavailable
 		}
 		return g, nil
 	case errors.Is(err, authorization.ErrApprovalRequired):
-		// No request exists yet: only a current preview can open one.
+		// No request exists yet: only a current preview can open one. Raw
+		// output downloads only through result-access children (ADR-279), so
+		// a raw request without them would retain payload nobody can read.
+		if approval.DataClass == "raw" && access == nil {
+			return authorization.Grant{}, value.ErrInvalid
+		}
 	default:
 		return authorization.Grant{}, err
 	}

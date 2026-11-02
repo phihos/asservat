@@ -33,6 +33,7 @@ type responseTransferFixture struct {
 	minWriteLease                                              time.Duration // least lease time left at any chunk write
 	backing                                                    []byte
 	windowWrite                                                time.Time
+	format                                                     string
 }
 type responseTestBatch struct {
 	f      *responseTransferFixture
@@ -175,7 +176,7 @@ func (f *responseTransferFixture) Describe(context.Context, artifact.DownloadSes
 	if f.badHash {
 		sum[0]++
 	}
-	return artifact.NativeDownloadMetadata{Filename: "synthetic.core", ETag: `"v1"`, Size: f.size, SHA256: sum, ReadUntil: f.a.AccessUntil, DeleteBy: f.a.DeleteBy}, artifact.DownloadWindowBytes, nil
+	return artifact.NativeDownloadMetadata{Filename: "synthetic.core", Format: f.format, ETag: `"v1"`, Size: f.size, SHA256: sum, ReadUntil: f.a.AccessUntil, DeleteBy: f.a.DeleteBy}, artifact.DownloadWindowBytes, nil
 }
 func (f *responseTransferFixture) ReadChunk(_ context.Context, l artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
 	if !f.w.IntentAcknowledged || !l.Allows(offset, length, f.now) {

@@ -139,7 +139,7 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 				// ADR-232: the view contains an artifact admitted by a share.
 				data.Case.Access = "shared"
 			}
-			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: "metadata", Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: []string{"personalIdentifiers", "networkAddresses", "paths"}, ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
+			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
 		}
 		out.Data = data
 	}
@@ -158,4 +158,21 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 		return OperationReply{}, catalog.ErrUnavailable
 	}
 	return OperationReply{Body: b, ValidUntil: until}, nil
+}
+
+// listedDataClass labels raw packet captures (ADR-279); every other listed
+// artifact is metadata.
+func listedDataClass(c string) string {
+	if c == "raw" {
+		return c
+	}
+	return "metadata"
+}
+
+// listedMayContain: raw payload prefixes may hold anything the workload sent.
+func listedMayContain(c string) []string {
+	if c == "raw" {
+		return []string{"userContent", "credentials", "personalIdentifiers", "networkAddresses", "unknownApplicationData"}
+	}
+	return []string{"personalIdentifiers", "networkAddresses", "paths"}
 }

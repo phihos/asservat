@@ -38,7 +38,7 @@ func AcceptableRecorder(plan value.RecorderPlan) RecorderAcceptance {
 // contextRecorderAcceptance structurally checks a finite policy expectation for
 // the actual SQL companion. A policy-shaped principal is not current
 // authority: admission, the committed observation permit and node enforcement
-// remain mandatory. Manual/public AcceptableRecorder keeps its raw refusal.
+// remain mandatory. Policy raw output stays refused (ADR-279).
 func contextRecorderAcceptance(plan value.RecorderPlan) RecorderAcceptance {
 	_, _, policy := authorization.PolicyExecutor(plan.Input.Executor)
 	return recorderAcceptance(plan, policy)
@@ -68,20 +68,21 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 		// confer no raw download, so it must not be produced yet.
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "policies cannot record raw packets in this release; use networkHeaders"}
 	}
-	if plan.Approval != nil && plan.Approval.ObservationLimits != nil && !policy {
-		// Manual raw observation has no issuer yet; ADR-279 adds it in its
-		// next slice. The finite policy companion is ADR-261's path.
-		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "manual raw packet capture and raw byte comparisons need observation authority that this release does not have yet"}
+	raw := a.PacketProfile == "rawPackets"
+	if plan.Approval != nil && plan.Approval.ObservationLimits != nil && !policy && !raw {
+		// A manual raw byte comparison on header captures has no observation
+		// issuer; manual rawPackets uses the ad hoc grant pool (ADR-279).
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "manual raw byte comparisons need observation authority that this release does not have yet; use a rawPackets profile"}
 	}
 	after, ok := durationValue(a.After, true)
 	if !ok || after < time.Second || after > 5*time.Minute {
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.after", "a manual capture records between 1 second and 5 minutes after it starts"}
 	}
-	if policy && plan.Approval != nil && plan.Approval.ObservationLimits != nil {
+	if (policy || raw) && plan.Approval != nil && plan.Approval.ObservationLimits != nil {
 		limits := plan.Approval.ObservationLimits
 		observed := authorization.ObservationLimits{MaxSessionSeconds: limits.MaxSessionSeconds, MaxObservedBytes: limits.MaxObservedBytes, MaxBytesPerSecond: limits.MaxBytesPerSecond, MaxConcurrentSessions: limits.MaxConcurrentSessions}
 		if a.ExecutionMode != "onTrigger" || a.Before != "0s" || after > 15*time.Second || !observed.Valid() {
-			return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a policy raw predicate needs one finite on-trigger action with original observation limits"}
+			return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a raw packet recording or policy raw predicate needs one finite on-trigger action (before 0s, after at most 15s) with original observation limits"}
 		}
 	}
 	return maxBytesAcceptance(plan)

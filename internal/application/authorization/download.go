@@ -20,7 +20,10 @@ type ContextDownloadEvidence struct {
 	PurposeRef string
 	CaptureID  string
 	// CaseID binds a recipient's share to the artifact's case (ADR-233).
-	CaseID                 string
+	CaseID string
+	// DataClass is the accepted expectation's class: metadata, or raw for an
+	// approved raw packet capture (ADR-279). ActionID names its action.
+	DataClass, ActionID    string
 	Version                artifact.Digest
 	Audience               []artifact.AudienceAssignment
 	Retained               privacy.RetainedArtifact
@@ -40,6 +43,21 @@ type DownloadEnvironmentReader interface {
 	DownloadEnvironment(context.Context, ContextDownloadEvidence, identity.Principal) (artifact.DownloadEnvironment, error)
 }
 
+// RawResultAccess is C-03's reviewed facet for a raw artifact (ADR-279): the
+// approved ad hoc grant's result-access child for exactly this artifact
+// version and the calling human's client. It returns when the child stops
+// admitting and reserves nothing; disclosure reserves per batch.
+type RawResultAccess interface {
+	CurrentResultAccess(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, actionID string) (time.Time, error)
+}
+
+// downloadClass is the record's class on the installed download path:
+// metadata, or raw only for a packet capture (ADR-279).
+func downloadClass(r ContextDownloadEvidence) (string, bool) {
+	ok := r.DataClass == "metadata" || r.DataClass == "raw" && r.Retained.Input.EvidenceType == "packetCapture"
+	return r.DataClass, ok
+}
+
 // ContextDownloadAuthority composes ordinary approved-metadata entitlement with
 // current retained obligations. Raw artifacts require their own reviewed
 // authority facet; there is no fallback when a prerequisite is absent.
@@ -57,7 +75,10 @@ type ContextDownloadAuthority struct {
 	// Reviews repeats the caller's recorded decision-time reviews before the
 	// permission read (ADR-245); nil disables them.
 	Reviews RecordedReviewRefresher
-	Now     func() time.Time
+	// RawResults admits raw artifacts on top of ordinary eligibility; no
+	// share admits them. Nil refuses every raw artifact.
+	RawResults RawResultAccess
+	Now        func() time.Time
 }
 
 func (s ContextDownloadAuthority) CheckDownload(ctx context.Context, token string, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
@@ -123,7 +144,16 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	if !r.Valid() || r.RootID != s.RootID || r.Registration.Location.ArtifactID != scope.ArtifactID || r.Input.Target != target || !artifact.DownloadEvidenceType(r.Input.EvidenceType) || r.Input.PrivacyClass != "potentialPersonalData" || !identity.Text(record.PurposeRef, 128) || record.CaptureID != scope.CaptureID || record.Version != scope.Version || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
 		return out, downloadRefused("catalog-record", nil)
 	}
+	class, known := downloadClass(record)
+	raw := class == "raw"
+	// A raw artifact needs the grant facet; no share and no response-owned
+	// entitlement admits it (only metadata entitlements are ever kept).
+	if !known || raw && (s.RawResults == nil || share != nil || accepted != nil) {
+		return out, downloadRefused("data-class", nil)
+	}
 	r.OriginPolicies = slices.Clone(r.OriginPolicies)
+	// Ordinary rights are evaluated with metadata semantics for both classes;
+	// the raw facet is the grant check below, never a relaxed evaluator.
 	retained := value.Retained{ArtifactID: scope.ArtifactID, Target: target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
 	var initial value.Result
 	switch {
@@ -137,7 +167,7 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 		share, initial = recipientShare(value.DownloadApproved, i, p, target, &retained, []value.Share{*share}, s.RootID, record.CaseID, scope.ArtifactID, scope.Version, s.Now())
 	default:
 		initial = value.Evaluate(i, p, value.DownloadApproved, target, &retained, s.Now())
-		if !initial.Eligible && value.UUID(record.CaseID) {
+		if !initial.Eligible && value.UUID(record.CaseID) && !raw {
 			// Whole-pod rights outside the retained audience: a share may admit.
 			if share, initial, err = s.recipientShare(ctx, i, p, target, &retained, record.CaseID, scope); err != nil {
 				return out, downloadRefused("share", err)
@@ -187,11 +217,24 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 		permission = accepted.permission
 		final = accepted.evaluate(current, scope, retained, s.Now())
 	}
+	if !final.Eligible || ctx.Err() != nil {
+		return out, downloadRefused("audience-final", ctx.Err())
+	}
+	// Last, so a revocation or expiry during the I/O above refuses.
+	var resultUntil time.Time
+	if raw {
+		if resultUntil, err = s.RawResults.CurrentResultAccess(ctx, source, scope, record.ActionID); err != nil {
+			return out, downloadRefused("result-access", err)
+		}
+	}
 	now := s.Now()
-	if !final.Eligible || ctx.Err() != nil || !now.Before(resolved.ExpiresAt) {
+	if ctx.Err() != nil || !now.Before(resolved.ExpiresAt) || raw && !now.Before(resultUntil) {
 		return out, downloadRefused("audience-final", ctx.Err())
 	}
 	until := started.Add(5 * time.Second)
+	if raw {
+		until = identity.Earlier(until, resultUntil)
+	}
 	if ordinary != nil {
 		if deadline, ok := ctx.Deadline(); ok {
 			until = identity.Earlier(until, deadline)
@@ -226,7 +269,7 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	if !out.Valid(now) {
 		return artifact.DownloadAuthority{}, downloadRefusedAs("decision-expired", artifact.ErrDownloadExpired)
 	}
-	if ordinary != nil && accepted == nil {
+	if ordinary != nil && accepted == nil && !raw {
 		// Commit the private observation only after the complete short authority
 		// succeeds. Failure in retention/environment/final identity cannot seed it.
 		*ordinary = newDownloadEntitlement(scope, current, permission, retained.Audience, final.ContributingAssignments, started, share)

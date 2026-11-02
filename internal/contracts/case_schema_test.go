@@ -53,7 +53,7 @@ func TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection(t *testing.T) {
 	if wire.ValidateOutput("get_case", shared) != nil {
 		t.Fatal("shared pod-status view rejected")
 	}
-	for _, which := range []string{"unknown access", "raw", "pcap", "native checksum", "native path", "title", "timeline", "preservation", "verified classification", "deletion complete", "omitted exposure", "partial", "missing notice", "extra provenance", "pending"} {
+	for _, which := range []string{"unknown access", "extract", "pcap", "native checksum", "native path", "title", "timeline", "preservation", "verified classification", "deletion complete", "omitted exposure", "partial", "missing notice", "extra provenance", "pending"} {
 		t.Run(which, func(t *testing.T) {
 			var v map[string]any
 			_ = json.Unmarshal(good, &v)
@@ -64,8 +64,8 @@ func TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection(t *testing.T) {
 			switch which {
 			case "unknown access":
 				c["access"] = "public"
-			case "raw":
-				a["data_class"] = "raw"
+			case "extract":
+				a["data_class"] = "extract" // raw is listed for raw packet captures (ADR-279)
 			case "pcap":
 				a["kind"] = "pcapng"
 			case "native checksum":

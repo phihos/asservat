@@ -52,6 +52,13 @@ type ContextExpectation struct {
 	TriggeredAt                                                       time.Time
 }
 
+// ServedClass reports a class the installed publication and download path
+// carries: metadata, or raw only as a raw packet capture (ADR-279). It is
+// not access: a raw disclosure still needs its approved grant child.
+func (e ContextExpectation) ServedClass() bool {
+	return e.DataClass == "metadata" || e.DataClass == "raw" && e.NativeType == RawPCAPNGArtifact
+}
+
 // Type returns the registered native type; Validate rejects unknown names.
 func (e ContextExpectation) Type() NativeType {
 	t, _ := LookupNativeType(e.NativeType)

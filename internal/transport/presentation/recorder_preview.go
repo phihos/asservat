@@ -161,9 +161,11 @@ func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResu
 	blockers := []OperationBlocker{}
 	warnings := recorderWarnings(result.Plan)
 	approval := result.Plan.Approval != nil
-	// ADR-248: a node recorder runs the plan, except one with REQ-AUT-006
-	// observation limits, whose spend it does not charge.
-	if !result.Recordable || approval && result.Plan.Approval.ObservationLimits != nil {
+	// ADR-248: a node recorder runs the plan. Of the plans with REQ-AUT-006
+	// observation limits only a single manual rawPackets action has an
+	// observation issuer, its approved ad hoc grant's pool (ADR-279).
+	metered := approval && result.Plan.Approval.ObservationLimits != nil
+	if !result.Recordable || metered && (result.Plan.Approval.DataClass != "raw" || len(result.Plan.Actions) != 1) {
 		blockers = append(blockers, RecorderUnavailableBlocker)
 	} else {
 		// ADR-248: the interim per-capture output cap.

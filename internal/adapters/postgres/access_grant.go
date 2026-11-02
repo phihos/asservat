@@ -544,6 +544,41 @@ func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.Gra
 	return out, replay, nil
 }
 
+// GrantChildFor reads the parent's child for one artifact and client.
+func (s *AccessGrants) GrantChildFor(ctx context.Context, parentID, artifactID, clientID string) (authorization.GrantChild, error) {
+	var zero authorization.GrantChild
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(parentID) || !authorization.UUID(artifactID) || !identity.Text(clientID, 256) {
+		return zero, authorization.ErrGrantInvalid
+	}
+	var out authorization.GrantChild
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		prow, err := q.ReadGrant(ctx, custodydb.ReadGrantParams{RootID: id(s.root), ID: id(parentID)})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return authapp.ErrGrantNotFound
+		}
+		if err != nil {
+			return err
+		}
+		parent, err := s.grant(prow)
+		if err != nil {
+			return err
+		}
+		row, err := q.ReadGrantChild(ctx, custodydb.ReadGrantChildParams{ParentID: id(parentID), ArtifactID: id(artifactID), ClientID: clientID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return authapp.ErrGrantNotFound
+		}
+		if err != nil {
+			return err
+		}
+		out, err = childFromRow(row, parent)
+		return err
+	})
+	if err != nil {
+		return zero, grantError(err)
+	}
+	return out, nil
+}
+
 func (s *AccessGrants) GrantChild(ctx context.Context, childID string) (authorization.GrantChild, error) {
 	var zero authorization.GrantChild
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(childID) {

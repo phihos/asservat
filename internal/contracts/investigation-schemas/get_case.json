@@ -1,6 +1,6 @@
 {
   "name": "get_case",
-  "description": "Read a currently authorized case of verified pod-status artifacts and effective handling dates: ordinary access, or artifacts an evidence owner shared with you (access shared). Artifact digest is the verified ciphertext-copy version, not native file SHA-256. No native bytes or raw access; shared artifacts cannot be downloaded.",
+  "description": "Read a currently authorized case of verified pod-status artifacts and effective handling dates: ordinary access, or artifacts an evidence owner shared with you (access shared). Artifact digest is the verified ciphertext-copy version, not native file SHA-256. No native bytes; a raw packet capture (data_class raw) downloads only through your approved grant; shared artifacts cannot be downloaded.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -142,7 +142,10 @@
                           ]
                         },
                         "data_class": {
-                          "const": "metadata"
+                          "enum": [
+                            "metadata",
+                            "raw"
+                          ]
                         },
                         "completeness": {
                           "const": "complete"
@@ -159,10 +162,19 @@
                               "const": "potentialPersonalData"
                             },
                             "mayContain": {
-                              "const": [
-                                "personalIdentifiers",
-                                "networkAddresses",
-                                "paths"
+                              "enum": [
+                                [
+                                  "personalIdentifiers",
+                                  "networkAddresses",
+                                  "paths"
+                                ],
+                                [
+                                  "userContent",
+                                  "credentials",
+                                  "personalIdentifiers",
+                                  "networkAddresses",
+                                  "unknownApplicationData"
+                                ]
                               ]
                             },
                             "expiresAt": {
