@@ -46,7 +46,7 @@ export class Investigation {
   private historyExpiry?: ReturnType<typeof setTimeout>;
   readonly snapshot = () => this.state;
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
-  constructor(private client: Operations = operations, private newID: () => string = () => crypto.randomUUID()) {}
+  constructor(readonly client: Operations = operations, private newID: () => string = () => crypto.randomUUID()) {}
   private publish(patch: Partial<State>) {
     if ('history' in patch) {
       clearTimeout(this.historyExpiry);

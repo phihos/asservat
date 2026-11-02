@@ -1,7 +1,7 @@
 import type { components } from '../generated/capture';
 import * as validators from '../generated/validate-capture';
 
-export type Operation = 'list_diagnostics' | 'preview_capture' | 'request_capture' | 'resolve_capture_request' | 'get_capture' | 'cancel_capture' | 'list_capture_history' | 'get_capture_settings';
+export type Operation = 'list_diagnostics' | 'preview_capture' | 'request_capture' | 'resolve_capture_request' | 'get_capture' | 'cancel_capture' | 'list_capture_history' | 'get_capture_settings' | 'list_capture_profiles' | 'get_capture_profile';
 export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
 export type Data<N extends Operation> = Extract<Output<N>, { status: 'ok' }>['data'];
@@ -33,7 +33,7 @@ export const operations: Operations = {
 // Only a paged list (allowCursor) may return a next_cursor.
 export async function postOperation(name: string, input: unknown, csrf: string, signal: AbortSignal, validInput: (value: unknown) => boolean, validOutput: (value: unknown) => boolean, idempotencyKey?: string, allowCursor = false): Promise<unknown> {
   if (!validInput(input)) throw new OperationFailure(400);
-  const responseLimit = name === 'get_capture_settings' ? 160 * 1024 : name === 'preview_recording_save' ? 128 * 1024 : 32_768;
+  const responseLimit = name === 'get_capture_settings' ? 160 * 1024 : name === 'get_capture_profile' ? 64 * 1024 : name === 'preview_recording_save' ? 128 * 1024 : 32_768;
   const request = new AbortController();
   const abort = () => request.abort();
   signal.addEventListener('abort', abort, { once: true });
@@ -68,7 +68,7 @@ export async function postOperation(name: string, input: unknown, csrf: string, 
     const value: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
     if (!validOutput(value)) throw new OperationFailure(502);
     const result = value as { data_class?: string; truncated?: boolean; next_cursor?: unknown };
-    const permittedClass = result.data_class === 'metadata' || (result.data_class === 'extract' && (name === 'preview_capture' || name === 'get_capture_settings'));
+    const permittedClass = result.data_class === 'metadata' || (result.data_class === 'extract' && (name === 'preview_capture' || name === 'get_capture_settings' || name === 'get_capture_profile'));
     if (!permittedClass || result.truncated || (result.next_cursor !== null && !allowCursor)) throw new OperationFailure(502);
     return value;
   } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }

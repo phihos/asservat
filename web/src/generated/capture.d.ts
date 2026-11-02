@@ -1650,6 +1650,122 @@ export interface components {
                 retry_after_seconds?: number;
             };
         });
+        McpInput_list_capture_profiles: {
+            target_handle?: string;
+            /** @enum {unknown} */
+            catalog?: "builtin" | "organization" | "namespace";
+            cursor?: string;
+            limit?: number;
+            target_ref?: {
+                /** Format: uuid */
+                cluster_id: string;
+                namespace: string;
+                /** @enum {unknown} */
+                kind: "Deployment" | "StatefulSet" | "Pod";
+                name: string;
+            };
+        } & (unknown | unknown);
+        Contract_guidance_c8c053ecb8f17e88: {
+            code: string;
+            message: string;
+            /** @enum {unknown} */
+            responsible_role: "maintainer" | "approver" | "administrator" | "none";
+            retryable: boolean;
+        };
+        McpOutput_list_capture_profiles: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: {
+                profiles: {
+                    profile_ref: components["schemas"]["Contract_capture_composition_f1d3ea703d6af495"];
+                    display_name: string;
+                    description: string;
+                    available: boolean;
+                    deprecated: boolean;
+                    approval_required: boolean;
+                    blockers: components["schemas"]["Contract_guidance_c8c053ecb8f17e88"][];
+                    execution_modes: ("onTrigger" | "ongoing")[];
+                }[];
+            };
+            /** @constant */
+            data_class?: "metadata";
+        } | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                retry_after_seconds: number;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
+        McpInput_get_capture_profile: {
+            target_handle?: string;
+            profile_ref: components["schemas"]["Contract_capture_composition_f1d3ea703d6af495"];
+            target_ref?: {
+                /** Format: uuid */
+                cluster_id: string;
+                namespace: string;
+                /** @enum {unknown} */
+                kind: "Deployment" | "StatefulSet" | "Pod";
+                name: string;
+            };
+        } & (unknown | unknown);
+        Contract_capture_profile_657e00232a612262: {
+            displayName: string;
+            description: string;
+            recipe: components["schemas"]["Contract_recipe_ad816c81a7733f89"];
+            editableFields: {
+                actionID: string;
+                /** @enum {unknown} */
+                field: "packetPeers" | "packetFilter" | "packetBefore" | "packetAfter" | "packetRing" | "processSelector" | "processBatch" | "profileDuration" | "syscallFilter" | "syscallMode" | "syscallBefore" | "syscallAfter" | "syscallRing" | "syscallArguments" | "syscallMaxEvents" | "syscallRate" | "filePath" | "commandArgv" | "actionMaxBytes" | "actionTimeout" | "actionExecutionMode";
+                label: string;
+                description?: string;
+            }[];
+            origins?: components["schemas"]["Contract_capture_composition_d3d99d35a2742711"][];
+        };
+        McpOutput_get_capture_profile: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: {
+                profile_ref: components["schemas"]["Contract_capture_composition_f1d3ea703d6af495"];
+                definition_digest: string;
+                definition: components["schemas"]["Contract_capture_profile_657e00232a612262"];
+            };
+            /** @constant */
+            data_class?: "extract";
+        } | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                retry_after_seconds: number;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
     };
     responses: never;
     parameters: never;
