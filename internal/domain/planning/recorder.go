@@ -29,6 +29,8 @@ const (
 const (
 	// ReasonRawBytePredicate: a proto[offset] filter can test payload bytes.
 	ReasonRawBytePredicate = "rawBytePredicate"
+	// ReasonRawPackets: the recording keeps payload prefixes (ADR-279).
+	ReasonRawPackets = "rawPackets"
 	// ReasonRecordingApproval: the installation requires approval for every
 	// packet/syscall recording (REQ-SYS-002 "unless an administrator requires more").
 	ReasonRecordingApproval = "recordingApprovalRequired"

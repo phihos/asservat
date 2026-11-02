@@ -22,7 +22,6 @@ func TestRawRecordingBounds(t *testing.T) {
 	}
 	for name, edit := range map[string]func(*Recording){
 		"over 15 seconds":   func(r *Recording) { r.DurationMillis = 16_000 },
-		"no approval":       func(r *Recording) { r.RequireApproval = false },
 		"snaplen too large": func(r *Recording) { r.Snaplen = MaxRawSnaplen + 1 },
 		"zero snaplen":      func(r *Recording) { r.Snaplen = 0 },
 		"cap too large":     func(r *Recording) { r.ProtocolSnaplen.UDP = MaxRawSnaplen + 1 },

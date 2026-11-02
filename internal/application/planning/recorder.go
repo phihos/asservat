@@ -453,6 +453,42 @@ func wholePodPeers(raw json.RawMessage) bool {
 	return slices.Equal(c, []string{"0.0.0.0/0", "::/0"})
 }
 
+// maxRawAfter bounds a finite raw recording (ADR-261/279).
+const maxRawAfter = 15 * time.Second
+
+// RawProfile is a rawPackets profile's default prefix and per-transport caps.
+type RawProfile struct {
+	Snaplen         int `json:"snaplen"`
+	ProtocolSnaplen []struct {
+		Protocol string `json:"protocol"`
+		Bytes    int    `json:"bytes"`
+	} `json:"protocolSnaplen,omitempty"`
+}
+
+// validRawProfile checks the default snaplen and at most one cap per
+// transport against the engine maximum; larger values are refused with a
+// remedy, never narrowed silently (ADR-279).
+func validRawProfile(path string, raw json.RawMessage) error {
+	var p RawProfile
+	if json.Unmarshal(raw, &p) != nil {
+		return refuse(value.CompositionInvalid, path, "rawPackets needs snaplen and optional protocolSnaplen")
+	}
+	if p.Snaplen < 1 || p.Snaplen > artifact.MaxRawSnaplen {
+		return refuse(value.CompositionInvalid, path+".snaplen", fmt.Sprintf("this recorder captures at most %d bytes per packet; lower snaplen", artifact.MaxRawSnaplen))
+	}
+	seen := map[string]bool{}
+	for i, c := range p.ProtocolSnaplen {
+		if c.Protocol != "tcp" && c.Protocol != "udp" && c.Protocol != "icmp" || seen[c.Protocol] {
+			return refuse(value.CompositionInvalid, pathf("%s.protocolSnaplen[%d].protocol", path, i), "one cap each for tcp, udp and icmp")
+		}
+		seen[c.Protocol] = true
+		if c.Bytes < 1 || c.Bytes > artifact.MaxRawSnaplen {
+			return refuse(value.CompositionInvalid, pathf("%s.protocolSnaplen[%d].bytes", path, i), fmt.Sprintf("a cap is 1 to %d bytes", artifact.MaxRawSnaplen))
+		}
+	}
+	return nil
+}
+
 func validRing(path string, r ring, before time.Duration) error {
 	age, ok := durationValue(r.MaxAge, false)
 	switch {
@@ -487,7 +523,18 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 	if len(a.action.DependsOn) != 0 {
 		return refuse(value.CompositionInvalid, path+".dependsOn", "a recorder cannot depend on another action")
 	}
-	if a.action.Impact != "observe" {
+	raw := false
+	if a.packet != nil {
+		var kind struct {
+			Kind string `json:"kind"`
+		}
+		_ = json.Unmarshal(a.packet.Profile, &kind)
+		raw = kind.Kind == "rawPackets"
+	}
+	if raw && a.action.Impact != "sensitiveRead" {
+		return refuse(value.CompositionInvalid, path+".impact", "raw packet recordings read payload and have impact sensitiveRead")
+	}
+	if !raw && a.action.Impact != "observe" {
 		return refuse(value.CompositionInvalid, path+".impact", "metadata recordings have impact observe")
 	}
 	var beforeText, afterText string
@@ -498,8 +545,14 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 		var kind struct {
 			Kind string `json:"kind"`
 		}
-		if json.Unmarshal(a.packet.Profile, &kind) != nil || kind.Kind != "networkHeaders" {
-			return refuse(value.CompositionApproval, path+".parameters.profile.kind", "HTTP headers and raw packets need sensitive capture approval and a recorder that this release does not have; use networkHeaders")
+		if json.Unmarshal(a.packet.Profile, &kind) != nil || kind.Kind != "networkHeaders" && kind.Kind != "rawPackets" {
+			return refuse(value.CompositionApproval, path+".parameters.profile.kind", "HTTP headers need sensitive capture approval and a recorder that this release does not have; use networkHeaders or rawPackets")
+		}
+		if raw {
+			if err := validRawProfile(path+".parameters.profile", a.packet.Profile); err != nil {
+				return err
+			}
+			a.sensitive = append(a.sensitive, value.ReasonRawPackets)
 		}
 		if !wholePodPeers(a.packet.Peers) {
 			return refuse(value.CompositionRecorderUnavailable, path+".parameters.peers", "Kubernetes and CIDR peer selection follows in a later release; this recorder captures all pod traffic, so narrow it with packetFilter (for example host 10.0.0.5)")
@@ -553,6 +606,11 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 	}
 	if !okAfter {
 		return refuse(value.CompositionInvalid, path+".parameters.after", "after is 0s or a positive duration")
+	}
+	// ADR-279: raw packets are finite for now; rings, Saves and longer
+	// recordings follow in later slices.
+	if raw && (mode != "onTrigger" || after > maxRawAfter) {
+		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "raw packets are recorded finitely for now: set actionExecutionMode onTrigger, before 0s and after at most 15s")
 	}
 	if mode == "onTrigger" && before != 0 {
 		return refuse(value.CompositionInvalid, path+".parameters.before", "an onTrigger recording captures only the next interval: also set before to 0s (no history before the trigger)")
@@ -1013,9 +1071,12 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 			approval.Reasons = append(approval.Reasons, reasonRecord{id, code})
 			summary.Sensitive = append(summary.Sensitive, code)
 		}
-		if slices.Contains(x.sensitive, value.ReasonRawBytePredicate) {
-			// REQ-AUT-006: a payload-sensitive predicate needs finite
-			// observation limits before any byte reaches it.
+		if slices.Contains(x.sensitive, value.ReasonRawPackets) {
+			approval.DataClass = "raw" // ADR-279: payload prefixes are raw output
+		}
+		if slices.Contains(x.sensitive, value.ReasonRawBytePredicate) || slices.Contains(x.sensitive, value.ReasonRawPackets) {
+			// REQ-AUT-006: a payload-sensitive predicate or raw recording
+			// needs finite observation limits before any byte reaches it.
 			t, _ := durationValue(a.Limits.Timeout, false)
 			limits := observationLimitsRecord{MaxSessionSeconds: int64(min(t, time.Hour) / time.Second), MaxObservedBytes: value.SensitiveMaxObservedBytes, MaxBytesPerSecond: value.SensitiveMaxBytesPerSecond, MaxConcurrentSessions: 1}
 			if approval.ObservationLimits == nil {

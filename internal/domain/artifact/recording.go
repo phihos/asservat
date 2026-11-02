@@ -126,7 +126,7 @@ func (r *Recording) Valid() bool {
 	case r.Kind == "syscallTrace":
 		return r.Profile == "metadata" && r.Filter == nil && r.Snaplen == RecordingSyscallSnaplen && r.DurationMillis <= maxSyscallRecordingMillis && r.Syscalls.valid()
 	case r.Kind == "packetCapture" && r.Profile == "rawPackets":
-		if r.Syscalls != nil || r.DurationMillis > maxRawRecordingMillis || r.Snaplen < 1 || r.Snaplen > MaxRawSnaplen || !r.ProtocolSnaplen.valid() || !r.RequireApproval {
+		if r.Syscalls != nil || r.DurationMillis > maxRawRecordingMillis || r.Snaplen < 1 || r.Snaplen > MaxRawSnaplen || !r.ProtocolSnaplen.valid() {
 			return false
 		}
 	case r.Kind != "packetCapture" || r.Profile != "networkHeaders" || r.Syscalls != nil || r.ProtocolSnaplen != nil || r.DurationMillis > maxRecordingDurationMillis || r.Snaplen != RecordingSnaplen:

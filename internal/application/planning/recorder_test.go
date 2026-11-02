@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -539,4 +540,63 @@ func TestEncryptedDiskRingAssessesSegmentMemory(t *testing.T) {
 		}
 	}
 	t.Fatalf("ring memory quantity %+v", a.Actions[0].Quantities)
+}
+
+// ADR-279: a finite rawPackets action compiles with raw approval and
+// observation limits, assesses retained payload, builds a raw recording with
+// its caps, and stays unacceptable for a manual capture until observation
+// authority exists; ongoing or oversized raw is refused with remedies.
+func TestRawPacketsPlan(t *testing.T) {
+	raw := func(profile string, edits ...value.ProfileEdit) value.ProfileComposition {
+		c := network(append([]value.ProfileEdit{text("sample", "actionExecutionMode", "onTrigger"), text("sample", "packetBefore", "0s"), text("sample", "packetAfter", "10s")}, edits...)...)
+		c.Resolved = []value.CatalogProfile{rawCatalogProfile(t, profile)}
+		c.Components[0].Profile = value.ProfileRef{Catalog: "namespace", Name: "raw-capture", Version: "v1"}
+		return c
+	}
+	in, now := recorderInput(t, raw(`{"kind":"rawPackets","snaplen":96,"protocolSnaplen":[{"protocol":"tcp","bytes":200}]}`), "packetCapture")
+	p, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Approval == nil || p.Approval.DataClass != "raw" || p.Approval.ObservationLimits == nil || !slices.Contains(p.Actions[0].Sensitive, value.ReasonRawPackets) {
+		t.Fatalf("approval %+v", p.Approval)
+	}
+	a, err := AssessRecorder(p, "00000000-0000-4000-8000-000000000161", now)
+	if err != nil || !slices.Contains(a.Actions[0].Exposure.RetainedPossible, "userContent") {
+		t.Fatal("raw exposure", err)
+	}
+	if AcceptableRecorder(p).Acceptable() {
+		t.Fatal("manual raw acceptable before observation authority")
+	}
+	for name, profile := range map[string]string{
+		"snaplen over engine": `{"kind":"rawPackets","snaplen":4000}`,
+		"duplicate cap":       `{"kind":"rawPackets","snaplen":96,"protocolSnaplen":[{"protocol":"tcp","bytes":200},{"protocol":"tcp","bytes":100}]}`,
+	} {
+		in, now := recorderInput(t, raw(profile), "packetCapture")
+		if _, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now); err == nil {
+			t.Fatal(name, "accepted")
+		}
+	}
+}
+
+// rawCatalogProfile is the builtin network profile republished in a namespace
+// catalog as "raw-capture" with the given rawPackets profile.
+func rawCatalogProfile(t *testing.T, profile string) value.CatalogProfile {
+	t.Helper()
+	var doc map[string]any
+	if err := json.Unmarshal(catalogDocument(t, "raw-capture", "v1"), &doc); err != nil {
+		t.Fatal(err)
+	}
+	action := doc["definition"].(map[string]any)["recipe"].(map[string]any)["actions"].([]any)[0].(map[string]any)
+	var p any
+	if err := json.Unmarshal([]byte(profile), &p); err != nil {
+		t.Fatal(err)
+	}
+	action["parameters"].(map[string]any)["profile"] = p
+	action["impact"] = "sensitiveRead"
+	out, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value.CatalogProfile{Ref: value.ProfileRef{Catalog: "namespace", Name: "raw-capture", Version: "v1"}, SourceClusterID: "00000000-0000-4000-8000-000000000001", SourceNamespaceUID: "ns-uid", SourceUID: "raw-uid", Document: out, Enabled: true}
 }
