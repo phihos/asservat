@@ -57,13 +57,21 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 		}
 		return maxBytesAcceptance(plan)
 	}
-	if a.Kind != "packetCapture" || a.PacketProfile != "networkHeaders" {
+	if a.Kind != "packetCapture" || a.PacketProfile != "networkHeaders" && a.PacketProfile != "rawPackets" {
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only network-header packet and syscall metadata captures can be recorded in this release"}
 	}
+	if a.PacketProfile == "rawPackets" && (plan.Approval == nil || plan.Approval.DataClass != "raw" || plan.Approval.ObservationLimits == nil) {
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a raw packet recording needs raw approval with observation limits"}
+	}
+	if a.PacketProfile == "rawPackets" && policy {
+		// ADR-279: policy raw output follows in a later slice; policy grants
+		// confer no raw download, so it must not be produced yet.
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "policies cannot record raw packets in this release; use networkHeaders"}
+	}
 	if plan.Approval != nil && plan.Approval.ObservationLimits != nil && !policy {
-		// Manual raw recording has no observation issuer; the finite policy
-		// companion is a separate authority path (ADR-261, REQ-AUT-006).
-		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a manual raw byte comparison needs observation authority that is not implemented"}
+		// Manual raw observation has no issuer yet; ADR-279 adds it in its
+		// next slice. The finite policy companion is ADR-261's path.
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "manual raw packet capture and raw byte comparisons need observation authority that this release does not have yet"}
 	}
 	after, ok := durationValue(a.After, true)
 	if !ok || after < time.Second || after > 5*time.Minute {
@@ -126,6 +134,30 @@ func RecordingFor(plan value.RecorderPlan) (artifact.Recording, string, error) {
 			return artifact.Recording{}, "", value.ErrInvalid
 		}
 		return r, a.ID, nil
+	}
+	if a.PacketProfile == "rawPackets" {
+		// ADR-279: the default prefix and per-transport caps come from the
+		// frozen recipe.
+		var recipe recipeSpec
+		var params packetParameters
+		var profile RawProfile
+		if strict(scope.Recipe, &recipe) != nil || len(recipe.Actions) != 1 || recipe.Actions[0].ID != a.ID || strict(recipe.Actions[0].Parameters, &params) != nil || json.Unmarshal(params.Profile, &profile) != nil {
+			return artifact.Recording{}, "", value.ErrInvalid
+		}
+		r.Profile, r.Snaplen = "rawPackets", profile.Snaplen
+		if len(profile.ProtocolSnaplen) > 0 {
+			r.ProtocolSnaplen = &artifact.RecordingProtocolSnaplen{}
+			for _, c := range profile.ProtocolSnaplen {
+				switch c.Protocol {
+				case "tcp":
+					r.ProtocolSnaplen.TCP = c.Bytes
+				case "udp":
+					r.ProtocolSnaplen.UDP = c.Bytes
+				case "icmp":
+					r.ProtocolSnaplen.ICMP = c.Bytes
+				}
+			}
+		}
 	}
 	for _, f := range scope.Filters {
 		if f.ActionID != a.ID || f.Expression != a.Filter {

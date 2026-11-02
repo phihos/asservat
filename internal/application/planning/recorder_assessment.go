@@ -15,6 +15,7 @@ import (
 // effect, category or interpretation requires a new rule digest.
 const (
 	packetAssessmentRule  = `{"rule":"recorder-assessment/v2","mechanism":"packetCapture","profile":"networkHeaders","impact":"unknown","effects":["nodeCPU","collectorMemory","storageIO","uploadContention"],"retained":["networkAddresses","personalIdentifiers"],"transient":["userContent","credentials"],"anchor":"submissionPreparation","metrics":"unavailable","quantities":["outputBytes:perIncident","ring:whileArmed|perIncident","frozen:perIncident"]}`
+	rawAssessmentRule     = `{"rule":"recorder-assessment/v2","mechanism":"packetCapture","profile":"rawPackets","impact":"unknown","effects":["nodeCPU","collectorMemory","storageIO","uploadContention"],"retained":["networkAddresses","personalIdentifiers","userContent","credentials"],"transient":[],"caps":"byteBudgetNotRedaction","anchor":"submissionPreparation","metrics":"unavailable","quantities":["outputBytes:perIncident","frozen:perIncident"]}`
 	syscallAssessmentRule = `{"rule":"recorder-assessment/v2","mechanism":"syscallTrace","mode":"metadata","impact":"unknown","effects":["nodeCPU","applicationCPU","collectorMemory","storageIO","uploadContention"],"retained":["personalIdentifiers"],"transient":[],"anchor":"submissionPreparation","metrics":"unavailable","quantities":["outputBytes:perIncident","ring:whileArmed|perIncident","frozen:perIncident"]}`
 	// No recorder capability exists in this release; the basis names that fact.
 	recorderCapabilityAbsent = "recorder-capability/v1:unavailable"
@@ -22,7 +23,7 @@ const (
 
 // RecorderAssessmentRulesDigest pins both mechanism rules.
 func RecorderAssessmentRulesDigest() artifact.Digest {
-	return artifact.Digest(sha256.Sum256([]byte(packetAssessmentRule + "\n" + syscallAssessmentRule)))
+	return artifact.Digest(sha256.Sum256([]byte(packetAssessmentRule + "\n" + rawAssessmentRule + "\n" + syscallAssessmentRule)))
 }
 
 // RecorderCapabilityDigest identifies the absent recorder capability basis.
@@ -99,6 +100,13 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 			assessed.Impact = value.AssessmentImpact{Level: "unknown", HasUnknowns: true, Effects: []string{"nodeCPU", "collectorMemory", "storageIO", "uploadContention"},
 				Explanation: "Kernel packet hooks add per-packet node work and the ring holds headers in collector memory; overhead depends on traffic and is not measured. Limits bound retained data, not latency."}
 			assessed.Exposure = value.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", RetainedPossible: []string{"networkAddresses", "personalIdentifiers"}, TransientOnly: []string{"userContent", "credentials"}}
+			if a.PacketProfile == "rawPackets" {
+				// ADR-279, REQ-ASM-003: payload prefixes are retained up to
+				// the approved caps; a cap limits bytes and does not redact.
+				assessed.Impact.Explanation = "Kernel packet hooks add per-packet node work and keep payload prefixes up to the approved per-transport caps; overhead depends on traffic and is not measured. Caps limit bytes and do not redact."
+				assessed.Exposure = value.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", RetainedPossible: []string{"networkAddresses", "personalIdentifiers", "userContent", "credentials"}, TransientOnly: []string{}}
+				out.Alternatives = append(out.Alternatives, value.AssessmentAlternative{ActionIDs: []string{a.ID}, Change: "metadataOnly", Benefit: "Network headers keep no payload and need no raw approval.", CoverageLoss: "Payload bytes are not recorded."})
+			}
 			if a.Filter == "" {
 				out.Alternatives = append(out.Alternatives, value.AssessmentAlternative{ActionIDs: []string{a.ID}, Change: "narrowScope", Benefit: "A pcap filter on hosts or ports reduces node work and retained addresses.", CoverageLoss: "Traffic outside the filter is not recorded."})
 			}

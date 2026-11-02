@@ -17,6 +17,13 @@ const RecordingSnaplen = 14 + 60 + 60
 // (maxEventsPerSecond 1 to 100,000), shared by the node payload.
 const MaxRecordingEventsPerSecond = 100_000
 
+// MaxRawSnaplen is the largest raw packet prefix the pinned gadget captures
+// (ADR-279); larger caps are refused, never narrowed silently.
+const MaxRawSnaplen = 1500
+
+// maxRawRecordingMillis bounds a finite raw recording (ADR-261/279).
+const maxRawRecordingMillis = 15_000
+
 // RecordingSyscallSnaplen is the fixed per-call metadata record size of a
 // syscall recording (internal/adapters/syscalls.RecordSize).
 const RecordingSyscallSnaplen = 32
@@ -50,7 +57,7 @@ type RecordingFilter struct {
 // owns its type), so the hub can recompile the exact accepted plan.
 type Recording struct {
 	Kind           string // "packetCapture" or "syscallTrace"
-	Profile        string // "networkHeaders" or "metadata"
+	Profile        string // "networkHeaders", "rawPackets" or "metadata"
 	Composition    []byte
 	Filter         *RecordingFilter `json:",omitempty"`
 	DurationMillis int64
@@ -63,6 +70,29 @@ type Recording struct {
 	// budgets (B3); nil for packets, so packet expectation digests are
 	// unchanged.
 	Syscalls *RecordingSyscalls `json:",omitempty"`
+	// ProtocolSnaplen are a rawPackets recording's per-transport byte caps
+	// over Snaplen (ADR-279); nil otherwise, so other digests are unchanged.
+	ProtocolSnaplen *RecordingProtocolSnaplen `json:",omitempty"`
+}
+
+// RecordingProtocolSnaplen caps the captured prefix per transport; zero
+// means the recording's default Snaplen applies.
+type RecordingProtocolSnaplen struct {
+	TCP  int `json:",omitempty"`
+	UDP  int `json:",omitempty"`
+	ICMP int `json:",omitempty"`
+}
+
+func (p *RecordingProtocolSnaplen) valid() bool {
+	if p == nil {
+		return true
+	}
+	for _, v := range []int{p.TCP, p.UDP, p.ICMP} {
+		if v < 0 || v > MaxRawSnaplen {
+			return false
+		}
+	}
+	return p.TCP+p.UDP+p.ICMP > 0
 }
 
 // RecordingSyscalls mirrors the source collector.SyscallFilter for a finite
@@ -95,7 +125,11 @@ func (r *Recording) Valid() bool {
 	switch {
 	case r.Kind == "syscallTrace":
 		return r.Profile == "metadata" && r.Filter == nil && r.Snaplen == RecordingSyscallSnaplen && r.DurationMillis <= maxSyscallRecordingMillis && r.Syscalls.valid()
-	case r.Kind != "packetCapture" || r.Profile != "networkHeaders" || r.Syscalls != nil || r.DurationMillis > maxRecordingDurationMillis || r.Snaplen != RecordingSnaplen:
+	case r.Kind == "packetCapture" && r.Profile == "rawPackets":
+		if r.Syscalls != nil || r.DurationMillis > maxRawRecordingMillis || r.Snaplen < 1 || r.Snaplen > MaxRawSnaplen || !r.ProtocolSnaplen.valid() {
+			return false
+		}
+	case r.Kind != "packetCapture" || r.Profile != "networkHeaders" || r.Syscalls != nil || r.ProtocolSnaplen != nil || r.DurationMillis > maxRecordingDurationMillis || r.Snaplen != RecordingSnaplen:
 		return false
 	}
 	if f := r.Filter; f != nil {
@@ -122,6 +156,10 @@ func (r *Recording) Clone() *Recording {
 		s := *r.Syscalls
 		s.Names = append([]string(nil), r.Syscalls.Names...)
 		out.Syscalls = &s
+	}
+	if r.ProtocolSnaplen != nil {
+		p := *r.ProtocolSnaplen
+		out.ProtocolSnaplen = &p
 	}
 	return &out
 }
