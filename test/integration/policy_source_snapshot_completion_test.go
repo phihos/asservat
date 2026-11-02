@@ -404,7 +404,10 @@ func completeSourceSnapshotCompletion(t *testing.T, ctx context.Context, f *capa
 		t.Fatal(err)
 	}
 	checkedHeaders := 0
-	verifier.WithStreamCheck(artifact.PCAPNGArtifact, func() objectstore.StreamCheck { checkedHeaders++; return packets.NewHeadersCheck() })
+	verifier.WithStreamCheck(artifact.PCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck {
+		checkedHeaders++
+		return packets.NewHeadersCheck()
+	})
 	unwrapControlsStarted := time.Now()
 	unwraps := qualifyContextKeyUnwraps(t, ctx, f.admin, f.fixturePool, s, final, accepted.CaptureID, stage.KeyServices)
 	unwrapControlsElapsed := time.Since(unwrapControlsStarted)

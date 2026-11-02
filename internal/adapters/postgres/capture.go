@@ -653,6 +653,9 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if recording.Kind == "syscallTrace" {
 				expected.NativeType = artifact.SyscallRecordsArtifact // B3 manual syscall metadata
 			}
+			if recording.Profile == "rawPackets" {
+				expected.NativeType, expected.DataClass = artifact.RawPCAPNGArtifact, "raw" // ADR-279
+			}
 		}
 		if in.Snapshot != nil {
 			lifecycle, err := planning.SourceSnapshotLifecycle(in.Snapshot)

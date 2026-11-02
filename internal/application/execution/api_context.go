@@ -163,7 +163,7 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		}
 		snapshotObserved = &observed
 		t = targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: observed.Original.Request, Pin: observed.Original.Pin}
-	} else if policyRawRecording(w) {
+	} else if meteredRecording(w) {
 		resolveStep = "ResolvePacketSource"
 		resolver, ok := s.Targets.(interface {
 			ResolvePacketSource(context.Context, targets.Request) (targets.RecorderResolution, error)
@@ -610,10 +610,14 @@ func captureFailurePhase(err error) string {
 	return "captureFailed"
 }
 
-// policyRawRecording selects the finite companion without changing the frozen
-// approval identity. Ordinary/manual recorders never acquire this authority.
-func policyRawRecording(w APIContextWork) bool {
+// meteredRecording selects the finite observation companion without changing
+// the frozen approval identity: a policy raw byte predicate (ADR-261) or a
+// human's approved rawPackets recording (ADR-279). It mirrors the SQL issuers.
+func meteredRecording(w APIContextWork) bool {
 	_, _, policy := authorization.PolicyExecutor(w.Actor)
 	r := w.Accepted.Expectation.Recording
-	return policy && r != nil && r.Filter != nil && compiler.RawBytePredicate(r.Filter.Expression)
+	if policy {
+		return r != nil && r.Filter != nil && compiler.RawBytePredicate(r.Filter.Expression)
+	}
+	return compiler.MeteredRecording(r) && r.Profile == "rawPackets"
 }

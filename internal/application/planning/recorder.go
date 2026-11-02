@@ -552,6 +552,10 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 			if err := validRawProfile(path+".parameters.profile", a.packet.Profile); err != nil {
 				return err
 			}
+			// The finite observation binding pins a compiled program (ADR-279).
+			if a.packet.Filter == "" {
+				return refuse(value.CompositionInvalid, path+".parameters.filter", "rawPackets keeps payload; narrow it with packetFilter (for example tcp port 8080)")
+			}
 			a.sensitive = append(a.sensitive, value.ReasonRawPackets)
 		}
 		if !wholePodPeers(a.packet.Peers) {

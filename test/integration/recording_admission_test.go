@@ -345,7 +345,7 @@ func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxp
 			t.Fatal(err)
 		}
 		checked := 0
-		verifier.WithStreamCheck(artifact.PCAPNGArtifact, func() objectstore.StreamCheck { checked++; return packets.NewHeadersCheck() })
+		verifier.WithStreamCheck(artifact.PCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { checked++; return packets.NewHeadersCheck() })
 		s.batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 		s.batch.FreshUntil = s.batch.ObservedAt.Add(5 * time.Second)
 		if err = s.p.RefreshPermissions(ctx, s.batch); err != nil {

@@ -167,6 +167,9 @@ func WireWork(w collector.Work) contracts.NodeWork {
 			c.Syscalls = &contracts.NodeSyscallFilter{Names: append([]string{}, s.Names...), ErrorsOnly: s.ErrorsOnly, MaxEvents: s.MaxEvents, MaxTrackedThreads: s.MaxTrackedThreads}
 			c.MaxEventsPerSecond = p.MaxEventsPerSecond
 		}
+		if r := p.Raw; r != nil {
+			c.Raw = &contracts.NodeRawPrefix{Snaplen: r.Snaplen, TCP: r.TCP, UDP: r.UDP, ICMP: r.ICMP}
+		}
 		out.PacketCapture = c
 	}
 	return out
@@ -248,6 +251,9 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 			}
 			p.Syscalls = &collector.SyscallFilter{Names: append([]string{}, s.Names...), ErrorsOnly: s.ErrorsOnly, MaxEvents: s.MaxEvents, MaxTrackedThreads: s.MaxTrackedThreads}
 			p.MaxEventsPerSecond = c.MaxEventsPerSecond
+		}
+		if r := c.Raw; r != nil {
+			p.Raw = &collector.RawPrefix{Snaplen: r.Snaplen, TCP: r.TCP, UDP: r.UDP, ICMP: r.ICMP}
 		}
 		if c.Observation != nil {
 			permit, valid := domainObservation(c.Observation)
