@@ -56,7 +56,11 @@ func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q
 	if err != nil || len(rows) != len(accepted.Group.Children) {
 		return zero, value.ErrUnavailable
 	}
-	out := value.ContextProgressObservation{CaptureID: uid(header.ID), CandidateCaseID: accepted.Group.CaseID, Operation: "recordingSave", Revision: header.ProgressRevision, CreatedAt: header.AcceptedAt.Time.UTC(), Deadline: header.Deadline.Time.UTC(), ObservedAt: observedAt, ValidUntil: identity.Earlier(observedAt.Add(5*time.Second), request.Recovery.FreshUntil), CancellationRequested: header.CancelRequestedAt.Valid, HistoryState: "unavailable"}
+	operation := "recordingSave"
+	if header.GroupKind == "composition" {
+		operation = "collect" // ADR-276: one Pod, several recorders
+	}
+	out := value.ContextProgressObservation{CaptureID: uid(header.ID), CandidateCaseID: accepted.Group.CaseID, Operation: operation, Revision: header.ProgressRevision, CreatedAt: header.AcceptedAt.Time.UTC(), Deadline: header.Deadline.Time.UTC(), ObservedAt: observedAt, ValidUntil: identity.Earlier(observedAt.Add(5*time.Second), request.Recovery.FreshUntil), CancellationRequested: header.CancelRequestedAt.Valid, HistoryState: "unavailable"}
 	for n, row := range rows {
 		childRequest := request
 		childRequest.CaptureID = uid(row.ID)
@@ -71,7 +75,9 @@ func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q
 		}
 		if n == 0 {
 			out.Target = child.Target
-			out.Target.PodUID = ""
+			if header.GroupKind != "composition" {
+				out.Target.PodUID = ""
+			}
 		}
 		out.ValidUntil = identity.Earlier(out.ValidUntil, child.ValidUntil)
 		out.CanCancel = out.CanCancel || child.CanCancel
@@ -85,7 +91,8 @@ func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q
 		out.Actions = append(out.Actions, value.ContextActionProgress{InstanceID: uid(row.ID), PodUID: child.Target.PodUID, PodName: accepted.Group.Children[n].Pin.Name, ActionID: child.ActionID, Phase: child.ActionPhase, ReasonCode: child.ReasonCode})
 	}
 	out.Phase, out.ReasonCode = recordingGroupPhase(out.Actions)
-	out.CanCancel = out.CanCancel && !out.CancellationRequested
+	// ADR-276: a composition group's cancellation is refused.
+	out.CanCancel = out.CanCancel && !out.CancellationRequested && header.GroupKind != "composition"
 	if history, err := q.ReadRecordingGroupHistoryFacts(ctx, custodydb.ReadRecordingGroupHistoryFactsParams{RootID: header.RootID, CaptureID: header.ID}); err == nil {
 		if history.Visible && history.State == "available" && history.CustodyState == artifact.StoredUnpublished && observedAt.Before(history.SummaryExpiresAt.Time) && observedAt.Before(history.EffectiveExpiresAt.Time) {
 			out.HistoryState = "available"

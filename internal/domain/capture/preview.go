@@ -120,7 +120,9 @@ func (r ContextRetentionReview) Valid() bool {
 // runtime proof or five-second observation may be persisted in it. Each ID is
 // generated once by the service; expired previews cannot begin new collection.
 type ContextPreview struct {
-	Group                                                  *RecordingSaveGroupPreview     `json:",omitempty"`
+	Group *RecordingSaveGroupPreview `json:",omitempty"`
+	// CompositionGroup is a manual packet + syscall composition (ADR-276).
+	CompositionGroup                                       *CompositionGroupPreview       `json:",omitempty"`
 	ExecutionClass                                         artifact.ContextExecutionClass `json:",omitempty"`
 	ID, RootID, InstallationID, IssuerEpoch                string
 	CaptureID, CaseID, OccurrenceID, ArtifactID, AttemptID string
@@ -159,7 +161,10 @@ func previewTime(t time.Time) bool {
 
 func (p ContextPreview) Valid() bool {
 	if p.Group != nil {
-		return p.Group.valid(p)
+		return p.CompositionGroup == nil && p.Group.valid(p)
+	}
+	if p.CompositionGroup != nil && !p.CompositionGroup.valid(p) {
+		return false
 	}
 	if p.Intent.Snapshot != nil && (!previewTime(p.SelectionUntil) || !p.SelectionUntil.After(p.CreatedAt) || p.SelectionUntil.After(p.CreatedAt.Add(time.Minute)) || !p.Intent.Snapshot.Request.ProcessingUntil.Equal(p.Deadline)) || p.Intent.Snapshot == nil && !p.SelectionUntil.IsZero() {
 		return false
@@ -217,6 +222,7 @@ func (p ContextPreview) Current(now time.Time) bool {
 func (p ContextPreview) Clone() ContextPreview {
 	p.ReasonEnvelope = slices.Clone(p.ReasonEnvelope)
 	p.Group = p.Group.Clone()
+	p.CompositionGroup = p.CompositionGroup.Clone()
 	p.CanonicalScope = slices.Clone(p.CanonicalScope)
 	p.Audience = slices.Clone(p.Audience)
 	p.Retention.Policies = slices.Clone(p.Retention.Policies)

@@ -37,7 +37,10 @@ func (r CaptureIntent) Valid() bool {
 		return false
 	}
 	if g := r.Group; g != nil {
-		if r.Initiator == nil || !authorization.UUID(g.ParentCaptureID) || g.ParentCaptureID == r.CaptureID || g.SelectionDigest != r.ScopeDigest || g.ChildCount < 2 || g.ChildCount > 16 || g.ChildIndex < 0 || g.ChildIndex >= g.ChildCount {
+		// A recording save child runs as its policy for a named initiator; an
+		// ADR-276 composition child runs as the requesting human itself.
+		_, _, policy := authorization.PolicyExecutor(r.Actor)
+		if (r.Initiator == nil) == policy || !authorization.UUID(g.ParentCaptureID) || g.ParentCaptureID == r.CaptureID || g.SelectionDigest != r.ScopeDigest || g.ChildCount < 2 || g.ChildCount > 16 || g.ChildIndex < 0 || g.ChildIndex >= g.ChildCount {
 			return false
 		}
 	}

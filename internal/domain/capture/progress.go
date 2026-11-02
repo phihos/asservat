@@ -105,7 +105,10 @@ type ContextActionProgress struct {
 }
 
 func (p ContextProgressObservation) validGroup(now time.Time) bool {
-	if p.Operation != "recordingSave" || p.ActionID != "" || len(p.Actions) < 2 || len(p.Actions) > MaxRecordingSaveGroupChildren || !authorization.UUID(p.CaptureID) || !authorization.UUID(p.CandidateCaseID) || p.CandidateArtifactID != "" || p.Target.PodUID != "" || !(authorization.WorkloadTarget{ClusterID: p.Target.ClusterID, NamespaceUID: p.Target.NamespaceUID, WorkloadUID: p.Target.WorkloadUID}).Valid() || p.Revision < 1 || p.Revision > MaxProgressRevision || !identity.Fresh(p.ObservedAt, p.ValidUntil, now, 5*time.Second) || p.CreatedAt.IsZero() || !p.Deadline.After(p.CreatedAt) {
+	// A recording save spans Pods of one workload; an ADR-276 composition
+	// group ("collect") records several recorders on exactly one Pod.
+	target := p.Operation == "recordingSave" && p.Target.PodUID == "" && (authorization.WorkloadTarget{ClusterID: p.Target.ClusterID, NamespaceUID: p.Target.NamespaceUID, WorkloadUID: p.Target.WorkloadUID}).Valid() || p.Operation == "collect" && p.Target.Valid()
+	if !target || p.ActionID != "" || len(p.Actions) < 2 || len(p.Actions) > MaxRecordingSaveGroupChildren || !authorization.UUID(p.CaptureID) || !authorization.UUID(p.CandidateCaseID) || p.CandidateArtifactID != "" || p.Revision < 1 || p.Revision > MaxProgressRevision || !identity.Fresh(p.ObservedAt, p.ValidUntil, now, 5*time.Second) || p.CreatedAt.IsZero() || !p.Deadline.After(p.CreatedAt) {
 		return false
 	}
 	seen := map[string]bool{}

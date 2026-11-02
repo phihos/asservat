@@ -121,12 +121,12 @@ def main():
     catalog = {t["name"]: t for t in json.loads((SOURCE / "mcp-tools.json").read_text())["tools"]}
     common = json.loads((SOURCE / "mcp-result.schema.json").read_text())
     documents = {p.name: json.loads(p.read_text()) for p in SOURCE.glob("*.schema.json")}
-    # ADR-243: the runtime composes one builtin profile and models only the
-    # packet/syscall window, ring, filter, limit and mode edits. Other registered
-    # fields stay canonical but are not accepted by this runtime.
+    # ADR-243: the runtime models only the packet/syscall window, ring, filter,
+    # limit and mode edits. Other registered fields stay canonical but are not
+    # accepted by this runtime. Several components are a policy's recorders
+    # (ADR-275) or a manual composition group (ADR-276).
     composition = documents["capture-composition.schema.json"]
     composition.pop("x-field-bindings")  # annotation of the canonical registry
-    composition["properties"]["components"]["maxItems"] = 1
     composition["$defs"]["override"]["oneOf"] = [o for o in composition["$defs"]["override"]["oneOf"] if o["properties"]["field"]["const"] in RECORDER_EDITS]
 
     def localize(root):

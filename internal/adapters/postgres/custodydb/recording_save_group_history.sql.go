@@ -173,7 +173,7 @@ func (q *Queries) ReadHistoryCaptureRows(ctx context.Context, arg ReadHistoryCap
 }
 
 const readHistoryGroupHeaders = `-- name: ReadHistoryGroupHeaders :many
-SELECT id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key FROM recording_save_group WHERE root_id=$1 AND id=ANY($2::uuid[])
+SELECT id, root_id, preview_id, request_key, submission_digest, scope_digest, scope_json, policy_uid, acceptance_id, allocation_id, child_ids, accepted_at, deadline, progress_revision, cancel_requested_at, cancel_request_key, group_kind FROM recording_save_group WHERE root_id=$1 AND id=ANY($2::uuid[])
 `
 
 type ReadHistoryGroupHeadersParams struct {
@@ -207,6 +207,7 @@ func (q *Queries) ReadHistoryGroupHeaders(ctx context.Context, arg ReadHistoryGr
 			&i.ProgressRevision,
 			&i.CancelRequestedAt,
 			&i.CancelRequestKey,
+			&i.GroupKind,
 		); err != nil {
 			return nil, err
 		}

@@ -31,12 +31,15 @@ type RetentionRule struct {
 // historical value is pod status, whose serialized form and digest are
 // unchanged. Lifecycle is set only for a save from an ongoing source.
 type ContextExpectation struct {
-	SourceSnapshotManifest                                            *SourceSnapshotManifest `json:",omitempty"`
-	Snapshot                                                          *SourceSnapshotRequest  `json:",omitempty"`
-	ExecutionClass                                                    ContextExecutionClass   `json:",omitempty"`
-	NativeType                                                        string                  `json:",omitempty"`
-	Lifecycle                                                         *OngoingLifecycle       `json:",omitempty"`
-	Recording                                                         *Recording              `json:",omitempty"`
+	// CompositionGroup binds one recording of a manual composition group
+	// (ADR-276) to its parent; nil otherwise, so other digests are unchanged.
+	CompositionGroup                                                  *CompositionGroupBinding `json:",omitempty"`
+	SourceSnapshotManifest                                            *SourceSnapshotManifest  `json:",omitempty"`
+	Snapshot                                                          *SourceSnapshotRequest   `json:",omitempty"`
+	ExecutionClass                                                    ContextExecutionClass    `json:",omitempty"`
+	NativeType                                                        string                   `json:",omitempty"`
+	Lifecycle                                                         *OngoingLifecycle        `json:",omitempty"`
+	Recording                                                         *Recording               `json:",omitempty"`
 	Registration                                                      Registration
 	CaseID, OccurrenceID                                              string
 	NodeUID, NodeBootID, PodUID, Namespace, NamespaceUID, WorkloadUID string
@@ -74,7 +77,8 @@ func (e ContextExpectation) Validate() error {
 	podStatus := e.NativeType == PodStatusArtifact && e.ActionID == "pod-status" && e.DataClass == "metadata" && r.NativeLimit == MaxContextBytes && e.Recording == nil
 	recording := (e.NativeType == PCAPNGArtifact && e.Recording != nil && e.Recording.Kind == "packetCapture" || e.NativeType == SyscallRecordsArtifact && e.Recording != nil && e.Recording.Kind == "syscallTrace") && recorderActionID(e.ActionID) && e.DataClass == "metadata" && r.NativeLimit == RecordingNativeLimit && e.Recording.Valid() && e.Lifecycle == nil
 	snapshot := (e.NativeType == PCAPNGArtifact || e.NativeType == SyscallRecordsArtifact) && recorderActionID(e.ActionID) && e.DataClass == "metadata" && e.Recording == nil && e.Snapshot != nil && e.Snapshot.Valid() && e.SourceSnapshotManifest.Valid() && e.Snapshot.MaxBytes == r.NativeLimit && !e.Snapshot.ProcessingUntil.After(r.WriteUntil) && e.Snapshot.T0.Equal(e.TriggeredAt) && SourceSnapshotAnchor(*e.Snapshot).Equal(r.AnchorAt) && e.Lifecycle != nil && e.Lifecycle.SourceSessionID == e.Snapshot.SourceID && e.Lifecycle.SnapshotID == e.Snapshot.SnapshotID && e.Lifecycle.SourceStartedAt.Equal(e.Snapshot.SourceStartedAt) && e.Lifecycle.RequestedBefore == e.Snapshot.Before && e.Lifecycle.After == e.Snapshot.After
-	if e.ExecutionClass == ContextAPIExecution && !podStatus && !recording && !snapshot || e.Recording != nil && !recording || e.Snapshot != nil && !snapshot || e.SourceSnapshotManifest != nil && !snapshot {
+	if e.CompositionGroup != nil && (!e.CompositionGroup.Valid() || !recording) ||
+		e.ExecutionClass == ContextAPIExecution && !podStatus && !recording && !snapshot || e.Recording != nil && !recording || e.Snapshot != nil && !snapshot || e.SourceSnapshotManifest != nil && !snapshot {
 		return ErrInvalid
 	}
 	// Pod status is an onTrigger snapshot; only recorder types save from an
@@ -112,4 +116,16 @@ func (e ContextExpectation) Validate() error {
 		return ErrInvalid
 	}
 	return nil
+}
+
+// CompositionGroupBinding is a composition child's place in its group
+// (ADR-276).
+type CompositionGroupBinding struct {
+	ParentCaptureID        string
+	ChildIndex, ChildCount int
+}
+
+// Valid checks the binding's own bounds.
+func (b *CompositionGroupBinding) Valid() bool {
+	return b != nil && len(b.ParentCaptureID) == 36 && b.ChildCount >= 2 && b.ChildCount <= 16 && b.ChildIndex >= 0 && b.ChildIndex < b.ChildCount
 }

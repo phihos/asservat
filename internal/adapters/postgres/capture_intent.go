@@ -128,6 +128,16 @@ func captureIntent(row custodydb.ContextCapture) (audit.CaptureIntent, error) {
 			return audit.CaptureIntent{}, capture.ErrUnavailable
 		}
 	}
+	if b := e.CompositionGroup; b != nil {
+		// ADR-276: a composition child's place comes from its own digest-bound
+		// expectation; the row's membership must agree.
+		if !b.Valid() || !row.GroupID.Valid || !row.GroupOrdinal.Valid || uid(row.GroupID) != b.ParentCaptureID || int(row.GroupOrdinal.Int16) != b.ChildIndex || out.Group != nil {
+			return audit.CaptureIntent{}, capture.ErrUnavailable
+		}
+		out.Group = &audit.CaptureGroupBinding{ParentCaptureID: b.ParentCaptureID, SelectionDigest: out.ScopeDigest, ChildIndex: b.ChildIndex, ChildCount: b.ChildCount}
+	} else if row.GroupID.Valid && out.Group == nil {
+		return audit.CaptureIntent{}, capture.ErrUnavailable
+	}
 	copy(out.IdentityRevision.Digest[:], row.IdentityPolicyDigest)
 	copy(out.ExpectationDigest[:], digest(e))
 	if row.ReasonRef != nil {

@@ -112,6 +112,13 @@ func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, sourc
 // this gate itself never arms a source, reserves input or grants acquisition.
 func (s ContextInvestigation) recorderRequest(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, access *authorization.ResultAccess) (authorization.Grant, error) {
 	actions, approval, err := compiler.RecorderScopeSummary(p.CanonicalScope)
+	if g := p.CompositionGroup; g != nil {
+		scopes := make([][]byte, len(g.Children))
+		for n, c := range g.Children {
+			scopes[n] = c.CanonicalScope
+		}
+		actions, approval, err = compiler.RecorderGroupSummary(scopes)
+	}
 	if err != nil {
 		return authorization.Grant{}, value.ErrUnavailable
 	}

@@ -62,6 +62,38 @@ func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code str
 // approvedRecordingArguments is the actual public request, validated offline
 // before the expensive installed qualification. It is never authority.
 func approvedRecordingArguments(cluster, namespace, workload string) map[string]any {
+	if installedJourneyFocus() == "manual-mixed" {
+		// ADR-276: packet and syscall finite recordings of one Pod at once.
+		return map[string]any{
+			"target_ref":                  map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
+			"requested_retention_seconds": 600,
+			"profile_composition": map[string]any{
+				"components": []any{
+					map[string]any{
+						"id":         "network",
+						"profileRef": map[string]string{"catalog": "builtin", "name": "network-connections", "version": "v1"},
+						"overrides": []any{
+							map[string]any{"actionID": "sample", "field": "packetFilter", "value": "tcp port 8080"},
+							map[string]any{"actionID": "sample", "field": "packetAfter", "value": "10s"},
+							map[string]any{"actionID": "sample", "field": "actionTimeout", "value": "20s"},
+						},
+					},
+					map[string]any{
+						"id":         "calls",
+						"profileRef": map[string]string{"catalog": "builtin", "name": "syscall-activity", "version": "v1"},
+						"overrides": []any{
+							map[string]any{"actionID": "syscalls", "field": "actionExecutionMode", "value": "onTrigger"},
+							map[string]any{"actionID": "syscalls", "field": "syscallBefore", "value": "0s"},
+							map[string]any{"actionID": "syscalls", "field": "syscallAfter", "value": "10s"},
+							map[string]any{"actionID": "syscalls", "field": "actionTimeout", "value": "20s"},
+						},
+					},
+				},
+				"maxTotalBytes": 32 << 20,
+				"maxDuration":   "20s",
+			},
+		}
+	}
 	if installedJourneyFocus() == "manual-syscall" {
 		// B3: one finite manual syscall metadata recording of 5 seconds.
 		return map[string]any{
@@ -455,7 +487,16 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	trafficAttempted := measurement == nil
 	var finishRecording func() error
 	observeTraffic := func(current installedJourneyCaptureProgress, expectedID string) {
-		if !trafficAttempted && current.CaptureID == expectedID && current.Phase == "Running" {
+		// A composition group reports Running with its first recording; its
+		// traffic waits until every recording runs, so the load does not
+		// starve the sibling's start on the shared runner.
+		allRunning := installedJourneyFocus() != "manual-mixed" || len(current.Actions) >= 2
+		for _, a := range current.Actions {
+			if installedJourneyFocus() == "manual-mixed" && a.Phase != "Running" {
+				allRunning = false
+			}
+		}
+		if !trafficAttempted && current.CaptureID == expectedID && current.Phase == "Running" && allRunning {
 			measurement.ExecutionObservedAt = time.Now().UTC()
 			if err := finishSetup(); err != nil {
 				t.Fatal("native workflow setup snapshot", err)
@@ -578,6 +619,40 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		} `json:"artifacts"`
 	}
 	read("get_case", map[string]string{"case_id": progress.CaseID}, &evidence)
+	if installedJourneyFocus() == "manual-mixed" {
+		// ADR-276: one case holds both recordings; each downloads natively.
+		if len(evidence.Artifacts) != 2 {
+			t.Fatal("composition group did not publish both recordings", evidence)
+		}
+		formats := map[string]bool{}
+		for n, a := range evidence.Artifacts {
+			native, extension := installedMixedDownload(t, ctx, transport, identity, origin, a.ID, "installed-mixed-download-"+strconv.Itoa(n), invoke, read, diagnose)
+			formats[extension] = true
+			if extension == ".pcapng" {
+				path := "../results/manual-mixed.pcapng"
+				if err := os.WriteFile(path, native, 0600); err != nil {
+					t.Fatal(err)
+				}
+				if out, err := exec.CommandContext(ctx, "tshark", "-r", path, "-T", "fields", "-e", "tcp.port").Output(); err != nil || strings.TrimSpace(string(out)) == "" {
+					t.Fatal("mixed PCAPNG did not open in tshark with real traffic", err)
+				}
+			} else if len(native) > 0 {
+				var first struct {
+					Identity struct {
+						PodUID string `json:"pod_uid"`
+					} `json:"identity"`
+				}
+				if json.Unmarshal(native[:bytes.IndexByte(native, '\n')+1], &first) != nil || first.Identity.PodUID != preview.Pods[0].UID {
+					t.Fatal("mixed syscall recording names another Pod")
+				}
+				t.Logf("mixed syscall recording: %d metadata events", ongoingSyscallEvents(t, native, first.Identity.PodUID, time.Now()))
+			}
+		}
+		if !formats[".pcapng"] || !formats[".jsonl"] {
+			t.Fatal("composition group recordings lack a format", formats)
+		}
+		return
+	}
 	if len(evidence.Artifacts) != 1 || evidence.Artifacts[0].Expires.Before(submitted.Add(590*time.Second)) || evidence.Artifacts[0].Expires.After(time.Now().Add(600*time.Second)) {
 		t.Fatal("manual recording retention did not start at submission", evidence)
 	}
@@ -793,4 +868,47 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Fatal(err)
 	}
 	t.Logf("independent approved exact preview submitted after real expiry; %d native PCAPNG packets/%d bytes verified in tshark", len(lines), len(native))
+}
+
+// installedMixedDownload prepares, awaits and reads one native artifact of
+// the manual-mixed focus, returning its bytes and its filename extension.
+func installedMixedDownload(t *testing.T, ctx context.Context, transport http.RoundTripper, identity *installedIdentity, origin, artifactID, key string, invoke func(string, any) (installedJourneyEnvelope, string), read func(string, any, any), diagnose func()) ([]byte, string) {
+	t.Helper()
+	var download installedJourneyDownload
+	// As in the main flow: preparation is an effect, so only the server's
+	// continuation flag permits another exact same-key prepare.
+	prepare := func() {
+		t.Helper()
+		reply, code := invoke("prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": key})
+		if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &download) != nil {
+			diagnose()
+			t.Fatal("mixed download preparation failed", code)
+		}
+	}
+	prepare()
+	for until := time.Now().Add(3 * time.Minute); download.State == "Preparing" && time.Now().Before(until); {
+		if err := installedJourneyPause(ctx, 2*time.Second); err != nil {
+			t.Fatal(err)
+		}
+		if download.ContinuePreparation {
+			prepare()
+		} else {
+			read("get_artifact_download", map[string]string{"download_id": download.DownloadID}, &download)
+		}
+	}
+	if download.State != "Ready" || download.SizeBytes == nil {
+		diagnose()
+		t.Fatal("mixed download not ready", download.State)
+	}
+	response := installedJourneyContent(t, ctx, &http.Client{Transport: transport, Timeout: time.Minute}, strings.TrimSuffix(origin, "/")+download.ContentPath, identity.downloadToken(), nil)
+	defer response.Body.Close()
+	_, disposition, err := mime.ParseMediaType(response.Header.Get("Content-Disposition"))
+	name := disposition["filename"]
+	extension := filepath.Ext(name)
+	native, readErr := io.ReadAll(io.LimitReader(response.Body, artifact.RecordingNativeLimit+1))
+	digest := sha256.Sum256(native)
+	if err != nil || readErr != nil || name != "artifact-"+artifactID+extension || (extension != ".pcapng" && extension != ".jsonl") || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
+		t.Fatal("mixed native download does not match its metadata", name, err, readErr)
+	}
+	return native, extension
 }

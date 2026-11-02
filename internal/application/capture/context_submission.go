@@ -205,6 +205,11 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if a.Replay && !continuation {
 		return a, nil
 	}
+	if compositionGroupAccepted(a) {
+		err = s.dispatchCompositionGroup(call, current, i, a, func() (context.Context, time.Time, error) { e := check(); return call, until, e })
+		fresh, readErr := s.refreshGroupMetadata(i, a, preview, key, func() (context.Context, time.Time, error) { e := check(); return call, until, e })
+		return fresh, errors.Join(err, readErr)
+	}
 	if a.Group != nil {
 		if !s.RecordingSaveEnabled {
 			return a, value.ErrUnavailable

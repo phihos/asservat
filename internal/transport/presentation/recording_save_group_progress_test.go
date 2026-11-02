@@ -142,6 +142,12 @@ func TestRecordingSaveGroupProgressRejectsSubstitutedOrDuplicateInstances(t *tes
 			t.Fatal("invalid child metadata accepted", kind)
 		}
 	}
+	// ADR-276: a composition group collects two recordings on one Pod.
+	second := original
+	second.InstanceID, second.ActionID = "00000000-0000-4000-8000-000000000102", "calls"
+	if actions, err := recordingProgressActions(value.ContextProgress{CaptureID: parent, Operation: "collect", Actions: []value.ContextActionProgress{original, second}}); err != nil || len(actions) != 2 {
+		t.Fatal("composition group actions", err)
+	}
 }
 
 type recordingParentCaptureFixture struct{ *contextOperationFixture }

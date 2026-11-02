@@ -2315,7 +2315,7 @@ type RecordingSaveGroup struct {
 	SubmissionDigest  []byte
 	ScopeDigest       []byte
 	ScopeJson         []byte
-	PolicyUid         string
+	PolicyUid         pgtype.Text
 	AcceptanceID      pgtype.UUID
 	AllocationID      pgtype.UUID
 	ChildIds          []pgtype.UUID
@@ -2324,6 +2324,7 @@ type RecordingSaveGroup struct {
 	ProgressRevision  int64
 	CancelRequestedAt pgtype.Timestamptz
 	CancelRequestKey  []byte
+	GroupKind         string
 }
 
 type RecordingSaveReservation struct {
