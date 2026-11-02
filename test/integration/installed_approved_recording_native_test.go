@@ -42,7 +42,12 @@ type installedApprovedRecordingPreview struct {
 	Blockers []struct {
 		Code string `json:"code"`
 	} `json:"blockers"`
-	Pods []struct{ UID, Name string } `json:"selected_pods"`
+	Pods      []struct{ UID, Name string } `json:"selected_pods"`
+	Lifecycle struct {
+		Actions []struct {
+			ActionID string `json:"actionID"`
+		} `json:"actions"`
+	} `json:"lifecycle_plan"`
 }
 
 func (p installedApprovedRecordingPreview) readyForApproval(now time.Time) bool {
@@ -347,6 +352,15 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Fatal("approved recording preview lacks its original window or has a non-approval blocker", preview.Blockers)
 	}
 	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "approved-preview-" + preview.ID}
+	if installedJourneyFocus() == "manual-raw" {
+		// ADR-279: raw output downloads only through result-access children of
+		// the requesting human's own client.
+		if len(preview.Lifecycle.Actions) != 1 {
+			t.Fatal("raw preview lacks its one action", preview.Lifecycle)
+		}
+		original["result_access"] = map[string]any{"actionIds": []string{preview.Lifecycle.Actions[0].ActionID}, "operations": []string{"download_artifact"}, "clientIDs": []string{"mcp"},
+			"maxArtifacts": 1, "maxBytes": 64 << 20, "maxOperations": 100, "notAfter": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}
+	}
 	pending, code := invoke("request_capture", original)
 	var refused struct {
 		URI string `json:"navigation_uri"`

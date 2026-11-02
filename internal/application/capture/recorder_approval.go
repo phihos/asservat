@@ -96,9 +96,10 @@ func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, sourc
 	if _, err := s.recorderRequest(ctx, source, p, key, access); err != nil {
 		return zero, err
 	}
-	// ADR-248: the node recorder does not deliver results under a result-access
-	// instruction yet.
-	return zero, value.ErrRecorderUnavailable
+	// The approved grant binds this exact result access (its digest); the
+	// ordinary submission rechecks the same covering grant (ADR-279: a raw
+	// recording downloads only through these children).
+	return s.Request(ctx, source, previewID, key)
 }
 
 // recorderRequest decides the approval gate of a reviewed packet/syscall
@@ -171,7 +172,12 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		}
 		return g, nil
 	case errors.Is(err, authorization.ErrApprovalRequired):
-		// No request exists yet: only a current preview can open one.
+		// No request exists yet: only a current preview can open one. Raw
+		// output downloads only through result-access children (ADR-279), so
+		// a raw request without them would retain payload nobody can read.
+		if approval.DataClass == "raw" && access == nil {
+			return authorization.Grant{}, value.ErrInvalid
+		}
 	default:
 		return authorization.Grant{}, err
 	}
