@@ -67,6 +67,9 @@ type heldRecording struct {
 	expires         time.Time
 	snapshot        *collector.SourceSnapshot
 	outcome         evidence.RecordingCollection
+	// stopPeers ends the recording's peer membership verifier (ADR-283
+	// part 3); nil without Kubernetes peers.
+	stopPeers context.CancelFunc
 }
 
 type ConnectorRecordings struct {
@@ -75,13 +78,19 @@ type ConnectorRecordings struct {
 	now   func() time.Time
 	log   func(string)
 
-	mu      sync.Mutex
-	held    map[string]*heldRecording // by capture ID
-	storing int64
+	// after paces the peer verifiers (time.After; tests inject a clock).
+	after func(time.Duration) <-chan time.Time
+	wg    sync.WaitGroup
+
+	mu        sync.Mutex
+	held      map[string]*heldRecording // by capture ID
+	storing   int64
+	peers     peerResolver
+	verifiers int // running peer verifiers, at most maxPeerVerifiers
 }
 
 func NewConnectorRecordings(nodes recordingNodes, pods podNodes, now func() time.Time, log func(string)) *ConnectorRecordings {
-	return &ConnectorRecordings{nodes: nodes, pods: pods, now: now, log: log, held: map[string]*heldRecording{}}
+	return &ConnectorRecordings{nodes: nodes, pods: pods, now: now, log: log, after: time.After, held: map[string]*heldRecording{}}
 }
 
 // expireLocked drops outcomes and pending recordings past their deadline.
@@ -151,12 +160,31 @@ func (h *ConnectorRecordings) start(ctx context.Context, p *objectstore.Prepared
 		}
 		work.ProgramDigest = [32]byte(compiler.FilterProgramDigest(work.Program))
 	}
+	// ADR-283 part 3: frozen Kubernetes peers must resolve to exactly the
+	// reviewed members before the node is asked to record.
+	frozen, peered, err := compiler.FrozenRecordingPeers(rec)
+	if err != nil {
+		return time.Time{}, value.ErrInvalid
+	}
+	var confirmed time.Time
+	if peered {
+		if confirmed, err = h.confirmPeersAtStart(ctx, frozen); err != nil {
+			h.log("connector recording " + e.CaptureUID + " refused at start: " + err.Error())
+			return time.Time{}, err
+		}
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	now := h.now()
 	h.expireLocked(now)
 	if _, exists := h.held[e.CaptureUID]; exists || len(h.held) >= maxHeldRecordings || !now.Before(until) {
 		return time.Time{}, value.ErrUnavailable
+	}
+	if peered && h.verifiers >= maxPeerVerifiers {
+		return time.Time{}, targets.ErrPeerVerifierBusy
+	}
+	if peered && !now.Before(confirmed.Add(frozen.MaxStaleness)) {
+		return time.Time{}, targets.ErrPeersStale
 	}
 	// The node may start until the earlier of the committed start's end
 	// plus its start allowance and the write window.
@@ -169,8 +197,19 @@ func (h *ConnectorRecordings) start(ctx context.Context, p *objectstore.Prepared
 		return time.Time{}, value.ErrUnavailable
 	}
 	queued := now.UTC().Truncate(time.Microsecond)
-	h.held[e.CaptureUID] = &heldRecording{expectation: e, digest: evidence.ContextExpectationDigest(e), prepared: p, nodeUID: v.Identity.NodeUID, workID: w.ID, queued: queued,
+	held := &heldRecording{expectation: e, digest: evidence.ContextExpectationDigest(e), prepared: p, nodeUID: v.Identity.NodeUID, workID: w.ID, queued: queued,
 		expires: e.Registration.WriteUntil.Add(recordingRetain), outcome: evidence.RecordingCollection{State: evidence.RecordingPending}}
+	h.held[e.CaptureUID] = held
+	if peered {
+		// The verifier outlives the start exchange; it ends with the
+		// recording window, the node's result or a stop.
+		verify, stop := context.WithCancel(context.Background())
+		held.stopPeers = stop
+		h.verifiers++
+		h.wg.Add(1)
+		go h.verifyPeers(verify, held, peerVerifier{resolve: h.peers, now: h.now, after: h.after, frozen: frozen}, confirmed, startBy.Add(work.Duration))
+		h.log(fmt.Sprintf("connector recording %s verifies %d frozen peer members every %s", e.CaptureUID, len(frozen.Resolution.Members), peerVerifyInterval))
+	}
 	h.log("connector recording " + e.CaptureUID + " queued on node " + name)
 	return queued, nil
 }
@@ -202,6 +241,9 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		return value.ErrDenied
 	}
 	if r.Failure != "" {
+		if held.stopPeers != nil {
+			held.stopPeers()
+		}
 		held.prepared, held.outcome = nil, evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "captureFailed"}
 		h.mu.Unlock()
 		_, _ = io.Copy(io.Discard, pcapng)
@@ -215,6 +257,9 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 	}
 	h.storing += r.CapturedBytes
 	held.storing = true
+	if held.stopPeers != nil {
+		held.stopPeers() // the node's capture ended; nothing more to verify
+	}
 	prepared, e := held.prepared, held.expectation
 	held.prepared = nil // single use, also after a failed store
 	h.mu.Unlock()

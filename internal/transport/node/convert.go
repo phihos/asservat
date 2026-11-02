@@ -152,6 +152,9 @@ func WireWork(w collector.Work) contracts.NodeWork {
 		binding := WireSourceBinding(*w.StopSource)
 		out.StopPacketSource = &binding
 	}
+	if c := w.CancelPacket; c != nil {
+		out.CancelPacketCapture = &contracts.NodePacketCancel{CaptureID: c.CaptureID, WorkID: c.WorkID}
+	}
 	if p := w.Packet; p != nil {
 		c := &contracts.NodePacketCapture{CaptureID: p.CaptureID, PodUID: p.PodUID, Program: make([]contracts.NodeBPFInstruction, len(p.Program)),
 			DurationMillis: p.Duration.Milliseconds(), MaxBytes: p.MaxBytes}
@@ -230,6 +233,14 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 			binding = collector.SourceBinding{}
 		}
 		out.StopSource = &binding
+	}
+	if c := w.CancelPacketCapture; c != nil {
+		// An unusable payload stays an invalid item, answered WorkUnknown.
+		cancel := collector.PacketCancel{CaptureID: c.CaptureID, WorkID: c.WorkID}
+		if !cancel.Valid() {
+			cancel = collector.PacketCancel{}
+		}
+		out.CancelPacket = &cancel
 	}
 	if c := w.PacketCapture; c != nil {
 		// An unusable payload stays an invalid item, answered WorkUnknown.

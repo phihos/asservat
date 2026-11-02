@@ -91,19 +91,67 @@ func TestKubernetesPeersCompileResolvedHostPrefixes(t *testing.T) {
 	if err != nil || replaced.Actions[0].PeerMembersDigest == a.PeerMembersDigest || replaced.Actions[0].Filter != a.Filter {
 		t.Fatal("a replaced member kept the members digest", err)
 	}
-	// Submission is refused with the reason; the context and recording paths
-	// fail closed as well.
+	// ADR-283 part 3: a manual plan is recordable; its node recording
+	// carries exactly the reviewed members for the connector's verifier, and
+	// the accepted scope rebuilds the same frozen input.
 	in.NodeRecorder = true
 	recordable, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := AcceptableRecorder(recordable)
-	if got.Acceptable() || got.Code != "RecorderUnavailable" || got.Reason != KubernetesPeersAcceptance || !strings.HasSuffix(got.Path, ".parameters.peers") {
+	if got := AcceptableRecorder(recordable); !got.Acceptable() {
 		t.Fatalf("acceptance %+v", got)
 	}
-	if _, _, err := RecordingFor(recordable); err == nil {
-		t.Fatal("a Kubernetes peer plan produced a node recording")
+	rec, _, err := RecordingFor(recordable)
+	if err != nil || rec.Peers == nil || len(rec.Peers.Members) != 3 || rec.Peers.MaxStalenessMillis != 5000 || !rec.Peers.ResolvedAt.Equal(now.Add(-time.Second)) {
+		t.Fatalf("recording peers %+v %v", rec.Peers, err)
+	}
+	frozen, ok, err := FrozenRecordingPeers(&rec)
+	if err != nil || !ok || !frozen.Resolution.Request.Equal(needed.Request) || frozen.MaxStaleness != 5*time.Second {
+		t.Fatalf("frozen %+v %v", frozen, err)
+	}
+	for _, rc := range []func() (*value.RecorderContext, error){
+		func() (*value.RecorderContext, error) {
+			return RecorderContextFromScope(in.Composition, recordable.CanonicalScope)
+		},
+		func() (*value.RecorderContext, error) { return RecorderContextFor(&rec) },
+	} {
+		ctx, err := rc()
+		if err != nil || len(ctx.Peers) != 1 {
+			t.Fatalf("context %+v %v", ctx, err)
+		}
+		again := in
+		again.Peers = ctx.Peers
+		replay, err := CompileRecorder(again, frozenFilters(ctx.Filters), now.Add(time.Second))
+		if err != nil || replay.ScopeDigest != recordable.ScopeDigest {
+			t.Fatalf("accepted scope not reproduced: %v", err)
+		}
+	}
+	// A policy executor cannot record Kubernetes peers.
+	if got := recorderAcceptance(recordable, true); got.Acceptable() || got.Reason != KubernetesPeersAcceptance || !strings.HasSuffix(got.Path, ".parameters.peers") {
+		t.Fatalf("policy acceptance %+v", got)
+	}
+}
+
+// ADR-283 part 3: the verifier re-resolves once per second, so a Kubernetes
+// peer freshness bound is 1 to 5 seconds; CIDR peers are unaffected.
+func TestKubernetesPeersMaxStalenessBounds(t *testing.T) {
+	in, now := recorderInput(t, network(), "packetCapture")
+	for _, staleness := range []string{"500ms", "6s", "1m"} {
+		edit := kubernetesPeersEdit(in.Target.Request.Namespace.Name, deploymentPeer("db"))
+		edit.Peers.MaxStaleness = staleness
+		in.Composition = network(edit)
+		_, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now)
+		var refusal value.CompositionError
+		if !errors.As(err, &refusal) || !strings.HasSuffix(refusal.Path, ".maxStaleness") {
+			t.Fatalf("%s: %v", staleness, err)
+		}
+	}
+	edit := kubernetesPeersEdit(in.Target.Request.Namespace.Name, deploymentPeer("db"))
+	edit.Peers.MaxStaleness = "1s"
+	in.Composition = network(edit)
+	if _, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now); !errors.As(err, new(PeerResolutionNeeded)) {
+		t.Fatal(err)
 	}
 }
 

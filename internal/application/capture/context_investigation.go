@@ -732,6 +732,9 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		if err = s.recordingAssessment(p, plan); err != nil {
 			return zero, s.requestChanged("assessment")
 		}
+		if err = s.peersCurrent(ctx, plan); err != nil {
+			return zero, err
+		}
 	} else if assessment, err := compiler.AssessContext(plan, p.AssessmentID, s.Now()); err != nil || assessment.RulesDigest != p.AssessmentRulesDigest {
 		return zero, s.requestChanged("assessment")
 	}

@@ -43,6 +43,7 @@ type installedApprovedRecordingPreview struct {
 		Code string `json:"code"`
 	} `json:"blockers"`
 	Pods      []struct{ UID, Name string } `json:"selected_pods"`
+	Warnings  []string                     `json:"warnings"`
 	Lifecycle struct {
 		Actions []struct {
 			ActionID string `json:"actionID"`
@@ -74,6 +75,10 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 	if installedJourneyFocus() == "manual-http" {
 		// ADR-282: one finite HTTP response-header recording from a namespace profile.
 		return manualHTTPArguments(cluster, namespace, workload)
+	}
+	if installedJourneyFocus() == "manual-peers" {
+		// ADR-283: one finite packet-header recording limited to a Kubernetes peer.
+		return manualPeersArguments(cluster, namespace, workload)
 	}
 	if installedJourneyFocus() == "manual-mixed" {
 		// ADR-276: packet and syscall finite recordings of one Pod at once.
@@ -360,7 +365,27 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		// ADR-282: extract downloads use ordinary eligibility; no result_access.
 		publishManualHTTPProfile(t, ctx, regionalConfig, namespace)
 	}
+	var peerIPs []string
+	if installedJourneyFocus() == "manual-peers" {
+		// ADR-283: the peer Pod runs before preview resolves its membership.
+		cfg, err := clientcmd.BuildConfigFromFlags("", regionalConfig)
+		if err != nil {
+			t.Fatal(err)
+		}
+		region, err := kubernetes.NewForConfig(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		peerIPs = createManualPeersClient(t, ctx, region, namespace, workload)
+	}
 	read("preview_capture", arguments, &preview)
+	if installedJourneyFocus() == "manual-peers" {
+		endpoints, digest, ok := manualPeersEndpoints(preview.Warnings)
+		t.Logf("peer preview: %d Kubernetes endpoints resolved (members digest %s); blockers %v", endpoints, digest, preview.Blockers)
+		if !ok || endpoints != len(peerIPs) {
+			t.Fatal("peer preview did not resolve exactly the client Pod's addresses", endpoints, peerIPs, preview.Warnings)
+		}
+	}
 	if !preview.readyForApproval(time.Now()) {
 		t.Fatal("approved recording preview lacks its original window or has a non-approval blocker", preview.Blockers)
 	}
@@ -522,6 +547,17 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 	}()
 	defer func() { endTraffic(); <-joined }()
+	peerRuns := make(chan int, 1)
+	if installedJourneyFocus() == "manual-peers" {
+		// ADR-283: the peer's traffic to the exact selected Pod, beside the
+		// API proxy traffic above that the peer filter must exclude.
+		pod, err := region.CoreV1().Pods(namespace).Get(ctx, preview.Pods[0].Name, meta.GetOptions{})
+		if err != nil || string(pod.UID) != preview.Pods[0].UID || pod.Status.PodIP == "" {
+			t.Fatal("exact peer traffic target is unavailable", err)
+		}
+		go func() { peerRuns <- manualPeersTraffic(traffic, regionalConfig, namespace, pod.Status.PodIP) }()
+		defer func() { endTraffic(); t.Logf("peer client completed %d bounded traffic runs", <-peerRuns) }()
+	}
 	submitted := time.Now()
 	var receipt struct {
 		CaptureID string `json:"capture_id"`
@@ -830,6 +866,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-http" {
 		s := qualifyManualHTTPProjection(t, native)
 		t.Logf("manual HTTP header recording %s: %d records (%d GET with status), %d bytes; counters %+v", receipt.CaptureID, s.Records, s.Answered, len(native), s.Counters)
+		return
+	}
+	if installedJourneyFocus() == "manual-peers" {
+		packets := qualifyManualPeersPCAP(t, ctx, native, peerIPs[0])
+		t.Logf("manual peer recording %s: %d packets, all to or from peer %s on port %d, %d bytes", receipt.CaptureID, packets, peerIPs[0], manualPeersPort, len(native))
 		return
 	}
 	if installedJourneyFocus() == "manual-raw" {

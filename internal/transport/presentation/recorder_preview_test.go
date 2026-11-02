@@ -243,10 +243,11 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 		t.Fatal("typed peers edit not decoded")
 	}
 	// ADR-283 PR 2: Kubernetes peers are previewed with their resolved
-	// endpoint count and members digest, and refused for submission.
+	// endpoint count and members digest; a plan-only preview has the generic
+	// RecorderUnavailable blocker (part 3 lifted the peer-specific gate).
 	k8s := strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"payments","name":"db"}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":8,"maxStaleness":"5s"}`, 1)
 	reply, err = s.Call(t.Context(), f, "preview_capture", []byte(k8s))
-	if err != nil || !strings.Contains(string(reply.Body), "Peers: 2 Kubernetes endpoints resolved at preview") || !strings.Contains(string(reply.Body), "(net 10.0.0.11/32 or net 10.0.0.12/32) and tcp") || !strings.Contains(string(reply.Body), "membership verifier of the next release") || !strings.Contains(string(reply.Body), `"capture_enabled":false`) {
+	if err != nil || !strings.Contains(string(reply.Body), "Peers: 2 Kubernetes endpoints resolved at preview") || !strings.Contains(string(reply.Body), "(net 10.0.0.11/32 or net 10.0.0.12/32) and tcp") || !strings.Contains(string(reply.Body), `"code":"RecorderUnavailable"`) || strings.Contains(string(reply.Body), "Kubernetes peers in this release") || !strings.Contains(string(reply.Body), `"capture_enabled":false`) {
 		t.Fatalf("kubernetes peers: %v %s", err, reply.Body)
 	}
 	if k := f.composition.Components[0].Edits[0].Peers; k == nil || len(k.Kubernetes) != 1 || k.Kubernetes[0].Resource.Kind != "Deployment" || k.Kubernetes[0].Resource.Namespace != "payments" {

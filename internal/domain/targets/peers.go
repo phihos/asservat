@@ -524,3 +524,51 @@ func labelValue(v string) bool {
 	}
 	return true
 }
+
+// Membership verification (ADR-283 part 3). The region re-resolves a frozen
+// peer query when a recording starts and once per second while it runs; the
+// reviewed member set may not lose or change a member.
+
+var (
+	// ErrPeersChanged is a frozen membership that lost a member, whose
+	// member changed its address, or whose address now belongs to another
+	// object. The capture never continues with a different set.
+	ErrPeersChanged = errors.New("kubernetes peer membership changed")
+	// ErrPeersStale is a frozen membership no consistent resolution
+	// confirmed within its freshness bound.
+	ErrPeersStale = errors.New("kubernetes peer membership stale")
+	// ErrPeerVerifierBusy is a region already verifying its maximum number
+	// of running captures with Kubernetes peers.
+	ErrPeerVerifierBusy = errors.New("kubernetes peer verifier capacity reached")
+)
+
+// PeerMembershipChanged reports whether current, a fresh resolution of the
+// same query, no longer contains every frozen member, or assigns a frozen
+// address to a different object. Members current adds are not captured
+// (the reviewed filter is fixed), so they change nothing.
+func PeerMembershipChanged(frozen, current []PeerMember) bool {
+	have := make(map[PeerMember]bool, len(current))
+	for _, m := range current {
+		have[m] = true
+	}
+	byIP := make(map[string]PeerMember, len(frozen))
+	for _, m := range frozen {
+		if !have[m] {
+			return true
+		}
+		byIP[m.IP] = m
+	}
+	for _, m := range current {
+		if f, ok := byIP[m.IP]; ok && f != m {
+			return true
+		}
+	}
+	return false
+}
+
+// FrozenPeers is the connector's decoded view of a recording's frozen
+// peers: the exact query, its reviewed resolution and the freshness bound.
+type FrozenPeers struct {
+	Resolution   PeerResolution
+	MaxStaleness time.Duration
+}

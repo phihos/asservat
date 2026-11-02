@@ -22,6 +22,9 @@ const (
 	CompositionRecorderUnavailable = "RecorderUnavailable"
 	// CompositionConflict is a duplicate or overlapping acquisition (REQ-CPR-003).
 	CompositionConflict = "AcquisitionConflict"
+	// CompositionPeersChanged is a frozen Kubernetes peer set that no longer
+	// resolves to the reviewed members at submission (ADR-283 part 3).
+	CompositionPeersChanged = "PeerMembershipChanged"
 )
 
 // Sensitive-acquisition reasons (ADR-249). Either makes the plan need an

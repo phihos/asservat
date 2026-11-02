@@ -173,3 +173,26 @@ func TestPeerRequestAndAnswerBounds(t *testing.T) {
 		t.Fatal("an answer to another query was accepted")
 	}
 }
+
+// ADR-283 part 3, pure membership rule: additions are ignored; losses, address changes and
+// reassignments are changes.
+func TestPeerMembershipChanged(t *testing.T) {
+	a := PeerMember{Kind: "Pod", UID: "a", IP: "10.0.0.1"}
+	b := PeerMember{Kind: "Pod", UID: "b", IP: "10.0.0.2"}
+	svc := PeerMember{Kind: "Service", UID: "s", IP: "10.96.0.1"}
+	for _, tc := range []struct {
+		frozen, current []PeerMember
+		changed         bool
+	}{
+		{[]PeerMember{a, svc}, []PeerMember{a, svc}, false},
+		{[]PeerMember{a}, []PeerMember{a, b}, false},
+		{[]PeerMember{a, b}, []PeerMember{a}, true},
+		{[]PeerMember{a}, []PeerMember{{Kind: "Pod", UID: "a", IP: "10.0.0.9"}}, true},
+		{[]PeerMember{a}, []PeerMember{a, {Kind: "Pod", UID: "z", IP: "10.0.0.1"}}, true},
+		{[]PeerMember{svc}, []PeerMember{{Kind: "Service", UID: "s2", IP: "10.96.0.1"}}, true},
+	} {
+		if got := PeerMembershipChanged(tc.frozen, tc.current); got != tc.changed {
+			t.Fatalf("%v -> %v: %v", tc.frozen, tc.current, got)
+		}
+	}
+}

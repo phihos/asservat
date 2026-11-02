@@ -1,5 +1,7 @@
 package artifact
 
+import "time"
+
 // ADR-248: the accepted node recording of a manual networkHeaders packet
 // capture. It is part of the expectation, so the expectation digest binds the
 // exact hub-compiled filter program, duration and output cap the node runs.
@@ -76,6 +78,54 @@ type Recording struct {
 	// HTTP are an httpHeaders recording's parser bounds (ADR-282); nil
 	// otherwise, so other digests are unchanged.
 	HTTP *RecordingHTTP `json:",omitempty"`
+	// Peers is the frozen Kubernetes peer membership the connector verifies
+	// at start and while the recording runs (ADR-283 part 3); nil without
+	// Kubernetes peers, so other digests are unchanged.
+	Peers *RecordingPeers `json:",omitempty"`
+}
+
+// Frozen peer bounds (ADR-283): at most 256 members per resolution and a
+// freshness bound of 1 to 5 seconds (specs/packets.md REQ-NET-003).
+const (
+	MaxRecordingPeerMembers   = 256
+	maxRecordingPeerQuery     = 16 << 10
+	MinRecordingPeerStaleness = 1000
+	MaxRecordingPeerStaleness = 5000
+)
+
+// RecordingPeers is one action's frozen Kubernetes peer resolution: the
+// region's query (the targets package owns its type and decodes Query), the
+// resolved (kind, UID, IP) members in canonical order, the hub's receipt
+// time and the freshness bound of the membership verifier.
+type RecordingPeers struct {
+	Query              []byte
+	Members            []RecordingPeerMember
+	ResolvedAt         time.Time
+	MaxStalenessMillis int64
+}
+
+// RecordingPeerMember is one frozen member.
+type RecordingPeerMember struct {
+	Kind, UID, IP string
+}
+
+// PeersValid checks only the frozen peer bounds.
+func (r *Recording) PeersValid() bool { return r != nil && r.Peers.valid() }
+
+func (p *RecordingPeers) valid() bool {
+	if p == nil {
+		return true
+	}
+	if len(p.Query) < 2 || len(p.Query) > maxRecordingPeerQuery || len(p.Members) < 1 || len(p.Members) > MaxRecordingPeerMembers || p.ResolvedAt.IsZero() ||
+		p.MaxStalenessMillis < MinRecordingPeerStaleness || p.MaxStalenessMillis > MaxRecordingPeerStaleness {
+		return false
+	}
+	for _, m := range p.Members {
+		if (m.Kind != "Pod" && m.Kind != "Service") || len(m.UID) < 1 || len(m.UID) > 64 || len(m.IP) < 2 || len(m.IP) > 64 {
+			return false
+		}
+	}
+	return true
 }
 
 // The specified httpHeaders parser maxima (specs/packets.md, ADR-282).
@@ -175,7 +225,8 @@ func (r *Recording) Valid() bool {
 			return false
 		}
 	}
-	return true
+	// Kubernetes peers narrow a packet filter; they never stand alone.
+	return r.Peers.valid() && (r.Peers == nil || r.Kind == "packetCapture" && r.Filter != nil)
 }
 
 // Clone returns an independent copy.
@@ -202,6 +253,12 @@ func (r *Recording) Clone() *Recording {
 	if r.HTTP != nil {
 		h := *r.HTTP
 		out.HTTP = &h
+	}
+	if r.Peers != nil {
+		p := *r.Peers
+		p.Query = append([]byte(nil), r.Peers.Query...)
+		p.Members = append([]RecordingPeerMember(nil), r.Peers.Members...)
+		out.Peers = &p
 	}
 	return &out
 }

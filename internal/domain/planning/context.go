@@ -102,6 +102,9 @@ type RecorderContext struct {
 	// RequireApproval is the installation's ADR-249 switch as frozen in
 	// the reviewed plan.
 	RequireApproval bool `json:",omitempty"`
+	// Peers are the frozen Kubernetes peer resolutions of the reviewed plan
+	// (ADR-283 part 3), so acceptance recompiles the exact reviewed scope.
+	Peers []targets.PeerResolution `json:",omitempty"`
 }
 
 // CompiledExpression is one frozen filter compilation.
@@ -116,6 +119,9 @@ func (r *RecorderContext) Clone() *RecorderContext {
 		return nil
 	}
 	out := RecorderContext{Composition: *r.Composition.Clone(), RequireApproval: r.RequireApproval}
+	for _, p := range r.Peers {
+		out.Peers = append(out.Peers, p.Clone())
+	}
 	for _, f := range r.Filters {
 		f.Filter.Program = append([]BPFInstruction(nil), f.Filter.Program...)
 		out.Filters = append(out.Filters, f)

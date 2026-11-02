@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -39,6 +40,7 @@ func TestPacketPeersCrossRegionalExchange(t *testing.T) {
 		"limit":       {&regionPeers{err: targets.ErrPeerLimit}, "peer-limit", targets.ErrPeerLimit},
 		"unsupported": {&regionPeers{err: targets.ErrPeerUnsupported}, "peer-unsupported", targets.ErrPeerUnsupported},
 		"missing":     {&regionPeers{err: targets.ErrPeerMissing}, "peer-missing", targets.ErrPeerMissing},
+		"busy":        {&regionPeers{err: targets.ErrPeerVerifierBusy}, "peer-busy", targets.ErrPeerVerifierBusy},
 		"old region":  {&countingLocal{}, "unsupported", targets.ErrUnsupported},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -80,5 +82,15 @@ func TestPacketPeersCrossRegionalExchange(t *testing.T) {
 				t.Fatalf("answer %s", reply.Body)
 			}
 		})
+	}
+}
+
+// ADR-283 part 3: the connector's start refusals cross the operation
+// exchange with their own closed labels.
+func TestPeerStartFailuresCrossOperationExchange(t *testing.T) {
+	for label, err := range map[string]error{"peers-changed": targets.ErrPeersChanged, "peers-stale": targets.ErrPeersStale, "peer-busy": targets.ErrPeerVerifierBusy} {
+		if got := operationFailureLabel(fmt.Errorf("start: %w", err)); got != label || !errors.Is(operationFailureError(got), err) {
+			t.Fatal(label, got)
+		}
 	}
 }

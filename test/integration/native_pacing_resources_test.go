@@ -30,6 +30,7 @@ func TestNativePacingTargetResourceProfileIsExplicit(t *testing.T) {
 		{"manual-mixed", "manual-mixed", false, 5, 100},
 		{"manual-raw", "manual-raw", false, 5, 100},
 		{"manual-http", "manual-http", false, 5, 100},
+		{"manual-peers", "manual-peers", false, 5, 100},
 		{"policy-recording", "policy-recording", false, 5, 100},
 		{"ongoing-save", "ongoing-save", false, 5, 100},
 		{"ongoing-save-disk", "ongoing-save-disk", false, 5, 100},

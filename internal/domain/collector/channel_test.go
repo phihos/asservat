@@ -55,3 +55,24 @@ func TestDecideRefusesEveryKindInThisBuild(t *testing.T) {
 		t.Fatal("open reason")
 	}
 }
+
+func TestDecideCancelPacketCaptureNeedsExactPayload(t *testing.T) {
+	ok := &PacketCancel{CaptureID: "22222222-2222-4222-8222-222222222222", WorkID: "33333333-3333-4333-8333-333333333333"}
+	at := t0.Add(time.Second)
+	if r := Decide(Work{ID: "w", Sequence: 1, Kind: WorkCancelPacketCapture, NotAfter: at, CancelPacket: ok}, t0); r.Reason != ReasonRecorderNotImplemented {
+		t.Fatalf("valid cancel: %+v", r)
+	}
+	for name, w := range map[string]Work{
+		"no payload":     {Kind: WorkCancelPacketCapture, NotAfter: at},
+		"bad capture ID": {Kind: WorkCancelPacketCapture, NotAfter: at, CancelPacket: &PacketCancel{CaptureID: "x", WorkID: ok.WorkID}},
+		"bad work ID":    {Kind: WorkCancelPacketCapture, NotAfter: at, CancelPacket: &PacketCancel{CaptureID: ok.CaptureID, WorkID: "33333333-3333-4333-8333-33333333333G"}},
+		"other kind":     {Kind: WorkSnapshot, NotAfter: at, CancelPacket: ok},
+	} {
+		if r := Decide(w, t0); r.Reason != ReasonWorkUnknown {
+			t.Fatalf("%s: %+v", name, r)
+		}
+	}
+	if r := Decide(Work{Kind: WorkCancelPacketCapture, NotAfter: t0, CancelPacket: ok}, t0); r.Reason != ReasonWorkExpired {
+		t.Fatalf("expired: %+v", r)
+	}
+}

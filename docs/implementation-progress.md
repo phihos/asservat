@@ -1,6 +1,29 @@
 # Sustained implementation progress
 
 
+## Kubernetes peer membership verifier (2026-11-02)
+
+ADR-283 part 3: plans record the frozen members; the request re-resolves the
+frozen query and admits only the reviewed members (`PeerMembershipChanged`
+refusal otherwise); the connector re-resolves at start and once per second
+while a manual recording runs (at most 8 per connector, own 50 QPS client)
+and stops it through the new node work kind `cancelPacketCapture` with phase
+`peerMembershipChanged` or `peerMembershipStale` (migration 00121, no
+refund). `AcceptableRecorder` accepts manual frozen Kubernetes peer plans;
+policies and `follow` stay refused. New native focus
+`continuation-manual-peers` (not run).
+
+Verification: verifier unit tests with a manual clock and scripted resolver
+(stable, UID gone, deleted, IP reassigned, address changed, stale reads,
+start mismatch, cap, no resolver, node result first) pass under -race;
+planning round-trip (scope → context → recording → context) and
+maxStaleness bounds, capture submission recheck, node cancel protocol
+(collector/contracts/convert/delivery/node), contextstart labels, execution
+phase mapping and SQL progress mapping tests pass; go build, go vet,
+go-architecture-check, sql-check, spec-check, architecture-check and
+design-check pass. Migration 00121 was not run against PostgreSQL
+(custody-integration not run); no native suite was run.
+
 ## Kubernetes packet peers resolved at preview (2026-11-02)
 
 ADR-283 PR 2: `podSelector`/`resourceRef` peer entries in the target's

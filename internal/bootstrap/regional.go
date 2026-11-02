@@ -345,6 +345,7 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 		if r.context != nil {
 			recordings := NewConnectorRecordings(r.nodes.server.Channel, r.context.collector, time.Now, func(line string) { fmt.Fprintln(os.Stderr, line) })
 			r.nodes.server.Channel.SetPacketSink(recordings)
+			recordings.SetPeers(r.context.peers)
 			r.context.output.recordings = recordings
 		}
 	}

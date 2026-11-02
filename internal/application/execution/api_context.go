@@ -622,6 +622,12 @@ func (e executeStep) FixedStep() string {
 // pinned Pod is gone or Kubernetes denied the read; anything else is generic.
 func captureFailurePhase(err error) string {
 	switch {
+	case errors.Is(err, targets.ErrPeersChanged):
+		// ADR-283 part 3: the frozen peers no longer resolve to the reviewed
+		// members when the node would start.
+		return "peerMembershipChanged"
+	case errors.Is(err, targets.ErrPeersStale):
+		return "peerMembershipStale"
 	case errors.Is(err, targets.ErrChanged):
 		return "targetGone"
 	case errors.Is(err, targets.ErrDenied):

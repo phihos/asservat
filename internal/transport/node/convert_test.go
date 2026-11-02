@@ -123,3 +123,22 @@ func TestSyscallCaptureWorkRoundTrips(t *testing.T) {
 		t.Fatal("the node would refuse the decoded syscall capture")
 	}
 }
+
+func TestPacketCancelWorkRoundTripsStrictly(t *testing.T) {
+	c := collector.PacketCancel{CaptureID: "22222222-2222-4222-8222-222222222222", WorkID: "33333333-3333-4333-8333-333333333333"}
+	at := time.Now().Add(time.Second).UTC().Truncate(time.Microsecond)
+	w := collector.Work{ID: "44444444-4444-4444-8444-444444444444", Sequence: 2, Kind: collector.WorkCancelPacketCapture, NotAfter: at, CancelPacket: &c}
+	wire := WireWork(w)
+	if wire.CancelPacketCapture == nil || wire.CancelPacketCapture.CaptureID != c.CaptureID || wire.CancelPacketCapture.WorkID != c.WorkID {
+		t.Fatalf("%+v", wire)
+	}
+	got, ok := DomainWork(wire)
+	if !ok || got.CancelPacket == nil || *got.CancelPacket != c || got.Kind != collector.WorkCancelPacketCapture || collector.Decide(got, time.Now()).Reason == collector.ReasonWorkUnknown {
+		t.Fatalf("%+v", got)
+	}
+	wire.CancelPacketCapture = &contracts.NodePacketCancel{CaptureID: c.CaptureID, WorkID: "not-a-uuid"}
+	got, ok = DomainWork(wire)
+	if !ok || got.CancelPacket == nil || collector.Decide(got, time.Now()).Reason != collector.ReasonWorkUnknown {
+		t.Fatalf("an invalid cancel payload must be refused: %+v", got)
+	}
+}

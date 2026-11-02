@@ -162,3 +162,79 @@ compare the members digest within `maxStaleness`, stop on churn), lifting
 the gate; then `follow` once open item 7 measures LIST load; administrator
 peer scopes for other namespaces; Service port mapping; per-network-profile
 IP identity qualification.
+
+## Part 3 — Connector membership verifier; submission gate lifted
+
+Date: 2026-11-02. Status: accepted (agent decision).
+
+1. Frozen members in the plan: `peers.kubernetes` additionally records the
+   sorted `members` (kind, UID, IP). The accepted scope therefore carries the
+   exact set to verify; `RecorderContextFromScope` and `RecorderContextFor`
+   rebuild the frozen resolution (query derived again from the recipe's
+   authored peers in the recorded cluster/namespace, recorded members and
+   generation time) and the recompiled plan must reproduce the scope digest.
+   The node recording (`artifact.Recording.Peers`, omitempty, so other
+   expectation digests are unchanged) carries the query, members, generation
+   time and `maxStaleness`. Kubernetes peers require `maxStaleness` 1–5 s
+   (REQ-NET-003 caps it at 5 s; the verifier runs once per second).
+2. Request: after the scope is reproduced, the hub asks the target's region
+   (`resolve-packet-peers`) for the frozen query again and admits only exactly
+   the reviewed members; otherwise it refuses with `PeerMembershipChanged`
+   ("the Kubernetes peers changed since the preview; preview again") before
+   admission reserves anything.
+3. Start: the connector resolves the frozen query once more before it queues
+   node work; a different set refuses the start with phase
+   `peerMembershipChanged`, an unconfirmed resolution with
+   `peerMembershipStale` (closed labels `peers-changed`, `peers-stale`). A
+   refused start is spent like any other start the region refuses.
+4. Runtime: one verifier per running recording on the connector re-resolves
+   the query once per second with the preview's bounded reads (target
+   namespace only, `maxEndpoints` relaxed to the 256-member region limit so a
+   scale-up does not stop it). A frozen member that is gone, has another
+   address, or whose address now belongs to another object stops the
+   recording with `PeerMembershipChanged`; no consistent resolution within
+   `maxStaleness` of the last confirmation stops it with
+   `PeerMembershipStale`; a failed read never extends that bound. Members
+   added after review are not captured (the program is fixed) and do not
+   stop it. The stop drops the prepared keys, records the failure (no
+   acquisition, no copies, no refund) and queues the new node work kind
+   `cancelPacketCapture` for exactly that capture and work ID; the node
+   cancels the running capture, which reports the existing early-stop
+   failure, and the connector stores nothing it sends. A result the node
+   delivered before a stop stands: it was captured while the last
+   confirmation was fresh. Migration 00121 adds the two terminal phases;
+   get_capture shows `Failed` with reason `PeerMembershipChanged` or
+   `PeerMembershipStale`.
+5. Bounds: at most 8 verified recordings per connector. The plan's
+   ≤64 queries per cluster assumed one LIST per query; one re-resolution is
+   about four requests for a Service or Deployment entry, so 8 × 4 per second
+   stays inside the verifier's own client (opening limiter, 50 QPS), separate
+   from target resolution. At the cap the region's peer query answers
+   `peer-busy`, so preview and request refuse with RecorderUnavailable and
+   the reason; the start checks the cap again.
+6. Gate: `AcceptableRecorder` accepts manual plans with frozen Kubernetes
+   peers. Policies remain refused (their compositions refuse Kubernetes
+   entries and acceptance refuses a policy executor), so ongoing policy
+   sources never carry Kubernetes peers in this release; `follow` stays
+   refused.
+
+Complexity gate (part 3): 1. Benefit: makes the specified frozen peer
+selection recordable and enforces the spec's removal of deleted/reassigned
+IPs; without it the preview-only feature has no use. 2. No accepted risk
+reopened. 3. Typical (database Service, client Deployment). 4. Precedent:
+the S5 polling design; kube-proxy/Cilium watch instead. 5. No new RBAC: the
+same namespace reads as PR 2; one more client of the existing observer
+token. 6. Two terminal outcomes, no fallback (a stop never widens or
+continues capture). 7. No configuration. 8. Kubernetes LIST consistency
+only. 9. ≤8 × ~4 requests/s per connector while peer recordings run; none
+otherwise. 10. Additive migration with a guarded downgrade; older nodes
+reject the new work kind (the poll that carries it fails until its 5 s
+NotAfter) and the connector still stores nothing. 11. Smaller fixes
+(discarding results without a node stop) would keep capturing a reassigned
+address for up to five minutes.
+
+Native qualification: the `continuation-manual-peers` focus records a
+networkHeaders capture with a `resourceRef` Pod peer and checks with tshark
+that every packet has the peer's address; not yet run. Open: `follow`, policy
+peers, administrator peer scopes, Service port mapping, per-network-profile
+IP identity qualification.

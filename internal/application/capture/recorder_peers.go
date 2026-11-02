@@ -54,3 +54,37 @@ func (s ContextInvestigation) compileRecorderPeers(ctx context.Context, in plann
 	}
 	return plan, err
 }
+
+// peersCurrent re-resolves the frozen Kubernetes peers of an accepted
+// recorder plan at submission (ADR-283 part 3) and refuses, before
+// admission reserves anything, unless the region answers exactly the
+// reviewed members. The connector checks again when the node starts and
+// then once per second while the recording runs.
+func (s ContextInvestigation) peersCurrent(ctx context.Context, plan planning.ContextPlan) error {
+	if plan.Input.Recorder == nil || len(plan.Input.Recorder.Peers) == 0 {
+		return nil
+	}
+	rp, err := compiler.RecorderPlanForContext(plan)
+	if err != nil || len(rp.Actions) != 1 {
+		return value.ErrInvalid
+	}
+	path := "profile_composition.components[0] action " + rp.Actions[0].LocalID + ".parameters.peers"
+	if s.Peers == nil {
+		return planning.CompositionError{Code: planning.CompositionRecorderUnavailable, Path: path, Reason: "this installation cannot resolve Kubernetes peers; use cidrs entries"}
+	}
+	for _, frozen := range plan.Input.Recorder.Peers {
+		mark := time.Now()
+		fresh, err := s.Peers.ResolvePacketPeers(ctx, frozen.Request)
+		auditapp.MarkStep(ctx, "q-peers", mark)
+		switch {
+		case errors.Is(err, targets.ErrPeerVerifierBusy):
+			return planning.CompositionError{Code: planning.CompositionRecorderUnavailable, Path: path, Reason: "the target's cluster is already verifying its maximum number of running captures with Kubernetes peers; retry when one ends or use cidrs peers"}
+		case errors.Is(err, targets.ErrPeerMissing), errors.Is(err, targets.ErrPeerLimit), errors.Is(err, targets.ErrPeerUnsupported),
+			err == nil && (!fresh.Answers(frozen.Request) || !slices.Equal(fresh.Members, frozen.Members)):
+			return planning.CompositionError{Code: planning.CompositionPeersChanged, Path: path, Reason: "the Kubernetes peers changed since the preview; preview again"}
+		case err != nil:
+			return err
+		}
+	}
+	return ctx.Err()
+}
