@@ -743,7 +743,7 @@
         }
       },
       "then": {
-        "description": "Pod status (4 KiB), a manual networkHeaders packet recording delivered through the connector (ADR-248, at most 8 MiB), a saved syscall metadata window as JSON Lines (ADR-273, at most 8 MiB), a raw packet recording (ADR-279) or an HTTP header projection of class extract (ADR-282, at most 8 MiB).",
+        "description": "Pod status (4 KiB), a manual networkHeaders packet recording delivered through the connector (ADR-248, at most 8 MiB), a saved syscall metadata window as JSON Lines (ADR-273, at most 8 MiB), a raw packet recording (ADR-279), an HTTP header projection of class extract (ADR-282, at most 8 MiB) or a Go endpoint pprof profile or execution trace of class raw (ADR-284, at most 64 and 128 MiB).",
         "anyOf": [
           {
             "properties": {
@@ -925,6 +925,102 @@
                 "properties": {
                   "plaintextBytes": {
                     "maximum": 8388608
+                  }
+                }
+              }
+            }
+          },
+          {
+            "properties": {
+              "target": {
+                "properties": {
+                  "scope": {
+                    "const": "pod"
+                  }
+                }
+              },
+              "kind": {
+                "const": "profile"
+              },
+              "format": {
+                "const": "pprof"
+              },
+              "mediaType": {
+                "const": "application/octet-stream"
+              },
+              "dataClass": {
+                "const": "raw"
+              },
+              "profile": {
+                "properties": {
+                  "format": {
+                    "const": "pprof"
+                  },
+                  "profileType": {
+                    "not": {
+                      "const": "runtimeTrace"
+                    }
+                  }
+                }
+              },
+              "collectionProvenance": {
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  }
+                }
+              },
+              "sizes": {
+                "properties": {
+                  "plaintextBytes": {
+                    "maximum": 67108864
+                  }
+                }
+              }
+            }
+          },
+          {
+            "properties": {
+              "target": {
+                "properties": {
+                  "scope": {
+                    "const": "pod"
+                  }
+                }
+              },
+              "kind": {
+                "const": "profile"
+              },
+              "format": {
+                "const": "go-trace"
+              },
+              "mediaType": {
+                "const": "application/octet-stream"
+              },
+              "dataClass": {
+                "const": "raw"
+              },
+              "profile": {
+                "properties": {
+                  "format": {
+                    "const": "go-trace"
+                  },
+                  "profileType": {
+                    "const": "runtimeTrace"
+                  }
+                }
+              },
+              "collectionProvenance": {
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  }
+                }
+              },
+              "sizes": {
+                "properties": {
+                  "plaintextBytes": {
+                    "maximum": 134217728
                   }
                 }
               }

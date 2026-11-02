@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	GoProfileMediaType          = "application/octet-stream"
+	GoProfileMediaType          = artifact.ProfileMediaType
 	DefaultGoProfileBytes int64 = 16 << 20
-	MaximumGoProfileBytes int64 = 64 << 20
+	MaximumGoProfileBytes       = artifact.MaxPprofBytes
 	DefaultGoTraceBytes   int64 = 32 << 20
-	MaximumGoTraceBytes   int64 = 128 << 20
+	MaximumGoTraceBytes         = artifact.MaxGoTraceBytes
 )
 
 var (
@@ -34,34 +34,14 @@ type GoProfileParameters struct {
 }
 
 func (p GoProfileParameters) Valid() bool {
-	if p.ForceGC && (p.Type != "heap" || p.Mode != "snapshot") {
-		return false
-	}
-	switch p.Type {
-	case "cpu", "runtimeTrace":
-		limit := 60 * time.Second
-		if p.Type == "runtimeTrace" {
-			limit = 15 * time.Second
-		}
-		return p.Mode == "interval" && p.Duration >= time.Second && p.Duration <= limit && p.Duration%time.Second == 0
-	case "heap", "goroutine":
-		return p.Mode == "snapshot" && p.Duration == 0 || p.Mode == "delta" && validGoDelta(p.Duration)
-	case "allocs", "block", "mutex", "threadcreate":
-		return p.Mode == "cumulative" && p.Duration == 0 || p.Mode == "delta" && validGoDelta(p.Duration)
-	default:
-		return false
-	}
-}
-
-func validGoDelta(d time.Duration) bool {
-	return d >= time.Second && d <= 60*time.Second && d%time.Second == 0
+	return artifact.ValidGoProfile(p.Type, p.Mode, p.Duration, p.ForceGC)
 }
 
 func (p GoProfileParameters) Format() string {
 	if p.Type == "runtimeTrace" {
-		return "go-trace"
+		return artifact.GoTraceFormat
 	}
-	return "pprof"
+	return artifact.PprofFormat
 }
 
 // GoProfileRequest is an already resolved mechanism input, not a public request

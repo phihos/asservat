@@ -46,8 +46,85 @@ func (v *Validator) NativeCheck(e artifact.ContextExpectation, m ContextManifest
 		return &pcapngCheck{}, nil // caps are rechecked by packets.CheckRaw
 	case artifact.SyscallRecordsArtifact:
 		return &syscallCheck{v: v, pod: e.PodUID, from: m.StartedAt, until: m.CompletedAt}, nil
+	case artifact.PprofArtifact:
+		return &gzipCheck{}, nil // the publisher parses the profile (ADR-284)
+	case artifact.GoTraceArtifact:
+		return &traceHeaderCheck{}, nil
 	}
 	return nil, artifact.ErrInvalid
+}
+
+// gzipCheck bounds a pprof response without decompressing it in the
+// wrapping process: one gzip member header (deflate, no reserved flags) and
+// a trailer whose declared length (ISIZE) is at most the publisher's
+// decompression bound. It keeps the last eight bytes only. The publisher
+// decompresses, verifies CRC and length and parses (ADR-284).
+type gzipCheck struct {
+	failure
+	head  []byte
+	tail  [8]byte
+	total int64
+}
+
+func (c *gzipCheck) Write(p []byte) error {
+	if c.err != nil {
+		return c.err
+	}
+	if need := 10 - len(c.head); need > 0 {
+		c.head = append(c.head, p[:min(need, len(p))]...)
+		if len(c.head) == 10 && (c.head[0] != 0x1f || c.head[1] != 0x8b || c.head[2] != 8 || c.head[3]&0xe0 != 0) {
+			return c.fail(artifact.ErrIntegrity)
+		}
+	}
+	c.total += int64(len(p))
+	if len(p) >= 8 {
+		copy(c.tail[:], p[len(p)-8:])
+	} else {
+		copy(c.tail[:], c.tail[len(p):])
+		copy(c.tail[8-len(p):], p)
+	}
+	return nil
+}
+
+func (c *gzipCheck) Close() error {
+	if c.err != nil {
+		return c.err
+	}
+	// Header (10) and trailer (8) plus at least one deflate byte.
+	if c.total < 19 || len(c.head) != 10 || binary.LittleEndian.Uint32(c.tail[4:]) > artifact.MaxPprofDecompressedBytes {
+		return c.fail(artifact.ErrIntegrity)
+	}
+	return nil
+}
+
+// traceHeaderCheck requires a version 2 Go execution trace header; the
+// publisher reads every event (ADR-284).
+type traceHeaderCheck struct {
+	failure
+	head []byte
+}
+
+func (c *traceHeaderCheck) Write(p []byte) error {
+	if c.err != nil {
+		return c.err
+	}
+	if need := artifact.GoTraceHeaderBytes - len(c.head); need > 0 {
+		c.head = append(c.head, p[:min(need, len(p))]...)
+		if len(c.head) == artifact.GoTraceHeaderBytes && !artifact.GoTraceHeader(c.head) {
+			return c.fail(artifact.ErrIntegrity)
+		}
+	}
+	return nil
+}
+
+func (c *traceHeaderCheck) Close() error {
+	if c.err != nil {
+		return c.err
+	}
+	if len(c.head) != artifact.GoTraceHeaderBytes {
+		return c.fail(artifact.ErrIntegrity)
+	}
+	return nil
 }
 
 type failure struct{ err error }

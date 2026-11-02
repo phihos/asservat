@@ -19,6 +19,10 @@ const (
 	RawPCAPNGArtifact      = "rawPcapng"
 	SyscallRecordsArtifact = "syscallRecords"
 	HTTPHeadersArtifact    = "httpHeaders"
+	// PprofArtifact and GoTraceArtifact are a Go endpoint's native response
+	// (ADR-284): gzip-compressed pprof protobuf and the Go execution trace.
+	PprofArtifact   = "pprof"
+	GoTraceArtifact = "goTrace"
 )
 
 const (
@@ -28,6 +32,14 @@ const (
 	HTTPHeadersFormat    = "http-response-headers/v1"
 	// HTTPHeadersNativeLimit is the specified HTTP projection total (16 MiB).
 	HTTPHeadersNativeLimit int64 = 16 << 20
+	// The profile formats are the names of specs/contracts/profile.schema.json.
+	PprofFormat   = "pprof"
+	GoTraceFormat = "go-trace"
+	// ProfileMediaType is what net/http/pprof serves for both (debug=0).
+	ProfileMediaType = "application/octet-stream"
+	// The specified output maxima (specs/profiles.md REQ-PRF-002).
+	MaxPprofBytes   int64 = 64 << 20
+	MaxGoTraceBytes int64 = 128 << 20
 )
 
 type NativeType struct {
@@ -50,6 +62,8 @@ var nativeTypes = []NativeType{
 	{Name: PCAPNGArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/x-pcapng", Format: PCAPNGFormat, Extension: ".pcapng", Coverage: "Packet headers of the selected pod, truncated after the transport header; no payload. Filtered, truncated or lost packets are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"metadata"}},
 	{Name: RawPCAPNGArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/x-pcapng", Format: RawPCAPNGFormat, Extension: ".pcapng", Coverage: "Packets of the selected pod including payload, truncated at the approved per-transport byte caps; caps limit bytes and do not redact. Filtered or lost packets are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"raw"}},
 	{Name: SyscallRecordsArtifact, Kind: "syscallTrace", EvidenceType: "syscallTrace", MediaType: "application/x-ndjson", Format: SyscallRecordsFormat, Extension: ".jsonl", Coverage: "Syscall metadata of the selected pod as JSON Lines: names, results, timing and process identity; no arguments or buffers. Lost events are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"metadata"}},
+	{Name: PprofArtifact, Kind: "profile", EvidenceType: "profile", MediaType: ProfileMediaType, Format: PprofFormat, Extension: ".pb.gz", Coverage: "The Go endpoint's pprof response as served (gzip-compressed protobuf); sample labels and symbol names are the application's and are not filtered.", MaxBytes: MaxPprofBytes, DataClasses: []string{"raw"}},
+	{Name: GoTraceArtifact, Kind: "profile", EvidenceType: "profile", MediaType: ProfileMediaType, Format: GoTraceFormat, Extension: ".trace", Coverage: "The Go endpoint's execution trace as served; it can contain goroutine, task and log text written by the application and is not filtered.", MaxBytes: MaxGoTraceBytes, DataClasses: []string{"raw"}},
 	{Name: HTTPHeadersArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/json", Format: HTTPHeadersFormat, Extension: ".json", Coverage: "Approved HTTP/1 response header fields as structured JSON, not a packet capture; no bodies, URLs or credentials.", MaxBytes: HTTPHeadersNativeLimit, DataClasses: []string{"extract"}},
 }
 
