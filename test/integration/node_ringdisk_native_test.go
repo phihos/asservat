@@ -242,13 +242,38 @@ func ringDiskNative(t *testing.T, ctx context.Context, k kubernetes.Interface, c
 			Credit: 64 << 20, BytesPerSecond: 1 << 20}, Ring: plan, Resources: resources}}
 	}
 	// renew is the quiet leaf renewal of the same incarnation.
-	renew := func(a *armed) {
+	renew := func(a *armed) collector.Receipt {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		a.source.Permit.IssuedAt, a.source.Permit.DispatchUntil, a.source.Permit.LeafUntil = now, now.Add(5*time.Second), now.Add(collector.SourceLeafLifetime)
-		if rc, _ := receipt(dispatch(*a)); rc.Outcome != collector.OutcomeAccepted {
-			t.Fatalf("renewal %+v", rc)
-		}
+		rc, _ := receipt(dispatch(*a))
+		return rc
+	}
+	// waitArmed waits while renewing the source's 30-second leaf every ten
+	// seconds; the engine may take a while to attach on a fresh node.
+	waitArmed := func(a *armed, what string, limit time.Duration, ok func() bool) {
+		t.Helper()
+		renewed := time.Now()
+		wait(what, limit, func() bool {
+			if ok() {
+				return true
+			}
+			if time.Since(renewed) > 10*time.Second {
+				if v, ok := current(); ok {
+					for _, s := range v.Report.Sources {
+						if s.SourceID == a.binding.SourceID {
+							t.Logf("%s: source observed %d bytes, closed %t", what, s.ObservedBytes, s.Closed)
+						}
+					}
+				}
+				// A refusal (the source just closed) is judged by ok().
+				if rc := renew(a); rc.Outcome != collector.OutcomeAccepted {
+					t.Logf("%s: renewal %+v", what, rc)
+				}
+				renewed = time.Now()
+			}
+			return false
+		})
 	}
 	snapshot := func(a armed, before time.Duration) (collector.Work, string, error) {
 		issued := time.Now().UTC().Truncate(time.Microsecond)
@@ -293,7 +318,7 @@ func ringDiskNative(t *testing.T, ctx context.Context, k kubernetes.Interface, c
 
 	// 2. Sealed segments on the volume, readable by their own process.
 	var files []string
-	wait("two sealed segments on the ring volume", 40*time.Second, func() bool {
+	waitArmed(&first, "two sealed segments on the ring volume", 90*time.Second, func() bool {
 		files = files[:0]
 		for _, e := range entries() {
 			f := strings.Fields(e)
@@ -310,7 +335,9 @@ func ringDiskNative(t *testing.T, ctx context.Context, k kubernetes.Interface, c
 		}
 		return len(files) >= 2
 	})
-	renew(&first)
+	if rc := renew(&first); rc.Outcome != collector.OutcomeAccepted {
+		t.Fatalf("renewal %+v", rc)
+	}
 	peak := used()
 	if peak > sealedRing || peak > ceiling {
 		t.Fatalf("ring volume holds %d bytes, above the ring's %d or the ceiling %d", peak, sealedRing, ceiling)
@@ -419,7 +446,7 @@ func ringDiskNative(t *testing.T, ctx context.Context, k kubernetes.Interface, c
 		t.Fatalf("disk ring on the small volume: %+v", rc)
 	}
 	var closed collector.SourceStatus
-	wait("ring closed by a failed seal", 40*time.Second, func() bool {
+	waitArmed(&third, "ring closed by a failed seal", 90*time.Second, func() bool {
 		v, ok := current()
 		if !ok {
 			return false
