@@ -40,14 +40,12 @@ type HTTPHeaderSelection struct {
 }
 
 func (s HTTPHeaderSelection) Valid() bool {
-	if !authorization.UUID(s.CaseID) || !authorization.UUID(s.ArtifactID) || s.Limit < 1 || s.Limit > HTTPHeaderPageRecords ||
-		s.Start < 0 || s.Start >= HTTPHeaderMaxRecords {
-		return false
-	}
-	if s.Start == 0 {
-		return s.Binding == ""
-	}
-	return lowerHex(s.Binding, httpHeaderBindingDigits)
+	return authorization.UUID(s.CaseID) && authorization.UUID(s.ArtifactID) && s.Window().Valid()
+}
+
+// Window is the record window without the artifact identity.
+func (s HTTPHeaderSelection) Window() HTTPHeaderWindow {
+	return HTTPHeaderWindow{Start: s.Start, Limit: s.Limit, Binding: s.Binding}
 }
 
 // NormalizeHTTPHeaderSelection applies the canonical defaults: no cursor

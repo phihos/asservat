@@ -17,7 +17,8 @@ import (
 var _ authorizationapp.ContextProjectionCatalog = (*ContextPublications)(nil)
 
 // ContextProjectionEvidence returns the independently verified fixed context
-// profile and its original publication identity. The SELECT-only facet provides
+// profile, or an httpHeaders extract (ADR-282), and its original publication
+// identity. The SELECT-only facet provides
 // no native content or read permit. C-03 checks ordinary target eligibility
 // before calling it, then current audience, retention and query-purpose state.
 func (s *ContextPublications) ContextProjectionEvidence(ctx context.Context, artifactID string) (authorizationapp.ContextProjectionEvidence, error) {
@@ -44,7 +45,10 @@ func (s *ContextPublications) ContextProjectionEvidence(ctx context.Context, art
 		if err != nil {
 			return err
 		}
-		if e.Registration.Location.ArtifactID != artifactID || e.DataClass != "metadata" || e.Registration.NativeLimit != artifact.MaxContextBytes {
+		// Exactly the pod-status metadata context or an httpHeaders extract
+		// (ADR-282); C-03 compares the source with the requested scope.
+		src, known := analysis.LookupProjectionSource(e.NativeType)
+		if e.Registration.Location.ArtifactID != artifactID || !known || e.DataClass != src.DataClass || e.Registration.NativeLimit != src.NativeLimit || e.Type().Format != src.Format {
 			return privacy.ErrFence
 		}
 		attempt, err := q.ReadAttempt(call, row.ContextCapture.AttemptID)
@@ -77,8 +81,8 @@ func (s *ContextPublications) ContextProjectionEvidence(ctx context.Context, art
 		// independent envelope/manifest/native verification of the pinned bytes.
 		out = authorizationapp.ContextProjectionEvidence{
 			CaseID: e.CaseID, CaptureID: e.CaptureUID, PurposeRef: e.PurposeRef,
-			SourceProjectionDigest: analysis.ContextSourceProjectionDigest(),
-			SourceFormat:           artifact.ContextFormat, DataClass: e.DataClass,
+			SourceProjectionDigest: src.ProjectionDigest, NativeType: src.NativeType,
+			SourceFormat: src.Format, DataClass: e.DataClass,
 			Audience: e.Audience, Retained: retained, ObservedAt: started.Time, ValidUntil: until,
 		}
 		copy(out.Version[:], row.ContextVerification.CopiesDigest)

@@ -157,3 +157,43 @@ plus InvalidCursor. 7. No configuration. 8. None outside Asservat. 9. One
 bounded page per call; the regional read cost is part of the pending
 composition. 10. Unadvertised unless composed. 11. Download alone would not
 meet REQ-MCP-005's bounded agent read.
+
+## Implementation (slice 5, part 1: read authority and worker page)
+
+The approved-read path now has a closed second source. `analysis.ProjectionSource`
+admits exactly the pod-status metadata context or an `httpHeaders` extract
+(`http-response-headers/v1`, evidence type `packetCapture`, the one-frame
+`RecordingNativeLimit`, no manifest projection digest). `ContextProjectionScope`
+and its candidate carry `NativeType` and an `HTTPHeaderWindow` (start, limit,
+cursor binding) as a selection union with the line selection; both fields are
+omitted when zero, so stored pod-status queries and decision digests keep their
+bytes. The catalog evidence read, processing facet, query fence and
+C-03/C-14 source checks use this source instead of the pod-status pins, so a
+pod-status scope never accepts an extract and the reverse.
+
+C-03 `HTTPHeaderReadAuthority` implements `CurrentHTTPHeaderRead`: identity
+with `evidence:read`, current recovery, the private case route
+(`ResolveProjectionRoute`), then the unchanged `ContextProjectionAuthority`
+facets (ReadApproved permissions, shares, recorded reviews, audience,
+retained policy origins, environment, all repeated after blocking reads) for
+the extract source. The decision covers the document; its bound window is the
+first page.
+
+The acquisition worker's branch is `evidence.ReadHTTPHeaderPage`: an artifact
+opened with the batch's key authority is read whole as its single frame,
+rechecked and paged by `httpheaders.RecordingPage` (the publisher's
+`RecordingLimits`, moved into the adapter), the plaintext is cleared and only
+the page leaves; its projection digest must equal the manifest-authenticated
+native SHA-256. An invalid cursor stays distinct from other refusals.
+
+Remaining before the tool is advertised: the query ledger migration
+(`get_http_headers` in the query tables and intent checks, the extract scope
+keys, `context-query-input/v1` audit input instead of the slice 4 lane, and a
+per-page read cost of one frame — `NativeWindowReadWork(httpHeaders)` — rather
+than the 4 MiB pod-status profile, so one page costs one worker Job), the
+result union through the regional read, native wire (a page payload bounded
+below the 64 KiB control frame; records beyond the 24 KiB response are never
+delivered, so the worker sends the longest fitting prefix) and hub decode,
+`HTTPHeaderReads` as Begin (`pending` + query id) plus a `get_query_result`
+branch, the restored canonical `pending` branch in the generated schema with
+browser OpenAPI parity, and composition in `newPublicProjection`.

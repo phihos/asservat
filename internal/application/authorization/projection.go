@@ -22,9 +22,12 @@ type ContextProjectionEvidence struct {
 	CaseID, CaptureID, PurposeRef   string
 	Version, SourceProjectionDigest artifact.Digest
 	SourceFormat, DataClass         string
-	Audience                        []artifact.AudienceAssignment
-	Retained                        privacy.RetainedArtifact
-	ObservedAt, ValidUntil          time.Time
+	// NativeType is the published native type (empty is pod status); with
+	// the other source facts it must be exactly one analysis.ProjectionSource.
+	NativeType             string
+	Audience               []artifact.AudienceAssignment
+	Retained               privacy.RetainedArtifact
+	ObservedAt, ValidUntil time.Time
 }
 
 type ContextProjectionCatalog interface {
@@ -146,7 +149,10 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	// The protected source lookup follows current ordinary target eligibility.
 	record, err := s.Catalog.ContextProjectionEvidence(call, candidate.ArtifactID)
 	record = cloneProjectionEvidence(record)
-	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat, DisplayVersion: analysis.ContextDisplayVersion}
+	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, NativeType: candidate.NativeType, Headers: candidate.Headers, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat}
+	if src, ok := analysis.LookupProjectionSource(candidate.NativeType); ok {
+		scope.DisplayVersion = src.DisplayVersion
+	}
 	if err != nil || !scope.Valid() || expected != nil && scope != *expected || !projectionEvidenceMatches(record, scope, s.Now()) || call.Err() != nil {
 		return zero, projectionRefused("catalog", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
@@ -274,11 +280,18 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 
 func projectionEvidenceMatches(r ContextProjectionEvidence, scope analysis.ContextProjectionScope, now time.Time) bool {
 	target := value.Target{ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID}
-	return r.Retained.Valid() && r.Retained.RootID == scope.RootID && r.CaseID == scope.CaseID && r.CaptureID == scope.CaptureID &&
-		r.Version == scope.Version && r.SourceFormat == artifact.ContextFormat && r.SourceFormat == scope.SourceFormat && r.SourceProjectionDigest == scope.SourceProjectionDigest &&
-		r.SourceProjectionDigest == analysis.ContextSourceProjectionDigest() && r.DataClass == "metadata" && identity.Text(r.PurposeRef, 128) &&
-		r.Retained.Registration.Location.ArtifactID == scope.ArtifactID && r.Retained.Registration.NativeLimit == artifact.MaxContextBytes && r.Retained.Input.Target == target &&
-		r.Retained.Input.EvidenceType == "context" && r.Retained.Input.PrivacyClass == "potentialPersonalData" && identity.Fresh(r.ObservedAt, r.ValidUntil, now, identity.EvidenceReadRequestWindow)
+	src, ok := scope.Source()
+	return ok && projectionSourceMatches(src, r) && r.Retained.Valid() && r.Retained.RootID == scope.RootID && r.CaseID == scope.CaseID && r.CaptureID == scope.CaptureID &&
+		r.Version == scope.Version && r.SourceFormat == scope.SourceFormat && r.SourceProjectionDigest == scope.SourceProjectionDigest &&
+		identity.Text(r.PurposeRef, 128) && r.Retained.Registration.Location.ArtifactID == scope.ArtifactID && r.Retained.Input.Target == target &&
+		identity.Fresh(r.ObservedAt, r.ValidUntil, now, identity.EvidenceReadRequestWindow)
+}
+
+// projectionSourceMatches requires the published facts to be exactly the
+// expected closed source (ADR-282) and potential personal data.
+func projectionSourceMatches(src analysis.ProjectionSource, r ContextProjectionEvidence) bool {
+	return src.Matches(r.NativeType, r.SourceFormat, r.DataClass, r.Retained.Input.EvidenceType, r.Retained.Registration.NativeLimit, r.SourceProjectionDigest) &&
+		r.Retained.Input.PrivacyClass == "potentialPersonalData"
 }
 
 func projectionRetentionMatches(v privacy.RetainedResolution, r ContextProjectionEvidence, scope analysis.ContextProjectionScope, now time.Time) bool {

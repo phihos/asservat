@@ -88,10 +88,21 @@ func (w *RegionalContextProjection) StopLocal() {
 
 func ProjectionSourceMatches(s NativeContextSource, q value.ContextQuery, a value.ContextProjectionAuthority) bool {
 	e := s.Expectation
-	return s.Valid(q.Scope.Version) && e.Registration.NativeLimit == artifact.MaxContextBytes && e.ActionID == "pod-status" && e.DataClass == "metadata" &&
-		e.CaseID == q.Scope.CaseID && e.CaptureUID == q.Scope.CaptureID && e.NamespaceUID == q.Scope.NamespaceUID && e.WorkloadUID == q.Scope.WorkloadUID && e.PodUID == q.Scope.PodUID &&
+	return s.Valid(q.Scope.Version) && projectionExpectation(e, q.Scope) &&
 		e.Registration.Location == a.Environment.Location && e.Registration.StoreID == a.Environment.StoreID &&
 		!a.AccessUntil.After(e.Registration.ExpiresAt) && !a.DeleteBy.After(e.Registration.DeleteBy)
+}
+
+// projectionExpectation requires the published expectation to be exactly the
+// scope's closed source (pod-status metadata, or an httpHeaders extract of
+// one recording frame, ADR-282) at the scope's case, capture and target.
+func projectionExpectation(e artifact.ContextExpectation, scope value.ContextProjectionScope) bool {
+	src, ok := scope.Source()
+	kind := e.NativeType == artifact.PodStatusArtifact && e.ActionID == "pod-status" && e.Recording == nil ||
+		e.NativeType == artifact.HTTPHeadersArtifact && e.Recording != nil && e.Recording.Profile == "httpHeaders"
+	return ok && kind && e.NativeType == src.NativeType && e.Registration.NativeLimit == src.NativeLimit && e.DataClass == src.DataClass &&
+		e.CaseID == scope.CaseID && e.CaptureUID == scope.CaptureID && e.NamespaceUID == scope.NamespaceUID && e.WorkloadUID == scope.WorkloadUID &&
+		e.PodUID == scope.PodUID && e.Registration.Location.ArtifactID == scope.ArtifactID && e.Registration.Location.ClusterID == scope.ClusterID
 }
 
 // RegionalProjectionRead deliberately does NOT implement Close or
