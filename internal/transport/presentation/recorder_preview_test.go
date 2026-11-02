@@ -225,12 +225,23 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	if err != nil || !strings.Contains(string(reply.Body), `"code":"InvalidComposition"`) || !strings.Contains(string(reply.Body), "does not expose actionMaxBytes") {
 		t.Fatalf("unexposed: %v %s", err, reply.Body)
 	}
-	// Schema subset: sharing, presets and peer edits are not accepted; more than
+	// ADR-283: a CIDR peer edit compiles into the hub filter and the preview
+	// names its prefix count. Kubernetes peers are outside the runtime subset.
+	cidrs := strings.Replace(wireComposition, `{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"}`, `{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"},{"actionID":"sample","field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8","2001:db8::/32"]}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}}`, 1)
+	reply, err = s.Call(t.Context(), f, "preview_capture", []byte(cidrs))
+	if err != nil || !strings.Contains(string(reply.Body), "Peers: 2 CIDR prefixes") || !strings.Contains(string(reply.Body), "((net 10.0.0.0/8 or net 2001:db8::/32) and tcp) and (tcp port 8080)") {
+		t.Fatalf("cidr peers: %v %s", err, reply.Body)
+	}
+	if f.composition == nil || f.composition.Components[0].Edits[1].Peers == nil || len(f.composition.Components[0].Edits[1].Peers.CIDRs[0]) != 2 {
+		t.Fatal("typed peers edit not decoded")
+	}
+	// Schema subset: sharing, presets, Kubernetes and malformed peer edits are not accepted; more than
 	// eight components exceed the canonical bound (ADR-276 groups are below it).
 	for name, bad := range map[string]string{
 		"sharing":  strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"requested_retention_seconds":3600,"sharing":{"recipients":[{"kind":"User","issuer":"https://id.invalid","id":"x"}]},`, 1),
 		"preset":   strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"preset_ref":{"name":"pod-status","version":"v1"},`, 1),
-		"peers":    strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8"]}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
+		"k8s peer": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"payments","name":"db"}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
+		"bad peer": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8"]}],"protocol":"sctp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
 		"nine":     strings.Replace(wireComposition, `"components":[{`, `"components":[`+strings.Repeat(`{"id":"other","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"}},`, 8)+`{`, 1),
 		"no field": strings.Replace(wireComposition, `"field":"packetFilter"`, `"field":"impact"`, 1),
 	} {

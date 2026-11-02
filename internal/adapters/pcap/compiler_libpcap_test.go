@@ -3,10 +3,12 @@
 package pcap
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"strings"
 	"testing"
@@ -178,5 +180,89 @@ func TestRecorderFixtureProgramPinned(t *testing.T) {
 	d := planning.FilterProgramDigest(f.Program)
 	if fmt.Sprint(got) != fmt.Sprint(fixture.Filters[0].Program) || hex.EncodeToString(d[:]) != fixture.Filters[0].ProgramDigest {
 		t.Fatalf("libpcap program %v differs from the fixture", got)
+	}
+}
+
+// frame builds a synthetic Ethernet frame carrying an IPv4 or IPv6 TCP
+// segment between src and dst on the given ports.
+func frame(src, dst netip.Addr, sport, dport uint16) []byte {
+	tcp := make([]byte, 20)
+	binary.BigEndian.PutUint16(tcp[0:], sport)
+	binary.BigEndian.PutUint16(tcp[2:], dport)
+	tcp[12] = 5 << 4
+	eth := make([]byte, 14)
+	if src.Is4() {
+		binary.BigEndian.PutUint16(eth[12:], 0x0800)
+		ip := make([]byte, 20)
+		ip[0], ip[8], ip[9] = 0x45, 64, 6
+		binary.BigEndian.PutUint16(ip[2:], 40)
+		s, d := src.As4(), dst.As4()
+		copy(ip[12:], s[:])
+		copy(ip[16:], d[:])
+		return append(append(eth, ip...), tcp...)
+	}
+	binary.BigEndian.PutUint16(eth[12:], 0x86dd)
+	ip := make([]byte, 40)
+	ip[0], ip[6], ip[7] = 0x60, 6, 64
+	binary.BigEndian.PutUint16(ip[4:], 20)
+	s, d := src.As16(), dst.As16()
+	copy(ip[8:], s[:])
+	copy(ip[24:], d[:])
+	return append(append(eth, ip...), tcp...)
+}
+
+// capturing keeps the programs the planner compiled with the real libpcap.
+type capturing struct{ programs []value.CompiledFilter }
+
+func (c *capturing) CompileFilter(expression string) (value.CompiledFilter, error) {
+	f, err := NewCompiler().CompileFilter(expression)
+	if err == nil {
+		c.programs = append(c.programs, f)
+	}
+	return f, err
+}
+
+// ADR-283: the planner's generated CIDR peer expression compiles with the
+// pinned libpcap, and the program matches only peer traffic: a user
+// `or host` term cannot admit a non-peer (SC-NET-001).
+func TestCIDRPeersThroughPlanner(t *testing.T) {
+	edits := []value.ProfileEdit{
+		{ActionID: "sample", Field: "packetPeers", Peers: &value.PeerSelection{CIDRs: [][]string{{"10.0.0.0/24", "2001:db8::/64"}}, Protocol: "tcp", Ports: []int{5432}, Resolution: "frozen", MaxEndpoints: 1, MaxStaleness: "5s"}},
+		{ActionID: "sample", Field: "packetFilter", Text: "tcp or host 203.0.113.9"},
+	}
+	c := value.ProfileComposition{Components: []value.ProfileComponent{{ID: "net", Profile: value.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}, Edits: edits}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
+	// Every rendered form compiles: host prefixes, default routes, ICMP of
+	// both families and ports without a transport.
+	for _, peers := range []*value.PeerSelection{
+		{CIDRs: [][]string{{"10.1.2.3", "2001:db8::1", "0.0.0.0/0"}}, Protocol: "icmp", Resolution: "follow", MaxEndpoints: 1, MaxStaleness: "5s"},
+		{CIDRs: [][]string{{"::/0"}, {"192.168.0.0/16"}}, Protocol: "any", Ports: []int{53, 443}, Resolution: "frozen", MaxEndpoints: 1, MaxStaleness: "5s"},
+		{CIDRs: [][]string{{"fd00::/8"}}, Protocol: "udp", Resolution: "frozen", MaxEndpoints: 1, MaxStaleness: "5s"},
+	} {
+		one := value.ProfileComposition{Components: []value.ProfileComponent{{ID: "net", Profile: c.Components[0].Profile, Edits: []value.ProfileEdit{{ActionID: "sample", Field: "packetPeers", Peers: peers}}}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
+		if err := planning.ValidateComposition(one, NewCompiler()); err != nil {
+			t.Fatalf("%+v: %v", peers, err)
+		}
+	}
+	compiler := &capturing{}
+	if err := planning.ValidateComposition(c, compiler); err != nil || len(compiler.programs) != 1 {
+		t.Fatal(err)
+	}
+	f := compiler.programs[0]
+	pod4, pod6 := netip.MustParseAddr("10.244.0.5"), netip.MustParseAddr("fd00::5")
+	for name, tc := range map[string]struct {
+		packet []byte
+		want   bool
+	}{
+		"ipv4 peer":        {frame(pod4, netip.MustParseAddr("10.0.0.7"), 40000, 5432), true},
+		"ipv4 peer reply":  {frame(netip.MustParseAddr("10.0.0.7"), pod4, 5432, 40000), true},
+		"ipv6 peer":        {frame(pod6, netip.MustParseAddr("2001:db8::7"), 40000, 5432), true},
+		"other port":       {frame(pod4, netip.MustParseAddr("10.0.0.7"), 40000, 443), false},
+		"user or host":     {frame(pod4, netip.MustParseAddr("203.0.113.9"), 40000, 5432), false},
+		"outside prefix":   {frame(pod4, netip.MustParseAddr("10.0.1.7"), 40000, 5432), false},
+		"outside prefix 6": {frame(pod6, netip.MustParseAddr("2001:db8:0:1::7"), 40000, 5432), false},
+	} {
+		if got := run(t, f.Program, tc.packet); got != tc.want {
+			t.Errorf("%s: matched %v", name, got)
+		}
 	}
 }

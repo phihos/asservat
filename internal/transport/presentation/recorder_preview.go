@@ -73,6 +73,9 @@ func recorderWarnings(plan planning.RecorderPlan) []string {
 		}
 		if a.Filter != "" {
 			out = append(out, fmt.Sprintf("Packet filter compiled on the hub to %d instructions: %s", a.FilterInstructions, boundedText(a.Filter, 160)))
+			if a.PeerPrefixes > 0 {
+				out = append(out, fmt.Sprintf("Peers: %d CIDR prefixes, intersected with the packet filter; traffic to or from other addresses is not recorded.", a.PeerPrefixes))
+			}
 		}
 	}
 	return out

@@ -215,9 +215,15 @@ func FilterProgramDigest(program []value.BPFInstruction) artifact.Digest {
 	return artifact.Digest(h.Sum(nil))
 }
 
-// compileFilter screens, compiles and checks one expression.
-func compileFilter(compiler FilterCompiler, path, expression string) (value.CompiledFilter, error) {
+// compileFilter screens, compiles and checks one expression. sizeHint is
+// appended to a size refusal of a generated expression (ADR-283 peers).
+func compileFilter(compiler FilterCompiler, path, expression, sizeHint string) (value.CompiledFilter, error) {
 	if err := ScreenFilter(path, expression); err != nil {
+		var e value.CompositionError
+		if sizeHint != "" && errors.As(err, &e) && strings.Contains(e.Reason, "at most") {
+			e.Reason += sizeHint
+			return value.CompiledFilter{}, e
+		}
 		return value.CompiledFilter{}, err
 	}
 	if compiler == nil {
@@ -232,7 +238,7 @@ func compileFilter(compiler FilterCompiler, path, expression string) (value.Comp
 	case f.LinkType != value.FilterLinkType || f.Snaplen != value.FilterSnaplen || len(f.Program) < 1:
 		return value.CompiledFilter{}, filterRefusal(value.CompositionNoCompiler, path, "the filter compiler does not use the pinned link type")
 	case len(f.Program) > value.MaxFilterInstructions:
-		return value.CompiledFilter{}, filterRefusal(value.CompositionFilterRejected, path, fmt.Sprintf("the compiled filter has %d instructions; at most %d are allowed: narrow or simplify it", len(f.Program), value.MaxFilterInstructions))
+		return value.CompiledFilter{}, filterRefusal(value.CompositionFilterRejected, path, fmt.Sprintf("the compiled filter has %d instructions; at most %d are allowed: narrow or simplify it", len(f.Program), value.MaxFilterInstructions)+sizeHint)
 	}
 	return f, nil
 }

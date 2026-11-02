@@ -339,7 +339,12 @@ type expandedAction struct {
 	packet  *packetParameters
 	syscall *syscallParameters
 	filter  *value.CompiledFilter
-	localID string
+	// peers is the canonical CIDR selection (ADR-283); nil selects all pod
+	// traffic. expression is the compiled effective filter: the peer
+	// expression intersected with the authored filter.
+	peers      *peerSet
+	expression string
+	localID    string
 	// componentID is the authoring component of this action.
 	componentID string
 	// sensitive names why this action needs individual approval (ADR-249).
@@ -363,7 +368,7 @@ func applyEdit(path string, e value.ProfileEdit, a *expandedAction) error {
 	if e.Unmodeled {
 		reason := e.Field + " cannot be edited in this release"
 		if e.Field == "packetPeers" {
-			reason = "Kubernetes peer selection follows in a later release; narrow traffic with packetFilter host, net or port primitives"
+			reason = kubernetesPeersRemedy
 		}
 		return refuse(value.CompositionInvalid, path, reason)
 	}
@@ -395,6 +400,11 @@ func applyEdit(path string, e value.ProfileEdit, a *expandedAction) error {
 	switch e.Field {
 	case "packetFilter":
 		a.packet.Filter, err = text()
+	case "packetPeers":
+		if e.Peers == nil {
+			return refuse(value.CompositionInvalid, path, "packetPeers takes a peers object")
+		}
+		a.packet.Peers, err = json.Marshal(peersEditWire(e.Peers))
 	case "packetBefore":
 		a.packet.Before, err = text()
 	case "packetAfter":
@@ -631,14 +641,19 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 		if json.Unmarshal(a.packet.Profile, &kind) != nil || kind.Kind != "networkHeaders" && kind.Kind != "rawPackets" && kind.Kind != "httpHeaders" {
 			return refuse(value.CompositionInvalid, path+".parameters.profile.kind", "the packet profile is networkHeaders, rawPackets or httpHeaders")
 		}
+		peers, err := packetPeers(path+".parameters.peers", a.packet.Peers)
+		if err != nil {
+			return err
+		}
+		a.peers = peers
 		if http {
 			if _, err := validHTTPProfile(path+".parameters.profile", a.packet.Profile); err != nil {
 				return err
 			}
 			// The finite observation binding pins a compiled program, as
 			// for raw packets (ADR-279/282).
-			if a.packet.Filter == "" {
-				return refuse(value.CompositionInvalid, path+".parameters.filter", "httpHeaders reads payload; narrow it with packetFilter (for example tcp port 8080)")
+			if a.packet.Filter == "" && peers == nil {
+				return refuse(value.CompositionInvalid, path+".parameters.filter", "httpHeaders reads payload; narrow it with packetFilter (for example tcp port 8080) or CIDR peers")
 			}
 			a.sensitive = append(a.sensitive, value.ReasonHTTPHeaders)
 		}
@@ -647,13 +662,10 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 				return err
 			}
 			// The finite observation binding pins a compiled program (ADR-279).
-			if a.packet.Filter == "" {
-				return refuse(value.CompositionInvalid, path+".parameters.filter", "rawPackets keeps payload; narrow it with packetFilter (for example tcp port 8080)")
+			if a.packet.Filter == "" && peers == nil {
+				return refuse(value.CompositionInvalid, path+".parameters.filter", "rawPackets keeps payload; narrow it with packetFilter (for example tcp port 8080) or CIDR peers")
 			}
 			a.sensitive = append(a.sensitive, value.ReasonRawPackets)
-		}
-		if !wholePodPeers(a.packet.Peers) {
-			return refuse(value.CompositionRecorderUnavailable, path+".parameters.peers", "Kubernetes and CIDR peer selection follows in a later release; this recorder captures all pod traffic, so narrow it with packetFilter (for example host 10.0.0.5)")
 		}
 		beforeText, afterText, r, frozen, snapshots = a.packet.Before, a.packet.After, a.packet.Ring, a.packet.MaxFrozenBytes, a.packet.MaxConcurrentSnapshots
 	} else {
@@ -745,13 +757,38 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 	if a.action.Limits.MaxBytes < 1 || a.action.Limits.MaxBytes > value.MaxCompositionBytes {
 		return refuse(value.CompositionInvalid, path+".limits.maxBytes", "the output limit is 1 byte to 1 TiB")
 	}
-	if a.packet != nil && a.packet.Filter != "" {
-		f, err := compileFilter(compiler, path+".parameters.filter", a.packet.Filter)
+	if a.packet != nil && a.peers != nil {
+		// ADR-283: the CIDR peers and the authored filter compile as one
+		// program; the authored filter alone is screened first so its own
+		// terms are refused at its path.
+		filterPath, user := path+".parameters.filter", ""
+		if a.packet.Filter != "" {
+			if err := ScreenFilter(filterPath, a.packet.Filter); err != nil {
+				return err
+			}
+			user = NormalizeFilter(a.packet.Filter)
+			if !balancedFilter(user) {
+				return refuse(value.CompositionFilterRejected, filterPath, "the filter's parentheses and brackets must balance")
+			}
+		} else {
+			filterPath = path + ".parameters.peers"
+		}
+		expression := a.peers.expression(user)
+		f, err := compileFilter(compiler, filterPath, expression, "; select fewer or broader peer prefixes or ports")
+		if err != nil {
+			return err
+		}
+		a.packet.Filter, a.expression, a.filter = user, expression, &f
+		if RawBytePredicate(user) {
+			a.sensitive = append(a.sensitive, value.ReasonRawBytePredicate)
+		}
+	} else if a.packet != nil && a.packet.Filter != "" {
+		f, err := compileFilter(compiler, path+".parameters.filter", a.packet.Filter, "")
 		if err != nil {
 			return err
 		}
 		a.packet.Filter = NormalizeFilter(a.packet.Filter)
-		a.filter = &f
+		a.expression, a.filter = a.packet.Filter, &f
 		if RawBytePredicate(a.packet.Filter) {
 			a.sensitive = append(a.sensitive, value.ReasonRawBytePredicate)
 		}
@@ -955,6 +992,8 @@ func editValue(e value.ProfileEdit) any {
 		return editRing(e.Ring)
 	case e.Syscalls != nil:
 		return syscallSelection{Mode: e.Syscalls.Mode, Names: e.Syscalls.Names}
+	case e.Peers != nil:
+		return peersEditWire(e.Peers)
 	case e.Number != 0:
 		return e.Number
 	}
@@ -1004,6 +1043,9 @@ type compiledFilterRecord struct {
 	Encoding      string      `json:"encoding"`
 	Program       [][4]uint32 `json:"program"`
 	ProgramDigest string      `json:"programDigest"`
+	// Peers is the CIDR peer provenance (ADR-283): absent for whole-pod
+	// plans, so their scopes and digests are unchanged.
+	Peers *peerSetRecord `json:"peers,omitempty"`
 }
 
 type recorderTarget struct {
@@ -1066,7 +1108,10 @@ func normalizedRecorderAction(x expandedAction, componentID string) (recipeActio
 			Kind string `json:"kind"`
 		}
 		_ = json.Unmarshal(x.packet.Profile, &kind)
-		summary.Before, summary.After, summary.MaxFrozenBytes, summary.MaxConcurrentSnapshots, summary.PacketProfile, summary.Filter = x.packet.Before, x.packet.After, x.packet.MaxFrozenBytes, x.packet.MaxConcurrentSnapshots, kind.Kind, x.packet.Filter
+		summary.Before, summary.After, summary.MaxFrozenBytes, summary.MaxConcurrentSnapshots, summary.PacketProfile, summary.Filter = x.packet.Before, x.packet.After, x.packet.MaxFrozenBytes, x.packet.MaxConcurrentSnapshots, kind.Kind, x.expression
+		if x.peers != nil {
+			summary.PeerPrefixes = len(x.peers.Prefixes)
+		}
 		rr = x.packet.Ring
 	} else {
 		s := x.syscall
@@ -1092,7 +1137,10 @@ func normalizedRecorderAction(x expandedAction, componentID string) (recipeActio
 		}
 		d := FilterProgramDigest(x.filter.Program)
 		summary.FilterInstructions, summary.FilterDigest = len(x.filter.Program), d
-		filter = &compiledFilterRecord{id, x.packet.Filter, x.filter.LinkType, x.filter.Snaplen, value.FilterProgramEncoding, program, hexDigest(d)}
+		filter = &compiledFilterRecord{ActionID: id, Expression: x.expression, LinkType: x.filter.LinkType, Snaplen: x.filter.Snaplen, Encoding: value.FilterProgramEncoding, Program: program, ProgramDigest: hexDigest(d)}
+		if x.peers != nil {
+			filter.Peers = x.peers.record(x.packet.Filter)
+		}
 	}
 	return a, summary, filter, nil
 }
@@ -1291,7 +1339,10 @@ func RecorderScopeSummary(scope []byte) ([]value.RecorderAction, *value.Recorder
 				return nil, nil, value.ErrInvalid
 			}
 			copy(s.FilterDigest[:], b)
-			s.FilterInstructions = len(f.Program)
+			s.FilterInstructions, s.Filter = len(f.Program), f.Expression
+			if f.Peers != nil {
+				s.PeerPrefixes = len(f.Peers.Prefixes)
+			}
 		}
 		out = append(out, s)
 	}

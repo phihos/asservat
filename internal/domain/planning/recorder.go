@@ -124,6 +124,9 @@ type RecorderAction struct {
 	PacketProfile, Filter string
 	FilterInstructions    int
 	FilterDigest          artifact.Digest
+	// PeerPrefixes counts the CIDR peer prefixes intersected into Filter
+	// (ADR-283); zero selects all pod traffic.
+	PeerPrefixes int `json:",omitempty"`
 	// Syscall actions.
 	SyscallMode, SyscallSelection, Result            string
 	SyscallNames                                     int

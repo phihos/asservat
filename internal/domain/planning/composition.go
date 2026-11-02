@@ -42,6 +42,18 @@ type SyscallSelection struct {
 	Names []string `json:",omitempty"`
 }
 
+// PeerSelection is the typed value of a packetPeers edit with only cidrs
+// entries (ADR-283): each entry lists CIDR prefixes, ORed with the others.
+// Kubernetes entries are not modeled yet and arrive as Unmodeled.
+type PeerSelection struct {
+	CIDRs        [][]string
+	Protocol     string
+	Ports        []int `json:",omitempty"`
+	Resolution   string
+	MaxEndpoints int
+	MaxStaleness string
+}
+
 // ProfileEdit is one typed override of an exposed profile field. Exactly the
 // member registered for its field carries the literal value; there is no
 // interpolation, patch or expression language. Unmodeled marks a registered
@@ -55,6 +67,7 @@ type ProfileEdit struct {
 	Number          int64             `json:",omitempty"`
 	Ring            *RingSettings     `json:",omitempty"`
 	Syscalls        *SyscallSelection `json:",omitempty"`
+	Peers           *PeerSelection    `json:",omitempty"`
 	Unmodeled       bool              `json:",omitempty"`
 	TextSet         bool              `json:",omitempty"`
 }
@@ -116,7 +129,7 @@ func (e ProfileEdit) valid() bool {
 		return false
 	}
 	set := 0
-	for _, present := range []bool{e.Text != "" || e.TextSet, e.Number != 0, e.Ring != nil, e.Syscalls != nil, e.Unmodeled} {
+	for _, present := range []bool{e.Text != "" || e.TextSet, e.Number != 0, e.Ring != nil, e.Syscalls != nil, e.Peers != nil, e.Unmodeled} {
 		if present {
 			set++
 		}
@@ -126,6 +139,21 @@ func (e ProfileEdit) valid() bool {
 	}
 	if e.Ring != nil && (len(e.Ring.MaxAge) > 16 || len(e.Ring.Medium) > 16 || len(e.Ring.StorageProfileRef) > 63) {
 		return false
+	}
+	if p := e.Peers; p != nil {
+		if len(p.CIDRs) > 16 || len(p.Ports) > 32 || len(p.Protocol) > 16 || len(p.Resolution) > 16 || len(p.MaxStaleness) > 16 {
+			return false
+		}
+		for _, entry := range p.CIDRs {
+			if len(entry) > 128 {
+				return false
+			}
+			for _, c := range entry {
+				if c == "" || len(c) > 64 {
+					return false
+				}
+			}
+		}
 	}
 	if e.Syscalls != nil {
 		if len(e.Syscalls.Mode) > 16 || len(e.Syscalls.Names) > 128 {
@@ -157,6 +185,15 @@ func (c *ProfileComposition) clone() *ProfileComposition {
 				s := *e.Syscalls
 				s.Names = append([]string(nil), s.Names...)
 				component.Edits[j].Syscalls = &s
+			}
+			if e.Peers != nil {
+				p := *e.Peers
+				p.CIDRs = make([][]string, len(e.Peers.CIDRs))
+				for k, entry := range e.Peers.CIDRs {
+					p.CIDRs[k] = append([]string(nil), entry...)
+				}
+				p.Ports = append([]int(nil), e.Peers.Ports...)
+				component.Edits[j].Peers = &p
 			}
 		}
 		out.Components[i] = component
