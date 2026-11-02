@@ -1,6 +1,7 @@
 package contextstart
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -22,6 +23,9 @@ type RegionalHistory interface {
 type HistoryLocal struct {
 	Verifier fleetapp.HistoryWorkVerifier
 	Effects  RegionalHistory
+	// Report, if set, receives the operation word and its fixed step timing
+	// once per exchange. Diagnostic only.
+	Report func(string, string)
 }
 
 func historyJSON(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
@@ -128,9 +132,13 @@ func serveHubHistory(ctx context.Context, s Stream, w fleetapp.HistoryWork, sign
 	}
 	call, cancel := context.WithDeadline(ctx, w.Authority.NotAfter)
 	defer cancel()
+	// Step marks are diagnostic only (the caller's step timing, if any).
+	began := time.Now()
 	if e := s.Send(call, contracts.APIContextFrame{Kind: contracts.HistoryWorkFrame, Payload: signed}); e != nil {
 		return out, e
 	}
+	auditapp.MarkStep(ctx, "x-send-work", began)
+	began = time.Now()
 	request, e := historyRequest(w.Authority, b, c)
 	if e != nil {
 		return out, e
@@ -144,7 +152,10 @@ func serveHubHistory(ctx context.Context, s Stream, w fleetapp.HistoryWork, sign
 	if e = s.Send(call, contracts.APIContextFrame{Kind: contracts.HistoryRequestFrame, Payload: encoded}); e != nil {
 		return out, e
 	}
+	auditapp.MarkStep(ctx, "x-send-request", began)
+	began = time.Now()
 	f, e := s.Receive(call)
+	auditapp.MarkStep(ctx, "x-await-reply", began)
 	defer clear(f.Payload)
 	if e != nil || f.Kind != contracts.HistoryResponseFrame {
 		return out, contracts.ErrAPIContextProtocol
@@ -175,21 +186,39 @@ func serveHubHistory(ctx context.Context, s Stream, w fleetapp.HistoryWork, sign
 		return fleetapp.HistoryReply{}, e
 	}
 	defer clear(ack)
+	began = time.Now()
 	if e = s.Send(call, contracts.APIContextFrame{Kind: contracts.HistoryReceiptFrame, Payload: ack}); e != nil {
 		out.Bundle.Clear()
 		return fleetapp.HistoryReply{}, e
 	}
+	auditapp.MarkStep(ctx, "x-send-ack", began)
 	return out, effectErr
 }
 func serveRegionalHistory(ctx context.Context, s Stream, r fleet.APIContextReceiver, signed []byte, l *HistoryLocal, now func() time.Time) error {
 	if l == nil || l.Verifier == nil || l.Effects == nil {
 		return fleet.ErrUnavailable
 	}
+	// Step timing for the region's fixed diagnostic report: only fixed step
+	// names and duration buckets, reported once the exchange ends.
+	ctx, steps := auditapp.WithStepTimes(ctx)
+	operation, total := "unknown", time.Now()
+	defer func() {
+		if l.Report != nil {
+			auditapp.MarkStep(ctx, "r-total", total)
+			l.Report(operation, steps.String())
+		}
+	}()
+	began := time.Now()
 	verified, e := l.Verifier.VerifyHistoryWork(ctx, signed, r)
+	auditapp.MarkStep(ctx, "r-verify", began)
 	if e != nil || !verified.Valid(now()) || verified.Work.Authority.ExecutorEpoch != r.Channel.Executor.ProcessEpoch {
 		return fleet.ErrDenied
 	}
 	a := verified.Work.Authority
+	switch a.Operation {
+	case "write", "read", "purge":
+		operation = a.Operation
+	}
 	call, cancel := context.WithDeadline(ctx, verified.ValidUntil)
 	ended := make(chan struct{})
 	stopStream := context.AfterFunc(s.Context(), func() { cancel(); close(ended) })
@@ -199,7 +228,9 @@ func serveRegionalHistory(ctx context.Context, s Stream, r fleet.APIContextRecei
 		}
 		cancel()
 	}()
+	began = time.Now()
 	f, e := s.Receive(call)
+	auditapp.MarkStep(ctx, "r-receive-request", began)
 	defer clear(f.Payload)
 	if e != nil || f.Kind != contracts.HistoryRequestFrame {
 		return contracts.ErrAPIContextProtocol
@@ -227,7 +258,9 @@ func serveRegionalHistory(ctx context.Context, s Stream, r fleet.APIContextRecei
 	if !a.Valid(now()) || call.Err() != nil {
 		return fleet.ErrDenied
 	}
+	began = time.Now()
 	reply, e := l.Effects.ExecuteHistory(call, a, b, copies)
+	auditapp.MarkStep(ctx, "r-effect", began)
 	defer reply.Bundle.Clear()
 	response := contracts.HistoryCiphertextMessage{Format: contracts.HistoryCiphertextFormat, OperationID: a.RequestID}
 	if e != nil {
@@ -247,10 +280,14 @@ func serveRegionalHistory(ctx context.Context, s Stream, r fleet.APIContextRecei
 		return e
 	}
 	defer clear(encoded)
+	began = time.Now()
 	if e = s.Send(call, contracts.APIContextFrame{Kind: contracts.HistoryResponseFrame, Payload: encoded}); e != nil {
 		return e
 	}
+	auditapp.MarkStep(ctx, "r-send-reply", began)
+	began = time.Now()
 	f, e = s.Receive(call)
+	auditapp.MarkStep(ctx, "r-await-ack", began)
 	defer clear(f.Payload)
 	if e != nil || f.Kind != contracts.HistoryReceiptFrame {
 		return contracts.ErrAPIContextProtocol
