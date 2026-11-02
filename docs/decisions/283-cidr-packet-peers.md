@@ -84,3 +84,81 @@ until then it is refused with the same remedy.
    removing the feature restores the refusal. 11. A smaller fix (asking users
    to write `net` terms in the filter) cannot enforce SC-NET-001's
    non-widening intersection or record the peer set.
+
+## PR 2 — Kubernetes peers resolved at preview (plan only)
+
+Date: 2026-11-02. Status: accepted (agent decision).
+
+1. Entries: `podSelector` (namespace plus 1–16 exact labels) and
+   `resourceRef` (Pod, Deployment, StatefulSet, Service; a Service also takes
+   `serviceMode` and `readyOnly`) are modeled in the typed `packetPeers` edit
+   and in the `preview_capture` runtime subset (descriptor still within the
+   36 KiB budget). The wire form lists cidrs entries first, then Kubernetes
+   entries, each in authored order.
+2. Namespace confinement: every Kubernetes entry must name the target's own
+   namespace (the caller's eligibility covers exactly that namespace; no
+   administrator peer scope exists yet). Other namespaces are refused at the
+   entry's `namespace` path with the remedy to use cidrs.
+3. Resolution runs in the target's region over a new pre-work query
+   `resolve-packet-peers`, after current eligibility on the target. The
+   connector reads only the target namespace: GETs of the named
+   Deployment/StatefulSet/Service/Pod and of the ReplicaSets owning listed
+   Pods (at most 16), paged consistent Pod LISTs by label selector (256 per
+   page, 1,024 Pods per resolution) and paged EndpointSlice LISTs of one
+   Service (64 slices). It answers only sorted unique (kind, UID, IP)
+   members, at most `min(maxEndpoints, 256)`; the frame bound (32 KiB) and the
+   compiled filter bounds admit no more. Closed failures cross the exchange
+   as `peer-limit`, `peer-unsupported` and `peer-missing`.
+4. Pure resolver (`targets.ResolvePeers`): podSelector by label subset;
+   Deployment through ReplicaSets it controls; StatefulSet through its
+   controller UID; Service backends are endpoints of controller-managed
+   EndpointSlices owned by that Service UID whose targetRef is a listed Pod
+   matching the Service selector and whose address is that Pod's IP of the
+   slice family (forged or foreign slices contribute nothing); `readyOnly`
+   drops endpoints whose ready condition is false (unknown counts as ready,
+   as the API documents); `virtualIP` adds the cluster IPs; `both` is the
+   union. Pods in phase Succeeded/Failed contribute nothing (their IPs may be
+   reused). ExternalName and selectorless Services, virtual IPs of headless
+   Services and hostNetwork Pods are refused (no qualified address identity).
+   Exceeding the limit refuses; it never truncates.
+5. Planning: the hub records its receipt time as the generation time.
+   Resolved addresses become host prefixes (/32, /128) in the same
+   `(net …)` expression as CIDR entries (exact duplicates merged). An empty
+   resolution is refused. Only `frozen` is accepted for Kubernetes entries.
+   The compiled-filter record gains `peers.kubernetes` (cluster, namespace
+   and UID, endpoint count, members digest = SHA-256 of the canonical sorted
+   member JSON, resolvedAt); `peerSetDigest` stays the digest of the
+   compiled prefix set. The resolutions are part of the plan input, so
+   `VerifyRecorderPlan` reproduces the plan; a supplied resolution that the
+   plan does not use, or one from the future, is refused.
+6. Gate: `AcceptableRecorder` refuses any plan with Kubernetes peer
+   endpoints with RecorderUnavailable, "Kubernetes peer capture needs the
+   membership verifier of the next release". The node-recorder preview path
+   returns not-acceptable before asking the region, the plan-only preview
+   resolves once, shows the endpoint count and members digest, and its
+   RecorderUnavailable blocker carries that reason. `RecordingFor`, context
+   compilation and policy recorders have no resolution and fail closed;
+   composition groups, policies and catalog validation refuse Kubernetes
+   entries with the remedy.
+7. RBAC: the connector executor ClusterRole adds `get services` and
+   `list endpointslices.discovery.k8s.io`; the chart's cluster installer
+   holds `get services` unconditionally (it already held the EndpointSlice
+   list). Pods, workloads and ReplicaSets use the existing target-resolution
+   reads. A region installed before this change lacks the reads and answers
+   unavailable, which refuses the peers.
+
+Complexity gate (PR 2): 1. Benefit: the specified workload/Service peer
+picker; no recording is enabled. 2. No accepted risk reopened. 3. Typical
+(select a database Service). 4. Precedent: kube-proxy and NetworkPolicy
+peer resolution over EndpointSlices/selectors. 5. Two read-only verbs on
+the connector; nothing leaves the region but members. 6. No new degraded
+state: refusals only. 7. No configuration. 8. Kubernetes API semantics only.
+9. One query per preview with Kubernetes peers, bounded LISTs of one
+namespace. 10. Older plans unchanged; removing the query restores the
+refusal. 11. Documenting only would leave REQ-NET-002 unimplemented.
+
+Open for PR 3: the connector membership verifier at arming (re-resolve and
+compare the members digest within `maxStaleness`, stop on churn), lifting
+the gate; then `follow` once open item 7 measures LIST load; administrator
+peer scopes for other namespaces; Service port mapping; per-network-profile
+IP identity qualification.

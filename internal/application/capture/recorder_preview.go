@@ -141,7 +141,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		return zero, previewFailure("approvals", err)
 	}
 	mark = time.Now()
-	plan, err := compiler.CompileRecorder(planning.RecorderInput{CaptureID: p.CaptureID, Executor: p.Actor, Target: target, Composition: *intent.Composition, Retention: r, Deadline: p.Deadline, RequireApproval: required}, s.Filters, s.Now())
+	plan, err := s.compileRecorderPeers(ctx, planning.RecorderInput{CaptureID: p.CaptureID, Executor: p.Actor, Target: target, Composition: *intent.Composition, Retention: r, Deadline: p.Deadline, RequireApproval: required})
 	auditapp.MarkStep(ctx, "p-compile", mark)
 	if err != nil {
 		return zero, previewFailure("compile", err)

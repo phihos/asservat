@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -58,7 +59,13 @@ func (f *recorderFixture) PreviewComposition(_ context.Context, _ identities.Cur
 	if err != nil {
 		return app.RecorderPreviewResult{}, err
 	}
-	plan, err := compiler.CompileRecorder(planning.RecorderInput{CaptureID: "00000000-0000-4000-8000-000000000045", Executor: f.i.Principal, Target: target, Composition: *in.Composition, Retention: r, Deadline: now.Add(time.Minute)}, oneInstruction{}, now)
+	input := planning.RecorderInput{CaptureID: "00000000-0000-4000-8000-000000000045", Executor: f.i.Principal, Target: target, Composition: *in.Composition, Retention: r, Deadline: now.Add(time.Minute)}
+	plan, err := compiler.CompileRecorder(input, oneInstruction{}, now)
+	if needed := (compiler.PeerResolutionNeeded{}); errors.As(err, &needed) {
+		// ADR-283 PR 2: a synthetic regional resolution of two members.
+		input.Peers = []targets.PeerResolution{{Request: needed.Request, Members: []targets.PeerMember{{Kind: "Pod", UID: "db-a", IP: "10.0.0.11"}, {Kind: "Pod", UID: "db-b", IP: "10.0.0.12"}}, ResolvedAt: now}}
+		plan, err = compiler.CompileRecorder(input, oneInstruction{}, now)
+	}
 	if err != nil {
 		return app.RecorderPreviewResult{}, err
 	}
@@ -235,15 +242,26 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	if f.composition == nil || f.composition.Components[0].Edits[1].Peers == nil || len(f.composition.Components[0].Edits[1].Peers.CIDRs[0]) != 2 {
 		t.Fatal("typed peers edit not decoded")
 	}
-	// Schema subset: sharing, presets, Kubernetes and malformed peer edits are not accepted; more than
+	// ADR-283 PR 2: Kubernetes peers are previewed with their resolved
+	// endpoint count and members digest, and refused for submission.
+	k8s := strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"payments","name":"db"}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":8,"maxStaleness":"5s"}`, 1)
+	reply, err = s.Call(t.Context(), f, "preview_capture", []byte(k8s))
+	if err != nil || !strings.Contains(string(reply.Body), "Peers: 2 Kubernetes endpoints resolved at preview") || !strings.Contains(string(reply.Body), "(net 10.0.0.11/32 or net 10.0.0.12/32) and tcp") || !strings.Contains(string(reply.Body), "membership verifier of the next release") || !strings.Contains(string(reply.Body), `"capture_enabled":false`) {
+		t.Fatalf("kubernetes peers: %v %s", err, reply.Body)
+	}
+	if k := f.composition.Components[0].Edits[0].Peers; k == nil || len(k.Kubernetes) != 1 || k.Kubernetes[0].Resource.Kind != "Deployment" || k.Kubernetes[0].Resource.Namespace != "payments" {
+		t.Fatal("typed Kubernetes peers edit not decoded")
+	}
+	// Schema subset: sharing, presets and malformed peer edits are not accepted; more than
 	// eight components exceed the canonical bound (ADR-276 groups are below it).
 	for name, bad := range map[string]string{
-		"sharing":  strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"requested_retention_seconds":3600,"sharing":{"recipients":[{"kind":"User","issuer":"https://id.invalid","id":"x"}]},`, 1),
-		"preset":   strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"preset_ref":{"name":"pod-status","version":"v1"},`, 1),
-		"k8s peer": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"payments","name":"db"}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
-		"bad peer": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8"]}],"protocol":"sctp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
-		"nine":     strings.Replace(wireComposition, `"components":[{`, `"components":[`+strings.Repeat(`{"id":"other","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"}},`, 8)+`{`, 1),
-		"no field": strings.Replace(wireComposition, `"field":"packetFilter"`, `"field":"impact"`, 1),
+		"sharing":              strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"requested_retention_seconds":3600,"sharing":{"recipients":[{"kind":"User","issuer":"https://id.invalid","id":"x"}]},`, 1),
+		"preset":               strings.Replace(wireComposition, `"requested_retention_seconds":3600,`, `"preset_ref":{"name":"pod-status","version":"v1"},`, 1),
+		"service without mode": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Service","namespace":"payments","name":"db"}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
+		"deployment with mode": strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"payments","name":"db","readyOnly":true}}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
+		"bad peer":             strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"packetPeers","value":{"entries":[{"cidrs":["10.0.0.0/8"]}],"protocol":"sctp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`, 1),
+		"nine":                 strings.Replace(wireComposition, `"components":[{`, `"components":[`+strings.Repeat(`{"id":"other","profileRef":{"catalog":"builtin","name":"syscall-activity","version":"v1"}},`, 8)+`{`, 1),
+		"no field":             strings.Replace(wireComposition, `"field":"packetFilter"`, `"field":"impact"`, 1),
 	} {
 		if _, err := s.Call(t.Context(), f, "preview_capture", []byte(bad)); err == nil {
 			t.Fatalf("%s accepted by the runtime subset", name)

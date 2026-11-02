@@ -3,6 +3,8 @@ package planning
 import (
 	"strings"
 	"unicode/utf8"
+
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // Bounds of the authored profile composition (specs/contracts/capture-composition.schema.json).
@@ -42,11 +44,13 @@ type SyscallSelection struct {
 	Names []string `json:",omitempty"`
 }
 
-// PeerSelection is the typed value of a packetPeers edit with only cidrs
-// entries (ADR-283): each entry lists CIDR prefixes, ORed with the others.
-// Kubernetes entries are not modeled yet and arrive as Unmodeled.
+// PeerSelection is the typed value of a packetPeers edit (ADR-283): each
+// CIDRs entry lists prefixes and each Kubernetes entry selects Pods or names
+// one resource; all entries are ORed. The wire form lists the cidrs entries
+// first, then the Kubernetes entries, each in authored order.
 type PeerSelection struct {
 	CIDRs        [][]string
+	Kubernetes   []targets.PeerEntry `json:",omitempty"`
 	Protocol     string
 	Ports        []int `json:",omitempty"`
 	Resolution   string
@@ -141,8 +145,13 @@ func (e ProfileEdit) valid() bool {
 		return false
 	}
 	if p := e.Peers; p != nil {
-		if len(p.CIDRs) > 16 || len(p.Ports) > 32 || len(p.Protocol) > 16 || len(p.Resolution) > 16 || len(p.MaxStaleness) > 16 {
+		if len(p.CIDRs)+len(p.Kubernetes) > 16 || len(p.Ports) > 32 || len(p.Protocol) > 16 || len(p.Resolution) > 16 || len(p.MaxStaleness) > 16 {
 			return false
+		}
+		for _, entry := range p.Kubernetes {
+			if !entry.Bounded() {
+				return false
+			}
 		}
 		for _, entry := range p.CIDRs {
 			if len(entry) > 128 {
@@ -193,6 +202,7 @@ func (c *ProfileComposition) clone() *ProfileComposition {
 					p.CIDRs[k] = append([]string(nil), entry...)
 				}
 				p.Ports = append([]int(nil), e.Peers.Ports...)
+				p.Kubernetes = targets.ClonePeerEntries(e.Peers.Kubernetes)
 				component.Edits[j].Peers = &p
 			}
 		}

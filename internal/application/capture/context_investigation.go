@@ -102,6 +102,9 @@ type ContextInvestigation struct {
 	// It is optional: without it a packet filter edit is refused with
 	// FilterCompilerUnavailable; it never affects pod-status previews.
 	Filters compiler.FilterCompiler
+	// Peers resolves Kubernetes packet peers in the target's region (ADR-283
+	// PR 2). It is optional: without it Kubernetes peers are refused.
+	Peers ContextPeers
 	// Profiles reads published organization/namespace capture profile
 	// versions (REQ-CPR-001); nil leaves only builtin profiles available.
 	Profiles CatalogProfiles
