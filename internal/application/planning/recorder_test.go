@@ -499,3 +499,24 @@ func TestRecorderGroupBindsChildScopes(t *testing.T) {
 		t.Fatal("children of another executor were grouped")
 	}
 }
+
+// A catalog profile's peer selection is not applied by the recorder yet, so
+// anything narrower than all pod traffic is refused instead of ignored.
+func TestNarrowPeersFailClosed(t *testing.T) {
+	whole := `{"entries":[{"cidrs":["::/0","0.0.0.0/0"]}],"protocol":"any","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`
+	if !wholePodPeers(json.RawMessage(whole)) {
+		t.Fatal("whole-pod peers refused")
+	}
+	for name, raw := range map[string]string{
+		"cidr":    `{"entries":[{"cidrs":["10.0.0.0/8"]}],"protocol":"any","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`,
+		"tcp":     `{"entries":[{"cidrs":["0.0.0.0/0","::/0"]}],"protocol":"tcp","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`,
+		"follow":  `{"entries":[{"cidrs":["0.0.0.0/0","::/0"]}],"protocol":"any","resolution":"follow","maxEndpoints":1,"maxStaleness":"5s"}`,
+		"service": `{"entries":[{"service":{"name":"db"}}],"protocol":"any","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`,
+		"two":     `{"entries":[{"cidrs":["0.0.0.0/0","::/0"]},{"cidrs":["10.0.0.0/8"]}],"protocol":"any","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`,
+		"missing": ``,
+	} {
+		if wholePodPeers(json.RawMessage(raw)) {
+			t.Fatal("narrow peers accepted:", name)
+		}
+	}
+}

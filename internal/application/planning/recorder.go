@@ -430,6 +430,29 @@ func applyEdit(path string, e value.ProfileEdit, a *expandedAction) error {
 	return err
 }
 
+// wholePodPeers reports whether peers select all pod traffic: one frozen
+// entry of exactly 0.0.0.0/0 and ::/0 for any protocol. The recorder applies
+// no peer selection yet, so any narrower selection must fail closed rather
+// than be silently ignored (it would capture more than was reviewed).
+func wholePodPeers(raw json.RawMessage) bool {
+	var p struct {
+		Entries []struct {
+			CIDRs []string `json:"cidrs"`
+		} `json:"entries"`
+		Protocol     string `json:"protocol"`
+		Resolution   string `json:"resolution"`
+		MaxEndpoints int    `json:"maxEndpoints"`
+		MaxStaleness string `json:"maxStaleness"`
+	}
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if len(raw) == 0 || d.Decode(&p) != nil || len(p.Entries) != 1 || p.Protocol != "any" || p.Resolution != "frozen" {
+		return false
+	}
+	c := slices.Sorted(slices.Values(p.Entries[0].CIDRs))
+	return slices.Equal(c, []string{"0.0.0.0/0", "::/0"})
+}
+
 func validRing(path string, r ring, before time.Duration) error {
 	age, ok := durationValue(r.MaxAge, false)
 	switch {
@@ -477,6 +500,9 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 		}
 		if json.Unmarshal(a.packet.Profile, &kind) != nil || kind.Kind != "networkHeaders" {
 			return refuse(value.CompositionApproval, path+".parameters.profile.kind", "HTTP headers and raw packets need sensitive capture approval and a recorder that this release does not have; use networkHeaders")
+		}
+		if !wholePodPeers(a.packet.Peers) {
+			return refuse(value.CompositionRecorderUnavailable, path+".parameters.peers", "Kubernetes and CIDR peer selection follows in a later release; this recorder captures all pod traffic, so narrow it with packetFilter (for example host 10.0.0.5)")
 		}
 		beforeText, afterText, r, frozen, snapshots = a.packet.Before, a.packet.After, a.packet.Ring, a.packet.MaxFrozenBytes, a.packet.MaxConcurrentSnapshots
 	} else {
