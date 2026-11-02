@@ -17,6 +17,7 @@ nothing yet; increment 4 adds the first recorder.
 | `internal/adapters/mtls/node.go` | C-21 | Connector's in-memory node issuer and server TLS config; collector's process key and leaf |
 | `internal/adapters/linux` | C-23 | File probes (procfs, sysfs, statfs magics, `/proc/*/comm`) and the one BPF probe |
 | `internal/adapters/gadget` | C-23 | Embedded Inspektor Gadget v0.57.0 local runtime (build tag `gadget`), stub otherwise |
+| `internal/adapters/httpheaders` | C-23 | ADR-282 `http-response-headers/v1` projector: gopacket TCP reassembly and net/http HTTP/1 framing within the httpHeaders profile bounds |
 | `internal/bootstrap/node.go`, `node_channel.go`, `regional_nodes.go` | bootstrap | `asservat node`, `NodeChannelServer`, the connector's optional `collector` input |
 
 ## Flow
