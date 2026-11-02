@@ -132,6 +132,17 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		if err != nil {
 			t.Fatal(err)
 		}
+		// ADR-280: a re-executed write of the same claimed bundle accepts the
+		// byte-identical objects; different bytes stay refused.
+		if again, err := objects.Write(ctx, h.Expectation, bundle); err != nil || again != copies {
+			t.Fatal("re-executed identical history write", err)
+		}
+		altered := bundle
+		altered[0] = bytes.Clone(bundle[0])
+		altered[0][len(altered[0])-1] ^= 1
+		if _, err := objects.Write(ctx, h.Expectation, altered); err == nil {
+			t.Fatal("history write accepted different bytes over an existing object")
+		}
 		completion := capture.HistoryWriterCompletion{RootID: s.a.RootID, CaptureID: first.CaptureID, AttemptID: h.Expectation.Registration.Location.AttemptID, OperationID: write.RequestID, ProcessEpoch: write.ExecutorEpoch, ExpectationDigest: capture.HistoryExpectationDigest(h.Expectation), CopiesDigest: capture.HistoryCopiesDigest(copies), CompletedAt: time.Now().UTC().Truncate(time.Microsecond), NotAfter: write.NotAfter}
 		var storedDigest []byte
 		if err = admin.QueryRow(ctx, "SELECT request_digest FROM custody_attempt WHERE id=$1", h.Expectation.Registration.Location.AttemptID).Scan(&storedDigest); err != nil {

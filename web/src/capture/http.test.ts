@@ -121,3 +121,15 @@ it('requires all grouped action identity fields without rejecting repeated confi
  expect(validOutput_get_capture(response)).toBe(true);
  const missing=structuredClone(response);delete missing.data.actions[1].pod_uid;expect(validOutput_get_capture(missing)).toBe(false);
 });
+it('never cancels a fully read response body, only an unfinished one', async () => {
+  // Cancelling a finished stream can abort the request in Chromium before its
+  // load completes; only an over-limit read is cancelled.
+  const cancelled = vi.spyOn(ReadableStreamDefaultReader.prototype, 'cancel');
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(recordingPreviewResult())));
+  await operations.call('preview_capture', { target_ref: target, preset_ref: { name: 'pod-status', version: 'v1' } }, 'csrf', new AbortController().signal);
+  expect(cancelled).not.toHaveBeenCalled();
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(' '.repeat(160 * 1024 + 1), { headers: { 'Content-Type': 'application/json' } })));
+  await expect(operations.call('get_capture_settings', { capture_id: id(41) }, 'csrf', new AbortController().signal)).rejects.toThrow();
+  expect(cancelled).toHaveBeenCalled();
+  cancelled.mockRestore();
+});

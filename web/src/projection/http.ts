@@ -29,16 +29,17 @@ export const operations: Operations = {
         await response.body?.cancel(); throw new Error('Query unavailable');
       }
       const reader = response.body.getReader();
+    let complete = false; // cancel only an unfinished read: cancelling a finished stream can abort the request
       let size = 0;
       try {
         for (;;) {
           const { value, done } = await reader.read();
-          if (done) break;
+          if (done) { complete = true; break; }
           size += value.length;
           if (size > 65_536 || request.signal.aborted) { value.fill(0); throw new Error('Query unavailable'); }
           chunks.push(value);
         }
-      } finally { await reader.cancel(); reader.releaseLock(); }
+      } finally { if (!complete) await reader.cancel(); reader.releaseLock(); }
       if (request.signal.aborted) throw new Error('Query unavailable');
       const body = new Uint8Array(size);
       let offset = 0;

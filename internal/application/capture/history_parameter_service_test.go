@@ -9,6 +9,7 @@ import (
 	privacy "asservat.local/asservat/internal/domain/privacy"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -25,16 +26,35 @@ type parameterReadFixture struct {
 	failInitial, failFinal         bool
 	afterOpen                      func()
 	originalBound                  time.Time
+	// writable opens the write path (ADR-280 retries): failPrepares and
+	// failExecutes fail that many attempts first; completed records success.
+	writable                   bool
+	failPrepares, failExecutes int
+	executes                   int
+	completed                  bool
 }
 
-func (h *parameterReadFixture) ReserveHistoryParameters(context.Context, value.HistoryReservation) (value.HistoryStorage, error) {
-	return value.HistoryStorage{}, value.ErrUnavailable
+var fixtureHistoryBundle = value.HistoryCiphertexts{[]byte{1}, []byte{2}, []byte{3}, []byte{4}}
+
+func (h *parameterReadFixture) ReserveHistoryParameters(_ context.Context, in value.HistoryReservation) (value.HistoryStorage, error) {
+	if !h.writable {
+		return value.HistoryStorage{}, value.ErrUnavailable
+	}
+	return value.HistoryStorage{Expectation: in.Expectation}, nil
 }
-func (h *parameterReadFixture) ClaimHistoryWrite(context.Context, value.HistoryWriteRequest) (value.HistoryOperationAuthority, error) {
-	return value.HistoryOperationAuthority{}, value.ErrUnavailable
+func (h *parameterReadFixture) ClaimHistoryWrite(ctx context.Context, in value.HistoryWriteRequest) (value.HistoryOperationAuthority, error) {
+	if !h.writable {
+		return value.HistoryOperationAuthority{}, value.ErrUnavailable
+	}
+	until, _ := ctx.Deadline()
+	return value.HistoryOperationAuthority{Expectation: in.Storage.Expectation, Operation: "write", RequestID: in.RequestID, ExecutorEpoch: in.ExecutorEpoch, StartedAt: h.f.now, NotAfter: until, BundleDigest: in.BundleDigest}, nil
 }
 func (h *parameterReadFixture) CompleteHistoryWrite(context.Context, value.HistoryWriteResult) error {
-	return value.ErrUnavailable
+	if !h.writable {
+		return value.ErrUnavailable
+	}
+	h.completed = true
+	return nil
 }
 func (h *parameterReadFixture) ReadHistoryStorage(context.Context, value.SettingsQuery) (value.HistoryStorage, bool, error) {
 	if h.failInitial {
@@ -57,6 +77,9 @@ func (h *parameterReadFixture) AuthorizeHistoryRead(ctx context.Context, in valu
 }
 func (h *parameterReadFixture) PrepareHistory(context.Context, string, string) (fleetapp.HistorySession, error) {
 	h.prepares++
+	if h.prepares <= h.failPrepares {
+		return nil, value.ErrUnavailable
+	}
 	return h, nil
 }
 func (h *parameterReadFixture) ExecutorEpoch() string { return fixtureID(99) }
@@ -66,10 +89,26 @@ func (h *parameterReadFixture) ExecuteHistory(ctx context.Context, a value.Histo
 	if a.NotAfter.After(h.originalBound) || ctx.Err() != nil {
 		return fleetapp.HistoryReply{}, value.ErrDenied
 	}
+	if a.Operation == "write" {
+		h.executes++
+		if h.executes <= h.failExecutes {
+			return fleetapp.HistoryReply{}, value.ErrUnavailable
+		}
+		var copies artifact.Copies
+		for i, b := range fixtureHistoryBundle {
+			copies[i] = artifact.CopyReceipt{VersionID: "v", ETag: "e", Bytes: int64(len(b)), SHA256: artifact.Digest(sha256.Sum256(b))}
+		}
+		e := a.Expectation
+		c := value.HistoryWriterCompletion{RootID: e.RootID, CaptureID: e.CaptureID, AttemptID: e.Registration.Location.AttemptID, OperationID: a.RequestID, ProcessEpoch: a.ExecutorEpoch, ExpectationDigest: value.HistoryExpectationDigest(e), CopiesDigest: value.HistoryCopiesDigest(copies), CompletedAt: h.f.now, NotAfter: a.NotAfter}
+		return fleetapp.HistoryReply{Copies: copies, WriterCompletion: &c}, nil
+	}
 	return fleetapp.HistoryReply{Bundle: value.HistoryCiphertexts{[]byte{1}, []byte{2}, []byte{3}, []byte{4}}}, nil
 }
 func (h *parameterReadFixture) SealHistory(context.Context, value.HistoryExpectation, value.HistoryParameters) (value.HistoryCiphertexts, error) {
-	return value.HistoryCiphertexts{}, value.ErrUnavailable
+	if !h.writable {
+		return value.HistoryCiphertexts{}, value.ErrUnavailable
+	}
+	return fixtureHistoryBundle, nil
 }
 func (h *parameterReadFixture) OpenHistory(context.Context, value.HistoryExpectation, artifact.Copies, value.HistoryCiphertexts) (value.HistoryParameters, error) {
 	h.opens++
@@ -367,5 +406,35 @@ func TestHistoryWriteReportsReservationStageWithoutDependencyText(t *testing.T) 
 	err = svc.Persist(t.Context(), accepted, q.Identity, *accepted.HistoryParameters, nil)
 	if err == nil || len(reports) != 1 || reports[0] != "write/reserve/live" {
 		t.Fatal("history reservation diagnostic", err, reports)
+	}
+}
+
+// ADR-280: a failed regional session open (before any claim) and a failed
+// execution of the claimed write are each retried once; a second failure stays
+// a failure.
+func TestHistoryWriteRetriesSessionAndExecutionOnce(t *testing.T) {
+	for _, c := range []struct {
+		name                      string
+		prepares, executes        int
+		ok                        bool
+		wantPrepares, wantExecute int
+	}{
+		{"prepare", 1, 0, true, 2, 1},
+		{"execute", 0, 1, true, 2, 2},
+		{"execute-twice", 0, 2, false, 2, 2},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			svc, h, q := newParameterReadFixture(t)
+			preview := h.f.preview(t)
+			accepted, err := h.f.svc.Request(t.Context(), h.f.source(t, t.Context()), preview.ID, "history-retry-"+c.name)
+			if err != nil || accepted.HistoryParameters == nil {
+				t.Fatal("admission", err)
+			}
+			h.writable, h.failPrepares, h.failExecutes, h.prepares, h.executes = true, c.prepares, c.executes, 0, 0
+			err = svc.Persist(t.Context(), accepted, q.Identity, *accepted.HistoryParameters, nil)
+			if (err == nil) != c.ok || h.completed != c.ok || h.prepares != c.wantPrepares || h.executes != c.wantExecute {
+				t.Fatalf("err=%v completed=%t prepares=%d executes=%d", err, h.completed, h.prepares, h.executes)
+			}
+		})
 	}
 }

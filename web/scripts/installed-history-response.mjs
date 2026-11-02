@@ -14,7 +14,9 @@ export async function readInstalledHistoryResponse(response) {
       : protocol && text.includes('No resource with given identifier found') ? 'inspector-no-resource'
       : protocol && text.includes('No data found for resource with given identifier') ? 'inspector-no-data'
       : 'other';
-    return { http, status: 'invalid', body: 'read-failed', reply: null, requestFailed, readFailure };
+    // Chromium's net error token only (for example net::ERR_ABORTED), never text.
+    const net = /^net::ERR_[A-Z_]+$/.exec(response.request().failure()?.errorText ?? '')?.[0] ?? 'none';
+    return { http, status: 'invalid', body: 'read-failed', reply: null, requestFailed, readFailure: requestFailed ? `${readFailure}(${net})` : readFailure };
   }
   if (bytes.length === 0) return { http, status: 'invalid', body: 'empty', reply: null };
   let text;

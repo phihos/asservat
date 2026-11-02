@@ -39,17 +39,18 @@ export const operations: Operations = {
         await response.body?.cancel(); throw new OperationFailure(response.status === 200 ? 502 : response.status);
       }
       const reader = response.body.getReader();
+    let complete = false; // cancel only an unfinished read: cancelling a finished stream can abort the request
       const chunks: Uint8Array[] = [];
       let size = 0;
       try {
         for (;;) {
           const { value, done } = await reader.read();
-          if (done) break;
+          if (done) { complete = true; break; }
           size += value.length;
           if (size > 32_768 || request.signal.aborted) throw new OperationFailure(502);
           chunks.push(value);
         }
-      } finally { await reader.cancel(); reader.releaseLock(); }
+      } finally { if (!complete) await reader.cancel(); reader.releaseLock(); }
       if (request.signal.aborted) throw new OperationFailure(503);
       const bytes = new Uint8Array(size);
       let offset = 0;

@@ -52,7 +52,7 @@ try {
     assert.equal(result.status, ['ok', 'error', 'pending'].includes(kind) ? kind : 'invalid');
     if (kind === 'partial' || kind === 'abort') {
       assert.equal(result.requestFailed, true);
-      assert.equal(result.readFailure, 'network-failed');
+      assert.match(result.readFailure, /^network-failed\((net::ERR_[A-Z_]+|none)\)$/);
     } else if (kind === 'navigate') {
       assert.equal(result.requestFailed, false);
       assert.equal(result.readFailure, 'inspector-no-resource');
@@ -73,8 +73,15 @@ for (const [message, failed, expected] of [
   ['Protocol error (Network.getResponseBody): No data found for resource with given identifier', false, 'inspector-no-data'],
   ['Protocol error (Network.getResponseBody): No resource with given identifier found', false, 'inspector-no-resource'],
   ['synthetic private exception content', false, 'other'],
-  ['Protocol error (Network.getResponseBody): No data found for resource with given identifier', true, 'network-failed'],
+  // Non-token failure text never escapes: it collapses to none.
+  ['Protocol error (Network.getResponseBody): No data found for resource with given identifier', true, 'network-failed(none)'],
 ]) {
   const response = { status: () => 200, body: async () => { throw new Error(message); }, request: () => ({ failure: () => failed ? { errorText: 'synthetic private failure content' } : null }) };
   assert.deepEqual(await readInstalledHistoryResponse(response), { http: 200, status: 'invalid', body: 'read-failed', reply: null, requestFailed: failed, readFailure: expected });
+}
+
+// Only Chromium's net error token is reported.
+{
+  const response = { status: () => 200, body: async () => { throw new Error('x'); }, request: () => ({ failure: () => ({ errorText: 'net::ERR_ABORTED' }) }) };
+  assert.equal((await readInstalledHistoryResponse(response)).readFailure, 'network-failed(net::ERR_ABORTED)');
 }
