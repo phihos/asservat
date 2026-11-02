@@ -35,15 +35,19 @@ import (
 // enrolled connector process. The API process and its exchanges are built
 // only once the connector credentials are active.
 type regionalContext struct {
-	c         contracts.RegionalAPIContext
-	rootID    string
-	pool      value.OwnerPool
-	roots     *x509.CertPool
-	attester  *kube.ConnectorProcessAttester
-	settings  *kube.ConnectorAPISettingsProtection
-	capacity  *kube.PermissionClient
-	journal   *kube.StartJournal
-	targets   *kube.PodTargets
+	c        contracts.RegionalAPIContext
+	rootID   string
+	pool     value.OwnerPool
+	roots    *x509.CertPool
+	attester *kube.ConnectorProcessAttester
+	settings *kube.ConnectorAPISettingsProtection
+	capacity *kube.PermissionClient
+	journal  *kube.StartJournal
+	targets  *kube.PodTargets
+	// peers re-resolves frozen Kubernetes packet peers for the running
+	// recordings' membership verifiers (ADR-283 part 3) with its own client
+	// and limiter, so verification never starves target resolution.
+	peers     *kube.PodTargets
 	collector *kube.ContextCollector
 	output    regionalArtifactOutput
 	history   objectstore.HistoryObjects
@@ -185,6 +189,13 @@ func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in 
 		if out.targets, err = out.targets.WithIdentityMappings(a.IdentityMappings); err != nil {
 			return nil, closers, mounts.ErrUnavailable
 		}
+	}
+	verifier, err := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-observer.token")), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	if out.peers, err = kube.NewAPIContextTargets(verifier); err != nil {
+		return nil, closers, mounts.ErrUnavailable
 	}
 	if out.collector, err = kube.NewAPIContextClient(in.kubernetes("kube-observer.token")); err != nil {
 		return nil, closers, mounts.ErrUnavailable
@@ -393,6 +404,17 @@ func (t reportedTargets) packetTargetAvailability(ctx context.Context, p targets
 		}
 	}
 	return targets.RecorderResolution{Target: p, Recorder: answer}
+}
+
+// ResolvePacketPeers refuses a peer resolution while the connector already
+// verifies its maximum of running recordings with Kubernetes peers (ADR-283
+// part 3), so preview and submission report the limit before anything is
+// reserved; the start checks it again.
+func (t reportedTargets) ResolvePacketPeers(ctx context.Context, r targets.PeerRequest) (targets.PeerResolution, error) {
+	if t.recordings != nil && t.recordings.peerVerifiersFull() {
+		return targets.PeerResolution{}, targets.ErrPeerVerifierBusy
+	}
+	return t.PodTargets.ResolvePacketPeers(ctx, r)
 }
 
 func (t reportedTargets) ReportAnswer(steps string) { t.report("answer", steps) }

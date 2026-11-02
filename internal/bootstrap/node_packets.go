@@ -47,8 +47,20 @@ type nodePackets struct {
 	// Protected by budgetMu; same-epoch poll resets cannot refill one permit.
 	// At most MaxQueuedWork capture IDs, each retained only until StartBy.
 	observations map[string]time.Time
+	// running holds the packetCapture items started by start that have not
+	// yet returned from runObserved, by capture ID (ADR-283), so a
+	// cancelPacketCapture item can stop exactly one of them early. Protected
+	// by budgetMu; at most MaxQueuedWork entries.
+	running map[string]runningPacket
 
 	wg sync.WaitGroup
+}
+
+// runningPacket is one registered running packet capture: the ID of the
+// work item that started it and the cancellation of its capture context.
+type runningPacket struct {
+	workID string
+	cancel context.CancelFunc
 }
 
 // start answers one packetCapture item. An accepted item runs in its own
@@ -126,7 +138,14 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		}
 		return r
 	}
+	capture, stopCapture := context.WithCancel(ctx)
 	n.budgetMu.Lock()
+	if _, busy := n.running[p.CaptureID]; busy || len(n.running) >= collector.MaxQueuedWork {
+		n.budgetMu.Unlock()
+		stopCapture()
+		r.Reason = collector.ReasonCaptureBusy
+		return r
+	}
 	if p.Observation != nil {
 		now := n.now()
 		for capture, until := range n.observations {
@@ -137,6 +156,7 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		_, replay := n.observations[p.CaptureID]
 		if replay || len(n.observations) >= collector.MaxQueuedWork {
 			n.budgetMu.Unlock()
+			stopCapture()
 			r.Reason = collector.ReasonCaptureBusy
 			return r
 		}
@@ -154,8 +174,17 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 			failureReason = collector.ReasonWorkUnknown
 		}
 	}
+	if err == nil {
+		// Registered before the goroutine runs, so a cancel decided after
+		// this receipt always finds the running capture.
+		if n.running == nil {
+			n.running = make(map[string]runningPacket)
+		}
+		n.running[p.CaptureID] = runningPacket{workID: w.ID, cancel: stopCapture}
+	}
 	n.budgetMu.Unlock()
 	if err != nil {
+		stopCapture()
 		if meter != nil {
 			meter.Close()
 		}
@@ -171,7 +200,15 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 			_ = n.budget().ReleaseFrozen(p.MaxBytes)
 			n.budgetMu.Unlock()
 		}()
-		n.runObserved(ctx, epoch, w.ID, p, rec, started, meter)
+		// A cancel ends capture like a node stop: runObserved reports the
+		// early stop as a failure, never as a shorter recording.
+		n.runObserved(capture, epoch, w.ID, p, rec, started, meter)
+		n.budgetMu.Lock()
+		if running, ok := n.running[p.CaptureID]; ok && running.workID == w.ID {
+			delete(n.running, p.CaptureID)
+		}
+		n.budgetMu.Unlock()
+		stopCapture()
 	}()
 	return r
 }

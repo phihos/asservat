@@ -1,11 +1,13 @@
 package capture
 
 import (
-	"asservat.local/asservat/internal/domain/artifact"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
+
+	"asservat.local/asservat/internal/domain/artifact"
 
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/planning"
@@ -15,11 +17,16 @@ import (
 type fakePeers struct {
 	requests []targets.PeerRequest
 	err      error
+	members  []targets.PeerMember
 }
 
 func (p *fakePeers) ResolvePacketPeers(_ context.Context, r targets.PeerRequest) (targets.PeerResolution, error) {
 	p.requests = append(p.requests, r)
-	return targets.PeerResolution{Request: r, Members: []targets.PeerMember{{Kind: "Pod", UID: "db-a", IP: "10.0.0.11"}, {Kind: "Pod", UID: "db-a", IP: "fd00::11"}}}, p.err
+	members := p.members
+	if members == nil {
+		members = []targets.PeerMember{{Kind: "Pod", UID: "db-a", IP: "10.0.0.11"}, {Kind: "Pod", UID: "db-a", IP: "fd00::11"}}
+	}
+	return targets.PeerResolution{Request: r, Members: members}, p.err
 }
 
 func kubernetesPeerEdit() planning.ProfileEdit {
@@ -28,8 +35,8 @@ func kubernetesPeerEdit() planning.ProfileEdit {
 }
 
 // ADR-283 PR 2: Kubernetes peers are resolved once in the target's region
-// after eligibility and shown in a plan-only preview; submission is refused
-// until the membership verifier exists.
+// after eligibility. Without a node recorder the preview is plan-only and
+// submission is refused like any other plan-only composition.
 func TestKubernetesPeerPreviewIsPlanOnly(t *testing.T) {
 	f := newInvestigationFixture()
 	f.svc.Filters = &stubFilters{}
@@ -83,5 +90,54 @@ func TestKubernetesPeerGroupPreviewFallsBackToPlanOnly(t *testing.T) {
 	var refusal planning.CompositionError
 	if !errors.As(err, &refusal) || refusal.Code != planning.CompositionRecorderUnavailable || !strings.Contains(refusal.Reason, "one packet capture") {
 		t.Fatal("mixed composition with Kubernetes peers", err, refusal.Reason)
+	}
+}
+
+// ADR-283 part 3: with a node recorder a frozen Kubernetes peer plan is
+// recordable. Submission resolves the frozen query again and is admitted
+// only for exactly the reviewed members; a changed set or a full verifier is
+// refused before admission reserves anything.
+func TestKubernetesPeerRecordingSubmissionRechecksMembers(t *testing.T) {
+	f := newInvestigationFixture()
+	f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
+	f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+	f.svc.Recorders, f.svc.Filters = availableRecording{f}, &stubFilters{}
+	peers := &fakePeers{}
+	f.svc.Peers = peers
+	ctx := context.Background()
+	preview := func() RecorderPreviewResult {
+		t.Helper()
+		r, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition(kubernetesPeerEdit())))
+		if err != nil || !r.Recordable || r.Plan.Actions[0].PeerEndpoints != 2 {
+			t.Fatalf("preview %+v %v", r.Plan.Actions, err)
+		}
+		return r
+	}
+	var refusal planning.CompositionError
+	for i, tc := range []struct {
+		members []targets.PeerMember
+		err     error
+		code    string
+	}{
+		{members: []targets.PeerMember{{Kind: "Pod", UID: "db-b", IP: "10.0.0.11"}, {Kind: "Pod", UID: "db-a", IP: "fd00::11"}}, code: planning.CompositionPeersChanged},
+		{members: []targets.PeerMember{{Kind: "Pod", UID: "db-a", IP: "10.0.0.11"}}, code: planning.CompositionPeersChanged},
+		{err: targets.ErrPeerMissing, code: planning.CompositionPeersChanged},
+		{err: targets.ErrPeerVerifierBusy, code: planning.CompositionRecorderUnavailable},
+	} {
+		r := preview()
+		peers.members, peers.err = tc.members, tc.err
+		_, err := f.request(t, r.Preview, fmt.Sprintf("peers-changed-%d", i))
+		if !errors.As(err, &refusal) || refusal.Code != tc.code || refusal.Path != "profile_composition.components[0] action sample.parameters.peers" || f.admissions.Load() != 0 {
+			t.Fatalf("%d: %v admissions %d", i, err, f.admissions.Load())
+		}
+		peers.members, peers.err = nil, nil
+	}
+	r := preview()
+	asked := len(peers.requests)
+	// This fixture's admission does not model recordings past admission;
+	// reaching it with exactly one recheck of the frozen query is the point.
+	_, err := f.request(t, r.Preview, "peers-same")
+	if errors.As(err, &refusal) || f.admissions.Load() != 1 || len(peers.requests) != asked+1 || !peers.requests[asked].Equal(r.Plan.Input.Peers[0].Request) {
+		t.Fatalf("unchanged peers not admitted: %v", err)
 	}
 }

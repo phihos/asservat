@@ -124,6 +124,7 @@ var queryFailures = []struct {
 	{"peer-limit", targets.ErrPeerLimit},
 	{"peer-unsupported", targets.ErrPeerUnsupported},
 	{"peer-missing", targets.ErrPeerMissing},
+	{"peer-busy", targets.ErrPeerVerifierBusy},
 	{"unscheduled", targets.ErrUnscheduled},
 	{"unsupported", targets.ErrUnsupported},
 	{"unavailable", targets.ErrUnavailable},

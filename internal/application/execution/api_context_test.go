@@ -451,10 +451,12 @@ func TestAPIContextRunnerLostRegionalReplyNeverReacquires(t *testing.T) {
 
 func TestCaptureFailurePhaseRecordsTheCause(t *testing.T) {
 	for err, want := range map[error]string{
-		fmt.Errorf("pod gone: %w", targets.ErrChanged): "targetGone",
-		fmt.Errorf("forbidden: %w", targets.ErrDenied): "denied",
-		value.ErrUnavailable:                           "captureFailed",
-		nil:                                            "captureFailed",
+		fmt.Errorf("pod gone: %w", targets.ErrChanged):   "targetGone",
+		fmt.Errorf("forbidden: %w", targets.ErrDenied):   "denied",
+		fmt.Errorf("start: %w", targets.ErrPeersChanged): "peerMembershipChanged",
+		fmt.Errorf("start: %w", targets.ErrPeersStale):   "peerMembershipStale",
+		value.ErrUnavailable:                             "captureFailed",
+		nil:                                              "captureFailed",
 	} {
 		if got := captureFailurePhase(err); got != want {
 			t.Fatal(err, got, want)

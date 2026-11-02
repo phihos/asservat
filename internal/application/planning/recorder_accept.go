@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // ADR-248: the first accepted recorder plan is a manual networkHeaders packet
@@ -49,9 +50,9 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only a single packet capture action can be recorded in this release"}
 	}
 	a := plan.Actions[0]
-	if a.PeerEndpoints > 0 {
-		// ADR-283 PR 2: a frozen Kubernetes peer set is reviewable, but
-		// nothing rechecks its membership at arming yet, so it never starts.
+	if a.PeerEndpoints > 0 && (policy || len(plan.Input.Peers) != 1) {
+		// ADR-283 part 3: the connector verifies a frozen set a human
+		// reviewed; a policy source has no reviewed resolution.
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.peers", KubernetesPeersAcceptance}
 	}
 	if a.Kind == "syscallTrace" {
@@ -205,6 +206,21 @@ func RecordingFor(plan value.RecorderPlan) (artifact.Recording, string, error) {
 		if f.ActionID != a.ID || f.Expression != a.Filter {
 			return artifact.Recording{}, "", value.ErrInvalid
 		}
+		if f.Peers != nil && f.Peers.Kubernetes != nil {
+			// ADR-283 part 3: the connector verifies exactly the reviewed
+			// members, resolved by the query the plan was compiled with.
+			var recipe recipeSpec
+			if strict(scope.Recipe, &recipe) != nil || len(plan.Input.Peers) != 1 {
+				return artifact.Recording{}, "", value.ErrInvalid
+			}
+			frozen, staleness, err := frozenPeerResolution(recipe, f)
+			if err != nil || !frozen.Request.Equal(plan.Input.Peers[0].Request) || !slices.Equal(frozen.Members, plan.Input.Peers[0].Members) || !frozen.ResolvedAt.Equal(plan.Input.Peers[0].ResolvedAt) {
+				return artifact.Recording{}, "", value.ErrInvalid
+			}
+			if r.Peers, err = RecordingPeersOf(frozen, staleness); err != nil {
+				return artifact.Recording{}, "", value.ErrInvalid
+			}
+		}
 		program := make([]artifact.FilterInstruction, len(f.Program))
 		for i, ins := range f.Program {
 			program[i] = artifact.FilterInstruction{Code: uint16(ins[0]), Jt: uint8(ins[1]), Jf: uint8(ins[2]), K: ins[3]}
@@ -231,6 +247,13 @@ func RecorderContextFor(r *artifact.Recording) (*value.RecorderContext, error) {
 		return nil, value.ErrInvalid
 	}
 	out := &value.RecorderContext{Composition: c, RequireApproval: r.RequireApproval}
+	frozen, ok, err := FrozenRecordingPeers(r)
+	if err != nil {
+		return nil, value.ErrInvalid
+	}
+	if ok {
+		out.Peers = []targets.PeerResolution{frozen.Resolution}
+	}
 	if f := r.Filter; f != nil {
 		program := make([]value.BPFInstruction, len(f.Program))
 		for i, ins := range f.Program {
@@ -268,7 +291,7 @@ func compileRecorderContext(in value.ContextInput, now time.Time) (value.Context
 	if err != nil || in.Retention.EvidenceType != evidence {
 		return bad()
 	}
-	plan, err := CompileRecorder(value.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: in.Recorder.Composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: in.Recorder.RequireApproval}, frozenFilters(in.Recorder.Filters), now)
+	plan, err := CompileRecorder(value.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: in.Recorder.Composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: in.Recorder.RequireApproval, Peers: in.Recorder.Peers}, frozenFilters(in.Recorder.Filters), now)
 	if err != nil || !contextRecorderAcceptance(plan).Acceptable() {
 		return bad()
 	}
@@ -285,7 +308,7 @@ func RecorderPlanForContext(p value.ContextPlan) (value.RecorderPlan, error) {
 	if in.Recorder == nil {
 		return value.RecorderPlan{}, value.ErrInvalid
 	}
-	plan, err := CompileRecorder(value.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: in.Recorder.Composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: in.Recorder.RequireApproval}, frozenFilters(in.Recorder.Filters), p.CompiledAt)
+	plan, err := CompileRecorder(value.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: in.Recorder.Composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: in.Recorder.RequireApproval, Peers: in.Recorder.Peers}, frozenFilters(in.Recorder.Filters), p.CompiledAt)
 	if err != nil || plan.ScopeDigest != p.ScopeDigest {
 		return value.RecorderPlan{}, value.ErrInvalid
 	}
@@ -321,7 +344,22 @@ func RecorderContextFromScope(c value.ProfileComposition, canonicalScope []byte)
 			required = required || r.Code == value.ReasonRecordingApproval
 		}
 	}
-	return &value.RecorderContext{Composition: *c.Clone(), Filters: filters, RequireApproval: required}, nil
+	out := &value.RecorderContext{Composition: *c.Clone(), Filters: filters, RequireApproval: required}
+	for _, f := range scope.Filters {
+		if f.Peers == nil || f.Peers.Kubernetes == nil {
+			continue
+		}
+		var recipe recipeSpec
+		if strict(scope.Recipe, &recipe) != nil {
+			return nil, value.ErrInvalid
+		}
+		frozen, _, err := frozenPeerResolution(recipe, f)
+		if err != nil {
+			return nil, err
+		}
+		out.Peers = append(out.Peers, frozen)
+	}
+	return out, nil
 }
 
 // RecorderFiltersOf returns the frozen compilations of a compiled plan, for

@@ -116,14 +116,23 @@ type peerSet struct {
 
 // kubernetesPeerRecord is the frozen Kubernetes resolution of a plan (ADR-283
 // PR 2): where and when it was resolved, how many (UID, IP) members it has
-// and their digest. A later verifier re-resolves and compares the digest.
+// and their digest. Part 3 records the members themselves, so an accepted
+// plan carries the exact set the connector verifies at start and while the
+// recording runs.
 type kubernetesPeerRecord struct {
-	ClusterID     string `json:"clusterID"`
-	Namespace     string `json:"namespace"`
-	NamespaceUID  string `json:"namespaceUID"`
-	Endpoints     int    `json:"endpoints"`
-	MembersDigest string `json:"membersDigest"`
-	ResolvedAt    string `json:"resolvedAt"`
+	ClusterID     string             `json:"clusterID"`
+	Namespace     string             `json:"namespace"`
+	NamespaceUID  string             `json:"namespaceUID"`
+	Endpoints     int                `json:"endpoints"`
+	MembersDigest string             `json:"membersDigest"`
+	ResolvedAt    string             `json:"resolvedAt"`
+	Members       []peerMemberRecord `json:"members"`
+}
+
+type peerMemberRecord struct {
+	Kind string `json:"kind"`
+	UID  string `json:"uid"`
+	IP   string `json:"ip"`
 }
 
 // peerSetRecord is the plan's provenance of a peer selection: the canonical
@@ -138,10 +147,10 @@ type peerSetRecord struct {
 
 const kubernetesPeersRemedy = "Kubernetes peers (podSelector, resourceRef) resolve only when previewing one packet capture of a resolved target; use cidrs entries (for example 10.0.0.0/24) here"
 
-// KubernetesPeersAcceptance is why a plan with Kubernetes peers is not
-// recordable yet (ADR-283 PR 2): without the runtime membership verifier a
-// frozen set cannot be rechecked at arming.
-const KubernetesPeersAcceptance = "Kubernetes peer capture needs the membership verifier of the next release; this plan can be previewed but not recorded. Use cidrs peers to record now."
+// KubernetesPeersAcceptance is why a policy plan with Kubernetes peers is
+// not recordable (ADR-283 part 3): the membership verifier checks a set
+// frozen at a human's preview; a policy source has no such review.
+const KubernetesPeersAcceptance = "policies cannot select Kubernetes peers in this release; use cidrs peers"
 
 // peerContext is the resolved target a plan's Kubernetes peers resolve in,
 // and the region's resolutions available to the compiler. nil refuses
@@ -177,6 +186,8 @@ func PeerResolutionRefusal(needed PeerResolutionNeeded, err error) error {
 		return refuse(value.CompositionRecorderUnavailable, needed.Path+".entries", "a peer has no qualified address identity: ExternalName and selectorless Services, virtual IPs of headless Services and hostNetwork Pods are not supported; select other peers or use cidrs entries")
 	case errors.Is(err, targets.ErrPeerMissing):
 		return refuse(value.CompositionInvalid, needed.Path+".entries", "a referenced peer is unavailable in the target's namespace")
+	case errors.Is(err, targets.ErrPeerVerifierBusy):
+		return refuse(value.CompositionRecorderUnavailable, needed.Path, "the target's cluster is already verifying its maximum number of running captures with Kubernetes peers; retry when one ends or use cidrs peers")
 	}
 	return err
 }
@@ -241,6 +252,11 @@ func packetPeers(path string, raw json.RawMessage, pc *peerContext) (*peerSet, e
 	}
 	if len(kubernetes) > 0 && p.Resolution != "frozen" {
 		return nil, refuse(value.CompositionRecorderUnavailable, path+".resolution", "Kubernetes peers resolve frozen in this release; follow is not available yet")
+	}
+	if staleness, ok := durationValue(p.MaxStaleness, false); ok && len(kubernetes) > 0 && (staleness < time.Second || staleness > 5*time.Second) {
+		// ADR-283 part 3: the verifier re-resolves once per second; the
+		// freshness bound is at most five seconds (REQ-NET-003).
+		return nil, refuse(value.CompositionInvalid, path+".maxStaleness", "maxStaleness of Kubernetes peers is 1s to 5s")
 	}
 	if p.MaxEndpoints < 1 || p.MaxEndpoints > targets.MaxPeerEndpoints {
 		return nil, refuse(value.CompositionInvalid, path+".maxEndpoints", "maxEndpoints is 1 to 4,096")
@@ -318,6 +334,9 @@ func packetPeers(path string, raw json.RawMessage, pc *peerContext) (*peerSet, e
 			return nil, value.ErrInvalid
 		}
 		set.kubernetes = &kubernetesPeerRecord{ClusterID: pc.clusterID, Namespace: pc.namespace.Name, NamespaceUID: pc.namespace.UID, Endpoints: len(r.Members), MembersDigest: hexDigest(digest), ResolvedAt: r.ResolvedAt.UTC().Format(time.RFC3339Nano)}
+		for _, m := range r.Members {
+			set.kubernetes.Members = append(set.kubernetes.Members, peerMemberRecord{Kind: m.Kind, UID: m.UID, IP: m.IP})
+		}
 	}
 	slices.SortFunc(prefixes, func(a, b netip.Prefix) int {
 		if c := a.Addr().Compare(b.Addr()); c != 0 {
@@ -403,4 +422,93 @@ func balancedFilter(expression string) bool {
 		}
 	}
 	return len(stack) == 0
+}
+
+// frozenPeerResolution rebuilds the reviewed resolution of one compiled
+// filter record from an accepted scope: the query is derived again from the
+// recipe's authored peers in the recorded cluster and namespace, the members
+// and generation time are the recorded ones. The recompiled plan must then
+// reproduce the scope digest, so nothing here can widen the reviewed set.
+func frozenPeerResolution(recipe recipeSpec, f compiledFilterRecord) (targets.PeerResolution, time.Duration, error) {
+	bad := func() (targets.PeerResolution, time.Duration, error) {
+		return targets.PeerResolution{}, 0, value.ErrInvalid
+	}
+	k := f.Peers.Kubernetes
+	i := slices.IndexFunc(recipe.Actions, func(a recipeAction) bool { return a.ID == f.ActionID })
+	if i < 0 {
+		return bad()
+	}
+	var params packetParameters
+	if strict(recipe.Actions[i].Parameters, &params) != nil {
+		return bad()
+	}
+	pc := &peerContext{clusterID: k.ClusterID, namespace: cfg.NamespaceRef{Name: k.Namespace, UID: k.NamespaceUID}, used: map[int]bool{}}
+	var needed PeerResolutionNeeded
+	if _, err := packetPeers("peers", params.Peers, pc); !errors.As(err, &needed) {
+		return bad()
+	}
+	var maxStaleness struct {
+		MaxStaleness string `json:"maxStaleness"`
+	}
+	if json.Unmarshal(params.Peers, &maxStaleness) != nil {
+		return bad()
+	}
+	staleness, ok := durationValue(maxStaleness.MaxStaleness, false)
+	resolvedAt, err := time.Parse(time.RFC3339Nano, k.ResolvedAt)
+	if !ok || err != nil {
+		return bad()
+	}
+	r := targets.PeerResolution{Request: needed.Request, ResolvedAt: resolvedAt.UTC()}
+	for _, m := range k.Members {
+		r.Members = append(r.Members, targets.PeerMember{Kind: m.Kind, UID: m.UID, IP: m.IP})
+	}
+	if !r.Answers(needed.Request) || len(r.Members) != k.Endpoints {
+		return bad()
+	}
+	return r, staleness, nil
+}
+
+// RecordingPeersOf encodes a reviewed resolution for the node recording.
+func RecordingPeersOf(r targets.PeerResolution, maxStaleness time.Duration) (*artifact.RecordingPeers, error) {
+	if !r.Answers(r.Request) || len(r.Members) == 0 || r.ResolvedAt.IsZero() || maxStaleness%time.Millisecond != 0 {
+		return nil, value.ErrInvalid
+	}
+	query, err := json.Marshal(r.Request)
+	if err != nil {
+		return nil, value.ErrInvalid
+	}
+	out := &artifact.RecordingPeers{Query: query, ResolvedAt: r.ResolvedAt.UTC(), MaxStalenessMillis: maxStaleness.Milliseconds()}
+	for _, m := range r.Members {
+		out.Members = append(out.Members, artifact.RecordingPeerMember{Kind: m.Kind, UID: m.UID, IP: m.IP})
+	}
+	if !(&artifact.Recording{Kind: "packetCapture", Peers: out}).PeersValid() {
+		return nil, value.ErrInvalid
+	}
+	return out, nil
+}
+
+// FrozenRecordingPeers strictly decodes a recording's frozen peers; a
+// recording without them answers false.
+func FrozenRecordingPeers(r *artifact.Recording) (targets.FrozenPeers, bool, error) {
+	if r == nil || r.Peers == nil {
+		return targets.FrozenPeers{}, false, nil
+	}
+	p := r.Peers
+	if !r.PeersValid() {
+		return targets.FrozenPeers{}, true, value.ErrInvalid
+	}
+	var request targets.PeerRequest
+	d := json.NewDecoder(bytes.NewReader(p.Query))
+	d.DisallowUnknownFields()
+	if d.Decode(&request) != nil || d.More() {
+		return targets.FrozenPeers{}, true, value.ErrInvalid
+	}
+	out := targets.FrozenPeers{Resolution: targets.PeerResolution{Request: request, ResolvedAt: p.ResolvedAt.UTC()}, MaxStaleness: time.Duration(p.MaxStalenessMillis) * time.Millisecond}
+	for _, m := range p.Members {
+		out.Resolution.Members = append(out.Resolution.Members, targets.PeerMember{Kind: m.Kind, UID: m.UID, IP: m.IP})
+	}
+	if !out.Resolution.Answers(request) {
+		return targets.FrozenPeers{}, true, value.ErrInvalid
+	}
+	return out, true, nil
 }

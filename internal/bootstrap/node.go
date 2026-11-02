@@ -461,6 +461,9 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 				}
 				r = p.packets.startSyscall(root, p.epoch, w)
 			}
+			if w.Kind == collector.WorkCancelPacketCapture && p.packets != nil {
+				r = p.packets.cancel(w)
+			}
 			if (w.Kind == collector.WorkPacketSource || w.Kind == collector.WorkStopPacketSource || w.Kind == collector.WorkPacketSourceSnapshot || w.Kind == collector.WorkCancelSourceSnapshot) && p.sources != nil {
 				root := p.root
 				if root == nil {

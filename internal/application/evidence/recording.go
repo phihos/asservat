@@ -48,10 +48,20 @@ const (
 	RecordingCancelled = "cancelled"
 )
 
+// Recording failures of a connector stop on frozen Kubernetes peers
+// (ADR-283 part 3). Like captureFailed they record no acquisition; the
+// committed start is not refunded.
+const (
+	RecordingPeersChanged = "peerMembershipChanged"
+	RecordingPeersStale   = "peerMembershipStale"
+)
+
 // RecordingCollection is the region's answer to a collect: still recording,
 // stored (with the writer completion of the four write-only objects), or
-// failed with a closed phase (captureFailed or storeUnconfirmed). Acquired is
-// the queue instant returned at start.
+// failed with a closed phase (captureFailed, storeUnconfirmed, or a
+// connector stop on Kubernetes peer membership: peerMembershipChanged or
+// peerMembershipStale, ADR-283 part 3). Acquired is the queue instant
+// returned at start.
 type RecordingCollection struct {
 	SnapshotCancellation *artifact.SourceSnapshotCancellation `json:",omitempty"`
 	SnapshotCoverage     *artifact.SourceSnapshotCoverage     `json:",omitempty"`
@@ -71,7 +81,7 @@ func (c RecordingCollection) Valid(r artifact.Registration) bool {
 	case RecordingCancelled:
 		return c.SnapshotCancellation != nil && c.SnapshotCancellation.Valid() && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && c.Failure == ""
 	case RecordingFailed:
-		return c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && (c.Failure == "captureFailed" || c.Failure == "storeUnconfirmed")
+		return c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && (c.Failure == "captureFailed" || c.Failure == "storeUnconfirmed" || c.Failure == RecordingPeersChanged || c.Failure == RecordingPeersStale)
 	}
 	return false
 }

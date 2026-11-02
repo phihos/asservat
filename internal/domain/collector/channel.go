@@ -72,11 +72,24 @@ const (
 	// (B3), with the PacketCapture payload carrying Syscalls. A node that
 	// predates it refuses the unknown kind instead of running tcpdump.
 	WorkSyscallCapture WorkKind = "syscallCapture"
+	// WorkCancelPacketCapture stops one running finite packetCapture item
+	// early (ADR-283). It names exactly the original work and capture IDs;
+	// the stopped capture still reports its failure, never a shorter
+	// recording. A node that predates it refuses the unknown kind.
+	WorkCancelPacketCapture WorkKind = "cancelPacketCapture"
 )
 
 func (k WorkKind) Valid() bool {
-	return k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource || k == WorkSyscallCapture
+	return k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource || k == WorkSyscallCapture || k == WorkCancelPacketCapture
 }
+
+// PacketCancel names one running finite packet capture by its capture ID and
+// the ID of the packetCapture work item that started it.
+type PacketCancel struct {
+	CaptureID, WorkID string
+}
+
+func (c PacketCancel) Valid() bool { return validUUID(c.CaptureID) && validUUID(c.WorkID) }
 
 // Work is one item the connector queued for one node process. Sequence is
 // assigned per node process and only grows; NotAfter bounds when the node may
@@ -92,6 +105,7 @@ type Work struct {
 	StopSource     *SourceBinding
 	Snapshot       *SourceSnapshot
 	CancelSnapshot *SourceSnapshot
+	CancelPacket   *PacketCancel
 }
 
 // Packet capture bounds (ADR-248). The output cap is the interim 8 MiB per
@@ -264,7 +278,8 @@ func Decide(w Work, now time.Time) Receipt {
 		(w.Kind == WorkPacketSource) != (w.Source != nil) || w.Source != nil && (!w.Source.Valid() || w.NotAfter.After(w.Source.Permit.DispatchUntil)) ||
 		(w.Kind == WorkCancelSourceSnapshot) != (w.CancelSnapshot != nil) || w.CancelSnapshot != nil && !w.CancelSnapshot.Valid() ||
 		(w.Kind == WorkPacketSourceSnapshot) != (w.Snapshot != nil) || w.Snapshot != nil && (!w.Snapshot.Valid() || w.NotAfter.After(w.Snapshot.Request.StartBy)) ||
-		(w.Kind == WorkStopPacketSource) != (w.StopSource != nil) || w.StopSource != nil && !w.StopSource.Valid():
+		(w.Kind == WorkStopPacketSource) != (w.StopSource != nil) || w.StopSource != nil && !w.StopSource.Valid() ||
+		(w.Kind == WorkCancelPacketCapture) != (w.CancelPacket != nil) || w.CancelPacket != nil && !w.CancelPacket.Valid():
 		r.Reason = ReasonWorkUnknown
 	case !now.Before(w.NotAfter):
 		r.Reason = ReasonWorkExpired

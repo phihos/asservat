@@ -135,6 +135,14 @@ type NodeWork struct {
 	CancelSourceSnapshot *NodeSourceSnapshot `json:"cancelSourceSnapshot,omitempty"`
 	SourceSnapshot       *NodeSourceSnapshot `json:"sourceSnapshot,omitempty"`
 	StopPacketSource     *NodeSourceBinding  `json:"stopPacketSource,omitempty"`
+	CancelPacketCapture  *NodePacketCancel   `json:"cancelPacketCapture,omitempty"`
+}
+
+// NodePacketCancel names one running finite packetCapture item to stop early
+// (ADR-283): its capture ID and the ID of the work item that started it.
+type NodePacketCancel struct {
+	CaptureID string `json:"captureID"`
+	WorkID    string `json:"workID"`
 }
 
 // NodePacketSource is a distinct ordinary ongoing work purpose. Older nodes
