@@ -163,9 +163,12 @@ func (h *ConnectorRecordings) verifyPeers(ctx context.Context, held *heldRecordi
 	h.mu.Unlock()
 	h.log("connector recording " + capture + " stopped: " + failure)
 	if nodes, ok := h.nodes.(packetCanceller); ok {
-		call, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		// The channel refuses an until after the call's deadline: derive the
+		// deadline from the same instant.
+		until := h.now().Add(5 * time.Second)
+		call, cancel := context.WithDeadline(context.Background(), until)
 		defer cancel()
-		if _, err := nodes.EnqueuePacketCancel(call, node, capture, work, h.now().Add(5*time.Second)); err != nil {
+		if _, err := nodes.EnqueuePacketCancel(call, node, capture, work, until); err != nil {
 			h.log("connector recording " + capture + " node cancel not queued; its result will not be stored")
 		}
 	}

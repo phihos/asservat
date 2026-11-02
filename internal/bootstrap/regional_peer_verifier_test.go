@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/application/delivery"
 	"bytes"
 	"context"
 	"errors"
@@ -112,7 +113,12 @@ type cancelRecordingNodes struct {
 	cancels []collector.PacketCancel
 }
 
-func (n *cancelRecordingNodes) EnqueuePacketCancel(_ context.Context, _, captureID, workID string, _ time.Time) (collector.Work, error) {
+// EnqueuePacketCancel enforces delivery.NodeChannel's rule that the cancel's
+// until is not after the call's deadline.
+func (n *cancelRecordingNodes) EnqueuePacketCancel(ctx context.Context, _, captureID, workID string, until time.Time) (collector.Work, error) {
+	if end, ok := ctx.Deadline(); !ok || until.After(end) {
+		return collector.Work{}, delivery.ErrNodeUnavailable
+	}
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.cancels = append(n.cancels, collector.PacketCancel{CaptureID: captureID, WorkID: workID})
@@ -180,7 +186,9 @@ func TestPeerVerifierStopsRecordingOnMembershipChange(t *testing.T) {
 		{name: "stale", err: targets.ErrUnavailable, ticks: 5, failure: evidence.RecordingPeersStale},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			now := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
+			// Ahead of the wall clock, so a deadline taken from the wall clock
+			// instead of the verifier's own instant would refuse the cancel.
+			now := time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond)
 			h, clock, resolver, nodes := peerHolder(now)
 			e := peerExpectation(t, now)
 			queued, err := h.Prepare(&objectstore.PreparedArtifact{}, e).StartRecording(context.Background(), peerPin, now, now.Add(time.Second))
