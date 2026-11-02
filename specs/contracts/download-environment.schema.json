@@ -210,11 +210,12 @@
           "type": "array",
           "items": {
             "enum": [
-              "metadata"
+              "metadata",
+              "raw"
             ]
           },
           "minItems": 0,
-          "maxItems": 1,
+          "maxItems": 2,
           "uniqueItems": true
         },
         "privacyClasses": {
