@@ -160,19 +160,24 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 	return OperationReply{Body: b, ValidUntil: until}, nil
 }
 
-// listedDataClass labels raw packet captures (ADR-279); every other listed
-// artifact is metadata.
+// listedDataClass labels raw packet captures (ADR-279) and HTTP header
+// projections (extract, ADR-282); every other listed artifact is metadata.
 func listedDataClass(c string) string {
-	if c == "raw" {
+	if c == "raw" || c == "extract" {
 		return c
 	}
 	return "metadata"
 }
 
-// listedMayContain: raw payload prefixes may hold anything the workload sent.
+// listedMayContain: raw payload prefixes may hold anything the workload sent;
+// the HTTP header projection keeps allowlisted fields that can still identify
+// users (ADR-282).
 func listedMayContain(c string) []string {
-	if c == "raw" {
+	switch c {
+	case "raw":
 		return []string{"userContent", "credentials", "personalIdentifiers", "networkAddresses", "unknownApplicationData"}
+	case "extract":
+		return []string{"personalIdentifiers"}
 	}
 	return []string{"personalIdentifiers", "networkAddresses", "paths"}
 }

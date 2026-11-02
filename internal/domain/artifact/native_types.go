@@ -39,8 +39,9 @@ type NativeType struct {
 	Extension    string // server-generated filename suffix
 	Coverage     string // fixed text; lifecycle coverage is appended per artifact
 	MaxBytes     int64
-	// DataClasses are the classes this increment can verify. Raw packet and
-	// syscall-argument variants need their own reviewed increments.
+	// DataClasses are the classes this increment can verify. Syscall-argument
+	// variants need their own reviewed increment; the HTTP header projection
+	// is an extract (ADR-282).
 	DataClasses []string
 }
 
@@ -49,7 +50,7 @@ var nativeTypes = []NativeType{
 	{Name: PCAPNGArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/x-pcapng", Format: PCAPNGFormat, Extension: ".pcapng", Coverage: "Packet headers of the selected pod, truncated after the transport header; no payload. Filtered, truncated or lost packets are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"metadata"}},
 	{Name: RawPCAPNGArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/x-pcapng", Format: RawPCAPNGFormat, Extension: ".pcapng", Coverage: "Packets of the selected pod including payload, truncated at the approved per-transport byte caps; caps limit bytes and do not redact. Filtered or lost packets are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"raw"}},
 	{Name: SyscallRecordsArtifact, Kind: "syscallTrace", EvidenceType: "syscallTrace", MediaType: "application/x-ndjson", Format: SyscallRecordsFormat, Extension: ".jsonl", Coverage: "Syscall metadata of the selected pod as JSON Lines: names, results, timing and process identity; no arguments or buffers. Lost events are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"metadata"}},
-	{Name: HTTPHeadersArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/json", Format: HTTPHeadersFormat, Extension: ".json", Coverage: "Approved HTTP/1 response header fields as structured JSON, not a packet capture; no bodies, URLs or credentials.", MaxBytes: HTTPHeadersNativeLimit, DataClasses: []string{"metadata"}},
+	{Name: HTTPHeadersArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/json", Format: HTTPHeadersFormat, Extension: ".json", Coverage: "Approved HTTP/1 response header fields as structured JSON, not a packet capture; no bodies, URLs or credentials.", MaxBytes: HTTPHeadersNativeLimit, DataClasses: []string{"extract"}},
 }
 
 // LookupNativeType returns a copy of the registered type, or false.

@@ -4474,6 +4474,7 @@ components:
                               enum:
                               - rawBytePredicate
                               - rawPackets
+                              - httpHeaders
                               - recordingApprovalRequired
                               - policyCollection
                           required:
@@ -8664,6 +8665,7 @@ components:
                         enum:
                         - rawBytePredicate
                         - rawPackets
+                        - httpHeaders
                         - recordingApprovalRequired
                         - policyCollection
                     required:
@@ -8870,6 +8872,7 @@ components:
                           enum:
                           - rawBytePredicate
                           - rawPackets
+                          - httpHeaders
                           - recordingApprovalRequired
                     required:
                     - action_id
@@ -14264,6 +14267,7 @@ components:
                         enum:
                         - rawBytePredicate
                         - rawPackets
+                        - httpHeaders
                         - recordingApprovalRequired
                         - policyCollection
                     required:
@@ -14470,6 +14474,7 @@ components:
                           enum:
                           - rawBytePredicate
                           - rawPackets
+                          - httpHeaders
                           - recordingApprovalRequired
                     required:
                     - action_id

@@ -614,3 +614,112 @@ func rawCatalogProfile(t *testing.T, profile string) value.CatalogProfile {
 	}
 	return value.CatalogProfile{Ref: value.ProfileRef{Catalog: "namespace", Name: "raw-capture", Version: "v1"}, SourceClusterID: "00000000-0000-4000-8000-000000000001", SourceNamespaceUID: "ns-uid", SourceUID: "raw-uid", Document: out, Enabled: true}
 }
+
+// httpProfile is an httpHeaders profile with the given bounds.
+func httpProfile(flows, header, flow, total int, idle string) string {
+	return fmt.Sprintf(`{"kind":"httpHeaders","protocol":"http1","projectionRef":{"name":"http-response-headers","version":"v1"},"maxFlows":%d,"maxHeaderBytes":%d,"maxReassemblyBytesPerFlow":%d,"maxReassemblyBytes":%d,"idleTimeout":%q}`, flows, header, flow, total, idle)
+}
+
+// ADR-282: a finite manual httpHeaders action compiles with sensitive
+// approval of class extract and observation limits, is acceptable for a human
+// and builds a recording at the fixed engine snaplen with its parser bounds;
+// ongoing, policy, unfiltered, longer and out-of-bounds plans are refused.
+func TestHTTPHeadersPlan(t *testing.T) {
+	http := func(profile string, edits ...value.ProfileEdit) value.ProfileComposition {
+		c := network(append([]value.ProfileEdit{text("sample", "actionExecutionMode", "onTrigger"), text("sample", "packetBefore", "0s"), text("sample", "packetAfter", "10s")}, edits...)...)
+		c.Resolved = []value.CatalogProfile{rawCatalogProfile(t, profile)}
+		c.Components[0].Profile = value.ProfileRef{Catalog: "namespace", Name: "raw-capture", Version: "v1"}
+		return c
+	}
+	filter := text("sample", "packetFilter", "tcp port 8080")
+	maxima := httpProfile(1024, 32<<10, 256<<10, 16<<20, "30s")
+	in, now := recorderInput(t, http(maxima, filter), "packetCapture")
+	p, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Approval == nil || p.Approval.DataClass != "extract" || p.Approval.ObservationLimits == nil || !slices.Contains(p.Actions[0].Sensitive, value.ReasonHTTPHeaders) || p.Actions[0].PacketProfile != "httpHeaders" {
+		t.Fatalf("approval %+v", p.Approval)
+	}
+	if !ManualObservationIssued(p.Actions, p.Approval) {
+		t.Fatal("HTTP observation has no manual issuer")
+	}
+	a, err := AssessRecorder(p, "00000000-0000-4000-8000-000000000162", now)
+	if err != nil || slices.Contains(a.Actions[0].Exposure.RetainedPossible, "userContent") || !slices.Contains(a.Actions[0].Exposure.TransientOnly, "userContent") || !slices.Contains(a.Actions[0].Exposure.TransientOnly, "credentials") {
+		t.Fatal("HTTP exposure", err, a.Actions[0].Exposure)
+	}
+	if !AcceptableRecorder(p).Acceptable() {
+		t.Fatal("approved finite manual HTTP headers refused", AcceptableRecorder(p))
+	}
+	if recorderAcceptance(p, true).Acceptable() {
+		t.Fatal("policy HTTP headers acceptable")
+	}
+	r, _, err := RecordingFor(p)
+	want := artifact.RecordingHTTP{MaxFlows: 1024, MaxHeaderBytes: 32 << 10, MaxFlowBytes: 256 << 10, MaxTotalBytes: 16 << 20, IdleMillis: 30_000}
+	if err != nil || r.Profile != "httpHeaders" || r.Snaplen != artifact.MaxRawSnaplen || r.HTTP == nil || *r.HTTP != want || r.Filter == nil || r.ProtocolSnaplen != nil || !r.Valid() || !MeteredRecording(&r) {
+		t.Fatalf("HTTP recording %+v %v", r, err)
+	}
+	// The smallest bounds the projector accepts compile too.
+	in, now = recorderInput(t, http(httpProfile(1, 1, 2*(1+2*httpReadBuffer)+4*httpPageBytes, 2*(1+2*httpReadBuffer)+4*httpPageBytes, "1s"), filter), "packetCapture")
+	if _, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now); err != nil {
+		t.Fatal("floor bounds refused", err)
+	}
+	in, now = recorderInput(t, http(maxima, filter, text("sample", "packetAfter", "20s")), "packetCapture")
+	if _, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now); err == nil {
+		t.Fatal("HTTP recording over 15 seconds compiled")
+	}
+	ongoing := network(filter)
+	ongoing.Resolved = []value.CatalogProfile{rawCatalogProfile(t, maxima)}
+	ongoing.Components[0].Profile = value.ProfileRef{Catalog: "namespace", Name: "raw-capture", Version: "v1"}
+	in, now = recorderInput(t, ongoing, "packetCapture")
+	if _, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now); err == nil || !strings.Contains(err.Error(), "HTTP headers are recorded finitely") {
+		t.Fatal("ongoing HTTP recording", err)
+	}
+	for name, c := range map[string]value.ProfileComposition{
+		"no filter":        http(maxima),
+		"too many flows":   http(httpProfile(1025, 32<<10, 256<<10, 16<<20, "30s"), filter),
+		"header block":     http(httpProfile(1024, 32<<10+1, 256<<10, 16<<20, "30s"), filter),
+		"per flow":         http(httpProfile(1024, 32<<10, 256<<10+1, 16<<20, "30s"), filter),
+		"total":            http(httpProfile(1024, 32<<10, 256<<10, 16<<20+1, "30s"), filter),
+		"total below flow": http(httpProfile(1024, 1024, 256<<10, 128<<10, "30s"), filter),
+		"idle too long":    http(httpProfile(1024, 32<<10, 256<<10, 16<<20, "31s"), filter),
+		"idle too short":   http(httpProfile(1024, 32<<10, 256<<10, 16<<20, "500ms"), filter),
+		"below flow floor": http(httpProfile(1, 1, 2*(1+2*httpReadBuffer)+4*httpPageBytes-1, 1<<20, "1s"), filter),
+		"other projection": http(`{"kind":"httpHeaders","protocol":"http1","projectionRef":{"name":"http-request-headers","version":"v1"},"maxFlows":1,"maxHeaderBytes":1024,"maxReassemblyBytesPerFlow":65536,"maxReassemblyBytes":65536,"idleTimeout":"5s"}`, filter),
+		"http2":            http(`{"kind":"httpHeaders","protocol":"http2","projectionRef":{"name":"http-response-headers","version":"v1"},"maxFlows":1,"maxHeaderBytes":1024,"maxReassemblyBytesPerFlow":65536,"maxReassemblyBytes":65536,"idleTimeout":"5s"}`, filter),
+		"missing bound":    http(`{"kind":"httpHeaders","protocol":"http1","projectionRef":{"name":"http-response-headers","version":"v1"},"maxFlows":1}`, filter),
+	} {
+		in, now := recorderInput(t, c, "packetCapture")
+		if _, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now); err == nil {
+			t.Fatal(name, "accepted")
+		}
+	}
+}
+
+// Only a single rawPackets (raw) or httpHeaders (extract) action has a manual
+// observation issuer; a raw byte predicate on a header capture has none.
+func TestManualObservationIssued(t *testing.T) {
+	limits := &value.ObservationLimits{MaxSessionSeconds: 15, MaxObservedBytes: 1 << 20, MaxBytesPerSecond: 1 << 20, MaxConcurrentSessions: 1}
+	one := func(codes ...string) []value.RecorderAction {
+		return []value.RecorderAction{{ID: "a", Sensitive: codes}}
+	}
+	for _, c := range []struct {
+		name    string
+		actions []value.RecorderAction
+		class   string
+		limits  *value.ObservationLimits
+		want    bool
+	}{
+		{"raw", one(value.ReasonRawPackets), "raw", limits, true},
+		{"http", one(value.ReasonHTTPHeaders), "extract", limits, true},
+		{"http with predicate", one(value.ReasonHTTPHeaders, value.ReasonRawBytePredicate), "extract", limits, true},
+		{"header predicate", one(value.ReasonRawBytePredicate), "extract", limits, false},
+		{"http as raw", one(value.ReasonHTTPHeaders), "raw", limits, false},
+		{"no limits", one(value.ReasonHTTPHeaders), "extract", nil, false},
+		{"two actions", append(one(value.ReasonHTTPHeaders), one(value.ReasonHTTPHeaders)...), "extract", limits, false},
+	} {
+		if got := ManualObservationIssued(c.actions, &value.RecorderApproval{DataClass: c.class, ObservationLimits: c.limits}); got != c.want {
+			t.Fatal(c.name, got)
+		}
+	}
+}

@@ -363,13 +363,15 @@ def main():
             row = artifacts["items"]["properties"]
             row["kind"] = {"enum": ["pod-status", "packetCapture", "syscallTrace"]}
             # ADR-279: a raw packet capture is listed as raw; its download
-            # needs the approved grant's result-access child.
-            row["data_class"] = {"enum": ["metadata", "raw"]}
+            # needs the approved grant's result-access child. ADR-282: an
+            # HTTP header projection is an extract.
+            row["data_class"] = {"enum": ["metadata", "extract", "raw"]}
             row["completeness"] = {"const": "complete"}
             notice = copy.deepcopy(documents["capture-assessment.schema.json"]["$defs"]["artifactNotice"])
             notice["properties"].pop("handlingPolicyRef", None)
             notice["properties"]["classification"] = {"const": "potentialPersonalData"}
             notice["properties"]["mayContain"] = {"enum": [["personalIdentifiers", "networkAddresses", "paths"],
+                                                           ["personalIdentifiers"],
                                                            ["userContent", "credentials", "personalIdentifiers", "networkAddresses", "unknownApplicationData"]]}
             notice["properties"]["deletionState"] = {"const": "scheduled"}
             notice["properties"]["preservationException"] = {"const": False}

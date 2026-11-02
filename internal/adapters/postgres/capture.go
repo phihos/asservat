@@ -656,6 +656,9 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if recording.Profile == "rawPackets" {
 				expected.NativeType, expected.DataClass = artifact.RawPCAPNGArtifact, "raw" // ADR-279
 			}
+			if recording.Profile == "httpHeaders" {
+				expected.NativeType, expected.DataClass = artifact.HTTPHeadersArtifact, "extract" // ADR-282
+			}
 		}
 		if in.Snapshot != nil {
 			lifecycle, err := planning.SourceSnapshotLifecycle(in.Snapshot)

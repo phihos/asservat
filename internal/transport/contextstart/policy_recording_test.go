@@ -166,4 +166,41 @@ func TestPolicyRecordingMatchesOnlyMeteredRecordings(t *testing.T) {
 	if !e.Recording.Valid() || !policyRecordingMatches(e, source, permit) {
 		t.Fatal("rawPackets recording did not match its permit")
 	}
+	e.Recording.Profile, e.Recording.Snaplen = "httpHeaders", artifact.MaxRawSnaplen
+	e.Recording.HTTP = &artifact.RecordingHTTP{MaxFlows: 16, MaxHeaderBytes: 8 << 10, MaxFlowBytes: 64 << 10, MaxTotalBytes: 1 << 20, IdleMillis: 5000}
+	if !e.Recording.Valid() || !policyRecordingMatches(e, source, permit) {
+		t.Fatal("httpHeaders recording did not match its permit")
+	}
+}
+
+// ADR-282: a human's verified httpHeaders expectation is metered like
+// rawPackets: it matches a finite permit and starts through the typed
+// operation, while an unmetered human networkHeaders recording cannot.
+func TestManualHTTPHeadersRecordingStartsMetered(t *testing.T) {
+	id := func(n string) string { return "10000000-0000-4000-8000-0000000000" + n }
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	program := []planning.BPFInstruction{{Code: 6, K: 65535}}
+	http := &artifact.Recording{Kind: "packetCapture", Profile: "httpHeaders", Composition: []byte("{}"), Filter: &artifact.RecordingFilter{Expression: "tcp port 8080", Program: []artifact.FilterInstruction{{Code: 6, K: 65535}}}, DurationMillis: 1000, MaxBytes: 64 << 10, Snaplen: artifact.MaxRawSnaplen,
+		HTTP: &artifact.RecordingHTTP{MaxFlows: 16, MaxHeaderBytes: 8 << 10, MaxFlowBytes: 64 << 10, MaxTotalBytes: 1 << 20, IdleMillis: 5000}}
+	headers := &artifact.Recording{Kind: "packetCapture", Profile: "networkHeaders", Composition: []byte("{}"), Filter: http.Filter, DurationMillis: 1000, MaxBytes: 64 << 10, Snaplen: artifact.RecordingSnaplen}
+	for name, recording := range map[string]*artifact.Recording{"httpHeaders": http, "networkHeaders": headers} {
+		t.Run(name, func(t *testing.T) {
+			e := artifact.ContextExpectation{CaptureUID: id("16"), ActionID: "a0123456789abcdef01234567", PodUID: id("20"), Recording: recording}
+			source := targets.PacketSourceObservation{PodUID: e.PodUID, NodeUID: "node", BootID: "boot", CollectorPodUID: "collector", CollectorEpoch: "epoch", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+			permit := collector.ObservationPermit{Binding: collector.ObservationBinding{Scope: [32]byte{1}, ProgramDigest: [32]byte(compiler.FilterProgramDigest(program)), ExpectationDigest: [32]byte(evidence.ContextExpectationDigest(e)), AccountingRule: collector.ObservationAccountingRule(), SessionID: id("30"), Fence: id("31"), CaptureID: e.CaptureUID, ActionID: e.ActionID, PodUID: e.PodUID, NodeUID: source.NodeUID, BootID: source.BootID, CollectorPodUID: source.CollectorPodUID, CollectorEpoch: source.CollectorEpoch}, StartedAt: now, SessionUntil: now.Add(4 * time.Second), LeaseUntil: now.Add(4 * time.Second), StartBy: now.Add(2 * time.Second), Duration: time.Second, Sequence: 1, Credit: 1 << 20, BytesPerSecond: 1 << 20}
+			pin := artifact.PinnedPod{UID: e.PodUID}
+			output := &policyRecorderOutput{}
+			w := workFixture().Work // an ordinary human actor
+			w.CaptureID = e.CaptureUID
+			w.ExpectationDigest = evidence.ContextExpectationDigest(e)
+			local := (&countingLocal{}).local()
+			local.Now = func() time.Time { return now }
+			s := &regionalSession{local: local, work: w, prepared: output, resolved: &targets.PodResolution{Pin: pin}, packetSource: &source, expectation: &e, consumed: &value.Disposition{MayStart: true, Phase: value.StartCommitted, CommittedAt: now, ValidUntil: now.Add(3 * time.Second)}}
+			b, _ := json.Marshal(policyRecordingRequest{Pin: pin, Started: now, Until: now.Add(3 * time.Second), Source: source, Permit: permit})
+			_, err := s.handle(t.Context(), contracts.APIContextOperation{Method: opStartPolicyRecording, Body: b})
+			if name == "httpHeaders" && (err != nil || output.policyStarts != 1) || name != "httpHeaders" && (err == nil || output.policyStarts != 0) {
+				t.Fatalf("%s start: %v/%d", name, err, output.policyStarts)
+			}
+		})
+	}
 }

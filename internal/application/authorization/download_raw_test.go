@@ -55,7 +55,7 @@ func TestContextDownloadAuthorityRawNeedsResultAccess(t *testing.T) {
 			case "no-ordinary-rights":
 				f.p.Allows = nil
 			case "unknown-class":
-				f.record.DataClass = "extract"
+				f.record.DataClass = "restricted"
 			case "raw-context":
 				f.record.Retained.Input.EvidenceType = "context"
 			}

@@ -494,6 +494,79 @@ func validRawProfile(path string, raw json.RawMessage) error {
 	return nil
 }
 
+// HTTPProfile is an httpHeaders profile (packet-capture.schema.json): the
+// reviewed projection and the parser bounds (ADR-282).
+type HTTPProfile struct {
+	Kind          string `json:"kind"`
+	Protocol      string `json:"protocol"`
+	ProjectionRef struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	} `json:"projectionRef"`
+	MaxFlows                  int    `json:"maxFlows"`
+	MaxHeaderBytes            int    `json:"maxHeaderBytes"`
+	MaxReassemblyBytesPerFlow int    `json:"maxReassemblyBytesPerFlow"`
+	MaxReassemblyBytes        int    `json:"maxReassemblyBytes"`
+	IdleTimeout               string `json:"idleTimeout"`
+}
+
+// The projector's buffer floors (ADR-282; httpheaders.Limits.Validate in
+// internal/adapters/httpheaders): a 4 KiB bufio buffer per direction,
+// gopacket's 1,900-byte reassembly page and a one-second idle minimum. They
+// are replicated here so planning refuses what the node would refuse.
+const (
+	httpReadBuffer     = 4 << 10
+	httpPageBytes      = 1900
+	minHTTPIdleTimeout = time.Second
+)
+
+// httpFloors reports whether the bounds leave the parser at least one
+// out-of-order page per direction and in total, and reader state for one
+// flow, exactly as the projector derives them.
+func httpFloors(header, flow, total int) (perFlow, shared bool) {
+	readers := 2 * (header + 2*httpReadBuffer)
+	pagesPerHalf := (flow-readers)/(2*httpPageBytes) - 1
+	pagesTotal := (total/2)/httpPageBytes - 1
+	readerBudget := total - (pagesTotal+1)*httpPageBytes
+	return pagesPerHalf >= 1, pagesTotal >= 1 && readerBudget >= 2*httpReadBuffer
+}
+
+// validHTTPProfile checks the reviewed projection and the parser bounds
+// against the specified maxima and the projector's floors; values out of
+// range are refused with a remedy, never narrowed (ADR-282).
+func validHTTPProfile(path string, raw json.RawMessage) (artifact.RecordingHTTP, error) {
+	var p HTTPProfile
+	if strict(raw, &p) != nil || p.Kind != "httpHeaders" {
+		return artifact.RecordingHTTP{}, refuse(value.CompositionInvalid, path, "httpHeaders needs protocol, projectionRef, maxFlows, maxHeaderBytes, maxReassemblyBytesPerFlow, maxReassemblyBytes and idleTimeout")
+	}
+	idle, ok := durationValue(p.IdleTimeout, false)
+	switch {
+	case p.Protocol != "http1":
+		return artifact.RecordingHTTP{}, refuse(value.CompositionInvalid, path+".protocol", "the HTTP projection reads plain HTTP/1 only: set protocol http1")
+	case p.ProjectionRef.Name != "http-response-headers" || p.ProjectionRef.Version != "v1":
+		return artifact.RecordingHTTP{}, refuse(value.CompositionInvalid, path+".projectionRef", "the reviewed projection is http-response-headers v1")
+	case p.MaxFlows < 1 || p.MaxFlows > artifact.MaxHTTPFlows:
+		return artifact.RecordingHTTP{}, refuse(value.CompositionInvalid, path+".maxFlows", fmt.Sprintf("track 1 to %d flows", artifact.MaxHTTPFlows))
+	case p.MaxHeaderBytes < 1 || p.MaxHeaderBytes > artifact.MaxHTTPHeaderBytes:
+		return artifact.RecordingHTTP{}, refuse(value.CompositionInvalid, path+".maxHeaderBytes", "a header block is 1 byte to 32 KiB")
+	case p.MaxReassemblyBytesPerFlow < 1 || p.MaxReassemblyBytesPerFlow > artifact.MaxHTTPFlowBytes:
+		return artifact.RecordingHTTP{}, refuse(value.CompositionInvalid, path+".maxReassemblyBytesPerFlow", "reassembly per flow is 1 byte to 256 KiB")
+	case p.MaxReassemblyBytes < p.MaxReassemblyBytesPerFlow || p.MaxReassemblyBytes > artifact.MaxHTTPTotalBytes:
+		return artifact.RecordingHTTP{}, refuse(value.CompositionInvalid, path+".maxReassemblyBytes", "total reassembly covers at least one flow's bound and is at most 16 MiB")
+	case !ok || idle < minHTTPIdleTimeout || idle > time.Duration(artifact.MaxHTTPIdleMillis)*time.Millisecond:
+		return artifact.RecordingHTTP{}, refuse(value.CompositionInvalid, path+".idleTimeout", "the idle timeout is 1s to 30s")
+	}
+	perFlow, shared := httpFloors(p.MaxHeaderBytes, p.MaxReassemblyBytesPerFlow, p.MaxReassemblyBytes)
+	if !perFlow {
+		minimum := 2*(p.MaxHeaderBytes+2*httpReadBuffer) + 4*httpPageBytes
+		return artifact.RecordingHTTP{}, refuse(value.CompositionInvalid, path+".maxReassemblyBytesPerFlow", fmt.Sprintf("too small for this header block's read buffers and one reassembly page per direction: raise it to at least %d bytes or lower maxHeaderBytes", minimum))
+	}
+	if !shared {
+		return artifact.RecordingHTTP{}, refuse(value.CompositionInvalid, path+".maxReassemblyBytes", "too small for shared reassembly pages and reader buffers: raise it to at least 24 KiB")
+	}
+	return artifact.RecordingHTTP{MaxFlows: p.MaxFlows, MaxHeaderBytes: p.MaxHeaderBytes, MaxFlowBytes: p.MaxReassemblyBytesPerFlow, MaxTotalBytes: p.MaxReassemblyBytes, IdleMillis: idle.Milliseconds()}, nil
+}
+
 func validRing(path string, r ring, before time.Duration) error {
 	age, ok := durationValue(r.MaxAge, false)
 	switch {
@@ -528,18 +601,23 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 	if len(a.action.DependsOn) != 0 {
 		return refuse(value.CompositionInvalid, path+".dependsOn", "a recorder cannot depend on another action")
 	}
-	raw := false
+	raw, http := false, false
 	if a.packet != nil {
 		var kind struct {
 			Kind string `json:"kind"`
 		}
 		_ = json.Unmarshal(a.packet.Profile, &kind)
-		raw = kind.Kind == "rawPackets"
+		raw, http = kind.Kind == "rawPackets", kind.Kind == "httpHeaders"
 	}
 	if raw && a.action.Impact != "sensitiveRead" {
 		return refuse(value.CompositionInvalid, path+".impact", "raw packet recordings read payload and have impact sensitiveRead")
 	}
-	if !raw && a.action.Impact != "observe" {
+	// ADR-282: projecting headers reads payload, even though the output is
+	// an extract.
+	if http && a.action.Impact != "sensitiveRead" {
+		return refuse(value.CompositionInvalid, path+".impact", "HTTP header recordings read payload and have impact sensitiveRead")
+	}
+	if !raw && !http && a.action.Impact != "observe" {
 		return refuse(value.CompositionInvalid, path+".impact", "metadata recordings have impact observe")
 	}
 	var beforeText, afterText string
@@ -550,8 +628,19 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 		var kind struct {
 			Kind string `json:"kind"`
 		}
-		if json.Unmarshal(a.packet.Profile, &kind) != nil || kind.Kind != "networkHeaders" && kind.Kind != "rawPackets" {
-			return refuse(value.CompositionApproval, path+".parameters.profile.kind", "HTTP headers need sensitive capture approval and a recorder that this release does not have; use networkHeaders or rawPackets")
+		if json.Unmarshal(a.packet.Profile, &kind) != nil || kind.Kind != "networkHeaders" && kind.Kind != "rawPackets" && kind.Kind != "httpHeaders" {
+			return refuse(value.CompositionInvalid, path+".parameters.profile.kind", "the packet profile is networkHeaders, rawPackets or httpHeaders")
+		}
+		if http {
+			if _, err := validHTTPProfile(path+".parameters.profile", a.packet.Profile); err != nil {
+				return err
+			}
+			// The finite observation binding pins a compiled program, as
+			// for raw packets (ADR-279/282).
+			if a.packet.Filter == "" {
+				return refuse(value.CompositionInvalid, path+".parameters.filter", "httpHeaders reads payload; narrow it with packetFilter (for example tcp port 8080)")
+			}
+			a.sensitive = append(a.sensitive, value.ReasonHTTPHeaders)
 		}
 		if raw {
 			if err := validRawProfile(path+".parameters.profile", a.packet.Profile); err != nil {
@@ -620,6 +709,10 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 	// recordings follow in later slices.
 	if raw && (mode != "onTrigger" || after > maxRawAfter) {
 		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "raw packets are recorded finitely for now: set actionExecutionMode onTrigger, before 0s and after at most 15s")
+	}
+	// ADR-282: HTTP header projections are manual and finite like raw packets.
+	if http && (mode != "onTrigger" || after > maxRawAfter) {
+		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "HTTP headers are recorded finitely for now: set actionExecutionMode onTrigger, before 0s and after at most 15s")
 	}
 	if mode == "onTrigger" && before != 0 {
 		return refuse(value.CompositionInvalid, path+".parameters.before", "an onTrigger recording captures only the next interval: also set before to 0s (no history before the trigger)")
@@ -1083,9 +1176,10 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 		if slices.Contains(x.sensitive, value.ReasonRawPackets) {
 			approval.DataClass = "raw" // ADR-279: payload prefixes are raw output
 		}
-		if slices.Contains(x.sensitive, value.ReasonRawBytePredicate) || slices.Contains(x.sensitive, value.ReasonRawPackets) {
-			// REQ-AUT-006: a payload-sensitive predicate or raw recording
-			// needs finite observation limits before any byte reaches it.
+		if slices.Contains(x.sensitive, value.ReasonRawBytePredicate) || slices.Contains(x.sensitive, value.ReasonRawPackets) || slices.Contains(x.sensitive, value.ReasonHTTPHeaders) {
+			// REQ-AUT-006: a payload-sensitive predicate, raw recording or
+			// HTTP header projection (ADR-282, class extract) needs finite
+			// observation limits before any byte reaches it.
 			t, _ := durationValue(a.Limits.Timeout, false)
 			limits := observationLimitsRecord{MaxSessionSeconds: int64(min(t, time.Hour) / time.Second), MaxObservedBytes: value.SensitiveMaxObservedBytes, MaxBytesPerSecond: value.SensitiveMaxBytesPerSecond, MaxConcurrentSessions: 1}
 			if approval.ObservationLimits == nil {

@@ -171,9 +171,9 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		if err != nil {
 			return authorization.Grant{}, authorization.ApprovalPendingError{GrantID: g.ID}
 		}
-		// Only a single manual rawPackets action has an observation issuer:
-		// its approved grant's pool (ADR-279).
-		if approval.ObservationLimits != nil && (approval.DataClass != "raw" || len(actions) != 1) {
+		// Only a single manual rawPackets or httpHeaders action has an
+		// observation issuer: its approved grant's pool (ADR-279/282).
+		if approval.ObservationLimits != nil && !compiler.ManualObservationIssued(actions, approval) {
 			return authorization.Grant{}, value.ErrRecorderUnavailable
 		}
 		return g, nil
@@ -181,6 +181,8 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		// No request exists yet: only a current preview can open one. Raw
 		// output downloads only through result-access children (ADR-279), so
 		// a raw request without them would retain payload nobody can read.
+		// An HTTP header extract (ADR-282) downloads under ordinary
+		// eligibility and needs no result access.
 		if approval.DataClass == "raw" && access == nil {
 			return authorization.Grant{}, value.ErrInvalid
 		}

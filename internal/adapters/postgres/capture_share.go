@@ -56,8 +56,10 @@ func captureShareInstruction(ctx context.Context, q *custodydb.Queries, stream c
 		return nil, value.ErrInvalid
 	}
 	// ADR-279: raw output is never shared until the S-06 raw-share approval
-	// exists; the retained class below is metadata only.
-	if r, _, err := planning.RecordingForContext(a.Plan); err == nil && r.Profile == "rawPackets" {
+	// exists; the retained class below is metadata only, so an HTTP header
+	// extract (ADR-282) is not shared at capture time either, as Create
+	// refuses it for existing artifacts.
+	if r, _, err := planning.RecordingForContext(a.Plan); err == nil && (r.Profile == "rawPackets" || r.Profile == "httpHeaders") {
 		return nil, value.ErrInvalid
 	}
 	p, err := permissionProjection(ctx, q, stream, target)

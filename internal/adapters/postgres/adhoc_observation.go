@@ -20,21 +20,22 @@ import (
 	"asservat.local/asservat/internal/domain/collector"
 )
 
-// sensitiveManualRawRecording is a human's approved finite raw packet
-// recording (ADR-279); it runs only with an observation preparation.
-func sensitiveManualRawRecording(c app.APIExecutionCheck) bool {
+// sensitiveManualRecording is a human's approved finite raw packet
+// (ADR-279) or HTTP header (ADR-282) recording; both read payload and run
+// only with an observation preparation.
+func sensitiveManualRecording(c app.APIExecutionCheck) bool {
 	_, _, policy := authorization.PolicyExecutor(c.Work.Actor)
 	r := c.Work.Accepted.Expectation.Recording
-	return !policy && r != nil && r.Profile == "rawPackets"
+	return !policy && r != nil && (r.Profile == "rawPackets" || r.Profile == "httpHeaders")
 }
 
-// prepareAdHocObservation is preparePolicyObservation for a manual raw
-// recording: the session is prepaid once from the approved ad hoc grant's
+// prepareAdHocObservation is preparePolicyObservation for a manual raw or
+// HTTP header recording: the session is prepaid once from the approved ad hoc grant's
 // reviewed pool (migration 00117) and never refilled; an exact existing
 // session is passive replay.
 func (s *APIContextExecutions) prepareAdHocObservation(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, capture custodydb.ContextCapture, checkedAt time.Time, first bool, p *policyObservationPreparation) error {
 	e := c.Work.Accepted.Expectation
-	if !sensitiveManualRawRecording(c) || !policyObservationSourceCurrent(p.source, c, checkedAt) {
+	if !sensitiveManualRecording(c) || !policyObservationSourceCurrent(p.source, c, checkedAt) {
 		return value.ErrDenied
 	}
 	row, err := q.ReadGrantByCapture(ctx, custodydb.ReadGrantByCaptureParams{RootID: capture.RootID, CaptureID: capture.ID})

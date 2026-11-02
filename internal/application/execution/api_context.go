@@ -632,12 +632,13 @@ func captureFailurePhase(err error) string {
 
 // meteredRecording selects the finite observation companion without changing
 // the frozen approval identity: a policy raw byte predicate (ADR-261) or a
-// human's approved rawPackets recording (ADR-279). It mirrors the SQL issuers.
+// human's approved rawPackets (ADR-279) or httpHeaders (ADR-282) recording.
+// It mirrors the SQL issuers.
 func meteredRecording(w APIContextWork) bool {
 	_, _, policy := authorization.PolicyExecutor(w.Actor)
 	r := w.Accepted.Expectation.Recording
 	if policy {
 		return r != nil && r.Filter != nil && compiler.RawBytePredicate(r.Filter.Expression)
 	}
-	return compiler.MeteredRecording(r) && r.Profile == "rawPackets"
+	return compiler.MeteredRecording(r) && (r.Profile == "rawPackets" || r.Profile == "httpHeaders")
 }

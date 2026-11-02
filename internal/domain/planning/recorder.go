@@ -31,6 +31,9 @@ const (
 	ReasonRawBytePredicate = "rawBytePredicate"
 	// ReasonRawPackets: the recording keeps payload prefixes (ADR-279).
 	ReasonRawPackets = "rawPackets"
+	// ReasonHTTPHeaders: acquisition reads payload to project HTTP/1 headers
+	// (ADR-282); the output is an extract.
+	ReasonHTTPHeaders = "httpHeaders"
 	// ReasonRecordingApproval: the installation requires approval for every
 	// packet/syscall recording (REQ-SYS-002 "unless an administrator requires more").
 	ReasonRecordingApproval = "recordingApprovalRequired"

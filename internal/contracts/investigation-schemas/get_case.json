@@ -144,6 +144,7 @@
                         "data_class": {
                           "enum": [
                             "metadata",
+                            "extract",
                             "raw"
                           ]
                         },
@@ -167,6 +168,9 @@
                                   "personalIdentifiers",
                                   "networkAddresses",
                                   "paths"
+                                ],
+                                [
+                                  "personalIdentifiers"
                                 ],
                                 [
                                   "userContent",

@@ -743,7 +743,7 @@
         }
       },
       "then": {
-        "description": "Pod status (4 KiB), a manual networkHeaders packet recording delivered through the connector (ADR-248, at most 8 MiB), or a saved syscall metadata window as JSON Lines (ADR-273, at most 8 MiB).",
+        "description": "Pod status (4 KiB), a manual networkHeaders packet recording delivered through the connector (ADR-248, at most 8 MiB), a saved syscall metadata window as JSON Lines (ADR-273, at most 8 MiB), a raw packet recording (ADR-279) or an HTTP header projection of class extract (ADR-282, at most 8 MiB).",
         "anyOf": [
           {
             "properties": {
@@ -839,6 +839,43 @@
               },
               "dataClass": {
                 "const": "raw"
+              },
+              "collectionProvenance": {
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  }
+                }
+              },
+              "sizes": {
+                "properties": {
+                  "plaintextBytes": {
+                    "maximum": 8388608
+                  }
+                }
+              }
+            }
+          },
+          {
+            "properties": {
+              "target": {
+                "properties": {
+                  "scope": {
+                    "const": "pod"
+                  }
+                }
+              },
+              "kind": {
+                "const": "packetCapture"
+              },
+              "format": {
+                "const": "http-response-headers/v1"
+              },
+              "mediaType": {
+                "const": "application/json"
+              },
+              "dataClass": {
+                "const": "extract"
               },
               "collectionProvenance": {
                 "properties": {

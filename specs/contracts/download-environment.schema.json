@@ -211,11 +211,12 @@
           "items": {
             "enum": [
               "metadata",
+              "extract",
               "raw"
             ]
           },
           "minItems": 0,
-          "maxItems": 2,
+          "maxItems": 3,
           "uniqueItems": true
         },
         "privacyClasses": {

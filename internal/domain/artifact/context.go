@@ -53,10 +53,11 @@ type ContextExpectation struct {
 }
 
 // ServedClass reports a class the installed publication and download path
-// carries: metadata, or raw only as a raw packet capture (ADR-279). It is
-// not access: a raw disclosure still needs its approved grant child.
+// carries: metadata, raw only as a raw packet capture (ADR-279) and extract
+// only as an HTTP header projection (ADR-282). It is not access: a raw
+// disclosure still needs its approved grant child.
 func (e ContextExpectation) ServedClass() bool {
-	return e.DataClass == "metadata" || e.DataClass == "raw" && e.NativeType == RawPCAPNGArtifact
+	return e.DataClass == "metadata" || e.DataClass == "raw" && e.NativeType == RawPCAPNGArtifact || e.DataClass == "extract" && e.NativeType == HTTPHeadersArtifact
 }
 
 // Type returns the registered native type; Validate rejects unknown names.
@@ -82,11 +83,13 @@ func (e ContextExpectation) Validate() error {
 	// The API class runs pod status, or (ADR-248) a manual networkHeaders
 	// recording on the target's node collector, delivered through the connector.
 	podStatus := e.NativeType == PodStatusArtifact && e.ActionID == "pod-status" && e.DataClass == "metadata" && r.NativeLimit == MaxContextBytes && e.Recording == nil
-	// ADR-279: the raw profile, raw native type and raw class come together.
+	// ADR-279: the raw profile, raw native type and raw class come together;
+	// ADR-282: so do the httpHeaders profile, its JSON type and extract.
 	raw := e.Recording != nil && e.Recording.Profile == "rawPackets"
-	recording := (e.NativeType == PCAPNGArtifact && e.Recording != nil && e.Recording.Kind == "packetCapture" && !raw && e.DataClass == "metadata" || e.NativeType == RawPCAPNGArtifact && raw && e.DataClass == "raw" || e.NativeType == SyscallRecordsArtifact && e.Recording != nil && e.Recording.Kind == "syscallTrace" && e.DataClass == "metadata") && recorderActionID(e.ActionID) && r.NativeLimit == RecordingNativeLimit && e.Recording.Valid() && e.Lifecycle == nil
+	http := e.Recording != nil && e.Recording.Profile == "httpHeaders"
+	recording := (e.NativeType == PCAPNGArtifact && e.Recording != nil && e.Recording.Kind == "packetCapture" && !raw && !http && e.DataClass == "metadata" || e.NativeType == RawPCAPNGArtifact && raw && e.DataClass == "raw" || e.NativeType == HTTPHeadersArtifact && http && e.DataClass == "extract" || e.NativeType == SyscallRecordsArtifact && e.Recording != nil && e.Recording.Kind == "syscallTrace" && e.DataClass == "metadata") && recorderActionID(e.ActionID) && r.NativeLimit == RecordingNativeLimit && e.Recording.Valid() && e.Lifecycle == nil
 	snapshot := (e.NativeType == PCAPNGArtifact || e.NativeType == SyscallRecordsArtifact) && recorderActionID(e.ActionID) && e.DataClass == "metadata" && e.Recording == nil && e.Snapshot != nil && e.Snapshot.Valid() && e.SourceSnapshotManifest.Valid() && e.Snapshot.MaxBytes == r.NativeLimit && !e.Snapshot.ProcessingUntil.After(r.WriteUntil) && e.Snapshot.T0.Equal(e.TriggeredAt) && SourceSnapshotAnchor(*e.Snapshot).Equal(r.AnchorAt) && e.Lifecycle != nil && e.Lifecycle.SourceSessionID == e.Snapshot.SourceID && e.Lifecycle.SnapshotID == e.Snapshot.SnapshotID && e.Lifecycle.SourceStartedAt.Equal(e.Snapshot.SourceStartedAt) && e.Lifecycle.RequestedBefore == e.Snapshot.Before && e.Lifecycle.After == e.Snapshot.After
-	if e.CompositionGroup != nil && (!e.CompositionGroup.Valid() || !recording) ||
+	if e.CompositionGroup != nil && (!e.CompositionGroup.Valid() || !recording) || e.NativeType == HTTPHeadersArtifact && !recording ||
 		e.ExecutionClass == ContextAPIExecution && !podStatus && !recording && !snapshot || e.Recording != nil && !recording || e.Snapshot != nil && !snapshot || e.SourceSnapshotManifest != nil && !snapshot {
 		return ErrInvalid
 	}

@@ -21,8 +21,9 @@ type ContextDownloadEvidence struct {
 	CaptureID  string
 	// CaseID binds a recipient's share to the artifact's case (ADR-233).
 	CaseID string
-	// DataClass is the accepted expectation's class: metadata, or raw for an
-	// approved raw packet capture (ADR-279). ActionID names its action.
+	// DataClass is the accepted expectation's class: metadata, raw for an
+	// approved raw packet capture (ADR-279) or extract for an HTTP header
+	// projection (ADR-282). ActionID names its action.
 	DataClass, ActionID    string
 	Version                artifact.Digest
 	Audience               []artifact.AudienceAssignment
@@ -52,9 +53,11 @@ type RawResultAccess interface {
 }
 
 // downloadClass is the record's class on the installed download path:
-// metadata, or raw only for a packet capture (ADR-279).
+// metadata, raw only for a packet capture (ADR-279), or extract only for a
+// packet capture's HTTP header projection (ADR-282), whose verified
+// expectation ties the class to that native type.
 func downloadClass(r ContextDownloadEvidence) (string, bool) {
-	ok := r.DataClass == "metadata" || r.DataClass == "raw" && r.Retained.Input.EvidenceType == "packetCapture"
+	ok := r.DataClass == "metadata" || (r.DataClass == "raw" || r.DataClass == "extract") && r.Retained.Input.EvidenceType == "packetCapture"
 	return r.DataClass, ok
 }
 
@@ -152,9 +155,15 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 		return out, downloadRefused("data-class", nil)
 	}
 	r.OriginPolicies = slices.Clone(r.OriginPolicies)
-	// Ordinary rights are evaluated with metadata semantics for both classes;
-	// the raw facet is the grant check below, never a relaxed evaluator.
-	retained := value.Retained{ArtifactID: scope.ArtifactID, Target: target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
+	// Ordinary rights are evaluated with metadata semantics for metadata and
+	// raw; the raw facet is the grant check below, never a relaxed evaluator.
+	// An extract (ADR-282) is evaluated as an extract: ordinary eligibility,
+	// no grant child.
+	evaluated := "metadata"
+	if class == "extract" {
+		evaluated = class
+	}
+	retained := value.Retained{ArtifactID: scope.ArtifactID, Target: target, DataClass: evaluated, ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
 	var initial value.Result
 	switch {
 	case accepted != nil:
