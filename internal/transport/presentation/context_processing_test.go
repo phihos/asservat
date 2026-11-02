@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -69,5 +70,17 @@ func TestRequestForAGonePinnedPodIsTargetGone(t *testing.T) {
 	}
 	if f := publicCaptureFailure(targets.ErrChanged, false); f.Code != "NotAvailable" {
 		t.Fatalf("preview stays nondisclosing: %+v", f)
+	}
+}
+
+// ADR-277: an expired storage binding refused the request before admission;
+// it is a retryable same-key refusal, not an unknown outcome to resolve.
+func TestStorageRefreshIsRetryableBeforeAdmission(t *testing.T) {
+	wrapped := fmt.Errorf("facts/storage/expired/readiness-tail: %w", value.ErrStorageBindingExpired)
+	if f := publicCaptureFailure(wrapped, true); f.Code != "StorageRefreshing" || !f.Retryable {
+		t.Fatalf("request: %+v", f)
+	}
+	if f := publicCaptureFailure(wrapped, false); f.Code == "StorageRefreshing" {
+		t.Fatalf("preview: %+v", f)
 	}
 }

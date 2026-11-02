@@ -487,16 +487,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	trafficAttempted := measurement == nil
 	var finishRecording func() error
 	observeTraffic := func(current installedJourneyCaptureProgress, expectedID string) {
-		// A composition group reports Running with its first recording; its
-		// traffic waits until every recording runs, so the load does not
-		// starve the sibling's start on the shared runner.
-		allRunning := installedJourneyFocus() != "manual-mixed" || len(current.Actions) >= 2
-		for _, a := range current.Actions {
-			if installedJourneyFocus() == "manual-mixed" && a.Phase != "Running" {
-				allRunning = false
-			}
-		}
-		if !trafficAttempted && current.CaptureID == expectedID && current.Phase == "Running" && allRunning {
+		if !trafficAttempted && current.CaptureID == expectedID && current.Phase == "Running" {
 			measurement.ExecutionObservedAt = time.Now().UTC()
 			if err := finishSetup(); err != nil {
 				t.Fatal("native workflow setup snapshot", err)
@@ -547,6 +538,15 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	continuation := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"], "continue_acquisition": true}
 	initialStoragePreview = preview.ID
 	initialCode := requestCapture(original)
+	// ADR-277: nothing was accepted while storage refreshed; the contract
+	// asks for a same-key retry, never a resolution that closes the intent.
+	for retries := 0; initialCode == "StorageRefreshing" && retries < 5; retries++ {
+		t.Logf("approved submission storage refreshing; same-key retry %d", retries+1)
+		if err := installedJourneyPause(ctx, 2*time.Second); err != nil {
+			t.Fatal(err)
+		}
+		initialCode = requestCapture(original)
+	}
 	t.Logf("approved submission initial public code=%q", initialCode)
 	closed, err := installedJourneyRecoverCapture(ctx, initialCode, func() (installedJourneyDisposition, error) {
 		var disposition installedJourneyDisposition
