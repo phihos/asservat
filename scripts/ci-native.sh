@@ -83,6 +83,8 @@ declare -A suites=(
   # runner's kernel, so the harness refuses without the disposable-host guard
   # that native.yml creates on its fresh runner.
   [collector-packet]="python3 scripts/test-collector.py packet"
+  # S-04 row 17 (EXP-02 subset): the packet suite on the pinned Cilium chart.
+  [collector-cilium]="python3 scripts/test-collector.py cilium"
 )
 if [[ ${1:-} == --list ]]; then
   printf '%s\n' "${!suites[@]}" | sort | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))'
