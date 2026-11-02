@@ -1746,7 +1746,9 @@ def main() -> None:
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p.update({"filter": "x" * 4097})))
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p["ring"].update({"maxSegments": 5})), True)
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p["ring"].update({"maxAge": "10s"})), True)
-    rejects(http_recipe, "recipe", packet_mutation(lambda p: p["ring"].update({"medium": "encryptedDisk"})))
+    # encryptedDisk needs no storage profile in this release (ADR-278); an
+    # unknown medium, such as a plaintext disk, stays refused.
+    rejects(http_recipe, "recipe", packet_mutation(lambda p: p["ring"].update({"medium": "plaintextDisk"})))
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p["peers"].update({"entries": []})))
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p["peers"].update({"maxStaleness": "10s"})), True)
     rejects(http_recipe, "recipe", packet_mutation(lambda p: p["peers"]["entries"][0]["resourceRef"].pop("serviceMode")))
