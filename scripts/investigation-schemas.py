@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile"]
+NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers"]
 
 RECORDER_EDITS = ["packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode"]
 
@@ -195,6 +195,24 @@ def main():
                 data["properties"]["tool_name"] = {"const": "get_file_excerpt"}
                 # The Go validator additionally applies the original output
                 # schema and relational request/timing checks to this object.
+            output["allOf"] = [{"oneOf": branches}]
+            description["inputSchema"] = localize(description["inputSchema"])
+            description["outputSchema"] = localize(output)
+            result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
+            continue
+        if name == "get_http_headers":
+            # ADR-282 slice 4: the whole canonical input; one synchronous page
+            # (no pending query handle). The cursor is the next record index
+            # bound to the projection digest; provenance names the one artifact.
+            description = copy.deepcopy(tool)
+            description.pop("enabledByDefault", None)
+            branches = [b for b in copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"]) if b["properties"]["status"].get("const") != "pending"]
+            output = copy.deepcopy(common)
+            output.pop("$id", None)
+            output["properties"]["truncated"] = {"const": False}
+            output["properties"]["narrowing_hint"] = {"type": "null"}
+            output["properties"]["next_cursor"] = {"anyOf": [{"type": "string", "pattern": "^[0-9]{1,7}:[0-9a-f]{32}$"}, {"type": "null"}]}
+            output["properties"]["provenance"]["maxItems"] = 1
             output["allOf"] = [{"oneOf": branches}]
             description["inputSchema"] = localize(description["inputSchema"])
             description["outputSchema"] = localize(output)

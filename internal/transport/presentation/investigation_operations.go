@@ -102,6 +102,15 @@ func NewInvestigationGrantOperations(base *InvestigationOperations, grants *Gran
 	return withOperations(base, grants)
 }
 
+// NewInvestigationHTTPHeaderOperations adds the ADR-282 get_http_headers
+// read the same way, only when its read service is composed.
+func NewInvestigationHTTPHeaderOperations(base *InvestigationOperations, headers *HTTPHeaderOperations) (*InvestigationOperations, error) {
+	if headers == nil {
+		return nil, ErrOperationsConfiguration
+	}
+	return withOperations(base, headers)
+}
+
 func withOperations(base *InvestigationOperations, policies Operations) (*InvestigationOperations, error) {
 	if base == nil || policies.PublicOrigin() != base.origin {
 		return nil, ErrOperationsConfiguration
@@ -237,6 +246,8 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 	case *RetentionPreviewOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *GrantOperations:
+		return p.CallWithContext(ctx, current, call, name, raw)
+	case *HTTPHeaderOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	default:
 		return OperationReply{}, contracts.ErrInvestigationWire

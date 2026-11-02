@@ -109,3 +109,51 @@ statuses and only `content-type` then `content-length` whose values the
 projector's own checks leave unchanged, and matching record counters. Record
 times are node clock values and are not compared with the connector's
 manifest window. The hub collect loop lists `httpHeaders` executions.
+
+## Implementation (slice 4: get_http_headers boundary)
+
+`get_http_headers(case_id, artifact_id, cursor?, limit?)` is a shared
+browser/MCP read in the normal audited lane (`context-input/v1`, five-second
+request window, migration 00120). The runtime contract is the canonical one
+without the `pending` branch: one synchronous page of at most `limit`
+(default and maximum 100) records, `data_class: extract`, one provenance
+entry (artifact ID and verified ciphertext-copy version), the fixed
+SensitiveDataHandling notice, `truncated: false` and `next_cursor` either
+null or `<next record index>:<first 16 bytes of the projection SHA-256, hex>`.
+The cursor is an unkeyed index into an immutable, already authorized
+document: each call reauthorizes, a forged index reaches nothing paging
+would not, and a cursor of another document, beyond its end or malformed is
+`InvalidCursor`, judged only after current read rights.
+
+C-18 `HTTPHeaderReads` resolves the identity (`evidence:read`), takes the C-03
+`HTTPHeaderReadAuthority` (ReadApproved, original audience, retained policy,
+effective access date; only a published `httpHeaders` extract of exactly
+`http-response-headers/v1` is valid), reads one page through the C-14
+`HTTPHeaderPageReader` under the earliest identity/authority/access bound,
+then reauthorizes and rechecks the identity before returning. The reader's
+contract is `httpheaders.ReadPage`: the full publisher recheck of the stored
+document, its SHA-256 as projection digest, the exact requested slice and
+the gap report. Stop counters count flow directions, so `dropped_flows`
+(no SYN seen, TLS, HTTP/2) and `incomplete_flows` (stopped after parsing
+began) are upper bounds on flows; frame losses, output drops and dropped
+values appear only as fixed `coverage_gaps` text. The presentation serializes
+the longest prefix that fits the 24 KiB response and continues the cursor
+after the last delivered record; nothing is skipped. Every refusal other than
+a cursor is the same nondisclosing `NotAvailable`.
+
+The operation is advertised only when an installation composes the service
+(`NewInvestigationHTTPHeaderOperations`). No production C-03 authorizer or
+C-14 regional page reader exists yet: the existing approved-read path
+(ADR-206 query ledger, projection worker, native wire DTO, key slots and the
+4 MiB read-work profile) is pinned to the 4096-byte pod-status metadata and
+must be generalized to a 16 MiB recording extract, with measured cost, before
+the tool can be enabled. Raw packets never reach this path.
+
+Complexity gate: 1. A specified first-release read; without it an approved
+extract is reachable only by download. 2. No reopened risk. 3. Typical
+HTTP/1 investigations. 4. Mirrors get_file_excerpt/get_case. 5. No new
+privilege; reads stay behind current ordinary rights. 6. One refusal state
+plus InvalidCursor. 7. No configuration. 8. None outside Asservat. 9. One
+bounded page per call; the regional read cost is part of the pending
+composition. 10. Unadvertised unless composed. 11. Download alone would not
+meet REQ-MCP-005's bounded agent read.
