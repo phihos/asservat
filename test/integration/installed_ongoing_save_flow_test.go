@@ -24,7 +24,9 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // Authored inputs only: the builtin ongoing networkHeaders recorder (30s ring,
@@ -38,6 +40,9 @@ const (
 	ongoingSaveAfterPort       = 9103
 	ongoingSaveBefore          = 15 * time.Second
 	ongoingSaveLifetime        = 300
+	// ongoingSaveDiskBytes is the ongoing-save-disk focus's collector ring
+	// volume (ADR-278): room for the one 4 x 4 MiB sealed ring with headroom.
+	ongoingSaveDiskBytes = 64 << 20
 )
 
 func installedOngoingSaveSpec(cluster, namespace, workload string) map[string]any {
@@ -68,7 +73,46 @@ func installedOngoingComposition() map[string]any {
 		// ADR-275: one policy, one packet and one syscall source per Pod.
 		return map[string]any{"components": []any{network, calls}, "maxTotalBytes": 32 << 20, "maxDuration": "30s"}
 	}
+	if installedJourneyFocus() == "ongoing-save-disk" {
+		// The builtin ring on the administrator's encrypted-disk medium (ADR-278).
+		network["overrides"] = append(network["overrides"].([]any), map[string]any{"actionID": "sample", "field": "packetRing", "value": map[string]any{"maxAge": "30s", "maxBytes": 16 << 20, "segmentBytes": 4 << 20, "maxSegments": 4, "medium": "encryptedDisk"}})
+	}
 	return map[string]any{"components": []any{network}, "maxTotalBytes": 16 << 20, "maxDuration": "20s"}
+}
+
+// qualifyOngoingRingDisk checks, for the ongoing-save-disk focus, that the
+// installed collector runs with the administrator's ring volume and reports
+// the encrypted-disk medium available. The node refuses an encryptedDisk
+// source with MediumUnavailable otherwise, so the armed source and its Save
+// already ran on that medium; this pins the installed shape and log.
+func qualifyOngoingRingDisk(t *testing.T, ctx context.Context, region kubernetes.Interface) {
+	t.Helper()
+	pods, err := region.CoreV1().Pods("asservat-collector").List(ctx, meta.ListOptions{LabelSelector: "app.kubernetes.io/name=asservat-node"})
+	if err != nil || len(pods.Items) == 0 {
+		t.Fatal("ring disk collector Pods", err)
+	}
+	for _, p := range pods.Items {
+		volume := false
+		for _, v := range p.Spec.Volumes {
+			if v.Name == "ring-disk" && v.EmptyDir != nil && v.EmptyDir.SizeLimit != nil && v.EmptyDir.SizeLimit.Value() == ongoingSaveDiskBytes {
+				volume = true
+			}
+		}
+		if !volume {
+			t.Fatal("collector lacks the bounded encrypted-disk ring volume", p.Name)
+		}
+		// The medium line is printed at startup: read from the log's start.
+		var limit int64 = 1 << 20
+		raw, err := region.CoreV1().Pods(p.Namespace).GetLogs(p.Name, &core.PodLogOptions{Container: "node", LimitBytes: &limit}).DoRaw(ctx)
+		if err != nil {
+			t.Fatal("collector ring medium log", p.Name, err)
+		}
+		logs := string(raw)
+		if !strings.Contains(logs, "node collector ring medium: encrypted disk available=true") || strings.Contains(logs, "encrypted disk available=false") {
+			t.Fatal("collector did not report the encrypted-disk ring medium available", p.Name)
+		}
+	}
+	t.Logf("encrypted-disk ring medium available on %d collector Pod(s), volume %d bytes", len(pods.Items), ongoingSaveDiskBytes)
 }
 
 // installedActionID is the compiler's generated expanded action ID
@@ -605,6 +649,9 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Logf("native ongoing evidence retained: ongoing-save.pcapng bytes=%d SHA256=%x", len(native), digest)
 		t.Fatal("ongoing Save window/header proof", err)
 	}
+	if installedJourneyFocus() == "ongoing-save-disk" {
+		qualifyOngoingRingDisk(t, ctx, f.region)
+	}
 
 	// Fresh selection repeat; the original handle is not reused. Retained
 	// traffic inside its window: an empty window with incomplete history is
@@ -692,11 +739,15 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 		"secondSourceID": replacement.ID, "explicitStopRequested": stopped, "secondSourceEndedAt": ended.EndedAt,
 		"scope": "one active ordinary ongoing networkHeaders source on one installed Pod; history labels are as reported (Unknown/Partial are not upgraded); no quiet-Full, clock-step, loss, multi-node or syscall claim",
 	}
+	report["ringMedium"] = "memory"
+	if installedJourneyFocus() == "ongoing-save-disk" {
+		report["ringMedium"] = "encryptedDisk"
+	}
 	raw, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = os.WriteFile("../results/ongoing-save-report.json", append(raw, '\n'), 0600); err != nil {
+	if err = os.WriteFile("../results/"+installedJourneyFocus()+"-report.json", append(raw, '\n'), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("UNPUBLISHED installed ongoing Save proof: source %s armed in %.1fs, Save %s T0=%s retained %d marker packets, PCAPNG %dB SHA256=%x, natural expiry %s, explicit stop of %s", src.ID, armLatency.Seconds(), captureID, t0.Format(time.RFC3339Nano), markers, len(native), digest, expired.EndedAt.Format(time.RFC3339Nano), replacement.ID)
@@ -706,7 +757,7 @@ func qualifyInstalledOngoingSave(t *testing.T, ctx context.Context, admin *pgxpo
 // Save qualification or the automatic incident snapshot.
 func installedOngoingFocus() bool {
 	f := installedJourneyFocus()
-	return f == "ongoing-save" || f == "ongoing-incident" || f == "ongoing-syscall" || f == "ongoing-mixed"
+	return f == "ongoing-save" || f == "ongoing-save-disk" || f == "ongoing-incident" || f == "ongoing-syscall" || f == "ongoing-mixed"
 }
 
 // ongoingSyscallEvents checks a downloaded syscall window (ADR-273): JSON
