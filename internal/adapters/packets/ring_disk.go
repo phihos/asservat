@@ -51,6 +51,12 @@ func newSealedSegments(parent string) (*sealedSegments, error) {
 	return &sealedSegments{dir: dir, aead: aead}, nil
 }
 
+// SealedRingBytes is the most a disk ring can occupy on its volume: every
+// segment sealed with its nonce and tag.
+func SealedRingBytes(l RingLimits) int64 {
+	return int64(l.MaxSegments) * (l.SegmentBytes + 12 + 16)
+}
+
 func (s *sealedSegments) path(i int) string { return filepath.Join(s.dir, strconv.Itoa(i)) }
 
 // aad binds a sealed body to its slot and its in-memory header, so a file can

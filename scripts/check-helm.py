@@ -419,10 +419,14 @@ def check_collector(directory):
     # only writable collector mount; it is absent unless enabled.
     assert "ring-disk" not in volumes
     disk = json.loads(json.dumps(base))
-    disk["collector"]["ringDisk"] = {"enabled": True, "sizeLimit": "2Gi"}
-    disk_pod = next(r for r in render(disk) if r["kind"] == "DaemonSet")["spec"]["template"]["spec"]
+    disk["collector"]["ringDisk"] = {"enabled": True, "bytes": 2147483648}
+    disk_docs = render(disk)
+    disk_pod = next(r for r in disk_docs if r["kind"] == "DaemonSet")["spec"]["template"]["spec"]
     disk_volumes = {v["name"]: v for v in disk_pod["volumes"]}
-    assert disk_volumes["ring-disk"] == {"name": "ring-disk", "emptyDir": {"sizeLimit": "2Gi"}}, disk_volumes.get("ring-disk")
+    assert disk_volumes["ring-disk"] == {"name": "ring-disk", "emptyDir": {"sizeLimit": "2147483648"}}, disk_volumes.get("ring-disk")
+    disk_node = json.loads(next(r for r in disk_docs if r["kind"] == "ConfigMap")["data"]["node.json"])
+    assert disk_node["ceilings"]["ringDiskBytes"] == 2147483648, disk_node["ceilings"]
+    assert "ringDiskBytes" not in json.loads(data["data"]["node.json"])["ceilings"]
     writable = [m for m in disk_pod["containers"][0]["volumeMounts"] if not m.get("readOnly")]
     assert writable == [{"name": "ring-disk", "mountPath": "/var/lib/asservat-ring"}], writable
     # Default: nothing of the collector renders.

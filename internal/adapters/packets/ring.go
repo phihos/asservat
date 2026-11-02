@@ -486,14 +486,13 @@ func (r *Ring) Snapshot(window RingWindow, now time.Time, maxCopyBytes int64) (*
 	if window.From.IsZero() || window.Until.Before(window.From) || maxCopyBytes < 1 || maxCopyBytes > r.limits.MaxFrozenBytes {
 		return nil, ErrInvalid
 	}
-	var n int64
-	r.walk(window, func(record []byte) { n += int64(len(record)) })
-	if r.state.Snapshots >= r.limits.MaxConcurrentSnapshots || n > maxCopyBytes || n > r.limits.MaxFrozenBytes-r.state.FrozenBytes {
+	if r.state.Snapshots >= r.limits.MaxConcurrentSnapshots {
 		return nil, ErrRingCapacity
 	}
-	data := make([]byte, int(n))
-	at := 0
-	r.walk(window, func(record []byte) { at += copy(data[at:], record) })
+	data, ok := r.copyWindow(window, min(maxCopyBytes, r.limits.MaxFrozenBytes-r.state.FrozenBytes))
+	if !ok {
+		return nil, ErrRingCapacity
+	}
 	if r.ctx.Err() != nil {
 		clear(data)
 		r.closeLive()
@@ -504,6 +503,43 @@ func (r *Ring) Snapshot(window RingWindow, now time.Time, maxCopyBytes int64) (*
 	r.state.Snapshots++
 	return &RingSnapshot{ring: r, data: data, coverage: c}, nil
 }
+// copyWindow copies window's records in one walk (on the disk medium each walk
+// decrypts sealed segments) into an exactly sized buffer; false means they
+// exceed limit. The capacity estimate uses only in-memory headers.
+func (r *Ring) copyWindow(window RingWindow, limit int64) ([]byte, bool) {
+	var bound int64
+	for i := 0; i < r.limits.MaxSegments; i++ {
+		h := r.header(i)
+		if ringEndian.Uint32(h[4:]) == 0 {
+			continue
+		}
+		if time.Unix(0, int64(ringEndian.Uint64(h[16:]))).Before(window.From) || time.Unix(0, int64(ringEndian.Uint64(h[8:]))).After(window.Until) {
+			continue
+		}
+		bound += int64(ringEndian.Uint32(h))
+	}
+	data := make([]byte, 0, max(0, min(bound, limit)))
+	over := false
+	r.walk(window, func(record []byte) {
+		if over || int64(len(data)+len(record)) > limit {
+			over = true
+			return
+		}
+		data = append(data, record...)
+	})
+	if over {
+		clear(data)
+		return nil, false
+	}
+	if cap(data) != len(data) {
+		exact := make([]byte, len(data))
+		copy(exact, data)
+		clear(data)
+		data = exact
+	}
+	return data, true
+}
+
 func (r *Ring) coverage(window RingWindow) RingCoverage {
 	observed := r.through
 	if !r.stopped.IsZero() && observed.After(r.stopped) {
@@ -594,14 +630,20 @@ func (r *Ring) BeginWindowSnapshot(processing context.Context, window RingWindow
 		return nil, ErrRingCapacity
 	}
 	preWindow := RingWindow{window.From, t0}
-	var used int
-	r.walk(preWindow, func(b []byte) { used += len(b) })
-	if int64(used) > maxCopyBytes {
+	// One pass: on the disk medium every walk decrypts sealed segments.
+	data := make([]byte, int(maxCopyBytes))
+	used, over := 0, false
+	r.walk(preWindow, func(b []byte) {
+		if over || used+len(b) > len(data) {
+			over = true
+			return
+		}
+		used += copy(data[used:], b)
+	})
+	if over {
+		clear(data)
 		return nil, ErrRingCapacity
 	}
-	data := make([]byte, int(maxCopyBytes))
-	used = 0
-	r.walk(preWindow, func(b []byte) { used += copy(data[used:], b) })
 	if processing.Err() != nil || r.ctx.Err() != nil {
 		clear(data)
 		return nil, ErrRingClosed
@@ -655,16 +697,6 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 		return nil
 	}
 	window := w.final.Requested
-	var used int
-	r.walkRetained(window, func(b []byte, sequence uint64) {
-		if time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) || sequence > w.cut {
-			used += len(b)
-		}
-	})
-	if used > cap(s.data)-len(s.data) {
-		w.failure = ErrRingCapacity
-		return w.failure
-	}
 	if w.processing.Err() != nil {
 		w.failure = ErrRingClosed
 		return w.failure
@@ -673,13 +705,28 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 		r.closeLive()
 		return nil
 	}
-	at := len(s.data)
-	s.data = s.data[:at+used]
+	// One pass into the reserved capacity (each walk decrypts on disk).
+	start := len(s.data)
+	s.data = s.data[:cap(s.data)]
+	used, over := 0, false
 	r.walkRetained(window, func(b []byte, sequence uint64) {
-		if time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) || sequence > w.cut {
-			at += copy(s.data[at:], b)
+		if !time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) && sequence <= w.cut {
+			return
 		}
+		if over || start+used+len(b) > len(s.data) {
+			over = true
+			return
+		}
+		used += copy(s.data[start+used:], b)
 	})
+	if over {
+		clear(s.data[start:])
+		s.data = s.data[:start]
+		w.failure = ErrRingCapacity
+		return w.failure
+	}
+	s.data = s.data[:start+used]
+	at := start + used
 	if w.processing.Err() != nil {
 		w.failure = ErrRingClosed
 		return w.failure

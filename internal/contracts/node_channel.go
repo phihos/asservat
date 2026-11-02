@@ -87,6 +87,9 @@ type NodeCeilings struct {
 	FrozenBytes          int64 `json:"frozenBytes"`
 	UploadBytesPerSecond int64 `json:"uploadBytesPerSecond"`
 	UploadBurstBytes     int64 `json:"uploadBurstBytes"`
+	// RingDiskBytes is the administrator's ring volume size (ADR-278); zero
+	// without the volume.
+	RingDiskBytes int64 `json:"ringDiskBytes,omitempty"`
 }
 
 // NodeEnrollRequest carries the projected token, a DER identity-free CSR, the

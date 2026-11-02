@@ -1137,15 +1137,16 @@
           "additionalProperties": false,
           "required": [
             "enabled",
-            "sizeLimit"
+            "bytes"
           ],
           "properties": {
             "enabled": {
               "type": "boolean"
             },
-            "sizeLimit": {
-              "type": "string",
-              "pattern": "^[1-9][0-9]*(Mi|Gi)$"
+            "bytes": {
+              "type": "integer",
+              "minimum": 16777216,
+              "maximum": 1099511627776
             }
           }
         }

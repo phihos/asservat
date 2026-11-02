@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -168,11 +169,18 @@ func RunNode(ctx context.Context, podUID string) error {
 	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
 	ringDir := ""
-	if st, err := os.Stat(contracts.NodeRingDiskPath); err == nil && st.IsDir() {
+	if st, err := os.Stat(contracts.NodeRingDiskPath); err == nil && st.IsDir() && d.Ceilings.RingDiskBytes > 0 {
 		ringDir = contracts.NodeRingDiskPath
+		// The volume outlives container restarts; earlier processes' sealed
+		// segments are unreadable without their keys, so remove them.
+		if entries, err := os.ReadDir(ringDir); err == nil {
+			for _, e := range entries {
+				_ = os.RemoveAll(filepath.Join(ringDir, e.Name()))
+			}
+		}
 	}
 	fmt.Fprintf(os.Stderr, "node collector ring medium: encrypted disk available=%t\n", ringDir != "")
-	p.sources = &nodeSources{ringDir: ringDir, log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
+	p.sources = &nodeSources{ringDir: ringDir, ringDiskBytes: d.Ceilings.RingDiskBytes, log: p.packets.log, upload: client.UploadCapture, takeUpload: p.packets.takeUpload, version: facts.Engine.Version, engine: gadget.CaptureObservedPackets, syscallEngine: syscallTraceIfAvailable(mechanisms), identity: p.packetIdentity, now: time.Now, budget: budget, budgetMu: &p.mu, available: packetAvailable(mechanisms)}
 	err = p.Run(ctx)
 	p.sources.Close()
 	p.packets.wg.Wait()

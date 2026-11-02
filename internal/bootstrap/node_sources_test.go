@@ -105,9 +105,15 @@ func TestNodeSourceReportKeepsNaturalStopAfterSourceSetAsOf(t *testing.T) {
 }
 
 // ADR-278: an encrypted-disk source is refused with MediumUnavailable when the
-// node has no ring volume, and reserves only resident memory when it has one.
+// node has no ring volume or its budget would be exceeded, and reserves only
+// resident memory when it fits.
 func TestNodeSourceEncryptedDiskMedium(t *testing.T) {
-	for _, mounted := range []bool{false, true} {
+	l := sourceOwnerLimits()
+	for _, c := range []struct {
+		mounted bool
+		budget  int64
+	}{{false, 0}, {true, packets.SealedRingBytes(l) - 1}, {true, packets.SealedRingBytes(l)}} {
+		mounted := c.mounted
 		now := time.Now().UTC()
 		clock := &packetRingClock{at: now}
 		permit := sourceOwnerPermit(now)
@@ -118,19 +124,18 @@ func TestNodeSourceEncryptedDiskMedium(t *testing.T) {
 		if mounted {
 			dir = t.TempDir()
 		}
-		n := &nodeSources{ringDir: dir, now: clock.now, budget: b, budgetMu: bmu, available: true, identity: func() collector.Identity {
+		n := &nodeSources{ringDir: dir, ringDiskBytes: c.budget, now: clock.now, budget: b, budgetMu: bmu, available: true, identity: func() collector.Identity {
 			return collector.Identity{NodeUID: permit.Binding.NodeUID, PodUID: permit.Binding.CollectorPodUID, BootID: permit.Binding.BootID, Epoch: permit.Binding.CollectorEpoch}
 		}, engine: func(ctx context.Context, _ string, _ int, _ func(gadget.Frame), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
 			<-ctx.Done()
 			return gadget.CaptureStats{}, ctx.Err()
 		}}
-		l := sourceOwnerLimits()
 		source := collector.PacketSource{Permit: permit, Resources: resource, Ring: collector.SourceRingLimits{MaxAge: l.MaxAge, MaxBytes: l.MaxBytes, SegmentBytes: l.SegmentBytes, MaxSegments: l.MaxSegments, MaxFrozenBytes: l.MaxFrozenBytes, MaxConcurrentSnapshots: l.MaxConcurrentSnapshots, EncryptedDisk: true}}
 		arm := collector.Work{ID: permit.Binding.SourceID, Sequence: 1, Kind: collector.WorkPacketSource, NotAfter: permit.DispatchUntil, Source: &source}
 		r := n.decide(t.Context(), permit.Binding.CollectorEpoch, arm)
-		if !mounted {
+		if !mounted || c.budget < packets.SealedRingBytes(l) {
 			if r.Reason != collector.ReasonMediumUnavailable {
-				t.Fatal("unmounted", r)
+				t.Fatal("unmounted or over budget", c, r)
 			}
 			n.Close()
 			continue

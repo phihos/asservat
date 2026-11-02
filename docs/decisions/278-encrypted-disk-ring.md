@@ -18,6 +18,8 @@ baseline and default.
    `emptyDir` only when the administrator enables `collector.ringDisk`. Without
    it, a plan asking for `encryptedDisk` is refused on the node with
    `MediumUnavailable` before anything is reserved.
+   Snapshot copies walk the ring once, since every walk decrypts sealed
+   segments under the ring lock.
 2. In disk mode a ring keeps all 32-byte segment headers and only the segment
    being written in memory. When writing moves on, the finished segment is
    sealed with AES-256-GCM under a key generated in memory for that ring (one
@@ -29,9 +31,14 @@ baseline and default.
    also removes the files. Nothing is written unencrypted.
 4. A seal that fails (for example a full volume) closes the ring with
    `MediumUnavailable`; no partial segment is treated as retained history.
-5. The node's memory reservation for a disk ring is one segment plus headers;
-   on-disk bytes are bounded by `ring.maxBytes` and the `emptyDir` size limit.
-   No CSI/StorageClass, no `storageProfileRef` in this release.
+5. The node's memory reservation for a disk ring is one segment plus headers.
+   `collector.ringDisk.bytes` sets both the `emptyDir` size limit and the
+   node's `ringDiskBytes` ceiling; the node admits a disk ring only while all
+   active disk rings, sealed with nonce and tag, fit in it, so the kubelet
+   limit (which would evict the collector Pod) is never reached. On start the
+   node removes earlier processes' ring files, which outlive container
+   restarts but are unreadable without their keys. No CSI/StorageClass, no
+   `storageProfileRef` in this release.
 
 ## Complexity gate
 
