@@ -25,7 +25,24 @@ const operation = name => response => new URL(response.url()).pathname === '/api
 // Observe each response under the existing Playwright network bound. Attach
 // rejection handling when arming: early failure of the first operation still
 // closes the browser in finally without an unhandled second waiter rejection.
-const waitOperation = name => page.waitForResponse(operation(name)).catch(() => null);
+// The console may abort an operation it supersedes (net::ERR_ABORTED) and
+// request it again; observe the first response of an operation that was not
+// aborted by the page, starting from the moment the wait is armed.
+const seen = [];
+page.on('response', response => seen.push(response));
+async function settled(name, from) {
+  const end = Date.now() + 30_000;
+  for (let i = from; Date.now() < end;) {
+    if (i >= seen.length) { await new Promise(resolve => setTimeout(resolve, 100)); continue; }
+    const response = seen[i++];
+    if (!operation(name)(response)) continue;
+    const read = await readInstalledHistoryResponse(response);
+    if (read.requestFailed && read.readFailure.includes('ERR_ABORTED')) continue;
+    return response;
+  }
+  return null;
+}
+const waitOperation = name => settled(name, seen.length);
 const closedCodes = new Set(['NotAvailable', 'ParametersUnavailable', 'ProfileChanged', 'RequiresSelection', 'RecorderUnavailable', 'InvalidComposition', 'ProfileUnavailable', 'FilterRejected', 'ApprovalRequired', 'FilterCompilerUnavailable', 'UnsupportedRequest', 'SharingNotPermitted', 'TargetReplaced', 'ProcessingCoverageUnavailable', 'CapacityUnavailable']);
 async function readOperation(name, pending) {
   const response = await pending;

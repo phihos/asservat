@@ -138,6 +138,10 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	defer bundle.Clear()
 	stage = "prepare"
 	session, err := s.Regional.PrepareHistory(ctx, p.Target.ClusterID, accepted.CaptureID)
+	if err != nil && ctx.Err() == nil {
+		// ADR-280: nothing is claimed yet; open the regional session once more.
+		session, err = s.Regional.PrepareHistory(ctx, p.Target.ClusterID, accepted.CaptureID)
+	}
 	if err != nil {
 		return err
 	}

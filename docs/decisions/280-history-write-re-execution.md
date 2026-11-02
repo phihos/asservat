@@ -17,7 +17,8 @@ stay unavailable and repeat-from-history fails although the capture succeeded.
 1. Within the same budget and claim, a failed execution (not an integrity
    failure) is re-executed once through a fresh regional session, only when
    the region's executor process epoch is unchanged (the claim binds it).
-2. The same in-memory sealed bundle is written again. The history object
+2. Opening the regional session before the claim is retried once too.
+3. The same in-memory sealed bundle is written again. The history object
    writer accepts a create-only conflict only when the existing object is
    byte-identical; different bytes stay refused.
 
