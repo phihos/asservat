@@ -1,8 +1,10 @@
 package capture
 
 import (
+	"asservat.local/asservat/internal/domain/artifact"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	value "asservat.local/asservat/internal/domain/capture"
@@ -60,5 +62,26 @@ func TestKubernetesPeerPreviewIsPlanOnly(t *testing.T) {
 	_, err = f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition(kubernetesPeerEdit())))
 	if !errors.As(err, &refusal) || refusal.Code != planning.CompositionRecorderUnavailable {
 		t.Fatal(err)
+	}
+}
+
+// A packet + syscall composition with Kubernetes peers leaves the group path
+// like a single recording does and gets the explicit composition refusal:
+// Kubernetes peers resolve only for one packet capture (use cidrs here).
+func TestKubernetesPeerGroupPreviewFallsBackToPlanOnly(t *testing.T) {
+	f := newInvestigationFixture()
+	f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
+	f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+	f.svc.Filters = &stubFilters{}
+	f.svc.Recorders = bothRecorders{availableRecording{f}}
+	peers := &fakePeers{}
+	f.svc.Peers = peers
+	c := mixedComposition()
+	c.Components[0].Edits = append(c.Components[0].Edits, kubernetesPeerEdit())
+	ctx := context.Background()
+	_, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(c))
+	var refusal planning.CompositionError
+	if !errors.As(err, &refusal) || refusal.Code != planning.CompositionRecorderUnavailable || !strings.Contains(refusal.Reason, "one packet capture") {
+		t.Fatal("mixed composition with Kubernetes peers", err, refusal.Reason)
 	}
 }

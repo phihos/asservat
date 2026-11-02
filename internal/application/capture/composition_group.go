@@ -114,6 +114,11 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 		}
 		child := value.CompositionGroupChild{CaptureID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), OccurrenceID: s.NewID(), AssessmentID: s.NewID(), Composition: *c.Clone(), Retention: retentionReview(facts[n].retention)}
 		plans[n], err = compiler.CompileRecorder(planning.RecorderInput{CaptureID: child.CaptureID, Executor: p.Actor, Target: target, Composition: c, Retention: facts[n].retention, Deadline: p.Deadline, NodeRecorder: true, RequireApproval: required}, s.Filters, s.Now())
+		if errors.As(err, new(compiler.PeerResolutionNeeded)) {
+			// ADR-283 part 2: Kubernetes peers are plan-only; the plan-only
+			// preview resolves them, as for a single recording.
+			return zero, errRecordingNotAcceptable
+		}
 		if err != nil {
 			return zero, previewFailure("compile", err)
 		}
