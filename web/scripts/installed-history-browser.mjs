@@ -45,7 +45,10 @@ async function settled(name, from) {
     const response = seen[i++];
     if (!operation(name)(response)) continue;
     const read = await readInstalledHistoryResponse(response);
-    if (read.requestFailed && read.readFailure.includes('ERR_ABORTED')) continue;
+    // A non-200 reply is final: the console cancels its body on purpose,
+    // which Chromium also reports as ERR_ABORTED (native run 41529848773:
+    // a 503 preview was skipped and the wait ended with no response).
+    if (read.requestFailed && read.readFailure.includes('ERR_ABORTED') && response.status() === 200) continue;
     return response;
   }
   return null;
