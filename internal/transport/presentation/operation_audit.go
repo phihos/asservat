@@ -540,6 +540,13 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		}
 		return json.Marshal(in)
 	}
+	if name == "get_http_headers" {
+		var in HTTPHeaderOperationInput
+		if json.Unmarshal(raw, &in) != nil {
+			return nil, contracts.ErrInvestigationWire
+		}
+		return json.Marshal(in)
+	}
 	if name == "get_case" {
 		var in struct {
 			CaseID string `json:"case_id"`
@@ -680,6 +687,18 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			}
 			for _, a := range refs.Artifacts {
 				out.ArtifactIDs = append(out.ArtifactIDs, a.ID)
+			}
+			if in.Name == "get_http_headers" {
+				// ADR-282: the disclosed page names its one artifact as provenance.
+				var page struct {
+					Provenance []struct {
+						ArtifactID string `json:"artifactID"`
+					} `json:"provenance"`
+				}
+				if json.Unmarshal(reply.Body, &page) != nil || len(page.Provenance) != 1 {
+					return out, auditapp.ErrUnavailable
+				}
+				out.ArtifactIDs = append(out.ArtifactIDs, page.Provenance[0].ArtifactID)
 			}
 			if in.Name == "request_capture" || in.Name == "resolve_capture_request" {
 				if refs.CaptureID != "" {

@@ -1,6 +1,8 @@
 package integration
 
 import (
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/audit"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -349,6 +351,20 @@ func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		var valid bool
 		if err := admin.QueryRow(ctx, "SELECT operation_audit_lane($1), operation_audit_human_input_valid($1,'context-input/v1')", name).Scan(&lane, &valid); err != nil || lane != "normal" || !valid {
 			t.Fatal("audit lane", name, lane, valid, err)
+		}
+	}
+	// Every registered investigation tool's SQL audit lane equals its Go lane:
+	// a tool missing from the SQL lists fails at audit-begin on installations
+	// (the capture profile reads did until migration 00120).
+	for _, name := range contracts.InvestigationToolNames() {
+		var lane *string
+		err := admin.QueryRow(ctx, "SELECT operation_audit_lane($1)", name).Scan(&lane)
+		got := ""
+		if lane != nil {
+			got = *lane
+		}
+		if err != nil || got != audit.OperationLane(name) {
+			t.Fatal("SQL audit lane differs from Go", name, got, audit.OperationLane(name), err)
 		}
 	}
 }

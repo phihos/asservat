@@ -76,28 +76,38 @@ func CheckProjection(r io.Reader, limits Limits, limit int64) (int, error) {
 	if int64(len(b)) > limit {
 		return 0, artifact.ErrLimit
 	}
+	pr, err := checkedProjection(b, limits)
+	if err != nil {
+		return 0, err
+	}
+	return len(pr.Records), nil
+}
+
+// checkedProjection applies CheckProjection's checks to b, already read
+// within the size bound, and returns the decoded document.
+func checkedProjection(b []byte, limits Limits) (Projection, error) {
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
 	var pr Projection
 	if dec.Decode(&pr) != nil || dec.More() {
-		return 0, ErrNotProjection
+		return Projection{}, ErrNotProjection
 	}
 	canonical, err := pr.Encode()
 	if err != nil || !bytes.Equal(canonical, b) {
-		return 0, ErrNotProjection
+		return Projection{}, ErrNotProjection
 	}
 	l := limits
 	want := LimitsRecord{MaxFlows: l.MaxFlows, MaxHeaderBytes: l.MaxHeaderBytes, MaxFlowBytes: l.MaxFlowBytes, MaxTotalBytes: l.MaxTotalBytes, IdleTimeoutSeconds: int64(l.IdleTimeout / time.Second), Snaplen: Snaplen}
 	if pr.Format != artifact.HTTPHeadersFormat || pr.Protocol != "http1" || pr.Limits != want ||
 		!validTime(pr.StartedAt) || !validTime(pr.EndedAt) || pr.EndedAt.Before(pr.StartedAt) ||
 		len(pr.Records) > maxRecords || pr.Counters.Records != uint64(len(pr.Records)) {
-		return 0, ErrNotProjection
+		return Projection{}, ErrNotProjection
 	}
 	var partial uint64
 	prev := pr.StartedAt
 	for _, rec := range pr.Records {
 		if !checkRecord(rec, prev, pr.EndedAt) {
-			return 0, ErrNotProjection
+			return Projection{}, ErrNotProjection
 		}
 		prev = rec.Timestamp
 		if rec.Partial {
@@ -105,9 +115,9 @@ func CheckProjection(r io.Reader, limits Limits, limit int64) (int, error) {
 		}
 	}
 	if partial != pr.Counters.PartialRecords {
-		return 0, ErrNotProjection
+		return Projection{}, ErrNotProjection
 	}
-	return len(pr.Records), nil
+	return pr, nil
 }
 
 func checkRecord(r Record, from, until time.Time) bool {
