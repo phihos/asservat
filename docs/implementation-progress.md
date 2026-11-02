@@ -22,9 +22,9 @@ version is refused. Publication uses the user's own Kubernetes rights.
 Verification: `npm run check` (277 console tests, including real Ajv
 validation of the manifest against the CRD openAPIV3Schema and the canonical
 `capture-profile.schema.json`), `npm run build` and `make
-console-browser-check` pass. Note: the checked-in `examples/capture-profile-*.yaml`
-use `metadata.name: <name>-v1`, which the CRD's CEL rule
-(`<name>.<version>`) and the Kubernetes adapter would reject.
+console-browser-check` pass. The checked-in `examples/capture-profile-*.yaml`
+now use the `metadata.name: <name>.<version>` form the CRD's CEL rule and the
+Kubernetes adapter require (they used `<name>-v1` before).
 
 
 ## Kubernetes peer membership verifier (2026-11-02)
