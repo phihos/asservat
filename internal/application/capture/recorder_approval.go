@@ -76,6 +76,9 @@ func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, sourc
 	if !authorization.UUID(previewID) || !identity.Text(key, 128) {
 		return zero, value.ErrInvalid
 	}
+	// The review gate has its own bound; the submission below keeps the
+	// caller's original context and its own phases (not this remainder).
+	original := ctx
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	i, err := source.ResolveIdentity(ctx)
@@ -99,7 +102,8 @@ func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, sourc
 	// The approved grant binds this exact result access (its digest); the
 	// ordinary submission rechecks the same covering grant (ADR-279: a raw
 	// recording downloads only through these children).
-	return s.Request(ctx, source, previewID, key)
+	cancel()
+	return s.Request(original, source, previewID, key)
 }
 
 // recorderRequest decides the approval gate of a reviewed packet/syscall
