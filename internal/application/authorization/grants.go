@@ -119,6 +119,8 @@ type GrantStore interface {
 	RevokeGrant(context.Context, GrantRevocationInput, artifact.RecoveryProof) (value.Grant, bool, error)
 	MaterializeGrantChild(context.Context, GrantChildRequest, artifact.RecoveryProof) (value.GrantChild, bool, error)
 	GrantChild(ctx context.Context, childID string) (value.GrantChild, error)
+	// GrantChildFor returns the parent's child for one artifact and client.
+	GrantChildFor(ctx context.Context, parentID, artifactID, clientID string) (value.GrantChild, error)
 	ReserveGrantUse(context.Context, GrantUseRequest, artifact.RecoveryProof) (value.Grant, bool, error)
 }
 
@@ -760,4 +762,83 @@ func (s GrantService) Use(ctx context.Context, current identities.CurrentIdentit
 		return zero, false, err
 	}
 	return out, replay, nil
+}
+
+// rawParent resolves the approved ad hoc grant of a raw download scope for
+// its requesting human: intact review, the exact target and the raw class.
+// Another human never reaches Materialize, so nobody else spends its pool.
+func (s GrantService) rawParent(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope) (identity.Identity, value.Grant, error) {
+	var zero value.Grant
+	if ctx == nil || ctx.Err() != nil || !s.ready() || !scope.Valid() || scope.RootID != s.RootID {
+		return identity.Identity{}, zero, value.ErrGrantInvalid
+	}
+	i, err := s.human(ctx, current, "evidence:download")
+	if err != nil {
+		return identity.Identity{}, zero, err
+	}
+	if i.Principal != scope.Principal {
+		return identity.Identity{}, zero, value.ErrGrantPrincipal
+	}
+	g, err := s.Store.GrantByCapture(ctx, scope.CaptureID)
+	if errors.Is(err, ErrGrantNotFound) {
+		return identity.Identity{}, zero, value.ErrApprovalRequired
+	}
+	if err != nil {
+		return identity.Identity{}, zero, ErrGrantUnavailable
+	}
+	target := value.Target{ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID}
+	if g.Kind != value.GrantAdHocCapture || g.DataClass != "raw" || g.Target != target || ReviewDigest(g, g.Review) != g.ReviewDigest {
+		return identity.Identity{}, zero, value.ErrGrantScope
+	}
+	if !sameHuman(i.Principal, g.Requester) {
+		return identity.Identity{}, zero, value.ErrGrantPrincipal
+	}
+	return i, g, nil
+}
+
+// CurrentResultAccess is the raw facet of ContextDownloadAuthority (ADR-279).
+// The first download of a published raw artifact materializes the child for
+// the calling client (REQ-INV-002: after verified commit, idempotent); every
+// check then confirms it with a current parent. It returns when the child
+// stops admitting and reserves nothing.
+func (s GrantService) CurrentResultAccess(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, actionID string) (time.Time, error) {
+	i, g, err := s.rawParent(ctx, current, scope)
+	if err != nil {
+		return time.Time{}, err
+	}
+	output := value.VerifiedOutput{CaptureID: scope.CaptureID, ActionID: actionID, ArtifactID: scope.ArtifactID, ExecutionDigest: g.ExecutionDigest, ArtifactDigest: scope.Version, Target: g.Target}
+	c, _, err := s.Materialize(ctx, g.ID, i.Principal.ClientID, output)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if c.Output != output {
+		return time.Time{}, value.ErrGrantScope
+	}
+	if err = value.CheckResultUse(g, c, i, value.GrantDownloadOperation, s.Now()); err != nil {
+		return time.Time{}, err
+	}
+	if err = s.final(ctx, current, i); err != nil {
+		return time.Time{}, err
+	}
+	return identity.Earlier(i.ValidUntil, g.ExpiresAt), nil
+}
+
+// ReserveRawResult reserves one use of the calling client's existing child
+// for a raw download batch before any of its bytes are read (ADR-279). The
+// child is the one CurrentResultAccess materialized; useID is the batch or
+// window ID, so a retry is idempotent and spend is never refunded.
+func (s GrantService) ReserveRawResult(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, useID string, use value.GrantUse) error {
+	i, g, err := s.rawParent(ctx, current, scope)
+	if err != nil {
+		return err
+	}
+	c, err := s.Store.GrantChildFor(ctx, g.ID, scope.ArtifactID, i.Principal.ClientID)
+	if err != nil {
+		return err
+	}
+	if c.ParentID != g.ID || c.ClientID != i.Principal.ClientID || c.Output.CaptureID != scope.CaptureID || c.Output.ArtifactID != scope.ArtifactID || c.Output.ArtifactDigest != scope.Version {
+		return value.ErrGrantScope
+	}
+	_, _, err = s.Use(ctx, current, c.ID, useID, use)
+	return err
 }

@@ -42,7 +42,7 @@ type ContextDownloadSource struct {
 
 func (s ContextDownloadSource) Valid(now time.Time) bool {
 	e, p := s.Expectation, s.Scope
-	return identity.Fresh(s.ObservedAt, s.ValidUntil, now, artifact.DownloadLease) && p.Valid() && e.Validate() == nil && e.DataClass == "metadata" && s.Copies.Validate(e.Registration) == nil && ContextCopiesDigest(s.Copies) == p.Version && e.Registration.Location.ArtifactID == p.ArtifactID && e.CaptureUID == p.CaptureID && e.Registration.Location.ClusterID == p.ClusterID && e.NamespaceUID == p.NamespaceUID && e.WorkloadUID == p.WorkloadUID && e.PodUID == p.PodUID
+	return identity.Fresh(s.ObservedAt, s.ValidUntil, now, artifact.DownloadLease) && p.Valid() && e.Validate() == nil && e.ServedClass() && s.Copies.Validate(e.Registration) == nil && ContextCopiesDigest(s.Copies) == p.Version && e.Registration.Location.ArtifactID == p.ArtifactID && e.CaptureUID == p.CaptureID && e.Registration.Location.ClusterID == p.ClusterID && e.NamespaceUID == p.NamespaceUID && e.WorkloadUID == p.WorkloadUID && e.PodUID == p.PodUID
 }
 
 // This read port supplies accepted, independently backed configuration; the

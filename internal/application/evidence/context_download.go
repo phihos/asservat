@@ -5,6 +5,7 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/sha256"
@@ -32,6 +33,14 @@ type ContextDownloadRequest struct {
 	Copies      artifact.Copies
 }
 
+// RawResultUses reserves one use of the approved grant's result-access child
+// for a raw artifact before any of its bytes are read (ADR-279). Only C-03
+// resolves the child; useID is the batch or window ID, so a retry is
+// idempotent and spend is never refunded. A refusal stops the batch.
+type RawResultUses interface {
+	ReserveRawResult(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, useID string, use authorization.GrantUse) error
+}
+
 // ContextDownloadWorker is a regional acquisition-role service. Its ledger and
 // current-gate ports may be mediated by authenticated control relay; the hub
 // must never wire an artifact unwrap key into its public HTTP/API process.
@@ -45,8 +54,10 @@ type ContextDownloadWorker struct {
 	Native                ContextNativeReader
 	BatchNative           ContextBatchNativeReader
 	RegionalPreparation   RegionalPreparation
-	Now                   func() time.Time
-	NewID                 func() string
+	// RawResults is required for a raw expectation; nil refuses it.
+	RawResults RawResultUses
+	Now        func() time.Time
+	NewID      func() string
 }
 
 // Covers four bounded ciphertext reads and bounded plaintext decode work for
@@ -61,7 +72,7 @@ func (w ContextDownloadWorker) valid(r ContextDownloadRequest) bool {
 			readers++
 		}
 	}
-	return w.Sessions != nil && w.AuditAcknowledgements != nil && w.Audit != nil && (w.Authority != nil || w.CurrentAuthority != nil) && readers == 1 && w.Now != nil && w.NewID != nil && s.Valid() && e.Validate() == nil && e.DataClass == "metadata" && r.Copies.Validate(e.Registration) == nil && s.ArtifactID == e.Registration.Location.ArtifactID && s.CaptureID == e.CaptureUID && s.ClusterID == e.Registration.Location.ClusterID && s.NamespaceUID == e.NamespaceUID && s.WorkloadUID == e.WorkloadUID && s.PodUID == e.PodUID && s.Version == ContextCopiesDigest(r.Copies)
+	return w.Sessions != nil && w.AuditAcknowledgements != nil && w.Audit != nil && (w.Authority != nil || w.CurrentAuthority != nil) && readers == 1 && w.Now != nil && w.NewID != nil && s.Valid() && e.Validate() == nil && e.ServedClass() && r.Copies.Validate(e.Registration) == nil && s.ArtifactID == e.Registration.Location.ArtifactID && s.CaptureID == e.CaptureUID && s.ClusterID == e.Registration.Location.ClusterID && s.NamespaceUID == e.NamespaceUID && s.WorkloadUID == e.WorkloadUID && s.PodUID == e.PodUID && s.Version == ContextCopiesDigest(r.Copies)
 }
 
 func (w ContextDownloadWorker) read(ctx context.Context, r ContextDownloadRequest, i audit.DownloadIntent, a artifact.DownloadAuthority) ([]byte, error) {
@@ -87,9 +98,13 @@ func (w ContextDownloadWorker) current(ctx context.Context, credential string, r
 type contextDownloadCheck func(context.Context) (artifact.DownloadAuthority, error)
 
 func (w ContextDownloadWorker) begin(ctx context.Context, credential string, r ContextDownloadRequest, purpose artifact.DownloadPurpose, selection DownloadSelection) (audit.DownloadIntent, error) {
-	return w.beginChecked(ctx, r, purpose, selection, func(ctx context.Context) (artifact.DownloadAuthority, error) { return w.current(ctx, credential, r) })
+	return w.beginChecked(ctx, nil, r, purpose, selection, func(ctx context.Context) (artifact.DownloadAuthority, error) { return w.current(ctx, credential, r) })
 }
-func (w ContextDownloadWorker) beginChecked(ctx context.Context, r ContextDownloadRequest, purpose artifact.DownloadPurpose, selection DownloadSelection, check contextDownloadCheck) (audit.DownloadIntent, error) {
+
+// beginChecked opens one batch. A raw batch first reserves one grant use
+// under its batch ID: one operation for a preparation, its output bytes for
+// content. Bearer callers have no current identity and cannot download raw.
+func (w ContextDownloadWorker) beginChecked(ctx context.Context, current identities.CurrentIdentity, r ContextDownloadRequest, purpose artifact.DownloadPurpose, selection DownloadSelection, check contextDownloadCheck) (audit.DownloadIntent, error) {
 	var zero audit.DownloadIntent
 	if ctx == nil || ctx.Err() != nil || !w.valid(r) || check == nil {
 		return zero, artifact.ErrInvalid
@@ -98,11 +113,24 @@ func (w ContextDownloadWorker) beginChecked(ctx context.Context, r ContextDownlo
 	if err != nil {
 		return zero, err
 	}
-	i, err := w.Sessions.BeginDownloadBatch(ctx, r.SessionID, a, artifact.DownloadBatch{ID: w.NewID(), Purpose: purpose, Offset: selection.Offset, OutputBytes: selection.Length, ReadBytes: ContextDownloadReadWork})
+	id := w.NewID()
+	if r.Expectation.DataClass == "raw" {
+		use := authorization.GrantUse{Operation: authorization.GrantDownloadOperation, Bytes: selection.Length}
+		if purpose == artifact.DownloadMetadata {
+			use.Operations = 1
+		}
+		if w.RawResults == nil || current == nil {
+			return zero, artifact.ErrDownloadUnavailable
+		}
+		if err = w.RawResults.ReserveRawResult(ctx, current, r.Scope, id, use); err != nil {
+			return zero, err
+		}
+	}
+	i, err := w.Sessions.BeginDownloadBatch(ctx, r.SessionID, a, artifact.DownloadBatch{ID: id, Purpose: purpose, Offset: selection.Offset, OutputBytes: selection.Length, ReadBytes: ContextDownloadReadWork})
 	if err != nil {
 		return zero, err
 	}
-	if !i.Valid() || i.SessionID != r.SessionID || i.Batch.Authority.Scope != r.Scope || i.Batch.Purpose != purpose || i.Batch.Offset != selection.Offset || i.Batch.OutputBytes != selection.Length || i.Batch.ReadBytes != ContextDownloadReadWork || !w.Now().Before(i.Batch.LeaseUntil) {
+	if !i.Valid() || i.SessionID != r.SessionID || i.Batch.ID != id || i.Batch.Authority.Scope != r.Scope || i.Batch.Purpose != purpose || i.Batch.Offset != selection.Offset || i.Batch.OutputBytes != selection.Length || i.Batch.ReadBytes != ContextDownloadReadWork || !w.Now().Before(i.Batch.LeaseUntil) {
 		return zero, artifact.ErrIntegrity
 	}
 	return i, nil
@@ -156,7 +184,7 @@ func contextDownloadMetadata(r ContextDownloadRequest, native []byte) DownloadMe
 }
 
 func (w ContextDownloadWorker) Prepare(ctx context.Context, credential string, r ContextDownloadRequest) (DownloadMetadata, error) {
-	return w.prepareChecked(ctx, r, func(ctx context.Context) (artifact.DownloadAuthority, error) { return w.current(ctx, credential, r) }, nil)
+	return w.prepareChecked(ctx, nil, r, func(ctx context.Context) (artifact.DownloadAuthority, error) { return w.current(ctx, credential, r) }, nil)
 }
 
 // PrepareCurrent accepts a live request-owned identity directly. It shares the
@@ -171,10 +199,10 @@ func (w ContextDownloadWorker) prepareCurrentRetained(ctx context.Context, curre
 	if err != nil {
 		return DownloadMetadata{}, stepped("identity", err)
 	}
-	return w.prepareChecked(ctx, r, check, retain)
+	return w.prepareChecked(ctx, current, r, check, retain)
 }
 
-func (w ContextDownloadWorker) prepareChecked(ctx context.Context, r ContextDownloadRequest, check contextDownloadCheck, retain func(artifact.PreparedDownload) error) (out DownloadMetadata, err error) {
+func (w ContextDownloadWorker) prepareChecked(ctx context.Context, current identities.CurrentIdentity, r ContextDownloadRequest, check contextDownloadCheck, retain func(artifact.PreparedDownload) error) (out DownloadMetadata, err error) {
 	// Private transport can recheck concurrently with control accounting. Share
 	// one serialized original closure; waiting cannot restart its deadline.
 	if check == nil {
@@ -190,7 +218,7 @@ func (w ContextDownloadWorker) prepareChecked(ctx context.Context, r ContextDown
 		}
 		return original(call)
 	}
-	i, err := w.beginChecked(ctx, r, artifact.DownloadMetadata, DownloadSelection{}, check)
+	i, err := w.beginChecked(ctx, current, r, artifact.DownloadMetadata, DownloadSelection{}, check)
 	if err != nil {
 		return out, stepped("begin", err)
 	}

@@ -22,7 +22,7 @@ func NewContextNativeReader(store *CustodyStore, keys evidence.KeyOpener) (*Cont
 }
 func (r *ContextNativeReader) ReadContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, leaseUntil time.Time) ([]byte, error) {
 	now := time.Now()
-	if r == nil || r.verifier == nil || e.DataClass != "metadata" || !now.Before(leaseUntil) || leaseUntil.After(now.Add(5*time.Second)) {
+	if r == nil || r.verifier == nil || !e.ServedClass() || !now.Before(leaseUntil) || leaseUntil.After(now.Add(5*time.Second)) {
 		return nil, artifact.ErrInvalid
 	}
 	// Downloads remain possible after acquisition's write window closes, but

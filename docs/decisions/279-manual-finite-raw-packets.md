@@ -56,3 +56,23 @@ Benefit: raw packets are a specified first-release capability. Cost: one
 native type, a grant-scoped observed-byte pool reusing the ADR-261 session
 table, per-transport truncation on the node; no new service, credential or
 background task. Disabling: raw needs approval and a profile that asks for it.
+
+## Implementation (slice 4)
+
+Publication and the download plumbing carry `raw` only for `rawPcapng`
+(`ContextExpectation.ServedClass`). The catalog record now states the class
+and action. `ContextDownloadAuthority` keeps ordinary `DownloadApproved`
+eligibility with metadata semantics and, for raw, refuses every share and
+never keeps a response-owned entitlement; its last check is C-03's
+`GrantService.CurrentResultAccess`. On the first download after verified
+commit this materializes, idempotently, the child for exactly the artifact
+version and the requesting human's approved client (`Materialize`), then
+checks the child's use with a current, unrevoked, unexpired parent; its end
+bounds the authority. Every raw batch then reserves one use under its own ID
+before any byte is read (`ReserveRawResult`, which finds the child by
+parent/artifact/client and calls `Use`): one operation per preparation batch,
+and each response window's bytes under the window ID (the 4 KiB content
+batch charges its bytes the same way). A missing port or a refused
+reservation fails the batch closed. The download environment admits `raw` as
+a client class, and installer clients list it; the grant still names the
+clients. The child ID never leaves C-03.

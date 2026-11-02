@@ -226,7 +226,7 @@ func newFixture() (*fixture, Service) {
 		i: identity.Identity{Principal: identity.Principal{Issuer: issuer, Subject: "owner", ClientID: "mcp", Kind: identity.Human}, Scopes: []string{"evidence:read", value.ShareScope}, Groups: []string{"owners"}, Policy: rev, VerifiedAt: n, ValidUntil: n.Add(30 * time.Second)},
 		p: value.Projection{Target: target, Revision: rev, ObservedAt: n, FreshUntil: n.Add(30 * time.Second), DeniesComplete: true, DeniesObservedAt: n, DeniesFreshUntil: n.Add(5 * time.Second),
 			Allows: []value.CurrentAssignment{{Audience: reader, ObservedAt: n, FreshUntil: n.Add(30 * time.Second)}, {Audience: owner, ObservedAt: n, FreshUntil: n.Add(30 * time.Second)}}},
-		record: authapp.ContextDownloadEvidence{PurposeRef: "diagnostics", CaptureID: testID(4), Version: artifact.Digest{3}, Audience: []artifact.AudienceAssignment{reader, owner},
+		record: authapp.ContextDownloadEvidence{PurposeRef: "diagnostics", DataClass: "metadata", CaptureID: testID(4), Version: artifact.Digest{3}, Audience: []artifact.AudienceAssignment{reader, owner},
 			Retained:   privacy.RetainedArtifact{RootID: testID(1), Registration: reg, Input: privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: 3600, AnchorAt: reg.AnchorAt}, OriginPolicies: []artifact.RetentionRule{{UID: "baseline", Generation: 1, Digest: artifact.Digest{5}}}, Effective: dates},
 			ObservedAt: n, ValidUntil: n.Add(5 * time.Second)},
 		route:    catalog.ContextCaseRoute{CaptureID: testID(4), ArtifactID: testID(5), Target: target},
@@ -288,7 +288,7 @@ func TestShareCreateListRevoke(t *testing.T) {
 }
 
 func TestShareCreateRefusals(t *testing.T) {
-	for _, name := range []string{"no-share-scope", "not-owner", "foreign-recipient-issuer", "too-long", "changed-version", "unrelated-caller", "too-many-recipients", "workload-caller"} {
+	for _, name := range []string{"no-share-scope", "not-owner", "foreign-recipient-issuer", "too-long", "changed-version", "unrelated-caller", "too-many-recipients", "workload-caller", "raw-artifact"} {
 		t.Run(name, func(t *testing.T) {
 			f, s := newFixture()
 			in := f.input("k")
@@ -313,6 +313,9 @@ func TestShareCreateRefusals(t *testing.T) {
 				want = capture.ErrInvalid
 			case "workload-caller":
 				f.i.Principal.Kind = identity.Workload
+			case "raw-artifact":
+				// ADR-279: raw output is never shared before S-06 raw-share approval.
+				f.record.DataClass = "raw"
 			}
 			if _, _, err := s.Create(context.Background(), f, in); !errors.Is(err, want) || len(f.store.created) != 0 {
 				t.Fatalf("refusal %s: %v (want %v)", name, err, want)

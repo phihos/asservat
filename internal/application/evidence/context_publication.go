@@ -65,7 +65,7 @@ func (p ContextPublisher) Publish(ctx context.Context, captureID string, copies 
 	if err != nil {
 		return out, err
 	}
-	if e.Validate() != nil || e.CaptureUID != captureID || e.DataClass != "metadata" || copies.Validate(e.Registration) != nil {
+	if e.Validate() != nil || e.CaptureUID != captureID || !e.ServedClass() || copies.Validate(e.Registration) != nil {
 		return out, artifact.ErrInvalid
 	}
 	e.Audience = slices.Clone(e.Audience)

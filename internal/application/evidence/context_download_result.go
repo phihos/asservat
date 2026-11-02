@@ -257,7 +257,7 @@ func (o *ContextDownloadResultOwner) Prepare(ctx context.Context, current identi
 	defer func() { o.mu.Lock(); o.preparing = false; o.mu.Unlock() }()
 	work, cancel := context.WithDeadline(call, until)
 	defer cancel()
-	_, err = o.config.Worker.prepareChecked(work, r, check, o.retain)
+	_, err = o.config.Worker.prepareChecked(work, current, r, check, o.retain)
 	return err
 }
 

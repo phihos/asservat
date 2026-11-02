@@ -40,6 +40,10 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Recovery == nil || s.Processing == nil || s.Now == nil || !actor.Valid() || !r.Retained.Valid() || r.Retained.RootID != s.RootID || !identity.Text(r.PurposeRef, 128) || !artifact.DownloadEvidenceType(r.Retained.Input.EvidenceType) || r.Retained.Input.PrivacyClass != "potentialPersonalData" {
 		return zero, downloadRefused("configuration", nil)
 	}
+	class, ok := downloadClass(r)
+	if !ok {
+		return zero, downloadRefused("configuration", nil)
+	}
 	start := s.Now()
 	until := identity.Earlier(start.Add(5*time.Second), identity.Earlier(r.ValidUntil, r.Retained.Effective.ExpiresAt))
 	if d, ok := ctx.Deadline(); ok {
@@ -54,7 +58,7 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 	if e != nil || !p.DownloadValid(s.Now()) || p.RootID != s.RootID || p.InstallationID != s.InstallationID {
 		return zero, downloadRefused("policy", e)
 	}
-	path, ok := p.SelectDownload(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, "metadata", r.Retained.Input.PrivacyClass, r.Retained.Input.EvidenceType, s.Now())
+	path, ok := p.SelectDownload(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, class, r.Retained.Input.PrivacyClass, r.Retained.Input.EvidenceType, s.Now())
 	if !ok {
 		return zero, downloadRefused("path", nil)
 	}
@@ -81,7 +85,7 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 	if e != nil || !last.DownloadValid(s.Now()) || last.RootID != p.RootID || last.InstallationID != p.InstallationID || last.RecoveryEpoch != p.RecoveryEpoch || last.Revision != p.Revision || last.ProtectionDigest != p.ProtectionDigest {
 		return zero, downloadRefused("policy-final", e)
 	}
-	lastPath, ok := last.SelectDownload(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, "metadata", r.Retained.Input.PrivacyClass, r.Retained.Input.EvidenceType, s.Now())
+	lastPath, ok := last.SelectDownload(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, class, r.Retained.Input.PrivacyClass, r.Retained.Input.EvidenceType, s.Now())
 	if !ok || lastPath != path {
 		return zero, downloadRefused("path-final", nil)
 	}

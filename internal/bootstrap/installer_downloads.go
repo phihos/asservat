@@ -128,8 +128,9 @@ func (k *InstallerContinuation) downloadRegion() string {
 }
 
 // downloadClients are the download environment's clients: every human client
-// of the installer's identity settings, for the context captures' data,
-// privacy class, evidence type and the retention baseline's purpose, with no
+// of the installer's identity settings, for the context captures' data
+// classes (raw only reaches a client through its approved grant child,
+// ADR-279), privacy class, evidence type and the retention baseline's purpose, with no
 // path yet; joining a cluster adds its derived path (ADR-204 decision 4).
 // Without a baseline no capture resolves a purpose, so there is no client.
 func downloadClients(p contracts.InstallerPublicSettings) []contracts.DownloadEnvironmentClient {
@@ -141,7 +142,7 @@ func downloadClients(p contracts.InstallerPublicSettings) []contracts.DownloadEn
 		if c.Kind != string(identity.Human) {
 			continue
 		}
-		out = append(out, contracts.DownloadEnvironmentClient{Issuer: p.Issuer, ID: c.ID, Kind: c.Kind, DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"},
+		out = append(out, contracts.DownloadEnvironmentClient{Issuer: p.Issuer, ID: c.ID, Kind: c.Kind, DataClasses: []string{"metadata", "raw"}, PrivacyClasses: []string{"potentialPersonalData"},
 			EvidenceTypes: []string{"context", "packetCapture", "syscallTrace"}, Purposes: []string{p.RetentionBaseline.PurposeRef}, PathIDs: []string{}})
 	}
 	return out

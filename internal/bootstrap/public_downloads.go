@@ -95,7 +95,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, mounts.ErrUnavailable
 	}
 	gate := authapp.ContextDownloadAuthority{RootID: root, Identities: d.publicID.download, Permissions: pc.permissions, Catalog: pc.catalog, Retention: pc.retention,
-		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: pc.recovery, Processing: processingReads, Now: time.Now}, Shares: pc.shares, Reviews: pc.reviews, Now: time.Now}
+		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: pc.recovery, Processing: processingReads, Now: time.Now}, Shares: pc.shares, Reviews: pc.reviews, RawResults: pc.grants, Now: time.Now}
 
 	makeDownloads := func(purpose string) (*postgres.Downloads, error) {
 		return postgres.NewDownloads(ctx, sql[purpose], root, g)
@@ -277,10 +277,10 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	}
 	services, err := NewContextNativeDownloadRuntime(d.Runtime, workers, preparations, configuration, first, responses, evidence.ContextNativeRuntimeConfig{
 		Profile: profile, Dispatcher: dispatch, Sources: downloads, Authority: gate,
-		Audit: a.downloadObjects(), Acknowledgements: audits,
+		Audit: a.downloadObjects(), Acknowledgements: audits, RawResults: pc.grants,
 		Native: evidence.NativeAttachmentConfig{KeyScope: scope, Fences: native, Origins: d.shared.origins, PreparationKeys: prepKeys, WindowKeys: windowKeys, Authority: gate, Now: time.Now, NewID: ownerRandomID},
 		Now:    time.Now, NewID: ownerRandomID},
-		evidence.DownloadResponseTransfer{Objects: windows, Audit: audits, NewResponseAuthority: func(ctx context.Context, scope artifact.DownloadScope) (evidence.CurrentDownloadAuthority, func(), error) {
+		evidence.DownloadResponseTransfer{Objects: windows, Audit: audits, RawResults: pc.grants, NewResponseAuthority: func(ctx context.Context, scope artifact.DownloadScope) (evidence.CurrentDownloadAuthority, func(), error) {
 			owned, err := gate.NewDownloadResponse(ctx, scope)
 			if err != nil {
 				return nil, nil, err
