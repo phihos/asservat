@@ -46,7 +46,7 @@ func TestPacketSourceQuietExpiryAndStaleTimerJoinBeforeRelease(t *testing.T) {
 		<-join
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, clock.now, b, bmu, nil)
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, clock.now, b, bmu, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestPacketSourceQuietRingExpiryAndWireDebitBeforeDiscard(t *testing.T) {
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, clock.now, b, bmu, nil)
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, clock.now, b, bmu, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestPacketSourceNaturalStopRetainsBoundedHistoryButCannotRenew(t *testing.T
 	b, bmu := sourceOwnerBudget(t, now)
 	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, func(context.Context, string, int, func(gadget.Frame), func(gadget.InputNotice)) (gadget.CaptureStats, error) {
 		return gadget.CaptureStats{}, nil
-	}, clock.now, b, bmu, nil)
+	}, clock.now, b, bmu, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +199,7 @@ func TestPacketSourceCopiedWindowKeepsIndependentFrozenReservation(t *testing.T)
 		close(ready)
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
-	}, clock.now, b, bmu, nil)
+	}, clock.now, b, bmu, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestPacketSourceRejectsUnknownTimestampAfterWireDebit(t *testing.T) {
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, func() time.Time { return now }, b, bmu, nil)
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, func() time.Time { return now }, b, bmu, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +288,7 @@ func TestPacketSourceUnknownNoticeInvalidatesAdmittedSnapshotCoverage(t *testing
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, func() time.Time { return now }, b, bmu, nil)
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, nil, engine, func() time.Time { return now }, b, bmu, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}

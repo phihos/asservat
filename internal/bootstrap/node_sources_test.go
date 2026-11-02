@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/adapters/packets"
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"context"
 	"sync"
@@ -100,5 +101,46 @@ func TestNodeSourceReportKeepsNaturalStopAfterSourceSetAsOf(t *testing.T) {
 	got := <-done
 	if len(got.sources) != 1 || !got.asOf.Equal(start) || !got.sources[0].SourceStoppedAt.Equal(stop) || !got.sources[0].Valid(got.asOf) {
 		t.Fatal("actual stop was rejected or restamped to set timestamp", got)
+	}
+}
+
+// ADR-278: an encrypted-disk source is refused with MediumUnavailable when the
+// node has no ring volume, and reserves only resident memory when it has one.
+func TestNodeSourceEncryptedDiskMedium(t *testing.T) {
+	for _, mounted := range []bool{false, true} {
+		now := time.Now().UTC()
+		clock := &packetRingClock{at: now}
+		permit := sourceOwnerPermit(now)
+		resource := collector.SourceResources{PolicyUID: "resource-policy"}
+		permit.Binding.ResourceDigest = deliveryapp.SourceResourcesDigest(resource)
+		b, bmu := sourceOwnerBudget(t, now)
+		dir := ""
+		if mounted {
+			dir = t.TempDir()
+		}
+		n := &nodeSources{ringDir: dir, now: clock.now, budget: b, budgetMu: bmu, available: true, identity: func() collector.Identity {
+			return collector.Identity{NodeUID: permit.Binding.NodeUID, PodUID: permit.Binding.CollectorPodUID, BootID: permit.Binding.BootID, Epoch: permit.Binding.CollectorEpoch}
+		}, engine: func(ctx context.Context, _ string, _ int, _ func(gadget.Frame), _ func(gadget.InputNotice)) (gadget.CaptureStats, error) {
+			<-ctx.Done()
+			return gadget.CaptureStats{}, ctx.Err()
+		}}
+		l := sourceOwnerLimits()
+		source := collector.PacketSource{Permit: permit, Resources: resource, Ring: collector.SourceRingLimits{MaxAge: l.MaxAge, MaxBytes: l.MaxBytes, SegmentBytes: l.SegmentBytes, MaxSegments: l.MaxSegments, MaxFrozenBytes: l.MaxFrozenBytes, MaxConcurrentSnapshots: l.MaxConcurrentSnapshots, EncryptedDisk: true}}
+		arm := collector.Work{ID: permit.Binding.SourceID, Sequence: 1, Kind: collector.WorkPacketSource, NotAfter: permit.DispatchUntil, Source: &source}
+		r := n.decide(t.Context(), permit.Binding.CollectorEpoch, arm)
+		if !mounted {
+			if r.Reason != collector.ReasonMediumUnavailable {
+				t.Fatal("unmounted", r)
+			}
+			n.Close()
+			continue
+		}
+		if r.Outcome != collector.OutcomeAccepted {
+			t.Fatal("mounted", r)
+		}
+		if got := n.sources[permit.Binding.SourceID].ring.State().LiveBytes; got != packets.MemoryRingBytes(l, true) {
+			t.Fatal("resident bytes", got)
+		}
+		n.Close()
 	}
 }

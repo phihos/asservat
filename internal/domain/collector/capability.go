@@ -139,12 +139,15 @@ const (
 	ReasonFilterUnsupported Reason = "FilterUnsupported"
 	ReasonCaptureBusy       Reason = "CaptureBusy"
 	ReasonCaptureFailed     Reason = "CaptureFailed"
+	// ReasonMediumUnavailable: the plan asks for the encrypted-disk ring and
+	// the node has no administrator ring volume, or it failed (ADR-278).
+	ReasonMediumUnavailable Reason = "MediumUnavailable"
 )
 
 func (r Reason) Valid() bool {
 	switch r {
 	case ReasonKernelTooOld, ReasonBTFMissing, ReasonCgroupV1, ReasonBPFUnavailable, ReasonNoTrafficHook, ReasonTracingUnavailable, ReasonHostProcessesHidden, ReasonRuntimeUnknown, ReasonEngineUnavailable, ReasonRecorderNotImplemented, ReasonWorkExpired, ReasonWorkUnknown,
-		ReasonTargetNotFound, ReasonTargetHostNet, ReasonFilterUnsupported, ReasonCaptureBusy, ReasonCaptureFailed:
+		ReasonTargetNotFound, ReasonTargetHostNet, ReasonFilterUnsupported, ReasonCaptureBusy, ReasonCaptureFailed, ReasonMediumUnavailable:
 		return true
 	}
 	return false

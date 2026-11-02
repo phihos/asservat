@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/adapters/syscalls"
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -17,6 +18,9 @@ import (
 // collection authority. Initial replay tombstones survive their original start
 // cutoff; a later renewal cannot construct a replacement engine.
 type nodeSources struct {
+	// ringDir is the mounted administrator ring volume; empty means the
+	// encrypted-disk medium is unavailable on this node (ADR-278).
+	ringDir    string
 	snapshots  map[string]*nodeSourceSnapshot
 	snapshotWG sync.WaitGroup
 	log        func(string)
@@ -168,8 +172,20 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 		return r
 	}
 	p := source.Ring
+	dir := ""
+	if p.EncryptedDisk {
+		if n.ringDir == "" {
+			r.Reason = collector.ReasonMediumUnavailable
+			return r
+		}
+		dir = n.ringDir
+	}
 	limits := packets.RingLimits{MaxAge: p.MaxAge, MaxBytes: p.MaxBytes, SegmentBytes: p.SegmentBytes, MaxFrozenBytes: p.MaxFrozenBytes, MaxSegments: p.MaxSegments, MaxConcurrentSnapshots: p.MaxConcurrentSnapshots}
-	s, err := newPacketSource(parent, source.Permit, source.Resources.Node, limits, source.Program, source.Syscalls, engine, n.now, n.budget, n.budgetMu, n.log)
+	s, err := newPacketSource(parent, source.Permit, source.Resources.Node, limits, source.Program, source.Syscalls, engine, n.now, n.budget, n.budgetMu, n.log, dir)
+	if errors.Is(err, packets.ErrMediumUnavailable) {
+		r.Reason = collector.ReasonMediumUnavailable
+		return r
+	}
 	if err != nil {
 		r.Reason = collector.ReasonCaptureBusy
 		return r

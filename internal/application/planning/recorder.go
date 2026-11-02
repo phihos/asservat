@@ -458,10 +458,10 @@ func validRing(path string, r ring, before time.Duration) error {
 	switch {
 	case !ok || age > maxRingAge:
 		return refuse(value.CompositionInvalid, path+".maxAge", "the ring age must be a duration of at most 1h")
-	case r.Medium == "encryptedDisk":
-		return refuse(value.CompositionInvalid, path+".medium", "the encrypted-disk ring medium is not available in this release; use memory")
-	case r.Medium != "memory" || r.StorageProfileRef != "":
-		return refuse(value.CompositionInvalid, path+".medium", "the ring medium must be memory")
+	case r.StorageProfileRef != "":
+		return refuse(value.CompositionInvalid, path+".storageProfileRef", "ring storage profiles are not available in this release; use medium encryptedDisk, which uses the administrator's node ring volume")
+	case r.Medium != "memory" && r.Medium != "encryptedDisk":
+		return refuse(value.CompositionInvalid, path+".medium", "the ring medium is memory or encryptedDisk")
 	case r.MaxSegments < 2 || r.MaxSegments > 64:
 		return refuse(value.CompositionInvalid, path+".maxSegments", "a ring has 2 to 64 segments")
 	case r.MaxBytes < 1 || r.MaxBytes > maxRingBytes:
@@ -917,6 +917,9 @@ func normalizedRecorderAction(x expandedAction, componentID string) (recipeActio
 		rr = s.Ring
 	}
 	summary.RingMaxAge, summary.RingMaxBytes, summary.SegmentBytes, summary.MaxSegments = rr.MaxAge, rr.MaxBytes, rr.SegmentBytes, rr.MaxSegments
+	if rr.Medium == "encryptedDisk" {
+		summary.RingMedium = rr.Medium
+	}
 	if encoded, err := json.Marshal(params); err != nil {
 		return recipeAction{}, value.RecorderAction{}, nil, value.ErrInvalid
 	} else {

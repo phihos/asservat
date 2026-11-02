@@ -997,7 +997,8 @@
         "installationID",
         "clusterID",
         "connector",
-        "ceilings"
+        "ceilings",
+        "ringDisk"
       ],
       "description": "ADR-246: the asservat node collector DaemonSet (off by default; disposable-host guard).",
       "properties": {
@@ -1130,6 +1131,23 @@
               }
             }
           ]
+        },
+        "ringDisk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "sizeLimit"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "sizeLimit": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*(Mi|Gi)$"
+            }
+          }
         }
       }
     }

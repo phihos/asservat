@@ -177,3 +177,11 @@ collector:
     frozenBytes: 268435456
     uploadBytesPerSecond: 33554432
     uploadBurstBytes: 67108864
+  # Optional encrypted-disk ring medium (ADR-278). When enabled, the collector
+  # gets a node-local emptyDir of at most sizeLimit; ring segments beyond the
+  # one being written are sealed there with a per-ring in-memory key, so a
+  # restart makes them unreadable. Plans asking for ring.medium encryptedDisk
+  # are refused with MediumUnavailable while this is disabled.
+  ringDisk:
+    enabled: false
+    sizeLimit: 1Gi

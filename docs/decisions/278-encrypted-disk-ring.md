@@ -38,5 +38,14 @@ baseline and default.
 Benefit: rings beyond node memory for long ongoing history (uncommon; spec
 option). Cost: one opt-in Helm value and volume, one storage mode in the ring,
 one wire field; no new service, state or credentials. Disabling it is the
-default. Qualification: native restart makes old segments unreadable, byte cap
-holds, a full volume yields `MediumUnavailable`.
+default.
+
+## Qualification
+
+Unit (real files): the complete ring suite runs on both media; closing removes
+the files and the key; a tampered sealed segment is evicted as a coverage gap;
+an unwritable volume closes the ring with `MediumUnavailable`; the node refuses
+an encrypted-disk source without a mounted volume and reserves one segment plus
+headers with one. `check-helm.py` renders the opt-in emptyDir as the only
+writable collector mount. A native installed run with the volume enabled
+(restart, byte cap, full volume on a real node) is still pending.

@@ -39,6 +39,8 @@ type SourceRingLimits struct {
 	MaxAge                                 time.Duration
 	MaxBytes, SegmentBytes, MaxFrozenBytes int64
 	MaxSegments, MaxConcurrentSnapshots    int
+	// EncryptedDisk selects the encrypted-disk ring medium (ADR-278).
+	EncryptedDisk bool `json:",omitempty"`
 }
 
 func (r SourceRingLimits) Valid() bool {

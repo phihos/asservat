@@ -183,7 +183,7 @@ func sourceSnapshotPipelineFixture(t *testing.T, upload packetUploader, natural 
 	}
 	limits := sourceOwnerLimits()
 	limits.MaxFrozenBytes = 65536
-	source, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, limits, nil, nil, engine, clock.now, budget, mu, nil)
+	source, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, limits, nil, nil, engine, clock.now, budget, mu, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}

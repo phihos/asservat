@@ -49,7 +49,7 @@ type packetSource struct {
 	log func(string)
 }
 
-func newPacketSource(parent context.Context, permit collector.SourcePermit, lowering collector.PolicyLimits, limits packets.RingLimits, program []planning.BPFInstruction, syscallFilter *collector.SyscallFilter, engine observedPacketEngine, now func() time.Time, budget *collector.Budget, budgetMu *sync.Mutex, log func(string)) (*packetSource, error) {
+func newPacketSource(parent context.Context, permit collector.SourcePermit, lowering collector.PolicyLimits, limits packets.RingLimits, program []planning.BPFInstruction, syscallFilter *collector.SyscallFilter, engine observedPacketEngine, now func() time.Time, budget *collector.Budget, budgetMu *sync.Mutex, log func(string), ringDir string) (*packetSource, error) {
 	if parent == nil || parent.Err() != nil || engine == nil || now == nil || budget == nil || budgetMu == nil || !permit.Startable(now()) {
 		return nil, collector.ErrInvalid
 	}
@@ -68,7 +68,9 @@ func newPacketSource(parent context.Context, permit collector.SourcePermit, lowe
 	}
 	// One-second burst is the existing wire-token rule. Ring physical bytes
 	// include all fixed segment framing and are reserved before allocation.
-	r := collector.SourceReservation{RingBytes: int64(limits.MaxSegments) * limits.SegmentBytes, InputBytesPerSecond: permit.BytesPerSecond, InputBurstBytes: permit.BytesPerSecond}
+	// On the encrypted-disk medium only one segment and the headers are
+	// resident (ADR-278); disk bytes are bounded by the ring volume.
+	r := collector.SourceReservation{RingBytes: packets.MemoryRingBytes(limits, ringDir != ""), InputBytesPerSecond: permit.BytesPerSecond, InputBurstBytes: permit.BytesPerSecond}
 	if limits.MaxSegments < 2 || limits.MaxSegments > 64 || limits.SegmentBytes <= 0 || limits.SegmentBytes > 64<<20 {
 		return nil, collector.ErrInvalid
 	}
@@ -80,7 +82,7 @@ func newPacketSource(parent context.Context, permit collector.SourcePermit, lowe
 	}
 	release := func() { budgetMu.Lock(); defer budgetMu.Unlock(); _ = budget.ReleaseSource(r) }
 	ctx, cancel := context.WithDeadline(parent, permit.HardUntil)
-	ring, err := packets.NewRing(ctx, packets.RingBounds{StartedAt: permit.StartedAt, Until: permit.HardUntil}, limits, program)
+	ring, err := packets.NewRingOn(ctx, packets.RingBounds{StartedAt: permit.StartedAt, Until: permit.HardUntil}, limits, program, ringDir)
 	if err != nil {
 		cancel()
 		release()

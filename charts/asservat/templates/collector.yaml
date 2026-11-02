@@ -149,7 +149,15 @@ spec:
             - { name: debugfs, mountPath: /sys/kernel/debug, readOnly: true }
             - { name: tracefs, mountPath: /sys/kernel/tracing, readOnly: true }
             - { name: bpffs, mountPath: /sys/fs/bpf, readOnly: true }
+            {{- if $c.ringDisk.enabled }}
+            - { name: ring-disk, mountPath: /var/lib/asservat-ring }
+            {{- end }}
       volumes:
+        {{- if $c.ringDisk.enabled }}
+        # ADR-278: node-local, size-limited; only sealed ring segments.
+        - name: ring-disk
+          emptyDir: { sizeLimit: {{ $c.ringDisk.sizeLimit | quote }} }
+        {{- end }}
         - name: input
           configMap:
             name: {{ printf "%s-input.%s" $name (trunc 32 $digest) }}

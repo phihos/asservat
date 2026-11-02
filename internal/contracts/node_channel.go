@@ -26,6 +26,9 @@ const (
 	// hostPath of type File keeps the Pod from starting, unless the host
 	// carries this file. Only disposable CI runners and VM images create it.
 	NodeDisposableHostGuard = "/etc/asservat-disposable-host"
+	// NodeRingDiskPath is the administrator\'s optional collector ring volume;
+	// the encrypted-disk ring medium is available only while it is mounted (ADR-278).
+	NodeRingDiskPath = "/var/lib/asservat-ring"
 
 	NodeEnrollFormat = "asservat-node-enroll/v1"
 	NodePollFormat   = "asservat-node-poll/v1"
@@ -190,6 +193,7 @@ type NodeSourceRingLimits struct {
 	MaxFrozenBytes         int64 `json:"maxFrozenBytes"`
 	MaxSegments            int   `json:"maxSegments"`
 	MaxConcurrentSnapshots int   `json:"maxConcurrentSnapshots"`
+	EncryptedDisk          bool  `json:"encryptedDisk,omitempty"`
 }
 
 // NodePacketCapture is one manual networkHeaders capture of one Pod. Program

@@ -53,7 +53,7 @@ func TestSyscallSourceRetainsPairedCallsAndDropsOverRateAsGap(t *testing.T) {
 		<-ctx.Done()
 		return gadget.CaptureStats{}, ctx.Err()
 	}
-	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, filter, syscallEngine(trace, nil, false, 16), clock.now, b, bmu, nil)
+	s, err := newPacketSource(t.Context(), p, collector.PolicyLimits{}, sourceOwnerLimits(), nil, filter, syscallEngine(trace, nil, false, 16), clock.now, b, bmu, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestSyscallSourceRetainsPairedCallsAndDropsOverRateAsGap(t *testing.T) {
 
 	// A packet permit cannot start a syscall source.
 	packetPermit := sourceOwnerPermit(now)
-	if _, err := newPacketSource(t.Context(), packetPermit, collector.PolicyLimits{}, sourceOwnerLimits(), nil, filter, syscallEngine(trace, nil, false, 16), clock.now, b, bmu, nil); err == nil {
+	if _, err := newPacketSource(t.Context(), packetPermit, collector.PolicyLimits{}, sourceOwnerLimits(), nil, filter, syscallEngine(trace, nil, false, 16), clock.now, b, bmu, nil, ""); err == nil {
 		t.Fatal("syscall source started on a packet program digest")
 	}
 }

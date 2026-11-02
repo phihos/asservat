@@ -75,12 +75,18 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 		assessed := value.RecorderActionAssessment{ActionID: a.ID, ExecutionMode: a.ExecutionMode, Retention: retention}
 		assessed.Retention.PolicyDigests = append([]artifact.Digest(nil), digests...)
 		ringPhase, ringScope := "perIncident", "perIncidentPod"
+		// ADR-278: on the encrypted-disk medium only one segment and the
+		// headers stay in collector memory; the rest is node disk.
+		ringMemory, ringRef := a.RingMaxBytes, "action:"+a.ID+":ring.maxBytes"
+		if a.RingMedium == "encryptedDisk" {
+			ringMemory, ringRef = a.SegmentBytes+int64(a.MaxSegments)*32, "action:"+a.ID+":ring.segmentBytes"
+		}
 		if a.ExecutionMode == "ongoing" {
 			ringPhase, ringScope = "whileArmed", "perObservationPod"
 			out.ObservationPods = 1
-			ringArmed += a.RingMaxBytes
+			ringArmed += ringMemory
 		} else {
-			ringIncident += a.RingMaxBytes
+			ringIncident += ringMemory
 		}
 		frozen += a.MaxFrozenBytes
 		limit := a.MaxBytes
@@ -114,7 +120,7 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 		}
 		assessed.Quantities = []value.AssessmentQuantity{
 			quantity("outputBytes", "perIncident", "perIncidentPod", "action:"+a.ID+":maxBytes", outputCoverage, limit),
-			quantity("collectorMemoryBytes", ringPhase, ringScope, "action:"+a.ID+":ring.maxBytes", ringCoverage, a.RingMaxBytes),
+			quantity("collectorMemoryBytes", ringPhase, ringScope, ringRef, ringCoverage, ringMemory),
 			quantity("collectorMemoryBytes", "perIncident", "perIncidentPod", "action:"+a.ID+":maxFrozenBytes", frozenCoverage, a.MaxFrozenBytes),
 		}
 		out.Actions = append(out.Actions, assessed)

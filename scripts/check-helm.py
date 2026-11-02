@@ -415,6 +415,16 @@ def check_collector(directory):
     token = volumes["token"]["projected"]["sources"][0]["serviceAccountToken"]
     assert token == {"path": "token", "audience": "asservat-node:10000000-0000-4000-8000-000000000001", "expirationSeconds": 600}
     assert pod["serviceAccountName"] == account["metadata"]["name"] == ds["metadata"]["name"] == "asservat-node"
+    # ADR-278: the optional ring volume is a size-limited emptyDir and the
+    # only writable collector mount; it is absent unless enabled.
+    assert "ring-disk" not in volumes
+    disk = json.loads(json.dumps(base))
+    disk["collector"]["ringDisk"] = {"enabled": True, "sizeLimit": "2Gi"}
+    disk_pod = next(r for r in render(disk) if r["kind"] == "DaemonSet")["spec"]["template"]["spec"]
+    disk_volumes = {v["name"]: v for v in disk_pod["volumes"]}
+    assert disk_volumes["ring-disk"] == {"name": "ring-disk", "emptyDir": {"sizeLimit": "2Gi"}}, disk_volumes.get("ring-disk")
+    writable = [m for m in disk_pod["containers"][0]["volumeMounts"] if not m.get("readOnly")]
+    assert writable == [{"name": "ring-disk", "mountPath": "/var/lib/asservat-ring"}], writable
     # Default: nothing of the collector renders.
     default = render({"mode": "cluster"})
     assert not any(r["kind"] in ("DaemonSet", "Namespace") for r in default)
