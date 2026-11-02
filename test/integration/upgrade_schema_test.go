@@ -109,7 +109,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	if e = conn.QueryRow(ctx, sourceDefinitions).Scan(&originalSourceValidator, &originalMonotonic); e != nil {
 		t.Fatal("previous source definitions", e)
 	}
-	// Migration 121 (ADR-282 slice 5) replaces these functions only.
+	// Migration 122 (ADR-282 slice 5) replaces these functions only.
 	const queryDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.operation_audit_human_input_valid(text,text)','public.guard_operation_audit()','public.context_query_intent_current(uuid,uuid,jsonb,uuid,jsonb)','public.context_query_outcome_closed(uuid,uuid,jsonb,uuid)','public.guard_context_query_account()','public.guard_context_query()','public.guard_context_query_child()']) f`
 	var originalQueryFunctions string
 	if e = conn.QueryRow(ctx, queryDefinitions).Scan(&originalQueryFunctions); e != nil {
@@ -205,7 +205,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		t.Log("resource projection Down restored exact validators and unchanged trust; Up restored104; no old-decoder rollback qualification")
 	}
-	if head == 121 {
+	if head == 122 {
 		// The extract scope reserves two units and one read batch, admits
 		// get_http_headers as its begin tool and needs its record window; a
 		// stored pod-status scope keeps one unit, two batches and
@@ -236,7 +236,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
 			t.Fatal("http header query Up after Down", from, to, e)
 		}
-		t.Log("http header query functions: units/batches/tool/source pinned; Down restored exact functions; Up restored 121")
+		t.Log("http header query functions: units/batches/tool/source pinned; Down restored exact functions; Up restored 122")
 	}
 	// A version this binary does not know is refused, not skipped.
 	if _, e = conn.Exec(ctx, "INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", head+1); e != nil {

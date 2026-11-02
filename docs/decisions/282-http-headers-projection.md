@@ -213,7 +213,7 @@ pod-status queries keep their DTO, payload and outputs unchanged. Each page
 is its own query, so a cursor reauthorizes completely. The slice 4
 synchronous service and the separate `HTTPHeaderReadAuthority` are removed.
 
-Migration 00121 (schema 121) changes functions only: `get_http_headers`
+Migration 00122 (schema 122) changes functions only: `get_http_headers`
 audits as `context-query-input/v1` with the 20 s evidence-read request
 window; the intent/outcome facets accept it; the call guard requires it as
 the begin tool of an `httpHeaders` scope (polls stay `get_query_result`); a
