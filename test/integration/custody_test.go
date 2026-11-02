@@ -588,6 +588,9 @@ func TestCustodyWithRealServices(t *testing.T) {
 	t.Run("remote native window within one frame (ADR-248)", func(t *testing.T) {
 		qualifyRemoteNativeWindow(t, ctx, store)
 	})
+	t.Run("Go profile native types (ADR-284)", func(t *testing.T) {
+		qualifyProfileArtifacts(t, ctx, store)
+	})
 }
 
 func qualifySchemaCompatibility(t *testing.T, ctx context.Context, admin, pool *pgxpool.Pool) {

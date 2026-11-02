@@ -1,5 +1,37 @@
 # Sustained implementation progress
 
+## Go pprof and execution-trace native types (2026-11-02)
+
+S-05 increment 1, [ADR-284](decisions/284-go-profile-native-types.md).
+Registry types `pprof` (`.pb.gz`, 64 MiB) and `goTrace` (`.trace`,
+128 MiB), class raw, kind/evidence type `profile`, media type
+`application/octet-stream`. The expectation gains `Profile` (endpoint
+acquisition facts); the manifest's `profile` block records acquisition facts
+only (`profile.schema.json` no longer requires semantic facts, finding F5).
+The connector-side producer checks only the gzip envelope and declared
+length (pprof) or a version 2 header (trace). The publisher decompresses at
+most 16 MiB, parses with `google/pprof/profile` (`CheckValid`, named sample
+types/units, bounded duration/period/mappings) and reads traces with
+`golang.org/x/exp/trace` (at most 2^25 events, version 1 refused).
+`ServedClass` still excludes profiles: no SQL publication, grant, download or
+migration change until increment 3.
+
+Verification: unit tests in `internal/adapters/diagnostics`,
+`internal/adapters/objectstore/manifest` and `internal/domain/artifact`
+pass. Fuzzing (local, 16 workers): `FuzzCheckPprof` 60 s, 475,225 execs, no
+failure; `FuzzCheckGoTrace` 60 s plus 40 s (4 workers, 508,672 execs), no
+failure. Measured parse cost: a 15.4 MB table-heavy profile peaked at about
+190 MiB sampled live heap in 0.23 s, which set the 16 MiB bound under the
+publisher's 512 MiB limit. Real S3 component run
+(`scripts/test-custody.py --run '^TestCustodyWithRealServices$/^Go_profile'`,
+selected subtest only, no cleanup failures): a runtime/pprof heap profile and
+a runtime/trace execution trace are stored, verified with the publisher's
+checks and read back byte-identical, `go tool pprof -symbolize=none -top`
+opens the read-back file; a gzip-valid corrupted profile and a truncated
+trace are refused by verification, a non-gzip response by the producer.
+Not qualified: SQL publication and download of profiles (increment 3),
+trace parse memory at 128 MiB, profiles from real endpoints on a cluster.
+
 ## Encrypted-disk ring on a real node (2026-11-02)
 
 ADR-278's pending native qualification. New suite `collector-ringdisk`

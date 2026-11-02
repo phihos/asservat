@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/profile.schema.json",
   "title": "Asservat profile metadata v1",
+  "description": "Acquisition facts recorded by the producer. An endpoint producer does not parse the response, so sampleTypes, samplePeriod, lostSamples and symbolCoverage are absent there; the publisher verifies the native bytes and queries recompute those facts (ADR-284). A producer that builds the profile itself (the eBPF sampler) may record them.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -172,6 +173,10 @@
           "minLength": 1,
           "maxLength": 63
         },
+        "endpointDigest": {
+          "description": "Digest of the resolved endpoint template, endpoint, credential audience and parameters (ADR-284).",
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+        },
         "forceGC": {
           "type": "boolean"
         },
@@ -193,6 +198,7 @@
           },
           "required": [
             "sourceRef",
+            "endpointDigest",
             "forceGC",
             "settingsKnown"
           ],
@@ -223,6 +229,11 @@
               {
                 "required": [
                   "forceGC"
+                ]
+              },
+              {
+                "required": [
+                  "endpointDigest"
                 ]
               }
             ]
@@ -256,11 +267,7 @@
     "runtime",
     "profileType",
     "mode",
-    "sampleTypes",
     "durationNanoseconds",
-    "samplePeriod",
-    "lostSamples",
-    "symbolCoverage",
     "acquisition"
   ],
   "allOf": [

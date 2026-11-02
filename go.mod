@@ -10,6 +10,7 @@ require (
 	github.com/cilium/ebpf v0.22.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/go-jose/go-jose/v4 v4.1.5
+	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50
 	github.com/google/uuid v1.6.0
 	github.com/gopacket/gopacket v1.7.4
 	github.com/inspektor-gadget/inspektor-gadget v0.57.0
@@ -24,6 +25,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/tink-crypto/tink-go/v2 v2.8.0
 	github.com/xdg-go/scram v1.2.0
+	golang.org/x/exp v0.0.0-20260824195058-e88cd73687aa
 	golang.org/x/net v0.60.0
 	golang.org/x/sys v0.48.0
 	golang.org/x/time v0.16.0
@@ -201,7 +203,6 @@ require (
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/exp v0.0.0-20260824195058-e88cd73687aa // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/diagnostics"
 	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -387,6 +388,10 @@ func (p *Publisher) publish(ctx context.Context, item postgres.PendingContextPub
 		limits, maxBytes := httpheaders.RecordingLimits(e.Recording)
 		return httpheaders.NewProjectionCheck(limits, maxBytes)
 	})
+	// ADR-284: a Go endpoint profile is decompressed and parsed within fixed
+	// bounds; an execution trace is read to its end within an event cap.
+	verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })
+	verifier.WithStreamCheck(artifact.GoTraceArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewGoTraceCheck() })
 	_, err = evidence.ContextPublisher{Ledger: p.ledger, Authority: p.gate, Verifier: verifier, Audit: p.audit, Now: time.Now}.Publish(ctx, item.CaptureID, item.Copies)
 	return err
 }

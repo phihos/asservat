@@ -9,9 +9,9 @@ import (
 )
 
 func TestNativeTypeRegistry(t *testing.T) {
-	safe := regexp.MustCompile(`^artifact-[0-9a-f-]{36}\.[a-z]+$`)
+	safe := regexp.MustCompile(`^artifact-[0-9a-f-]{36}(\.[a-z]+){1,2}$`)
 	names, formats := map[string]bool{}, map[string]bool{}
-	for _, name := range []string{PodStatusArtifact, PCAPNGArtifact, SyscallRecordsArtifact, HTTPHeadersArtifact} {
+	for _, name := range []string{PodStatusArtifact, PCAPNGArtifact, SyscallRecordsArtifact, HTTPHeadersArtifact, PprofArtifact, GoTraceArtifact} {
 		nt, ok := LookupNativeType(name)
 		if !ok || names[nt.Name] || formats[nt.Format] || nt.MaxBytes < 1 || nt.MaxBytes > StreamingNativeLimit || len(nt.DataClasses) == 0 || !safe.MatchString(nt.Filename("10000000-0000-4000-8000-000000000002")) || nt.Coverage == "" {
 			t.Fatal("registry entry", name, nt)
@@ -37,6 +37,18 @@ func TestNativeTypeRegistry(t *testing.T) {
 	httpType, _ := LookupNativeType(HTTPHeadersArtifact)
 	if httpType.MediaType == pcap.MediaType || httpType.Extension == pcap.Extension {
 		t.Fatal("HTTP header JSON would be labelled as a packet capture")
+	}
+	// ADR-284: both Go endpoint types are raw profiles under the media type
+	// net/http/pprof serves, with distinct local filename extensions.
+	pprofType, _ := LookupNativeType(PprofArtifact)
+	traceType, _ := LookupNativeType(GoTraceArtifact)
+	if pprofType.Kind != "profile" || traceType.Kind != "profile" || pprofType.MediaType != "application/octet-stream" || traceType.MediaType != pprofType.MediaType ||
+		pprofType.Extension != ".pb.gz" || traceType.Extension != ".trace" || !pprofType.AllowsClass("raw") || pprofType.AllowsClass("metadata") || !traceType.AllowsClass("raw") ||
+		pprofType.MaxBytes != 64<<20 || traceType.MaxBytes != 128<<20 || pprofType.DownloadLimit() != RemoteNativeLimit {
+		t.Fatal("profile types", pprofType, traceType)
+	}
+	if !GoTraceHeader([]byte("go 1.22 trace\x00\x00\x00")) || !GoTraceHeader([]byte("go 1.99 trace\x00\x00\x00")) || GoTraceHeader([]byte("go 1.21 trace\x00\x00\x00")) || GoTraceHeader([]byte("go 1.2a trace\x00\x00\x00")) || GoTraceHeader([]byte("go 1.26 trace\x00\x00")) {
+		t.Fatal("trace header rule")
 	}
 	if _, ok := LookupNativeType("core"); ok {
 		t.Fatal("unregistered type accepted")

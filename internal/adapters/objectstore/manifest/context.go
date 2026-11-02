@@ -183,6 +183,44 @@ type contextDTO struct {
 	CollectionProvenance   originDTO                  `json:"collectionProvenance"`
 	ActionLifecycle        lifecycleDTO               `json:"actionLifecycle"`
 	StorageObjects         storageDTO                 `json:"storageObjects"`
+	Profile                *profileDTO                `json:"profile,omitempty"`
+}
+
+// profileDTO records a Go endpoint profile's acquisition facts
+// (profile.schema.json, ADR-284). Sample types, period and symbol coverage
+// are omitted: the wrapping producer does not parse the response.
+type profileDTO struct {
+	SchemaVersion       string                `json:"schemaVersion"`
+	Format              string                `json:"format"`
+	Runtime             string                `json:"runtime"`
+	ProfileType         string                `json:"profileType"`
+	Mode                string                `json:"mode"`
+	DurationNanoseconds *int64                `json:"durationNanoseconds"`
+	Acquisition         profileAcquisitionDTO `json:"acquisition"`
+}
+
+type profileAcquisitionDTO struct {
+	Mechanism      string `json:"mechanism"`
+	SourceRef      string `json:"sourceRef"`
+	EndpointDigest string `json:"endpointDigest"`
+	ForceGC        bool   `json:"forceGC"`
+	SettingsKnown  bool   `json:"settingsKnown"`
+}
+
+func profileDocument(e artifact.ContextExpectation) *profileDTO {
+	p := e.Profile
+	if p == nil {
+		return nil
+	}
+	var duration *int64
+	if p.DurationMillis > 0 {
+		d := p.DurationMillis * 1_000_000
+		duration = &d
+	}
+	// The endpoint applies the application's own sampling settings, which
+	// the HTTP response does not report.
+	return &profileDTO{SchemaVersion: "profile/v1", Format: e.Type().Format, Runtime: "go", ProfileType: p.Type, Mode: p.Mode, DurationNanoseconds: duration,
+		Acquisition: profileAcquisitionDTO{Mechanism: "endpoint", SourceRef: p.SourceRef, EndpointDigest: hash(p.EndpointDigest), ForceGC: p.ForceGC}}
 }
 
 func hash(h artifact.Digest) string { return hex.EncodeToString(h[:]) }
@@ -261,6 +299,7 @@ func contextDocument(e artifact.ContextExpectation, l artifact.Layout, c artifac
 		AccessProvenance: accessDTO{e.NamespaceUID, assignments}, Privacy: privacyDTO{"potentialPersonalData", t.EvidenceType, e.PurposeRef, "default"},
 		Retention:            retentionDTO{r.AnchorAt.UTC(), "acquisition", e.RequestedAgeSeconds, e.MaximumAgeSeconds, e.DeletionBudgetSeconds, r.DeleteBy.UTC(), rules},
 		CollectionProvenance: originDTO{e.CaptureUID, e.ActionID, hash(e.PlanDigest)}, ActionLifecycle: lifecycle(e), StorageObjects: storageDTO{identity(c[0]), identity(c[1])},
+		Profile: profileDocument(e),
 	}, nil
 }
 
