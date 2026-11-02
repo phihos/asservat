@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,8 @@ type recorderFixture struct {
 	composition *planning.ProfileComposition
 	compileErr  error
 	access      *authorization.ResultAccess
+	// resolved supplies namespace catalog profiles (the service reads them).
+	resolved []planning.CatalogProfile
 }
 
 type oneInstruction struct{}
@@ -36,6 +39,11 @@ func (oneInstruction) CompileFilter(string) (planning.CompiledFilter, error) {
 }
 
 func (f *recorderFixture) PreviewComposition(_ context.Context, _ identities.CurrentIdentity, in value.ContextIntent) (app.RecorderPreviewResult, error) {
+	if f.resolved != nil {
+		c := in.Composition.Clone()
+		c.Resolved = f.resolved
+		in.Composition = c
+	}
 	f.composition = in.Composition
 	now := f.i.VerifiedAt
 	target := targets.PodResolution{Request: targets.Request{ClusterID: in.Target.ClusterID, Namespace: configuration.NamespaceRef{Name: in.Target.Namespace, UID: "ns"}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload"}, PodName: "api-a", PodUID: "pod"}, Pin: artifact.PinnedPod{Namespace: in.Target.Namespace, NamespaceUID: "ns", Name: "api-a", UID: "pod", NodeName: "worker", ControllerUID: "rs"}, NodeUID: "node", NodeBootID: "00000000-0000-4000-8000-000000000006", PodResourceVersion: "1", WorkloadResourceVersion: "2", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
@@ -283,5 +291,33 @@ func TestRecorderPreviewOperationalFailureIsTypedUnavailable(t *testing.T) {
 	}
 	if err != nil || json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "error" || envelope.Data.Code != "NotAvailable" || !envelope.Data.Retryable || envelope.Data.PreviewID != "" || envelope.Data.Approval {
 		t.Fatal("operational failure became a reviewable or terminal preview", err, string(reply.Body))
+	}
+}
+
+// ADR-282: a finite manual httpHeaders preview from a namespace profile
+// renders within the preview_capture output contract.
+func TestHTTPHeadersPreviewWire(t *testing.T) {
+	s, f := recorderOperations(t, true)
+	raw, err := os.ReadFile("../../application/planning/profiles/network-connections-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err = json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["name"] = "http-capture"
+	action := doc["definition"].(map[string]any)["recipe"].(map[string]any)["actions"].([]any)[0].(map[string]any)
+	action["parameters"].(map[string]any)["profile"] = map[string]any{"kind": "httpHeaders", "protocol": "http1", "projectionRef": map[string]any{"name": "http-response-headers", "version": "v1"}, "maxFlows": 1024, "maxHeaderBytes": 32768, "maxReassemblyBytesPerFlow": 262144, "maxReassemblyBytes": 16777216, "idleTimeout": "30s"}
+	action["impact"] = "sensitiveRead"
+	document, _ := json.Marshal(doc)
+	f.resolved = []planning.CatalogProfile{{Ref: planning.ProfileRef{Catalog: "namespace", Name: "http-capture", Version: "v1"}, SourceClusterID: "00000000-0000-4000-8000-000000000001", SourceNamespaceUID: "ns", SourceUID: "http-uid", Document: document, Enabled: true}}
+	in := `{` + wireTarget + `,"requested_retention_seconds":3600,"profile_composition":{"components":[{"id":"http","profileRef":{"catalog":"namespace","name":"http-capture","version":"v1"},"overrides":[{"actionID":"sample","field":"packetFilter","value":"tcp port 8080"},{"actionID":"sample","field":"actionExecutionMode","value":"onTrigger"},{"actionID":"sample","field":"packetBefore","value":"0s"},{"actionID":"sample","field":"packetAfter","value":"5s"},{"actionID":"sample","field":"actionTimeout","value":"15s"}]}],"maxTotalBytes":16777216,"maxDuration":"15s"}}`
+	reply, err := s.Call(t.Context(), f, "preview_capture", []byte(in))
+	if err != nil {
+		t.Fatal("preview_capture", err)
+	}
+	if !strings.Contains(string(reply.Body), `"status":"ok"`) {
+		t.Fatalf("http preview: %s", reply.Body)
 	}
 }
