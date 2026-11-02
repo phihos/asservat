@@ -310,7 +310,6 @@ func CheckRaw(src io.Reader, limits RawLimits) (int, error) {
 	if err != nil {
 		return 0, ErrRawOverCap
 	}
-	d := newDecoder()
 	count := 0
 	for {
 		data, ci, err := r.ReadPacketData()
@@ -326,11 +325,53 @@ func CheckRaw(src io.Reader, limits RawLimits) (int, error) {
 				return count, ErrRawOverCap
 			}
 		}
-		if _, drop := d.headerLength(data); drop == DropNone && len(data) > limits.cap(d.decoded[2]) {
+		if c, ok := rawFrameCap(data, limits); !ok || len(data) > c {
 			return count, ErrRawOverCap
 		}
 		count++
 	}
+}
+
+// rawFrameCap classifies a stored raw frame from its own Ethernet and IP
+// header bytes, as the recorder retained it: the cap of its transport, or the
+// frame's length when it ends inside those headers (header bytes only). A
+// frame the recorder never retains (another ethertype, a fragment, IPv6
+// extension headers or another transport) is refused.
+func rawFrameCap(b []byte, l RawLimits) (int, bool) {
+	if len(b) < 14 {
+		return len(b), true
+	}
+	var proto byte
+	switch uint16(b[12])<<8 | uint16(b[13]) {
+	case 0x0800:
+		if len(b) < 14+20 || len(b) < 14+int(b[14]&0x0f)*4 {
+			return len(b), true
+		}
+		if (uint16(b[20])<<8|uint16(b[21]))&0x3fff != 0 {
+			return 0, false // more-fragments flag or a fragment offset
+		}
+		if proto = b[23]; proto == 58 {
+			return 0, false
+		}
+	case 0x86dd:
+		if len(b) < 14+40 {
+			return len(b), true
+		}
+		if proto = b[20]; proto == 1 {
+			return 0, false
+		}
+	default:
+		return 0, false
+	}
+	switch proto {
+	case 6:
+		return l.cap(layers.LayerTypeTCP), true
+	case 17:
+		return l.cap(layers.LayerTypeUDP), true
+	case 1, 58:
+		return l.cap(layers.LayerTypeICMPv4), true
+	}
+	return 0, false
 }
 
 // NewRawCheck is the streaming form of CheckRaw (see NewHeadersCheck).

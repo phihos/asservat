@@ -286,4 +286,19 @@ func TestRawRecorderKeepsCappedPrefixes(t *testing.T) {
 	if _, err := CheckHeadersOnly(bytes.NewReader(out)); err == nil {
 		t.Fatal("raw capture passed the headers-only check")
 	}
+	// Frames the recorder never retains cannot pass with up to Max bytes.
+	for _, name := range []string{"fragment", "arp", "gre", "hopbyhop"} {
+		var buf bytes.Buffer
+		w, err := pcapgo.NewNgWriterInterface(&buf, pcapgo.NgInterface{LinkType: layers.LinkTypeEthernet, SnapLength: 100, TimestampResolution: 9}, pcapgo.DefaultNgWriterOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data := c[name][:min(len(c[name]), 100)]
+		if err = w.WritePacket(gopacket.CaptureInfo{Timestamp: start, CaptureLength: len(data), Length: len(c[name])}, data); err != nil || w.Flush() != nil {
+			t.Fatal(err)
+		}
+		if _, err := CheckRaw(bytes.NewReader(buf.Bytes()), limits); err == nil {
+			t.Fatal(name, "accepted in a raw capture")
+		}
+	}
 }
