@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Cilium packet capture qualification (2026-11-02)
+
+S-04 row 17, EXP-02 subset. New native suite `collector-cilium`
+(`scripts/test-collector.py cilium`): kind without kindnet or kube-proxy,
+dual stack, Cilium 1.20.3 (checksum-pinned chart, digest-pinned images) with
+kube-proxy replacement and WireGuard. The node collector suite runs unchanged,
+then measures IPv4/IPv6 capture, Service VIP versus backend addresses on both
+sides, pod loopback visibility and hostNetwork refusal. Results and their
+limits are in docs/research/cni-qualification-cilium.md; specs/packets.md now
+states that `virtualIP` peers observe nothing at the Pod hook under socket
+load balancing. Not exercised: inter-node WireGuard (single node), other CNIs,
+NAT.
+
+Verification: native `collector-cilium` passes in runs 41519034299 and
+41519038538, `collector-packet` in 41519042815, and the measurements now
+carry positive controls: each direct, VIP and loopback request kind must have
+succeeded during the captures, so a zero VIP or loopback count is the hook's
+view rather than failed traffic. The first run (41516602345) failed only on
+the test's own too-strict hostNetwork assertion; one run failed on an in-node
+Docker Hub pull, which led to loading fixture images from the host.
+
 ## Console plan diff and Save as profile (2026-11-02)
 
 REQ-CPR-005, console only (no backend, contract or route change). A

@@ -45,9 +45,12 @@ type collectorFixture struct {
 	Pause              string `json:"pause"`
 	Busybox            string `json:"busybox"`
 	S3                 string `json:"s3"`
-	Work               string `json:"work"`
-	Results            string `json:"results"`
-	Runner             struct {
+	// CNI names the cluster network profile; "cilium" adds the S-04 row 17
+	// qualification phase. Empty is kind's default network.
+	CNI     string `json:"cni"`
+	Work    string `json:"work"`
+	Results string `json:"results"`
+	Runner  struct {
 		KernelRelease string `json:"kernelRelease"`
 		BTF           bool   `json:"btf"`
 		Cgroup2       bool   `json:"cgroup2"`
@@ -297,6 +300,9 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 
 	// 3b. ADR-248: manual networkHeaders captures through the real gadget.
 	packetCaptureNative(t, ctx, k, admin, s.Channel, second, workload, f.Busybox, f.Work, f.S3, results)
+	if f.CNI == "cilium" {
+		cniQualificationNative(t, ctx, k, s.Channel, second, workload, f.Busybox, f.Work, results)
+	}
 
 	// 3c. ADR-273: an ongoing syscall metadata source and one saved window.
 	current, _ := s.Channel.NodeByUID(second.Identity.NodeUID)

@@ -14,7 +14,14 @@ on a workstation, not even with kind.
                              tcpdump gadget with a libpcap-compiled filter
                              (ADR-248), restart epoch, Restricted negative,
                              uninstall leaves workloads
+  test-collector.py cilium   collector-cilium (S-04 row 17, EXP-02 subset):
+                             the packet suite on kind without kindnet or
+                             kube-proxy, with the pinned Cilium chart
+                             (kube-proxy replacement, WireGuard, dual stack),
+                             plus IPv4/IPv6, Service VIP vs backend, pod
+                             loopback and hostNetwork refusal measurements
 """
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -35,6 +42,10 @@ NODE = "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de
 PAUSE = "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a"
 # ADR-248: synthetic HTTP traffic between Restricted Pods (busybox httpd/wget).
 BUSYBOX = "docker.io/library/busybox@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
+# S-04 row 17: the Cilium chart, checksum-pinned; it references every image
+# by digest (Envoy and the L7 proxy are disabled, leaving agent and operator).
+CILIUM_CHART = "https://helm.cilium.io/cilium-1.20.3.tgz"
+CILIUM_CHART_SHA256 = "0805a5273118c436c9772bb9566d87ec558d8b25cc2ce5dc32918ecdd36f2c7c"
 # The evidence store of the connector path (the custody fixture's pinned image).
 SEAWEED = "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d"
 
@@ -107,7 +118,33 @@ def loaded_digest(node, tag):
     raise RuntimeError("loaded collector image not found in the kind node")
 
 
-def packet(work, report):
+def cilium(work, name, kubeconfig, report):
+    """Installs the pinned Cilium chart into the CNI-less cluster and waits for
+    the node to become Ready under it."""
+    started = time.monotonic()
+    chart = work / "cilium.tgz"
+    with urllib.request.urlopen(CILIUM_CHART, timeout=60) as r:
+        chart.write_bytes(r.read())
+    digest = hashlib.sha256(chart.read_bytes()).hexdigest()
+    if digest != CILIUM_CHART_SHA256:
+        raise RuntimeError(f"Cilium chart digest {digest} is not the pinned {CILIUM_CHART_SHA256}")
+    kc = ["--kubeconfig", str(kubeconfig)]
+    run(["helm", "install", "cilium", str(chart), "--namespace", "kube-system", *kc, "--wait", "--timeout", "5m",
+         "--set", "kubeProxyReplacement=true", "--set", f"k8sServiceHost={name}-control-plane", "--set", "k8sServicePort=6443",
+         "--set", "ipv4.enabled=true", "--set", "ipv6.enabled=true", "--set", "ipam.mode=kubernetes",
+         "--set", "encryption.enabled=true", "--set", "encryption.type=wireguard",
+         "--set", "operator.replicas=1", "--set", "envoy.enabled=false", "--set", "l7Proxy=false", "--set", "hubble.enabled=false"])
+    run(["kubectl", *kc, "wait", "--for=condition=Ready", "nodes", "--all", "--timeout=180s"])
+    status = run(["kubectl", *kc, "-n", "kube-system", "exec", "ds/cilium", "-c", "cilium-agent", "--", "cilium-dbg", "status", "-o", "json"])
+    st = json.loads(status)
+    report["cilium"] = {"seconds": round(time.monotonic() - started, 1), "chart": CILIUM_CHART, "chartSHA256": digest,
+                        "kubeProxyReplacement": st.get("kube-proxy-replacement", {}).get("mode"),
+                        "encryption": st.get("encryption", {}).get("mode"),
+                        "images": sorted(set(run(["kubectl", *kc, "-n", "kube-system", "get", "pods", "-o", "jsonpath={.items[*].spec.containers[*].image}"]).split()))}
+
+
+def packet(work, report, cni=""):
+    suite = "collector-" + (cni or "packet")
     run_id = secrets.token_hex(4)
     name = "asservat-collector-" + run_id
     env = dict(os.environ, TMPDIR=str(work), CGO_ENABLED="0")
@@ -128,15 +165,32 @@ def packet(work, report):
     run(["docker", "build", "--network=none", "--label", "asservat.test=" + run_id, "-t", tag, str(image_dir)])
     report["build"] = {"seconds": round(time.monotonic() - started, 1), "binaryBytes": (image_dir / "asservat").stat().st_size, "tags": "gadget,netgo,osusergo"}
     config = work / "kind.json"
-    config.write_text(json.dumps({"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4",
-                                  "nodes": [{"role": "control-plane", "extraMounts": [{"hostPath": str(GUARD), "containerPath": str(GUARD), "readOnly": True}]}]}))
+    cluster = {"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4",
+               "nodes": [{"role": "control-plane", "extraMounts": [{"hostPath": str(GUARD), "containerPath": str(GUARD), "readOnly": True}]}]}
+    if cni == "cilium":
+        cluster["networking"] = {"disableDefaultCNI": True, "kubeProxyMode": "none", "ipFamily": "dual"}
+    config.write_text(json.dumps(cluster))
     kubeconfig = work / "kubeconfig"
     s3name = None
     try:
         s3name, s3url = seaweed(run_id)
         started = time.monotonic()
-        run(["kind", "create", "cluster", "--name", name, "--image", NODE, "--config", str(config), "--kubeconfig", str(kubeconfig), "--wait", "120s"])
+        # Without a CNI the node only becomes Ready once Cilium runs.
+        run(["kind", "create", "cluster", "--name", name, "--image", NODE, "--config", str(config), "--kubeconfig", str(kubeconfig), *([] if cni else ["--wait", "120s"])])
+        if cni == "cilium":
+            cilium(work, name, kubeconfig, report)
         run(["kind", "load", "docker-image", tag, "--name", name])
+        # The fixture images come from the host's digest-pinned pulls, so the
+        # node never reaches a registry (an in-node Docker Hub pull on the
+        # dual-stack node failed intermittently). kind cannot load a digest
+        # reference, so each loads under a run-local tag of the same content.
+        fixtures = {}
+        for ref in (PAUSE, BUSYBOX):
+            local = "asservat-fixture/" + ref.split("@")[0].rsplit("/", 1)[-1] + ":" + ref.rsplit(":", 1)[-1][:16]
+            run(["docker", "pull", "-q", ref])
+            run(["docker", "tag", ref, local])
+            run(["kind", "load", "docker-image", local, "--name", name])
+            fixtures[ref] = "docker.io/" + local
         report["cluster"] = {"seconds": round(time.monotonic() - started, 1), "node": NODE,
                              "kubernetes": json.loads(run(["kubectl", "--kubeconfig", str(kubeconfig), "version", "-o", "json"]))["serverVersion"]["gitVersion"]}
         node = name + "-control-plane"
@@ -154,14 +208,14 @@ def packet(work, report):
         run(["kubectl", "--kubeconfig", str(kubeconfig), "apply", "-f", str(manifests)])
         fixture = {"kubeconfig": str(kubeconfig), "collectorNamespace": "asservat-collector", "daemonSet": "asservat-node", "serviceAccount": "asservat-node",
                    "installationID": INSTALLATION, "clusterID": CLUSTER, "listen": f"{gateway}:{PORT}", "serverCertificate": str(cert), "serverKey": str(key),
-                   "pause": PAUSE, "busybox": BUSYBOX, "s3": s3url, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
+                   "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
         (work / "fixture.json").write_text(json.dumps(fixture))
         started = time.monotonic()
         test = subprocess.run(["go", "test", "-tags", "libpcap", "-count=1", "-v", "-timeout", "12m", "-run", "^TestNodeCollectorWithRealKubernetes$", "./test/integration"],
                               cwd=ROOT, env=dict(env, CGO_ENABLED="1", CGO_CFLAGS=f"-I{prefix}/include", CGO_LDFLAGS=f"-L{prefix}/lib", ASSERVAT_COLLECTOR_FIXTURES=str(work / "fixture.json")))
-        for artifact_name in ("filtered", "unfiltered", "encrypted"):
+        for artifact_name in ("filtered", "unfiltered", "encrypted", "cni-backend", "cni-client"):
             if (work / (artifact_name + ".pcapng")).exists():
-                shutil.copy(work / (artifact_name + ".pcapng"), ROOT / "test/results" / ("collector-packet-" + artifact_name + ".pcapng"))
+                shutil.copy(work / (artifact_name + ".pcapng"), ROOT / "test/results" / (suite + "-" + artifact_name + ".pcapng"))
         report["testSeconds"] = round(time.monotonic() - started, 1)
         if (work / "native-results.json").exists():
             report["native"] = json.loads((work / "native-results.json").read_text())
@@ -170,18 +224,22 @@ def packet(work, report):
             subprocess.run(["kubectl", "--kubeconfig", str(kubeconfig), "-n", "asservat-collector", "logs", "-l", "app.kubernetes.io/name=asservat-node", "--tail", "200", "--prefix"])
             subprocess.run(["kubectl", "--kubeconfig", str(kubeconfig), "get", "pods", "-A", "-o", "wide"])
             subprocess.run(["kubectl", "--kubeconfig", str(kubeconfig), "-n", "asservat-collector", "describe", "pods"])
-            raise SystemExit("collector-packet failed")
+            if cni:
+                subprocess.run(["kubectl", "--kubeconfig", str(kubeconfig), "-n", "kube-system", "logs", "-l", "k8s-app=cilium", "--tail", "100", "--prefix"])
+            raise SystemExit(suite + " failed")
     finally:
         subprocess.run(["kind", "delete", "cluster", "--name", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if s3name:
             subprocess.run(["docker", "rm", "-f", "-v", s3name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(["docker", "image", "rm", "-f", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for ref in (PAUSE, BUSYBOX):
+            subprocess.run(["docker", "image", "rm", "asservat-fixture/" + ref.split("@")[0].rsplit("/", 1)[-1] + ":" + ref.rsplit(":", 1)[-1][:16]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         report["cleanup"] = {"cluster": name not in run(["kind", "get", "clusters"]).split(), "image": subprocess.run(["docker", "image", "inspect", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0}
 
 
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] != "packet":
-        raise SystemExit("usage: test-collector.py packet")
+    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium"):
+        raise SystemExit("usage: test-collector.py packet|cilium")
     if not GUARD.is_file():
         raise SystemExit(f"refused: {GUARD} is absent. Collector suites load BPF programs and run only on disposable CI runners or VMs.")
     results = ROOT / "test/results"
@@ -192,7 +250,7 @@ def main():
     base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="collector-", dir=base))
     try:
-        packet(work, report)
+        packet(work, report, "" if sys.argv[1] == "packet" else sys.argv[1])
         report["result"] = "passed"
     except BaseException:
         report["result"] = "failed"

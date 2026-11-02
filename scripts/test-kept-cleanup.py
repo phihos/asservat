@@ -93,7 +93,7 @@ class CollectorPacketCleanup(unittest.TestCase):
                         output = json.dumps([{"IPAM": {"Config": [{"Gateway": "192.0.2.1"}]}}])
                     elif args[:3] == ["docker", "image", "inspect"]:
                         code = 1
-                    elif (args[:2] in (["make", "libpcap"], ["docker", "build"], ["kind", "load"], ["helm", "template"], ["docker", "rm"])
+                    elif (args[:2] in (["make", "libpcap"], ["docker", "build"], ["kind", "load"], ["helm", "template"], ["docker", "rm"], ["docker", "pull"], ["docker", "tag"])
                           or args[:3] == ["docker", "image", "rm"]
                           or (args[0] == "kubectl" and ("create" in args or "apply" in args))
                           or args[0] == str(root / "scripts/fetch-gadget.sh")):
