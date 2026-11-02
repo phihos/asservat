@@ -198,6 +198,13 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != compiler.RecorderAssessmentRulesDigest() {
 		return zero, s.requestChanged("epoch")
 	}
+	// As for a single recording: warm the reviewed storage selection while
+	// the grant gate does I/O. The hint confers no authority.
+	var wait *contextStorageWait
+	if p.Storage != (value.ContextStorageSelection{}) {
+		wait = s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, identity.Earlier(i.ValidUntil, recovery.FreshUntil), p.Storage)
+		defer wait.close()
+	}
 	grant, err := s.recorderRequest(ctx, source, p, key, nil)
 	if err != nil {
 		return zero, err
@@ -250,9 +257,7 @@ func (s ContextInvestigation) requestCompositionGroup(ctx context.Context, sourc
 	anchor := s.Now().UTC().Truncate(time.Microsecond)
 	first := p.Intent
 	first.Composition = &children[0].Composition
-	wait := s.beginStorageWait(ctx, target, identity.Earlier(p.Deadline, identity.Earlier(i.ValidUntil, recovery.FreshUntil)), p.Storage)
 	f, err := s.factsWithStorageWait(ctx, source, p.Actor, first, target, anchor, wait)
-	wait.close()
 	if err != nil {
 		var changed contextStorageSelectionChange
 		if errors.As(err, &changed) {
