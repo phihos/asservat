@@ -63,6 +63,11 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 	if a.PacketProfile == "rawPackets" && (plan.Approval == nil || plan.Approval.DataClass != "raw" || plan.Approval.ObservationLimits == nil) {
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a raw packet recording needs raw approval with observation limits"}
 	}
+	if a.PacketProfile == "rawPackets" && policy {
+		// ADR-279: policy raw output follows in a later slice; policy grants
+		// confer no raw download, so it must not be produced yet.
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "policies cannot record raw packets in this release; use networkHeaders"}
+	}
 	if plan.Approval != nil && plan.Approval.ObservationLimits != nil && !policy {
 		// Manual raw observation has no issuer yet; ADR-279 adds it in its
 		// next slice. The finite policy companion is ADR-261's path.

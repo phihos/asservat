@@ -568,6 +568,12 @@ func TestRawPacketsPlan(t *testing.T) {
 	if AcceptableRecorder(p).Acceptable() {
 		t.Fatal("manual raw acceptable before observation authority")
 	}
+	if recorderAcceptance(p, true).Acceptable() || contextRecorderAcceptance(p).Acceptable() {
+		t.Fatal("policy raw acceptable")
+	}
+	if _, _, err := RecordingFor(p); err == nil {
+		t.Fatal("raw recording derived without acceptance")
+	}
 	for name, profile := range map[string]string{
 		"snaplen over engine": `{"kind":"rawPackets","snaplen":4000}`,
 		"duplicate cap":       `{"kind":"rawPackets","snaplen":96,"protocolSnaplen":[{"protocol":"tcp","bytes":200},{"protocol":"tcp","bytes":100}]}`,
