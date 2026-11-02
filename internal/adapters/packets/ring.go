@@ -503,6 +503,7 @@ func (r *Ring) Snapshot(window RingWindow, now time.Time, maxCopyBytes int64) (*
 	r.state.Snapshots++
 	return &RingSnapshot{ring: r, data: data, coverage: c}, nil
 }
+
 // copyWindow copies window's records in one walk (on the disk medium each walk
 // decrypts sealed segments) into an exactly sized buffer; false means they
 // exceed limit. The capacity estimate uses only in-memory headers.
