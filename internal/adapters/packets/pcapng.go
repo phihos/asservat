@@ -333,8 +333,9 @@ func CheckRaw(src io.Reader, limits RawLimits) (int, error) {
 }
 
 // rawFrameCap classifies a stored raw frame from its own Ethernet and IP
-// header bytes, as the recorder retained it: the cap of its transport, or the
-// frame's length when it ends inside those headers (header bytes only). A
+// header bytes, as the recorder retained it: the cap of its transport once
+// the fixed IP header names it, or the frame's length when it ends before
+// that (Ethernet and fixed IP header bytes only, never payload or options). A
 // frame the recorder never retains (another ethertype, a fragment, IPv6
 // extension headers or another transport) is refused.
 func rawFrameCap(b []byte, l RawLimits) (int, bool) {
@@ -344,8 +345,8 @@ func rawFrameCap(b []byte, l RawLimits) (int, bool) {
 	var proto byte
 	switch uint16(b[12])<<8 | uint16(b[13]) {
 	case 0x0800:
-		if len(b) < 14+20 || len(b) < 14+int(b[14]&0x0f)*4 {
-			return len(b), true
+		if len(b) < 14+20 {
+			return len(b), true // Ethernet and part of the fixed IP header only
 		}
 		if (uint16(b[20])<<8|uint16(b[21]))&0x3fff != 0 {
 			return 0, false // more-fragments flag or a fragment offset

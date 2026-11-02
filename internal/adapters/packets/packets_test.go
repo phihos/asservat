@@ -286,18 +286,29 @@ func TestRawRecorderKeepsCappedPrefixes(t *testing.T) {
 	if _, err := CheckHeadersOnly(bytes.NewReader(out)); err == nil {
 		t.Fatal("raw capture passed the headers-only check")
 	}
-	// Frames the recorder never retains cannot pass with up to Max bytes.
-	for _, name := range []string{"fragment", "arp", "gre", "hopbyhop"} {
+	// Frames the recorder never retains cannot pass with up to Max bytes, nor
+	// can a frame whose claimed IP options would hide bytes past its cap.
+	opts := append([]byte(nil), c["tcp4"]...)
+	opts[14] = 0x4f // IHL 60 bytes: the "options" are the TCP header and payload
+	c["ihl"] = opts
+	strict := RawLimits{Snaplen: 40, UDP: 100}
+	stored := func(name string, n int) []byte {
 		var buf bytes.Buffer
 		w, err := pcapgo.NewNgWriterInterface(&buf, pcapgo.NgInterface{LinkType: layers.LinkTypeEthernet, SnapLength: 100, TimestampResolution: 9}, pcapgo.DefaultNgWriterOptions)
 		if err != nil {
 			t.Fatal(err)
 		}
-		data := c[name][:min(len(c[name]), 100)]
+		data := c[name][:min(len(c[name]), n)]
 		if err = w.WritePacket(gopacket.CaptureInfo{Timestamp: start, CaptureLength: len(data), Length: len(c[name])}, data); err != nil || w.Flush() != nil {
 			t.Fatal(err)
 		}
-		if _, err := CheckRaw(bytes.NewReader(buf.Bytes()), limits); err == nil {
+		return buf.Bytes()
+	}
+	if n, err := CheckRaw(bytes.NewReader(stored("tcp4", 30)), strict); err != nil || n != 1 {
+		t.Fatal("frame ending inside the fixed IP header refused", err)
+	}
+	for _, name := range []string{"fragment", "arp", "gre", "hopbyhop", "ihl"} {
+		if _, err := CheckRaw(bytes.NewReader(stored(name, 74)), strict); err == nil {
 			t.Fatal(name, "accepted in a raw capture")
 		}
 	}
