@@ -36,7 +36,7 @@ const started = Date.now();
 const timeline = [];
 const apiPath = request => { const path = new URL(request.url()).pathname; return path.startsWith('/api/') ? path : null; };
 page.on('request', request => { const path = apiPath(request); if (path) timeline.push(`+${Date.now() - started}ms request ${request.method()} ${path}`); });
-page.on('response', response => { const path = apiPath(response.request()); if (path) timeline.push(`+${Date.now() - started}ms response ${response.status()} ${path} bytes=${Number(response.headers()['content-length'] ?? -1)}`); });
+page.on('response', response => { const path = apiPath(response.request()); if (path) timeline.push(`+${Date.now() - started}ms response ${response.status()} ${path}`); });
 page.on('requestfailed', request => { const path = apiPath(request); if (path) timeline.push(`+${Date.now() - started}ms failed ${/^net::ERR_[A-Z_]+$/.exec(request.failure()?.errorText ?? '')?.[0] ?? 'other'} ${path}`); });
 async function settled(name, from) {
   const end = Date.now() + 30_000;

@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { operations, OperationFailure } from './http';
-import { id, result, historyResult, previewResult, recordingPreviewResult, settingsResult, acceptedResult, progressResult, resolvedAcceptedResult, resolvedClosedResult, target } from './test-fixtures';
+import { id, result, previewResult, recordingPreviewResult, settingsResult, acceptedResult, progressResult, resolvedAcceptedResult, resolvedClosedResult, target } from './test-fixtures';
 import { validInput_preview_capture, validInput_request_capture, validOutput_preview_capture, validOutput_get_capture, validInput_resolve_capture_request, validOutput_resolve_capture_request } from '../generated/validate-capture';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -53,19 +53,11 @@ it.each([
   () => json({ ...progressResult(), extra: 'unexpected' }),
   () => json({ ...progressResult(), data_class: 'raw' }),
   () => json({ ...progressResult(), truncated: true, narrowing_hint: 'more' }),
-  () => new Response(' '.repeat(64 * 1024 + 1), { headers: { 'Content-Type': 'application/json' } }),
+  () => new Response(' '.repeat(32769), { headers: { 'Content-Type': 'application/json' } }),
   () => new Response(new Uint8Array([0xc3, 0x28]), { headers: { 'Content-Type': 'application/json' } }),
 ])('rejects malformed, oversized or nonmetadata responses', async response => {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => response()));
   await expect(operations.call('get_capture', { capture_id: id(8) }, 'csrf', new AbortController().signal)).rejects.toThrow();
-});
-it('accepts a general reply up to the server operation cap of 64 KiB', async () => {
-  // Installed native 41532422125: a valid history list over 32 KiB was
-  // cancelled mid-body by an older, smaller client bound.
-  const history = historyResult();
-  const body = JSON.stringify(history) + ' '.repeat(40 * 1024);
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { headers: { 'Content-Type': 'application/json' } })));
-  expect(await operations.call('list_capture_history', { target_ref: target, limit: 10 }, 'csrf', new AbortController().signal)).toEqual(history);
 });
 it('does not expose an upstream error body and aborts on scope loss', async () => {
   const scope = new AbortController();

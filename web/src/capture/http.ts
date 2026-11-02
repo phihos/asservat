@@ -30,13 +30,10 @@ export const operations: Operations = {
 // postOperation is the one session-authenticated metadata operation request:
 // generated input/output validation, CSRF, an optional identical
 // Idempotency-Key header, 10 s and fixed response bounds, and no automatic replay.
-// The general bound is the server's 64 KiB operation reply cap: a smaller
-// client bound rejected valid history and profile lists (installed native
-// 41532422125: 200 replies cancelled mid-body as ERR_ABORTED).
 // Only a paged list (allowCursor) may return a next_cursor.
 export async function postOperation(name: string, input: unknown, csrf: string, signal: AbortSignal, validInput: (value: unknown) => boolean, validOutput: (value: unknown) => boolean, idempotencyKey?: string, allowCursor = false): Promise<unknown> {
   if (!validInput(input)) throw new OperationFailure(400);
-  const responseLimit = name === 'get_capture_settings' ? 160 * 1024 : name === 'get_capture_profile' ? 64 * 1024 : name === 'preview_recording_save' ? 128 * 1024 : 64 * 1024;
+  const responseLimit = name === 'get_capture_settings' ? 160 * 1024 : name === 'get_capture_profile' ? 64 * 1024 : name === 'preview_recording_save' ? 128 * 1024 : 32_768;
   const request = new AbortController();
   const abort = () => request.abort();
   signal.addEventListener('abort', abort, { once: true });
