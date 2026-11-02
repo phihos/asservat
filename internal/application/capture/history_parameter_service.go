@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -161,6 +162,18 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	}
 	stage = "execute"
 	reply, err := session.ExecuteHistory(operation, authority, bundle, artifact.Copies{})
+	if err != nil && !errors.Is(err, artifact.ErrIntegrity) && operation.Err() == nil {
+		// ADR-280: one re-execution of the same claim and bundle through a
+		// fresh regional session of the same executor process; the region
+		// accepts only byte-identical objects an earlier attempt created.
+		stage = "execute-retry"
+		if retry, e := s.Regional.PrepareHistory(operation, p.Target.ClusterID, accepted.CaptureID); e == nil {
+			if retry.ExecutorEpoch() == authority.ExecutorEpoch {
+				reply, err = retry.ExecuteHistory(operation, authority, bundle, artifact.Copies{})
+			}
+			retry.Close()
+		}
+	}
 	if err != nil {
 		return err
 	}

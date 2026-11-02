@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"errors"
 	"io"
 
 	"asservat.local/asservat/internal/adapters/objectstore/framed"
@@ -222,7 +223,17 @@ func (s HistoryObjects) Write(ctx context.Context, e value.HistoryExpectation, b
 				return out, err
 			}
 		}
-		o, err := s.Store.PutSmall(call, historyPrefix(e)+artifact.Role(i), body)
+		key := historyPrefix(e) + artifact.Role(i)
+		o, err := s.Store.PutSmall(call, key, body)
+		if errors.Is(err, ErrExists) {
+			// A re-executed write of the same claimed bundle (ADR-280) accepts
+			// only the byte-identical object an earlier attempt created.
+			var existing []byte
+			if o, existing, err = s.Store.readControlAudit(call, key, historyObjectLimits[i]); err == nil && !bytes.Equal(existing, body) {
+				err = ErrExists
+			}
+			clear(existing)
+		}
 		if err != nil {
 			return out, err
 		}
