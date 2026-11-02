@@ -27,7 +27,44 @@ var (
 	ErrInvalid     = errors.New("invalid context projection")
 	ErrUnavailable = errors.New("context projection unavailable")
 	ErrExpired     = errors.New("context projection expired")
+	// ErrBusy refuses a query whose worker would exceed the live acquisition
+	// worker caps; the query stays charged and a later retry may succeed.
+	ErrBusy = errors.New("context projection workers busy")
 )
+
+// HTTPHeadersDisplayVersion names the get_http_headers page rendering of an
+// approved httpHeaders extract (ADR-282).
+const HTTPHeadersDisplayVersion = "approved-http-headers-page/v1"
+
+// ProjectionSource is one of the two closed published sources the approved
+// read path accepts (ADR-282): the pod-status metadata context and an
+// httpHeaders extract. Every field must match exactly; no other native type,
+// class or size bound is a projection source. The HTTP projection is itself
+// the native document, so it has no separate manifest projection digest.
+type ProjectionSource struct {
+	NativeType, Format, DataClass, EvidenceType, DisplayVersion string
+	NativeLimit                                                 int64
+	ProjectionDigest                                            artifact.Digest
+}
+
+// LookupProjectionSource returns the source for a published native type.
+func LookupProjectionSource(nativeType string) (ProjectionSource, bool) {
+	switch nativeType {
+	case artifact.PodStatusArtifact:
+		return ProjectionSource{NativeType: artifact.PodStatusArtifact, Format: artifact.ContextFormat, DataClass: "metadata", EvidenceType: "context",
+			DisplayVersion: ContextDisplayVersion, NativeLimit: artifact.MaxContextBytes, ProjectionDigest: ContextSourceProjectionDigest()}, true
+	case artifact.HTTPHeadersArtifact:
+		return ProjectionSource{NativeType: artifact.HTTPHeadersArtifact, Format: artifact.HTTPHeadersFormat, DataClass: "extract", EvidenceType: "packetCapture",
+			DisplayVersion: HTTPHeadersDisplayVersion, NativeLimit: artifact.RecordingNativeLimit}, true
+	}
+	return ProjectionSource{}, false
+}
+
+// Matches reports whether published facts are exactly this source.
+func (p ProjectionSource) Matches(nativeType, format, dataClass, evidenceType string, nativeLimit int64, digest artifact.Digest) bool {
+	return p.NativeType == nativeType && p.Format == format && p.DataClass == dataClass && p.EvidenceType == evidenceType &&
+		p.NativeLimit == nativeLimit && p.ProjectionDigest == digest
+}
 
 func ContextSourceProjectionDigest() artifact.Digest {
 	// Pinned immutable native definition; the unit regression verifies its SHA256.
@@ -68,19 +105,64 @@ func NormalizeLineSelection(start, maximum int) (LineSelection, error) {
 	return s, nil
 }
 
+// HTTPHeaderWindow is the record window of an httpHeaders projection read:
+// the first record index, the page size and, after the first page, the
+// projection-digest binding its cursor carries.
+type HTTPHeaderWindow struct {
+	Start, Limit int
+	Binding      string `json:",omitempty"`
+}
+
+func (w HTTPHeaderWindow) Valid() bool {
+	if w.Limit < 1 || w.Limit > HTTPHeaderPageRecords || w.Start < 0 || w.Start >= HTTPHeaderMaxRecords {
+		return false
+	}
+	if w.Start == 0 {
+		return w.Binding == ""
+	}
+	return lowerHex(w.Binding, httpHeaderBindingDigits)
+}
+
+// Selection is the public selection this window reads for one artifact.
+func (w HTTPHeaderWindow) Selection(caseID, artifactID string) HTTPHeaderSelection {
+	return HTTPHeaderSelection{CaseID: caseID, ArtifactID: artifactID, Start: w.Start, Limit: w.Limit, Binding: w.Binding}
+}
+
 // ContextProjectionCandidate is a content-minimized route, not a protected
 // evidence lookup. C-03 checks target rights before reading the published source
 // and resolving the exact version-bound scope. No caller may supply that route.
+// NativeType selects the source (empty is pod status) and with it the
+// selection branch: a line selection for pod status, a record window for an
+// httpHeaders extract. The other branch is zero. Both new fields are omitted
+// when zero, so a pod-status candidate/scope keeps its serialized form.
 type ContextProjectionCandidate struct {
 	RootID, CaseID, ArtifactID, CaptureID, ClusterID, NamespaceUID, WorkloadUID, PodUID string
 	Selection                                                                           LineSelection
 	Principal                                                                           identity.Principal
+	NativeType                                                                          string           `json:",omitempty"`
+	Headers                                                                             HTTPHeaderWindow `json:",omitzero"`
 }
 
 func (c ContextProjectionCandidate) Valid() bool {
+	return c.RouteValid() && c.selectionValid()
+}
+
+// RouteValid checks only the routing facts a case locator supplies, without
+// any source or selection.
+func (c ContextProjectionCandidate) RouteValid() bool {
 	return authorization.UUID(c.RootID) && authorization.UUID(c.CaseID) && authorization.UUID(c.ArtifactID) &&
 		authorization.UUID(c.CaptureID) && authorization.UUID(c.ClusterID) && identity.Text(c.NamespaceUID, 64) &&
-		identity.Text(c.WorkloadUID, 64) && identity.Text(c.PodUID, 64) && c.Selection.Valid() && c.Principal.Valid()
+		identity.Text(c.WorkloadUID, 64) && identity.Text(c.PodUID, 64) && c.Principal.Valid()
+}
+
+func (c ContextProjectionCandidate) selectionValid() bool {
+	switch c.NativeType {
+	case artifact.PodStatusArtifact:
+		return c.Selection.Valid() && c.Headers == HTTPHeaderWindow{}
+	case artifact.HTTPHeadersArtifact:
+		return c.Selection == LineSelection{} && c.Headers.Valid()
+	}
+	return false
 }
 
 // ContextProjectionScope is built from protected routing/publication facts,
@@ -91,18 +173,25 @@ type ContextProjectionScope struct {
 	SourceFormat, DisplayVersion                                                        string
 	Selection                                                                           LineSelection
 	Principal                                                                           identity.Principal
+	NativeType                                                                          string           `json:",omitempty"`
+	Headers                                                                             HTTPHeaderWindow `json:",omitzero"`
 }
 
 func (s ContextProjectionScope) Valid() bool {
-	return s.Candidate().Valid() && s.Version != (artifact.Digest{}) &&
-		s.SourceProjectionDigest == ContextSourceProjectionDigest() && s.SourceFormat == artifact.ContextFormat &&
-		s.DisplayVersion == ContextDisplayVersion
+	src, ok := s.Source()
+	return ok && s.Candidate().Valid() && s.Version != (artifact.Digest{}) &&
+		s.SourceProjectionDigest == src.ProjectionDigest && s.SourceFormat == src.Format && s.DisplayVersion == src.DisplayVersion
+}
+
+// Source is the closed projection source this scope reads.
+func (s ContextProjectionScope) Source() (ProjectionSource, bool) {
+	return LookupProjectionSource(s.NativeType)
 }
 
 func (s ContextProjectionScope) Candidate() ContextProjectionCandidate {
 	return ContextProjectionCandidate{RootID: s.RootID, CaseID: s.CaseID, ArtifactID: s.ArtifactID, CaptureID: s.CaptureID,
 		ClusterID: s.ClusterID, NamespaceUID: s.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.PodUID,
-		Selection: s.Selection, Principal: s.Principal}
+		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers}
 }
 
 // ContextProjectionPath is accepted placement for this query purpose. It is not

@@ -251,7 +251,7 @@ func TestPublisherHTTPCheckUsesAcceptedRecording(t *testing.T) {
 	accepted := &artifact.Recording{Kind: "packetCapture", Profile: "httpHeaders", MaxBytes: w.Packet.MaxBytes, Snaplen: 1500,
 		HTTP: &artifact.RecordingHTTP{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleMillis: h.IdleTimeout.Milliseconds()}}
 	check := func(r *artifact.Recording) error {
-		limits, maxBytes := httpCheckLimits(r)
+		limits, maxBytes := httpheaders.RecordingLimits(r)
 		c := httpheaders.NewProjectionCheck(limits, maxBytes)
 		if err := c.Write(out); err != nil {
 			_ = c.Close()

@@ -206,11 +206,10 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		// Result write, acknowledgement and close, for the worker's read report.
 		framesStarted := time.Now()
 		defer func() { auditapp.MarkStep(ctx, "frames", framesStarted) }()
-		b, e := json.Marshal(projection)
-		projection = query.PodStatusProjection{}
-		if e != nil || len(b) > query.ContextResultBytes {
-			clear(b)
-			return contracts.ErrNativeProtocol
+		b, e := encodeProjectionResult(projection, approvedScope)
+		projection.Clear()
+		if e != nil {
+			return e
 		}
 		stage = "result"
 		e = sendControl(work, s, contracts.NativeMetadataFrame, contracts.NativeMetadata{Format: c.Format, Reference: c.Reference, Nonce: c.Nonce, Metadata: b})

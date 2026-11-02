@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"slices"
+	"time"
 
 	"asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -91,4 +92,24 @@ func coverage(c Counters) (dropped, incomplete uint64, gaps []string) {
 		}
 	}
 	return dropped, incomplete, slices.Clip(gaps)
+}
+
+// RecordingLimits are an httpHeaders recording's accepted parser limits and
+// output cap; anything else yields limits every check refuses.
+func RecordingLimits(r *artifact.Recording) (Limits, int64) {
+	if r == nil || r.Profile != "httpHeaders" || !r.HTTP.Valid() {
+		return Limits{}, 0
+	}
+	h := r.HTTP
+	return Limits{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: time.Duration(h.IdleMillis) * time.Millisecond}, r.MaxBytes
+}
+
+// RecordingPage is ReadPage under the stored recording's own accepted
+// limits and output cap, the same values the publisher rechecked. It
+// implements the acquisition worker's evidence.HTTPHeaderPager.
+type RecordingPage struct{}
+
+func (RecordingPage) HTTPHeaderPage(native []byte, r *artifact.Recording, s analysis.HTTPHeaderSelection) (analysis.HTTPHeaderPage, error) {
+	limits, limit := RecordingLimits(r)
+	return ReadPage(native, limits, limit, s)
 }

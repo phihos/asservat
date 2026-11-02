@@ -43,6 +43,7 @@ type ContextQueryInvocation interface {
 // neither computes another MAC nor accepts an unrelated acknowledged intent.
 type ContextQueryInput struct {
 	Selection value.ContextExcerptSelection
+	Headers   value.HTTPHeaderSelection
 	QueryID   string
 }
 
@@ -73,6 +74,9 @@ type ContextQueryLedger interface {
 // Only initial admission receives this capability. Observing a query/result
 // never calls it, including missing, failed, expired or uncertain workers.
 type ContextProjectionWorkerAdmission interface {
+	// ProjectionWorkerRoom returns value.ErrBusy while the live worker caps
+	// are full, before the query is admitted and charged.
+	ProjectionWorkerRoom(context.Context, value.ContextQuery) error
 	AdmitProjectionWorker(context.Context, value.ContextQuery, ContextProjectionRequestOwner) error
 }
 
@@ -100,7 +104,9 @@ type ContextProjectionRequestOwner interface {
 // errors/EOF/lease expiry never fabricate positive closure. Returning a handle
 // alongside an error still transfers its cleanup obligation to C-18.
 type ContextProjectionRead interface {
-	Projection(context.Context) (value.PodStatusProjection, error)
+	// Projection is the scope's one result: the pod-status DTO or one
+	// httpHeaders page (or its invalid-cursor refusal), ADR-282.
+	Projection(context.Context) (value.ProjectionResult, error)
 	CheckCurrent(context.Context) error
 	Close(context.Context) error
 	ContextProjectionClosed

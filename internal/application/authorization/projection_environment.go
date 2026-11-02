@@ -34,7 +34,7 @@ var _ ContextProjectionEnvironmentReader = CurrentProjectionEnvironment{}
 
 func (s CurrentProjectionEnvironment) ProjectionEnvironment(ctx context.Context, r ContextProjectionEvidence, actor identity.Principal) (value.ContextProjectionEnvironment, error) {
 	var zero value.ContextProjectionEnvironment
-	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Recovery == nil || s.Processing == nil || s.Now == nil || !actor.Valid() || !r.Retained.Valid() || r.Retained.RootID != s.RootID || !identity.Text(r.PurposeRef, 128) || r.SourceFormat != artifact.ContextFormat || r.SourceProjectionDigest != value.ContextSourceProjectionDigest() || r.DataClass != "metadata" || r.Retained.Input.EvidenceType != "context" || r.Retained.Input.PrivacyClass != "potentialPersonalData" || r.Retained.Registration.NativeLimit != artifact.MaxContextBytes {
+	if ctx == nil || ctx.Err() != nil || s.Policies == nil || s.Recovery == nil || s.Processing == nil || s.Now == nil || !actor.Valid() || !r.Retained.Valid() || r.Retained.RootID != s.RootID || !identity.Text(r.PurposeRef, 128) || !projectionSourceKnown(r) {
 		return zero, projectionRefused("configuration", value.ErrUnavailable, nil)
 	}
 	start := s.Now()
@@ -137,4 +137,10 @@ func policyStep(step string, err error, valid bool) string {
 		return step + "-permits"
 	}
 	return step
+}
+
+// projectionSourceKnown accepts exactly one of the closed projection sources.
+func projectionSourceKnown(r ContextProjectionEvidence) bool {
+	src, ok := value.LookupProjectionSource(r.NativeType)
+	return ok && projectionSourceMatches(src, r)
 }

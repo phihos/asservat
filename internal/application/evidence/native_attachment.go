@@ -23,7 +23,7 @@ type NativePendingExchange interface {
 	Close()
 }
 type NativeProjectionExchange interface {
-	Projection(context.Context) (query.PodStatusProjection, error)
+	Projection(context.Context) (query.ProjectionResult, error)
 	AcknowledgeProjection(context.Context) error
 }
 

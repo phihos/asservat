@@ -384,7 +384,7 @@ func (p *Publisher) publish(ctx context.Context, item postgres.PendingContextPub
 	// ADR-282: an HTTP header projection is rechecked as a document: strict
 	// canonical decode, the accepted limits and only approved header values.
 	verifier.WithStreamCheck(artifact.HTTPHeadersArtifact, func(e artifact.ContextExpectation) objectstore.StreamCheck {
-		limits, maxBytes := httpCheckLimits(e.Recording)
+		limits, maxBytes := httpheaders.RecordingLimits(e.Recording)
 		return httpheaders.NewProjectionCheck(limits, maxBytes)
 	})
 	_, err = evidence.ContextPublisher{Ledger: p.ledger, Authority: p.gate, Verifier: verifier, Audit: p.audit, Now: time.Now}.Publish(ctx, item.CaptureID, item.Copies)
@@ -519,16 +519,6 @@ func (s mountedEvidence) Retrieve(ctx context.Context) (aws.Credentials, error) 
 
 // rawLimits are an accepted rawPackets recording's prefix caps; zero (refused
 // by the check) for anything else.
-// httpCheckLimits are an httpHeaders recording's accepted parser limits and
-// output cap; anything else yields limits the check refuses.
-func httpCheckLimits(r *artifact.Recording) (httpheaders.Limits, int64) {
-	if r == nil || r.Profile != "httpHeaders" || !r.HTTP.Valid() {
-		return httpheaders.Limits{}, 0
-	}
-	h := r.HTTP
-	return httpheaders.Limits{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: time.Duration(h.IdleMillis) * time.Millisecond}, r.MaxBytes
-}
-
 func rawLimits(r *artifact.Recording) packets.RawLimits {
 	if r == nil || r.Profile != "rawPackets" {
 		return packets.RawLimits{}

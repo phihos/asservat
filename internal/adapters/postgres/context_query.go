@@ -197,7 +197,7 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 		return queryRefusal("fence-published-read", e)
 	}
 	original, e := currentPublishedContext(published)
-	if e != nil || original.CaseID != q.Scope.CaseID || original.CaptureUID != q.Scope.CaptureID || original.NamespaceUID != q.Scope.NamespaceUID || original.WorkloadUID != q.Scope.WorkloadUID || original.PodUID != q.Scope.PodUID || original.Registration.Location != a.Environment.Location || original.Registration.StoreID != a.Environment.StoreID || original.Registration.NativeLimit != artifact.MaxContextBytes || original.DataClass != "metadata" || !bytes.Equal(published.ContextVerification.CopiesDigest, q.Scope.Version[:]) || a.AccessUntil.After(published.EffectiveExpiresAt.Time) || a.DeleteBy.After(published.EffectiveDeleteBy.Time) {
+	if e != nil || original.CaseID != q.Scope.CaseID || original.CaptureUID != q.Scope.CaptureID || original.NamespaceUID != q.Scope.NamespaceUID || original.WorkloadUID != q.Scope.WorkloadUID || original.PodUID != q.Scope.PodUID || original.Registration.Location != a.Environment.Location || original.Registration.StoreID != a.Environment.StoreID || !scopeSource(q.Scope, original) || !bytes.Equal(published.ContextVerification.CopiesDigest, q.Scope.Version[:]) || a.AccessUntil.After(published.EffectiveExpiresAt.Time) || a.DeleteBy.After(published.EffectiveDeleteBy.Time) {
 		return queryRefusal("fence-published", nil)
 	}
 	linked, e := tx.ContextQueryCaseExists(ctx, custodydb.ContextQueryCaseExistsParams{RootID: id(s.root), CaseID: id(q.Scope.CaseID), CaptureID: id(q.Scope.CaptureID), ArtifactID: id(q.Scope.ArtifactID)})
@@ -234,7 +234,7 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 
 func (s *ContextQueries) AdmitQuery(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) (app.ContextQueryAdmission, error) {
 	var out app.ContextQueryAdmission
-	if !q.Plan.Valid(q.Scope, time.Now()) || q.OperationID != r.Call.ID || r.Call.Tool != "get_file_excerpt" || q.CreatedAt.Before(r.Call.StartedAt) {
+	if !q.Plan.Valid(q.Scope, time.Now()) || q.OperationID != r.Call.ID || r.Call.Tool != q.Scope.BeginTool() || q.CreatedAt.Before(r.Call.StartedAt) {
 		return out, value.ErrUnavailable
 	}
 	e := s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, b custodydb.ContextQueryBacking, allocation custodydb.ContextQueryAllocation) error {
@@ -382,4 +382,11 @@ func (e *queryStepError) FixedStep() string {
 
 func queryRefusal(step string, cause error) error {
 	return &queryStepError{step: step, cause: cause}
+}
+
+// scopeSource requires the published expectation to be exactly the scope's
+// closed projection source: pod-status metadata or an httpHeaders extract.
+func scopeSource(scope value.ContextProjectionScope, e artifact.ContextExpectation) bool {
+	src, ok := scope.Source()
+	return ok && e.NativeType == src.NativeType && e.DataClass == src.DataClass && e.Registration.NativeLimit == src.NativeLimit && e.Type().Format == src.Format
 }

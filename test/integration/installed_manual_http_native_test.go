@@ -3,16 +3,22 @@ package integration
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/httpheaders"
+	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"k8s.io/client-go/rest"
 )
 
@@ -164,4 +170,192 @@ func qualifyManualHTTPProjection(t *testing.T, native []byte) manualHTTPSummary 
 		t.Fatalf("HTTP header projection: %v; counters %+v", err, s.Counters)
 	}
 	return s
+}
+
+// manualHTTPReply is one get_http_headers or get_query_result MCP reply.
+type manualHTTPReply struct {
+	RequestID  string          `json:"request_id"`
+	Status     string          `json:"status"`
+	NextCursor *string         `json:"next_cursor"`
+	Data       json.RawMessage `json:"data"`
+	Provenance []struct {
+		ArtifactID string `json:"artifactID"`
+	} `json:"provenance"`
+}
+
+// manualHTTPPage is the disclosed page data of get_http_headers.
+type manualHTTPPage struct {
+	ProjectionDigest string `json:"projection_digest"`
+	Records          []struct {
+		Timestamp time.Time `json:"timestamp"`
+		Method    string    `json:"method"`
+		Status    int       `json:"status"`
+		Headers   []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"headers"`
+		Partial bool `json:"partial"`
+	} `json:"records"`
+	DroppedFlows    uint64   `json:"dropped_flows"`
+	IncompleteFlows uint64   `json:"incomplete_flows"`
+	CoverageGaps    []string `json:"coverage_gaps"`
+	Code            string   `json:"code"`
+}
+
+// qualifyManualHTTPQuery reads the published extract through get_http_headers
+// over MCP (ADR-282 slice 5): each page is an approved query answered pending
+// and served by get_query_result. Every delivered record, counter, gap and the
+// cursor binding must equal httpheaders.ReadPage on the downloaded native
+// bytes; the record limit is chosen for about three pages, of which at most
+// three are followed. A cursor with a foreign binding is InvalidCursor.
+func qualifyManualHTTPQuery(t *testing.T, ctx context.Context, session *sdk.ClientSession, wire *contracts.InvestigationContracts, caseID, artifactID string, native []byte, diagnose func()) {
+	t.Helper()
+	call := func(name string, args any) (manualHTTPReply, time.Duration) {
+		t.Helper()
+		started := time.Now()
+		bounded, end := context.WithTimeout(ctx, 45*time.Second)
+		defer end()
+		result, err := session.CallTool(bounded, &sdk.CallToolParams{Name: name, Arguments: args})
+		if err != nil || result == nil {
+			diagnose()
+			t.Fatal("get_http_headers MCP", name, err)
+		}
+		raw, err := json.Marshal(result.StructuredContent)
+		var out manualHTTPReply
+		if err != nil || wire.ValidateOutput(name, raw) != nil || json.Unmarshal(raw, &out) != nil || result.IsError != (out.Status == "error") {
+			t.Fatalf("%s reply violates its contract: %s", name, raw)
+		}
+		return out, time.Since(started)
+	}
+	// read admits one page query and polls it within the original query
+	// lifetime; it returns the get_http_headers envelope of the page.
+	read := func(cursor string, limit int) (manualHTTPReply, string) {
+		t.Helper()
+		args := map[string]any{"case_id": caseID, "artifact_id": artifactID, "limit": limit}
+		if cursor != "" {
+			args["cursor"] = cursor
+		}
+		started := time.Now()
+		reply, begin := call("get_http_headers", args)
+		// ADR-282: a full live-worker cap (two per principal and workload) is a
+		// retryable NotAvailable. A worker holds its slot for its 60 s runtime
+		// and retires on a later demand; retry like a client would.
+		busy := 0
+		for reply.Status == "error" && strings.Contains(string(reply.Data), `"NotAvailable"`) && time.Since(started) < 2*query.ContextMaxQueryTime {
+			busy++
+			if installedJourneyPause(ctx, 2*time.Second) != nil {
+				t.Fatal("get_http_headers busy retry canceled", ctx.Err())
+			}
+			reply, begin = call("get_http_headers", args)
+		}
+		if busy > 0 {
+			t.Logf("get_http_headers begin retried %d times while workers were busy (%s)", busy, time.Since(started).Round(time.Millisecond))
+			started = time.Now()
+		}
+		if reply.Status != "pending" {
+			if reply.Status == "ok" {
+				return reply, fmt.Sprintf("begin=%dms immediate", begin.Milliseconds())
+			}
+			return reply, fmt.Sprintf("begin=%dms refused", begin.Milliseconds())
+		}
+		var pending struct {
+			Handle string `json:"query_handle"`
+			Retry  int    `json:"retry_after_seconds"`
+		}
+		if json.Unmarshal(reply.Data, &pending) != nil || pending.Handle == "" || pending.Retry < 1 {
+			t.Fatal("invalid get_http_headers pending reply")
+		}
+		// The canonical pending reply carries no query times. The installed
+		// profile's query lifetime is the 60 s maximum; spreading the poll
+		// allowance over its first half leaves the deadline unreached.
+		until := started.Add(query.ContextMaxQueryTime / 2)
+		for poll := 0; ; poll++ {
+			next, err := installedProjectionPollTime(started, until, time.Now(), time.Duration(pending.Retry)*time.Second, poll)
+			if err != nil {
+				t.Fatal("get_http_headers query did not become ready within its lifetime", err)
+			}
+			if installedJourneyPause(ctx, time.Until(next)) != nil {
+				t.Fatal("get_http_headers poll canceled", ctx.Err())
+			}
+			result, took := call("get_query_result", map[string]string{"query_handle": pending.Handle})
+			if result.Status == "pending" {
+				continue
+			}
+			if result.Status != "ok" {
+				return result, fmt.Sprintf("begin=%dms ready-after=%dms result=%dms", begin.Milliseconds(), time.Since(started).Milliseconds(), took.Milliseconds())
+			}
+			var resolved struct {
+				Handle string          `json:"query_handle"`
+				Tool   string          `json:"tool_name"`
+				Result json.RawMessage `json:"result"`
+			}
+			var page manualHTTPReply
+			if json.Unmarshal(result.Data, &resolved) != nil || resolved.Handle != pending.Handle || resolved.Tool != "get_http_headers" || json.Unmarshal(resolved.Result, &page) != nil {
+				t.Fatal("get_query_result did not serve the original get_http_headers page")
+			}
+			return page, fmt.Sprintf("begin=%dms ready-after=%dms result=%dms polls=%d", begin.Milliseconds(), time.Since(started).Milliseconds(), took.Milliseconds(), poll+1)
+		}
+	}
+	all, err := query.NormalizeHTTPHeaderSelection(caseID, artifactID, "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	whole, err := httpheaders.ReadPage(native, manualHTTPLimits(), artifact.RecordingNativeLimit, all)
+	if err != nil || whole.Total < 1 {
+		t.Fatal("downloaded projection has no readable record", err)
+	}
+	digest := sha256.Sum256(native)
+	limit := min(max((whole.Total+2)/3, 1), query.HTTPHeaderPageRecords)
+	cursor, delivered := "", 0
+	for n := 0; n < 3; n++ {
+		page, timing := read(cursor, limit)
+		var data manualHTTPPage
+		if page.Status != "ok" || json.Unmarshal(page.Data, &data) != nil || len(page.Provenance) != 1 || page.Provenance[0].ArtifactID != artifactID {
+			t.Fatalf("page %d not disclosed: %s %s", n, page.Status, page.Data)
+		}
+		sel, err := query.NormalizeHTTPHeaderSelection(caseID, artifactID, cursor, limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := httpheaders.ReadPage(native, manualHTTPLimits(), artifact.RecordingNativeLimit, sel)
+		if err != nil || data.ProjectionDigest != hex.EncodeToString(digest[:]) || data.ProjectionDigest != hex.EncodeToString(want.ProjectionDigest[:]) ||
+			data.DroppedFlows != want.DroppedFlows || data.IncompleteFlows != want.IncompleteFlows || strings.Join(data.CoverageGaps, "\n") != strings.Join(want.CoverageGaps, "\n") {
+			t.Fatalf("page %d digest or gap report differs from the native document", n)
+		}
+		if len(data.Records) < 1 || len(data.Records) > len(want.Records) {
+			t.Fatalf("page %d is not a non-empty prefix of its selection: %d of %d", n, len(data.Records), len(want.Records))
+		}
+		for i, r := range data.Records {
+			w := want.Records[i]
+			same := r.Timestamp.Equal(w.Timestamp) && r.Method == w.Method && r.Status == w.Status && r.Partial == w.Partial && len(r.Headers) == len(w.Headers)
+			for j := 0; same && j < len(r.Headers); j++ {
+				same = r.Headers[j].Name == w.Headers[j].Name && r.Headers[j].Value == w.Headers[j].Value
+			}
+			if !same {
+				t.Fatalf("page %d record %d differs from the native document", n, i)
+			}
+		}
+		next := want.Next(len(data.Records))
+		if next == "" && page.NextCursor != nil || next != "" && (page.NextCursor == nil || *page.NextCursor != next) {
+			t.Fatalf("page %d cursor does not continue at the first omitted record", n)
+		}
+		delivered += len(data.Records)
+		t.Logf("get_http_headers page %d: start %d, %d records of %d, %s", n, sel.Start, len(data.Records), want.Total, timing)
+		if next == "" {
+			break
+		}
+		cursor = next
+	}
+	// A cursor bound to another document is judged after current read
+	// rights, by the worker, and discloses nothing.
+	foreign := "1:" + strings.Repeat("0", 32)
+	if strings.HasPrefix(hex.EncodeToString(digest[:]), strings.Repeat("0", 32)) {
+		foreign = "1:" + strings.Repeat("f", 32)
+	}
+	refused, timing := read(foreign, limit)
+	var failure manualHTTPPage
+	if refused.Status != "error" || json.Unmarshal(refused.Data, &failure) != nil || failure.Code != "InvalidCursor" {
+		t.Fatalf("foreign cursor binding was not InvalidCursor: %s %s", refused.Status, refused.Data)
+	}
+	t.Logf("get_http_headers: %d of %d records over MCP equal the native document; foreign cursor InvalidCursor (%s)", delivered, whole.Total, timing)
 }

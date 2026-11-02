@@ -13,8 +13,8 @@ import (
 // ReadApprovedContext reuses the installed regional store and mTLS key client.
 // AuthorityID is the exact query batch, independently classified and consumed
 // by the key service. No metadata/download operation or byte response is used.
-func (r *NativeContextReader) ReadApprovedContext(ctx context.Context, source evidence.NativeContextSource, o value.NativeOperation, scope query.ContextProjectionScope, until time.Time) (query.PodStatusProjection, error) {
-	var zero query.PodStatusProjection
+func (r *NativeContextReader) ReadApprovedContext(ctx context.Context, source evidence.NativeContextSource, o value.NativeOperation, scope query.ContextProjectionScope, until time.Time) (query.ProjectionResult, error) {
+	var zero query.ProjectionResult
 	if r == nil || ctx == nil || ctx.Err() != nil || o.Kind != value.NativeProjection || !o.CurrentValid(time.Now()) || o.Reference.InstallationID != r.scope.InstallationID || !scope.Valid() || scope.Version != o.SourceVersion {
 		return zero, &readRefusal{query.ErrUnavailable, &contextReadStage{"operation", query.ErrUnavailable}}
 	}
@@ -31,7 +31,16 @@ func (r *NativeContextReader) ReadApprovedContext(ctx context.Context, source ev
 	if e != nil {
 		return zero, &readRefusal{e, &contextReadStage{"store", e}}
 	}
+	reader.pages = r.pages
 	return reader.ReadProjectionNative(ctx, source, scope, opener, end)
+}
+
+// ServeHTTPHeaderPages installs the httpHeaders pager (ADR-282); without it
+// this reader serves pod-status projections only.
+func (r *NativeContextReader) ServeHTTPHeaderPages(p evidence.HTTPHeaderPager) {
+	if r != nil {
+		r.pages = p
+	}
 }
 
 var _ evidence.NativeApprovedContextRead = (*NativeContextReader)(nil)

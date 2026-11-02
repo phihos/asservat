@@ -44,7 +44,7 @@ func TestHTTPHeaderSelectionNormalization(t *testing.T) {
 	}
 }
 
-func TestHTTPHeaderPageRequiresTheExactSelection(t *testing.T) {
+func TestHTTPHeaderPageRequiresAPrefixOfTheSelection(t *testing.T) {
 	d := artifact.Digest{7}
 	s, _ := NormalizeHTTPHeaderSelection(headerCase, headerArtifact, "", 2)
 	at := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
@@ -55,7 +55,8 @@ func TestHTTPHeaderPageRequiresTheExactSelection(t *testing.T) {
 	}
 	partial := HTTPHeaderRecord{Timestamp: at, Method: "POST", Partial: true}
 	for name, m := range map[string]func(*HTTPHeaderPage){
-		"short page":       func(p *HTTPHeaderPage) { p.Records = p.Records[:1] },
+		"empty page":       func(p *HTTPHeaderPage) { p.Records = nil },
+		"beyond selection": func(p *HTTPHeaderPage) { p.Records = append(p.Records, p.Records[0]) },
 		"credential":       func(p *HTTPHeaderPage) { p.Records[0].Headers = []HTTPHeaderField{{"cookie", "a=b"}} },
 		"status missing":   func(p *HTTPHeaderPage) { p.Records[0].Status = 0 },
 		"method":           func(p *HTTPHeaderPage) { p.Records[0].Method = "BREW" },
@@ -76,5 +77,16 @@ func TestHTTPHeaderPageRequiresTheExactSelection(t *testing.T) {
 	page.Records[1] = partial
 	if !page.Valid(s) {
 		t.Fatal("partial record")
+	}
+	// ADR-282 slice 5: a non-empty prefix is valid and continues at its first
+	// omitted record; only an empty projection may deliver no record.
+	prefix := page
+	prefix.Records = page.Records[:1]
+	if !prefix.Valid(s) || prefix.Next(1) != HTTPHeaderCursor(1, d) {
+		t.Fatal("prefix page")
+	}
+	empty := HTTPHeaderPage{ProjectionDigest: d}
+	if !empty.Valid(s) || empty.Next(0) != "" {
+		t.Fatal("empty projection")
 	}
 }

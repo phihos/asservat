@@ -62,9 +62,13 @@ type projectionProtocolReader struct {
 	read  func(context.Context, evidence.NativeContextSource, value.NativeOperation, query.ContextProjectionScope, time.Time) (query.PodStatusProjection, error)
 }
 
-func (r *projectionProtocolReader) ReadApprovedContext(ctx context.Context, source evidence.NativeContextSource, operation value.NativeOperation, scope query.ContextProjectionScope, until time.Time) (query.PodStatusProjection, error) {
+func (r *projectionProtocolReader) ReadApprovedContext(ctx context.Context, source evidence.NativeContextSource, operation value.NativeOperation, scope query.ContextProjectionScope, until time.Time) (query.ProjectionResult, error) {
 	r.calls.Add(1)
-	return r.read(ctx, source, operation, scope, until)
+	p, err := r.read(ctx, source, operation, scope, until)
+	if err != nil {
+		return query.ProjectionResult{}, err
+	}
+	return query.ProjectionResult{PodStatus: p}, nil
 }
 
 func (f projectionProtocolFixture) result(t *testing.T, reader *projectionProtocolReader) *evidence.RegionalContextResult {
@@ -249,7 +253,7 @@ func TestNativeApprovedProjectionJoinsExactQueryWithoutNativeData(t *testing.T) 
 	})
 	done, stream := f.run(t, client, result, f.target, artifact.Digest{1})
 	p, err := op.Projection(f.ctx)
-	if err != nil || !reflect.DeepEqual(p, f.projection) {
+	if err != nil || !reflect.DeepEqual(p.PodStatus, f.projection) {
 		t.Fatal("approved DTO changed", err)
 	}
 	ack := make(chan error, 1)
@@ -454,7 +458,7 @@ func TestNativeApprovedProjectionResultReadOutlivesHelloDeadline(t *testing.T) {
 	slow.Store(true)
 	done, _ := f.run(t, client, result, f.target, artifact.Digest{1})
 	p, err := op.Projection(f.ctx)
-	if err != nil || !reflect.DeepEqual(p, f.projection) {
+	if err != nil || !reflect.DeepEqual(p.PodStatus, f.projection) {
 		t.Fatal("result read failed after the Hello deadline", err)
 	}
 	if err = op.AcknowledgeProjection(f.ctx); err != nil {

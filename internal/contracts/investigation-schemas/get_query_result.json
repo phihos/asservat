@@ -33,7 +33,10 @@
         "format": "uuid"
       },
       "data_class": {
-        "const": "metadata"
+        "enum": [
+          "metadata",
+          "extract"
+        ]
       },
       "status": {
         "type": "string",
@@ -102,7 +105,10 @@
                     "maxLength": 4096
                   },
                   "tool_name": {
-                    "const": "get_file_excerpt"
+                    "enum": [
+                      "get_file_excerpt",
+                      "get_http_headers"
+                    ]
                   },
                   "result": {
                     "type": "object"

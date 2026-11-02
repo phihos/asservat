@@ -37,7 +37,7 @@ type HubOperation struct {
 	next, pending   int64
 	stream          Stream
 	metadata        chan artifact.NativeDownloadMetadata
-	projection      chan query.PodStatusProjection
+	projection      chan query.ProjectionResult
 	projectionScope query.ContextProjectionScope
 	body            chan []byte
 	action          chan nativeAction
@@ -127,7 +127,7 @@ func newHubOperationChecked(gate *evidence.NativeFrameGate, checked *checkedNati
 		return nil, artifact.ErrDownloadUnavailable
 	}
 	ctx, cancel := context.WithDeadline(gate.Context(), until)
-	result := &HubOperation{gate: gate, complete: complete, command: c, expected: cloned, delivery: delivery, ctx: ctx, cancel: cancel, metadata: make(chan artifact.NativeDownloadMetadata, 1), projection: make(chan query.PodStatusProjection, 1), projectionScope: projectionScope, body: make(chan []byte), action: make(chan nativeAction), done: make(chan struct{}), next: c.Offset}
+	result := &HubOperation{gate: gate, complete: complete, command: c, expected: cloned, delivery: delivery, ctx: ctx, cancel: cancel, metadata: make(chan artifact.NativeDownloadMetadata, 1), projection: make(chan query.ProjectionResult, 1), projectionScope: projectionScope, body: make(chan []byte), action: make(chan nativeAction), done: make(chan struct{}), next: c.Offset}
 	if o.Kind == value.NativeResponse && !result.matchChunk(delivery, c.Offset, min(nativeChunkBytes, c.Length)) {
 		cancel()
 		return nil, artifact.ErrInvalid

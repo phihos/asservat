@@ -76,7 +76,7 @@ func (r OperationOutcome) credentialValid() bool {
 // this branch explicit prevents a private peer operation accepting human data.
 func humanOperationInputValid(name, format string) bool {
 	switch name {
-	case "get_file_excerpt", "get_query_result":
+	case "get_file_excerpt", "get_http_headers", "get_query_result":
 		return format == "context-query-input/v1"
 	case "download_artifact_content":
 		return format == "native-content-input/v1"
@@ -84,7 +84,7 @@ func humanOperationInputValid(name, format string) bool {
 		return format == CaptureOperationInputFormat || format == CaptureReasonInputFormat
 	case "initialize_processing", "restrict_processing", "release_processing":
 		return format == "processing-input/v1"
-	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "resolve_capture_request", "invalid_operation", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers":
+	case "cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "resolve_capture_request", "invalid_operation", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "get_grant", "list_reviews", "decide_review", "revoke_grant", "request_policy_grant", "list_capture_profiles", "get_capture_profile":
 		return format == "context-input/v1" || format == "invalid-input/v1"
 	default:
 		return false

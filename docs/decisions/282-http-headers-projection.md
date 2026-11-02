@@ -157,3 +157,123 @@ plus InvalidCursor. 7. No configuration. 8. None outside Asservat. 9. One
 bounded page per call; the regional read cost is part of the pending
 composition. 10. Unadvertised unless composed. 11. Download alone would not
 meet REQ-MCP-005's bounded agent read.
+
+## Implementation (slice 5, part 1: read authority and worker page)
+
+The approved-read path now has a closed second source. `analysis.ProjectionSource`
+admits exactly the pod-status metadata context or an `httpHeaders` extract
+(`http-response-headers/v1`, evidence type `packetCapture`, the one-frame
+`RecordingNativeLimit`, no manifest projection digest). `ContextProjectionScope`
+and its candidate carry `NativeType` and an `HTTPHeaderWindow` (start, limit,
+cursor binding) as a selection union with the line selection; both fields are
+omitted when zero, so stored pod-status queries and decision digests keep their
+bytes. The catalog evidence read, processing facet, query fence and
+C-03/C-14 source checks use this source instead of the pod-status pins, so a
+pod-status scope never accepts an extract and the reverse.
+
+C-03 `HTTPHeaderReadAuthority` implements `CurrentHTTPHeaderRead`: identity
+with `evidence:read`, current recovery, the private case route
+(`ResolveProjectionRoute`), then the unchanged `ContextProjectionAuthority`
+facets (ReadApproved permissions, shares, recorded reviews, audience,
+retained policy origins, environment, all repeated after blocking reads) for
+the extract source. The decision covers the document; its bound window is the
+first page.
+
+The acquisition worker's branch is `evidence.ReadHTTPHeaderPage`: an artifact
+opened with the batch's key authority is read whole as its single frame,
+rechecked and paged by `httpheaders.RecordingPage` (the publisher's
+`RecordingLimits`, moved into the adapter), the plaintext is cleared and only
+the page leaves; its projection digest must equal the manifest-authenticated
+native SHA-256. An invalid cursor stays distinct from other refusals.
+
+Remaining before the tool is advertised: the query ledger migration
+(`get_http_headers` in the query tables and intent checks, the extract scope
+keys, `context-query-input/v1` audit input instead of the slice 4 lane, and a
+per-page read cost of one frame — `NativeWindowReadWork(httpHeaders)` — rather
+than the 4 MiB pod-status profile, so one page costs one worker Job), the
+result union through the regional read, native wire (a page payload bounded
+below the 64 KiB control frame; records beyond the 24 KiB response are never
+delivered, so the worker sends the longest fitting prefix) and hub decode,
+`HTTPHeaderReads` as Begin (`pending` + query id) plus a `get_query_result`
+branch, the restored canonical `pending` branch in the generated schema with
+browser OpenAPI parity, and composition in `newPublicProjection`.
+
+## Implementation (slice 5, part 2: query ledger, wire and composition)
+
+`get_http_headers` is now an approved query of one page in the existing
+ADR-206 ledger instead of the slice 4 synchronous read. Begin
+(`HTTPHeaderReads.Begin`) resolves the case route (`ResolveProjectionRoute`),
+sets the extract source and the requested record window on the candidate,
+lets C-03 `ResolveProjectionCurrent` decide ReadApproved for that exact
+scope and admits the query, dispatching its worker; the reply is the
+canonical `pending` branch (handle and `retry_after_seconds` only).
+`get_query_result` serves the page as its nested `get_http_headers` result
+(`tool_name: get_http_headers`, `data_class: extract`, handling notice);
+pod-status queries keep their DTO, payload and outputs unchanged. Each page
+is its own query, so a cursor reauthorizes completely. The slice 4
+synchronous service and the separate `HTTPHeaderReadAuthority` are removed.
+
+Migration 00122 (schema 122) changes functions only: `get_http_headers`
+audits as `context-query-input/v1` with the 20 s evidence-read request
+window; the intent/outcome facets accept it; the call guard requires it as
+the begin tool of an `httpHeaders` scope (polls stay `get_query_result`); a
+stored extract scope needs its record window and no line selection; an
+extract query starts at most one read batch and reserves two accepted query
+units (`context_query_units`), because its single read of one recording
+frame (`NativeWindowReadWork`, 8 MiB plus cipher overhead and one index page)
+exceeds the two 4 MiB batches of one pod-status unit while two units cover it
+in every cost dimension. No accepted profile, envelope or pod-status value
+changes. Down refuses while extract queries exist and restores the previous
+bodies; the real-PostgreSQL upgrade test checks the exact restoration.
+
+One result type (`analysis.ProjectionResult`: pod status, a page or an
+invalid-cursor refusal) passes through `RegionalProjectionRead`,
+`RegionalContextResult.ReadApproved`, the native exchange and the hub
+`Projection`. On the wire pod status keeps its bare DTO payload byte for
+byte; an extract scope carries `{"Page":…}` or `{"InvalidCursor":true}`,
+bounded by `HTTPHeaderPageWireBytes` (46 KiB, inside the 64 KiB control
+frame). The worker sends the longest record prefix within that bound; a page
+is valid as a non-empty prefix of its selection (empty only for an empty
+projection), still bound to the projection digest, and `next_cursor`
+continues at the first omitted record. The response then trims further to
+24 KiB the same way. A cursor the worker judges invalid against the
+rechecked document returns `InvalidCursor` after current read rights; the
+read stays charged and nothing is disclosed. A malformed cursor is answered
+before any lookup.
+
+`newPublicProjection` composes the case route reader as `HeaderRoutes`, and
+the public operations advertise `get_http_headers` whenever the approved read
+path is composed. The acquisition worker installs `httpheaders.RecordingPage`
+as the pager.
+
+Complexity gate (cumulative with part 1): 1. A specified first-release read.
+2. No reopened risk. 3. Typical HTTP/1 investigations. 4. Reuses the
+get_file_excerpt query path. 5. No new privilege, credential or network
+access. 6. One added refusal (InvalidCursor) and no fallback. 7. No
+configuration. 8. None outside Asservat. 9. Per page one worker read of one
+frame, charged as two accepted query units; no SQL row or profile added.
+10. Down restores the previous functions; the tool disappears with the
+composition. 11. A synchronous read without the ledger would bypass the
+query accounting and worker key custody.
+
+Remaining: the installed manual-http focus now reads up to three pages over
+MCP and compares them with `httpheaders.ReadPage` on the downloaded bytes
+(not yet run natively); real-PostgreSQL admission of an extract query (its
+two-unit charge through the guards) is covered only by the function checks
+of the upgrade test and the native focus; worker transient memory for one
+page (about three frame-sized buffers) is within the 256 MiB Job limit but
+above the profile's declared 8 MiB per unit.
+
+The live acquisition worker caps (16 per installation, two per workload and
+two per principal, shared with downloads) count a projection worker until its
+Job is retired, after its page was delivered. A begin that finds a cap full
+is the retryable `NotAvailable` tool result (`ErrBusy`), not a transport 503.
+The caps are read before the query is admitted, so a busy refusal charges no
+query units; a slot taken between that read and the locked reservation is
+still a charged 503. Native paging measured the third page reaching the cap
+while the first two workers awaited retirement, and a charged busy refusal
+let one retry exhaust the workload's eight query units. A projection worker
+holds its slot for its full 60 s runtime and retires only on a later cleanup
+demand, so the room check is also such a demand; a third page therefore waits
+for the first page's worker to expire. Retiring a worker as soon as its page
+is delivered would shorten that wait and is not implemented.

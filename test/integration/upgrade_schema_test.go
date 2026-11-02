@@ -109,6 +109,12 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	if e = conn.QueryRow(ctx, sourceDefinitions).Scan(&originalSourceValidator, &originalMonotonic); e != nil {
 		t.Fatal("previous source definitions", e)
 	}
+	// Migration 122 (ADR-282 slice 5) replaces these functions only.
+	const queryDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.operation_audit_human_input_valid(text,text)','public.guard_operation_audit()','public.context_query_intent_current(uuid,uuid,jsonb,uuid,jsonb)','public.context_query_outcome_closed(uuid,uuid,jsonb,uuid)','public.guard_context_query_account()','public.guard_context_query()','public.guard_context_query_child()']) f`
+	var originalQueryFunctions string
+	if e = conn.QueryRow(ctx, queryDefinitions).Scan(&originalQueryFunctions); e != nil {
+		t.Fatal("previous query functions", e)
+	}
 	upgrade, e := postgres.NewUpgradeSchema(config)
 	if e != nil {
 		t.Fatal(e)
@@ -198,6 +204,39 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("resource projection Up after Down", from, to, e)
 		}
 		t.Log("resource projection Down restored exact validators and unchanged trust; Up restored104; no old-decoder rollback qualification")
+	}
+	if head == 122 {
+		// The extract scope reserves two units and one read batch, admits
+		// get_http_headers as its begin tool and needs its record window; a
+		// stored pod-status scope keeps one unit, two batches and
+		// get_file_excerpt.
+		pod := `{"SourceFormat":"asservat-pod-status/v1","DisplayVersion":"approved-pod-status-display/v1","Selection":{"LineStart":1,"MaxLines":200}}`
+		extract := `{"NativeType":"httpHeaders","Headers":{"Start":0,"Limit":100},"SourceFormat":"http-response-headers/v1","DisplayVersion":"approved-http-headers-page/v1","Selection":{"LineStart":0,"MaxLines":0}}`
+		var podUnits, podBatches, extractUnits, extractBatches int
+		var podTool, extractTool string
+		var podValid, extractValid, mixedValid, httpInput, contextInput bool
+		if e = conn.QueryRow(ctx, `SELECT context_query_units($1::jsonb),context_query_read_batches($1::jsonb),context_query_begin_tool($1::jsonb),context_query_scope_source_valid($1::jsonb),
+ context_query_units($2::jsonb),context_query_read_batches($2::jsonb),context_query_begin_tool($2::jsonb),context_query_scope_source_valid($2::jsonb),
+ context_query_scope_source_valid($2::jsonb-'Headers'),operation_audit_human_input_valid('get_http_headers','context-query-input/v1'),operation_audit_human_input_valid('get_http_headers','context-input/v1')`, pod, extract).
+			Scan(&podUnits, &podBatches, &podTool, &podValid, &extractUnits, &extractBatches, &extractTool, &extractValid, &mixedValid, &httpInput, &contextInput); e != nil ||
+			podUnits != 1 || podBatches != 2 || podTool != "get_file_excerpt" || !podValid || extractUnits != 2 || extractBatches != 1 || extractTool != "get_http_headers" || !extractValid || mixedValid || !httpInput || contextInput {
+			t.Fatal("http header query functions", e, podUnits, podBatches, podTool, podValid, extractUnits, extractBatches, extractTool, extractValid, mixedValid, httpInput, contextInput)
+		}
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("http header query Down", e)
+		}
+		var restored string
+		var helpers int
+		if e = conn.QueryRow(ctx, queryDefinitions).Scan(&restored); e != nil || restored != originalQueryFunctions {
+			t.Fatal("Down did not restore the exact query functions", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT count(*) FROM pg_proc WHERE proname IN ('context_query_units','context_query_read_batches','context_query_begin_tool','context_query_scope_source_valid')`).Scan(&helpers); e != nil || helpers != 0 {
+			t.Fatal("Down kept helper functions", helpers, e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("http header query Up after Down", from, to, e)
+		}
+		t.Log("http header query functions: units/batches/tool/source pinned; Down restored exact functions; Up restored 122")
 	}
 	// A version this binary does not know is refused, not skipped.
 	if _, e = conn.Exec(ctx, "INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", head+1); e != nil {

@@ -149,11 +149,11 @@ func (f *projectionWorkerFixture) OpenProjectionKey(ctx context.Context, _ value
 	}
 	return f.lastKey, ctx.Err()
 }
-func (f *projectionWorkerFixture) ReadProjectionNative(ctx context.Context, s NativeContextSource, _ value.ContextProjectionScope, keys KeyOpener, _ time.Time) (value.PodStatusProjection, error) {
+func (f *projectionWorkerFixture) ReadProjectionNative(ctx context.Context, s NativeContextSource, _ value.ContextProjectionScope, keys KeyOpener, _ time.Time) (value.ProjectionResult, error) {
 	f.reads++
 	if f.nativeHook != nil {
 		if err := f.nativeHook(ctx, keys); err != nil {
-			return value.PodStatusProjection{}, err
+			return value.ProjectionResult{}, err
 		}
 	}
 	for _, role := range []string{"manifest-key", "data-key", "index-key"} {
@@ -162,10 +162,10 @@ func (f *projectionWorkerFixture) ReadProjectionNative(ctx context.Context, s Na
 		clear(aad)
 		clear(key)
 		if err != nil {
-			return value.PodStatusProjection{}, err
+			return value.ProjectionResult{}, err
 		}
 	}
-	return value.PodStatusProjection{Format: artifact.ContextFormat, NamespaceUID: s.Expectation.NamespaceUID, PodUID: s.Expectation.PodUID, ResourceVersion: "1", ObservedAt: f.now, Phase: "Running", Ready: "True", Initialized: "True", Scheduled: "True", RuntimeInstances: 1, Running: 1}, nil
+	return value.ProjectionResult{PodStatus: value.PodStatusProjection{Format: artifact.ContextFormat, NamespaceUID: s.Expectation.NamespaceUID, PodUID: s.Expectation.PodUID, ResourceVersion: "1", ObservedAt: f.now, Phase: "Running", Ready: "True", Initialized: "True", Scheduled: "True", RuntimeInstances: 1, Running: 1}}, nil
 }
 func TestProjectionWorkerExactClaimBeforeProtectedOpen(t *testing.T) {
 	f := newProjectionWorkerFixture(t)
@@ -211,7 +211,7 @@ func TestProjectionWorkerThreeRolesAndTwoChargedBatches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p, err := r.Projection(context.Background()); err != nil || p.PodUID != f.q.Scope.PodUID || f.keyCalls != 3 {
+	if p, err := r.Projection(context.Background()); err != nil || p.PodStatus.PodUID != f.q.Scope.PodUID || f.keyCalls != 3 {
 		t.Fatal("missing approved projection/three roles", p, err, f.keyCalls)
 	}
 	second := f.start

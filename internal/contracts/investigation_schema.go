@@ -204,8 +204,20 @@ func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 	}
 	// The server-selected original tool is closed at this implementation
 	// boundary. A future catalog entry cannot choose a weaker nested schema.
-	if out.Data.Tool != "get_file_excerpt" || v.ValidateOutput(out.Data.Tool, out.Data.Result) != nil {
+	if out.Data.Tool != "get_file_excerpt" && out.Data.Tool != "get_http_headers" || v.ValidateOutput(out.Data.Tool, out.Data.Result) != nil {
 		return ErrInvestigationWire
+	}
+	if out.Data.Tool == "get_http_headers" {
+		// ADR-282: the page carries no query times; it is the same request's
+		// successful page.
+		var page struct {
+			RequestID string `json:"request_id"`
+			Status    string `json:"status"`
+		}
+		if json.Unmarshal(out.Data.Result, &page) != nil || page.Status != "ok" || page.RequestID != out.RequestID {
+			return ErrInvestigationWire
+		}
+		return nil
 	}
 	var nested struct {
 		RequestID string `json:"request_id"`

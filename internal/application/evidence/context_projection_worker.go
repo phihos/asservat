@@ -19,6 +19,7 @@ type ProjectionWorkerState struct {
 	Worker           value.AcquisitionWorker
 }
 type ProjectionWorkerLedger interface {
+	ProjectionWorkerRoom(context.Context, query.ContextQuery) error
 	ReserveProjectionWorker(context.Context, query.ContextQuery, query.ContextQueryRequest, query.ContextProjectionAuthority) (ProjectionWorkerState, error)
 	ReadProjectionWorker(context.Context, query.ContextQuery, query.ContextQueryRequest, query.ContextProjectionAuthority) (ProjectionWorkerState, error)
 	ClaimProjectionWorker(context.Context, query.ContextProjectionWorkerIntent, query.ContextQueryRequest, query.ContextProjectionAuthority, audit.Receipt) (value.AcquisitionWorkerLaunch, error)
@@ -39,6 +40,19 @@ type ProjectionWorkerAdmission struct {
 	Audit   auditapp.ProjectionWorkerWriter
 	Now     func() time.Time
 	Cleanup *ProjectionWorkerCleanup
+}
+
+// ProjectionWorkerRoom refuses with query.ErrBusy, before any charge, while the
+// live worker caps are full. Cleanup is demand-driven, so each check is also a
+// cleanup demand: expired workers retire only when someone asks for room.
+func (s *ProjectionWorkerAdmission) ProjectionWorkerRoom(ctx context.Context, q query.ContextQuery) error {
+	if s == nil || s.Ledger == nil {
+		return query.ErrUnavailable
+	}
+	if s.Cleanup != nil {
+		s.Cleanup.CleanupProjectionWorkers(ctx)
+	}
+	return s.Ledger.ProjectionWorkerRoom(ctx, q)
 }
 
 func (s *ProjectionWorkerAdmission) AdmitProjectionWorker(ctx context.Context, q query.ContextQuery, owner ContextProjectionRequestOwner) error {

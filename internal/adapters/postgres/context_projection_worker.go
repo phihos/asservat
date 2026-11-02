@@ -89,7 +89,7 @@ func projectionWorkerState(row custodydb.DownloadWorker, q query.ContextQuery) (
 }
 func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, a query.ContextProjectionAuthority) (evidence.ProjectionWorkerState, error) {
 	var out evidence.ProjectionWorkerState
-	if r.Call.ID != q.OperationID || r.Call.Tool != "get_file_excerpt" {
+	if r.Call.ID != q.OperationID || r.Call.Tool != q.Scope.BeginTool() {
 		return out, query.ErrUnavailable
 	}
 	err := s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries) error {
@@ -102,7 +102,7 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 			return e
 		}
 		counts, e := tx.AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: id(q.Plan.InstallationID), ClusterID: id(q.Scope.ClusterID), NamespaceUid: q.Scope.NamespaceUID, WorkloadUid: q.Scope.WorkloadUID, PrincipalKey: principalKey(q.Scope.Principal)})
-		if e != nil || counts.Total >= 16 || counts.Workload >= 2 || counts.Principal >= 2 {
+		if e != nil || !projectionWorkerRoom(counts) {
 			return query.ErrUnavailable
 		}
 		i := query.ContextProjectionWorkerIntent{Query: q, Worker: value.AcquisitionWorkerIntent{ID: q.WorkerID, Parent: value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: q.ID}, Profile: s.profile, CreatedAt: q.CreatedAt, RunUntil: q.WorkerUntil}}
@@ -124,6 +124,26 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 	}
 	return out, nil
 }
+
+// projectionWorkerRoom applies the live acquisition worker caps shared with
+// downloads: 16 per installation, two per workload and two per principal.
+func projectionWorkerRoom(c custodydb.AcquisitionWorkerCapacityRow) bool {
+	return c.Total < 16 && c.Workload < 2 && c.Principal < 2
+}
+
+// ProjectionWorkerRoom reads the live worker caps before a query is admitted,
+// so a full cap refuses without charging the query. It is advisory: the
+// reservation rechecks the caps under its lock.
+func (s *ProjectionWorkers) ProjectionWorkerRoom(ctx context.Context, q query.ContextQuery) error {
+	counts, e := custodydb.New(s.queries.ledger.pool).AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: id(q.Plan.InstallationID), ClusterID: id(q.Scope.ClusterID), NamespaceUid: q.Scope.NamespaceUID, WorkloadUid: q.Scope.WorkloadUID, PrincipalKey: principalKey(q.Scope.Principal)})
+	if e != nil {
+		return query.ErrUnavailable
+	}
+	if !projectionWorkerRoom(counts) {
+		return query.ErrBusy
+	}
+	return nil
+}
 func (s *ProjectionWorkers) ReadProjectionWorker(ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, a query.ContextProjectionAuthority) (evidence.ProjectionWorkerState, error) {
 	var out evidence.ProjectionWorkerState
 	e := s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries) error {
@@ -141,7 +161,7 @@ func (s *ProjectionWorkers) ReadProjectionWorker(ctx context.Context, q query.Co
 }
 func (s *ProjectionWorkers) ClaimProjectionWorker(ctx context.Context, i query.ContextProjectionWorkerIntent, r query.ContextQueryRequest, a query.ContextProjectionAuthority, receipt audit.Receipt) (value.AcquisitionWorkerLaunch, error) {
 	var out value.AcquisitionWorkerLaunch
-	if !i.Valid() || !receipt.ValidProjectionWorker(i) || r.Call.ID != i.Query.OperationID || r.Call.Tool != "get_file_excerpt" {
+	if !i.Valid() || !receipt.ValidProjectionWorker(i) || r.Call.ID != i.Query.OperationID || r.Call.Tool != i.Query.Scope.BeginTool() {
 		return out, query.ErrUnavailable
 	}
 	e := s.current(ctx, i.Query, r, a, func(ctx context.Context, tx *custodydb.Queries) error {

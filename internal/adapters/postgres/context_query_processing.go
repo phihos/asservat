@@ -17,7 +17,7 @@ import (
 func (s *ProcessingReads) ContextProjectionProcessing(ctx context.Context, r app.ContextProjectionEvidence, recovery artifact.RecoveryProof) (artifact.DownloadProcessingProof, error) {
 	var out artifact.DownloadProcessingProof
 	now := time.Now()
-	if s == nil || s.ledger == nil || s.recovery == nil || ctx == nil || ctx.Err() != nil || !identity.Fresh(r.ObservedAt, r.ValidUntil, now, identity.EvidenceReadRequestWindow) || !recovery.Valid(now) || r.CaseID == "" || r.SourceFormat != artifact.ContextFormat || r.SourceProjectionDigest != value.ContextSourceProjectionDigest() || r.DataClass != "metadata" || r.Retained.Registration.NativeLimit != artifact.MaxContextBytes {
+	if s == nil || s.ledger == nil || s.recovery == nil || ctx == nil || ctx.Err() != nil || !identity.Fresh(r.ObservedAt, r.ValidUntil, now, identity.EvidenceReadRequestWindow) || !recovery.Valid(now) || r.CaseID == "" || !projectionSource(r) {
 		return out, value.ErrUnavailable
 	}
 	until := identity.Earlier(r.ValidUntil, identity.Earlier(recovery.FreshUntil, r.Retained.Effective.ExpiresAt))
@@ -48,7 +48,7 @@ func (s *ProcessingReads) ContextProjectionProcessing(ctx context.Context, r app
 			return e
 		}
 		original, e := currentPublishedContext(published)
-		if e != nil || original.CaseID != r.CaseID || original.CaptureUID != r.CaptureID || original.Registration != r.Retained.Registration || original.PurposeRef != r.PurposeRef || original.DataClass != r.DataClass || artifact.Digest(published.ContextVerification.CopiesDigest) != r.Version {
+		if e != nil || original.CaseID != r.CaseID || original.CaptureUID != r.CaptureID || original.Registration != r.Retained.Registration || original.PurposeRef != r.PurposeRef || original.DataClass != r.DataClass || original.NativeType != r.NativeType || artifact.Digest(published.ContextVerification.CopiesDigest) != r.Version {
 			return value.ErrUnavailable
 		}
 		out = processingProof(snapshot, p)
@@ -65,4 +65,11 @@ func (s *ProcessingReads) ContextProjectionProcessing(ctx context.Context, r app
 		return artifact.DownloadProcessingProof{}, value.ErrUnavailable
 	}
 	return out, nil
+}
+
+// projectionSource accepts exactly the pod-status metadata context or an
+// httpHeaders extract (ADR-282), never another native type or class.
+func projectionSource(r app.ContextProjectionEvidence) bool {
+	src, ok := value.LookupProjectionSource(r.NativeType)
+	return ok && src.Matches(r.NativeType, r.SourceFormat, r.DataClass, r.Retained.Input.EvidenceType, r.Retained.Registration.NativeLimit, r.SourceProjectionDigest)
 }

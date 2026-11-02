@@ -10,6 +10,7 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	identities "asservat.local/asservat/internal/application/identity"
 	value "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -34,6 +35,14 @@ type ContextProjectionService struct {
 	Routes   ContextProjectionRoutes
 	Plans    ContextQueryPlans
 	Workers  ContextProjectionWorkerAdmission
+	// HeaderRoutes, when composed, admits get_http_headers (ADR-282).
+	HeaderRoutes ContextProjectionRouteReader
+}
+
+// HTTPHeaders is the get_http_headers admission over this same service, when
+// its route reader is composed.
+func (s ContextProjectionService) HTTPHeaders() (HTTPHeaderReads, bool) {
+	return HTTPHeaderReads{Service: s, Routes: s.HeaderRoutes}, s.HeaderRoutes != nil
 }
 
 func (s ContextProjectionResults) valid() bool {
@@ -52,10 +61,13 @@ const (
 	ContextQueryReadCharged ContextQueryEffect = "query_read_charged"
 )
 
+// Exactly one selection branch is set: the line selection of a pod-status
+// excerpt or the record window of an httpHeaders page (ADR-282).
 type ContextProjectionAssociation struct {
 	ID, QueryID, OperationID, BatchID string
 	Generation                        int64
 	Selection                         value.LineSelection
+	Headers                           value.HTTPHeaderWindow
 }
 
 // ContextProjectionDelivery owns both the prepared result and its live request.
@@ -67,6 +79,7 @@ type ContextProjectionDelivery struct {
 	association                             ContextProjectionAssociation
 	effect                                  ContextQueryEffect
 	excerpt                                 value.ContextExcerpt
+	page                                    value.HTTPHeaderPage
 	pending                                 bool
 	batch                                   *value.ContextReadBatch
 	read                                    ContextProjectionRead
@@ -96,8 +109,32 @@ func (d *ContextProjectionDelivery) Done() <-chan struct{} {
 	close(closed)
 	return closed
 }
+
+// Tool is the public tool that admitted this delivery's query.
+func (d *ContextProjectionDelivery) Tool() string { return d.owner.query.Scope.BeginTool() }
+
+// Provenance is the read artifact and its verified ciphertext-copy version.
+func (d *ContextProjectionDelivery) Provenance() (string, artifact.Digest) {
+	return d.owner.query.Scope.ArtifactID, d.owner.query.Scope.Version
+}
+
+// HeaderPage returns the prepared httpHeaders page of a ready delivery.
+func (d *ContextProjectionDelivery) HeaderPage() (value.HTTPHeaderPage, bool) {
+	if d == nil || d.pending || d.owner.query.Scope.NativeType != artifact.HTTPHeadersArtifact {
+		return value.HTTPHeaderPage{}, false
+	}
+	d.owner.mu.Lock()
+	defer d.owner.mu.Unlock()
+	if d.owner.closed {
+		return value.HTTPHeaderPage{}, false
+	}
+	p := d.page
+	p.Records, p.CoverageGaps = slices.Clone(p.Records), slices.Clone(p.CoverageGaps)
+	return p, true
+}
+
 func (d *ContextProjectionDelivery) Excerpt() (value.ContextExcerpt, bool) {
-	if d == nil || d.pending {
+	if d == nil || d.pending || d.owner.query.Scope.NativeType != artifact.PodStatusArtifact {
 		return value.ContextExcerpt{}, false
 	}
 	d.owner.mu.Lock()
@@ -171,6 +208,9 @@ func (d *ContextProjectionDelivery) Close(ctx context.Context) error {
 		o.closed = true
 		clear(d.excerpt.Lines)
 		d.excerpt = value.ContextExcerpt{}
+		clear(d.page.Records)
+		clear(d.page.CoverageGaps)
+		d.page = value.HTTPHeaderPage{}
 		o.mu.Unlock()
 		if d.read == nil {
 			return
@@ -432,16 +472,30 @@ func (o *projectionRequest) CheckCurrent(ctx context.Context) (value.ContextProj
 }
 
 func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, selection value.ContextExcerptSelection) (*ContextProjectionDelivery, error) {
-	d, err := s.beginExcerpt(ctx, current, invocation, selection)
+	var d *ContextProjectionDelivery
+	err := queryStepped("configuration", value.ErrUnavailable)
+	if selection.Valid() && s.Routes != nil {
+		d, err = s.begin(ctx, current, invocation, "get_file_excerpt", ContextQueryInput{Selection: selection}, func(ctx context.Context, caller identity.Identity, recovery artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
+			c, err := s.Routes.ResolveContextProjection(ctx, selection, caller, recovery)
+			if err != nil || c.CaseID != selection.CaseID || c.ArtifactID != selection.ArtifactID || c.Selection != selection.Selection || c.NativeType != artifact.PodStatusArtifact {
+				return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)
+			}
+			return c, nil
+		})
+	}
 	s.Results.refused(ctx, "excerpt", err)
 	return d, err
 }
 
-func (s ContextProjectionService) beginExcerpt(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, selection value.ContextExcerptSelection) (*ContextProjectionDelivery, error) {
-	if !selection.Valid() || s.Recovery == nil || s.Routes == nil || s.Plans == nil || s.Workers == nil {
+// begin admits one approved query for tool: the caller's route resolves
+// the content-minimized candidate after recovery; C-03 then resolves the
+// exact current scope and the query is admitted, its worker dispatched and
+// the pending handle prepared.
+func (s ContextProjectionService) begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, tool string, input ContextQueryInput, route func(context.Context, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error)) (*ContextProjectionDelivery, error) {
+	if s.Recovery == nil || s.Plans == nil || s.Workers == nil || route == nil {
 		return nil, queryStepped("configuration", value.ErrUnavailable)
 	}
-	o, err := s.Results.request(ctx, current, invocation, "get_file_excerpt")
+	o, err := s.Results.request(ctx, current, invocation, tool)
 	if err != nil {
 		return nil, err
 	}
@@ -451,20 +505,19 @@ func (s ContextProjectionService) beginExcerpt(ctx context.Context, current iden
 			o.cancel()
 		}
 	}()
-	if err = invocation.CheckInput(o.ctx, ContextQueryInput{Selection: selection}); err != nil {
+	if err = invocation.CheckInput(o.ctx, input); err != nil {
 		return nil, queryStepped("input", value.ErrUnavailable)
 	}
 	recovery, err := s.Recovery.RecoveryState(o.ctx)
 	if err != nil || !recovery.Valid(s.Results.Now()) || recovery.InstallationID != s.Results.InstallationID || !o.shorten("recovery", recovery.FreshUntil) {
 		return nil, queryCollapsed("recovery", value.ErrUnavailable, err)
 	}
-	candidate, err := s.Routes.ResolveContextProjection(o.ctx, selection, o.initial, recovery)
-	if err != nil || !candidate.Valid() || candidate.RootID != s.Results.RootID || candidate.CaseID != selection.CaseID ||
-		candidate.ArtifactID != selection.ArtifactID || candidate.Selection != selection.Selection || candidate.Principal != o.initial.Principal {
+	candidate, err := route(o.ctx, o.initial, recovery)
+	if err != nil || !candidate.Valid() || candidate.RootID != s.Results.RootID || candidate.Principal != o.initial.Principal {
 		return nil, queryCollapsed("route", value.ErrUnavailable, err)
 	}
 	a, err := s.Results.Authority.ResolveProjectionCurrent(o.ctx, current, candidate)
-	if err != nil || !a.Valid(s.Results.Now()) || a.Scope.Candidate() != candidate || a.Environment.InstallationID != s.Results.InstallationID ||
+	if err != nil || !a.Valid(s.Results.Now()) || a.Scope.Candidate() != candidate || a.Scope.BeginTool() != tool || a.Environment.InstallationID != s.Results.InstallationID ||
 		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten("resolved-authority/"+a.Bound, a.ValidUntil) {
 		return nil, queryCollapsed("authority", value.ErrUnavailable, err)
 	}
@@ -483,6 +536,11 @@ func (s ContextProjectionService) beginExcerpt(ctx context.Context, current iden
 	a, err = o.CheckCurrent(o.ctx)
 	if err != nil {
 		return nil, queryStepped("pre-admit", err)
+	}
+	if err = s.Workers.ProjectionWorkerRoom(o.ctx, q); errors.Is(err, value.ErrBusy) {
+		return nil, queryStepped("worker-room", value.ErrBusy)
+	} else if err != nil {
+		return nil, queryCollapsed("worker-room", value.ErrUnavailable, err)
 	}
 	admitted, err := s.Results.Ledger.AdmitQuery(o.ctx, q, o.request, a)
 	if err != nil || !admitted.Fresh || !admitted.Query.Equal(q) {
@@ -572,7 +630,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
-		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection}}
+		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers}}
 	if !authorization.UUID(d.association.ID) {
 		return nil, queryStepped("association", value.ErrUnavailable)
 	}
@@ -648,12 +706,22 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	mark = time.Now()
 	projection, err := d.read.Projection(o.ctx)
 	auditapp.MarkStep(o.ctx, "q-projection", mark)
-	if err == nil && projection.NamespaceUID == o.query.Scope.NamespaceUID && projection.PodUID == o.query.Scope.PodUID {
-		d.excerpt, err = FormatContextExcerpt(projection, o.query.Scope.Selection)
-	} else {
+	scope := o.query.Scope
+	invalidCursor, tooLarge := false, false
+	switch {
+	case err != nil || !projection.Valid(scope):
 		err = value.ErrUnavailable
+	case scope.NativeType == artifact.HTTPHeadersArtifact && projection.InvalidCursor:
+		invalidCursor = true
+	case scope.NativeType == artifact.HTTPHeadersArtifact && projection.TooLarge:
+		tooLarge = true
+	case scope.NativeType == artifact.HTTPHeadersArtifact:
+		// The page keeps the result's own record slices; Close clears them.
+		d.page, projection.Headers = projection.Headers, value.HTTPHeaderPage{}
+	default:
+		d.excerpt, err = FormatContextExcerpt(projection.PodStatus, scope.Selection)
 	}
-	projection = value.PodStatusProjection{}
+	projection.Clear()
 	if err == nil {
 		_, err = o.CheckCurrent(o.ctx)
 	}
@@ -666,6 +734,16 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	if err != nil {
 		_ = d.Close(context.WithoutCancel(o.ctx))
 		return nil, queryCollapsed("projection", value.ErrUnavailable, err)
+	}
+	if invalidCursor {
+		// Judged by the worker against the rechecked document after current
+		// read rights; it discloses no record. The read stays charged.
+		_ = d.Close(context.WithoutCancel(o.ctx))
+		return nil, queryStepped("cursor", value.ErrInvalidCursor)
+	}
+	if tooLarge {
+		_ = d.Close(context.WithoutCancel(o.ctx))
+		return nil, queryStepped("record-size", value.ErrRecordTooLarge)
 	}
 	return d, nil
 }

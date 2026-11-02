@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"sync"
 	"time"
 
@@ -89,7 +90,7 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 	var err error
 	switch i.call.Tool {
 	case "get_file_excerpt":
-		if !in.Selection.Valid() || in.QueryID != "" {
+		if !in.Selection.Valid() || in.QueryID != "" || in.Headers != (value.HTTPHeaderSelection{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(struct {
@@ -98,8 +99,13 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 			LineStart  int    `json:"line_start"`
 			MaxLines   int    `json:"max_lines"`
 		}{in.Selection.CaseID, in.Selection.ArtifactID, in.Selection.Selection.LineStart, in.Selection.Selection.MaxLines})
+	case "get_http_headers":
+		if !in.Headers.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) {
+			return ErrOperationDelivery
+		}
+		raw, err = json.Marshal(HTTPHeaderOperationInput{CaseID: in.Headers.CaseID, ArtifactID: in.Headers.ArtifactID, Cursor: httpHeaderCursorText(in.Headers), Limit: in.Headers.Limit})
 	case "get_query_result":
-		if !authorization.UUID(in.QueryID) || in.Selection != (value.ContextExcerptSelection{}) {
+		if !authorization.UUID(in.QueryID) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(struct {
@@ -130,18 +136,20 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		return ErrOperationDelivery
 	}
 	a := d.Association()
-	if !authorization.UUID(a.ID) || !authorization.UUID(a.QueryID) || !a.Selection.Valid() {
+	selected := a.Selection.Valid() && a.Headers == (value.HTTPHeaderWindow{}) || a.Selection == (value.LineSelection{}) && a.Headers.Valid()
+	if !authorization.UUID(a.ID) || !authorization.UUID(a.QueryID) || !selected {
 		return ErrOperationDelivery
 	}
 	until := d.ValidUntil()
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	if !i.current(ctx) || !i.inputChecked || i.delivery != nil || !authorization.UUID(a.ID) ||
-		!authorization.UUID(a.QueryID) || a.OperationID != i.call.ID || !a.Selection.Valid() ||
+		!authorization.UUID(a.QueryID) || a.OperationID != i.call.ID ||
 		!i.now().Before(until) || until.After(i.call.Until) || bytes <= 0 || bytes > audit.OperationOutputLimit {
 		return ErrOperationDelivery
 	}
-	if i.call.Tool == "get_file_excerpt" && a.Selection != i.input.Selection.Selection ||
+	if i.call.Tool == "get_file_excerpt" && (a.Selection != i.input.Selection.Selection || a.Headers != (value.HTTPHeaderWindow{})) ||
+		i.call.Tool == "get_http_headers" && (a.Headers != i.input.Headers.Window() || a.Selection != (value.LineSelection{})) ||
 		i.call.Tool == "get_query_result" && a.QueryID != i.input.QueryID {
 		return ErrOperationDelivery
 	}
@@ -197,3 +205,12 @@ func (i *contextQueryInvocation) close() {
 }
 
 var _ analysisapp.ContextQueryInvocation = (*contextQueryInvocation)(nil)
+
+// httpHeaderCursorText is the public cursor a normalized selection was read
+// from: empty on the first page, otherwise the canonical index and binding.
+func httpHeaderCursorText(s value.HTTPHeaderSelection) string {
+	if s.Start == 0 {
+		return ""
+	}
+	return strconv.Itoa(s.Start) + ":" + s.Binding
+}

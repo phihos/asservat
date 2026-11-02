@@ -70,7 +70,7 @@ func (s *ContextQueries) BeginReadBatch(ctx context.Context, q value.ContextQuer
 			if !errors.Is(e, pgx.ErrNoRows) {
 				return e
 			}
-			if row.ActiveBatch.Valid || row.Generation >= value.ContextMaxReadBatches {
+			if row.ActiveBatch.Valid || int64(row.Generation) >= q.Scope.ReadBatches() {
 				return value.ErrUnavailable
 			}
 			call, e := tx.ReadContextQueryCall(ctx, custodydb.ReadContextQueryCallParams{OperationID: id(r.Call.ID), QueryID: id(q.ID)})

@@ -67,7 +67,8 @@ func TestConfigurationReconcilerIndependentSerialLoopsAndShutdown(t *testing.T) 
 		t.Fatal("duplicate concurrent loops accepted")
 	}
 	until := time.Now().Add(2 * time.Second)
-	for ownerCalls.Load() < 2 && time.Now().Before(until) {
+	// The fence follows its read; wait for both, or the check races the fence.
+	for (ownerCalls.Load() < 2 || ownerFences.Load() < 2) && time.Now().Before(until) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	if ownerCalls.Load() != 2 || ownerFences.Load() != 2 {

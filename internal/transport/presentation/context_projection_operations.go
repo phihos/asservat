@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	analysisapp "asservat.local/asservat/internal/application/analysis"
@@ -27,6 +28,7 @@ type ContextQueryResults interface {
 type ContextProjectionOperations struct {
 	excerpts  ContextExcerptService
 	results   ContextQueryResults
+	headers   HTTPHeaderQueryService
 	contracts *contracts.InvestigationContracts
 }
 
@@ -41,10 +43,35 @@ func NewContextProjectionOperations(excerpts ContextExcerptService, results Cont
 	return &ContextProjectionOperations{excerpts: excerpts, results: results, contracts: wire}, nil
 }
 
+// WithHTTPHeaders adds the ADR-282 get_http_headers admission to the same
+// audited query operations; get_query_result then also serves its pages.
+func (s *ContextProjectionOperations) WithHTTPHeaders(headers HTTPHeaderQueryService) (*ContextProjectionOperations, error) {
+	if s == nil || headers == nil || s.headers != nil {
+		return nil, ErrOperationsConfiguration
+	}
+	out := *s
+	out.headers = headers
+	return &out, nil
+}
+
+// serves reports whether name is one of this composition's operations.
+func (s *ContextProjectionOperations) serves(name string) bool {
+	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil)
+}
+
+// toolNames are the operations this composition advertises.
+func (s *ContextProjectionOperations) toolNames() []string {
+	names := []string{"get_file_excerpt", "get_query_result"}
+	if s.headers != nil {
+		names = append(names, "get_http_headers")
+	}
+	return names
+}
+
 func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, current identities.CurrentIdentity, call OperationCall, name string, raw json.RawMessage) (OperationReply, error) {
 	noDispatch := OperationReply{auditNoDispatch: true, auditEffect: operationEffectNone}
 	if s == nil || ctx == nil || ctx.Err() != nil || current == nil || call.queryInvocation == nil ||
-		!queryOperation(name) || s.contracts.ValidateInput(name, raw) != nil {
+		!s.serves(name) || s.contracts.ValidateInput(name, raw) != nil {
 		return noDispatch, stopped("query-call", ErrOperationDelivery)
 	}
 	i := call.queryInvocation
@@ -53,7 +80,24 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		return noDispatch, stopped("query-invocation", ErrOperationDelivery)
 	}
 	var input analysisapp.ContextQueryInput
-	if name == "get_file_excerpt" {
+	switch name {
+	case "get_http_headers":
+		var in HTTPHeaderOperationInput
+		if json.Unmarshal(raw, &in) != nil {
+			return noDispatch, ErrOperationDelivery
+		}
+		sel, e := value.NormalizeHTTPHeaderSelection(in.CaseID, in.ArtifactID, in.Cursor, in.Limit)
+		if e != nil {
+			// A malformed cursor is judged before any lookup and names no
+			// artifact fact; any other input refusal is the shared outcome.
+			failure, decision := httpHeaderNotAvailable, operationAuditDenied
+			if errors.Is(e, value.ErrInvalidCursor) {
+				failure, decision = httpHeaderInvalidCursor, operationAuditInvalid
+			}
+			return s.refusal(record.ID, name, record.Until, failure, decision, operationEffectNone, true)
+		}
+		input.Headers = sel
+	case "get_file_excerpt":
 		var in struct {
 			CaseID     string `json:"case_id"`
 			ArtifactID string `json:"artifact_id"`
@@ -68,7 +112,7 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			return noDispatch, ErrOperationDelivery
 		}
 		input.Selection = value.ContextExcerptSelection{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: selection}
-	} else {
+	default:
 		var in struct {
 			QueryHandle string `json:"query_handle"`
 		}
@@ -81,9 +125,12 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		return noDispatch, stopped("query-input", ErrOperationDelivery)
 	}
 	var d *analysisapp.ContextProjectionDelivery
-	if name == "get_file_excerpt" {
+	switch name {
+	case "get_file_excerpt":
 		d, err = s.excerpts.BeginExcerpt(ctx, current, i, input.Selection)
-	} else {
+	case "get_http_headers":
+		d, err = s.headers.Begin(ctx, current, i, input.Headers)
+	default:
 		d, err = s.results.GetQueryResult(ctx, current, i, input.QueryID)
 	}
 	// Any dispatched error may have spent query/read/control capacity. Closing
@@ -100,6 +147,21 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			}
 		}
 	}()
+	if d == nil && errors.Is(err, value.ErrInvalidCursor) && name != "get_file_excerpt" {
+		// The worker judged the cursor against the rechecked document after
+		// current read rights; the read stays charged and nothing is disclosed.
+		return s.refusal(record.ID, name, record.Until, httpHeaderInvalidCursor, operationAuditInvalid, operationEffectAccepted, false)
+	}
+	if d == nil && errors.Is(err, value.ErrRecordTooLarge) && name != "get_file_excerpt" {
+		// The worker's first selected record alone exceeds the wire bound; the
+		// read stays charged and nothing is disclosed.
+		return s.refusal(record.ID, name, record.Until, httpHeaderTooLarge, operationAuditDenied, operationEffectAccepted, false)
+	}
+	if d == nil && errors.Is(err, value.ErrBusy) && name == "get_http_headers" {
+		// ADR-282: the live worker caps are full; the query was not admitted
+		// or charged, and a later page request may succeed.
+		return s.refusal(record.ID, name, record.Until, httpHeaderNotAvailable, operationAuditDenied, operationEffectNone, false)
+	}
 	if err != nil || d == nil {
 		// The service's own closed stage names this refusal in the report.
 		return OperationReply{}, stoppedAt("query", err, ErrOperationDelivery)
@@ -137,14 +199,51 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 	times := queryViewTimes{ObservedAt: d.ObservedAt(), ExpiresAt: d.QueryDeadline()}
 	envelope := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: requestID,
 		DataClass: "metadata", Status: "ok", Warnings: []string{}, Provenance: []any{}}
-	if d.Pending() {
+	switch {
+	case d.Pending() && name == "get_http_headers":
+		// The canonical get_http_headers pending branch carries the handle only.
+		envelope.Status = "pending"
+		envelope.Data = struct {
+			QueryHandle string `json:"query_handle"`
+			RetryAfter  int    `json:"retry_after_seconds"`
+		}{d.Association().QueryID, 1}
+	case d.Pending():
 		envelope.Status = "pending"
 		envelope.Data = struct {
 			QueryHandle string `json:"query_handle"`
 			RetryAfter  int    `json:"retry_after_seconds"`
 			queryViewTimes
 		}{d.Association().QueryID, 1, times}
-	} else {
+	case d.Tool() == "get_http_headers":
+		page, ok := d.HeaderPage()
+		if !ok {
+			return nil, ErrOperationDelivery
+		}
+		artifactID, version := d.Provenance()
+		wrap := func(inner OperationEnvelope) any { return inner }
+		if name == "get_query_result" {
+			wrap = func(inner OperationEnvelope) any {
+				outer := envelope
+				outer.Data = queryResult(d.Association().QueryID, d.Tool(), inner, times)
+				if inner.Status == "ok" {
+					outer.DataClass, outer.Warnings = "extract", []string{httpHeaderHandling}
+				}
+				return outer
+			}
+		}
+		inner, err := renderHTTPHeaderPage(requestID, page, artifactID, version, wrap)
+		if err != nil {
+			return nil, ErrOperationDelivery
+		}
+		if inner.Status != "ok" {
+			// A record that cannot fit is the tool's explicit error.
+			envelope = inner
+		} else if outer, ok := wrap(inner).(OperationEnvelope); ok {
+			envelope = outer
+		} else {
+			return nil, ErrOperationDelivery
+		}
+	default:
 		excerpt, ok := d.Excerpt()
 		if !ok {
 			return nil, ErrOperationDelivery
@@ -155,13 +254,7 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 			queryViewTimes
 		}{excerpt, times}
 		if name == "get_query_result" {
-			inner := envelope
-			envelope.Data = struct {
-				QueryHandle string            `json:"query_handle"`
-				ToolName    string            `json:"tool_name"`
-				Result      OperationEnvelope `json:"result"`
-				queryViewTimes
-			}{d.Association().QueryID, "get_file_excerpt", inner, times}
+			envelope.Data = queryResult(d.Association().QueryID, "get_file_excerpt", envelope, times)
 		}
 	}
 	body, err := json.Marshal(envelope)
@@ -170,6 +263,26 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 		return nil, ErrOperationDelivery
 	}
 	return body, nil
+}
+
+func queryResult(queryID, tool string, inner OperationEnvelope, times queryViewTimes) any {
+	return struct {
+		QueryHandle string            `json:"query_handle"`
+		ToolName    string            `json:"tool_name"`
+		Result      OperationEnvelope `json:"result"`
+		queryViewTimes
+	}{queryID, tool, inner, times}
+}
+
+// refusal is a fixed error reply without a delivery. noDispatch marks a
+// refusal proven before any query effect.
+func (s *ContextProjectionOperations) refusal(requestID, name string, until time.Time, f OperationFailure, decision operationAuditDecision, effect operationAuditEffect, noDispatch bool) (OperationReply, error) {
+	body, err := json.Marshal(httpHeaderFailure(requestID, f))
+	if err != nil || s.contracts.ValidateOutput(name, body) != nil {
+		clear(body)
+		return OperationReply{auditNoDispatch: noDispatch, auditEffect: effect}, ErrOperationDelivery
+	}
+	return OperationReply{Body: body, ValidUntil: until, auditDecision: decision, auditEffect: effect, auditNoDispatch: noDispatch}, nil
 }
 
 type contextProjectionGuard struct {
