@@ -257,3 +257,19 @@ func TestPolicyObservationScopeSurvivesActualPostgresTimestampCodec(t *testing.T
 		t.Fatalf("same PostgreSQL instants changed original scope/permit: %v", err)
 	}
 }
+
+// ADR-279: an ad hoc session's scope is computed on the inserted row, before
+// PostgreSQL generates adhoc_capture_id; the read-back row must still permit.
+func TestAdHocObservationPermitIgnoresGeneratedCaptureKey(t *testing.T) {
+	row := policyObservationRowFixture()
+	row.PolicyUid, row.AcceptanceID = pgtype.Text{}, pgtype.UUID{}
+	row.BindingScope = policyObservationScope(row)
+	row.AdhocCaptureID = row.CaptureID
+	if _, err := policyObservationPermit(row); err != nil {
+		t.Fatal("read-back ad hoc session denied", err)
+	}
+	limits := adHocObservationLimits([]byte(`{"approval":{"dataClass":"raw","observationLimits":{"maxSessionSeconds":60,"maxObservedBytes":1073741824,"maxBytesPerSecond":16777216,"maxConcurrentSessions":1}}}`))
+	if limits != (authorization.ObservationLimits{MaxSessionSeconds: 60, MaxObservedBytes: 1 << 30, MaxBytesPerSecond: 16 << 20, MaxConcurrentSessions: 1}) || adHocObservationLimits([]byte(`{"approval":{}}`)).Valid() {
+		t.Fatal("reviewed limits", limits)
+	}
+}

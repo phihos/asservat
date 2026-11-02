@@ -137,6 +137,9 @@ func observationRuleBytes() []byte { r := collector.ObservationAccountingRule();
 func policyObservationScope(row custodydb.PolicyObservationSession) []byte {
 	row.BindingScope = nil
 	row.EndedAt = pgtype.Timestamptz{}
+	// Generated from capture_id/acceptance_id, both bound below; absent on
+	// the inserted row the digest is first computed from.
+	row.AdhocCaptureID = pgtype.UUID{}
 	// pgx's timestamptz binary scan preserves instants but may return
 	// time.Local. Canonical scope binds those exact instants, not a receiver's
 	// zone representation; never change or renew an original cutoff here.

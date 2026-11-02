@@ -3,6 +3,7 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -67,7 +68,7 @@ func (s *APIContextExecutions) prepareAdHocObservation(ctx context.Context, q *c
 	}
 	hard := identity.Earlier(c.Work.Accepted.Deadline, e.Registration.WriteUntil)
 	hard = identity.Earlier(hard, e.Registration.ExpiresAt)
-	finite, err := authorization.PlanFiniteAdHocObservation(g, time.Duration(e.Recording.DurationMillis)*time.Millisecond, active, checkedAt.Add(collector.PacketCaptureStartWithin), hard, checkedAt)
+	finite, err := authorization.PlanFiniteAdHocObservation(g, adHocObservationLimits(g.Scope), time.Duration(e.Recording.DurationMillis)*time.Millisecond, active, checkedAt.Add(collector.PacketCaptureStartWithin), hard, checkedAt)
 	if err != nil {
 		return err
 	}
@@ -102,4 +103,18 @@ func (s *APIContextExecutions) prepareAdHocObservation(ctx context.Context, q *c
 	}
 	p.permit, err = policyObservationPermit(session)
 	return err
+}
+
+// adHocObservationLimits reads the reviewed observation limits frozen in an
+// approved ad hoc grant's plan scope (ADR-279); zero (invalid) without them.
+func adHocObservationLimits(scope []byte) authorization.ObservationLimits {
+	var s struct {
+		Approval struct {
+			ObservationLimits authorization.ObservationLimits `json:"observationLimits"`
+		} `json:"approval"`
+	}
+	if json.Unmarshal(scope, &s) != nil {
+		return authorization.ObservationLimits{}
+	}
+	return s.Approval.ObservationLimits
 }
