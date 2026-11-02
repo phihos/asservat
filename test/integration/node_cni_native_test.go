@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -134,7 +135,7 @@ func cniQualificationNative(t *testing.T, ctx context.Context, k kubernetes.Inte
 	// The web Pod also polls its own loopback on 9090, the probe for the
 	// pod loopback path that the veth hook cannot observe.
 	webSpec := restrictedPod("cni-web", busybox, "mkdir -p /tmp/www && printf '%s' \""+packetMarker+"\" > /tmp/www/index.html && httpd -p 8080 -h /tmp/www && httpd -p 9090 -h /tmp/www && "+
-		"while true; do wget -q -O /dev/null http://127.0.0.1:9090/ ; sleep 0.2; done")
+		"while true; do wget -q -O /dev/null http://127.0.0.1:9090/ && echo lo ; sleep 0.2; done")
 	if _, err := k.CoreV1().Pods(workload).Create(ctx, webSpec, meta.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -164,8 +165,8 @@ func cniQualificationNative(t *testing.T, ctx context.Context, k kubernetes.Inte
 		t.Fatalf("Service is not dual-stack: %v", svc.Spec.ClusterIPs)
 	}
 	if _, err := k.CoreV1().Pods(workload).Create(ctx, restrictedPod("cni-client", busybox,
-		"while true; do wget -q -O /dev/null http://"+web4.String()+":8080/ ; wget -q -O /dev/null 'http://["+web6.String()+"]:8080/' ; "+
-			"wget -q -O /dev/null http://"+vip4.String()+":80/ ; wget -q -O /dev/null 'http://["+vip6.String()+"]:80/' ; done"), meta.CreateOptions{}); err != nil {
+		"while true; do wget -q -O /dev/null http://"+web4.String()+":8080/ && echo d4 ; wget -q -O /dev/null 'http://["+web6.String()+"]:8080/' && echo d6 ; "+
+			"wget -q -O /dev/null http://"+vip4.String()+":80/ && echo v4 ; wget -q -O /dev/null 'http://["+vip6.String()+"]:80/' && echo v6 ; done"), meta.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	client := running(workload, "cni-client")
@@ -210,8 +211,30 @@ func cniQualificationNative(t *testing.T, ctx context.Context, k kubernetes.Inte
 	headersOnly("client", rc, bc)
 	atClient := countPacketAddresses(t, bc, 8080, 9090, vips...)
 	clientVIP := countPacketAddresses(t, bc, 80, 9090, vips...)
+	// Positive controls: every request kind succeeded during the captures,
+	// so a zero VIP or loopback count is the hook's view, not failed traffic.
+	succeeded := func(pod string, tokens ...string) map[string]int {
+		t.Helper()
+		logs, err := k.CoreV1().Pods(workload).GetLogs(pod, &core.PodLogOptions{TailLines: ptr.To[int64](4000)}).DoRaw(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := map[string]int{}
+		for _, line := range strings.Fields(string(logs)) {
+			n[line]++
+		}
+		for _, token := range tokens {
+			if n[token] == 0 {
+				t.Fatalf("%s: no successful %q request in its recent log: %v", pod, token, n)
+			}
+		}
+		return n
+	}
+	clientOK := succeeded("cni-client", "d4", "d6", "v4", "v6")
+	webOK := succeeded("cni-web", "lo")
 	results["cni"] = map[string]any{
-		"profile": "cilium kubeProxyReplacement wireguard dual-stack (single node: inter-node WireGuard not exercised)",
+		"successfulRequests": map[string]int{"direct4": clientOK["d4"], "direct6": clientOK["d6"], "vip4": clientOK["v4"], "vip6": clientOK["v6"], "loopback": webOK["lo"]},
+		"profile":            "cilium kubeProxyReplacement wireguard dual-stack (single node: inter-node WireGuard not exercised)",
 		"backend": map[string]any{"ipv4Packets": server.IPv4, "ipv6Packets": server.IPv6, "serviceVIPPackets": server.Marked, "loopbackPackets": server.Loopback,
 			"seen": r.Seen, "retained": r.Retained, "lostSamples": r.LostSamples},
 		"client": map[string]any{"backendPort8080Packets": atClient.IPv4 + atClient.IPv6, "servicePort80Packets": clientVIP.IPv4 + clientVIP.IPv6, "serviceVIPPackets": atClient.Marked,

@@ -13,9 +13,13 @@ states that `virtualIP` peers observe nothing at the Pod hook under socket
 load balancing. Not exercised: inter-node WireGuard (single node), other CNIs,
 NAT.
 
-Verification: native `collector-cilium` run 41516602345 measured the results
-(its only failure was the test's own too-strict hostNetwork assertion, fixed);
-`collector-packet` run 41516607140 passes with the shared harness change.
+Verification: native `collector-cilium` passes in runs 41519034299 and
+41519038538, `collector-packet` in 41519042815, and the measurements now
+carry positive controls: each direct, VIP and loopback request kind must have
+succeeded during the captures, so a zero VIP or loopback count is the hook's
+view rather than failed traffic. The first run (41516602345) failed only on
+the test's own too-strict hostNetwork assertion; one run failed on an in-node
+Docker Hub pull, which led to loading fixture images from the host.
 
 ## Console plan diff and Save as profile (2026-11-02)
 

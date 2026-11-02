@@ -144,6 +144,7 @@ def cilium(work, name, kubeconfig, report):
 
 
 def packet(work, report, cni=""):
+    suite = "collector-" + (cni or "packet")
     run_id = secrets.token_hex(4)
     name = "asservat-collector-" + run_id
     env = dict(os.environ, TMPDIR=str(work), CGO_ENABLED="0")
@@ -214,7 +215,7 @@ def packet(work, report, cni=""):
                               cwd=ROOT, env=dict(env, CGO_ENABLED="1", CGO_CFLAGS=f"-I{prefix}/include", CGO_LDFLAGS=f"-L{prefix}/lib", ASSERVAT_COLLECTOR_FIXTURES=str(work / "fixture.json")))
         for artifact_name in ("filtered", "unfiltered", "encrypted", "cni-backend", "cni-client"):
             if (work / (artifact_name + ".pcapng")).exists():
-                shutil.copy(work / (artifact_name + ".pcapng"), ROOT / "test/results" / (report["suite"] + "-" + artifact_name + ".pcapng"))
+                shutil.copy(work / (artifact_name + ".pcapng"), ROOT / "test/results" / (suite + "-" + artifact_name + ".pcapng"))
         report["testSeconds"] = round(time.monotonic() - started, 1)
         if (work / "native-results.json").exists():
             report["native"] = json.loads((work / "native-results.json").read_text())
@@ -225,7 +226,7 @@ def packet(work, report, cni=""):
             subprocess.run(["kubectl", "--kubeconfig", str(kubeconfig), "-n", "asservat-collector", "describe", "pods"])
             if cni:
                 subprocess.run(["kubectl", "--kubeconfig", str(kubeconfig), "-n", "kube-system", "logs", "-l", "k8s-app=cilium", "--tail", "100", "--prefix"])
-            raise SystemExit(report["suite"] + " failed")
+            raise SystemExit(suite + " failed")
     finally:
         subprocess.run(["kind", "delete", "cluster", "--name", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if s3name:
