@@ -54,5 +54,29 @@ the files and the key; a tampered sealed segment is evicted as a coverage gap;
 an unwritable volume closes the ring with `MediumUnavailable`; the node refuses
 an encrypted-disk source without a mounted volume and reserves one segment plus
 headers with one. `check-helm.py` renders the opt-in emptyDir as the only
-writable collector mount. A native installed run with the volume enabled
-(restart, byte cap, full volume on a real node) is still pending.
+writable collector mount. The installed save path on the disk ring passes
+natively (`continuation-ongoing-save-disk`, PR #133).
+
+Native node behaviour (2026-11-02, `collector-ringdisk`, runs 41528226602
+and 41528974254 on GitHub runners, kernel 7.0 Azure, kind, chart volume at
+its 16 MiB minimum, rings of three 4 MiB segments so exactly one fits):
+
+- Byte cap: the first encrypted-disk source is accepted (4,194,400 bytes of
+  ring memory reserved); a second one is refused with `MediumUnavailable`
+  and the reservation stays unchanged. The volume peaked at 8,388,600 bytes
+  (two sealed 4,194,300-byte `0600` files) against the 16 MiB limit; the
+  collector Pod was never evicted.
+- Sealing: the sealed files hold neither client/server address pair, which
+  the decrypted snapshot of the same ring does contain (positive control).
+- Restart: after SIGKILL of the collector process the container restarts in
+  the same Pod with the emptyDir intact; the new process logs
+  `removedEarlier=1`, the volume is empty and the old source is gone from
+  the report (a snapshot of it is refused as unavailable).
+- Full volume: the test mounts a 1 MiB tmpfs over the Pod's emptyDir on the
+  node before a second container restart, so the first seal of a 4 MiB
+  segment hits a real ENOSPC. The ring closes (`stopped: ring medium
+  unavailable`, source InputUnknown), no partial file or ring directory
+  remains, a snapshot is refused (`CaptureBusy`) and the reservation is
+  released. The tmpfs is test-only node manipulation; the chart has no such
+  option. A volume filled by other writers on a shared node disk is not
+  exercised.

@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Encrypted-disk ring on a real node (2026-11-02)
+
+ADR-278's pending native qualification. New suite `collector-ringdisk`
+(`scripts/test-collector.py ringdisk`): the node collector suite with
+`collector.ringDisk` enabled at 16 MiB, running the ring-volume phase
+(test/integration/node_ringdisk_native_test.go) instead of the capture
+phases that `collector-packet` covers. Measured natively in runs
+41528226602 and 41528974254 (both passed, test phase ~90 s):
+
+- byte cap: one disk ring (12,599,296 sealed bytes) admitted, a second
+  refused `MediumUnavailable` before any reservation; volume peak
+  8,388,600 bytes, Pod never evicted;
+- sealed segments on the node are `0600`, carry no plaintext address
+  pairs, and a snapshot of the live ring decrypts them (608/616 packets);
+- SIGKILL container restart (same Pod, emptyDir kept): the new process
+  removes the earlier ring (`removedEarlier=1`), the old source is gone;
+- full volume: a test-mounted 1 MiB tmpfs over the emptyDir makes the
+  first seal fail with ENOSPC; the ring closes `MediumUnavailable`, no
+  partial segment or directory remains and a snapshot is refused.
+
+Two earlier runs failed on the test itself: 41526476384 let the 30-second
+source leaf expire before the engine's first seal (the test now renews it),
+41527346534 expected the sealed file to include the in-memory 32-byte
+segment header. Product change: the collector's start line now reports how many earlier
+ring entries it removed. `collector-packet` (41528997593) and
+`collector-cilium` (41529001581) still pass on the same commit. Remaining
+gap: a node disk filled by other writers (kubelet eviction path) is not
+exercised; the ADR's design keeps the collector below the emptyDir limit
+rather than relying on eviction.
+
 ## Cilium packet capture qualification (2026-11-02)
 
 S-04 row 17, EXP-02 subset. New native suite `collector-cilium`

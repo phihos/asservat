@@ -47,10 +47,14 @@ type collectorFixture struct {
 	S3                 string `json:"s3"`
 	// CNI names the cluster network profile; "cilium" adds the S-04 row 17
 	// qualification phase. Empty is kind's default network.
-	CNI     string `json:"cni"`
-	Work    string `json:"work"`
-	Results string `json:"results"`
-	Runner  struct {
+	CNI string `json:"cni"`
+	// RingDiskBytes is the chart's collector.ringDisk.bytes; nonzero runs
+	// the ADR-278 ring-volume phase instead of the capture phases, which
+	// collector-packet already covers.
+	RingDiskBytes int64  `json:"ringDiskBytes"`
+	Work          string `json:"work"`
+	Results       string `json:"results"`
+	Runner        struct {
 		KernelRelease string `json:"kernelRelease"`
 		BTF           bool   `json:"btf"`
 		Cgroup2       bool   `json:"cgroup2"`
@@ -298,15 +302,20 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 		t.Fatalf("status interval %v", interval)
 	}
 
-	// 3b. ADR-248: manual networkHeaders captures through the real gadget.
-	packetCaptureNative(t, ctx, k, admin, s.Channel, second, workload, f.Busybox, f.Work, f.S3, results)
-	if f.CNI == "cilium" {
-		cniQualificationNative(t, ctx, k, s.Channel, second, workload, f.Busybox, f.Work, results)
-	}
+	if f.RingDiskBytes > 0 {
+		// 3a. ADR-278: byte cap, restart and full volume of the disk ring.
+		ringDiskNative(t, ctx, k, s.Channel, f.CollectorNamespace, f.RingDiskBytes, workload, f.Busybox, results)
+	} else {
+		// 3b. ADR-248: manual networkHeaders captures through the real gadget.
+		packetCaptureNative(t, ctx, k, admin, s.Channel, second, workload, f.Busybox, f.Work, f.S3, results)
+		if f.CNI == "cilium" {
+			cniQualificationNative(t, ctx, k, s.Channel, second, workload, f.Busybox, f.Work, results)
+		}
 
-	// 3c. ADR-273: an ongoing syscall metadata source and one saved window.
-	current, _ := s.Channel.NodeByUID(second.Identity.NodeUID)
-	syscallSourceNative(t, ctx, k, s.Channel, current, workload, f.Busybox, f.Work, results)
+		// 3c. ADR-273: an ongoing syscall metadata source and one saved window.
+		current, _ := s.Channel.NodeByUID(second.Identity.NodeUID)
+		syscallSourceNative(t, ctx, k, s.Channel, current, workload, f.Busybox, f.Work, results)
+	}
 
 	if b, err := k.CoreV1().Pods(f.CollectorNamespace).GetLogs(first.Name, &core.PodLogOptions{LimitBytes: ptr.To[int64](8 << 10)}).DoRaw(ctx); err == nil {
 		results["collectorLog"] = strings.Split(strings.TrimSpace(string(b)), "\n")

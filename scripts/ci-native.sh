@@ -85,6 +85,9 @@ declare -A suites=(
   [collector-packet]="python3 scripts/test-collector.py packet"
   # S-04 row 17 (EXP-02 subset): the packet suite on the pinned Cilium chart.
   [collector-cilium]="python3 scripts/test-collector.py cilium"
+  # ADR-278: the encrypted-disk ring volume on a real node (byte cap, crash
+  # restart, full volume).
+  [collector-ringdisk]="python3 scripts/test-collector.py ringdisk"
 )
 if [[ ${1:-} == --list ]]; then
   printf '%s\n' "${!suites[@]}" | sort | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))'

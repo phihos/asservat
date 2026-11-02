@@ -20,6 +20,10 @@ on a workstation, not even with kind.
                              (kube-proxy replacement, WireGuard, dual stack),
                              plus IPv4/IPv6, Service VIP vs backend, pod
                              loopback and hostNetwork refusal measurements
+  test-collector.py ringdisk collector-ringdisk (ADR-278): the chart's ring
+                             volume enabled at its 16 MiB minimum; byte cap,
+                             crash restart and full-volume seal on the node
+                             instead of the capture phases
 """
 import hashlib
 import json
@@ -143,8 +147,13 @@ def cilium(work, name, kubeconfig, report):
                         "images": sorted(set(run(["kubectl", *kc, "-n", "kube-system", "get", "pods", "-o", "jsonpath={.items[*].spec.containers[*].image}"]).split()))}
 
 
-def packet(work, report, cni=""):
-    suite = "collector-" + (cni or "packet")
+# ADR-278: the chart's minimum ring volume; the native phase sizes its rings
+# so that exactly one fits.
+RING_DISK_BYTES = 16 << 20
+
+
+def packet(work, report, cni="", ring_disk=False):
+    suite = "collector-" + (cni or ("ringdisk" if ring_disk else "packet"))
     run_id = secrets.token_hex(4)
     name = "asservat-collector-" + run_id
     env = dict(os.environ, TMPDIR=str(work), CGO_ENABLED="0")
@@ -200,6 +209,8 @@ def packet(work, report, cni=""):
         roots, cert, key = certificates(work, gateway)
         values = {"mode": "cluster", "collector": {"enabled": True, "image": image, "installationID": INSTALLATION, "clusterID": CLUSTER,
                   "connector": {"endpoint": f"https://{gateway}:{PORT}", "serverName": "asservat-connector-nodes", "rootsPEM": roots}}}
+        if ring_disk:
+            values["collector"]["ringDisk"] = {"enabled": True, "bytes": RING_DISK_BYTES}
         (work / "values.yaml").write_text(json.dumps(values))
         rendered = run(["helm", "template", "asservat", str(ROOT / "charts/asservat"), "--namespace", "asservat-region", "--kube-version", "1.37.0", "-f", str(work / "values.yaml")])
         manifests = work / "collector.yaml"
@@ -208,7 +219,7 @@ def packet(work, report, cni=""):
         run(["kubectl", "--kubeconfig", str(kubeconfig), "apply", "-f", str(manifests)])
         fixture = {"kubeconfig": str(kubeconfig), "collectorNamespace": "asservat-collector", "daemonSet": "asservat-node", "serviceAccount": "asservat-node",
                    "installationID": INSTALLATION, "clusterID": CLUSTER, "listen": f"{gateway}:{PORT}", "serverCertificate": str(cert), "serverKey": str(key),
-                   "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
+                   "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "ringDiskBytes": RING_DISK_BYTES if ring_disk else 0, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
         (work / "fixture.json").write_text(json.dumps(fixture))
         started = time.monotonic()
         test = subprocess.run(["go", "test", "-tags", "libpcap", "-count=1", "-v", "-timeout", "12m", "-run", "^TestNodeCollectorWithRealKubernetes$", "./test/integration"],
@@ -238,8 +249,8 @@ def packet(work, report, cni=""):
 
 
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium"):
-        raise SystemExit("usage: test-collector.py packet|cilium")
+    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium", "ringdisk"):
+        raise SystemExit("usage: test-collector.py packet|cilium|ringdisk")
     if not GUARD.is_file():
         raise SystemExit(f"refused: {GUARD} is absent. Collector suites load BPF programs and run only on disposable CI runners or VMs.")
     results = ROOT / "test/results"
@@ -250,7 +261,7 @@ def main():
     base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="collector-", dir=base))
     try:
-        packet(work, report, "" if sys.argv[1] == "packet" else sys.argv[1])
+        packet(work, report, "cilium" if sys.argv[1] == "cilium" else "", ring_disk=sys.argv[1] == "ringdisk")
         report["result"] = "passed"
     except BaseException:
         report["result"] = "failed"
