@@ -26,7 +26,7 @@ func ringFixture(t *testing.T, edit func(*RingLimits)) (*Ring, time.Time) {
 	}
 	ctx, cancel := context.WithDeadline(t.Context(), now.Add(time.Hour))
 	t.Cleanup(cancel)
-	r, err := NewRing(ctx, RingBounds{now, now.Add(time.Hour)}, limits, nil)
+	r, err := testNewRing(ctx, RingBounds{now, now.Add(time.Hour)}, limits, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestRingOriginalRecordDoesNotAliasInputOrLiveRotation(t *testing.T) {
 	if err != nil || p.Header[12] != 8 || !p.At.Equal(now) {
 		t.Fatal("copy changed after overwrite", err, p)
 	}
-	if r.State().HistoryEvicted == 0 || r.State().LiveBytes != 1024 {
+	if r.State().HistoryEvicted == 0 || r.State().LiveBytes != MemoryRingBytes(r.limits, ringTestDir != "") {
 		t.Fatal("rotation not bounded", r.State())
 	}
 	if err = r.Close(); err != nil {
@@ -212,7 +212,7 @@ func TestRingBoundsAndStoppedSource(t *testing.T) {
 				bound = now.Add(time.Minute)
 			}
 			limits := RingLimits{MaxAge: 30 * time.Second, MaxBytes: 512, SegmentBytes: 256, MaxSegments: 2, MaxFrozenBytes: 512, MaxConcurrentSnapshots: 1}
-			r, err := NewRing(ctx, RingBounds{now, bound}, limits, nil)
+			r, err := testNewRing(ctx, RingBounds{now, bound}, limits, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -333,7 +333,7 @@ func TestRingInputAndConstructorNegatives(t *testing.T) {
 			case "snapshots":
 				l.MaxConcurrentSnapshots = 5
 			}
-			if x, err := NewRing(ctx, RingBounds{now, now.Add(time.Minute)}, l, nil); err == nil {
+			if x, err := testNewRing(ctx, RingBounds{now, now.Add(time.Minute)}, l, nil); err == nil {
 				x.Close()
 				t.Fatal("invalid constructor admitted")
 			}
@@ -356,7 +356,7 @@ func TestRingOutOfOrderTimesAndOriginalWireFilter(t *testing.T) {
 	if r.State().HistoryEvicted != 2 {
 		t.Fatal("out-of-order earliest expiry ignored", r.State())
 	}
-	filtered, err := NewRing(r.ctx, r.bounds, r.limits, greater1000)
+	filtered, err := testNewRing(r.ctx, r.bounds, r.limits, greater1000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +425,7 @@ func ringNext(s *RingSnapshot) (RingPacket, error) {
 
 func TestRingFirstObservationCannotBackfillQuietOrFutureCoverage(t *testing.T) {
 	template, now := ringFixture(t, nil)
-	r, e := NewRing(template.ctx, template.bounds, template.limits, nil)
+	r, e := testNewRing(template.ctx, template.bounds, template.limits, nil)
 	if e != nil {
 		t.Fatal(e)
 	}
