@@ -2925,6 +2925,97 @@
                 "maxLength": 63
               },
               "field": {
+                "const": "packetPeers"
+              },
+              "value": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "entries": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cidrs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "minItems": 1,
+                          "maxItems": 128,
+                          "uniqueItems": true
+                        }
+                      },
+                      "required": [
+                        "cidrs"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "uniqueItems": true
+                  },
+                  "protocol": {
+                    "enum": [
+                      "tcp",
+                      "udp",
+                      "icmp",
+                      "any"
+                    ]
+                  },
+                  "ports": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  },
+                  "resolution": {
+                    "enum": [
+                      "frozen",
+                      "follow"
+                    ]
+                  },
+                  "maxEndpoints": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4096
+                  },
+                  "maxStaleness": {
+                    "$ref": "#/$defs/d8"
+                  }
+                },
+                "required": [
+                  "entries",
+                  "protocol",
+                  "resolution",
+                  "maxEndpoints",
+                  "maxStaleness"
+                ]
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
                 "const": "packetFilter"
               },
               "value": {

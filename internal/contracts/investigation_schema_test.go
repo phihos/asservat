@@ -48,11 +48,13 @@ func TestInvestigationInputsRejectUnsupportedOrAmbiguousValues(t *testing.T) {
 		}
 		b, _ := json.Marshal(d)
 		// ADR-243: the composition branch adds the typed edit, provenance and
-		// lifecycle schemas to preview_capture; it stays within the 32 KiB
-		// hard result limit of specs/mcp.md.
+		// lifecycle schemas to preview_capture. ADR-283's cidrs-only
+		// packetPeers edit (input and authored provenance) needs 36 KiB; a
+		// descriptor is not a tool result, and the transport's per-page
+		// tools/list budget (60 KiB) is the hard bound.
 		budget := 24 << 10
 		if name == "preview_capture" {
-			budget = 32 << 10
+			budget = 36 << 10
 		}
 		if len(b) > budget {
 			t.Fatalf("tool description exceeds bounded discovery budget: %d bytes", len(b))

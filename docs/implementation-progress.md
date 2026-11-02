@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+
+## CIDR packet peers in the hub filter (2026-11-02)
+
+ADR-283 (S-04 increment 9, PR 1): cidrs-only peer queries compile on the hub
+as `(peers) and (filter)` into the frozen cBPF program; the compiled-filter
+record adds the canonical peer set, `peerSetDigest` and
+`authoredFilterDigest` (omitted for whole-pod plans, whose scopes are
+unchanged). The `packetPeers` edit is in the runtime `preview_capture` subset
+(cidrs only). Kubernetes peers remain refused with a remedy; frozen
+Kubernetes resolution through the connector is next.
+
+Verification: planning unit matrix (IPv4/IPv6/mixed, ports and protocol,
+`or host` non-widening, refusals, digest stability, acceptance replay, policy
+path), presentation wire test, and the libpcap-tagged
+`TestCIDRPeersThroughPlanner` (real libpcap 1.11.0 program evaluated with
+x/net/bpf on synthetic frames) pass. No native suite was run.
+
 ## Incident start headroom: observation reuse margins raised to three seconds (2026-11-01)
 
 About two in twelve installed incident runs (packets and syscalls) admitted the

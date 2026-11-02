@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
+  "description": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, CIDR packetPeers, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -265,31 +265,31 @@
       },
       "d6": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 4096,
-        "pattern": "\\S"
+        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+        "maxLength": 16
       },
       "d7": {
         "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
+        "minLength": 1,
+        "maxLength": 4096,
+        "pattern": "\\S"
       },
       "d8": {
         "type": "string",
         "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
         "maxLength": 16
       },
-      "d10": {
+      "d9": {
         "type": "string",
-        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
         "maxLength": 16
       },
-      "d9": {
+      "d10": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "maxAge": {
-            "$ref": "#/$defs/d10"
+            "$ref": "#/$defs/d6"
           },
           "maxBytes": {
             "type": "integer",
@@ -400,7 +400,7 @@
             "const": "0s"
           },
           {
-            "$ref": "#/$defs/d10"
+            "$ref": "#/$defs/d6"
           }
         ]
       },
@@ -410,12 +410,12 @@
             "const": "0s"
           },
           {
-            "$ref": "#/$defs/d10"
+            "$ref": "#/$defs/d6"
           }
         ]
       },
       "d15": {
-        "$ref": "#/$defs/d9"
+        "$ref": "#/$defs/d10"
       },
       "d16": {
         "type": "integer",
@@ -439,10 +439,79 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "packetFilter"
+                "const": "packetPeers"
               },
               "value": {
-                "$ref": "#/$defs/d6"
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "entries": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cidrs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "minItems": 1,
+                          "maxItems": 128,
+                          "uniqueItems": true
+                        }
+                      },
+                      "required": [
+                        "cidrs"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "uniqueItems": true
+                  },
+                  "protocol": {
+                    "enum": [
+                      "tcp",
+                      "udp",
+                      "icmp",
+                      "any"
+                    ]
+                  },
+                  "ports": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  },
+                  "resolution": {
+                    "enum": [
+                      "frozen",
+                      "follow"
+                    ]
+                  },
+                  "maxEndpoints": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4096
+                  },
+                  "maxStaleness": {
+                    "$ref": "#/$defs/d6"
+                  }
+                },
+                "required": [
+                  "entries",
+                  "protocol",
+                  "resolution",
+                  "maxEndpoints",
+                  "maxStaleness"
+                ]
               }
             },
             "required": [
@@ -461,7 +530,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "packetBefore"
+                "const": "packetFilter"
               },
               "value": {
                 "$ref": "#/$defs/d7"
@@ -483,7 +552,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "packetAfter"
+                "const": "packetBefore"
               },
               "value": {
                 "$ref": "#/$defs/d8"
@@ -505,10 +574,32 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "packetRing"
+                "const": "packetAfter"
               },
               "value": {
                 "$ref": "#/$defs/d9"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "packetRing"
+              },
+              "value": {
+                "$ref": "#/$defs/d10"
               }
             },
             "required": [
@@ -708,7 +799,7 @@
                 "const": "actionTimeout"
               },
               "value": {
-                "$ref": "#/$defs/d10"
+                "$ref": "#/$defs/d6"
               }
             },
             "required": [
@@ -788,7 +879,7 @@
             "maximum": 1099511627776
           },
           "maxDuration": {
-            "$ref": "#/$defs/d10"
+            "$ref": "#/$defs/d6"
           }
         },
         "required": [
@@ -1397,31 +1488,31 @@
       },
       "d5": {
         "type": "string",
-        "minLength": 1,
-        "maxLength": 4096,
-        "pattern": "\\S"
+        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+        "maxLength": 16
       },
       "d6": {
         "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
+        "minLength": 1,
+        "maxLength": 4096,
+        "pattern": "\\S"
       },
       "d7": {
         "type": "string",
         "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
         "maxLength": 16
       },
-      "d9": {
+      "d8": {
         "type": "string",
-        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
         "maxLength": 16
       },
-      "d8": {
+      "d9": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "maxAge": {
-            "$ref": "#/$defs/d9"
+            "$ref": "#/$defs/d5"
           },
           "maxBytes": {
             "type": "integer",
@@ -1532,7 +1623,7 @@
             "const": "0s"
           },
           {
-            "$ref": "#/$defs/d9"
+            "$ref": "#/$defs/d5"
           }
         ]
       },
@@ -1542,12 +1633,12 @@
             "const": "0s"
           },
           {
-            "$ref": "#/$defs/d9"
+            "$ref": "#/$defs/d5"
           }
         ]
       },
       "d14": {
-        "$ref": "#/$defs/d8"
+        "$ref": "#/$defs/d9"
       },
       "d15": {
         "type": "integer",
@@ -1571,10 +1662,79 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "packetFilter"
+                "const": "packetPeers"
               },
               "value": {
-                "$ref": "#/$defs/d5"
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "entries": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cidrs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "minItems": 1,
+                          "maxItems": 128,
+                          "uniqueItems": true
+                        }
+                      },
+                      "required": [
+                        "cidrs"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "uniqueItems": true
+                  },
+                  "protocol": {
+                    "enum": [
+                      "tcp",
+                      "udp",
+                      "icmp",
+                      "any"
+                    ]
+                  },
+                  "ports": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "uniqueItems": true
+                  },
+                  "resolution": {
+                    "enum": [
+                      "frozen",
+                      "follow"
+                    ]
+                  },
+                  "maxEndpoints": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4096
+                  },
+                  "maxStaleness": {
+                    "$ref": "#/$defs/d5"
+                  }
+                },
+                "required": [
+                  "entries",
+                  "protocol",
+                  "resolution",
+                  "maxEndpoints",
+                  "maxStaleness"
+                ]
               }
             },
             "required": [
@@ -1593,7 +1753,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "packetBefore"
+                "const": "packetFilter"
               },
               "value": {
                 "$ref": "#/$defs/d6"
@@ -1615,7 +1775,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "packetAfter"
+                "const": "packetBefore"
               },
               "value": {
                 "$ref": "#/$defs/d7"
@@ -1637,10 +1797,32 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "packetRing"
+                "const": "packetAfter"
               },
               "value": {
                 "$ref": "#/$defs/d8"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "packetRing"
+              },
+              "value": {
+                "$ref": "#/$defs/d9"
               }
             },
             "required": [
@@ -1840,7 +2022,7 @@
                 "const": "actionTimeout"
               },
               "value": {
-                "$ref": "#/$defs/d9"
+                "$ref": "#/$defs/d5"
               }
             },
             "required": [
@@ -1920,7 +2102,7 @@
             "maximum": 1099511627776
           },
           "maxDuration": {
-            "$ref": "#/$defs/d9"
+            "$ref": "#/$defs/d5"
           }
         },
         "required": [
