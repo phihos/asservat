@@ -435,7 +435,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		return nil, mounts.ErrUnavailable
 	}
 	// One governed pool/credential, retaining the three typed runner ports.
-	runner := executionapp.APIContextRunner{Read: executionSQL, Prepare: executionSQL, Record: executionSQL, Eligibility: eligibility, Retention: out.retention}
+	runner := executionapp.APIContextRunner{Read: executionSQL, Prepare: executionSQL, Record: executionSQL, Eligibility: eligibility, Retention: out.retention, Profiles: profiles}
 	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
 	out.collect = RegionalRecordingCollect{Runner: executionapp.APIContextRunner{Record: executionSQL, Capabilities: capabilities, Recovery: out.recovery, Now: time.Now}, Recordings: executionSQL, Signer: signers, Router: router, Now: time.Now, Report: eventLog(os.Stderr, "recording collect refused")}
 	out.investigation.ReasonCipher = reasonCipher

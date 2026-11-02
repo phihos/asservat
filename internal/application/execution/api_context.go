@@ -128,7 +128,13 @@ type APIContextRunner struct {
 	Eligibility  APIContextEligibility
 	Capabilities APIContextCapability
 	Retention    APIContextRetention
-	Recovery     fleetapp.RecoveryReader
+	// Profiles reads the current organization and namespace profile versions
+	// an accepted recording pins (REQ-CPR-001: never persisted, read again for
+	// each start); nil refuses a recording that pins any.
+	Profiles interface {
+		ReadCatalogProfiles(context.Context, targets.PodResolution, []planning.ProfileRef) ([]planning.CatalogProfile, error)
+	}
+	Recovery fleetapp.RecoveryReader
 	Output       evidence.ContextProducer
 	Collector    ContextCollector
 	Now          func() time.Time
@@ -209,6 +215,20 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 	if e.Recording != nil {
 		if recorder, err = compiler.RecorderContextFor(e.Recording); err != nil {
 			return out, nil, apiCheckStep{"Recording", value.ErrInvalid}
+		}
+		var refs []planning.ProfileRef
+		for _, c := range recorder.Composition.Components {
+			if c.Profile.Catalog != "builtin" {
+				refs = append(refs, c.Profile)
+			}
+		}
+		if len(refs) > 0 {
+			if s.Profiles == nil {
+				return out, nil, apiCheckStep{"Profiles", value.ErrUnavailable}
+			}
+			if recorder.Composition.Resolved, err = s.Profiles.ReadCatalogProfiles(ctx, t, refs); err != nil {
+				return out, nil, apiCheckStep{"Profiles", err}
+			}
 		}
 		evidenceType = e.Type().EvidenceType
 	}

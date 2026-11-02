@@ -197,6 +197,23 @@ func TestInstalledManualRawRequestCompiles(t *testing.T) {
 	if err != nil || recording.Profile != "rawPackets" || recording.Snaplen != 96 || recording.ProtocolSnaplen == nil || recording.ProtocolSnaplen.TCP != manualRawTCPCap || recording.DurationMillis != 5000 || recording.MaxBytes > artifact.RecordingNativeLimit || recording.Filter == nil || !recording.RequireApproval {
 		t.Fatalf("raw recording %+v %v", recording, err)
 	}
+	// The executor recompiles the accepted recording from its frozen
+	// composition and program (api_context Check/Compile).
+	frozen, err := compiler.RecorderContextFor(&recording)
+	if err != nil {
+		t.Fatal("frozen raw recorder context", err)
+	}
+	capability := planvalue.ContextCapability{ExecutionClass: artifact.ContextAPIExecution, Enabled: true, Revision: identity.Revision{UID: "ceiling", Generation: 1, Digest: artifact.Digest{1}}, CollectorVersion: "v1", CollectorImageDigest: artifact.Digest{2}, ProjectionDigest: compiler.ProjectionDigest(), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	// Catalog documents are never persisted (REQ-CPR-001): the executor's
+	// Profiles port reads the pinned namespace version again for each start.
+	executor := planvalue.ContextInput{CaptureID: cluster, Executor: identity.Principal{Issuer: "https://identity.example.test", Subject: "requester", ClientID: "console", Kind: identity.Human}, Deadline: now.Add(time.Minute), Target: target, Capability: capability, Retention: retention, Recorder: frozen}
+	if _, err := compiler.CompileContext(executor, now); err == nil {
+		t.Fatal("recompiled a namespace profile without reading it")
+	}
+	frozen.Composition.Resolved = resolved.Resolved
+	if _, err := compiler.CompileContext(planvalue.ContextInput{CaptureID: cluster, Executor: identity.Principal{Issuer: "https://identity.example.test", Subject: "requester", ClientID: "console", Kind: identity.Human}, Deadline: now.Add(time.Minute), Target: target, Capability: capability, Retention: retention, Recorder: frozen}, now); err != nil {
+		t.Fatal("executor cannot recompile the accepted raw recording", err)
+	}
 }
 
 // The tshark gate of the manual-raw focus on synthetic field lines.
