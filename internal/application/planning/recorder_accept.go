@@ -49,6 +49,11 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only a single packet capture action can be recorded in this release"}
 	}
 	a := plan.Actions[0]
+	if a.PeerEndpoints > 0 {
+		// ADR-283 PR 2: a frozen Kubernetes peer set is reviewable, but
+		// nothing rechecks its membership at arming yet, so it never starts.
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.peers", KubernetesPeersAcceptance}
+	}
 	if a.Kind == "syscallTrace" {
 		// B3: one finite syscall metadata recording of the after window.
 		after, ok := durationValue(a.After, true)

@@ -109,6 +109,10 @@ type RecorderInput struct {
 	// packet recorder at preview (ADR-248): acceptance "nodeRecorder" instead
 	// of the interim "recorderUnavailable". It enters the plan digest.
 	NodeRecorder bool `json:",omitempty"`
+	// Peers are the region's Kubernetes peer resolutions this plan was
+	// compiled with (ADR-283 PR 2), one per action with Kubernetes peers.
+	// They are observations frozen for review, never authority.
+	Peers []targets.PeerResolution `json:",omitempty"`
 }
 
 // RecorderAction is the normalized review summary of one expanded action.
@@ -127,6 +131,11 @@ type RecorderAction struct {
 	// PeerPrefixes counts the CIDR peer prefixes intersected into Filter
 	// (ADR-283); zero selects all pod traffic.
 	PeerPrefixes int `json:",omitempty"`
+	// PeerEndpoints counts the resolved Kubernetes peer members (UID, IP)
+	// and PeerMembersDigest is their digest (hex); zero without Kubernetes
+	// peers.
+	PeerEndpoints     int    `json:",omitempty"`
+	PeerMembersDigest string `json:",omitempty"`
 	// Syscall actions.
 	SyscallMode, SyscallSelection, Result            string
 	SyscallNames                                     int

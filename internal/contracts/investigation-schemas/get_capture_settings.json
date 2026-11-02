@@ -2934,23 +2934,142 @@
                   "entries": {
                     "type": "array",
                     "items": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "properties": {
-                        "cidrs": {
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "cidrs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "minItems": 1,
+                              "maxItems": 128,
+                              "uniqueItems": true
+                            }
                           },
-                          "minItems": 1,
-                          "maxItems": 128,
-                          "uniqueItems": true
+                          "required": [
+                            "cidrs"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "podSelector": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "namespace": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "matchLabels": {
+                                  "type": "object",
+                                  "minProperties": 1,
+                                  "maxProperties": 16,
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 63
+                                  }
+                                }
+                              },
+                              "required": [
+                                "namespace",
+                                "matchLabels"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "podSelector"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "resourceRef": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "Pod",
+                                    "Deployment",
+                                    "StatefulSet",
+                                    "Service"
+                                  ]
+                                },
+                                "namespace": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 253
+                                },
+                                "serviceMode": {
+                                  "enum": [
+                                    "backends",
+                                    "virtualIP",
+                                    "both"
+                                  ]
+                                },
+                                "readyOnly": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "namespace",
+                                "name"
+                              ],
+                              "allOf": [
+                                {
+                                  "if": {
+                                    "properties": {
+                                      "kind": {
+                                        "const": "Service"
+                                      }
+                                    }
+                                  },
+                                  "then": {
+                                    "required": [
+                                      "serviceMode",
+                                      "readyOnly"
+                                    ]
+                                  },
+                                  "else": {
+                                    "not": {
+                                      "anyOf": [
+                                        {
+                                          "required": [
+                                            "serviceMode"
+                                          ]
+                                        },
+                                        {
+                                          "required": [
+                                            "readyOnly"
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "resourceRef"
+                          ]
                         }
-                      },
-                      "required": [
-                        "cidrs"
                       ]
                     },
                     "minItems": 1,

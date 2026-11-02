@@ -473,7 +473,10 @@ def check_collector(directory):
     without = json.loads(json.dumps(joint))
     without["collector"]["enabled"] = False
     rules = next(r for r in render(without) if r["kind"] == "ClusterRole")["rules"]
-    assert not any("nodes" in r["resources"] or "services" in r["resources"] for r in rules)
+    # Without the collector there is no node read and no Service create; the
+    # unconditional Service get is ADR-283's Kubernetes peer read.
+    assert not any("nodes" in r["resources"] or "services" in r["resources"] and r["verbs"] != ["get"] for r in rules)
+    assert {"apiGroups": [""], "resources": ["services"], "verbs": ["get"]} in rules
     # Explicit values still render the DaemonSet; partial values are refused.
     joint["collector"]["connector"] = base["collector"]["connector"]
     assert any(r["kind"] == "DaemonSet" for r in render(joint))

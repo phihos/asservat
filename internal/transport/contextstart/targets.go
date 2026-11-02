@@ -150,6 +150,28 @@ func (t Targets) ReadCaptureProfiles(ctx context.Context, r targets.ProfileCatal
 	return out, nil
 }
 
+// ResolvePacketPeers asks the target's region to resolve one action's
+// Kubernetes packet peers (ADR-283 PR 2). A mismatched or unbounded answer is
+// unavailable; the caller records its own receipt time.
+func (t Targets) ResolvePacketPeers(ctx context.Context, r targets.PeerRequest) (targets.PeerResolution, error) {
+	var out targets.PeerResolution
+	if !r.Valid() || t.Router == nil || ctx == nil || ctx.Err() != nil {
+		return out, targets.ErrInvalid
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	call, diagnostics := NewStreamDiagnosticContext(call)
+	if _, err := t.Router.Query(call, r.ClusterID, queryResolvePacketPeers, r, &out); err != nil {
+		t.report("peers/"+queryStep(err, diagnostics), "")
+		return targets.PeerResolution{}, err
+	}
+	if !out.ResolvedAt.IsZero() || !out.Answers(r) {
+		t.report("peers/result", "")
+		return targets.PeerResolution{}, targets.ErrUnavailable
+	}
+	return out, nil
+}
+
 // ListCaptureProfiles asks the target's region for its namespace catalog
 // (one bounded LIST). A mismatched answer is unavailable.
 func (t Targets) ListCaptureProfiles(ctx context.Context, r targets.ProfileListRequest) (targets.ProfileCatalogAnswer, error) {

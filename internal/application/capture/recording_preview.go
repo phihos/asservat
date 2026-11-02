@@ -118,6 +118,11 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	mark := time.Now()
 	plan, err := compiler.CompileRecorder(planning.RecorderInput{CaptureID: p.CaptureID, Executor: p.Actor, Target: target, Composition: *intent.Composition, Retention: f.retention, Deadline: p.Deadline, NodeRecorder: true, RequireApproval: required}, s.Filters, s.Now())
 	auditapp.MarkStep(ctx, "p-compile", mark)
+	if errors.As(err, new(compiler.PeerResolutionNeeded)) {
+		// ADR-283 PR 2: Kubernetes peers are not recordable yet; the plan-only
+		// preview resolves them once and shows the frozen set.
+		return zero, errRecordingNotAcceptable
+	}
 	if err != nil {
 		return zero, previewFailure("compile", err)
 	}

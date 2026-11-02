@@ -157,7 +157,7 @@ func TestCIDRPeerRefusals(t *testing.T) {
 		`{"entries":[{"resourceRef":{"kind":"Deployment","namespace":"a","name":"db"}}],"protocol":"any","resolution":"frozen","maxEndpoints":1,"maxStaleness":"5s"}`,
 		`{"entries":[{"cidrs":["10.0.0.0/8"]},{"podSelector":{"namespace":"a","matchLabels":{"app":"db"}}}],"protocol":"any","resolution":"follow","maxEndpoints":1,"maxStaleness":"5s"}`,
 	} {
-		_, err := packetPeers("p", json.RawMessage(raw))
+		_, err := packetPeers("p", json.RawMessage(raw), nil)
 		var e value.CompositionError
 		if !errors.As(err, &e) || e.Code != value.CompositionRecorderUnavailable || !strings.Contains(e.Reason, "use cidrs") {
 			t.Fatalf("kubernetes peers: %v", err)

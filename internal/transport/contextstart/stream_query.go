@@ -29,6 +29,9 @@ const (
 	// REQ-CPR-001: exact CaptureProfile versions in the target's namespace.
 	queryCaptureProfiles     = "capture-profiles"
 	queryListCaptureProfiles = "list-capture-profiles"
+	// ADR-283 PR 2: one action's Kubernetes packet peers in the target's
+	// namespace, resolved into frozen (UID, IP) members.
+	queryResolvePacketPeers = "resolve-packet-peers"
 	// ADR-248: whether the target Pod's node collector offers the packet
 	// recorder now.
 	queryPacketRecorder        = "packet-recorder"
@@ -64,6 +67,12 @@ type ReviewTargets interface {
 type ProfileTargets interface {
 	ReadCaptureProfiles(context.Context, targets.ProfileCatalogRequest) (targets.ProfileCatalogAnswer, error)
 	ListCaptureProfiles(context.Context, targets.ProfileListRequest) (targets.ProfileCatalogAnswer, error)
+}
+
+// PeerTargets is the region's optional Kubernetes peer resolution (ADR-283
+// PR 2). A region without it answers unsupported, which refuses the peers.
+type PeerTargets interface {
+	ResolvePacketPeers(context.Context, targets.PeerRequest) (targets.PeerResolution, error)
 }
 
 // SyscallTargetResolver is PacketTargetResolver for the syscall recorder.
@@ -112,6 +121,9 @@ var queryFailures = []struct {
 	{"denied", targets.ErrDenied},
 	{"invalid", targets.ErrInvalid},
 	{"profile-limit", targets.ErrProfileLimit},
+	{"peer-limit", targets.ErrPeerLimit},
+	{"peer-unsupported", targets.ErrPeerUnsupported},
+	{"peer-missing", targets.ErrPeerMissing},
 	{"unscheduled", targets.ErrUnscheduled},
 	{"unsupported", targets.ErrUnsupported},
 	{"unavailable", targets.ErrUnavailable},
@@ -402,6 +414,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if reader, ok := s.targets.(ProfileTargets); ok {
 			out, e = reader.ListCaptureProfiles(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryResolvePacketPeers:
+		var r targets.PeerRequest
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(PeerTargets); ok {
+			out, e = resolver.ResolvePacketPeers(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}

@@ -72,7 +72,12 @@ func regionalExecutorRBAC(namespace string) (cluster []rbac.PolicyRule, connecto
 		{APIGroups: []string{"metrics.k8s.io"}, Resources: []string{"pods"}, Verbs: []string{"list"}},
 		// REQ-CPR-001: a preview/start reads exact namespace CaptureProfile
 		// versions in the target's namespace.
-		{APIGroups: []string{"asservat.io"}, Resources: []string{"captureprofiles"}, Verbs: []string{"get", "list"}}}
+		{APIGroups: []string{"asservat.io"}, Resources: []string{"captureprofiles"}, Verbs: []string{"get", "list"}},
+		// ADR-283 PR 2: a preview's Kubernetes packet peers in the target's
+		// namespace read the named Service and list its EndpointSlices
+		// (Pods, workloads and ReplicaSets are read under the rules above).
+		{APIGroups: []string{""}, Resources: []string{"services"}, Verbs: []string{"get"}},
+		{APIGroups: []string{"discovery.k8s.io"}, Resources: []string{"endpointslices"}, Verbs: []string{"list"}}}
 	connector = []rbac.PolicyRule{
 		// get for the settings/trust reads; update only for their dry-run probes.
 		{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{RegionalSettings, RegionalWorkTrust}, Verbs: []string{"get", "update"}},

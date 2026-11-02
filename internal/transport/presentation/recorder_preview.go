@@ -73,7 +73,9 @@ func recorderWarnings(plan planning.RecorderPlan) []string {
 		}
 		if a.Filter != "" {
 			out = append(out, fmt.Sprintf("Packet filter compiled on the hub to %d instructions: %s", a.FilterInstructions, boundedText(a.Filter, 160)))
-			if a.PeerPrefixes > 0 {
+			if a.PeerEndpoints > 0 {
+				out = append(out, fmt.Sprintf("Peers: %d Kubernetes endpoints resolved at preview (members digest %s), %d prefixes in total, intersected with the packet filter; traffic to or from other addresses is not recorded. Membership is frozen at preview and shown for review.", a.PeerEndpoints, boundedText(a.PeerMembersDigest, 16), a.PeerPrefixes))
+			} else if a.PeerPrefixes > 0 {
 				out = append(out, fmt.Sprintf("Peers: %d CIDR prefixes, intersected with the packet filter; traffic to or from other addresses is not recorded.", a.PeerPrefixes))
 			}
 		}
@@ -170,7 +172,12 @@ func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResu
 	// (ADR-279/282).
 	metered := approval && result.Plan.Approval.ObservationLimits != nil
 	if !result.Recordable || metered && !compiler.ManualObservationIssued(result.Plan.Actions, result.Plan.Approval) {
-		blockers = append(blockers, RecorderUnavailableBlocker)
+		blocker := RecorderUnavailableBlocker
+		if slices.ContainsFunc(result.Plan.Actions, func(a planning.RecorderAction) bool { return a.PeerEndpoints > 0 }) {
+			// ADR-283 PR 2: the specific reason of a Kubernetes peer plan.
+			blocker.Message = compiler.KubernetesPeersAcceptance
+		}
+		blockers = append(blockers, blocker)
 	} else {
 		// ADR-248: the interim per-capture output cap.
 		limit = min(limit, artifact.RecordingNativeLimit)

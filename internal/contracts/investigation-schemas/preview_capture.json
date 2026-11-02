@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, CIDR packetPeers, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
+  "description": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, CIDR packetPeers or preview-only Kubernetes peers, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -448,23 +448,142 @@
                   "entries": {
                     "type": "array",
                     "items": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "properties": {
-                        "cidrs": {
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "cidrs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "minItems": 1,
+                              "maxItems": 128,
+                              "uniqueItems": true
+                            }
                           },
-                          "minItems": 1,
-                          "maxItems": 128,
-                          "uniqueItems": true
+                          "required": [
+                            "cidrs"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "podSelector": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "namespace": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "matchLabels": {
+                                  "type": "object",
+                                  "minProperties": 1,
+                                  "maxProperties": 16,
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 63
+                                  }
+                                }
+                              },
+                              "required": [
+                                "namespace",
+                                "matchLabels"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "podSelector"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "resourceRef": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "Pod",
+                                    "Deployment",
+                                    "StatefulSet",
+                                    "Service"
+                                  ]
+                                },
+                                "namespace": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 253
+                                },
+                                "serviceMode": {
+                                  "enum": [
+                                    "backends",
+                                    "virtualIP",
+                                    "both"
+                                  ]
+                                },
+                                "readyOnly": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "namespace",
+                                "name"
+                              ],
+                              "allOf": [
+                                {
+                                  "if": {
+                                    "properties": {
+                                      "kind": {
+                                        "const": "Service"
+                                      }
+                                    }
+                                  },
+                                  "then": {
+                                    "required": [
+                                      "serviceMode",
+                                      "readyOnly"
+                                    ]
+                                  },
+                                  "else": {
+                                    "not": {
+                                      "anyOf": [
+                                        {
+                                          "required": [
+                                            "serviceMode"
+                                          ]
+                                        },
+                                        {
+                                          "required": [
+                                            "readyOnly"
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "resourceRef"
+                          ]
                         }
-                      },
-                      "required": [
-                        "cidrs"
                       ]
                     },
                     "minItems": 1,
@@ -1671,23 +1790,142 @@
                   "entries": {
                     "type": "array",
                     "items": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "properties": {
-                        "cidrs": {
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 64
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "cidrs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "minItems": 1,
+                              "maxItems": 128,
+                              "uniqueItems": true
+                            }
                           },
-                          "minItems": 1,
-                          "maxItems": 128,
-                          "uniqueItems": true
+                          "required": [
+                            "cidrs"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "podSelector": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "namespace": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "matchLabels": {
+                                  "type": "object",
+                                  "minProperties": 1,
+                                  "maxProperties": 16,
+                                  "additionalProperties": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 63
+                                  }
+                                }
+                              },
+                              "required": [
+                                "namespace",
+                                "matchLabels"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "podSelector"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "resourceRef": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "Pod",
+                                    "Deployment",
+                                    "StatefulSet",
+                                    "Service"
+                                  ]
+                                },
+                                "namespace": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 253
+                                },
+                                "serviceMode": {
+                                  "enum": [
+                                    "backends",
+                                    "virtualIP",
+                                    "both"
+                                  ]
+                                },
+                                "readyOnly": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "namespace",
+                                "name"
+                              ],
+                              "allOf": [
+                                {
+                                  "if": {
+                                    "properties": {
+                                      "kind": {
+                                        "const": "Service"
+                                      }
+                                    }
+                                  },
+                                  "then": {
+                                    "required": [
+                                      "serviceMode",
+                                      "readyOnly"
+                                    ]
+                                  },
+                                  "else": {
+                                    "not": {
+                                      "anyOf": [
+                                        {
+                                          "required": [
+                                            "serviceMode"
+                                          ]
+                                        },
+                                        {
+                                          "required": [
+                                            "readyOnly"
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "resourceRef"
+                          ]
                         }
-                      },
-                      "required": [
-                        "cidrs"
                       ]
                     },
                     "minItems": 1,

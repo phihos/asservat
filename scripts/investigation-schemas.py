@@ -128,10 +128,9 @@ def main():
     composition = documents["capture-composition.schema.json"]
     composition.pop("x-field-bindings")  # annotation of the canonical registry
     composition["$defs"]["override"]["oneOf"] = [o for o in composition["$defs"]["override"]["oneOf"] if o["properties"]["field"]["const"] in RECORDER_EDITS]
-    # ADR-283: packetPeers takes cidrs entries only; Kubernetes peers are not
-    # implemented, and their branches would exceed the discovery budget.
+    # ADR-283: packetPeers takes cidrs entries and, since PR 2, the
+    # Kubernetes podSelector/resourceRef entries resolved at preview.
     peers = copy.deepcopy(documents["packet-capture.schema.json"]["properties"]["peers"])
-    peers["properties"]["entries"]["items"] = next(b for b in peers["properties"]["entries"]["items"]["oneOf"] if "cidrs" in b["properties"])
     for o in composition["$defs"]["override"]["oneOf"]:
         if o["properties"]["field"]["const"] == "packetPeers":
             o["properties"]["value"] = peers
@@ -416,7 +415,7 @@ def main():
             "name": name,
             "description": {
                 "list_diagnostics": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
-                "preview_capture": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, CIDR packetPeers, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
+                "preview_capture": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, CIDR packetPeers or preview-only Kubernetes peers, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
                 "request_capture": "Submit the reviewed pod-status preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet/syscall plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads; submit the same preview again after approval.",
                 "resolve_capture_request": tool["description"],
                 "get_capture": "Read authorized pod-status capture progress. No evidence bytes. Finalizing is not publication; Indeterminate must not be automatically recaptured.",

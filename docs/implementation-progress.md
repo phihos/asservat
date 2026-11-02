@@ -1,6 +1,25 @@
 # Sustained implementation progress
 
 
+## Kubernetes packet peers resolved at preview (2026-11-02)
+
+ADR-283 PR 2: `podSelector`/`resourceRef` peer entries in the target's
+namespace are resolved `frozen` by the target's region (new pre-work query
+`resolve-packet-peers`, bounded paged LISTs of that namespace only) with the
+pure `targets.ResolvePeers`, compiled on the hub as host prefixes in the same
+peer expression as CIDRs, and recorded as `peers.kubernetes` (endpoint count,
+members digest, resolvedAt). Such plans are preview-only: `AcceptableRecorder`
+refuses them with "Kubernetes peer capture needs the membership verifier of
+the next release". The connector executor gains `get services` and `list
+endpointslices`; the chart installer holds `get services`.
+
+Verification: domain resolver table/order tests, adapter fake-API reader
+tests, planning, capture preview, contextstart exchange and presentation wire
+tests, schema regeneration and the contracts budget test pass; go vet,
+go-architecture-check, spec-check, architecture-check, design-check,
+helm-check and the web check pass. No native suite was run; the membership
+verifier (PR 3) is not implemented.
+
 ## CIDR packet peers in the hub filter (2026-11-02)
 
 ADR-283 (S-04 increment 9, PR 1): cidrs-only peer queries compile on the hub

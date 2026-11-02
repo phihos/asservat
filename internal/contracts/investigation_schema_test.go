@@ -48,8 +48,9 @@ func TestInvestigationInputsRejectUnsupportedOrAmbiguousValues(t *testing.T) {
 		}
 		b, _ := json.Marshal(d)
 		// ADR-243: the composition branch adds the typed edit, provenance and
-		// lifecycle schemas to preview_capture. ADR-283's cidrs-only
-		// packetPeers edit (input and authored provenance) needs 36 KiB; a
+		// lifecycle schemas to preview_capture. ADR-283's packetPeers edit
+		// with cidrs and Kubernetes entries (input and authored provenance)
+		// needs 36 KiB; a
 		// descriptor is not a tool result, and the transport's per-page
 		// tools/list budget (60 KiB) is the hard bound.
 		budget := 24 << 10

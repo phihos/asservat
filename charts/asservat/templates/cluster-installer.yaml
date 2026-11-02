@@ -88,6 +88,11 @@ rules:
   - apiGroups: [discovery.k8s.io]
     resources: [endpointslices]
     verbs: [list]
+  # ADR-283 PR 2: Kubernetes packet peers read the named Service of the
+  # target's namespace (EndpointSlice list is held above).
+  - apiGroups: [""]
+    resources: [services]
+    verbs: [get]
   - apiGroups: [rbac.authorization.k8s.io]
     resources: [roles, rolebindings, clusterroles, clusterrolebindings]
     verbs: [get, create]

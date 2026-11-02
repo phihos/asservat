@@ -16,6 +16,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // Builtin capture profiles are embedded in the release binary (S6, ADR-243):
@@ -600,7 +601,7 @@ func validRing(path string, r ring, before time.Duration) error {
 
 // normalize resolves the execution mode and validates one expanded action
 // against the action-lifecycle and mechanism rules as a whole.
-func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
+func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peerContext) error {
 	if a.action.ExecutionMode == "" {
 		a.action.ExecutionMode = "ongoing" // action.schema.json x-execution-modes default
 	}
@@ -641,7 +642,7 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 		if json.Unmarshal(a.packet.Profile, &kind) != nil || kind.Kind != "networkHeaders" && kind.Kind != "rawPackets" && kind.Kind != "httpHeaders" {
 			return refuse(value.CompositionInvalid, path+".parameters.profile.kind", "the packet profile is networkHeaders, rawPackets or httpHeaders")
 		}
-		peers, err := packetPeers(path+".parameters.peers", a.packet.Peers)
+		peers, err := packetPeers(path+".parameters.peers", a.packet.Peers, pc)
 		if err != nil {
 			return err
 		}
@@ -818,7 +819,7 @@ func generatedID(prefix, component, local string) string {
 // is then validated as a whole: generated IDs are unique, at most 16 actions,
 // aggregate bounds cover the sum of outputs and the longest timeout, and
 // recorder sources do not overlap on one Pod.
-func expand(c value.ProfileComposition, compiler FilterCompiler) ([]expandedAction, []resolvedProfile, error) {
+func expand(c value.ProfileComposition, compiler FilterCompiler, pc *peerContext) ([]expandedAction, []resolvedProfile, error) {
 	if err := compositionShape(c); err != nil {
 		return nil, nil, err
 	}
@@ -886,7 +887,7 @@ func expand(c value.ProfileComposition, compiler FilterCompiler) ([]expandedActi
 			}
 		}
 		for i := first; i < len(actions); i++ {
-			if err := normalize(pathf("%s action %s", base, actions[i].localID), &actions[i], compiler); err != nil {
+			if err := normalize(pathf("%s action %s", base, actions[i].localID), &actions[i], compiler, pc); err != nil {
 				return nil, nil, err
 			}
 		}
@@ -919,7 +920,7 @@ func expand(c value.ProfileComposition, compiler FilterCompiler) ([]expandedActi
 // ValidateComposition compiles an authored composition without target facts,
 // for callers that only need its field-level refusals.
 func ValidateComposition(c value.ProfileComposition, compiler FilterCompiler) error {
-	_, _, err := expand(c, compiler)
+	_, _, err := expand(c, compiler, nil)
 	return err
 }
 
@@ -1111,6 +1112,9 @@ func normalizedRecorderAction(x expandedAction, componentID string) (recipeActio
 		summary.Before, summary.After, summary.MaxFrozenBytes, summary.MaxConcurrentSnapshots, summary.PacketProfile, summary.Filter = x.packet.Before, x.packet.After, x.packet.MaxFrozenBytes, x.packet.MaxConcurrentSnapshots, kind.Kind, x.expression
 		if x.peers != nil {
 			summary.PeerPrefixes = len(x.peers.Prefixes)
+			if k := x.peers.kubernetes; k != nil {
+				summary.PeerEndpoints, summary.PeerMembersDigest = k.Endpoints, k.MembersDigest
+			}
 		}
 		rr = x.packet.Ring
 	} else {
@@ -1154,9 +1158,14 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 	if !authorization.UUID(in.CaptureID) || !in.Executor.Valid() || !in.Target.Valid(now) || in.Deadline.Nanosecond()%1000 != 0 || !now.Before(in.Deadline) || in.Deadline.After(now.Add(5*time.Minute)) {
 		return bad()
 	}
-	actions, profiles, err := expand(in.Composition, filters)
+	pc := &peerContext{clusterID: in.Target.Request.ClusterID, namespace: in.Target.Request.Namespace, resolved: in.Peers, now: now, used: map[int]bool{}}
+	actions, profiles, err := expand(in.Composition, filters, pc)
 	if err != nil {
 		return value.RecorderPlan{}, err
+	}
+	if len(pc.used) != len(in.Peers) {
+		// Every supplied resolution answers one action's exact query.
+		return bad()
 	}
 	r := in.Retention
 	if r.Target != in.Target.Target() || !r.PolicyRevision.Valid() || !now.Before(r.ValidUntil) || r.ValidUntil.After(now.Add(60*time.Second)) || r.PrivacyClass != "potentialPersonalData" || !r.Deadlines.Valid() || r.AnchorAt.After(now) || !identity.Text(r.PurposeRef, 128) || len(r.Policies) < 1 || len(r.Policies) > 64 {
@@ -1283,6 +1292,7 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 		return bad()
 	}
 	out.Input.Retention.Policies = slices.Clone(in.Retention.Policies)
+	out.Input.Peers = clonePeerResolutions(in.Peers)
 	out.Input.Composition = *in.Composition.Clone()
 	out.RecipeDigest, out.CanonicalScope, out.ScopeDigest = recipeDigest, b, d
 	out.ValidUntil = identity.Earlier(identity.Earlier(in.Target.FreshUntil, r.ValidUntil), in.Deadline)
@@ -1342,6 +1352,9 @@ func RecorderScopeSummary(scope []byte) ([]value.RecorderAction, *value.Recorder
 			s.FilterInstructions, s.Filter = len(f.Program), f.Expression
 			if f.Peers != nil {
 				s.PeerPrefixes = len(f.Peers.Prefixes)
+				if k := f.Peers.Kubernetes; k != nil {
+					s.PeerEndpoints, s.PeerMembersDigest = k.Endpoints, k.MembersDigest
+				}
 			}
 		}
 		out = append(out, s)
@@ -1365,4 +1378,15 @@ func RecorderScopeSummary(scope []byte) ([]value.RecorderAction, *value.Recorder
 		return nil, nil, value.ErrInvalid
 	}
 	return out, approval, nil
+}
+
+func clonePeerResolutions(in []targets.PeerResolution) []targets.PeerResolution {
+	if in == nil {
+		return nil
+	}
+	out := make([]targets.PeerResolution, len(in))
+	for i, r := range in {
+		out[i] = r.Clone()
+	}
+	return out
 }

@@ -5,6 +5,7 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/targets"
 	"encoding/json"
 )
 
@@ -49,9 +50,9 @@ func CompositionFromWire(in contracts.CaptureComposition) (*value.ProfileComposi
 	return out, nil
 }
 
-// peersFromWire models a cidrs-only peer selection (ADR-283). A Kubernetes
-// entry (podSelector, resourceRef) stays Unmodeled so the compiler refuses it
-// by path with its remedy.
+// peersFromWire models a packetPeers value (ADR-283): cidrs entries and the
+// Kubernetes podSelector/resourceRef entries. Any other entry shape stays
+// Unmodeled so the compiler refuses it by path.
 func peersFromWire(raw json.RawMessage) (*value.PeerSelection, bool, error) {
 	var p struct {
 		Entries      []map[string]json.RawMessage `json:"entries"`
@@ -68,15 +69,56 @@ func peersFromWire(raw json.RawMessage) (*value.PeerSelection, bool, error) {
 	}
 	out := &value.PeerSelection{Protocol: p.Protocol, Ports: p.Ports, Resolution: p.Resolution, MaxEndpoints: p.MaxEndpoints, MaxStaleness: p.MaxStaleness, CIDRs: [][]string{}}
 	for _, entry := range p.Entries {
-		cidrs, ok := entry["cidrs"]
-		if !ok || len(entry) != 1 {
+		if len(entry) != 1 {
 			return nil, true, nil
 		}
-		var list []string
-		if err := json.Unmarshal(cidrs, &list); err != nil {
-			return nil, false, err
+		if cidrs, ok := entry["cidrs"]; ok {
+			var list []string
+			if err := json.Unmarshal(cidrs, &list); err != nil {
+				return nil, false, err
+			}
+			out.CIDRs = append(out.CIDRs, list)
+			continue
 		}
-		out.CIDRs = append(out.CIDRs, list)
+		e, ok := kubernetesPeerFromWire(entry)
+		if !ok {
+			return nil, true, nil
+		}
+		out.Kubernetes = append(out.Kubernetes, e)
 	}
 	return out, false, nil
+}
+
+func kubernetesPeerFromWire(entry map[string]json.RawMessage) (targets.PeerEntry, bool) {
+	strictly := func(raw json.RawMessage, out any) bool {
+		d := json.NewDecoder(bytes.NewReader(raw))
+		d.DisallowUnknownFields()
+		return d.Decode(out) == nil
+	}
+	if raw, ok := entry["podSelector"]; ok {
+		var w struct {
+			Namespace   string            `json:"namespace"`
+			MatchLabels map[string]string `json:"matchLabels"`
+		}
+		if !strictly(raw, &w) || w.MatchLabels == nil {
+			return targets.PeerEntry{}, false
+		}
+		return targets.PeerEntry{Pods: &targets.PeerPodSelector{Namespace: w.Namespace, MatchLabels: w.MatchLabels}}, true
+	}
+	raw, ok := entry["resourceRef"]
+	var w struct {
+		Kind        string  `json:"kind"`
+		Namespace   string  `json:"namespace"`
+		Name        string  `json:"name"`
+		ServiceMode *string `json:"serviceMode"`
+		ReadyOnly   *bool   `json:"readyOnly"`
+	}
+	if !ok || !strictly(raw, &w) || (w.ServiceMode == nil) != (w.ReadyOnly == nil) || (w.ServiceMode != nil) != (w.Kind == "Service") {
+		return targets.PeerEntry{}, false
+	}
+	r := &targets.PeerResourceRef{Kind: w.Kind, Namespace: w.Namespace, Name: w.Name}
+	if w.ServiceMode != nil {
+		r.ServiceMode, r.ReadyOnly = *w.ServiceMode, *w.ReadyOnly
+	}
+	return targets.PeerEntry{Resource: r}, true
 }

@@ -10,7 +10,7 @@ import (
 // bounds, conflicts); a component with more than one action is refused, so
 // each child is one recording. A one-component composition is returned as is.
 func SplitComposition(c value.ProfileComposition, compiler FilterCompiler) ([]value.ProfileComposition, error) {
-	actions, _, err := expand(c, compiler)
+	actions, _, err := expand(c, compiler, nil)
 	if err != nil {
 		return nil, err
 	}

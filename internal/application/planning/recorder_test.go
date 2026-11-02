@@ -436,7 +436,7 @@ func TestEmptyTextEditGetsFieldRemedy(t *testing.T) {
 // component with generated IDs, while a manual capture (one artifact) refuses
 // to mix evidence types with a remedy instead of an opaque error.
 func TestMixedCompositionExpandsButManualRefuses(t *testing.T) {
-	actions, profiles, err := expand(mixed(32<<20), &fakeCompiler{program: fixtureProgram})
+	actions, profiles, err := expand(mixed(32<<20), &fakeCompiler{program: fixtureProgram}, nil)
 	if err != nil || len(actions) != 2 || len(profiles) != 2 || actions[0].componentID != "net" || actions[1].componentID != "calls" {
 		t.Fatal("mixed expansion", err, len(actions), len(profiles))
 	}

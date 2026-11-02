@@ -45,7 +45,7 @@ func CompileOngoingPolicyRecorders(c value.ProfileComposition, filters FilterCom
 }
 
 func compilePolicyRecorders(c value.ProfileComposition, filters FilterCompiler, sources bool) ([]value.PolicyRecorderConfiguration, error) {
-	actions, profiles, err := expand(c, filters)
+	actions, profiles, err := expand(c, filters, nil)
 	if err != nil {
 		return nil, err
 	}
