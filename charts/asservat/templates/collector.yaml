@@ -20,6 +20,9 @@
 {{- if and (not $ready) (not $published) }}{{ fail "collector.connector requires the connector's https endpoint, certificate server name and issuing roots (or leave all three empty with cluster.enabled)" }}{{ end }}
 {{- $name := printf "%s-node" .Release.Name }}
 {{- $ceilings := dict "ringBytes" (int64 $c.ceilings.ringBytes) "frozenBytes" (int64 $c.ceilings.frozenBytes) "uploadBytesPerSecond" (int64 $c.ceilings.uploadBytesPerSecond) "uploadBurstBytes" (int64 $c.ceilings.uploadBurstBytes) }}
+{{- if $c.ringDisk.enabled }}
+{{- $_ := set $ceilings "ringDiskBytes" (int64 $c.ringDisk.bytes) }}
+{{- end }}
 {{- if gt (int64 $c.ceilings.maxActiveSources) 0 }}
 {{- $_ := set $ceilings "maxActiveSources" (int64 $c.ceilings.maxActiveSources) }}
 {{- $_ := set $ceilings "inputBytesPerSecond" (int64 $c.ceilings.inputBytesPerSecond) }}
@@ -149,7 +152,15 @@ spec:
             - { name: debugfs, mountPath: /sys/kernel/debug, readOnly: true }
             - { name: tracefs, mountPath: /sys/kernel/tracing, readOnly: true }
             - { name: bpffs, mountPath: /sys/fs/bpf, readOnly: true }
+            {{- if $c.ringDisk.enabled }}
+            - { name: ring-disk, mountPath: /var/lib/asservat-ring }
+            {{- end }}
       volumes:
+        {{- if $c.ringDisk.enabled }}
+        # ADR-278: node-local, size-limited; only sealed ring segments.
+        - name: ring-disk
+          emptyDir: { sizeLimit: {{ int64 $c.ringDisk.bytes | quote }} }
+        {{- end }}
         - name: input
           configMap:
             name: {{ printf "%s-input.%s" $name (trunc 32 $digest) }}

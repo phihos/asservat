@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/adapters/syscalls"
 	deliveryapp "asservat.local/asservat/internal/application/delivery"
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -17,18 +18,24 @@ import (
 // collection authority. Initial replay tombstones survive their original start
 // cutoff; a later renewal cannot construct a replacement engine.
 type nodeSources struct {
-	snapshots  map[string]*nodeSourceSnapshot
-	snapshotWG sync.WaitGroup
-	log        func(string)
-	upload     packetUploader
-	takeUpload func(context.Context, int64) bool
-	version    string
-	mu         sync.Mutex
-	closed     bool
-	sources    map[string]*packetSource
-	plans      map[string]collector.SourceRingLimits
-	stops      map[string]sourceStop
-	engine     observedPacketEngine
+	// ringDir is the mounted administrator ring volume; empty means the
+	// encrypted-disk medium is unavailable on this node (ADR-278).
+	ringDir string
+	// ringDiskBytes bounds all active disk rings, so the volume's sizeLimit
+	// (which would evict the collector Pod) is never reached.
+	ringDiskBytes int64
+	snapshots     map[string]*nodeSourceSnapshot
+	snapshotWG    sync.WaitGroup
+	log           func(string)
+	upload        packetUploader
+	takeUpload    func(context.Context, int64) bool
+	version       string
+	mu            sync.Mutex
+	closed        bool
+	sources       map[string]*packetSource
+	plans         map[string]collector.SourceRingLimits
+	stops         map[string]sourceStop
+	engine        observedPacketEngine
 	// syscallEngine runs syscall sources; nil when the recorder is unavailable.
 	syscallEngine syscallTraceEngine
 	identity      func() collector.Identity
@@ -168,8 +175,39 @@ func (n *nodeSources) decide(parent context.Context, epoch string, w collector.W
 		return r
 	}
 	p := source.Ring
+	dir := ""
+	if p.EncryptedDisk {
+		if n.ringDir == "" {
+			r.Reason = collector.ReasonMediumUnavailable
+			return r
+		}
+		dir = n.ringDir
+	}
 	limits := packets.RingLimits{MaxAge: p.MaxAge, MaxBytes: p.MaxBytes, SegmentBytes: p.SegmentBytes, MaxFrozenBytes: p.MaxFrozenBytes, MaxSegments: p.MaxSegments, MaxConcurrentSnapshots: p.MaxConcurrentSnapshots}
-	s, err := newPacketSource(parent, source.Permit, source.Resources.Node, limits, source.Program, source.Syscalls, engine, n.now, n.budget, n.budgetMu, n.log)
+	if dir != "" {
+		used := packets.SealedRingBytes(limits)
+		for key, other := range n.sources {
+			plan := n.plans[key]
+			if !plan.EncryptedDisk {
+				continue
+			}
+			other.mu.Lock()
+			released := other.released
+			other.mu.Unlock()
+			if !released {
+				used += packets.SealedRingBytes(packets.RingLimits{SegmentBytes: plan.SegmentBytes, MaxSegments: plan.MaxSegments})
+			}
+		}
+		if used > n.ringDiskBytes {
+			r.Reason = collector.ReasonMediumUnavailable
+			return r
+		}
+	}
+	s, err := newPacketSource(parent, source.Permit, source.Resources.Node, limits, source.Program, source.Syscalls, engine, n.now, n.budget, n.budgetMu, n.log, dir)
+	if errors.Is(err, packets.ErrMediumUnavailable) {
+		r.Reason = collector.ReasonMediumUnavailable
+		return r
+	}
 	if err != nil {
 		r.Reason = collector.ReasonCaptureBusy
 		return r

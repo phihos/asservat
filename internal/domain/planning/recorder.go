@@ -112,6 +112,9 @@ type RecorderAction struct {
 	Before, After, Timeout, RingMaxAge                          string
 	RingMaxBytes, SegmentBytes, MaxFrozenBytes, MaxBytes        int64
 	MaxSegments, MaxConcurrentSnapshots                         int
+	// RingMedium is "encryptedDisk" for that medium (ADR-278) and empty for
+	// memory, so existing memory plans serialize exactly as before.
+	RingMedium string `json:",omitempty"`
 	// Packet actions.
 	PacketProfile, Filter string
 	FilterInstructions    int

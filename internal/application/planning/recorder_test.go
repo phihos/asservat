@@ -128,7 +128,7 @@ func TestCompositionNormalizationMatrix(t *testing.T) {
 		"segments exceed ring":           {network(ringValue("30s", 16<<20, 8<<20, 4, "memory")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.segmentBytes"},
 		"ring over 256 MiB":              {network(ringValue("30s", 512<<20, 4<<20, 4, "memory")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.maxBytes"},
 		"ring age over an hour":          {network(ringValue("2h", 16<<20, 4<<20, 4, "memory")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.maxAge"},
-		"encrypted disk":                 {network(ringValue("30s", 16<<20, 4<<20, 4, "encryptedDisk")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.medium"},
+		"unknown ring medium":            {network(ringValue("30s", 16<<20, 4<<20, 4, "nfs")), value.CompositionInvalid, "profile_composition.components[0] action sample.parameters.ring.medium"},
 		"timeout without margin":         {network(text("sample", "packetAfter", "12s")), value.CompositionInvalid, "profile_composition.components[0] action sample.limits.timeout"},
 		"duration below timeout":         {network(text("sample", "actionTimeout", "25s")), value.CompositionInvalid, "profile_composition.maxDuration"},
 		"unexposed field":                {network(value.ProfileEdit{ActionID: "sample", Field: "actionMaxBytes", Number: 1}), value.CompositionInvalid, "profile_composition.components[0].overrides[0].field"},
@@ -519,4 +519,24 @@ func TestNarrowPeersFailClosed(t *testing.T) {
 			t.Fatal("narrow peers accepted:", name)
 		}
 	}
+}
+
+// ADR-278: the encrypted-disk ring compiles; its collector memory is one
+// segment plus headers, not the whole ring.
+func TestEncryptedDiskRingAssessesSegmentMemory(t *testing.T) {
+	in, now := recorderInput(t, network(value.ProfileEdit{ActionID: "sample", Field: "packetRing", Ring: &value.RingSettings{MaxAge: "30s", MaxBytes: 16 << 20, SegmentBytes: 4 << 20, MaxSegments: 4, Medium: "encryptedDisk"}}), "packetCapture")
+	p, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now)
+	if err != nil || p.Actions[0].RingMedium != "encryptedDisk" {
+		t.Fatal(err)
+	}
+	a, err := AssessRecorder(p, "00000000-0000-4000-8000-000000000161", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range a.Actions[0].Quantities {
+		if q.SourceRef == "action:"+p.Actions[0].ID+":ring.segmentBytes" && q.Upper == 4<<20+4*32 {
+			return
+		}
+	}
+	t.Fatalf("ring memory quantity %+v", a.Actions[0].Quantities)
 }

@@ -41,14 +41,19 @@ type RingState struct {
 // Its owner must drive Advance while quiet and Close on cancellation/expiry;
 // no timer or goroutine here provides that lifecycle guarantee.
 type Ring struct {
-	mu                                                      sync.Mutex
-	ctx                                                     context.Context
-	bounds                                                  RingBounds
-	limits                                                  RingLimits
-	filter                                                  *Filter
-	decoder                                                 *decoder
-	scratch                                                 [Snaplen]byte // Bounded parser working state, outside historical storage.
-	arena                                                   []byte
+	mu      sync.Mutex
+	ctx     context.Context
+	bounds  RingBounds
+	limits  RingLimits
+	filter  *Filter
+	decoder *decoder
+	scratch [Snaplen]byte // Bounded parser working state, outside historical storage.
+	arena   []byte
+	// Encrypted-disk medium (ADR-278): only the written segment and every
+	// header stay in memory; finished bodies are sealed on disk.
+	disk                                                    *sealedSegments
+	live                                                    []byte
+	headers                                                 [][]byte
 	write                                                   int
 	now, through, floor, cleanSince, stopped, evictedBefore time.Time
 	closedAt                                                time.Time
@@ -63,6 +68,12 @@ const ringRecordHeader = 16
 var ringEndian = binary.LittleEndian
 
 func NewRing(ctx context.Context, bounds RingBounds, limits RingLimits, program []planning.BPFInstruction) (*Ring, error) {
+	return NewRingOn(ctx, bounds, limits, program, "")
+}
+
+// NewRingOn is NewRing on the encrypted-disk medium below dir; an empty dir
+// keeps the memory medium.
+func NewRingOn(ctx context.Context, bounds RingBounds, limits RingLimits, program []planning.BPFInstruction, dir string) (*Ring, error) {
 	if ctx == nil || ctx.Err() != nil || bounds.StartedAt.IsZero() || !bounds.Until.After(bounds.StartedAt) {
 		return nil, ErrInvalid
 	}
@@ -80,13 +91,67 @@ func NewRing(ctx context.Context, bounds RingBounds, limits RingLimits, program 
 	if err != nil {
 		return nil, err
 	}
-	arena := make([]byte, int64(limits.MaxSegments)*limits.SegmentBytes)
 	if ctx.Err() != nil {
 		return nil, ErrRingClosed
 	}
-	return &Ring{ctx: ctx, bounds: bounds, limits: limits, filter: filter, decoder: newDecoder(), arena: arena, now: bounds.StartedAt, floor: bounds.StartedAt, cleanSince: bounds.StartedAt, state: RingState{LiveBytes: int64(len(arena))}}, nil
+	r := &Ring{ctx: ctx, bounds: bounds, limits: limits, filter: filter, decoder: newDecoder(), now: bounds.StartedAt, floor: bounds.StartedAt, cleanSince: bounds.StartedAt}
+	if dir == "" {
+		r.arena = make([]byte, int64(limits.MaxSegments)*limits.SegmentBytes)
+		r.state.LiveBytes = int64(len(r.arena))
+		return r, nil
+	}
+	disk, err := newSealedSegments(dir)
+	if err != nil {
+		return nil, err
+	}
+	r.disk, r.live, r.headers = disk, make([]byte, limits.SegmentBytes), make([][]byte, limits.MaxSegments)
+	for i := range r.headers {
+		r.headers[i] = make([]byte, ringSegmentHeader)
+	}
+	r.state.LiveBytes = MemoryRingBytes(limits, true)
+	return r, nil
 }
-func (r *Ring) segment(i int) []byte { n := int(r.limits.SegmentBytes); return r.arena[i*n : (i+1)*n] }
+
+// MemoryRingBytes is a ring's resident storage: every segment in memory, or
+// one segment plus all headers on the encrypted-disk medium.
+func MemoryRingBytes(l RingLimits, disk bool) int64 {
+	if disk {
+		return l.SegmentBytes + int64(l.MaxSegments)*ringSegmentHeader
+	}
+	return int64(l.MaxSegments) * l.SegmentBytes
+}
+
+// header is segment i's 32-byte header, always in memory.
+func (r *Ring) header(i int) []byte {
+	if r.disk == nil {
+		return r.segment(i)[:ringSegmentHeader]
+	}
+	if i == r.write {
+		return r.live[:ringSegmentHeader]
+	}
+	return r.headers[i]
+}
+
+// segment is segment i in full. On disk, a finished segment is decrypted into
+// a fresh buffer; nil means it could not be read and is treated as empty.
+func (r *Ring) segment(i int) []byte {
+	n := int(r.limits.SegmentBytes)
+	if r.disk == nil {
+		return r.arena[i*n : (i+1)*n]
+	}
+	if i == r.write {
+		return r.live
+	}
+	h := r.headers[i]
+	if ringEndian.Uint32(h[4:]) == 0 {
+		return nil
+	}
+	body, err := r.disk.open(i, h)
+	if err != nil || len(body) != n-ringSegmentHeader {
+		return nil
+	}
+	return append(append(make([]byte, 0, n), h...), body...)
+}
 func later(a, b time.Time) time.Time {
 	if b.After(a) {
 		return b
@@ -94,7 +159,7 @@ func later(a, b time.Time) time.Time {
 	return a
 }
 func (r *Ring) evict(i int) {
-	s := r.segment(i)
+	s := r.header(i)
 	n := uint64(ringEndian.Uint32(s[4:]))
 	if n > 0 {
 		r.state.HistoryEvicted += n
@@ -102,11 +167,25 @@ func (r *Ring) evict(i int) {
 		r.evictedBefore = later(r.evictedBefore, time.Unix(0, int64(ringEndian.Uint64(s[16:]))).Add(time.Nanosecond))
 		r.floor = later(r.floor, r.evictedBefore)
 	}
+	if r.disk == nil {
+		clear(r.segment(i))
+		return
+	}
 	clear(s)
+	if i == r.write {
+		clear(r.live)
+	} else {
+		r.disk.remove(i)
+	}
 }
 func (r *Ring) closeLive() {
 	clear(r.arena)
 	r.arena = nil
+	if r.disk != nil {
+		r.disk.close()
+		clear(r.live)
+		r.disk, r.live, r.headers = nil, nil, nil
+	}
 	r.filter = nil
 	r.decoder = nil
 	r.state.LiveBytes = 0
@@ -129,7 +208,7 @@ func (r *Ring) advance(now time.Time) error {
 	r.floor = later(r.floor, cutoff)
 	r.nextExpiry = time.Time{}
 	for i := 0; i < r.limits.MaxSegments; i++ {
-		s := r.segment(i)
+		s := r.header(i)
 		if ringEndian.Uint32(s[4:]) > 0 && time.Unix(0, int64(ringEndian.Uint64(s[8:]))).Before(cutoff) {
 			r.evict(i)
 		}
@@ -292,8 +371,22 @@ func (r *Ring) retain(data []byte, wire uint32, at, observedAt time.Time) error 
 	// keeps at least MaxAge minus one slice of history.
 	slice := int64(r.limits.MaxAge / time.Duration(r.limits.MaxSegments))
 	if used+size > len(s)-ringSegmentHeader || used > 0 && at.UnixNano()-int64(ringEndian.Uint64(s[8:])) >= slice {
-		r.write = (r.write + 1) % r.limits.MaxSegments
-		r.evict(r.write)
+		if r.disk != nil {
+			// Seal the finished segment before its slot can be reused.
+			old := r.write
+			if err := r.disk.seal(old, s[:ringSegmentHeader], s[ringSegmentHeader:]); err != nil {
+				r.cleanSince = later(r.cleanSince, observedAt.Add(time.Nanosecond))
+				r.closeLive()
+				return ErrMediumUnavailable
+			}
+			copy(r.headers[old], s[:ringSegmentHeader])
+			clear(r.live)
+		}
+		// Evict the next slot before it becomes the written one, so its own
+		// header (and, on disk, its sealed file) is the one accounted.
+		next := (r.write + 1) % r.limits.MaxSegments
+		r.evict(next)
+		r.write = next
 		s = r.segment(r.write)
 		used = 0
 	}
@@ -357,7 +450,16 @@ func (r *Ring) walk(window RingWindow, visit func([]byte)) {
 }
 func (r *Ring) walkRetained(window RingWindow, visit func([]byte, uint64)) {
 	for step := 1; step <= r.limits.MaxSegments; step++ {
-		s := r.segment((r.write + step) % r.limits.MaxSegments)
+		i := (r.write + step) % r.limits.MaxSegments
+		s := r.segment(i)
+		if s == nil {
+			// An unreadable sealed segment is evicted, so it shows as a
+			// coverage gap rather than silently missing history.
+			if r.disk != nil && ringEndian.Uint32(r.header(i)[4:]) > 0 {
+				r.evict(i)
+			}
+			continue
+		}
 		end := ringSegmentHeader + int(ringEndian.Uint32(s))
 		sequence := ringEndian.Uint64(s[24:])
 		for at := ringSegmentHeader; at < end; {
@@ -384,14 +486,13 @@ func (r *Ring) Snapshot(window RingWindow, now time.Time, maxCopyBytes int64) (*
 	if window.From.IsZero() || window.Until.Before(window.From) || maxCopyBytes < 1 || maxCopyBytes > r.limits.MaxFrozenBytes {
 		return nil, ErrInvalid
 	}
-	var n int64
-	r.walk(window, func(record []byte) { n += int64(len(record)) })
-	if r.state.Snapshots >= r.limits.MaxConcurrentSnapshots || n > maxCopyBytes || n > r.limits.MaxFrozenBytes-r.state.FrozenBytes {
+	if r.state.Snapshots >= r.limits.MaxConcurrentSnapshots {
 		return nil, ErrRingCapacity
 	}
-	data := make([]byte, int(n))
-	at := 0
-	r.walk(window, func(record []byte) { at += copy(data[at:], record) })
+	data, ok := r.copyWindow(window, min(maxCopyBytes, r.limits.MaxFrozenBytes-r.state.FrozenBytes))
+	if !ok {
+		return nil, ErrRingCapacity
+	}
 	if r.ctx.Err() != nil {
 		clear(data)
 		r.closeLive()
@@ -402,6 +503,44 @@ func (r *Ring) Snapshot(window RingWindow, now time.Time, maxCopyBytes int64) (*
 	r.state.Snapshots++
 	return &RingSnapshot{ring: r, data: data, coverage: c}, nil
 }
+
+// copyWindow copies window's records in one walk (on the disk medium each walk
+// decrypts sealed segments) into an exactly sized buffer; false means they
+// exceed limit. The capacity estimate uses only in-memory headers.
+func (r *Ring) copyWindow(window RingWindow, limit int64) ([]byte, bool) {
+	var bound int64
+	for i := 0; i < r.limits.MaxSegments; i++ {
+		h := r.header(i)
+		if ringEndian.Uint32(h[4:]) == 0 {
+			continue
+		}
+		if time.Unix(0, int64(ringEndian.Uint64(h[16:]))).Before(window.From) || time.Unix(0, int64(ringEndian.Uint64(h[8:]))).After(window.Until) {
+			continue
+		}
+		bound += int64(ringEndian.Uint32(h))
+	}
+	data := make([]byte, 0, max(0, min(bound, limit)))
+	over := false
+	r.walk(window, func(record []byte) {
+		if over || int64(len(data)+len(record)) > limit {
+			over = true
+			return
+		}
+		data = append(data, record...)
+	})
+	if over {
+		clear(data)
+		return nil, false
+	}
+	if cap(data) != len(data) {
+		exact := make([]byte, len(data))
+		copy(exact, data)
+		clear(data)
+		data = exact
+	}
+	return data, true
+}
+
 func (r *Ring) coverage(window RingWindow) RingCoverage {
 	observed := r.through
 	if !r.stopped.IsZero() && observed.After(r.stopped) {
@@ -492,14 +631,20 @@ func (r *Ring) BeginWindowSnapshot(processing context.Context, window RingWindow
 		return nil, ErrRingCapacity
 	}
 	preWindow := RingWindow{window.From, t0}
-	var used int
-	r.walk(preWindow, func(b []byte) { used += len(b) })
-	if int64(used) > maxCopyBytes {
+	// One pass: on the disk medium every walk decrypts sealed segments.
+	data := make([]byte, int(maxCopyBytes))
+	used, over := 0, false
+	r.walk(preWindow, func(b []byte) {
+		if over || used+len(b) > len(data) {
+			over = true
+			return
+		}
+		used += copy(data[used:], b)
+	})
+	if over {
+		clear(data)
 		return nil, ErrRingCapacity
 	}
-	data := make([]byte, int(maxCopyBytes))
-	used = 0
-	r.walk(preWindow, func(b []byte) { used += copy(data[used:], b) })
 	if processing.Err() != nil || r.ctx.Err() != nil {
 		clear(data)
 		return nil, ErrRingClosed
@@ -553,16 +698,6 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 		return nil
 	}
 	window := w.final.Requested
-	var used int
-	r.walkRetained(window, func(b []byte, sequence uint64) {
-		if time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) || sequence > w.cut {
-			used += len(b)
-		}
-	})
-	if used > cap(s.data)-len(s.data) {
-		w.failure = ErrRingCapacity
-		return w.failure
-	}
 	if w.processing.Err() != nil {
 		w.failure = ErrRingClosed
 		return w.failure
@@ -571,13 +706,28 @@ func (w *WindowSnapshot) Complete(now time.Time) error {
 		r.closeLive()
 		return nil
 	}
-	at := len(s.data)
-	s.data = s.data[:at+used]
+	// One pass into the reserved capacity (each walk decrypts on disk).
+	start := len(s.data)
+	s.data = s.data[:cap(s.data)]
+	used, over := 0, false
 	r.walkRetained(window, func(b []byte, sequence uint64) {
-		if time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) || sequence > w.cut {
-			at += copy(s.data[at:], b)
+		if !time.Unix(0, int64(ringEndian.Uint64(b))).After(w.t0) && sequence <= w.cut {
+			return
 		}
+		if over || start+used+len(b) > len(s.data) {
+			over = true
+			return
+		}
+		used += copy(s.data[start+used:], b)
 	})
+	if over {
+		clear(s.data[start:])
+		s.data = s.data[:start]
+		w.failure = ErrRingCapacity
+		return w.failure
+	}
+	s.data = s.data[:start+used]
+	at := start + used
 	if w.processing.Err() != nil {
 		w.failure = ErrRingClosed
 		return w.failure

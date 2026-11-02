@@ -422,7 +422,7 @@ func (s *PolicySourceRuntime) maintain(ctx context.Context, p value.RestartPolic
 			continue
 		}
 
-		source := collector.PacketSource{Permit: admission.Permit, Resources: admission.Resources, Ring: collector.SourceRingLimits{MaxAge: age, MaxBytes: rec.Action.RingMaxBytes, SegmentBytes: rec.Action.SegmentBytes, MaxSegments: rec.Action.MaxSegments, MaxFrozenBytes: rec.Action.MaxFrozenBytes, MaxConcurrentSnapshots: rec.Action.MaxConcurrentSnapshots}}
+		source := collector.PacketSource{Permit: admission.Permit, Resources: admission.Resources, Ring: collector.SourceRingLimits{MaxAge: age, MaxBytes: rec.Action.RingMaxBytes, SegmentBytes: rec.Action.SegmentBytes, MaxSegments: rec.Action.MaxSegments, MaxFrozenBytes: rec.Action.MaxFrozenBytes, MaxConcurrentSnapshots: rec.Action.MaxConcurrentSnapshots, EncryptedDisk: rec.Action.RingMedium == "encryptedDisk"}}
 		if rec.Filter != nil {
 			source.Program = slices.Clone(rec.Filter.Program)
 		}
