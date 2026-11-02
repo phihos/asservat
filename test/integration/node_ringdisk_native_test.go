@@ -212,7 +212,9 @@ func ringDiskNative(t *testing.T, ctx context.Context, k kubernetes.Interface, c
 	if sealedRing > ceiling || 2*sealedRing <= ceiling {
 		t.Fatalf("ring plan %d sealed bytes does not fit exactly once into %d", sealedRing, ceiling)
 	}
-	sealedFile := plan.SegmentBytes + 12 + 16
+	// A sealed file is the segment body (the 32-byte header stays in
+	// memory) plus nonce and tag.
+	sealedFile := plan.SegmentBytes - 32 + 12 + 16
 	out["plan"] = map[string]any{"segmentBytes": plan.SegmentBytes, "segments": plan.MaxSegments, "sealedRingBytes": sealedRing, "residentBytes": resident}
 	resources := collector.SourceResources{PolicyUID: "synthetic-ringdisk-policy"}
 	type armed struct {
