@@ -239,7 +239,8 @@ func cniQualificationNative(t *testing.T, ctx context.Context, k kubernetes.Inte
 		t.Fatal(err)
 	}
 	wait("hostNetwork result", 60*time.Second, func() bool { _, _, _, ok := sink.get(p.CaptureID); return ok })
-	if hr, hb, _, _ := sink.get(p.CaptureID); hr.Failure != collector.ReasonTargetHostNet || hr.Seen != 0 || len(hb) != 0 {
+	// The refusal may carry the empty PCAPNG header; it holds no packet.
+	if hr, hb, _, _ := sink.get(p.CaptureID); hr.Failure != collector.ReasonTargetHostNet || hr.Seen != 0 || hr.Retained != 0 || bytes.Contains(hb, []byte(packetMarker)) {
 		t.Fatalf("hostNetwork target %+v (%d bytes)", hr, len(hb))
 	}
 	results["cni"].(map[string]any)["hostNetwork"] = string(collector.ReasonTargetHostNet)
