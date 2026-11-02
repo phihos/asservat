@@ -179,6 +179,17 @@ def packet(work, report, cni=""):
         if cni == "cilium":
             cilium(work, name, kubeconfig, report)
         run(["kind", "load", "docker-image", tag, "--name", name])
+        # The fixture images come from the host's digest-pinned pulls, so the
+        # node never reaches a registry (an in-node Docker Hub pull on the
+        # dual-stack node failed intermittently). kind cannot load a digest
+        # reference, so each loads under a run-local tag of the same content.
+        fixtures = {}
+        for ref in (PAUSE, BUSYBOX):
+            local = "asservat-fixture/" + ref.split("@")[0].rsplit("/", 1)[-1] + ":" + ref.rsplit(":", 1)[-1][:16]
+            run(["docker", "pull", "-q", ref])
+            run(["docker", "tag", ref, local])
+            run(["kind", "load", "docker-image", local, "--name", name])
+            fixtures[ref] = "docker.io/" + local
         report["cluster"] = {"seconds": round(time.monotonic() - started, 1), "node": NODE,
                              "kubernetes": json.loads(run(["kubectl", "--kubeconfig", str(kubeconfig), "version", "-o", "json"]))["serverVersion"]["gitVersion"]}
         node = name + "-control-plane"
@@ -196,7 +207,7 @@ def packet(work, report, cni=""):
         run(["kubectl", "--kubeconfig", str(kubeconfig), "apply", "-f", str(manifests)])
         fixture = {"kubeconfig": str(kubeconfig), "collectorNamespace": "asservat-collector", "daemonSet": "asservat-node", "serviceAccount": "asservat-node",
                    "installationID": INSTALLATION, "clusterID": CLUSTER, "listen": f"{gateway}:{PORT}", "serverCertificate": str(cert), "serverKey": str(key),
-                   "pause": PAUSE, "busybox": BUSYBOX, "s3": s3url, "cni": cni, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
+                   "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
         (work / "fixture.json").write_text(json.dumps(fixture))
         started = time.monotonic()
         test = subprocess.run(["go", "test", "-tags", "libpcap", "-count=1", "-v", "-timeout", "12m", "-run", "^TestNodeCollectorWithRealKubernetes$", "./test/integration"],
@@ -220,6 +231,8 @@ def packet(work, report, cni=""):
         if s3name:
             subprocess.run(["docker", "rm", "-f", "-v", s3name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(["docker", "image", "rm", "-f", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for ref in (PAUSE, BUSYBOX):
+            subprocess.run(["docker", "image", "rm", "asservat-fixture/" + ref.split("@")[0].rsplit("/", 1)[-1] + ":" + ref.rsplit(":", 1)[-1][:16]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         report["cleanup"] = {"cluster": name not in run(["kind", "get", "clusters"]).split(), "image": subprocess.run(["docker", "image", "inspect", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0}
 
 
