@@ -92,6 +92,9 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 	if r.Call.ID != q.OperationID || r.Call.Tool != q.Scope.BeginTool() {
 		return out, query.ErrUnavailable
 	}
+	// The transaction's step errors replace their cause, so the cap refusal
+	// is recorded here rather than recovered from the returned chain.
+	busy := false
 	err := s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries) error {
 		row, e := tx.ReadQueryAcquisitionWorker(ctx, custodydb.ReadQueryAcquisitionWorkerParams{QueryID: id(q.ID), RootID: id(q.Scope.RootID)})
 		if e == nil {
@@ -106,6 +109,7 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 			return e
 		}
 		if counts.Total >= 16 || counts.Workload >= 2 || counts.Principal >= 2 {
+			busy = true
 			return query.ErrBusy
 		}
 		i := query.ContextProjectionWorkerIntent{Query: q, Worker: value.AcquisitionWorkerIntent{ID: q.WorkerID, Parent: value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: q.ID}, Profile: s.profile, CreatedAt: q.CreatedAt, RunUntil: q.WorkerUntil}}
@@ -122,7 +126,7 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 		out.Intent = i
 		return nil
 	})
-	if errors.Is(err, query.ErrBusy) {
+	if err != nil && busy {
 		return evidence.ProjectionWorkerState{}, query.ErrBusy
 	}
 	if err != nil {
