@@ -134,10 +134,10 @@ type APIContextRunner struct {
 	Profiles interface {
 		ReadCatalogProfiles(context.Context, targets.PodResolution, []planning.ProfileRef) ([]planning.CatalogProfile, error)
 	}
-	Recovery fleetapp.RecoveryReader
-	Output       evidence.ContextProducer
-	Collector    ContextCollector
-	Now          func() time.Time
+	Recovery  fleetapp.RecoveryReader
+	Output    evidence.ContextProducer
+	Collector ContextCollector
+	Now       func() time.Time
 }
 
 func APIExecutionDigest(r value.APIExecution) artifact.Digest {
