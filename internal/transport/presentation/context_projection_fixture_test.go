@@ -30,7 +30,7 @@ type bridgeFixture struct {
 	admissions, starts, polls, observations, batches, claims, reads, completions int
 	active                                                                       bool
 	queryFresh, batchFresh, claimFresh, ready                                    bool
-	queryErr, claimErr, closeErr, permitErr, errorAfterRead                      error
+	queryErr, claimErr, closeErr, permitErr, errorAfterRead, workerErr           error
 	authorityHook                                                                func()
 	observeHook                                                                  func()
 	routeHook, planHook, claimHook                                               func(context.Context)
@@ -172,7 +172,7 @@ func (f *bridgeFixture) CompleteReadBatch(ctx context.Context, b value.ContextRe
 }
 func (f *bridgeFixture) AdmitProjectionWorker(context.Context, value.ContextQuery, analysisapp.ContextProjectionRequestOwner) error {
 	f.starts++
-	return nil
+	return f.workerErr
 }
 func (f *bridgeFixture) ObserveProjectionWorker(_ context.Context, q value.ContextQuery, _ analysisapp.ContextProjectionRequestOwner) (analysisapp.ContextProjectionWorkerObservation, error) {
 	f.observations++

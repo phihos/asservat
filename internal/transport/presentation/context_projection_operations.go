@@ -152,6 +152,11 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		// current read rights; the read stays charged and nothing is disclosed.
 		return s.refusal(record.ID, name, record.Until, httpHeaderInvalidCursor, operationAuditInvalid, operationEffectAccepted, false)
 	}
+	if d == nil && errors.Is(err, value.ErrBusy) && name == "get_http_headers" {
+		// ADR-282: the live worker caps are full. The admitted query stays
+		// charged; a later page request may succeed.
+		return s.refusal(record.ID, name, record.Until, httpHeaderNotAvailable, operationAuditDenied, operationEffectAccepted, false)
+	}
 	if err != nil || d == nil {
 		// The service's own closed stage names this refusal in the report.
 		return OperationReply{}, stoppedAt("query", err, ErrOperationDelivery)

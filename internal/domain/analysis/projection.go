@@ -27,6 +27,9 @@ var (
 	ErrInvalid     = errors.New("invalid context projection")
 	ErrUnavailable = errors.New("context projection unavailable")
 	ErrExpired     = errors.New("context projection expired")
+	// ErrBusy refuses a query whose worker would exceed the live acquisition
+	// worker caps; the query stays charged and a later retry may succeed.
+	ErrBusy = errors.New("context projection workers busy")
 )
 
 // HTTPHeadersDisplayVersion names the get_http_headers page rendering of an

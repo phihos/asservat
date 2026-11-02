@@ -102,8 +102,11 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 			return e
 		}
 		counts, e := tx.AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: id(q.Plan.InstallationID), ClusterID: id(q.Scope.ClusterID), NamespaceUid: q.Scope.NamespaceUID, WorkloadUid: q.Scope.WorkloadUID, PrincipalKey: principalKey(q.Scope.Principal)})
-		if e != nil || counts.Total >= 16 || counts.Workload >= 2 || counts.Principal >= 2 {
-			return query.ErrUnavailable
+		if e != nil {
+			return e
+		}
+		if counts.Total >= 16 || counts.Workload >= 2 || counts.Principal >= 2 {
+			return query.ErrBusy
 		}
 		i := query.ContextProjectionWorkerIntent{Query: q, Worker: value.AcquisitionWorkerIntent{ID: q.WorkerID, Parent: value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: q.ID}, Profile: s.profile, CreatedAt: q.CreatedAt, RunUntil: q.WorkerUntil}}
 		if !i.Valid() {
@@ -119,6 +122,9 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 		out.Intent = i
 		return nil
 	})
+	if errors.Is(err, query.ErrBusy) {
+		return evidence.ProjectionWorkerState{}, query.ErrBusy
+	}
 	if err != nil {
 		return evidence.ProjectionWorkerState{}, query.ErrUnavailable
 	}

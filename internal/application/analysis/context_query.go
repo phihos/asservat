@@ -545,6 +545,9 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 		return nil, queryStepped("post-admit", err)
 	}
 	if err = s.Workers.AdmitProjectionWorker(o.ctx, q, o); err != nil {
+		if errors.Is(err, value.ErrBusy) {
+			return nil, queryCollapsed("worker-admission", value.ErrBusy, err)
+		}
 		return nil, queryCollapsed("worker-admission", value.ErrUnavailable, err)
 	}
 	d, err := s.Results.prepare(o, ContextQueryAdmitted)

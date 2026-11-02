@@ -6,6 +6,7 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
+	"errors"
 	"time"
 )
 
@@ -58,6 +59,9 @@ func (s *ProjectionWorkerAdmission) AdmitProjectionWorker(ctx context.Context, q
 	current := func() bool { return call.Err() == nil && q.Current(a, s.Now()) && r.Valid(s.Now()) }
 	state, e := s.Ledger.ReserveProjectionWorker(call, q, r, a)
 	if e != nil || !state.Intent.Valid() || !state.Intent.Query.Equal(q) || !current() {
+		if errors.Is(e, query.ErrBusy) {
+			return collapsed("reserve", query.ErrBusy, e)
+		}
 		return collapsed("reserve", query.ErrUnavailable, e)
 	}
 	receipt := state.Receipt

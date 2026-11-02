@@ -263,3 +263,10 @@ two-unit charge through the guards) is covered only by the function checks
 of the upgrade test and the native focus; worker transient memory for one
 page (about three frame-sized buffers) is within the 256 MiB Job limit but
 above the profile's declared 8 MiB per unit.
+
+The live acquisition worker caps (16 per installation, two per workload and
+two per principal, shared with downloads) count a projection worker until its
+Job is retired, after its page was delivered. A begin that finds a cap full
+is the retryable `NotAvailable` tool result (`ErrBusy`), not a transport 503;
+the admitted query stays charged. Native paging measured the third page
+reaching the cap while the first two workers awaited retirement.
