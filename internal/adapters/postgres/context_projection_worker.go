@@ -92,9 +92,6 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 	if r.Call.ID != q.OperationID || r.Call.Tool != q.Scope.BeginTool() {
 		return out, query.ErrUnavailable
 	}
-	// The transaction's step errors replace their cause, so the cap refusal
-	// is recorded here rather than recovered from the returned chain.
-	busy := false
 	err := s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries) error {
 		row, e := tx.ReadQueryAcquisitionWorker(ctx, custodydb.ReadQueryAcquisitionWorkerParams{QueryID: id(q.ID), RootID: id(q.Scope.RootID)})
 		if e == nil {
@@ -105,12 +102,8 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 			return e
 		}
 		counts, e := tx.AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: id(q.Plan.InstallationID), ClusterID: id(q.Scope.ClusterID), NamespaceUid: q.Scope.NamespaceUID, WorkloadUid: q.Scope.WorkloadUID, PrincipalKey: principalKey(q.Scope.Principal)})
-		if e != nil {
-			return e
-		}
-		if counts.Total >= 16 || counts.Workload >= 2 || counts.Principal >= 2 {
-			busy = true
-			return query.ErrBusy
+		if e != nil || !projectionWorkerRoom(counts) {
+			return query.ErrUnavailable
 		}
 		i := query.ContextProjectionWorkerIntent{Query: q, Worker: value.AcquisitionWorkerIntent{ID: q.WorkerID, Parent: value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: q.ID}, Profile: s.profile, CreatedAt: q.CreatedAt, RunUntil: q.WorkerUntil}}
 		if !i.Valid() {
@@ -126,13 +119,30 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 		out.Intent = i
 		return nil
 	})
-	if err != nil && busy {
-		return evidence.ProjectionWorkerState{}, query.ErrBusy
-	}
 	if err != nil {
 		return evidence.ProjectionWorkerState{}, query.ErrUnavailable
 	}
 	return out, nil
+}
+
+// projectionWorkerRoom applies the live acquisition worker caps shared with
+// downloads: 16 per installation, two per workload and two per principal.
+func projectionWorkerRoom(c custodydb.AcquisitionWorkerCapacityRow) bool {
+	return c.Total < 16 && c.Workload < 2 && c.Principal < 2
+}
+
+// ProjectionWorkerRoom reads the live worker caps before a query is admitted,
+// so a full cap refuses without charging the query. It is advisory: the
+// reservation rechecks the caps under its lock.
+func (s *ProjectionWorkers) ProjectionWorkerRoom(ctx context.Context, q query.ContextQuery) error {
+	counts, e := custodydb.New(s.queries.ledger.pool).AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: id(q.Plan.InstallationID), ClusterID: id(q.Scope.ClusterID), NamespaceUid: q.Scope.NamespaceUID, WorkloadUid: q.Scope.WorkloadUID, PrincipalKey: principalKey(q.Scope.Principal)})
+	if e != nil {
+		return query.ErrUnavailable
+	}
+	if !projectionWorkerRoom(counts) {
+		return query.ErrBusy
+	}
+	return nil
 }
 func (s *ProjectionWorkers) ReadProjectionWorker(ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, a query.ContextProjectionAuthority) (evidence.ProjectionWorkerState, error) {
 	var out evidence.ProjectionWorkerState

@@ -74,6 +74,9 @@ type ContextQueryLedger interface {
 // Only initial admission receives this capability. Observing a query/result
 // never calls it, including missing, failed, expired or uncertain workers.
 type ContextProjectionWorkerAdmission interface {
+	// ProjectionWorkerRoom returns value.ErrBusy while the live worker caps
+	// are full, before the query is admitted and charged.
+	ProjectionWorkerRoom(context.Context, value.ContextQuery) error
 	AdmitProjectionWorker(context.Context, value.ContextQuery, ContextProjectionRequestOwner) error
 }
 

@@ -198,8 +198,8 @@ func TestHTTPHeaderCursorRefusals(t *testing.T) {
 	})
 }
 
-// A full live-worker cap is a retryable tool refusal, not a transport 503;
-// the admitted query stays charged.
+// A full live-worker cap is a retryable tool refusal, not a transport 503,
+// checked before the query is admitted, so it charges nothing.
 func TestHTTPHeaderBusyWorkersAreRetryable(t *testing.T) {
 	s, f, g, _ := httpBridge(t, value.HTTPHeaderWindow{Limit: 100})
 	f.workerErr = value.ErrBusy
@@ -212,7 +212,7 @@ func TestHTTPHeaderBusyWorkersAreRetryable(t *testing.T) {
 		} `json:"data"`
 	}
 	if err != nil || json.Unmarshal(reply.Body, &body) != nil || body.Status != "error" || body.Data.Code != "NotAvailable" || !body.Data.Retryable ||
-		s.contracts.ValidateOutput("get_http_headers", reply.Body) != nil || f.admissions != 1 || g.outcomes[0].Effect != "accepted" || g.outcomes[0].Status != "denied" {
+		s.contracts.ValidateOutput("get_http_headers", reply.Body) != nil || f.admissions != 0 || f.starts != 0 || g.outcomes[0].Effect != "none" || g.outcomes[0].Status != "denied" {
 		t.Fatalf("busy workers: %v %s %+v", err, reply.Body, g.outcomes)
 	}
 }

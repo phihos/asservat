@@ -267,6 +267,9 @@ above the profile's declared 8 MiB per unit.
 The live acquisition worker caps (16 per installation, two per workload and
 two per principal, shared with downloads) count a projection worker until its
 Job is retired, after its page was delivered. A begin that finds a cap full
-is the retryable `NotAvailable` tool result (`ErrBusy`), not a transport 503;
-the admitted query stays charged. Native paging measured the third page
-reaching the cap while the first two workers awaited retirement.
+is the retryable `NotAvailable` tool result (`ErrBusy`), not a transport 503.
+The caps are read before the query is admitted, so a busy refusal charges no
+query units; a slot taken between that read and the locked reservation is
+still a charged 503. Native paging measured the third page reaching the cap
+while the first two workers awaited retirement, and a charged busy refusal
+let one retry exhaust the workload's eight query units.

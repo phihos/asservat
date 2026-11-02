@@ -44,6 +44,10 @@ type publicProjectionAdmission struct {
 	admission *evidence.ProjectionWorkerAdmission
 }
 
+func (s publicProjectionAdmission) ProjectionWorkerRoom(ctx context.Context, q query.ContextQuery) error {
+	return s.admission.ProjectionWorkerRoom(ctx, q)
+}
+
 func (s publicProjectionAdmission) AdmitProjectionWorker(ctx context.Context, q query.ContextQuery, owner analysisapp.ContextProjectionRequestOwner) error {
 	return s.admission.AdmitProjectionWorker(ctx, q, owner)
 }

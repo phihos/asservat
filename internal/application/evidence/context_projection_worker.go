@@ -6,7 +6,6 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
-	"errors"
 	"time"
 )
 
@@ -20,6 +19,7 @@ type ProjectionWorkerState struct {
 	Worker           value.AcquisitionWorker
 }
 type ProjectionWorkerLedger interface {
+	ProjectionWorkerRoom(context.Context, query.ContextQuery) error
 	ReserveProjectionWorker(context.Context, query.ContextQuery, query.ContextQueryRequest, query.ContextProjectionAuthority) (ProjectionWorkerState, error)
 	ReadProjectionWorker(context.Context, query.ContextQuery, query.ContextQueryRequest, query.ContextProjectionAuthority) (ProjectionWorkerState, error)
 	ClaimProjectionWorker(context.Context, query.ContextProjectionWorkerIntent, query.ContextQueryRequest, query.ContextProjectionAuthority, audit.Receipt) (value.AcquisitionWorkerLaunch, error)
@@ -42,6 +42,15 @@ type ProjectionWorkerAdmission struct {
 	Cleanup *ProjectionWorkerCleanup
 }
 
+// ProjectionWorkerRoom refuses with query.ErrBusy, before any charge, while the
+// live worker caps are full.
+func (s *ProjectionWorkerAdmission) ProjectionWorkerRoom(ctx context.Context, q query.ContextQuery) error {
+	if s == nil || s.Ledger == nil {
+		return query.ErrUnavailable
+	}
+	return s.Ledger.ProjectionWorkerRoom(ctx, q)
+}
+
 func (s *ProjectionWorkerAdmission) AdmitProjectionWorker(ctx context.Context, q query.ContextQuery, owner ContextProjectionRequestOwner) error {
 	if s == nil || s.Ledger == nil || s.Jobs == nil || s.Audit == nil || s.Now == nil || ctx == nil || owner == nil {
 		return query.ErrUnavailable
@@ -59,9 +68,6 @@ func (s *ProjectionWorkerAdmission) AdmitProjectionWorker(ctx context.Context, q
 	current := func() bool { return call.Err() == nil && q.Current(a, s.Now()) && r.Valid(s.Now()) }
 	state, e := s.Ledger.ReserveProjectionWorker(call, q, r, a)
 	if e != nil || !state.Intent.Valid() || !state.Intent.Query.Equal(q) || !current() {
-		if errors.Is(e, query.ErrBusy) {
-			return collapsed("reserve", query.ErrBusy, e)
-		}
 		return collapsed("reserve", query.ErrUnavailable, e)
 	}
 	receipt := state.Receipt

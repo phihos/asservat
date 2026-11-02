@@ -173,6 +173,9 @@ func (f *projectionFixture) PermitReadBatch(context.Context, value.ContextReadBa
 func (f *projectionFixture) CompleteReadBatch(ctx context.Context, b value.ContextReadBatch, closed ContextProjectionClosed) error {
 	return closed.WithProjectionClosed(ctx, b, func(context.Context) error { f.completions++; f.active = false; return nil })
 }
+func (f *projectionFixture) ProjectionWorkerRoom(context.Context, value.ContextQuery) error {
+	return nil
+}
 func (f *projectionFixture) AdmitProjectionWorker(context.Context, value.ContextQuery, ContextProjectionRequestOwner) error {
 	f.starts++
 	return nil

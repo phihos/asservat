@@ -537,6 +537,11 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 	if err != nil {
 		return nil, queryStepped("pre-admit", err)
 	}
+	if err = s.Workers.ProjectionWorkerRoom(o.ctx, q); errors.Is(err, value.ErrBusy) {
+		return nil, queryStepped("worker-room", value.ErrBusy)
+	} else if err != nil {
+		return nil, queryCollapsed("worker-room", value.ErrUnavailable, err)
+	}
 	admitted, err := s.Results.Ledger.AdmitQuery(o.ctx, q, o.request, a)
 	if err != nil || !admitted.Fresh || !admitted.Query.Equal(q) {
 		return nil, queryCollapsed("admit", value.ErrUnavailable, err)
@@ -545,9 +550,6 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 		return nil, queryStepped("post-admit", err)
 	}
 	if err = s.Workers.AdmitProjectionWorker(o.ctx, q, o); err != nil {
-		if errors.Is(err, value.ErrBusy) {
-			return nil, queryCollapsed("worker-admission", value.ErrBusy, err)
-		}
 		return nil, queryCollapsed("worker-admission", value.ErrUnavailable, err)
 	}
 	d, err := s.Results.prepare(o, ContextQueryAdmitted)

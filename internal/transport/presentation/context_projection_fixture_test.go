@@ -170,9 +170,12 @@ func (f *bridgeFixture) PermitReadBatch(context.Context, value.ContextReadBatch,
 func (f *bridgeFixture) CompleteReadBatch(ctx context.Context, b value.ContextReadBatch, closed analysisapp.ContextProjectionClosed) error {
 	return closed.WithProjectionClosed(ctx, b, func(context.Context) error { f.completions++; f.active = false; return nil })
 }
+func (f *bridgeFixture) ProjectionWorkerRoom(context.Context, value.ContextQuery) error {
+	return f.workerErr
+}
 func (f *bridgeFixture) AdmitProjectionWorker(context.Context, value.ContextQuery, analysisapp.ContextProjectionRequestOwner) error {
 	f.starts++
-	return f.workerErr
+	return nil
 }
 func (f *bridgeFixture) ObserveProjectionWorker(_ context.Context, q value.ContextQuery, _ analysisapp.ContextProjectionRequestOwner) (analysisapp.ContextProjectionWorkerObservation, error) {
 	f.observations++
