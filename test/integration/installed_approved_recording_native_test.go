@@ -168,7 +168,12 @@ func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api ku
 	if err != nil {
 		t.Fatal("installed collector endpoint", err)
 	}
-	values := map[string]any{"mode": "cluster", "collector": map[string]any{"enabled": true, "image": image, "installationID": installation, "clusterID": cluster, "connector": source.Data}}
+	collector := map[string]any{"enabled": true, "image": image, "installationID": installation, "clusterID": cluster, "connector": source.Data}
+	if installedJourneyFocus() == "ongoing-save-disk" {
+		// ADR-278: the administrator's opt-in encrypted-disk ring volume.
+		collector["ringDisk"] = map[string]any{"enabled": true, "bytes": ongoingSaveDiskBytes}
+	}
+	values := map[string]any{"mode": "cluster", "collector": collector}
 	raw, _ := json.Marshal(values)
 	path := filepath.Join(t.TempDir(), "collector-values.json")
 	if err := os.WriteFile(path, raw, 0600); err != nil {

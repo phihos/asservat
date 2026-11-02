@@ -186,29 +186,6 @@
         "segmentBytes",
         "maxSegments",
         "medium"
-      ],
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "medium": {
-                "const": "encryptedDisk"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "storageProfileRef"
-            ]
-          },
-          "else": {
-            "not": {
-              "required": [
-                "storageProfileRef"
-              ]
-            }
-          }
-        }
       ]
     },
     "peers": {

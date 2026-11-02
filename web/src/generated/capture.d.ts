@@ -321,7 +321,7 @@ export interface components {
             /** @enum {unknown} */
             medium: "memory" | "encryptedDisk";
             storageProfileRef?: string;
-        } & unknown;
+        };
         Contract_action_f252bcf961e0afcb: {
             match: {
                 executablePath?: string;
@@ -1515,7 +1515,7 @@ export interface components {
                 /** @enum {unknown} */
                 medium: "memory" | "encryptedDisk";
                 storageProfileRef?: string;
-            } & unknown;
+            };
             peers: {
                 entries: ({
                     cidrs: string[];
