@@ -164,7 +164,9 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		if err != nil {
 			return authorization.Grant{}, authorization.ApprovalPendingError{GrantID: g.ID}
 		}
-		if approval.ObservationLimits != nil {
+		// Only a single manual rawPackets action has an observation issuer:
+		// its approved grant's pool (ADR-279).
+		if approval.ObservationLimits != nil && (approval.DataClass != "raw" || len(actions) != 1) {
 			return authorization.Grant{}, value.ErrRecorderUnavailable
 		}
 		return g, nil
