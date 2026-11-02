@@ -740,6 +740,7 @@ components:
   - internal/adapters/linux
   - internal/adapters/gadget
   - internal/adapters/packets
+  - internal/adapters/httpheaders
   - internal/adapters/syscalls
   - internal/adapters/pcap
   - internal/adapters/diagnostics
