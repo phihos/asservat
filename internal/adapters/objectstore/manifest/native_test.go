@@ -219,8 +219,12 @@ func TestSyscallAndHTTPNativeChecks(t *testing.T) {
 			t.Fatal("accepted invalid syscall records:", name)
 		}
 	}
-	e.NativeType = artifact.HTTPHeadersArtifact
-	e.Registration.NativeLimit = artifact.HTTPHeadersNativeLimit
+	// ADR-282: the projection is an httpHeaders recording of class extract.
+	e.NativeType, e.DataClass, e.Lifecycle = artifact.HTTPHeadersArtifact, "extract", nil
+	e.Registration.NativeLimit = artifact.RecordingNativeLimit
+	e.Recording = &artifact.Recording{Kind: "packetCapture", Profile: "httpHeaders", Composition: []byte("{}"), DurationMillis: 10_000, MaxBytes: 1 << 20, Snaplen: artifact.MaxRawSnaplen,
+		Filter: &artifact.RecordingFilter{Expression: "tcp port 8080", Program: []artifact.FilterInstruction{{Code: 6, K: 65535}}},
+		HTTP:   &artifact.RecordingHTTP{MaxFlows: 1, MaxHeaderBytes: 1024, MaxFlowBytes: 64 << 10, MaxTotalBytes: 1 << 20, IdleMillis: 5000}}
 	for name, b := range map[string]struct {
 		body string
 		ok   bool

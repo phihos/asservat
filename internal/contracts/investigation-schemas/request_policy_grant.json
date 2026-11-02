@@ -289,6 +289,7 @@
                           "enum": [
                             "rawBytePredicate",
                             "rawPackets",
+                            "httpHeaders",
                             "recordingApprovalRequired",
                             "policyCollection"
                           ]
@@ -559,6 +560,7 @@
                             "enum": [
                               "rawBytePredicate",
                               "rawPackets",
+                              "httpHeaders",
                               "recordingApprovalRequired"
                             ]
                           }

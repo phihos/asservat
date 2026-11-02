@@ -65,15 +65,16 @@ func (p DownloadPolicy) WellFormed() bool {
 	for _, c := range p.Clients {
 		key := [2]string{c.Issuer, c.ID}
 		if !identity.Text(c.Issuer, 2048) || !identity.Text(c.ID, 256) || !identity.ValidKind(c.Kind) || clients[key] ||
-			c.DataClasses == nil || !identity.Strings(c.DataClasses, 2, 32) || c.PrivacyClasses == nil || !identity.Strings(c.PrivacyClasses, 1, 32) ||
+			c.DataClasses == nil || !identity.Strings(c.DataClasses, 3, 32) || c.PrivacyClasses == nil || !identity.Strings(c.PrivacyClasses, 1, 32) ||
 			c.EvidenceTypes == nil || !identity.Strings(c.EvidenceTypes, 3, 32) || c.Purposes == nil || !identity.Strings(c.Purposes, 32, 128) ||
 			c.PathIDs == nil || !identity.Strings(c.PathIDs, 32, 36) {
 			return false
 		}
 		clients[key] = true
-		// Raw is offered only where the grant facet admits it (ADR-279).
+		// Raw is offered only where the grant facet admits it (ADR-279);
+		// extract is an HTTP header projection (ADR-282).
 		for _, v := range c.DataClasses {
-			if v != "metadata" && v != "raw" {
+			if v != "metadata" && v != "extract" && v != "raw" {
 				return false
 			}
 		}

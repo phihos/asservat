@@ -10,6 +10,7 @@ const date = (value: string) => new Date(value).toLocaleString();
 const reasons: Record<string, string> = {
   rawBytePredicate: 'a raw byte comparison in the packet filter can test payload bytes',
   rawPackets: 'the recording keeps payload prefixes up to the approved per-transport caps',
+  httpHeaders: 'the recording reads payload to project HTTP/1 method, status, Content-Type and Content-Length; bodies, URLs and credentials are discarded',
   recordingApprovalRequired: 'this installation requires approval for every recording',
   policyCollection: 'recurring policy collection uses a separate finite approval and shared budgets',
 };

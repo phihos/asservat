@@ -352,8 +352,13 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		"onTrigger":       func(x *artifact.ContextExpectation) { x.Lifecycle = nil; x.TriggeredAt = started },
 		"syscall type":    func(x *artifact.ContextExpectation) { x.NativeType = artifact.SyscallRecordsArtifact },
 		"http as pcap": func(x *artifact.ContextExpectation) {
-			x.NativeType = artifact.HTTPHeadersArtifact
-			x.Registration.NativeLimit = artifact.HTTPHeadersNativeLimit
+			// ADR-282: a valid projection expectation is an httpHeaders
+			// recording of class extract.
+			x.NativeType, x.DataClass, x.Lifecycle = artifact.HTTPHeadersArtifact, "extract", nil
+			x.Registration.NativeLimit = artifact.RecordingNativeLimit
+			x.Recording = &artifact.Recording{Kind: "packetCapture", Profile: "httpHeaders", Composition: []byte("{}"), DurationMillis: 10_000, MaxBytes: 1 << 20, Snaplen: artifact.MaxRawSnaplen,
+				Filter: &artifact.RecordingFilter{Expression: "tcp port 8080", Program: []artifact.FilterInstruction{{Code: 6, K: 65535}}},
+				HTTP:   &artifact.RecordingHTTP{MaxFlows: 1, MaxHeaderBytes: 1024, MaxFlowBytes: 64 << 10, MaxTotalBytes: 1 << 20, IdleMillis: 5000}}
 		},
 	} {
 		x := e

@@ -16,6 +16,7 @@ import (
 const (
 	packetAssessmentRule  = `{"rule":"recorder-assessment/v2","mechanism":"packetCapture","profile":"networkHeaders","impact":"unknown","effects":["nodeCPU","collectorMemory","storageIO","uploadContention"],"retained":["networkAddresses","personalIdentifiers"],"transient":["userContent","credentials"],"anchor":"submissionPreparation","metrics":"unavailable","quantities":["outputBytes:perIncident","ring:whileArmed|perIncident","frozen:perIncident"]}`
 	rawAssessmentRule     = `{"rule":"recorder-assessment/v2","mechanism":"packetCapture","profile":"rawPackets","impact":"unknown","effects":["nodeCPU","collectorMemory","storageIO","uploadContention"],"retained":["networkAddresses","personalIdentifiers","userContent","credentials"],"transient":[],"caps":"byteBudgetNotRedaction","anchor":"submissionPreparation","metrics":"unavailable","quantities":["outputBytes:perIncident","frozen:perIncident"]}`
+	httpAssessmentRule    = `{"rule":"recorder-assessment/v2","mechanism":"packetCapture","profile":"httpHeaders","impact":"unknown","effects":["nodeCPU","collectorMemory","storageIO","uploadContention"],"retained":["personalIdentifiers"],"transient":["userContent","credentials","networkAddresses"],"projection":"http-response-headers/v1","anchor":"submissionPreparation","metrics":"unavailable","quantities":["outputBytes:perIncident","frozen:perIncident"]}`
 	syscallAssessmentRule = `{"rule":"recorder-assessment/v2","mechanism":"syscallTrace","mode":"metadata","impact":"unknown","effects":["nodeCPU","applicationCPU","collectorMemory","storageIO","uploadContention"],"retained":["personalIdentifiers"],"transient":[],"anchor":"submissionPreparation","metrics":"unavailable","quantities":["outputBytes:perIncident","ring:whileArmed|perIncident","frozen:perIncident"]}`
 	// No recorder capability exists in this release; the basis names that fact.
 	recorderCapabilityAbsent = "recorder-capability/v1:unavailable"
@@ -23,7 +24,7 @@ const (
 
 // RecorderAssessmentRulesDigest pins both mechanism rules.
 func RecorderAssessmentRulesDigest() artifact.Digest {
-	return artifact.Digest(sha256.Sum256([]byte(packetAssessmentRule + "\n" + rawAssessmentRule + "\n" + syscallAssessmentRule)))
+	return artifact.Digest(sha256.Sum256([]byte(packetAssessmentRule + "\n" + rawAssessmentRule + "\n" + httpAssessmentRule + "\n" + syscallAssessmentRule)))
 }
 
 // RecorderCapabilityDigest identifies the absent recorder capability basis.
@@ -106,6 +107,14 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 				assessed.Impact.Explanation = "Kernel packet hooks add per-packet node work and keep payload prefixes up to the approved per-transport caps; overhead depends on traffic and is not measured. Caps limit bytes and do not redact."
 				assessed.Exposure = value.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", RetainedPossible: []string{"networkAddresses", "personalIdentifiers", "userContent", "credentials"}, TransientOnly: []string{}}
 				out.Alternatives = append(out.Alternatives, value.AssessmentAlternative{ActionIDs: []string{a.ID}, Change: "metadataOnly", Benefit: "Network headers keep no payload and need no raw approval.", CoverageLoss: "Payload bytes are not recorded."})
+			}
+			if a.PacketProfile == "httpHeaders" {
+				// ADR-282, REQ-ASM-003: the parser inspects payload
+				// transiently; the stored allowlisted fields can still
+				// identify users.
+				assessed.Impact.Explanation = "Kernel packet hooks add per-packet node work and a bounded parser reassembles TCP to read plain HTTP/1 headers; overhead depends on traffic and is not measured. Only method, status, Content-Type and Content-Length are kept; bodies, URLs, Host, cookies and credentials are read transiently and discarded, and TLS or HTTP/2 traffic is reported as unsupported."
+				assessed.Exposure = value.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", RetainedPossible: []string{"personalIdentifiers"}, TransientOnly: []string{"userContent", "credentials", "networkAddresses"}}
+				out.Alternatives = append(out.Alternatives, value.AssessmentAlternative{ActionIDs: []string{a.ID}, Change: "metadataOnly", Benefit: "Network headers read no payload and need no sensitive approval.", CoverageLoss: "HTTP methods, statuses and content types are not recorded."})
 			}
 			if a.Filter == "" {
 				out.Alternatives = append(out.Alternatives, value.AssessmentAlternative{ActionIDs: []string{a.ID}, Change: "narrowScope", Benefit: "A pcap filter on hosts or ports reduces node work and retained addresses.", CoverageLoss: "Traffic outside the filter is not recorded."})

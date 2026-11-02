@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/planning"
 )
@@ -170,6 +171,9 @@ func WireWork(w collector.Work) contracts.NodeWork {
 		if r := p.Raw; r != nil {
 			c.Raw = &contracts.NodeRawPrefix{Snaplen: r.Snaplen, TCP: r.TCP, UDP: r.UDP, ICMP: r.ICMP}
 		}
+		if h := p.HTTP; h != nil {
+			c.HTTP = &contracts.NodeHTTPProjection{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeoutMillis: h.IdleTimeout.Milliseconds()}
+		}
 		out.PacketCapture = c
 	}
 	return out
@@ -254,6 +258,13 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 		}
 		if r := c.Raw; r != nil {
 			p.Raw = &collector.RawPrefix{Snaplen: r.Snaplen, TCP: r.TCP, UDP: r.UDP, ICMP: r.ICMP}
+		}
+		if h := c.HTTP; h != nil {
+			if h.IdleTimeoutMillis < 0 || h.IdleTimeoutMillis > artifact.MaxHTTPIdleMillis {
+				out.Packet = &collector.PacketCapture{}
+				return out, true
+			}
+			p.HTTP = &collector.HTTPProjection{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: time.Duration(h.IdleTimeoutMillis) * time.Millisecond}
 		}
 		if c.Observation != nil {
 			permit, valid := domainObservation(c.Observation)

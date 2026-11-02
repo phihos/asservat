@@ -218,6 +218,18 @@ type NodePacketCapture struct {
 	// Raw keeps payload prefixes of an observed rawPackets recording
 	// (ADR-279): snaplen, or a nonzero per-transport cap instead.
 	Raw *NodeRawPrefix `json:"raw,omitempty"`
+	// HTTP projects plain HTTP/1 headers of an observed httpHeaders
+	// recording (ADR-282) from frames read at raw's fixed snaplen.
+	HTTP *NodeHTTPProjection `json:"http,omitempty"`
+}
+
+// NodeHTTPProjection are the parser bounds of an httpHeaders recording.
+type NodeHTTPProjection struct {
+	MaxFlows          int   `json:"maxFlows"`
+	MaxHeaderBytes    int   `json:"maxHeaderBytes"`
+	MaxFlowBytes      int   `json:"maxFlowBytes"`
+	MaxTotalBytes     int   `json:"maxTotalBytes"`
+	IdleTimeoutMillis int64 `json:"idleTimeoutMillis"`
 }
 
 type NodeRawPrefix struct {

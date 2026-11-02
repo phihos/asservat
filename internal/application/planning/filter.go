@@ -52,10 +52,11 @@ func RawBytePredicate(expression string) bool {
 }
 
 // MeteredRecording reports a recording that starts only under a finite
-// observation permit: a raw byte predicate (ADR-261) or kept payload
-// prefixes (ADR-279). Both always carry a compiled filter.
+// observation permit: a raw byte predicate (ADR-261), kept payload prefixes
+// (ADR-279) or an HTTP header projection (ADR-282). All carry a compiled
+// filter.
 func MeteredRecording(r *artifact.Recording) bool {
-	return r != nil && r.Filter != nil && (r.Profile == "rawPackets" || RawBytePredicate(r.Filter.Expression))
+	return r != nil && r.Filter != nil && (r.Profile == "rawPackets" || r.Profile == "httpHeaders" || RawBytePredicate(r.Filter.Expression))
 }
 
 // ScreenFilter enforces the REQ-NET-001 bounds before compilation: at most

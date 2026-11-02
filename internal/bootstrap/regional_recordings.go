@@ -370,6 +370,12 @@ func (p *preparedRecording) StartPolicyRecording(ctx context.Context, pin artifa
 			work.Raw.TCP, work.Raw.UDP, work.Raw.ICMP = c.TCP, c.UDP, c.ICMP
 		}
 	}
+	if h := r.HTTP; r.Profile == "httpHeaders" && h != nil {
+		// ADR-282: frames are read at the fixed engine snaplen and projected
+		// on the node within the accepted parser bounds.
+		work.Raw = &collector.RawPrefix{Snaplen: r.Snaplen}
+		work.HTTP = &collector.HTTPProjection{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: time.Duration(h.IdleMillis) * time.Millisecond}
+	}
 	if work.ProgramDigest != b.ProgramDigest || packets.CheckPrefixProgram(work.Program) != nil || !work.Valid() {
 		return time.Time{}, value.ErrDenied
 	}

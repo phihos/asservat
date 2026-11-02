@@ -123,6 +123,22 @@ type PacketCapture struct {
 	// Raw keeps payload prefixes of an observed rawPackets recording
 	// (ADR-279); nil keeps headers only.
 	Raw *RawPrefix `json:",omitempty"`
+	// HTTP projects plain HTTP/1 headers of an observed httpHeaders
+	// recording (ADR-282) from frames read at Raw's fixed engine snaplen;
+	// nil otherwise.
+	HTTP *HTTPProjection `json:",omitempty"`
+}
+
+// HTTPProjection are an httpHeaders recording's parser bounds
+// (artifact.RecordingHTTP).
+type HTTPProjection struct {
+	MaxFlows, MaxHeaderBytes, MaxFlowBytes, MaxTotalBytes int
+	IdleTimeout                                           time.Duration
+}
+
+func (h HTTPProjection) valid() bool {
+	r := artifact.RecordingHTTP{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleMillis: h.IdleTimeout.Milliseconds()}
+	return h.IdleTimeout%time.Millisecond == 0 && r.Valid()
 }
 
 // RawPrefix caps each retained frame at Snaplen bytes, or at a nonzero
@@ -152,7 +168,8 @@ func (p PacketCapture) Valid() bool {
 	}
 	if p.Syscalls != nil && (!p.Syscalls.Valid() || len(p.Program) != 0 || p.ProgramDigest != [32]byte{} || p.Observation != nil || p.Duration > MaxSyscallCaptureDuration || p.MaxEventsPerSecond < 1 || p.MaxEventsPerSecond > artifact.MaxRecordingEventsPerSecond) ||
 		p.Syscalls == nil && p.MaxEventsPerSecond != 0 ||
-		p.Raw != nil && (p.Observation == nil || p.Syscalls != nil || len(p.Program) == 0 || !p.Raw.valid()) {
+		p.Raw != nil && (p.Observation == nil || p.Syscalls != nil || len(p.Program) == 0 || !p.Raw.valid()) ||
+		p.HTTP != nil && (p.Raw == nil || *p.Raw != RawPrefix{Snaplen: artifact.MaxRawSnaplen} || !p.HTTP.valid()) {
 		return false
 	}
 	return validUUID(p.CaptureID) && validUUID(p.PodUID) && len(p.Program) <= planning.MaxFilterInstructions && (len(p.Program) == 0) == (p.ProgramDigest == [32]byte{}) &&

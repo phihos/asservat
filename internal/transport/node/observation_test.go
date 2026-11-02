@@ -112,3 +112,50 @@ func TestRawPrefixClosedWireRoundTrips(t *testing.T) {
 		}
 	}
 }
+
+// ADR-282: an HTTP header projection's bounds cross the closed wire exactly
+// and are executable only on an observed capture at the fixed engine snaplen.
+func TestHTTPProjectionClosedWireRoundTrips(t *testing.T) {
+	http := func() *collector.HTTPProjection {
+		return &collector.HTTPProjection{MaxFlows: 1024, MaxHeaderBytes: 32 << 10, MaxFlowBytes: 256 << 10, MaxTotalBytes: 16 << 20, IdleTimeout: 30 * time.Second}
+	}
+	w := observedNodeWork()
+	w.Packet.Raw, w.Packet.HTTP = &collector.RawPrefix{Snaplen: 1500}, http()
+	data, err := json.Marshal(contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: []contracts.NodeWork{WireWork(w)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte(`"http":{"maxFlows":1024,"maxHeaderBytes":32768,"maxFlowBytes":262144,"maxTotalBytes":16777216,"idleTimeoutMillis":30000}`)) {
+		t.Fatal("HTTP wire field", string(data))
+	}
+	decoded, err := contracts.DecodeNodePollResponse(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := DomainWork(decoded.Work[0]); !ok || !reflect.DeepEqual(got, w) || !got.Packet.Valid() {
+		t.Fatal("HTTP projection changed through closed codec")
+	}
+	for name, change := range map[string]func(*collector.PacketCapture){
+		"unobserved":     func(p *collector.PacketCapture) { p.Observation = nil },
+		"no raw read":    func(p *collector.PacketCapture) { p.Raw = nil },
+		"short snaplen":  func(p *collector.PacketCapture) { p.Raw.Snaplen = 96 },
+		"prefix cap":     func(p *collector.PacketCapture) { p.Raw.TCP = 200 },
+		"too many flows": func(p *collector.PacketCapture) { p.HTTP.MaxFlows = 1025 },
+		"total too big":  func(p *collector.PacketCapture) { p.HTTP.MaxTotalBytes = 16<<20 + 1 },
+		"idle too long":  func(p *collector.PacketCapture) { p.HTTP.IdleTimeout = 31 * time.Second },
+		"no program":     func(p *collector.PacketCapture) { p.Program, p.ProgramDigest = nil, [32]byte{} },
+	} {
+		bad := observedNodeWork()
+		bad.Packet.Raw, bad.Packet.HTTP = &collector.RawPrefix{Snaplen: 1500}, http()
+		change(bad.Packet)
+		if bad.Packet.Valid() {
+			t.Fatal(name, "HTTP capture valid")
+		}
+	}
+	// A negative idle timeout from the wire is an invalid item, not a panic.
+	wire := WireWork(w)
+	wire.PacketCapture.HTTP.IdleTimeoutMillis = -1
+	if got, ok := DomainWork(wire); !ok || got.Packet.Valid() {
+		t.Fatal("negative idle timeout accepted")
+	}
+}

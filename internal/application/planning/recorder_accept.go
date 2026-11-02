@@ -57,8 +57,17 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 		}
 		return maxBytesAcceptance(plan)
 	}
-	if a.Kind != "packetCapture" || a.PacketProfile != "networkHeaders" && a.PacketProfile != "rawPackets" {
-		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only network-header packet and syscall metadata captures can be recorded in this release"}
+	if a.Kind != "packetCapture" || a.PacketProfile != "networkHeaders" && a.PacketProfile != "rawPackets" && a.PacketProfile != "httpHeaders" {
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only network-header, raw and HTTP header packet and syscall metadata captures can be recorded in this release"}
+	}
+	http := a.PacketProfile == "httpHeaders"
+	if http && (plan.Approval == nil || plan.Approval.DataClass != "extract" || plan.Approval.ObservationLimits == nil) {
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "an HTTP header recording needs sensitive approval with observation limits"}
+	}
+	if http && policy {
+		// ADR-282: the projection is manual first; policy rings, Saves and
+		// live watch follow in later slices.
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "policies cannot record HTTP headers in this release; use a manual capture or networkHeaders"}
 	}
 	if a.PacketProfile == "rawPackets" && (plan.Approval == nil || plan.Approval.DataClass != "raw" || plan.Approval.ObservationLimits == nil) {
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a raw packet recording needs raw approval with observation limits"}
@@ -69,23 +78,36 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "policies cannot record raw packets in this release; use networkHeaders"}
 	}
 	raw := a.PacketProfile == "rawPackets"
-	if plan.Approval != nil && plan.Approval.ObservationLimits != nil && !policy && !raw {
+	if plan.Approval != nil && plan.Approval.ObservationLimits != nil && !policy && !raw && !http {
 		// A manual raw byte comparison on header captures has no observation
-		// issuer; manual rawPackets uses the ad hoc grant pool (ADR-279).
+		// issuer; manual rawPackets and httpHeaders use the ad hoc grant pool
+		// (ADR-279/282).
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "manual raw byte comparisons need observation authority that this release does not have yet; use a rawPackets profile"}
 	}
 	after, ok := durationValue(a.After, true)
 	if !ok || after < time.Second || after > 5*time.Minute {
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.after", "a manual capture records between 1 second and 5 minutes after it starts"}
 	}
-	if (policy || raw) && plan.Approval != nil && plan.Approval.ObservationLimits != nil {
+	if (policy || raw || http) && plan.Approval != nil && plan.Approval.ObservationLimits != nil {
 		limits := plan.Approval.ObservationLimits
 		observed := authorization.ObservationLimits{MaxSessionSeconds: limits.MaxSessionSeconds, MaxObservedBytes: limits.MaxObservedBytes, MaxBytesPerSecond: limits.MaxBytesPerSecond, MaxConcurrentSessions: limits.MaxConcurrentSessions}
 		if a.ExecutionMode != "onTrigger" || a.Before != "0s" || after > 15*time.Second || !observed.Valid() {
-			return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a raw packet recording or policy raw predicate needs one finite on-trigger action (before 0s, after at most 15s) with original observation limits"}
+			return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "a raw packet or HTTP header recording or policy raw predicate needs one finite on-trigger action (before 0s, after at most 15s) with original observation limits"}
 		}
 	}
 	return maxBytesAcceptance(plan)
+}
+
+// ManualObservationIssued reports whether a plan's REQ-AUT-006 observation
+// limits have a manual issuer, the approved ad hoc grant's pool: a single
+// rawPackets action of class raw (ADR-279) or httpHeaders action of class
+// extract (ADR-282). Raw byte predicates on header captures have none.
+func ManualObservationIssued(actions []value.RecorderAction, approval *value.RecorderApproval) bool {
+	if approval == nil || approval.ObservationLimits == nil || len(actions) != 1 {
+		return false
+	}
+	codes := actions[0].Sensitive
+	return approval.DataClass == "raw" && slices.Contains(codes, value.ReasonRawPackets) || approval.DataClass == "extract" && slices.Contains(codes, value.ReasonHTTPHeaders)
 }
 
 func maxBytesAcceptance(plan value.RecorderPlan) RecorderAcceptance {
@@ -159,6 +181,20 @@ func RecordingFor(plan value.RecorderPlan) (artifact.Recording, string, error) {
 				}
 			}
 		}
+	}
+	if a.PacketProfile == "httpHeaders" {
+		// ADR-282: the parser bounds come from the frozen recipe; the engine
+		// reads at its fixed snaplen and reports truncation as gaps.
+		var recipe recipeSpec
+		var params packetParameters
+		if strict(scope.Recipe, &recipe) != nil || len(recipe.Actions) != 1 || recipe.Actions[0].ID != a.ID || strict(recipe.Actions[0].Parameters, &params) != nil {
+			return artifact.Recording{}, "", value.ErrInvalid
+		}
+		bounds, err := validHTTPProfile("", params.Profile)
+		if err != nil {
+			return artifact.Recording{}, "", value.ErrInvalid
+		}
+		r.Profile, r.Snaplen, r.HTTP = "httpHeaders", artifact.MaxRawSnaplen, &bounds
 	}
 	for _, f := range scope.Filters {
 		if f.ActionID != a.ID || f.Expression != a.Filter {

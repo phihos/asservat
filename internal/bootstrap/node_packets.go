@@ -62,6 +62,13 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		r.Reason = collector.ReasonEngineUnavailable
 		return r
 	}
+	// ADR-282: the node HTTP projection follows in a later slice. Until it
+	// exists the item is refused before any frame is read; it never falls
+	// back to a raw or header recording.
+	if p.HTTP != nil {
+		r.Reason = collector.ReasonEngineUnavailable
+		return r
+	}
 	var actual [32]byte
 	if len(p.Program) > 0 {
 		actual = [32]byte(compiler.FilterProgramDigest(p.Program))

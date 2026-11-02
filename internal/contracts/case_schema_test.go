@@ -53,7 +53,16 @@ func TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection(t *testing.T) {
 	if wire.ValidateOutput("get_case", shared) != nil {
 		t.Fatal("shared pod-status view rejected")
 	}
-	for _, which := range []string{"unknown access", "extract", "pcap", "native checksum", "native path", "title", "timeline", "preservation", "verified classification", "deletion complete", "omitted exposure", "partial", "missing notice", "extra provenance", "pending"} {
+	// ADR-282: an HTTP header projection is listed as an extract.
+	row["kind"], row["data_class"] = "packetCapture", "extract"
+	notice["mayContain"] = []any{"personalIdentifiers"}
+	extract, _ := json.Marshal(result)
+	row["kind"], row["data_class"] = "pod-status", "metadata"
+	notice["mayContain"] = []any{"personalIdentifiers", "networkAddresses", "paths"}
+	if wire.ValidateOutput("get_case", extract) != nil {
+		t.Fatal("HTTP header extract rejected")
+	}
+	for _, which := range []string{"unknown access", "unknown class", "pcap", "native checksum", "native path", "title", "timeline", "preservation", "verified classification", "deletion complete", "omitted exposure", "partial", "missing notice", "extra provenance", "pending"} {
 		t.Run(which, func(t *testing.T) {
 			var v map[string]any
 			_ = json.Unmarshal(good, &v)
@@ -64,8 +73,8 @@ func TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection(t *testing.T) {
 			switch which {
 			case "unknown access":
 				c["access"] = "public"
-			case "extract":
-				a["data_class"] = "extract" // raw is listed for raw packet captures (ADR-279)
+			case "unknown class":
+				a["data_class"] = "restricted" // raw (ADR-279) and extract (ADR-282) are listed
 			case "pcap":
 				a["kind"] = "pcapng"
 			case "native checksum":

@@ -57,7 +57,7 @@ type RecordingFilter struct {
 // owns its type), so the hub can recompile the exact accepted plan.
 type Recording struct {
 	Kind           string // "packetCapture" or "syscallTrace"
-	Profile        string // "networkHeaders", "rawPackets" or "metadata"
+	Profile        string // "networkHeaders", "rawPackets", "httpHeaders" or "metadata"
 	Composition    []byte
 	Filter         *RecordingFilter `json:",omitempty"`
 	DurationMillis int64
@@ -73,6 +73,38 @@ type Recording struct {
 	// ProtocolSnaplen are a rawPackets recording's per-transport byte caps
 	// over Snaplen (ADR-279); nil otherwise, so other digests are unchanged.
 	ProtocolSnaplen *RecordingProtocolSnaplen `json:",omitempty"`
+	// HTTP are an httpHeaders recording's parser bounds (ADR-282); nil
+	// otherwise, so other digests are unchanged.
+	HTTP *RecordingHTTP `json:",omitempty"`
+}
+
+// The specified httpHeaders parser maxima (specs/packets.md, ADR-282).
+const (
+	MaxHTTPFlows           = 1024
+	MaxHTTPHeaderBytes     = 32 << 10
+	MaxHTTPFlowBytes       = 256 << 10
+	MaxHTTPTotalBytes      = 16 << 20
+	MaxHTTPIdleMillis      = 30_000
+	minHTTPIdleMillis      = 1000
+	maxHTTPRecordingMillis = maxRawRecordingMillis
+)
+
+// RecordingHTTP are the profile's projection bounds: flows, one header
+// block, reassembly per flow and in total, and the idle timeout. Planning
+// additionally refuses values below the parser's buffer floors.
+type RecordingHTTP struct {
+	MaxFlows       int
+	MaxHeaderBytes int
+	MaxFlowBytes   int
+	MaxTotalBytes  int
+	IdleMillis     int64
+}
+
+// Valid checks the bounds against the specified maxima.
+func (h *RecordingHTTP) Valid() bool {
+	return h != nil && h.MaxFlows >= 1 && h.MaxFlows <= MaxHTTPFlows && h.MaxHeaderBytes >= 1 && h.MaxHeaderBytes <= MaxHTTPHeaderBytes &&
+		h.MaxFlowBytes >= 1 && h.MaxFlowBytes <= MaxHTTPFlowBytes && h.MaxTotalBytes >= h.MaxFlowBytes && h.MaxTotalBytes <= MaxHTTPTotalBytes &&
+		h.IdleMillis >= minHTTPIdleMillis && h.IdleMillis <= MaxHTTPIdleMillis
 }
 
 // RecordingProtocolSnaplen caps the captured prefix per transport; zero
@@ -124,12 +156,18 @@ func (r *Recording) Valid() bool {
 	}
 	switch {
 	case r.Kind == "syscallTrace":
-		return r.Profile == "metadata" && r.Filter == nil && r.Snaplen == RecordingSyscallSnaplen && r.DurationMillis <= maxSyscallRecordingMillis && r.Syscalls.valid()
+		return r.Profile == "metadata" && r.Filter == nil && r.Snaplen == RecordingSyscallSnaplen && r.DurationMillis <= maxSyscallRecordingMillis && r.Syscalls.valid() && r.HTTP == nil
 	case r.Kind == "packetCapture" && r.Profile == "rawPackets":
-		if r.Syscalls != nil || r.DurationMillis > maxRawRecordingMillis || r.Snaplen < 1 || r.Snaplen > MaxRawSnaplen || !r.ProtocolSnaplen.valid() {
+		if r.Syscalls != nil || r.HTTP != nil || r.DurationMillis > maxRawRecordingMillis || r.Snaplen < 1 || r.Snaplen > MaxRawSnaplen || !r.ProtocolSnaplen.valid() {
 			return false
 		}
-	case r.Kind != "packetCapture" || r.Profile != "networkHeaders" || r.Syscalls != nil || r.ProtocolSnaplen != nil || r.DurationMillis > maxRecordingDurationMillis || r.Snaplen != RecordingSnaplen:
+	case r.Kind == "packetCapture" && r.Profile == "httpHeaders":
+		// ADR-282: a finite filtered projection at the fixed engine snaplen;
+		// truncated frames become gaps, never a longer read.
+		if r.Syscalls != nil || r.ProtocolSnaplen != nil || r.Filter == nil || r.DurationMillis > maxHTTPRecordingMillis || r.Snaplen != MaxRawSnaplen || !r.HTTP.Valid() {
+			return false
+		}
+	case r.Kind != "packetCapture" || r.Profile != "networkHeaders" || r.Syscalls != nil || r.ProtocolSnaplen != nil || r.HTTP != nil || r.DurationMillis > maxRecordingDurationMillis || r.Snaplen != RecordingSnaplen:
 		return false
 	}
 	if f := r.Filter; f != nil {
@@ -160,6 +198,10 @@ func (r *Recording) Clone() *Recording {
 	if r.ProtocolSnaplen != nil {
 		p := *r.ProtocolSnaplen
 		out.ProtocolSnaplen = &p
+	}
+	if r.HTTP != nil {
+		h := *r.HTTP
+		out.HTTP = &h
 	}
 	return &out
 }

@@ -162,10 +162,11 @@ func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResu
 	warnings := recorderWarnings(result.Plan)
 	approval := result.Plan.Approval != nil
 	// ADR-248: a node recorder runs the plan. Of the plans with REQ-AUT-006
-	// observation limits only a single manual rawPackets action has an
-	// observation issuer, its approved ad hoc grant's pool (ADR-279).
+	// observation limits only a single manual rawPackets or httpHeaders
+	// action has an observation issuer, its approved ad hoc grant's pool
+	// (ADR-279/282).
 	metered := approval && result.Plan.Approval.ObservationLimits != nil
-	if !result.Recordable || metered && (result.Plan.Approval.DataClass != "raw" || len(result.Plan.Actions) != 1) {
+	if !result.Recordable || metered && !compiler.ManualObservationIssued(result.Plan.Actions, result.Plan.Approval) {
 		blockers = append(blockers, RecorderUnavailableBlocker)
 	} else {
 		// ADR-248: the interim per-capture output cap.
@@ -183,7 +184,11 @@ func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResu
 		}
 		blockers = append([]OperationBlocker{approvalRequiredBlocker(view)}, blockers...)
 		if l := result.Plan.Approval.ObservationLimits; l != nil {
-			warnings = append(warnings, fmt.Sprintf("A raw byte comparison may test payload bytes: the approval binds observation limits of %d s per session, %d bytes in total, %d bytes per second and %d concurrent session.", l.MaxSessionSeconds, l.MaxObservedBytes, l.MaxBytesPerSecond, l.MaxConcurrentSessions))
+			reads := "A raw byte comparison may test payload bytes"
+			if slices.Contains(view.reasons, planning.ReasonHTTPHeaders) {
+				reads = "Projecting HTTP headers reads payload bytes" // ADR-282
+			}
+			warnings = append(warnings, fmt.Sprintf("%s: the approval binds observation limits of %d s per session, %d bytes in total, %d bytes per second and %d concurrent session.", reads, l.MaxSessionSeconds, l.MaxObservedBytes, l.MaxBytesPerSecond, l.MaxConcurrentSessions))
 		}
 	}
 	if !s.config.CollectionEnabled {
