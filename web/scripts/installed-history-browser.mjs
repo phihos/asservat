@@ -77,11 +77,17 @@ async function settled(name, from) {
   }
   return null;
 }
-const waitOperation = name => settled(name, seen.length);
+// Arming clears this operation's cached page replies, and a read consumes its
+// entry: a retried identical request never reads an earlier attempt's text.
+const waitOperation = name => {
+  const from = seen.length;
+  const cleared = page.evaluate(prefix => { for (const k of [...window.__installedReplies.keys()]) if (k.startsWith(prefix)) window.__installedReplies.delete(k); }, '/api/v1/operations/' + name + '\n');
+  return cleared.then(() => settled(name, from));
+};
 async function pageReply(response) {
   const key = new URL(response.url()).pathname + '\n' + (response.request().postData() ?? '');
   for (const end = Date.now() + 2_000; Date.now() < end;) {
-    const text = await page.evaluate(k => window.__installedReplies.get(k) ?? null, key);
+    const text = await page.evaluate(k => { const v = window.__installedReplies.get(k) ?? null; window.__installedReplies.delete(k); return v; }, key);
     if (text !== null) return text;
     await new Promise(resolve => setTimeout(resolve, 100));
   }
