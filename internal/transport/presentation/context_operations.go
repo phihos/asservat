@@ -332,6 +332,10 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 		// Decided from the caller's own scope (preview) or after the
 		// caller's capture eligibility on the target (request): no oracle.
 		return OperationFailure{"SharingNotPermitted", "Sharing the result needs the evidence-owner role on this workload and the evidence:share scope. No capture was started. Remove the recipients, or ask an administrator for the role.", false}
+	case request && errors.Is(err, value.ErrStorageBindingExpired):
+		// ADR-277: refused before admission (or by a rolled-back admission)
+		// while the workload's storage binding refreshes: nothing was accepted.
+		return OperationFailure{"StorageRefreshing", "Evidence storage for this workload is being refreshed. Nothing was accepted. Retry the same request with the same preview and request key in a few seconds.", true}
 	case errors.Is(err, value.ErrPreparationUncertain):
 		return OperationFailure{"AcquisitionUncertain", "Collection may already be in progress, or this attempt may no longer be usable. Check its status before starting a new investigation. The original may still produce a result.", false}
 	case request && errors.Is(err, value.ErrAcquisitionNotStarted):
