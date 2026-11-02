@@ -64,18 +64,20 @@ func (f *flow) half(dir reassembly.TCPFlowDirection) *half {
 
 // Accept refuses bytes the direction will not parse, so no page is queued
 // for them: a stopped direction, one that never saw its SYN, or a frame
-// whose TCP payload was truncated.
+// whose TCP payload was truncated (except their FIN/RST, see below).
 func (f *flow) Accept(tcp *layers.TCP, _ gopacket.CaptureInfo, dir reassembly.TCPFlowDirection, nextSeq reassembly.Sequence, _ *bool, _ reassembly.AssemblerContext) bool {
 	h := f.half(dir)
+	// A stopped direction still passes FIN/RST so the assembler closes the
+	// connection and frees its flow slot; ReassembledSG discards its bytes.
 	switch {
 	case h.done:
-		return false
+		return tcp.FIN || tcp.RST
 	case nextSeq == invalidSequence && !tcp.SYN:
 		h.close(stopMidstream)
-		return false
+		return tcp.FIN || tcp.RST
 	case f.p.ctx.truncated:
 		h.close(stopGap)
-		return false
+		return tcp.FIN || tcp.RST
 	}
 	return true
 }

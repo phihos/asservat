@@ -373,3 +373,20 @@ func TestRecordBound(t *testing.T) {
 		t.Fatalf("record %d bytes", len(b))
 	}
 }
+
+// A stopped direction (TLS here) still closes on FIN: the flow frees its
+// slot at once instead of holding it until the idle timeout.
+func TestStoppedFlowReleasesSlotOnFIN(t *testing.T) {
+	l := DefaultLimits()
+	l.MaxFlows = 1
+	f := newFeeder(t, l)
+	tls := newConn(42100)
+	f.addGroups(tls.handshake(), tls.data(true, []byte{0x16, 0x03, 0x01, 0x00, 0x05, 1, 2, 3, 4, 5}))
+	f.add(tls.fin(true), tls.fin(false))
+	plain := newConn(42101)
+	f.addGroups(plain.handshake(), plain.data(true, []byte("GET / HTTP/1.1\r\nHost: h\r\n\r\n")), plain.data(false, []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")))
+	pr, n, _ := f.close(t)
+	if len(pr.Records) != 1 || n.Flows != 2 || n.FlowLimitFrames != 0 {
+		t.Fatalf("records %d counters %+v", len(pr.Records), n)
+	}
+}
