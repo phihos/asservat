@@ -71,6 +71,10 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 		// ADR-279: one finite raw packet recording from a namespace profile.
 		return manualRawArguments(cluster, namespace, workload)
 	}
+	if installedJourneyFocus() == "manual-http" {
+		// ADR-282: one finite HTTP response-header recording from a namespace profile.
+		return manualHTTPArguments(cluster, namespace, workload)
+	}
 	if installedJourneyFocus() == "manual-mixed" {
 		// ADR-276: packet and syscall finite recordings of one Pod at once.
 		return map[string]any{
@@ -347,6 +351,10 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-raw" {
 		publishManualRawProfile(t, ctx, regionalConfig, namespace)
 	}
+	if installedJourneyFocus() == "manual-http" {
+		// ADR-282: extract downloads use ordinary eligibility; no result_access.
+		publishManualHTTPProfile(t, ctx, regionalConfig, namespace)
+	}
 	read("preview_capture", arguments, &preview)
 	if !preview.readyForApproval(time.Now()) {
 		t.Fatal("approved recording preview lacks its original window or has a non-approval blocker", preview.Blockers)
@@ -455,6 +463,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		t.Logf("raw approval: observation limits %d bytes over %d seconds", grant.Observation.MaxObservedBytes, grant.Observation.MaxSessionSeconds)
 	}
+	if installedJourneyFocus() == "manual-http" {
+		// ADR-282: header approval names the extract class and observation limits.
+		if grant.DataClass != "extract" || grant.Observation == nil || grant.Observation.MaxObservedBytes < 1 || grant.Observation.MaxSessionSeconds < 1 {
+			t.Fatal("HTTP header recording approval lacks extract class or observation limits", grant.DataClass, grant.Observation)
+		}
+		t.Logf("HTTP header approval: observation limits %d bytes over %d seconds", grant.Observation.MaxObservedBytes, grant.Observation.MaxSessionSeconds)
+	}
 	if code := browserCall(self, "get_grant", map[string]string{"grant_id": grantID}, &own); code != "" || own.CanResume || own.CanResolve || !own.ResumeRequiresOriginalClient {
 		t.Fatal("approved original human lacks precise original-client guidance", code)
 	}
@@ -488,7 +503,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		for traffic.Err() == nil {
 			call, end := context.WithTimeout(traffic, 2*time.Second)
-			_, _ = region.CoreV1().RESTClient().Get().Namespace(namespace).Resource("pods").Name(preview.Pods[0].Name+":8080").SubResource("proxy").Suffix("log").Param("line", "synthetic-approved-recording").DoRaw(call)
+			request := region.CoreV1().RESTClient().Get().Namespace(namespace).Resource("pods").Name(preview.Pods[0].Name + ":8080").SubResource("proxy").Suffix("log")
+			if installedJourneyFocus() == "manual-http" {
+				request = manualHTTPTraffic(request)
+			} else {
+				request = request.Param("line", "synthetic-approved-recording")
+			}
+			_, _ = request.DoRaw(call)
 			end()
 			if installedJourneyPause(traffic, 100*time.Millisecond) != nil {
 				return
@@ -695,6 +716,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-raw" {
 		wantClass = "raw"
 	}
+	if installedJourneyFocus() == "manual-http" {
+		wantClass = "extract"
+	}
 	if evidence.Artifacts[0].DataClass != wantClass {
 		t.Fatal("case lists the recording with another data class", evidence.Artifacts[0].DataClass, wantClass)
 	}
@@ -762,6 +786,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-syscall" {
 		extension = ".jsonl"
 	}
+	if installedJourneyFocus() == "manual-http" {
+		extension = manualHTTPExtension(t)
+	}
 	if dispositionErr != nil || disposition["filename"] != "artifact-"+evidence.Artifacts[0].ID+extension {
 		response.Body.Close()
 		t.Fatal("native download lacks its PCAPNG filename", dispositionErr)
@@ -793,6 +820,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		events := ongoingSyscallEvents(t, native, first.Identity.PodUID, time.Now())
 		t.Logf("manual syscall recording %s: %d metadata events, %d bytes", receipt.CaptureID, events, len(native))
+		return
+	}
+	if installedJourneyFocus() == "manual-http" {
+		s := qualifyManualHTTPProjection(t, native)
+		t.Logf("manual HTTP header recording %s: %d records (%d GET with status), %d bytes; counters %+v", receipt.CaptureID, s.Records, s.Answered, len(native), s.Counters)
 		return
 	}
 	if installedJourneyFocus() == "manual-raw" {
