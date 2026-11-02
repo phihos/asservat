@@ -28,6 +28,7 @@ func TestNativePacingTargetResourceProfileIsExplicit(t *testing.T) {
 		{"approved-recording", "approved-recording", false, 5, 100},
 		{"manual-syscall", "manual-syscall", false, 5, 100},
 		{"manual-mixed", "manual-mixed", false, 5, 100},
+		{"manual-raw", "manual-raw", false, 5, 100},
 		{"policy-recording", "policy-recording", false, 5, 100},
 		{"ongoing-save", "ongoing-save", false, 5, 100},
 		{"ongoing-incident", "ongoing-incident", false, 5, 100},
