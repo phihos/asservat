@@ -272,4 +272,8 @@ The caps are read before the query is admitted, so a busy refusal charges no
 query units; a slot taken between that read and the locked reservation is
 still a charged 503. Native paging measured the third page reaching the cap
 while the first two workers awaited retirement, and a charged busy refusal
-let one retry exhaust the workload's eight query units.
+let one retry exhaust the workload's eight query units. A projection worker
+holds its slot for its full 60 s runtime and retires only on a later cleanup
+demand, so the room check is also such a demand; a third page therefore waits
+for the first page's worker to expire. Retiring a worker as soon as its page
+is delivered would shorten that wait and is not implemented.

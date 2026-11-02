@@ -237,11 +237,11 @@ func qualifyManualHTTPQuery(t *testing.T, ctx context.Context, session *sdk.Clie
 		}
 		started := time.Now()
 		reply, begin := call("get_http_headers", args)
-		// ADR-282: a full live-worker cap (two per principal and workload until
-		// earlier workers retire) is a retryable NotAvailable; retry it like a
-		// client would, within one query lifetime.
+		// ADR-282: a full live-worker cap (two per principal and workload) is a
+		// retryable NotAvailable. A worker holds its slot for its 60 s runtime
+		// and retires on a later demand; retry like a client would.
 		busy := 0
-		for reply.Status == "error" && strings.Contains(string(reply.Data), `"NotAvailable"`) && time.Since(started) < query.ContextMaxQueryTime {
+		for reply.Status == "error" && strings.Contains(string(reply.Data), `"NotAvailable"`) && time.Since(started) < 2*query.ContextMaxQueryTime {
 			busy++
 			if installedJourneyPause(ctx, 2*time.Second) != nil {
 				t.Fatal("get_http_headers busy retry canceled", ctx.Err())

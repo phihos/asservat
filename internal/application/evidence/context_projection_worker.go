@@ -43,10 +43,14 @@ type ProjectionWorkerAdmission struct {
 }
 
 // ProjectionWorkerRoom refuses with query.ErrBusy, before any charge, while the
-// live worker caps are full.
+// live worker caps are full. Cleanup is demand-driven, so each check is also a
+// cleanup demand: expired workers retire only when someone asks for room.
 func (s *ProjectionWorkerAdmission) ProjectionWorkerRoom(ctx context.Context, q query.ContextQuery) error {
 	if s == nil || s.Ledger == nil {
 		return query.ErrUnavailable
+	}
+	if s.Cleanup != nil {
+		s.Cleanup.CleanupProjectionWorkers(ctx)
 	}
 	return s.Ledger.ProjectionWorkerRoom(ctx, q)
 }
