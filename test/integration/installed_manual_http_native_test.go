@@ -208,7 +208,7 @@ type manualHTTPPage struct {
 // cursor binding must equal httpheaders.ReadPage on the downloaded native
 // bytes; the record limit is chosen for about three pages, of which at most
 // three are followed. A cursor with a foreign binding is InvalidCursor.
-func qualifyManualHTTPQuery(t *testing.T, ctx context.Context, session *sdk.ClientSession, wire *contracts.InvestigationContracts, caseID, artifactID string, native []byte) {
+func qualifyManualHTTPQuery(t *testing.T, ctx context.Context, session *sdk.ClientSession, wire *contracts.InvestigationContracts, caseID, artifactID string, native []byte, diagnose func()) {
 	t.Helper()
 	call := func(name string, args any) (manualHTTPReply, time.Duration) {
 		t.Helper()
@@ -217,6 +217,7 @@ func qualifyManualHTTPQuery(t *testing.T, ctx context.Context, session *sdk.Clie
 		defer end()
 		result, err := session.CallTool(bounded, &sdk.CallToolParams{Name: name, Arguments: args})
 		if err != nil || result == nil {
+			diagnose()
 			t.Fatal("get_http_headers MCP", name, err)
 		}
 		raw, err := json.Marshal(result.StructuredContent)
