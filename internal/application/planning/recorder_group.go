@@ -10,6 +10,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/planning"
 )
 
@@ -87,6 +88,7 @@ func CompileRecorderGroup(captureID string, children []value.RecorderPlan) ([]by
 type RecorderGroupScope struct {
 	CaptureID    string
 	Executor     identity.Principal
+	Target       authorization.Target
 	ChildCapture []string
 	ChildScope   []artifact.Digest
 }
@@ -99,7 +101,7 @@ func ReadRecorderGroupScope(scope []byte, d artifact.Digest) (RecorderGroupScope
 	if c, digest, err := canonical(scope); err != nil || digest != d || !bytes.Equal(c, scope) || strict(scope, &s) != nil || s.Version != RecorderGroupVersion || len(s.Children) < 2 || len(s.Children) > 16 {
 		return out, value.ErrInvalid
 	}
-	out = RecorderGroupScope{CaptureID: s.CaptureID, Executor: identity.Principal{Issuer: s.Executor.Issuer, Subject: s.Executor.Subject, ClientID: s.Executor.ClientID, Kind: identity.Kind(s.Executor.Kind)}}
+	out = RecorderGroupScope{CaptureID: s.CaptureID, Executor: identity.Principal{Issuer: s.Executor.Issuer, Subject: s.Executor.Subject, ClientID: s.Executor.ClientID, Kind: identity.Kind(s.Executor.Kind)}, Target: authorization.Target{ClusterID: s.Source.ClusterID, NamespaceUID: s.Source.NamespaceUID, WorkloadUID: s.Target.Workload.UID, PodUID: s.Target.PodUID}}
 	for _, c := range s.Children {
 		b, err := hex.DecodeString(c.ScopeDigest)
 		if err != nil || len(b) != len(artifact.Digest{}) {

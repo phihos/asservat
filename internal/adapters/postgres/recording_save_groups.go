@@ -113,17 +113,27 @@ func compositionGroupAcceptedRows(row custodydb.RecordingSaveGroup, rows []custo
 
 // groupRequester is the human or policy principal a group was requested by.
 func groupRequester(row custodydb.RecordingSaveGroup) (identity.Principal, error) {
+	requester, _, err := groupScope(row)
+	return requester, err
+}
+
+// groupScope reads a group header's requester and accepted targets, so
+// replay authorizes them before any child row is read.
+func groupScope(row custodydb.RecordingSaveGroup) (identity.Principal, []authorization.Target, error) {
 	var digest artifact.Digest
 	copy(digest[:], row.ScopeDigest)
 	if row.GroupKind == "composition" {
 		scope, err := planning.ReadRecorderGroupScope(row.ScopeJson, digest)
-		return scope.Executor, err
+		if err != nil {
+			return identity.Principal{}, nil, value.ErrUnavailable
+		}
+		return scope.Executor, []authorization.Target{scope.Target}, nil
 	}
 	scope, err := planning.ReadContextScopeIdentity(row.ScopeJson, digest)
-	if err != nil || scope.Requester == nil {
-		return identity.Principal{}, value.ErrUnavailable
+	if err != nil || scope.Requester == nil || len(scope.Targets) < 2 {
+		return identity.Principal{}, nil, value.ErrUnavailable
 	}
-	return *scope.Requester, nil
+	return *scope.Requester, scope.Targets, nil
 }
 
 func findRecordingGroupRequest(ctx context.Context, q *custodydb.Queries, in value.ReplayQuery) (custodydb.RecordingSaveGroup, bool, error) {

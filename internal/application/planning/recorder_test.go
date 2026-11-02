@@ -489,6 +489,10 @@ func TestRecorderGroupBindsChildScopes(t *testing.T) {
 	if err != nil || digest == (artifact.Digest{}) || !bytes.Contains(scope, []byte(hexDigest(plans[0].ScopeDigest))) || !bytes.Contains(scope, []byte(hexDigest(plans[1].ScopeDigest))) {
 		t.Fatalf("%s %v", scope, err)
 	}
+	read, err := ReadRecorderGroupScope(scope, digest)
+	if err != nil || read.Target != plans[0].Input.Target.Target() || read.Executor != plans[0].Input.Executor || len(read.ChildScope) != 2 || read.ChildScope[1] != plans[1].ScopeDigest {
+		t.Fatalf("read group scope %+v %v", read, err)
+	}
 	other := plans[1]
 	other.CanonicalScope = bytes.Replace(other.CanonicalScope, []byte(`"subject":"`), []byte(`"subject":"x`), 1)
 	if _, _, err = CompileRecorderGroup("00000000-0000-4000-8000-000000000200", []value.RecorderPlan{plans[0], other}); err == nil {

@@ -91,7 +91,8 @@ func (s *ContextProgressReads) readRecordingGroupProgress(ctx context.Context, q
 		out.Actions = append(out.Actions, value.ContextActionProgress{InstanceID: uid(row.ID), PodUID: child.Target.PodUID, PodName: accepted.Group.Children[n].Pin.Name, ActionID: child.ActionID, Phase: child.ActionPhase, ReasonCode: child.ReasonCode})
 	}
 	out.Phase, out.ReasonCode = recordingGroupPhase(out.Actions)
-	out.CanCancel = out.CanCancel && !out.CancellationRequested
+	// ADR-276: a composition group's cancellation is refused.
+	out.CanCancel = out.CanCancel && !out.CancellationRequested && header.GroupKind != "composition"
 	if history, err := q.ReadRecordingGroupHistoryFacts(ctx, custodydb.ReadRecordingGroupHistoryFactsParams{RootID: header.RootID, CaptureID: header.ID}); err == nil {
 		if history.Visible && history.State == "available" && history.CustodyState == artifact.StoredUnpublished && observedAt.Before(history.SummaryExpiresAt.Time) && observedAt.Before(history.EffectiveExpiresAt.Time) {
 			out.HistoryState = "available"

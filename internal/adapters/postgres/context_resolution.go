@@ -213,9 +213,16 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 			return err
 		}
 		if groupFound {
-			requester, err := groupRequester(group)
+			// Requester and every accepted target are authorized before the
+			// digest comparison or any child read.
+			requester, targets, err := groupScope(group)
 			if err != nil || requester != in.Identity.Principal {
 				return value.ErrDenied
+			}
+			for _, target := range targets {
+				if err := authorize(target); err != nil {
+					return err
+				}
 			}
 			if !bytes.Equal(group.SubmissionDigest, in.SubmissionDigest[:]) {
 				return value.ErrConflict
@@ -223,12 +230,6 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 			a, err := recordingGroupAccepted(ctx, q, group)
 			if err != nil {
 				return err
-			}
-			for _, child := range a.Group.Children {
-				e := child.Expectation
-				if err := authorize(authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}); err != nil {
-					return err
-				}
 			}
 			a.Replay, a.MetadataValidUntil = true, deadline()
 			for n := range a.Group.Children {
