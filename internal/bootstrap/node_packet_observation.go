@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"asservat.local/asservat/internal/adapters/gadget"
-	"asservat.local/asservat/internal/adapters/packets"
 )
 
 // packetInput is the actual node callback boundary, not a second predicate.
@@ -14,13 +13,13 @@ import (
 type packetInput struct {
 	ctx      context.Context
 	mu       sync.Mutex
-	recorder *packets.Recorder
+	recorder frameRecorder
 	meter    *LocalObservationGate
 }
 
 // Notices run on the engine's existing callback owner. Only mark/cancel here;
 // runPacketEngine owns the synchronous join before budget release.
-func runObservedPacketEngine(ctx context.Context, engine observedPacketEngine, pod string, rec *packets.Recorder, meter *LocalObservationGate) (gadget.CaptureStats, error) {
+func runObservedPacketEngine(ctx context.Context, engine observedPacketEngine, pod string, rec frameRecorder, meter *LocalObservationGate) (gadget.CaptureStats, error) {
 	return runPacketEngine(ctx, func(call context.Context, pod string, snaplen int, deliver func(gadget.Frame)) (gadget.CaptureStats, error) {
 		return engine(call, pod, snaplen, deliver, func(n gadget.InputNotice) {
 			if n.LostSamples > 0 {
@@ -51,7 +50,7 @@ func (p *packetInput) add(f gadget.Frame) {
 // debit refusal cancels its context, rather than relying on a datasource callback
 // error (Gadget logs those and continues). Raw runtime producers remain refused
 // until the complete SQL/channel/recording path is qualified.
-func runPacketEngine(ctx context.Context, engine packetEngine, pod string, rec *packets.Recorder, meter *LocalObservationGate) (gadget.CaptureStats, error) {
+func runPacketEngine(ctx context.Context, engine packetEngine, pod string, rec frameRecorder, meter *LocalObservationGate) (gadget.CaptureStats, error) {
 	input := packetInput{ctx: ctx, recorder: rec, meter: meter}
 	if meter == nil {
 		return engine(ctx, pod, rec.Snaplen(), input.add)

@@ -84,3 +84,28 @@ response become partial records. Unit tests cover the EXP-03 synthetic
 corpus and every bound; `FuzzProjector` checks bounds, state release and that
 a secret marker in credentials and bodies never appears in the output.
 Planning, node and download wiring follow in later slices.
+
+## Implementation (slice 3: node execution and publisher recheck)
+
+The node runs an `httpHeaders` work item only as a metered finite
+observation with `Raw.Snaplen` 1500: each frame is charged to the
+observation meter, the hub-compiled program (proven by
+`packets.CheckPrefixProgram`) selects frames exactly as for header and raw
+recordings, and matching frames feed the projector. The native output is the
+projection, at most the recording's output cap: `Projection.EncodeWithin`
+drops the latest records and counts them as `records_dropped`. Limits below
+the parser's floors are refused (`WorkUnknown`) before budget, observation or
+engine use. Frame counters keep their PCAPNG meaning: `Seen` is every
+delivered frame, `Filtered` the frames the program refused, `Retained` the
+frames handed to the projector and `WireBytes` their original lengths; the
+projector's own accounting stays in the document's counters.
+
+The publisher rechecks the stored document in the verification read
+(`httpheaders.NewProjectionCheck`): strict decode without unknown fields,
+byte-identical canonical re-encoding (no duplicate keys, whitespace or
+escapes), format/protocol, the accepted limits, the recording's output cap,
+record times inside the document's window in order, projected methods,
+statuses and only `content-type` then `content-length` whose values the
+projector's own checks leave unchanged, and matching record counters. Record
+times are node clock values and are not compared with the connector's
+manifest window. The hub collect loop lists `httpHeaders` executions.
