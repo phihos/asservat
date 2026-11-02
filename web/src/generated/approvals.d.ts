@@ -76,7 +76,7 @@ export interface components {
                 reasons: {
                     action_id: string;
                     /** @enum {unknown} */
-                    code: "rawBytePredicate" | "recordingApprovalRequired" | "policyCollection";
+                    code: "rawBytePredicate" | "rawPackets" | "recordingApprovalRequired" | "policyCollection";
                 }[];
                 observation_limits?: {
                     max_session_seconds: number;
@@ -138,7 +138,7 @@ export interface components {
                     max_bytes: number;
                     ring_max_bytes: number;
                     ring_max_age: string;
-                    sensitive: ("rawBytePredicate" | "recordingApprovalRequired")[];
+                    sensitive: ("rawBytePredicate" | "rawPackets" | "recordingApprovalRequired")[];
                 }[];
                 result_access?: {
                     action_ids: string[];
@@ -254,7 +254,7 @@ export interface components {
                 reasons: {
                     action_id: string;
                     /** @enum {unknown} */
-                    code: "rawBytePredicate" | "recordingApprovalRequired" | "policyCollection";
+                    code: "rawBytePredicate" | "rawPackets" | "recordingApprovalRequired" | "policyCollection";
                 }[];
                 observation_limits?: {
                     max_session_seconds: number;
@@ -316,7 +316,7 @@ export interface components {
                     max_bytes: number;
                     ring_max_bytes: number;
                     ring_max_age: string;
-                    sensitive: ("rawBytePredicate" | "recordingApprovalRequired")[];
+                    sensitive: ("rawBytePredicate" | "rawPackets" | "recordingApprovalRequired")[];
                 }[];
                 result_access?: {
                     action_ids: string[];
@@ -434,7 +434,7 @@ export interface components {
                     reasons: {
                         action_id: string;
                         /** @enum {unknown} */
-                        code: "rawBytePredicate" | "recordingApprovalRequired" | "policyCollection";
+                        code: "rawBytePredicate" | "rawPackets" | "recordingApprovalRequired" | "policyCollection";
                     }[];
                     observation_limits?: {
                         max_session_seconds: number;
