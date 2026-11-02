@@ -51,10 +51,16 @@ func newSealedSegments(parent string) (*sealedSegments, error) {
 	return &sealedSegments{dir: dir, aead: aead}, nil
 }
 
+// diskBlock is the allocation unit assumed for the ring volume; files are
+// charged in whole blocks so the kubelet's du-based limit is never reached.
+const diskBlock = 4096
+
 // SealedRingBytes is the most a disk ring can occupy on its volume: every
-// segment sealed with its nonce and tag.
+// segment sealed with its nonce and tag, rounded up to whole blocks, plus the
+// ring's directory.
 func SealedRingBytes(l RingLimits) int64 {
-	return int64(l.MaxSegments) * (l.SegmentBytes + 12 + 16)
+	file := (l.SegmentBytes + 12 + 16 + diskBlock - 1) / diskBlock * diskBlock
+	return int64(l.MaxSegments)*file + diskBlock
 }
 
 func (s *sealedSegments) path(i int) string { return filepath.Join(s.dir, strconv.Itoa(i)) }

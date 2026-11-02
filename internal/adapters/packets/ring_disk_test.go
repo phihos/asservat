@@ -131,3 +131,13 @@ func TestEncryptedDiskRingFullVolumeIsMediumUnavailable(t *testing.T) {
 		t.Fatal("full volume", last, r.State().Closed)
 	}
 }
+
+// The disk budget charges whole blocks: a tiny segment still costs a block.
+func TestSealedRingBytesRoundsToBlocks(t *testing.T) {
+	if got := SealedRingBytes(RingLimits{SegmentBytes: 100, MaxSegments: 2}); got != 3*4096 {
+		t.Fatal(got)
+	}
+	if got := SealedRingBytes(RingLimits{SegmentBytes: 4096, MaxSegments: 4}); got != 4*8192+4096 {
+		t.Fatal(got)
+	}
+}
