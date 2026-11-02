@@ -11,6 +11,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActiveAdHocObservations = `-- name: CountActiveAdHocObservations :one
+SELECT count(*) FROM policy_observation_session
+WHERE root_id=$1 AND grant_id=$2 AND acceptance_id IS NULL AND ended_at IS NULL AND lease_until>clock_timestamp()
+`
+
+type CountActiveAdHocObservationsParams struct {
+	RootID  pgtype.UUID
+	GrantID pgtype.UUID
+}
+
+func (q *Queries) CountActiveAdHocObservations(ctx context.Context, arg CountActiveAdHocObservationsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveAdHocObservations, arg.RootID, arg.GrantID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countActivePolicyObservations = `-- name: CountActivePolicyObservations :one
 SELECT count(*) FROM policy_observation_session
 WHERE root_id=$1 AND acceptance_id=$2 AND ended_at IS NULL AND lease_until>clock_timestamp()
@@ -33,13 +50,13 @@ INSERT INTO policy_observation_session(id,root_id,policy_uid,acceptance_id,grant
  action_id,pod_uid,node_uid,boot_id,collector_pod_uid,collector_epoch,expectation_digest,program_digest,binding_scope,accounting_rule,
  source_observed_at,source_fresh_until,started_at,session_until,lease_until,start_by,duration_millis,sequence,credit,max_bytes_per_second)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$22,$23,$24,1,$25,$26)
-RETURNING id, root_id, policy_uid, acceptance_id, grant_id, capture_id, attempt_id, fence, action_id, pod_uid, node_uid, boot_id, collector_pod_uid, collector_epoch, expectation_digest, program_digest, binding_scope, accounting_rule, source_observed_at, source_fresh_until, started_at, session_until, lease_until, start_by, duration_millis, sequence, credit, max_bytes_per_second, ended_at
+RETURNING id, root_id, policy_uid, acceptance_id, grant_id, capture_id, attempt_id, fence, action_id, pod_uid, node_uid, boot_id, collector_pod_uid, collector_epoch, expectation_digest, program_digest, binding_scope, accounting_rule, source_observed_at, source_fresh_until, started_at, session_until, lease_until, start_by, duration_millis, sequence, credit, max_bytes_per_second, ended_at, adhoc_capture_id
 `
 
 type InsertPolicyObservationParams struct {
 	ID                pgtype.UUID
 	RootID            pgtype.UUID
-	PolicyUid         string
+	PolicyUid         pgtype.Text
 	AcceptanceID      pgtype.UUID
 	GrantID           pgtype.UUID
 	CaptureID         pgtype.UUID
@@ -125,12 +142,13 @@ func (q *Queries) InsertPolicyObservation(ctx context.Context, arg InsertPolicyO
 		&i.Credit,
 		&i.MaxBytesPerSecond,
 		&i.EndedAt,
+		&i.AdhocCaptureID,
 	)
 	return i, err
 }
 
 const readPolicyObservation = `-- name: ReadPolicyObservation :one
-SELECT id, root_id, policy_uid, acceptance_id, grant_id, capture_id, attempt_id, fence, action_id, pod_uid, node_uid, boot_id, collector_pod_uid, collector_epoch, expectation_digest, program_digest, binding_scope, accounting_rule, source_observed_at, source_fresh_until, started_at, session_until, lease_until, start_by, duration_millis, sequence, credit, max_bytes_per_second, ended_at FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2
+SELECT id, root_id, policy_uid, acceptance_id, grant_id, capture_id, attempt_id, fence, action_id, pod_uid, node_uid, boot_id, collector_pod_uid, collector_epoch, expectation_digest, program_digest, binding_scope, accounting_rule, source_observed_at, source_fresh_until, started_at, session_until, lease_until, start_by, duration_millis, sequence, credit, max_bytes_per_second, ended_at, adhoc_capture_id FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2
 `
 
 type ReadPolicyObservationParams struct {
@@ -173,6 +191,7 @@ func (q *Queries) ReadPolicyObservation(ctx context.Context, arg ReadPolicyObser
 		&i.Credit,
 		&i.MaxBytesPerSecond,
 		&i.EndedAt,
+		&i.AdhocCaptureID,
 	)
 	return i, err
 }
@@ -192,6 +211,24 @@ func (q *Queries) RetirePolicyObservation(ctx context.Context, arg RetirePolicyO
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const spendAdHocObservedBytes = `-- name: SpendAdHocObservedBytes :one
+SELECT spend_adhoc_observed_bytes($1::uuid,$2::uuid,$3::bigint)::boolean
+`
+
+type SpendAdHocObservedBytesParams struct {
+	RootID  pgtype.UUID
+	GrantID pgtype.UUID
+	Bytes   int64
+}
+
+// ADR-279: the ad hoc pool debit of a manual raw recording (false refuses).
+func (q *Queries) SpendAdHocObservedBytes(ctx context.Context, arg SpendAdHocObservedBytesParams) (bool, error) {
+	row := q.db.QueryRow(ctx, spendAdHocObservedBytes, arg.RootID, arg.GrantID, arg.Bytes)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const spendPolicyGrantObservedBytes = `-- name: SpendPolicyGrantObservedBytes :execrows

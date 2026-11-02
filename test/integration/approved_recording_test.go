@@ -27,6 +27,9 @@ var recordingScenarioSlots int64 = 1
 // reviewer; independent reviewer/step-up qualification belongs to ADR-249.
 func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, create func(*testing.T) captureAdmissionScenario) {
 	t.Helper()
+	t.Run("adhoc-observation-pool", func(t *testing.T) {
+		qualifyAdHocObservationPool(t, ctx, admin, poolFor, create(t))
+	})
 	t.Run("recording-composition-group", func(t *testing.T) {
 		// Both recordings reserve storage in one allocation.
 		recordingScenarioSlots = 2
@@ -314,5 +317,92 @@ func qualifyCompositionGroup(t *testing.T, ctx context.Context, admin *pgxpool.P
 	var count int
 	if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_capture WHERE group_id=$1", parentID).Scan(&count); err != nil || count != 2 {
 		t.Fatal("group children", count, err)
+	}
+}
+
+// ADR-279: the ad hoc observation pool of an approved grant debits its
+// reviewed maxObservedBytes once and monotonically; it is never refilled,
+// pending or revoked grants have none, and nothing can lower it.
+func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario) {
+	in := s.a.Plan.Input
+	in.Target.ExecutionClass, in.Capability.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+	in.Target.NodeUID, in.Target.NodeBootID, in.Target.Pin.NodeName = "", "", ""
+	policies, err := s.retention.policies(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	in.Retention, err = privacy.Resolve(policies, privacy.Input{Target: in.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", AnchorAt: now}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	composition := planvalue.ProfileComposition{Components: []planvalue.ProfileComponent{{ID: "net", Profile: planvalue.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}, Edits: []planvalue.ProfileEdit{{ActionID: "sample", Field: "packetAfter", Text: "2s"}}}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
+	reviewed, err := planning.CompileRecorder(planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: composition, Retention: in.Retention, Deadline: now.Add(time.Minute), NodeRecorder: true, RequireApproval: true}, nil, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
+		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &composition, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
+		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: reviewOf(in.Retention), Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: now.Add(time.Minute)}
+	previewPool := poolFor("context_preview_runtime", "synthetic-context-preview")
+	defer previewPool.Close()
+	previews, err := postgres.NewContextPreviews(ctx, previewPool, s.a.RootID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = previews.CreateContextPreview(ctx, p); err != nil {
+		t.Fatal("persist preview", err)
+	}
+	role := narrowRole(t, ctx, admin, "adhoc_pool_", "synthetic-adhoc-pool", func(role string) []string {
+		sql, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
+		if !ok {
+			t.Fatal("missing hub runtime grants")
+		}
+		return sql
+	})
+	grantPool := poolFor(role, "synthetic-adhoc-pool")
+	defer grantPool.Close()
+	grants, err := postgres.NewAccessGrants(ctx, grantPool, s.a.RootID, s.recovery.guard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The grant's frozen scope carries the reviewed observation limits.
+	scope := []byte(`{"timing":"approvedAcceptance/v1","approval":{"dataClass":"raw","observationLimits":{"maxSessionSeconds":60,"maxObservedBytes":100,"maxBytesPerSecond":16,"maxConcurrentSessions":1}}}`)
+	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: sha256.Sum256(scope), Scope: scope, Review: []byte(`{}`), DataClass: "raw", Reasons: []authorization.SensitiveReason{{ActionID: reviewed.Actions[0].ID, Code: planvalue.ReasonRawPackets}}, Lifetime: time.Hour, Revision: 1}
+	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
+	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "raw", RequestDigest: sha256.Sum256([]byte("synthetic-raw-request"))}, s.a.Recovery)
+	if err != nil {
+		t.Fatal("persist grant", err)
+	}
+	spend := func(amount int64) bool {
+		t.Helper()
+		var ok bool
+		if err := admin.QueryRow(ctx, "SELECT spend_adhoc_observed_bytes($1,$2,$3)", s.a.RootID, g.ID, amount).Scan(&ok); err != nil {
+			t.Fatal(err)
+		}
+		return ok
+	}
+	if spend(10) {
+		t.Fatal("a pending grant has an observation pool")
+	}
+	approver := p.Actor
+	approver.Subject = "synthetic-independent-reviewer"
+	if g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic raw review", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"}, s.a.Recovery); err != nil {
+		t.Fatal("decision", err)
+	}
+	if !spend(60) || spend(41) || !spend(40) || spend(1) {
+		t.Fatal("pool not bounded by the reviewed maximum")
+	}
+	if _, err := admin.Exec(ctx, "UPDATE adhoc_observation_spend SET spent=0 WHERE grant_id=$1", g.ID); err == nil {
+		t.Fatal("spend lowered")
+	}
+	if _, err := admin.Exec(ctx, "DELETE FROM adhoc_observation_spend WHERE grant_id=$1", g.ID); err == nil {
+		t.Fatal("spend deleted")
+	}
+	if _, _, err = grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: p.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke"}, s.a.Recovery); err != nil {
+		t.Fatal("revoke", err)
+	}
+	if spend(0) || spend(1) {
+		t.Fatal("revoked grant spent")
 	}
 }

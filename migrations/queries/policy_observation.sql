@@ -28,3 +28,11 @@ RETURNING *;
 
 -- name: RetirePolicyObservation :execrows
 DELETE FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2;
+
+-- ADR-279: the ad hoc pool debit of a manual raw recording (false refuses).
+-- name: SpendAdHocObservedBytes :one
+SELECT spend_adhoc_observed_bytes(sqlc.arg(root_id)::uuid,sqlc.arg(grant_id)::uuid,sqlc.arg(bytes)::bigint)::boolean;
+
+-- name: CountActiveAdHocObservations :one
+SELECT count(*) FROM policy_observation_session
+WHERE root_id=$1 AND grant_id=$2 AND acceptance_id IS NULL AND ended_at IS NULL AND lease_until>clock_timestamp();

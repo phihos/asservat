@@ -305,7 +305,7 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.APIExecutionCheck, observation *policyObservationPreparation) (value.APIExecution, bool, error) {
 	var out value.APIExecution
 	var first bool
-	if sensitivePolicyRecording(c) && observation == nil {
+	if (sensitivePolicyRecording(c) || sensitiveManualRawRecording(c)) && observation == nil {
 		return out, false, value.ErrDenied
 	}
 	if !authorization.UUID(c.Work.Accepted.CaptureID) || c.Work.Accepted.Expectation.ExecutionClass != artifact.ContextAPIExecution {
@@ -388,7 +388,13 @@ func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.AP
 				return sqlStep{"expired", value.ErrExpired}
 			}
 			if observation != nil {
-				if err := s.preparePolicyObservation(ctx, q, c, accepted, policyGrant, now.Time, first, observation); err != nil {
+				prepare := func() error {
+					return s.preparePolicyObservation(ctx, q, c, accepted, policyGrant, now.Time, first, observation)
+				}
+				if sensitiveManualRawRecording(c) {
+					prepare = func() error { return s.prepareAdHocObservation(ctx, q, c, accepted, now.Time, first, observation) }
+				}
+				if err := prepare(); err != nil {
 					return sqlStep{"observation", err}
 				}
 				// New preparation must still have dispatch slack after all existing
