@@ -127,7 +127,9 @@ func TestPolicySourceOperationNeverFallsBackOrRefreshes(t *testing.T) {
 			b, _ := json.Marshal(request)
 			q := contracts.APIContextOperation{Method: opResolvePacketSource, Body: b}
 			_, err := s.handle(t.Context(), q)
-			if mode != "valid" {
+			// A manual human actor may resolve too (ADR-279): only a verified
+			// metered expectation can later start with the source.
+			if mode != "valid" && mode != "ordinary-actor" {
 				if err == nil || s.resolved != nil || s.packetSource != nil || resolver.calls != 0 {
 					t.Fatal("source refusal fell back", err, resolver.calls)
 				}
@@ -145,5 +147,23 @@ func TestPolicySourceOperationNeverFallsBackOrRefreshes(t *testing.T) {
 				t.Fatal("source refreshed within work", err, resolver.sourceReads)
 			}
 		})
+	}
+}
+
+// A resolved source never starts an unmetered recording: only a raw byte
+// predicate or a rawPackets recording matches a finite permit (ADR-279).
+func TestPolicyRecordingMatchesOnlyMeteredRecordings(t *testing.T) {
+	program := []artifact.FilterInstruction{{Code: 6, K: 65535}}
+	native := []planning.BPFInstruction{{Code: 6, K: 65535}}
+	e := artifact.ContextExpectation{PodUID: "pod", Recording: &artifact.Recording{Kind: "packetCapture", Profile: "networkHeaders", Composition: []byte(`{}`), DurationMillis: 2000, MaxBytes: 1 << 20, Snaplen: artifact.RecordingSnaplen,
+		Filter: &artifact.RecordingFilter{Expression: "tcp port 8080", Program: program}}}
+	source := targets.PacketSourceObservation{PodUID: "pod", NodeUID: "node", BootID: "boot", CollectorPodUID: "collector", CollectorEpoch: "epoch"}
+	permit := collector.ObservationPermit{Duration: 2 * time.Second, Binding: collector.ObservationBinding{PodUID: "pod", NodeUID: "node", BootID: "boot", CollectorPodUID: "collector", CollectorEpoch: "epoch", ProgramDigest: [32]byte(compiler.FilterProgramDigest(native))}}
+	if !e.Recording.Valid() || policyRecordingMatches(e, source, permit) {
+		t.Fatal("unmetered networkHeaders recording matched a finite permit")
+	}
+	e.Recording.Profile, e.Recording.Snaplen = "rawPackets", 96
+	if !e.Recording.Valid() || !policyRecordingMatches(e, source, permit) {
+		t.Fatal("rawPackets recording did not match its permit")
 	}
 }
