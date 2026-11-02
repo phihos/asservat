@@ -44,7 +44,11 @@ that, while policy grants confer no download rights.
    (`snaplen` otherwise); the engine still hands over at least the header
    snaplen so a short cap still classifies its transport. The publisher
    rechecks the stored `rawPcapng` against the accepted caps
-   (`packets.CheckRaw`) in the same verification read.
+   (`packets.CheckRaw`) in the same verification read: each frame is held to
+   its transport's cap as soon as its IP header names the protocol, and a
+   frame too short to name it to the smallest cap. Caps are therefore at
+   least 54 bytes (Ethernet plus the fixed IPv6 header), so every frame the
+   node keeps names its transport.
 
 ## Complexity gate
 

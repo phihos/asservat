@@ -333,20 +333,21 @@ func CheckRaw(src io.Reader, limits RawLimits) (int, error) {
 }
 
 // rawFrameCap classifies a stored raw frame from its own Ethernet and IP
-// header bytes, as the recorder retained it: the cap of its transport once
-// the fixed IP header names it, or the frame's length when it ends before
-// that (Ethernet and fixed IP header bytes only, never payload or options). A
-// frame the recorder never retains (another ethertype, a fragment, IPv6
-// extension headers or another transport) is refused.
+// header bytes, as the recorder retained it: the cap of its transport as soon
+// as the IP header names it; a frame too short to name it fits the smallest
+// effective cap (caps are byte budgets, header bytes included). A frame the
+// recorder never retains (another ethertype, a fragment, IPv6 extension
+// headers or another transport) is refused.
 func rawFrameCap(b []byte, l RawLimits) (int, bool) {
+	smallest := min(l.cap(layers.LayerTypeTCP), l.cap(layers.LayerTypeUDP), l.cap(layers.LayerTypeICMPv4))
 	if len(b) < 14 {
-		return len(b), true
+		return smallest, true
 	}
 	var proto byte
 	switch uint16(b[12])<<8 | uint16(b[13]) {
 	case 0x0800:
-		if len(b) < 14+20 {
-			return len(b), true // Ethernet and part of the fixed IP header only
+		if len(b) < 24 {
+			return smallest, true
 		}
 		if (uint16(b[20])<<8|uint16(b[21]))&0x3fff != 0 {
 			return 0, false // more-fragments flag or a fragment offset
@@ -355,8 +356,8 @@ func rawFrameCap(b []byte, l RawLimits) (int, bool) {
 			return 0, false
 		}
 	case 0x86dd:
-		if len(b) < 14+40 {
-			return len(b), true
+		if len(b) < 21 {
+			return smallest, true
 		}
 		if proto = b[20]; proto == 1 {
 			return 0, false

@@ -468,13 +468,18 @@ type RawProfile struct {
 // validRawProfile checks the default snaplen and at most one cap per
 // transport against the engine maximum; larger values are refused with a
 // remedy, never narrowed silently (ADR-279).
+// minRawSnaplen is Ethernet (14) plus the fixed IPv6 header (40).
+const minRawSnaplen = 54
+
 func validRawProfile(path string, raw json.RawMessage) error {
 	var p RawProfile
 	if json.Unmarshal(raw, &p) != nil {
 		return refuse(value.CompositionInvalid, path, "rawPackets needs snaplen and optional protocolSnaplen")
 	}
-	if p.Snaplen < 1 || p.Snaplen > artifact.MaxRawSnaplen {
-		return refuse(value.CompositionInvalid, path+".snaplen", fmt.Sprintf("this recorder captures at most %d bytes per packet; lower snaplen", artifact.MaxRawSnaplen))
+	// A cap below the Ethernet and fixed IPv6 headers could not name its
+	// transport, so the verifier could not recheck it (ADR-279).
+	if p.Snaplen < minRawSnaplen || p.Snaplen > artifact.MaxRawSnaplen {
+		return refuse(value.CompositionInvalid, path+".snaplen", fmt.Sprintf("this recorder keeps %d to %d bytes per packet", minRawSnaplen, artifact.MaxRawSnaplen))
 	}
 	seen := map[string]bool{}
 	for i, c := range p.ProtocolSnaplen {
@@ -482,8 +487,8 @@ func validRawProfile(path string, raw json.RawMessage) error {
 			return refuse(value.CompositionInvalid, pathf("%s.protocolSnaplen[%d].protocol", path, i), "one cap each for tcp, udp and icmp")
 		}
 		seen[c.Protocol] = true
-		if c.Bytes < 1 || c.Bytes > artifact.MaxRawSnaplen {
-			return refuse(value.CompositionInvalid, pathf("%s.protocolSnaplen[%d].bytes", path, i), fmt.Sprintf("a cap is 1 to %d bytes", artifact.MaxRawSnaplen))
+		if c.Bytes < minRawSnaplen || c.Bytes > artifact.MaxRawSnaplen {
+			return refuse(value.CompositionInvalid, pathf("%s.protocolSnaplen[%d].bytes", path, i), fmt.Sprintf("a cap is %d to %d bytes", minRawSnaplen, artifact.MaxRawSnaplen))
 		}
 	}
 	return nil

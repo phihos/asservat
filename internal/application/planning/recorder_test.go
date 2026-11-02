@@ -579,6 +579,7 @@ func TestRawPacketsPlan(t *testing.T) {
 		"snaplen over engine": raw(`{"kind":"rawPackets","snaplen":4000}`, filter),
 		"duplicate cap":       raw(`{"kind":"rawPackets","snaplen":96,"protocolSnaplen":[{"protocol":"tcp","bytes":200},{"protocol":"tcp","bytes":100}]}`, filter),
 		"no filter":           raw(`{"kind":"rawPackets","snaplen":96}`),
+		"under headers":       raw(`{"kind":"rawPackets","snaplen":40}`, filter),
 	} {
 		in, now := recorderInput(t, c, "packetCapture")
 		if _, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now); err == nil {

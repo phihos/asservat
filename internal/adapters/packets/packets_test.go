@@ -304,8 +304,16 @@ func TestRawRecorderKeepsCappedPrefixes(t *testing.T) {
 		}
 		return buf.Bytes()
 	}
-	if n, err := CheckRaw(bytes.NewReader(stored("tcp4", 30)), strict); err != nil || n != 1 {
-		t.Fatal("frame ending inside the fixed IP header refused", err)
+	if n, err := CheckRaw(bytes.NewReader(stored("tcp4", 23)), strict); err != nil || n != 1 {
+		t.Fatal("frame too short to name its transport refused within the smallest cap", err)
+	}
+	// Caps are byte budgets: a short frame still fits the smallest cap, and a
+	// header-only UDP frame fits the UDP cap, not its own length.
+	if _, err := CheckRaw(bytes.NewReader(stored("tcp4", 30)), RawLimits{Snaplen: 20, UDP: 100}); err == nil {
+		t.Fatal("30-byte frame accepted under a 20-byte TCP cap")
+	}
+	if _, err := CheckRaw(bytes.NewReader(stored("udp6", 53)), RawLimits{Snaplen: 100, UDP: 20}); err == nil {
+		t.Fatal("53-byte IPv6/UDP header-only frame accepted under a 20-byte UDP cap")
 	}
 	for _, name := range []string{"fragment", "arp", "gre", "hopbyhop", "ihl"} {
 		if _, err := CheckRaw(bytes.NewReader(stored(name, 74)), strict); err == nil {
