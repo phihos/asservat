@@ -224,6 +224,7 @@
                               "code": {
                                 "enum": [
                                   "rawBytePredicate",
+                                  "rawPackets",
                                   "recordingApprovalRequired",
                                   "policyCollection"
                                 ]
