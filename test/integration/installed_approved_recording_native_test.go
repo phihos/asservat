@@ -74,8 +74,8 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 						"profileRef": map[string]string{"catalog": "builtin", "name": "network-connections", "version": "v1"},
 						"overrides": []any{
 							map[string]any{"actionID": "sample", "field": "packetFilter", "value": "tcp port 8080"},
-							map[string]any{"actionID": "sample", "field": "packetAfter", "value": "5s"},
-							map[string]any{"actionID": "sample", "field": "actionTimeout", "value": "15s"},
+							map[string]any{"actionID": "sample", "field": "packetAfter", "value": "10s"},
+							map[string]any{"actionID": "sample", "field": "actionTimeout", "value": "20s"},
 						},
 					},
 					map[string]any{
@@ -84,13 +84,13 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 						"overrides": []any{
 							map[string]any{"actionID": "syscalls", "field": "actionExecutionMode", "value": "onTrigger"},
 							map[string]any{"actionID": "syscalls", "field": "syscallBefore", "value": "0s"},
-							map[string]any{"actionID": "syscalls", "field": "syscallAfter", "value": "5s"},
-							map[string]any{"actionID": "syscalls", "field": "actionTimeout", "value": "15s"},
+							map[string]any{"actionID": "syscalls", "field": "syscallAfter", "value": "10s"},
+							map[string]any{"actionID": "syscalls", "field": "actionTimeout", "value": "20s"},
 						},
 					},
 				},
 				"maxTotalBytes": 32 << 20,
-				"maxDuration":   "15s",
+				"maxDuration":   "20s",
 			},
 		}
 	}
@@ -487,7 +487,16 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	trafficAttempted := measurement == nil
 	var finishRecording func() error
 	observeTraffic := func(current installedJourneyCaptureProgress, expectedID string) {
-		if !trafficAttempted && current.CaptureID == expectedID && current.Phase == "Running" {
+		// A composition group reports Running with its first recording; its
+		// traffic waits until every recording runs, so the load does not
+		// starve the sibling's start on the shared runner.
+		allRunning := installedJourneyFocus() != "manual-mixed" || len(current.Actions) >= 2
+		for _, a := range current.Actions {
+			if installedJourneyFocus() == "manual-mixed" && a.Phase != "Running" {
+				allRunning = false
+			}
+		}
+		if !trafficAttempted && current.CaptureID == expectedID && current.Phase == "Running" && allRunning {
 			measurement.ExecutionObservedAt = time.Now().UTC()
 			if err := finishSetup(); err != nil {
 				t.Fatal("native workflow setup snapshot", err)
