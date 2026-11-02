@@ -358,8 +358,13 @@ func qualifyAccessGrants(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 	// (the capture profile reads did until migration 00120).
 	for _, name := range contracts.InvestigationToolNames() {
 		var lane *string
-		if err := admin.QueryRow(ctx, "SELECT operation_audit_lane($1)", name).Scan(&lane); err != nil || lane == nil || *lane != audit.OperationLane(name) {
-			t.Fatal("SQL audit lane differs from Go", name, lane, audit.OperationLane(name), err)
+		err := admin.QueryRow(ctx, "SELECT operation_audit_lane($1)", name).Scan(&lane)
+		got := ""
+		if lane != nil {
+			got = *lane
+		}
+		if err != nil || got != audit.OperationLane(name) {
+			t.Fatal("SQL audit lane differs from Go", name, got, audit.OperationLane(name), err)
 		}
 	}
 }
