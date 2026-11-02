@@ -13,14 +13,17 @@ import (
 // The empty name is the historical pod-status type, so existing expectations,
 // their digests and manifests keep their serialized form.
 const (
-	PodStatusArtifact      = ""
-	PCAPNGArtifact         = "pcapng"
+	PodStatusArtifact = ""
+	PCAPNGArtifact    = "pcapng"
+	// RawPCAPNGArtifact keeps payload prefixes up to approved caps (ADR-279).
+	RawPCAPNGArtifact      = "rawPcapng"
 	SyscallRecordsArtifact = "syscallRecords"
 	HTTPHeadersArtifact    = "httpHeaders"
 )
 
 const (
 	PCAPNGFormat         = "pcapng"
+	RawPCAPNGFormat      = "pcapng-raw"
 	SyscallRecordsFormat = "asservat-syscall-events/v1"
 	HTTPHeadersFormat    = "http-response-headers/v1"
 	// HTTPHeadersNativeLimit is the specified HTTP projection total (16 MiB).
@@ -44,6 +47,7 @@ type NativeType struct {
 var nativeTypes = []NativeType{
 	{Name: PodStatusArtifact, Kind: "kubernetesSnapshot", EvidenceType: "context", MediaType: "application/json", Format: ContextFormat, Extension: ".json", Coverage: "Selected pod-status fields only; no logs, messages or workload configuration.", MaxBytes: MaxContextBytes, DataClasses: []string{"metadata", "raw"}},
 	{Name: PCAPNGArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/x-pcapng", Format: PCAPNGFormat, Extension: ".pcapng", Coverage: "Packet headers of the selected pod, truncated after the transport header; no payload. Filtered, truncated or lost packets are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"metadata"}},
+	{Name: RawPCAPNGArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/x-pcapng", Format: RawPCAPNGFormat, Extension: ".pcapng", Coverage: "Packets of the selected pod including payload, truncated at the approved per-transport byte caps; caps limit bytes and do not redact. Filtered or lost packets are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"raw"}},
 	{Name: SyscallRecordsArtifact, Kind: "syscallTrace", EvidenceType: "syscallTrace", MediaType: "application/x-ndjson", Format: SyscallRecordsFormat, Extension: ".jsonl", Coverage: "Syscall metadata of the selected pod as JSON Lines: names, results, timing and process identity; no arguments or buffers. Lost events are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"metadata"}},
 	{Name: HTTPHeadersArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/json", Format: HTTPHeadersFormat, Extension: ".json", Coverage: "Approved HTTP/1 response header fields as structured JSON, not a packet capture; no bodies, URLs or credentials.", MaxBytes: HTTPHeadersNativeLimit, DataClasses: []string{"metadata"}},
 }
