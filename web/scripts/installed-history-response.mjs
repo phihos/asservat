@@ -22,6 +22,13 @@ export async function readInstalledHistoryResponse(response) {
   let text;
   try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
   catch { return { http, status: 'invalid', body: 'invalid-utf8', reply: null }; }
+  return parseInstalledHistoryText(http, text);
+}
+
+// parseInstalledHistoryText classifies a complete reply text the page itself
+// consumed (see the installed history browser's fetch observer).
+export function parseInstalledHistoryText(http, text) {
+  if (text.length === 0) return { http, status: 'invalid', body: 'empty', reply: null };
   let reply;
   try { reply = JSON.parse(text); }
   catch { return { http, status: 'invalid', body: 'invalid-json', reply: null }; }
