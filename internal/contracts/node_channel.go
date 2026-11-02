@@ -215,6 +215,16 @@ type NodePacketCapture struct {
 	// recording (B3, work kind syscallCapture).
 	Syscalls           *NodeSyscallFilter `json:"syscalls,omitempty"`
 	MaxEventsPerSecond int64              `json:"maxEventsPerSecond,omitempty"`
+	// Raw keeps payload prefixes of an observed rawPackets recording
+	// (ADR-279): snaplen, or a nonzero per-transport cap instead.
+	Raw *NodeRawPrefix `json:"raw,omitempty"`
+}
+
+type NodeRawPrefix struct {
+	Snaplen int `json:"snaplen"`
+	TCP     int `json:"tcp,omitempty"`
+	UDP     int `json:"udp,omitempty"`
+	ICMP    int `json:"icmp,omitempty"`
 }
 
 // NodeObservationPermit carries one committed finite original allowance over

@@ -10,6 +10,7 @@ import (
 	"asservat.local/asservat/internal/adapters/gadget"
 	"asservat.local/asservat/internal/adapters/packets"
 	compiler "asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
 )
@@ -98,7 +99,13 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		}
 	}
 	started := n.now().UTC()
-	rec, err := packets.NewRecorder(p.Program, int(p.MaxBytes), started, "asservat networkHeaders capture of one pod; frames cut at the transport header")
+	var rec *packets.Recorder
+	var err error
+	if raw := p.Raw; raw != nil {
+		rec, err = packets.NewRawRecorder(p.Program, int(p.MaxBytes), started, "asservat rawPackets capture of one pod; frames cut at the approved prefix caps", packets.RawLimits{Snaplen: raw.Snaplen, TCP: raw.TCP, UDP: raw.UDP, ICMP: raw.ICMP})
+	} else {
+		rec, err = packets.NewRecorder(p.Program, int(p.MaxBytes), started, "asservat networkHeaders capture of one pod; frames cut at the transport header")
+	}
 	if err != nil {
 		if meter != nil {
 			meter.Close()
@@ -198,8 +205,11 @@ func (n *nodePackets) runObserved(ctx context.Context, epoch, workID string, p c
 	out, counters, closeErr := rec.Close(ended, stats.LostSamples)
 	result := collector.PacketResult{WorkID: workID, CaptureID: p.CaptureID, StartedAt: started, EndedAt: ended, Seen: counters.Seen, Retained: counters.Retained,
 		Filtered: counters.Filtered, Unsupported: counters.Unsupported, Fragment: counters.Fragment, Extension: counters.Extension, Malformed: counters.Malformed,
-		OutputFull: counters.OutputFull, LostSamples: stats.LostSamples, WireBytes: counters.WireBytes, CapturedBytes: int64(len(out)), Snaplen: packets.Snaplen,
+		OutputFull: counters.OutputFull, LostSamples: stats.LostSamples, WireBytes: counters.WireBytes, CapturedBytes: int64(len(out)), Snaplen: rec.Snaplen(),
 		EngineVersion: n.version, ProgramDigest: p.ProgramDigest}
+	if p.Raw != nil {
+		result.NativeType = artifact.RawPCAPNGArtifact
+	}
 	switch {
 	case errors.Is(err, gadget.ErrTargetNotFound):
 		result.Failure = collector.ReasonTargetNotFound

@@ -375,7 +375,11 @@ func (p *Publisher) publish(ctx context.Context, item postgres.PendingContextPub
 	}
 	// ADR-248: a networkHeaders PCAPNG is rechecked packet by packet in the
 	// same verification read (packets.CheckHeadersOnly).
-	verifier.WithStreamCheck(artifact.PCAPNGArtifact, func() objectstore.StreamCheck { return packets.NewHeadersCheck() })
+	verifier.WithStreamCheck(artifact.PCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return packets.NewHeadersCheck() })
+	// ADR-279: a rawPackets PCAPNG is rechecked against its accepted caps.
+	verifier.WithStreamCheck(artifact.RawPCAPNGArtifact, func(e artifact.ContextExpectation) objectstore.StreamCheck {
+		return packets.NewRawCheck(rawLimits(e.Recording))
+	})
 	_, err = evidence.ContextPublisher{Ledger: p.ledger, Authority: p.gate, Verifier: verifier, Audit: p.audit, Now: time.Now}.Publish(ctx, item.CaptureID, item.Copies)
 	return err
 }
@@ -504,4 +508,17 @@ func (s mountedEvidence) Retrieve(ctx context.Context) (aws.Credentials, error) 
 		return zero, mounts.ErrUnavailable
 	}
 	return aws.Credentials{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey, SessionToken: c.SessionToken, Source: "protected-publisher-evidence-read"}, nil
+}
+
+// rawLimits are an accepted rawPackets recording's prefix caps; zero (refused
+// by the check) for anything else.
+func rawLimits(r *artifact.Recording) packets.RawLimits {
+	if r == nil || r.Profile != "rawPackets" {
+		return packets.RawLimits{}
+	}
+	l := packets.RawLimits{Snaplen: r.Snaplen}
+	if c := r.ProtocolSnaplen; c != nil {
+		l.TCP, l.UDP, l.ICMP = c.TCP, c.UDP, c.ICMP
+	}
+	return l
 }

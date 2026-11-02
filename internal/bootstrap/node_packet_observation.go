@@ -54,7 +54,7 @@ func (p *packetInput) add(f gadget.Frame) {
 func runPacketEngine(ctx context.Context, engine packetEngine, pod string, rec *packets.Recorder, meter *LocalObservationGate) (gadget.CaptureStats, error) {
 	input := packetInput{ctx: ctx, recorder: rec, meter: meter}
 	if meter == nil {
-		return engine(ctx, pod, packets.Snaplen, input.add)
+		return engine(ctx, pod, rec.Snaplen(), input.add)
 	}
 	capture, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(meter.Context(), cancel)
@@ -64,7 +64,7 @@ func runPacketEngine(ctx context.Context, engine packetEngine, pod string, rec *
 	if meter.Context().Err() != nil {
 		cancel()
 	}
-	stats, err := engine(capture, pod, packets.Snaplen, input.add)
+	stats, err := engine(capture, pod, rec.Snaplen(), input.add)
 	meter.LostSamples(stats.LostSamples)
 	if ctx.Err() != nil {
 		meter.Stop(ctx.Err())

@@ -36,6 +36,20 @@ that, while policy grants confer no download rights.
 5. Download of the raw artifact consumes the grant's result-access child;
    sharing raw output stays refused until the S-06 raw-share approval exists.
 
+6. A `rawPackets` action needs a `packetFilter`: the observation binding pins
+   a compiled program, and a filter narrows the payload a review covers.
+   Filters still read only the header snaplen (`CheckPrefixProgram`); a
+   predicate on later payload bytes is refused as unsupported.
+7. The node keeps each retained frame's prefix up to its transport cap
+   (`snaplen` otherwise); the engine still hands over at least the header
+   snaplen so a short cap still classifies its transport. The publisher
+   rechecks the stored `rawPcapng` against the accepted caps
+   (`packets.CheckRaw`) in the same verification read: each frame is held to
+   its transport's cap as soon as its IP header names the protocol, and a
+   frame too short to name it to the smallest cap. Caps are therefore at
+   least 54 bytes (Ethernet plus the fixed IPv6 header), so every frame the
+   node keeps names its transport.
+
 ## Complexity gate
 
 Benefit: raw packets are a specified first-release capability. Cost: one

@@ -120,6 +120,25 @@ type PacketCapture struct {
 	// recording (B3, WorkSyscallCapture): no program, at most a minute.
 	Syscalls           *SyscallFilter `json:",omitempty"`
 	MaxEventsPerSecond int64          `json:",omitempty"`
+	// Raw keeps payload prefixes of an observed rawPackets recording
+	// (ADR-279); nil keeps headers only.
+	Raw *RawPrefix `json:",omitempty"`
+}
+
+// RawPrefix caps each retained frame at Snaplen bytes, or at a nonzero
+// per-transport cap instead (artifact.RecordingProtocolSnaplen).
+type RawPrefix struct{ Snaplen, TCP, UDP, ICMP int }
+
+func (r RawPrefix) valid() bool {
+	if r.Snaplen < 1 || r.Snaplen > artifact.MaxRawSnaplen {
+		return false
+	}
+	for _, v := range []int{r.TCP, r.UDP, r.ICMP} {
+		if v < 0 || v > artifact.MaxRawSnaplen {
+			return false
+		}
+	}
+	return true
 }
 
 // MaxSyscallCaptureDuration is a manual syscall recording's longest window.
@@ -132,7 +151,8 @@ func (p PacketCapture) Valid() bool {
 		return false
 	}
 	if p.Syscalls != nil && (!p.Syscalls.Valid() || len(p.Program) != 0 || p.ProgramDigest != [32]byte{} || p.Observation != nil || p.Duration > MaxSyscallCaptureDuration || p.MaxEventsPerSecond < 1 || p.MaxEventsPerSecond > artifact.MaxRecordingEventsPerSecond) ||
-		p.Syscalls == nil && p.MaxEventsPerSecond != 0 {
+		p.Syscalls == nil && p.MaxEventsPerSecond != 0 ||
+		p.Raw != nil && (p.Observation == nil || p.Syscalls != nil || len(p.Program) == 0 || !p.Raw.valid()) {
 		return false
 	}
 	return validUUID(p.CaptureID) && validUUID(p.PodUID) && len(p.Program) <= planning.MaxFilterInstructions && (len(p.Program) == 0) == (p.ProgramDigest == [32]byte{}) &&
@@ -197,7 +217,7 @@ func (r PacketResult) Valid() bool {
 	dropped := r.Filtered + r.Unsupported + r.Fragment + r.Extension + r.Malformed + r.OutputFull
 	failure := r.Failure == "" || r.Failure == ReasonTargetNotFound || r.Failure == ReasonTargetHostNet || r.Failure == ReasonCaptureFailed
 	return validUUID(r.WorkID) && validUUID(r.CaptureID) && !r.StartedAt.IsZero() && !r.EndedAt.Before(r.StartedAt) && r.Retained+dropped == r.Seen &&
-		r.CapturedBytes > 0 && r.CapturedBytes <= MaxPacketCaptureBytes && (r.NativeType == "" || r.NativeType == artifact.SyscallRecordsArtifact) && r.Snaplen > 0 && r.Snaplen <= 1500 && len(r.EngineVersion) <= 64 && failure
+		r.CapturedBytes > 0 && r.CapturedBytes <= MaxPacketCaptureBytes && (r.NativeType == "" || r.NativeType == artifact.SyscallRecordsArtifact || r.NativeType == artifact.RawPCAPNGArtifact) && r.Snaplen > 0 && r.Snaplen <= 1500 && len(r.EngineVersion) <= 64 && failure
 }
 
 // Outcome of one work item, reported in the next status.

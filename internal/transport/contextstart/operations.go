@@ -744,7 +744,7 @@ func samePacketSource(a, b targets.PacketSourceObservation) bool {
 // recovered from the permit's caller-supplied copies.
 func policyRecordingMatches(e artifact.ContextExpectation, source targets.PacketSourceObservation, permit collector.ObservationPermit) bool {
 	r, b := e.Recording, permit.Binding
-	if r == nil || !r.Valid() || r.Filter == nil || !compiler.RawBytePredicate(r.Filter.Expression) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || b.PodUID != e.PodUID || source.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch {
+	if !r.Valid() || !compiler.MeteredRecording(r) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || b.PodUID != e.PodUID || source.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch {
 		return false
 	}
 	program := make([]planning.BPFInstruction, len(r.Filter.Program))

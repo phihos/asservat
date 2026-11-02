@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"asservat.local/asservat/internal/application/planning"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -52,6 +53,11 @@ func captureShareInstruction(ctx context.Context, q *custodydb.Queries, stream c
 	}
 	target := a.Plan.Input.Target.Target()
 	if !s.Valid() || i.Principal != reviewed.Actor || s.Recipients[0].Issuer != i.Principal.Issuer {
+		return nil, value.ErrInvalid
+	}
+	// ADR-279: raw output is never shared until the S-06 raw-share approval
+	// exists; the retained class below is metadata only.
+	if r, _, err := planning.RecordingForContext(a.Plan); err == nil && r.Profile == "rawPackets" {
 		return nil, value.ErrInvalid
 	}
 	p, err := permissionProjection(ctx, q, stream, target)

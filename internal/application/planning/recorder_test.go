@@ -553,7 +553,8 @@ func TestRawPacketsPlan(t *testing.T) {
 		c.Components[0].Profile = value.ProfileRef{Catalog: "namespace", Name: "raw-capture", Version: "v1"}
 		return c
 	}
-	in, now := recorderInput(t, raw(`{"kind":"rawPackets","snaplen":96,"protocolSnaplen":[{"protocol":"tcp","bytes":200}]}`), "packetCapture")
+	filter := text("sample", "packetFilter", "tcp port 8080")
+	in, now := recorderInput(t, raw(`{"kind":"rawPackets","snaplen":96,"protocolSnaplen":[{"protocol":"tcp","bytes":200}]}`, filter), "packetCapture")
 	p, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now)
 	if err != nil {
 		t.Fatal(err)
@@ -574,11 +575,13 @@ func TestRawPacketsPlan(t *testing.T) {
 	if _, _, err := RecordingFor(p); err == nil {
 		t.Fatal("raw recording derived without acceptance")
 	}
-	for name, profile := range map[string]string{
-		"snaplen over engine": `{"kind":"rawPackets","snaplen":4000}`,
-		"duplicate cap":       `{"kind":"rawPackets","snaplen":96,"protocolSnaplen":[{"protocol":"tcp","bytes":200},{"protocol":"tcp","bytes":100}]}`,
+	for name, c := range map[string]value.ProfileComposition{
+		"snaplen over engine": raw(`{"kind":"rawPackets","snaplen":4000}`, filter),
+		"duplicate cap":       raw(`{"kind":"rawPackets","snaplen":96,"protocolSnaplen":[{"protocol":"tcp","bytes":200},{"protocol":"tcp","bytes":100}]}`, filter),
+		"no filter":           raw(`{"kind":"rawPackets","snaplen":96}`),
+		"under headers":       raw(`{"kind":"rawPackets","snaplen":40}`, filter),
 	} {
-		in, now := recorderInput(t, raw(profile), "packetCapture")
+		in, now := recorderInput(t, c, "packetCapture")
 		if _, err := CompileRecorder(in, &fakeCompiler{program: fixtureProgram}, now); err == nil {
 			t.Fatal(name, "accepted")
 		}

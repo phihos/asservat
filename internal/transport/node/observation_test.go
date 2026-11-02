@@ -81,3 +81,34 @@ func TestNodeObservationMaximumPollFitsExistingBound(t *testing.T) {
 	}
 	t.Logf("actual maximal observed poll JSON bytes=%d, ceiling=%d", len(data), contracts.NodeMaxResponse)
 }
+
+// ADR-279: a raw recording's prefix caps cross the closed wire exactly and
+// are executable only on an observed capture within the engine maximum.
+func TestRawPrefixClosedWireRoundTrips(t *testing.T) {
+	w := observedNodeWork()
+	w.Packet.Raw = &collector.RawPrefix{Snaplen: 96, TCP: 1500}
+	data, err := json.Marshal(contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: []contracts.NodeWork{WireWork(w)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := contracts.DecodeNodePollResponse(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := DomainWork(decoded.Work[0]); !ok || !reflect.DeepEqual(got, w) || !got.Packet.Valid() {
+		t.Fatal("raw prefix changed through closed codec")
+	}
+	for name, change := range map[string]func(*collector.PacketCapture){
+		"unobserved":  func(p *collector.PacketCapture) { p.Observation = nil },
+		"over engine": func(p *collector.PacketCapture) { p.Raw.TCP = 1501 },
+		"no snaplen":  func(p *collector.PacketCapture) { p.Raw.Snaplen = 0 },
+		"no program":  func(p *collector.PacketCapture) { p.Program, p.ProgramDigest = nil, [32]byte{} },
+	} {
+		bad := observedNodeWork()
+		bad.Packet.Raw = &collector.RawPrefix{Snaplen: 96}
+		change(bad.Packet)
+		if bad.Packet.Valid() {
+			t.Fatal(name, "raw capture valid")
+		}
+	}
+}

@@ -19,7 +19,7 @@ type ContextVerifier struct {
 	contracts *manifest.Validator
 	// extra are additional streaming checks per native type, run on the
 	// same authenticated read (ADR-248: the networkHeaders recheck).
-	extra map[string]func() StreamCheck
+	extra map[string]func(artifact.ContextExpectation) StreamCheck
 }
 
 // StreamCheck sees every authenticated native byte of one verification and
@@ -31,9 +31,9 @@ type StreamCheck interface {
 
 // WithStreamCheck adds a verification check for one native type. It runs in
 // the same read as the type's own check: no second unwrap or download.
-func (v *ContextVerifier) WithStreamCheck(nativeType string, check func() StreamCheck) *ContextVerifier {
+func (v *ContextVerifier) WithStreamCheck(nativeType string, check func(artifact.ContextExpectation) StreamCheck) *ContextVerifier {
 	if v.extra == nil {
-		v.extra = map[string]func() StreamCheck{}
+		v.extra = map[string]func(artifact.ContextExpectation) StreamCheck{}
 	}
 	v.extra[nativeType] = check
 	return v
@@ -116,7 +116,7 @@ func (v *ContextVerifier) verifyStream(ctx context.Context, e artifact.ContextEx
 	}
 	var extra StreamCheck
 	if factory := v.extra[e.NativeType]; factory != nil {
-		extra = factory()
+		extra = factory(e)
 	}
 	if err = reader.Read(ctx, 0, m.Layout.NativeBytes, checkSink{check, extra}); err != nil {
 		if extra != nil {

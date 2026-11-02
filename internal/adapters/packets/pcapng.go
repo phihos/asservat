@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/planning"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -60,12 +61,56 @@ type Recorder struct {
 	first    time.Time
 	last     time.Time
 	full     bool
+	raw      *RawLimits
+	snaplen  int
+}
+
+// RawLimits keep payload prefixes (ADR-279): Snaplen bytes of each retained
+// frame, or a nonzero per-transport cap instead. Caps limit bytes; they do not
+// redact.
+type RawLimits struct{ Snaplen, TCP, UDP, ICMP int }
+
+// Max is the longest prefix any frame keeps: the engine and interface
+// snapshot length.
+func (l RawLimits) Max() int { return max(l.Snaplen, l.TCP, l.UDP, l.ICMP) }
+
+func (l RawLimits) valid() bool {
+	return l.Snaplen >= 1 && min(l.TCP, l.UDP, l.ICMP) >= 0 && l.Max() <= artifact.MaxRawSnaplen
+}
+
+func (l RawLimits) cap(transport gopacket.LayerType) int {
+	c := 0
+	switch transport {
+	case layers.LayerTypeTCP:
+		c = l.TCP
+	case layers.LayerTypeUDP:
+		c = l.UDP
+	case layers.LayerTypeICMPv4, layers.LayerTypeICMPv6:
+		c = l.ICMP
+	}
+	if c == 0 {
+		return l.Snaplen
+	}
+	return c
 }
 
 // NewRecorder prepares a recorder whose PCAPNG, including its closing
 // statistics block, stays within maxBytes. description names the interface
 // (fixed text, never workload data).
 func NewRecorder(program []value.BPFInstruction, maxBytes int, started time.Time, description string) (*Recorder, error) {
+	return newRecorder(program, maxBytes, started, description, nil)
+}
+
+// NewRawRecorder is NewRecorder for a rawPackets recording: retained frames
+// keep their prefix up to limits instead of ending at the transport header.
+func NewRawRecorder(program []value.BPFInstruction, maxBytes int, started time.Time, description string, limits RawLimits) (*Recorder, error) {
+	if !limits.valid() || len(program) == 0 {
+		return nil, ErrInvalid
+	}
+	return newRecorder(program, maxBytes, started, description, &limits)
+}
+
+func newRecorder(program []value.BPFInstruction, maxBytes int, started time.Time, description string, raw *RawLimits) (*Recorder, error) {
 	f, err := NewFilter(program)
 	if err != nil {
 		return nil, err
@@ -74,16 +119,25 @@ func NewRecorder(program []value.BPFInstruction, maxBytes int, started time.Time
 		return nil, ErrInvalid
 	}
 	out := &limitedBuffer{limit: maxBytes}
-	intf := pcapgo.NgInterface{Name: "pod", Description: description, LinkType: layers.LinkTypeEthernet, SnapLength: Snaplen, TimestampResolution: 9}
-	w, err := pcapgo.NewNgWriterInterface(out, intf, pcapgo.NgWriterOptions{SectionInfo: pcapgo.NgSectionInfo{Application: "asservat networkHeaders"}})
+	// The engine always hands over at least the header snaplen, so a frame
+	// still decodes (and classifies its transport) under a shorter raw cap.
+	snaplen, stored, application := Snaplen, Snaplen, "asservat networkHeaders"
+	if raw != nil {
+		snaplen, stored, application = max(raw.Max(), Snaplen), raw.Max(), "asservat rawPackets"
+	}
+	intf := pcapgo.NgInterface{Name: "pod", Description: description, LinkType: layers.LinkTypeEthernet, SnapLength: uint32(stored), TimestampResolution: 9}
+	w, err := pcapgo.NewNgWriterInterface(out, intf, pcapgo.NgWriterOptions{SectionInfo: pcapgo.NgSectionInfo{Application: application}})
 	if err != nil {
 		return nil, err
 	}
 	if err := w.Flush(); err != nil {
 		return nil, err
 	}
-	return &Recorder{filter: f, decoder: newDecoder(), out: out, w: w, started: started.UTC()}, nil
+	return &Recorder{filter: f, decoder: newDecoder(), out: out, w: w, started: started.UTC(), raw: raw, snaplen: snaplen}, nil
 }
+
+// Snaplen is the longest frame prefix the engine must hand over.
+func (r *Recorder) Snaplen() int { return r.snaplen }
 
 // Add processes one engine frame.
 func (r *Recorder) Add(frame []byte, wire uint32, at time.Time) {
@@ -109,6 +163,9 @@ func (r *Recorder) Add(frame []byte, wire uint32, at time.Time) {
 	case DropMalformed:
 		r.counters.Malformed++
 		return
+	}
+	if r.raw != nil {
+		n = min(len(frame), r.raw.cap(r.decoder.decoded[2]))
 	}
 	// An enhanced packet block is 32 bytes plus the data padded to 4.
 	block := 32 + (n+3)&^3
@@ -209,11 +266,13 @@ type HeadersCheck struct {
 }
 
 // NewHeadersCheck starts a check; Close returns its verdict.
-func NewHeadersCheck() *HeadersCheck {
+func NewHeadersCheck() *HeadersCheck { return newStreamCheck(CheckHeadersOnly) }
+
+func newStreamCheck(check func(io.Reader) (int, error)) *HeadersCheck {
 	r, w := io.Pipe()
 	c := &HeadersCheck{w: w, done: make(chan error, 1)}
 	go func() {
-		n, err := CheckHeadersOnly(r)
+		n, err := check(r)
 		c.n = n
 		_, _ = io.Copy(io.Discard, r)
 		c.done <- err
@@ -234,3 +293,90 @@ func (c *HeadersCheck) Close() error {
 
 // Packets is the number of packets checked; valid after Close.
 func (c *HeadersCheck) Packets() int { return c.n }
+
+// ErrRawOverCap is a raw PCAPNG frame longer than its approved cap.
+var ErrRawOverCap = errors.New("raw packet capture exceeds its approved prefix caps")
+
+// CheckRaw is the verifier's recheck of a rawPackets PCAPNG (ADR-279),
+// independently of the node: Ethernet interfaces with a snapshot length of at
+// most limits.Max(); every packet at most its original length and at most the
+// cap of its decoded transport (a prefix cut inside its headers, at most
+// limits.Max()). It returns the packet count.
+func CheckRaw(src io.Reader, limits RawLimits) (int, error) {
+	if !limits.valid() {
+		return 0, ErrRawOverCap
+	}
+	r, err := pcapgo.NewNgReader(src, pcapgo.NgReaderOptions{ErrorOnMismatchingLinkType: true})
+	if err != nil {
+		return 0, ErrRawOverCap
+	}
+	count := 0
+	for {
+		data, ci, err := r.ReadPacketData()
+		if errors.Is(err, io.EOF) {
+			return count, nil
+		}
+		if err != nil || r.LinkType() != layers.LinkTypeEthernet || len(data) != ci.CaptureLength || len(data) > limits.Max() || ci.CaptureLength > ci.Length {
+			return count, ErrRawOverCap
+		}
+		for i := 0; i < r.NInterfaces(); i++ {
+			intf, err := r.Interface(i)
+			if err != nil || intf.LinkType != layers.LinkTypeEthernet || intf.SnapLength == 0 || intf.SnapLength > uint32(limits.Max()) {
+				return count, ErrRawOverCap
+			}
+		}
+		if c, ok := rawFrameCap(data, limits); !ok || len(data) > c {
+			return count, ErrRawOverCap
+		}
+		count++
+	}
+}
+
+// rawFrameCap classifies a stored raw frame from its own Ethernet and IP
+// header bytes, as the recorder retained it: the cap of its transport as soon
+// as the IP header names it; a frame too short to name it fits the smallest
+// effective cap (caps are byte budgets, header bytes included). A frame the
+// recorder never retains (another ethertype, a fragment, IPv6 extension
+// headers or another transport) is refused.
+func rawFrameCap(b []byte, l RawLimits) (int, bool) {
+	smallest := min(l.cap(layers.LayerTypeTCP), l.cap(layers.LayerTypeUDP), l.cap(layers.LayerTypeICMPv4))
+	if len(b) < 14 {
+		return smallest, true
+	}
+	var proto byte
+	switch uint16(b[12])<<8 | uint16(b[13]) {
+	case 0x0800:
+		if len(b) < 24 {
+			return smallest, true
+		}
+		if (uint16(b[20])<<8|uint16(b[21]))&0x3fff != 0 {
+			return 0, false // more-fragments flag or a fragment offset
+		}
+		if proto = b[23]; proto == 58 {
+			return 0, false
+		}
+	case 0x86dd:
+		if len(b) < 21 {
+			return smallest, true
+		}
+		if proto = b[20]; proto == 1 {
+			return 0, false
+		}
+	default:
+		return 0, false
+	}
+	switch proto {
+	case 6:
+		return l.cap(layers.LayerTypeTCP), true
+	case 17:
+		return l.cap(layers.LayerTypeUDP), true
+	case 1, 58:
+		return l.cap(layers.LayerTypeICMPv4), true
+	}
+	return 0, false
+}
+
+// NewRawCheck is the streaming form of CheckRaw (see NewHeadersCheck).
+func NewRawCheck(limits RawLimits) *HeadersCheck {
+	return newStreamCheck(func(r io.Reader) (int, error) { return CheckRaw(r, limits) })
+}

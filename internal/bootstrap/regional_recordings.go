@@ -327,7 +327,7 @@ func (p *preparedRecording) StartRecording(ctx context.Context, pin artifact.Pin
 	// The legacy operation carries no committed input permit. Refuse before
 	// transferring prepared ownership; only the future typed policy start may
 	// carry a current exact source and the original SQL observation reservation.
-	if r := p.expectation.Recording; r != nil && r.Filter != nil && compiler.RawBytePredicate(r.Filter.Expression) {
+	if compiler.MeteredRecording(p.expectation.Recording) {
 		return time.Time{}, value.ErrUnavailable
 	}
 	p.mu.Lock()
@@ -355,7 +355,7 @@ func (p *preparedRecording) StartPolicyRecording(ctx context.Context, pin artifa
 	h, e := p.holder, p.expectation
 	r, b := e.Recording, permit.Binding
 	now := h.now()
-	if ctx == nil || ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || started.After(now) || started.Before(permit.StartedAt) || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID || source.PodUID != e.PodUID || r == nil || !r.Valid() || r.Filter == nil || !compiler.RawBytePredicate(r.Filter.Expression) || b.CaptureID != e.CaptureUID || b.ActionID != e.ActionID || b.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch || b.ExpectationDigest != [32]byte(evidence.ContextExpectationDigest(e)) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || permit.SessionUntil.After(e.Registration.WriteUntil) {
+	if ctx == nil || ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || started.After(now) || started.Before(permit.StartedAt) || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID || source.PodUID != e.PodUID || !r.Valid() || !compiler.MeteredRecording(r) || b.CaptureID != e.CaptureUID || b.ActionID != e.ActionID || b.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch || b.ExpectationDigest != [32]byte(evidence.ContextExpectationDigest(e)) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || permit.SessionUntil.After(e.Registration.WriteUntil) {
 		return time.Time{}, value.ErrDenied
 	}
 	work := collector.PacketCapture{CaptureID: e.CaptureUID, PodUID: e.PodUID, Duration: permit.Duration, MaxBytes: r.MaxBytes, Observation: &permit}
@@ -364,6 +364,12 @@ func (p *preparedRecording) StartPolicyRecording(ctx context.Context, pin artifa
 		work.Program[i] = planning.BPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
 	}
 	work.ProgramDigest = [32]byte(compiler.FilterProgramDigest(work.Program))
+	if r.Profile == "rawPackets" {
+		work.Raw = &collector.RawPrefix{Snaplen: r.Snaplen}
+		if c := r.ProtocolSnaplen; c != nil {
+			work.Raw.TCP, work.Raw.UDP, work.Raw.ICMP = c.TCP, c.UDP, c.ICMP
+		}
+	}
 	if work.ProgramDigest != b.ProgramDigest || packets.CheckPrefixProgram(work.Program) != nil || !work.Valid() {
 		return time.Time{}, value.ErrDenied
 	}

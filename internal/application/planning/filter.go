@@ -51,6 +51,13 @@ func RawBytePredicate(expression string) bool {
 	return strings.ContainsAny(expression, "[]")
 }
 
+// MeteredRecording reports a recording that starts only under a finite
+// observation permit: a raw byte predicate (ADR-261) or kept payload
+// prefixes (ADR-279). Both always carry a compiled filter.
+func MeteredRecording(r *artifact.Recording) bool {
+	return r != nil && r.Filter != nil && (r.Profile == "rawPackets" || RawBytePredicate(r.Filter.Expression))
+}
+
 // ScreenFilter enforces the REQ-NET-001 bounds before compilation: at most
 // 4,096 bytes and 256 syntax tokens of printable ASCII and no name that
 // libpcap would resolve. A raw byte comparison passes screening; the

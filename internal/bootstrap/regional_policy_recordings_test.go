@@ -39,6 +39,12 @@ func TestPolicyRecordingHolderPinsFrozenProgramAndOriginalPermit(t *testing.T) {
 		change func(*collector.ObservationPermit, *artifact.ContextExpectation, *targets.PacketSourceObservation)
 	}{
 		{"valid", func(*collector.ObservationPermit, *artifact.ContextExpectation, *targets.PacketSourceObservation) {}},
+		// ADR-279: a manual rawPackets recording queues its accepted caps.
+		{"raw", func(p *collector.ObservationPermit, e *artifact.ContextExpectation, _ *targets.PacketSourceObservation) {
+			e.Recording.Profile, e.Recording.Snaplen, e.Recording.ProtocolSnaplen = "rawPackets", 96, &artifact.RecordingProtocolSnaplen{TCP: 200}
+			e.Recording.Filter.Expression = "tcp port 8080"
+			p.Binding.ExpectationDigest = [32]byte(evidence.ContextExpectationDigest(*e))
+		}},
 		{"program", func(p *collector.ObservationPermit, _ *artifact.ContextExpectation, _ *targets.PacketSourceObservation) {
 			p.Binding.ProgramDigest = [32]byte{9}
 		}},
@@ -67,7 +73,7 @@ func TestPolicyRecordingHolderPinsFrozenProgramAndOriginalPermit(t *testing.T) {
 			keys := &objectstore.PreparedArtifact{}
 			p := h.Prepare(keys, current)
 			queued, err := p.StartPolicyRecording(t.Context(), artifact.PinnedPod{UID: e.PodUID, NamespaceUID: e.NamespaceUID}, now, now.Add(time.Second), s, receipt)
-			if test.name != "valid" {
+			if test.name != "valid" && test.name != "raw" {
 				if err == nil || nodes.expected != 0 || len(nodes.work) != 0 || p.prepared != keys {
 					t.Fatalf("refusal consumed keys or queued: %v/%d", err, nodes.expected)
 				}
@@ -78,7 +84,13 @@ func TestPolicyRecordingHolderPinsFrozenProgramAndOriginalPermit(t *testing.T) {
 				t.Fatal("typed queue", queued, err, nodes.expected)
 			}
 			work := nodes.work[0]
-			if work.Packet.Observation == nil || *work.Packet.Observation != original || !work.NotAfter.Equal(original.StartBy) {
+			if test.name == "raw" {
+				if work.Packet.Raw == nil || *work.Packet.Raw != (collector.RawPrefix{Snaplen: 96, TCP: 200}) || *work.Packet.Observation != receipt {
+					t.Fatal("raw caps", work.Packet.Raw)
+				}
+				return
+			}
+			if work.Packet.Raw != nil || work.Packet.Observation == nil || *work.Packet.Observation != original || !work.NotAfter.Equal(original.StartBy) {
 				t.Fatal("permit or cutoff changed", work)
 			}
 			if _, err = p.StartPolicyRecording(t.Context(), artifact.PinnedPod{UID: e.PodUID, NamespaceUID: e.NamespaceUID}, now, now.Add(time.Second), source, original); err == nil || nodes.expected != 1 {

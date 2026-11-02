@@ -242,3 +242,82 @@ func FuzzHeaderLength(f *testing.F) {
 		}
 	})
 }
+
+// ADR-279: a raw recording keeps each retained frame's prefix up to its
+// transport's cap (Snaplen otherwise), and the verifier rechecks those caps.
+func TestRawRecorderKeepsCappedPrefixes(t *testing.T) {
+	start := time.Unix(1_800_000_000, 0).UTC()
+	all := []value.BPFInstruction{{Code: 0x06, K: 0xffff}}
+	limits := RawLimits{Snaplen: 60, TCP: 100}
+	if _, err := NewRawRecorder(nil, 8192, start, "synthetic", limits); err == nil {
+		t.Fatal("raw recorder without a filter")
+	}
+	r, err := NewRawRecorder(all, 8192, start, "synthetic", limits)
+	if err != nil || r.Snaplen() != Snaplen {
+		t.Fatal(err, r.Snaplen())
+	}
+	c := corpus(t)
+	for _, name := range []string{"tcp4", "udp6", "icmp4", "arp"} {
+		r.Add(c[name], uint32(len(c[name])), start)
+	}
+	out, counters, err := r.Close(start.Add(time.Second), 0)
+	if err != nil || counters.Retained != 3 || counters.Unsupported != 1 {
+		t.Fatalf("%+v %v", counters, err)
+	}
+	rd, err := pcapgo.NewNgReader(bytes.NewReader(out), pcapgo.DefaultNgReaderOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []int{100, 60, 60} {
+		data, ci, err := rd.ReadPacketData()
+		if err != nil || len(data) != want || ci.Length <= want {
+			t.Fatal(len(data), want, ci, err)
+		}
+	}
+	if !bytes.Contains(out, []byte(marker[:8])) {
+		t.Fatal("tcp payload prefix missing")
+	}
+	if n, err := CheckRaw(bytes.NewReader(out), limits); err != nil || n != 3 {
+		t.Fatal("raw check", n, err)
+	}
+	if _, err := CheckRaw(bytes.NewReader(out), RawLimits{Snaplen: 60, UDP: 100}); err == nil {
+		t.Fatal("tcp prefix over its cap accepted")
+	}
+	if _, err := CheckHeadersOnly(bytes.NewReader(out)); err == nil {
+		t.Fatal("raw capture passed the headers-only check")
+	}
+	// Frames the recorder never retains cannot pass with up to Max bytes, nor
+	// can a frame whose claimed IP options would hide bytes past its cap.
+	opts := append([]byte(nil), c["tcp4"]...)
+	opts[14] = 0x4f // IHL 60 bytes: the "options" are the TCP header and payload
+	c["ihl"] = opts
+	strict := RawLimits{Snaplen: 40, UDP: 100}
+	stored := func(name string, n int) []byte {
+		var buf bytes.Buffer
+		w, err := pcapgo.NewNgWriterInterface(&buf, pcapgo.NgInterface{LinkType: layers.LinkTypeEthernet, SnapLength: 100, TimestampResolution: 9}, pcapgo.DefaultNgWriterOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data := c[name][:min(len(c[name]), n)]
+		if err = w.WritePacket(gopacket.CaptureInfo{Timestamp: start, CaptureLength: len(data), Length: len(c[name])}, data); err != nil || w.Flush() != nil {
+			t.Fatal(err)
+		}
+		return buf.Bytes()
+	}
+	if n, err := CheckRaw(bytes.NewReader(stored("tcp4", 23)), strict); err != nil || n != 1 {
+		t.Fatal("frame too short to name its transport refused within the smallest cap", err)
+	}
+	// Caps are byte budgets: a short frame still fits the smallest cap, and a
+	// header-only UDP frame fits the UDP cap, not its own length.
+	if _, err := CheckRaw(bytes.NewReader(stored("tcp4", 30)), RawLimits{Snaplen: 20, UDP: 100}); err == nil {
+		t.Fatal("30-byte frame accepted under a 20-byte TCP cap")
+	}
+	if _, err := CheckRaw(bytes.NewReader(stored("udp6", 53)), RawLimits{Snaplen: 100, UDP: 20}); err == nil {
+		t.Fatal("53-byte IPv6/UDP header-only frame accepted under a 20-byte UDP cap")
+	}
+	for _, name := range []string{"fragment", "arp", "gre", "hopbyhop", "ihl"} {
+		if _, err := CheckRaw(bytes.NewReader(stored(name, 74)), strict); err == nil {
+			t.Fatal(name, "accepted in a raw capture")
+		}
+	}
+}
