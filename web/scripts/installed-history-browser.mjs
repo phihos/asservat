@@ -74,6 +74,13 @@ try {
       await page.waitForTimeout(2000);
       continue;
     }
+    // ParametersUnavailable is the product's retryable answer when the saved
+    // settings could not be read this time (a regional exchange failed).
+    if (attempt < 3 && previewResponse && (await readInstalledHistoryResponse(previewResponse)).reply?.data?.code === 'ParametersUnavailable') {
+      process.stderr.write(`installed history preview_capture ParametersUnavailable attempt=${attempt}; retrying\n`);
+      await page.waitForTimeout(2000);
+      continue;
+    }
     preview = await readOperation('preview_capture', previewResponse);
     break;
   }
