@@ -875,16 +875,26 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 func installedMixedDownload(t *testing.T, ctx context.Context, transport http.RoundTripper, identity *installedIdentity, origin, artifactID, key string, invoke func(string, any) (installedJourneyEnvelope, string), read func(string, any, any), diagnose func()) ([]byte, string) {
 	t.Helper()
 	var download installedJourneyDownload
-	reply, code := invoke("prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": key})
-	if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &download) != nil {
-		diagnose()
-		t.Fatal("mixed download preparation failed", code)
+	// As in the main flow: preparation is an effect, so only the server's
+	// continuation flag permits another exact same-key prepare.
+	prepare := func() {
+		t.Helper()
+		reply, code := invoke("prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": key})
+		if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &download) != nil {
+			diagnose()
+			t.Fatal("mixed download preparation failed", code)
+		}
 	}
-	for until := time.Now().Add(time.Minute); download.State == "Preparing" && time.Now().Before(until); {
+	prepare()
+	for until := time.Now().Add(3 * time.Minute); download.State == "Preparing" && time.Now().Before(until); {
 		if err := installedJourneyPause(ctx, 2*time.Second); err != nil {
 			t.Fatal(err)
 		}
-		read("get_artifact_download", map[string]string{"download_id": download.DownloadID}, &download)
+		if download.ContinuePreparation {
+			prepare()
+		} else {
+			read("get_artifact_download", map[string]string{"download_id": download.DownloadID}, &download)
+		}
 	}
 	if download.State != "Ready" || download.SizeBytes == nil {
 		diagnose()
