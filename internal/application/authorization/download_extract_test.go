@@ -3,6 +3,7 @@ package authorization
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func extractDownload(f *downloadAuthorityFixture) {
@@ -47,5 +48,27 @@ func TestContextDownloadAuthorityExtractRefusesShareRecipient(t *testing.T) {
 	extractDownload(f)
 	if _, err := s.CheckDownload(context.Background(), "synthetic-token", scope); err == nil || f.environmentReads != 0 {
 		t.Fatal("share admitted an extract", err)
+	}
+}
+
+// A response-owned ordinary entitlement serves later checks of the same
+// extract download (the native transfer checks per window).
+func TestDownloadResponseReusesExtractEntitlement(t *testing.T) {
+	f, s, scope := newDownloadAuthorityFixture()
+	extractDownload(f)
+	owner, err := s.NewDownloadResponse(t.Context(), scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer owner.Close()
+	current := credentialIdentity{f, "synthetic"}
+	start := f.now
+	currentDownloadResponseFacts(f, start)
+	if _, err = owner.CheckDownloadCurrent(t.Context(), current, scope); err != nil {
+		t.Fatal("first extract check", err)
+	}
+	currentDownloadResponseFacts(f, start.Add(time.Second))
+	if _, err = owner.CheckDownloadCurrent(t.Context(), current, scope); err != nil {
+		t.Fatal("second extract check of the same response", err)
 	}
 }

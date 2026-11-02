@@ -130,7 +130,7 @@ func (d *downloadEntitlement) sameIdentity(i identity.Identity) bool {
 }
 
 func (d *downloadEntitlement) evaluate(i identity.Identity, scope artifact.DownloadScope, retained value.Retained, now time.Time) value.Result {
-	if !d.current(now) || !i.Valid(now) || !d.sameIdentity(i) || scope != d.scope || retained.ArtifactID != scope.ArtifactID || retained.Target != (value.Target{ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID}) || retained.DataClass != "metadata" || !now.Before(retained.ExpiresAt) {
+	if !d.current(now) || !i.Valid(now) || !d.sameIdentity(i) || scope != d.scope || retained.ArtifactID != scope.ArtifactID || retained.Target != (value.Target{ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID}) || retained.DataClass != "metadata" && retained.DataClass != "extract" || !now.Before(retained.ExpiresAt) {
 		return value.Result{}
 	}
 	audience := slices.Clone(retained.Audience)

@@ -791,7 +791,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	if dispositionErr != nil || disposition["filename"] != "artifact-"+evidence.Artifacts[0].ID+extension {
 		response.Body.Close()
-		t.Fatal("native download lacks its PCAPNG filename", dispositionErr)
+		t.Fatal("native download lacks its PCAPNG filename", response.StatusCode, dispositionErr)
 	}
 	native, err := io.ReadAll(io.LimitReader(response.Body, artifact.RecordingNativeLimit+1))
 	response.Body.Close()
