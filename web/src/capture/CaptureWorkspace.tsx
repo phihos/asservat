@@ -6,6 +6,7 @@ import type { Data, HistoryEntry, Input, Preview, Progress, Target } from './htt
 import { captureIDFromPath } from '../routes';
 import { WhyAccess } from '../access/WhyAccess';
 import { RecipientsEditor } from '../sharing/SharePanel';
+import { ProfileCatalog } from './ProfileCatalog';
 const RecordingsPanel = lazy(() => import('../recordings/RecordingsPanel').then(module => ({ default: module.RecordingsPanel })));
 
 const phases: Record<Progress['phase'], string> = {
@@ -184,6 +185,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         {diagnostic.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
         <Button className="button" isDisabled={state.busy || diagnostic.preset_ref?.name !== 'pod-status'} onPress={() => void controller.preview(diagnostic)}>{state.busy ? 'Preparing review…' : 'Review collection'}</Button>
       </article>)}
+      <ProfileCatalog session={session} scope={scope} target={draft.target} busy={state.busy} client={controller.client} onPreview={composition => void controller.previewComposition(composition)}/>
       <Button className="button secondary" isDisabled={state.busy} onPress={controller.showRecordings}>Save existing recordings now</Button>
       <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Change target</Button>
       <RecentCaptures state={state} controller={controller}/>

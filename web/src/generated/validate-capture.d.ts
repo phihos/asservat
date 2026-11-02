@@ -16,3 +16,7 @@ export declare function validInput_list_capture_history(value: unknown): value i
 export declare function validOutput_list_capture_history(value: unknown): value is components['schemas']['McpOutput_list_capture_history'];
 export declare function validInput_get_capture_settings(value: unknown): value is components['schemas']['McpInput_get_capture_settings'];
 export declare function validOutput_get_capture_settings(value: unknown): value is components['schemas']['McpOutput_get_capture_settings'];
+export declare function validInput_list_capture_profiles(value: unknown): value is components['schemas']['McpInput_list_capture_profiles'];
+export declare function validOutput_list_capture_profiles(value: unknown): value is components['schemas']['McpOutput_list_capture_profiles'];
+export declare function validInput_get_capture_profile(value: unknown): value is components['schemas']['McpInput_get_capture_profile'];
+export declare function validOutput_get_capture_profile(value: unknown): value is components['schemas']['McpOutput_get_capture_profile'];

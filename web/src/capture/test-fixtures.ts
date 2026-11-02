@@ -47,9 +47,19 @@ export function repeatedPreviewResult(from: string): Output<'preview_capture'> {
   (value.data as { repeated_from_capture_id?: string }).repeated_from_capture_id = from;
   return value;
 }
+const builtin = (name: string) => JSON.parse(readFileSync(new URL('../../../internal/application/planning/profiles/' + name + '-v1.json', import.meta.url), 'utf8'));
+export function profilesResult(): Output<'list_capture_profiles'> {
+  return result<'list_capture_profiles'>({ profiles: ['network-connections', 'syscall-activity'].map(name => ({ profile_ref: { catalog: 'builtin', name, version: 'v1' }, display_name: builtin(name).definition.displayName, description: builtin(name).definition.description,
+    available: true, deprecated: false, approval_required: false, blockers: [], execution_modes: ['onTrigger', 'ongoing'] })) });
+}
+export function profileResult(name = 'network-connections'): Output<'get_capture_profile'> {
+  const value = result<'get_capture_profile'>({ profile_ref: { catalog: 'builtin', name, version: 'v1' }, definition_digest: 'a'.repeat(64), definition: builtin(name).definition });
+  (value as { data_class: string }).data_class = 'extract';
+  return value;
+}
 export class SyntheticOperations implements Operations {
   calls: { name: Operation; input: unknown; signal: AbortSignal; csrf: string }[] = [];
-  responder: (name: Operation) => unknown | Promise<unknown> = name => ({ list_diagnostics: catalogResult, preview_capture: previewResult, request_capture: acceptedResult, resolve_capture_request: resolvedClosedResult, get_capture: progressResult, cancel_capture: () => result<'cancel_capture'>({ capture_id: id(8), revision: 2, phase: 'Running', cancellation_requested: true, navigation_uri: 'https://asservat.invalid/captures/' + id(8) }), list_capture_history: () => historyResult(), get_capture_settings: () => settingsResult() })[name]();
+  responder: (name: Operation) => unknown | Promise<unknown> = name => ({ list_diagnostics: catalogResult, preview_capture: previewResult, request_capture: acceptedResult, resolve_capture_request: resolvedClosedResult, get_capture: progressResult, cancel_capture: () => result<'cancel_capture'>({ capture_id: id(8), revision: 2, phase: 'Running', cancellation_requested: true, navigation_uri: 'https://asservat.invalid/captures/' + id(8) }), list_capture_history: () => historyResult(), get_capture_settings: () => settingsResult(), list_capture_profiles: profilesResult, get_capture_profile: profileResult })[name]();
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), signal, csrf });
     return await this.responder(name) as Output<N>;
