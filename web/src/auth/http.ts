@@ -22,15 +22,16 @@ export async function authRequest(path: '/auth/csrf' | '/auth/refresh' | '/auth/
       // On logout this response guarantees rejection before local revocation.
       if (response.status === 409 && response.headers.get('Retry-After') === '1' && response.headers.get('Content-Type')?.split(';')[0].trim() === 'application/problem+json' && response.body) {
         const reader = response.body.getReader();
+    let complete = false; // cancel only an unfinished read: cancelling a finished stream can abort the request
         const chunks: Uint8Array[] = []; let total = 0;
         try {
           for (;;) {
-            const { done, value } = await reader.read(); if (done) break;
+            const { done, value } = await reader.read(); if (done) { complete = true; break; }
             total += value.length;
             if (total > 1024 || timeout.signal.aborted) throw new SessionFailure(response.status);
             chunks.push(value);
           }
-        } finally { await reader.cancel(); reader.releaseLock(); }
+        } finally { if (!complete) await reader.cancel(); reader.releaseLock(); }
         if (timeout.signal.aborted) throw new SessionFailure(response.status);
         const bytes = new Uint8Array(total); let offset = 0;
         for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
@@ -49,17 +50,18 @@ export async function authRequest(path: '/auth/csrf' | '/auth/refresh' | '/auth/
       await response.body?.cancel(); throw new SessionFailure(502);
     }
     const reader = response.body.getReader();
+    let complete = false; // cancel only an unfinished read: cancelling a finished stream can abort the request
     const chunks: Uint8Array[] = [];
     let total = 0;
     try {
       for (;;) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) { complete = true; break; }
         total += value.length;
         if (total > 32_768 || timeout.signal.aborted) throw new SessionFailure(502);
         chunks.push(value);
       }
-    } finally { await reader.cancel(); reader.releaseLock(); }
+    } finally { if (!complete) await reader.cancel(); reader.releaseLock(); }
     if (timeout.signal.aborted) throw new SessionFailure(503);
     const bytes = new Uint8Array(total);
     let offset = 0;
