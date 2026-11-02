@@ -569,6 +569,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 	}
 	continuation := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"], "continue_acquisition": true}
+	resolution := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"]}
 	initialStoragePreview = preview.ID
 	initialCode := requestCapture(original)
 	// ADR-277: nothing was accepted while storage refreshed; the contract
@@ -583,7 +584,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	t.Logf("approved submission initial public code=%q", initialCode)
 	closed, err := installedJourneyRecoverCapture(ctx, initialCode, func() (installedJourneyDisposition, error) {
 		var disposition installedJourneyDisposition
-		read("resolve_capture_request", original, &disposition)
+		read("resolve_capture_request", resolution, &disposition)
 		t.Logf("approved submission resolution state=%q", disposition.State)
 		if disposition.State == "accepted" {
 			receipt.CaptureID = disposition.CaptureID
@@ -591,7 +592,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		return disposition, nil
 	}, func() (string, string) { code := requestCapture(continuation); return code, receipt.CaptureID }, func() error {
 		var disposition installedJourneyDisposition
-		read("resolve_capture_request", original, &disposition)
+		read("resolve_capture_request", resolution, &disposition)
 		if receipt.CaptureID == "" || disposition.State != "accepted" || disposition.CaptureID != receipt.CaptureID {
 			return errors.New("original approved request was not accepted once")
 		}
