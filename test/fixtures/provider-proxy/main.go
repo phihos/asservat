@@ -175,7 +175,8 @@ func postgres(raw net.Conn, backend string, config *tls.Config) {
 }
 
 // signals is the ADR-241 installed log/resource focus workload: on GET
-// /log?line=<text> it writes one synthetic line to stdout; on GET
+// /log?line=<text> it writes one synthetic line to stdout (with headers=1 it
+// also answers with response headers and closes the connection); on GET
 // /burn?seconds=<n> it keeps one CPU busy for n seconds (at most 300). It
 // reads no input besides these parameters and exits on SIGTERM.
 func signals() error {
@@ -190,6 +191,15 @@ func signals() error {
 			return
 		}
 		fmt.Fprintln(os.Stdout, line)
+		if r.URL.Query().Get("headers") == "1" {
+			// ADR-282 manual-http focus: close the connection after each
+			// response, and return a cookie that the header projection
+			// must drop.
+			w.Header().Set("Connection", "close")
+			w.Header().Set("Set-Cookie", "session="+line)
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			fmt.Fprint(w, "ok\n")
+		}
 	})
 	mux.HandleFunc("/burn", func(w http.ResponseWriter, r *http.Request) {
 		var seconds int

@@ -33,6 +33,12 @@ const (
 // manualRawProfileDefinition copies the builtin network-connections v1
 // definition with a rawPackets profile and sensitiveRead impact.
 func manualRawProfileDefinition() (map[string]any, error) {
+	return builtinNetworkDefinitionWith(map[string]any{"kind": "rawPackets", "snaplen": 96, "protocolSnaplen": []any{map[string]any{"protocol": "tcp", "bytes": manualRawTCPCap}}})
+}
+
+// builtinNetworkDefinitionWith copies the builtin network-connections v1
+// definition with the given packet profile and sensitiveRead impact.
+func builtinNetworkDefinitionWith(profile map[string]any) (map[string]any, error) {
 	raw, err := os.ReadFile("../../internal/application/planning/profiles/network-connections-v1.json")
 	if err != nil {
 		return nil, err
@@ -48,7 +54,7 @@ func manualRawProfileDefinition() (map[string]any, error) {
 		return nil, fmt.Errorf("builtin network profile has %d actions", len(actions))
 	}
 	action := actions[0].(map[string]any)
-	action["parameters"].(map[string]any)["profile"] = map[string]any{"kind": "rawPackets", "snaplen": 96, "protocolSnaplen": []any{map[string]any{"protocol": "tcp", "bytes": manualRawTCPCap}}}
+	action["parameters"].(map[string]any)["profile"] = profile
 	action["impact"] = "sensitiveRead"
 	return doc.Definition, nil
 }
@@ -84,6 +90,17 @@ func manualRawArguments(cluster, namespace, workload string) map[string]any {
 // own namespace catalog query; nothing here is authority.
 func publishManualRawProfile(t *testing.T, ctx context.Context, regionalConfig, namespace string) {
 	t.Helper()
+	definition, err := manualRawProfileDefinition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	publishNamespaceCaptureProfile(t, ctx, regionalConfig, namespace, manualRawProfileName, manualRawProfileVersion, definition)
+}
+
+// publishNamespaceCaptureProfile publishes one namespace CaptureProfile
+// version (applying the chart's CRD first when the cluster lacks it).
+func publishNamespaceCaptureProfile(t *testing.T, ctx context.Context, regionalConfig, namespace, name, version string, definition map[string]any) {
+	t.Helper()
 	cfg, err := clientcmd.BuildConfigFromFlags("", regionalConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -107,13 +124,9 @@ func publishManualRawProfile(t *testing.T, ctx context.Context, regionalConfig, 
 	if err := client.Post().AbsPath(crds).MaxRetries(0).Body(data).Do(call).Error(); err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatal("operator CaptureProfile CRD create", err)
 	}
-	definition, err := manualRawProfileDefinition()
-	if err != nil {
-		t.Fatal(err)
-	}
 	object := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "CaptureProfile",
-		"metadata": map[string]any{"name": manualRawProfileName + "." + manualRawProfileVersion},
-		"spec":     map[string]any{"name": manualRawProfileName, "version": manualRawProfileVersion, "definition": definition, "availability": map[string]any{"enabled": true, "deprecated": false}}}}
+		"metadata": map[string]any{"name": name + "." + version},
+		"spec":     map[string]any{"name": name, "version": version, "definition": definition, "availability": map[string]any{"enabled": true, "deprecated": false}}}}
 	resource := objects.Resource(schema.GroupVersionResource{Group: "asservat.io", Version: "v1alpha1", Resource: "captureprofiles"}).Namespace(namespace)
 	// A just-created CRD serves its resource shortly after Established; retry
 	// only the not-yet-served NotFound within the bounded call.

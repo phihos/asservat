@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/gadget"
+	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/packets"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -62,11 +63,11 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		r.Reason = collector.ReasonEngineUnavailable
 		return r
 	}
-	// ADR-282: the node HTTP projection follows in a later slice. Until it
-	// exists the item is refused before any frame is read; it never falls
-	// back to a raw or header recording.
-	if p.HTTP != nil {
-		r.Reason = collector.ReasonEngineUnavailable
+	// ADR-282: an HTTP header projection reads payload, so it runs only as
+	// a metered finite observation at the fixed engine snaplen; it never
+	// falls back to a raw or header recording.
+	if p.HTTP != nil && (p.Observation == nil || p.Raw == nil || p.Raw.Snaplen != httpheaders.Snaplen) {
+		r.Reason = collector.ReasonWorkUnknown
 		return r
 	}
 	var actual [32]byte
@@ -106,9 +107,11 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 		}
 	}
 	started := n.now().UTC()
-	var rec *packets.Recorder
+	var rec frameRecorder
 	var err error
-	if raw := p.Raw; raw != nil {
+	if h := p.HTTP; h != nil {
+		rec, err = newHTTPRecorder(p.Program, p.MaxBytes, started, *h)
+	} else if raw := p.Raw; raw != nil {
 		rec, err = packets.NewRawRecorder(p.Program, int(p.MaxBytes), started, "asservat rawPackets capture of one pod; frames cut at the approved prefix caps", packets.RawLimits{Snaplen: raw.Snaplen, TCP: raw.TCP, UDP: raw.UDP, ICMP: raw.ICMP})
 	} else {
 		rec, err = packets.NewRecorder(p.Program, int(p.MaxBytes), started, "asservat networkHeaders capture of one pod; frames cut at the transport header")
@@ -118,6 +121,9 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 			meter.Close()
 		}
 		r.Reason = collector.ReasonFilterUnsupported
+		if errors.Is(err, httpheaders.ErrInvalid) {
+			r.Reason = collector.ReasonWorkUnknown // limits below the parser's floors
+		}
 		return r
 	}
 	n.budgetMu.Lock()
@@ -175,11 +181,11 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 // within this time; the connector accepts it until startBy + duration + 30 s.
 const packetDeliveryGrace = 10 * time.Second
 
-func (n *nodePackets) run(ctx context.Context, epoch, workID string, p collector.PacketCapture, rec *packets.Recorder, started time.Time) {
+func (n *nodePackets) run(ctx context.Context, epoch, workID string, p collector.PacketCapture, rec frameRecorder, started time.Time) {
 	n.runObserved(ctx, epoch, workID, p, rec, started, nil)
 }
 
-func (n *nodePackets) runObserved(ctx context.Context, epoch, workID string, p collector.PacketCapture, rec *packets.Recorder, started time.Time, meter *LocalObservationGate) {
+func (n *nodePackets) runObserved(ctx context.Context, epoch, workID string, p collector.PacketCapture, rec frameRecorder, started time.Time, meter *LocalObservationGate) {
 	capture, cancel := context.WithTimeout(ctx, p.Duration)
 	var stats gadget.CaptureStats
 	var err error
@@ -214,7 +220,10 @@ func (n *nodePackets) runObserved(ctx context.Context, epoch, workID string, p c
 		Filtered: counters.Filtered, Unsupported: counters.Unsupported, Fragment: counters.Fragment, Extension: counters.Extension, Malformed: counters.Malformed,
 		OutputFull: counters.OutputFull, LostSamples: stats.LostSamples, WireBytes: counters.WireBytes, CapturedBytes: int64(len(out)), Snaplen: rec.Snaplen(),
 		EngineVersion: n.version, ProgramDigest: p.ProgramDigest}
-	if p.Raw != nil {
+	switch {
+	case p.HTTP != nil:
+		result.NativeType = artifact.HTTPHeadersArtifact
+	case p.Raw != nil:
 		result.NativeType = artifact.RawPCAPNGArtifact
 	}
 	switch {

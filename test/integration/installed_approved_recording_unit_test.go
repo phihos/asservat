@@ -1,11 +1,13 @@
 package integration
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/httpheaders"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -43,7 +45,7 @@ func TestInstalledApprovedRecordingFixtureShape(t *testing.T) {
 		clusters int
 		fast     bool
 	}{
-		{"approved-recording", 2, true}, {"manual-syscall", 2, true}, {"manual-mixed", 2, true}, {"manual-raw", 2, true}, {"policy-recording", 2, true}, {"ongoing-save", 2, true}, {"ongoing-incident", 2, true}, {"ongoing-syscall", 2, true}, {"ongoing-mixed", 2, true}, {"native-paced", 2, true}, {"journey", 2, true}, {"browser", 2, true},
+		{"approved-recording", 2, true}, {"manual-syscall", 2, true}, {"manual-mixed", 2, true}, {"manual-raw", 2, true}, {"manual-http", 2, true}, {"policy-recording", 2, true}, {"ongoing-save", 2, true}, {"ongoing-incident", 2, true}, {"ongoing-syscall", 2, true}, {"ongoing-mixed", 2, true}, {"native-paced", 2, true}, {"journey", 2, true}, {"browser", 2, true},
 		{"policy", 2, true}, {"alert", 2, true}, {"logresource", 2, true},
 		{"restart", 2, true}, {"upgrade", 2, true}, {"share", 2, true},
 		{"chain", 2, false}, {"clusters", 3, true}, {"", 3, false}, {"unknown", 3, false},
@@ -56,7 +58,7 @@ func TestInstalledApprovedRecordingFixtureShape(t *testing.T) {
 			if got := installedFastFixture(); got != tc.fast {
 				t.Fatalf("fast feature fixture=%v; want %v", got, tc.fast)
 			}
-			wantRecording := tc.focus == "approved-recording" || tc.focus == "manual-syscall" || tc.focus == "manual-mixed" || tc.focus == "manual-raw" || tc.focus == "native-paced" || tc.focus == "policy-recording" || tc.focus == "ongoing-save" || tc.focus == "ongoing-incident" || tc.focus == "ongoing-syscall" || tc.focus == "ongoing-mixed"
+			wantRecording := tc.focus == "approved-recording" || tc.focus == "manual-syscall" || tc.focus == "manual-mixed" || tc.focus == "manual-raw" || tc.focus == "manual-http" || tc.focus == "native-paced" || tc.focus == "policy-recording" || tc.focus == "ongoing-save" || tc.focus == "ongoing-incident" || tc.focus == "ongoing-syscall" || tc.focus == "ongoing-mixed"
 			if got := installedRecordingFocus(); got != wantRecording {
 				t.Fatalf("recording focus parent-return guard=%v; want %v", got, wantRecording)
 			}
@@ -216,6 +218,97 @@ func TestInstalledManualRawRequestCompiles(t *testing.T) {
 	}
 }
 
+// ADR-282 manual-http focus: the public request is valid, and the published
+// namespace definition compiles through the actual planner (synthetic facts,
+// test filter compiler; no capture) into an acceptable HTTP header recording
+// with extract approval, observation limits and the reviewed parser bounds.
+func TestInstalledManualHTTPRequestCompiles(t *testing.T) {
+	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "manual-http")
+	const cluster = "00000000-0000-4000-8000-000000000001"
+	input := approvedRecordingArguments(cluster, "payments", "api")
+	raw, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wire, err := contracts.NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := wire.ValidateInput("preview_capture", raw); err != nil {
+		t.Fatal("manual HTTP request is not a public capture input", err)
+	}
+	definition, err := manualHTTPProfileDefinition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	document, err := json.Marshal(map[string]any{"name": manualHTTPProfileName, "version": manualHTTPProfileVersion, "definition": definition})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compositionJSON, _ := json.Marshal(input["profile_composition"])
+	var public presentation.CompositionInput
+	if err := json.Unmarshal(compositionJSON, &public); err != nil {
+		t.Fatal(err)
+	}
+	ref := planvalue.ProfileRef{Catalog: "namespace", Name: manualHTTPProfileName, Version: manualHTTPProfileVersion}
+	resolved := planvalue.ProfileComposition{MaxTotalBytes: public.MaxTotalBytes, MaxDuration: public.MaxDuration,
+		Resolved: []planvalue.CatalogProfile{{Ref: ref, SourceClusterID: cluster, SourceNamespaceUID: "namespace", SourceUID: "http-capture-uid", Document: document, Enabled: true}}}
+	for _, c := range public.Components {
+		component := planvalue.ProfileComponent{ID: c.ID, Profile: planvalue.ProfileRef{Catalog: c.ProfileRef.Catalog, Name: c.ProfileRef.Name, Version: c.ProfileRef.Version}}
+		for _, o := range c.Overrides {
+			edit := planvalue.ProfileEdit{ActionID: o.ActionID, Field: o.Field}
+			if err := json.Unmarshal(o.Value, &edit.Text); err != nil {
+				t.Fatal("HTTP override", o.Field, err)
+			}
+			component.Edits = append(component.Edits, edit)
+		}
+		resolved.Components = append(resolved.Components, component)
+	}
+	if len(resolved.Components) != 1 || resolved.Components[0].Profile != ref {
+		t.Fatal("HTTP request does not reference the namespace profile", resolved.Components)
+	}
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	target := targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: targets.Request{ClusterID: cluster, Namespace: configuration.NamespaceRef{Name: "payments", UID: "namespace"}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload"}, PodName: "api-a", PodUID: "pod"}, Pin: artifact.PinnedPod{Namespace: "payments", NamespaceUID: "namespace", Name: "api-a", UID: "pod", ControllerUID: "replicaset"}, PodResourceVersion: "1", WorkloadResourceVersion: "2", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	retention, err := privacy.Resolve(privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "policies", Generation: 1, Digest: artifact.Digest{1}}, Complete: true, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: artifact.Digest{2}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 600, MaximumSeconds: 3600, DeletionBudgetSeconds: 10}}}, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", RequestedSeconds: 600, AnchorAt: now}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := compiler.CompileRecorder(planvalue.RecorderInput{CaptureID: cluster, Executor: identity.Principal{Issuer: "https://identity.example.test", Subject: "requester", ClientID: "console", Kind: identity.Human}, Target: target, Composition: resolved, Retention: retention, Deadline: now.Add(time.Minute), NodeRecorder: true, RequireApproval: true}, recordingCompiler{}, now)
+	if err != nil {
+		t.Fatal("HTTP request cannot compile through the actual planner", err)
+	}
+	if _, ok := input["result_access"]; ok {
+		t.Fatal("HTTP request carries result_access")
+	}
+	if plan.Approval == nil || plan.Approval.DataClass != "extract" || plan.Approval.ObservationLimits == nil || !compiler.AcceptableRecorder(plan).Acceptable() {
+		t.Fatal("HTTP plan lacks extract approval/observation limits or is unacceptable", plan.Approval, compiler.AcceptableRecorder(plan))
+	}
+	t.Logf("HTTP observation limits %+v", *plan.Approval.ObservationLimits)
+	recording, _, err := compiler.RecordingFor(plan)
+	l := manualHTTPLimits()
+	want := artifact.RecordingHTTP{MaxFlows: l.MaxFlows, MaxHeaderBytes: l.MaxHeaderBytes, MaxFlowBytes: l.MaxFlowBytes, MaxTotalBytes: l.MaxTotalBytes, IdleMillis: l.IdleTimeout.Milliseconds()}
+	if err != nil || recording.Profile != "httpHeaders" || recording.Snaplen != httpheaders.Snaplen || recording.HTTP == nil || *recording.HTTP != want || recording.ProtocolSnaplen != nil || recording.DurationMillis != 5000 || recording.MaxBytes > artifact.RecordingNativeLimit || recording.Filter == nil || !recording.RequireApproval {
+		t.Fatalf("HTTP recording %+v %v", recording, err)
+	}
+	// The executor recompiles the accepted recording from its frozen
+	// composition and program (api_context Check/Compile).
+	frozen, err := compiler.RecorderContextFor(&recording)
+	if err != nil {
+		t.Fatal("frozen HTTP recorder context", err)
+	}
+	capability := planvalue.ContextCapability{ExecutionClass: artifact.ContextAPIExecution, Enabled: true, Revision: identity.Revision{UID: "ceiling", Generation: 1, Digest: artifact.Digest{1}}, CollectorVersion: "v1", CollectorImageDigest: artifact.Digest{2}, ProjectionDigest: compiler.ProjectionDigest(), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	// Catalog documents are never persisted (REQ-CPR-001): the executor's
+	// Profiles port reads the pinned namespace version again for each start.
+	executor := planvalue.ContextInput{CaptureID: cluster, Executor: identity.Principal{Issuer: "https://identity.example.test", Subject: "requester", ClientID: "console", Kind: identity.Human}, Deadline: now.Add(time.Minute), Target: target, Capability: capability, Retention: retention, Recorder: frozen}
+	if _, err := compiler.CompileContext(executor, now); err == nil {
+		t.Fatal("recompiled a namespace profile without reading it")
+	}
+	frozen.Composition.Resolved = resolved.Resolved
+	if _, err := compiler.CompileContext(planvalue.ContextInput{CaptureID: cluster, Executor: identity.Principal{Issuer: "https://identity.example.test", Subject: "requester", ClientID: "console", Kind: identity.Human}, Deadline: now.Add(time.Minute), Target: target, Capability: capability, Retention: retention, Recorder: frozen}, now); err != nil {
+		t.Fatal("executor cannot recompile the accepted HTTP recording", err)
+	}
+}
+
 // The tshark gate of the manual-raw focus on synthetic field lines.
 func TestInstalledManualRawPacketFields(t *testing.T) {
 	for _, tc := range []struct {
@@ -231,6 +324,51 @@ func TestInstalledManualRawPacketFields(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, err := checkManualRawFields(tc.out); (err == nil) != tc.ok {
+				t.Fatal(tc.name, err)
+			}
+		})
+	}
+}
+
+// The projection gate of the manual-http focus on synthetic projections.
+func TestInstalledManualHTTPProjectionFields(t *testing.T) {
+	l := manualHTTPLimits()
+	start := time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
+	projection := func(records ...httpheaders.Record) httpheaders.Projection {
+		p := httpheaders.Projection{Format: artifact.HTTPHeadersFormat, Protocol: "http1", StartedAt: start, EndedAt: start.Add(5 * time.Second), Records: records,
+			Limits: httpheaders.LimitsRecord{MaxFlows: l.MaxFlows, MaxHeaderBytes: l.MaxHeaderBytes, MaxFlowBytes: l.MaxFlowBytes, MaxTotalBytes: l.MaxTotalBytes, IdleTimeoutSeconds: 30, Snaplen: httpheaders.Snaplen}}
+		p.Counters.Records = uint64(len(records))
+		return p
+	}
+	encode := func(p httpheaders.Projection) []byte {
+		b, err := p.Encode()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	answered := httpheaders.Record{Timestamp: start.Add(time.Second), Method: "GET", Status: 200, Headers: []httpheaders.Header{{Name: "content-type", Value: "text/plain; charset=utf-8"}, {Name: "content-length", Value: "3"}}}
+	good := encode(projection(answered))
+	otherProtocol := projection(answered)
+	otherProtocol.Protocol = "http2"
+	otherLimits := projection(answered)
+	otherLimits.Limits.MaxFlows = 1
+	for _, tc := range []struct {
+		name string
+		doc  []byte
+		ok   bool
+	}{
+		{"answered GET", good, true},
+		{"no records", encode(projection()), false},
+		{"partial only", encode(projection(httpheaders.Record{Timestamp: start.Add(time.Second), Method: "GET", Headers: []httpheaders.Header{}, Partial: true})), false},
+		{"other protocol", encode(otherProtocol), false},
+		{"other limits", encode(otherLimits), false},
+		{"unknown field", append(good[:len(good)-1:len(good)-1], []byte(`,"cookie":"x"}`)...), false},
+		{"trailing data", append(append([]byte(nil), good...), []byte(" {}")...), false},
+		{"marker", bytes.Replace(good, []byte(`"text/plain`), []byte(`"`+manualHTTPMarker), 1), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := checkManualHTTPProjection(tc.doc); (err == nil) != tc.ok {
 				t.Fatal(tc.name, err)
 			}
 		})

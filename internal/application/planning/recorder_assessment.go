@@ -112,7 +112,7 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 				// ADR-282, REQ-ASM-003: the parser inspects payload
 				// transiently; the stored allowlisted fields can still
 				// identify users.
-				assessed.Impact.Explanation = "Kernel packet hooks add per-packet node work and a bounded parser reassembles TCP to read plain HTTP/1 headers; overhead depends on traffic and is not measured. Only method, status, Content-Type and Content-Length are kept; bodies, URLs, Host, cookies and credentials are read transiently and discarded, and TLS or HTTP/2 traffic is reported as unsupported."
+				assessed.Impact.Explanation = "Packet hooks and a bounded TCP reassembly parse plain HTTP/1 headers on the node; overhead is not measured. Only method, status, Content-Type and Content-Length are kept; bodies, URLs, cookies and credentials are discarded. TLS and HTTP/2 are unsupported."
 				assessed.Exposure = value.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", RetainedPossible: []string{"personalIdentifiers"}, TransientOnly: []string{"userContent", "credentials", "networkAddresses"}}
 				out.Alternatives = append(out.Alternatives, value.AssessmentAlternative{ActionIDs: []string{a.ID}, Change: "metadataOnly", Benefit: "Network headers read no payload and need no sensitive approval.", CoverageLoss: "HTTP methods, statuses and content types are not recorded."})
 			}
