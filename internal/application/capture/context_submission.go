@@ -459,3 +459,14 @@ func sameAcceptedGroup(a, b value.Accepted) bool {
 	}
 	return true
 }
+
+// RequestWithResultAccess is ContextInvestigation's result-access review
+// followed by this submission's own Request, which dispatches the start.
+func (s ContextSubmission) RequestWithResultAccess(ctx context.Context, current identities.CurrentIdentity, preview, key string, access *authorization.ResultAccess) (value.Accepted, error) {
+	if access != nil {
+		if err := s.reviewResultAccess(ctx, current, preview, key, access); err != nil {
+			return value.Accepted{}, err
+		}
+	}
+	return s.Request(ctx, current, preview, key)
+}
