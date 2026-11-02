@@ -152,6 +152,11 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		// current read rights; the read stays charged and nothing is disclosed.
 		return s.refusal(record.ID, name, record.Until, httpHeaderInvalidCursor, operationAuditInvalid, operationEffectAccepted, false)
 	}
+	if d == nil && errors.Is(err, value.ErrRecordTooLarge) && name != "get_file_excerpt" {
+		// The worker's first selected record alone exceeds the wire bound; the
+		// read stays charged and nothing is disclosed.
+		return s.refusal(record.ID, name, record.Until, httpHeaderTooLarge, operationAuditDenied, operationEffectAccepted, false)
+	}
 	if d == nil && errors.Is(err, value.ErrBusy) && name == "get_http_headers" {
 		// ADR-282: the live worker caps are full; the query was not admitted
 		// or charged, and a later page request may succeed.

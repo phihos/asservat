@@ -707,12 +707,14 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	projection, err := d.read.Projection(o.ctx)
 	auditapp.MarkStep(o.ctx, "q-projection", mark)
 	scope := o.query.Scope
-	invalidCursor := false
+	invalidCursor, tooLarge := false, false
 	switch {
 	case err != nil || !projection.Valid(scope):
 		err = value.ErrUnavailable
 	case scope.NativeType == artifact.HTTPHeadersArtifact && projection.InvalidCursor:
 		invalidCursor = true
+	case scope.NativeType == artifact.HTTPHeadersArtifact && projection.TooLarge:
+		tooLarge = true
 	case scope.NativeType == artifact.HTTPHeadersArtifact:
 		// The page keeps the result's own record slices; Close clears them.
 		d.page, projection.Headers = projection.Headers, value.HTTPHeaderPage{}
@@ -738,6 +740,10 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 		// read rights; it discloses no record. The read stays charged.
 		_ = d.Close(context.WithoutCancel(o.ctx))
 		return nil, queryStepped("cursor", value.ErrInvalidCursor)
+	}
+	if tooLarge {
+		_ = d.Close(context.WithoutCancel(o.ctx))
+		return nil, queryStepped("record-size", value.ErrRecordTooLarge)
 	}
 	return d, nil
 }

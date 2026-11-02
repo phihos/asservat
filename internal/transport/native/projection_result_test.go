@@ -121,3 +121,25 @@ func TestProjectionPayloadRefusals(t *testing.T) {
 		t.Fatal("encoded more records than selected")
 	}
 }
+
+// A single valid record whose escaped values exceed the wire bound is an
+// explicit TooLarge refusal, not a (retryable) protocol error.
+func TestProjectionPayloadOversizedRecordIsTooLarge(t *testing.T) {
+	s := headerScope(query.HTTPHeaderWindow{Limit: 100})
+	p := wirePage(1, "text/plain")
+	p.Records[0].Headers = nil
+	for range 32 {
+		p.Records[0].Headers = append(p.Records[0].Headers, query.HTTPHeaderField{Name: "content-type", Value: strings.Repeat("<", 1024)})
+	}
+	if !(query.ProjectionResult{Headers: p}).Valid(s) {
+		t.Fatal("fixture record must be valid")
+	}
+	b, err := encodeProjectionResult(query.ProjectionResult{Headers: p}, s)
+	if err != nil {
+		t.Fatal("oversized record failed as protocol error", err)
+	}
+	r, err := decodeProjectionResult(b, s)
+	if err != nil || !r.TooLarge || r.InvalidCursor || len(r.Headers.Records) != 0 {
+		t.Fatal("oversized record not refused as TooLarge", err, string(b))
+	}
+}

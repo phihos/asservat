@@ -29,11 +29,12 @@ func (o *HubOperation) readProjection(ctx context.Context, s Stream) (query.Proj
 }
 
 // headerPageReply is the httpHeaders projection payload (ADR-282): one page,
-// or an invalid-cursor refusal that carries no record. Pod status keeps its
-// historical payload, the bare DTO.
+// or an invalid-cursor or too-large refusal that carries no record. Pod status
+// keeps its historical payload, the bare DTO.
 type headerPageReply struct {
 	Page          *query.HTTPHeaderPage `json:",omitempty"`
 	InvalidCursor bool                  `json:",omitempty"`
+	TooLarge      bool                  `json:",omitempty"`
 }
 
 // encodeProjectionResult is the worker's payload for the scope's result. A
@@ -51,8 +52,8 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 		}
 		return b, nil
 	}
-	if r.InvalidCursor {
-		return json.Marshal(headerPageReply{InvalidCursor: true})
+	if r.InvalidCursor || r.TooLarge {
+		return json.Marshal(headerPageReply{InvalidCursor: r.InvalidCursor, TooLarge: r.TooLarge})
 	}
 	page := r.Headers
 	for n := len(page.Records); ; n-- {
@@ -67,8 +68,10 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 		}
 		clear(b)
 		if n <= 1 {
-			// A single record never exceeds the bound (two bounded fields).
-			return nil, contracts.ErrNativeProtocol
+			// Valid records allow 32 values of 1 KiB, whose JSON escapes (the
+			// canonical encoding escapes <, > and &) can exceed the bound;
+			// refuse explicitly rather than as a retryable protocol error.
+			return json.Marshal(headerPageReply{TooLarge: true})
 		}
 	}
 }
@@ -84,13 +87,13 @@ func decodeProjectionResult(b []byte, scope query.ContextProjectionScope) (query
 		}
 	case artifact.HTTPHeadersArtifact:
 		var reply headerPageReply
-		if len(b) > query.HTTPHeaderPageWireBytes || nativeDecode(b, &reply) != nil || (reply.Page == nil) == !reply.InvalidCursor {
+		if len(b) > query.HTTPHeaderPageWireBytes || nativeDecode(b, &reply) != nil || (reply.Page != nil) == (reply.InvalidCursor || reply.TooLarge) {
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol
 		}
 		if reply.Page != nil {
 			r.Headers = *reply.Page
 		}
-		r.InvalidCursor = reply.InvalidCursor
+		r.InvalidCursor, r.TooLarge = reply.InvalidCursor, reply.TooLarge
 	}
 	if !r.Valid(scope) {
 		r.Clear()

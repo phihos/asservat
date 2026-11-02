@@ -29,6 +29,10 @@ const (
 // issued for a different projection. It discloses nothing about the artifact.
 var ErrInvalidCursor = errors.New("invalid http header cursor")
 
+// ErrRecordTooLarge is a page whose first selected record alone exceeds the
+// response bound. It is not retryable at that cursor.
+var ErrRecordTooLarge = errors.New("http header record too large")
+
 // HTTPHeaderSelection is the normalized public input. Start is the index of
 // the first record; Binding is the projection-digest prefix a cursor carries
 // (empty on the first page). It names no source, worker, key or deadline.

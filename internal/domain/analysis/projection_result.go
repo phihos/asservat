@@ -23,6 +23,9 @@ type ProjectionResult struct {
 	PodStatus     PodStatusProjection
 	Headers       HTTPHeaderPage
 	InvalidCursor bool
+	// TooLarge refuses a page whose first selected record alone exceeds the
+	// wire bound; it discloses no record and paging cannot pass that record.
+	TooLarge bool
 }
 
 // Valid reports whether the result is exactly the scope's source branch.
@@ -32,13 +35,13 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 	}
 	switch s.NativeType {
 	case artifact.PodStatusArtifact:
-		return !r.InvalidCursor && r.Headers.empty() && r.PodStatus.Valid() && r.PodStatus.NamespaceUID == s.NamespaceUID && r.PodStatus.PodUID == s.PodUID
+		return !r.InvalidCursor && !r.TooLarge && r.Headers.empty() && r.PodStatus.Valid() && r.PodStatus.NamespaceUID == s.NamespaceUID && r.PodStatus.PodUID == s.PodUID
 	case artifact.HTTPHeadersArtifact:
 		if r.PodStatus != (PodStatusProjection{}) {
 			return false
 		}
-		if r.InvalidCursor {
-			return r.Headers.empty()
+		if r.InvalidCursor || r.TooLarge {
+			return r.InvalidCursor != r.TooLarge && r.Headers.empty()
 		}
 		return r.Headers.Valid(s.Headers.Selection(s.CaseID, s.ArtifactID))
 	}

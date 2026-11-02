@@ -196,6 +196,29 @@ func TestHTTPHeaderCursorRefusals(t *testing.T) {
 			t.Fatalf("worker cursor refusal: %v %s %+v", err, reply.Body, g.outcomes)
 		}
 	})
+	t.Run("worker-too-large", func(t *testing.T) {
+		s, f, g, _ := httpBridge(t, value.HTTPHeaderWindow{Limit: 5})
+		f.ready = false
+		first, err := s.Call(context.Background(), f, "get_http_headers", headerInput("", 5))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = first.Close(context.Background())
+		f.ready = true
+		f.result = &value.ProjectionResult{TooLarge: true}
+		reply, err := s.Call(context.Background(), f, "get_query_result", bridgePoll(f.q.ID))
+		var body struct {
+			Status string `json:"status"`
+			Data   struct {
+				Code      string `json:"code"`
+				Retryable bool   `json:"retryable"`
+			} `json:"data"`
+		}
+		if err != nil || json.Unmarshal(reply.Body, &body) != nil || body.Status != "error" || body.Data.Code != "AnalysisUnavailable" || body.Data.Retryable ||
+			s.contracts.ValidateOutput("get_query_result", reply.Body) != nil || g.outcomes[1].Effect != "accepted" || g.outcomes[1].Status != "denied" {
+			t.Fatalf("worker too-large refusal: %v %s %+v", err, reply.Body, g.outcomes)
+		}
+	})
 }
 
 // A full live-worker cap is a retryable tool refusal, not a transport 503,
