@@ -6,7 +6,10 @@ import type { Data, HistoryEntry, Input, Preview, Progress, Target } from './htt
 import { captureIDFromPath } from '../routes';
 import { WhyAccess } from '../access/WhyAccess';
 import { RecipientsEditor } from '../sharing/SharePanel';
-import { ProfileCatalog } from './ProfileCatalog';
+import { ProfileCatalog, type CatalogDraft } from './ProfileCatalog';
+import { PlanDiff } from './PlanDiff';
+import { planFromPreview } from './plan-diff';
+import { SaveAsProfile } from './SaveAsProfile';
 const RecordingsPanel = lazy(() => import('../recordings/RecordingsPanel').then(module => ({ default: module.RecordingsPanel })));
 
 const phases: Record<Progress['phase'], string> = {
@@ -144,6 +147,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   const [customRetention, setCustomRetention] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
+  const catalogDraft = useRef<{ target: string; draft: CatalogDraft }>(undefined);
   useEffect(() => controller.attach(session, scope, captureIDFromPath(window.location.pathname)), [controller, session, scope]);
   const draft = state.draft;
   const setTarget = (key: keyof Target, value: string) => controller.setDraft({ ...draft, target: { ...draft.target, [key]: value } });
@@ -185,7 +189,8 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         {diagnostic.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
         <Button className="button" isDisabled={state.busy || diagnostic.preset_ref?.name !== 'pod-status'} onPress={() => void controller.preview(diagnostic)}>{state.busy ? 'Preparing review…' : 'Review collection'}</Button>
       </article>)}
-      <ProfileCatalog session={session} scope={scope} target={draft.target} busy={state.busy} client={controller.client} onPreview={composition => void controller.previewComposition(composition)}/>
+      <ProfileCatalog session={session} scope={scope} target={draft.target} busy={state.busy} client={controller.client} onPreview={composition => void controller.previewComposition(composition)}
+        initial={catalogDraft.current?.target === JSON.stringify(draft.target) ? catalogDraft.current.draft : undefined} onDraft={value => { catalogDraft.current = { target: JSON.stringify(draft.target), draft: value }; }}/>
       <Button className="button secondary" isDisabled={state.busy} onPress={controller.showRecordings}>Save existing recordings now</Button>
       <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Change target</Button>
       <RecentCaptures state={state} controller={controller}/>
@@ -193,6 +198,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
     {state.stage === 'recordings' && <><Suspense fallback={<p role="status">Loading recording tools…</p>}><RecordingsPanel session={session} scope={scope} target={draft.target} repeat={state.recordingRepeat} submit={controller.submitRecordingSave}/></Suspense><Button className="button secondary" onPress={controller.edit}>Change target</Button></>}
     {state.stage === 'review' && state.preview && <section aria-label="Collection review" aria-busy={state.busy}>
       {state.repeatedFrom && <p className="notice">Collecting again with the settings of capture <span className="identifier">{state.repeatedFrom}</span>: the original target, recipe and requested settings. The current Pod, access, limits and approval needs are checked below.</p>}
+      {state.previousPlan && state.preview.profile_composition && <PlanDiff previous={state.previousPlan} current={planFromPreview(state.preview)!}/>}
       <Assessment preview={state.preview}/>
       {state.preview.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
       {state.preview.blockers.length > 0 && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
@@ -201,7 +207,9 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
       {state.preview.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
       <p role="status">{state.expired ? 'This preview has expired. Refreshing may select a different pod; check the updated selection.' : state.stale ? 'The impact assessment is older. Collection will recheck current conditions and these exact identities, and stop if the reviewed scope changed.' : 'The assessment is current. Collection rechecks your access and these exact identities.'}</p>
       <div className="actions"><Button className="button" isDisabled={state.busy || (!state.expired && !requestablePreview(state.preview))} onPress={() => void (state.expired ? controller.preview() : controller.submit())}>{state.busy ? 'Checking…' : state.expired ? 'Refresh review' : state.preview.approval_required ? 'Request approval' : state.preview.profile_composition ? 'Collect evidence' : 'Collect pod status'}</Button>
+        {state.preview.profile_composition && !state.repeatedFrom && <Button className="button secondary" isDisabled={state.busy} onPress={controller.changeProfiles}>Change profiles</Button>}
         <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Edit request</Button></div>
+      {state.preview.profile_composition?.authored.components.length === 1 && <SaveAsProfile key={state.preview.preview_id} session={session} scope={scope} target={draft.target} composition={state.preview.profile_composition} client={controller.client}/>}
     </section>}
     {state.stage === 'reviewed' && <section>
       <p>Your session was checked again, so the previous target details and assessment are hidden. Your original reviewed request is still held in this tab.</p>

@@ -1,7 +1,7 @@
 apiVersion: asservat.io/v1alpha1
 kind: CaptureProfile
 metadata:
-  name: network-connections-v1
+  name: network-connections.v1
   namespace: asservat-builtin-profiles
 spec:
   name: network-connections

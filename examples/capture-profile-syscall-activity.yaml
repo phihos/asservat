@@ -1,7 +1,7 @@
 apiVersion: asservat.io/v1alpha1
 kind: CaptureProfile
 metadata:
-  name: syscall-activity-v1
+  name: syscall-activity.v1
   namespace: asservat-builtin-profiles
 spec:
   name: syscall-activity

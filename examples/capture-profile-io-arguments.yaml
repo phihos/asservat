@@ -1,7 +1,7 @@
 apiVersion: asservat.io/v1alpha1
 kind: CaptureProfile
 metadata:
-  name: io-arguments-v1
+  name: io-arguments.v1
   namespace: asservat-profiles
 spec:
   name: io-arguments

@@ -9,6 +9,9 @@ type Definition = Data<'get_capture_profile'>['definition'];
 type Ref = Listed['profile_ref'];
 type Field = NonNullable<Definition['editableFields']>[number];
 type Added = { id: string; ref: Ref; definition: Definition; values: Record<string, string> };
+// Composer state the workspace keeps while the user reviews a plan, so
+// "Change profiles" returns to the same selection and edits.
+export type CatalogDraft = { added: Added[]; bounds?: { bytes: string; duration: string } };
 
 // Typed scalar edits this panel offers; structured settings (rings, peers,
 // filters, process selectors) keep the profile's reviewed defaults here.
@@ -64,10 +67,11 @@ export function composition(added: Added[], bytes: number, duration: string): Co
   } as Composition;
 }
 
-export function ProfileCatalog({ session, scope, target, busy, onPreview, client = operations }: { session: Session; scope: AbortSignal; target: Target; busy: boolean; onPreview: (c: Composition) => void; client?: Operations }) {
+export function ProfileCatalog({ session, scope, target, busy, onPreview, client = operations, initial, onDraft }: { session: Session; scope: AbortSignal; target: Target; busy: boolean; onPreview: (c: Composition) => void; client?: Operations; initial?: CatalogDraft; onDraft?: (draft: CatalogDraft) => void }) {
   const [profiles, setProfiles] = useState<Listed[]>();
-  const [added, setAdded] = useState<Added[]>([]);
-  const [bounds, setBounds] = useState<{ bytes: string; duration: string }>();
+  const [added, setAdded] = useState<Added[]>(initial?.added ?? []);
+  const [bounds, setBounds] = useState<{ bytes: string; duration: string } | undefined>(initial?.bounds);
+  useEffect(() => { onDraft?.({ added, bounds }); }, [added, bounds]); // eslint-disable-line react-hooks/exhaustive-deps
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
   const call = async <N extends 'list_capture_profiles' | 'get_capture_profile'>(name: N, input: Input<N>): Promise<Data<N> | undefined> => {

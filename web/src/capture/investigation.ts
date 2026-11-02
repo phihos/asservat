@@ -1,6 +1,7 @@
 import { approvalPath, approvalSubmissionKey } from './approval-intent';
 import type { Session } from '../auth/session';
 import type { Recipient } from '../sharing/shares';
+import { planFromPreview, planFromSettings, type PlanSnapshot, type PreviousPlan } from './plan-diff';
 import { operations, OperationFailure, operationMessage, type Operations, type Target, type Diagnostic, type Preview, type Progress, type HistoryEntry, type Input, type Output, type Operation, type Data } from './http';
 
 // sharing/shareHours: the optional capture-time share of the result (ADR-235);
@@ -14,6 +15,8 @@ export type State = {
   history?: HistoryEntry[]; historyMessage?: string; repeatedFrom?: string;
   recordingRepeat?: { policyUID: string; captureID: string; before?: string };
   historyOrigin?: 'manual' | 'policy' | 'discovery' | 'all'; historyCursor?: string; settings?: Data<'get_capture_settings'>;
+  // REQ-CPR-005: the plan an edited composition preview is compared with.
+  previousPlan?: PreviousPlan;
 };
 export const historyPageSize = 10;
 type Receipt = { operation?: 'recordingSave'; expectedCaptureID?: string; preview_id: string; idempotency_key: string; captureID?: string; revision?: number; closed?: true; continuationBlocked?: true; approvalURI?: string };
@@ -42,6 +45,8 @@ export class Investigation {
   private repeatOf?: string;
   private repeatSelection?: 'currentEligiblePod';
   private repeatRetention?: string;
+  // The last reviewed composition when the user went back to change profiles.
+  private priorPlan?: PlanSnapshot;
   private settingsExpiry?: ReturnType<typeof setTimeout>;
   private historyExpiry?: ReturnType<typeof setTimeout>;
   readonly snapshot = () => this.state;
@@ -88,16 +93,25 @@ export class Investigation {
   reset = () => {
     this.invalidate(); this.identity = undefined; this.session = undefined; this.scope = undefined;
     clearTimeout(this.historyExpiry);
-    this.receipt = undefined; this.cancellation = undefined; this.selected = undefined; this.selectedComposition = undefined; this.reviewed = undefined; this.repeatOf = undefined;
+    this.receipt = undefined; this.cancellation = undefined; this.selected = undefined; this.selectedComposition = undefined; this.reviewed = undefined; this.repeatOf = undefined; this.priorPlan = undefined;
     this.state = { stage: 'target', busy: false, draft: emptyDraft() };
     for (const listener of this.listeners) listener();
   };
   setDraft = (draft: Draft) => {
     if (this.receipt || this.state.busy) return;
-    this.invalidate(); this.selected = undefined; this.selectedComposition = undefined; this.reviewed = undefined; this.repeatOf = undefined;
+    this.invalidate(); this.selected = undefined; this.selectedComposition = undefined; this.reviewed = undefined; this.repeatOf = undefined; this.priorPlan = undefined;
     this.publish({ draft: structuredClone(draft), stage: 'target', preview: undefined, diagnostics: undefined, error: undefined, history: undefined, historyMessage: undefined });
   };
-  edit = () => { if (!this.receipt) { this.invalidate(); this.reviewed = undefined; this.repeatOf = undefined; this.publish({ stage: 'target', preview: undefined, diagnostics: undefined, approvalURI: undefined, error: undefined, busy: false, history: undefined, historyMessage: undefined }); } };
+  edit = () => { if (!this.receipt) { this.invalidate(); this.reviewed = undefined; this.repeatOf = undefined; this.priorPlan = undefined; this.publish({ stage: 'target', preview: undefined, previousPlan: undefined, diagnostics: undefined, approvalURI: undefined, error: undefined, busy: false, history: undefined, historyMessage: undefined }); } };
+  // Back to the profile composer with the reviewed plan kept for comparison;
+  // the next composition preview shows a before/after diff (REQ-CPR-005).
+  changeProfiles = () => {
+    const preview = this.state.preview;
+    if (this.receipt || this.state.busy || this.state.stage !== 'review' || !preview?.profile_composition || this.repeatOf) return;
+    this.priorPlan = planFromPreview(preview);
+    this.invalidate(); this.reviewed = undefined; this.selectedComposition = undefined;
+    this.publish({ stage: 'diagnostics', preview: undefined, previousPlan: undefined, error: undefined });
+  };
   editClosedRequest = () => {
     if (!this.receipt?.closed || this.receipt.captureID || this.state.busy) return;
     this.receipt = undefined; this.selected = undefined; this.selectedComposition = undefined;
@@ -302,6 +316,13 @@ export class Investigation {
   // a catalog entry invented by the browser. The server resolves every pin.
   previewComposition = async (composition: NonNullable<Input<'preview_capture'>['profile_composition']>, repeatedFrom?: string, selection?: 'currentEligiblePod', requestedRetention?: string) => {
     if (this.state.busy || (this.receipt && !repeatedFrom)) return;
+    // The comparison baseline: the saved settings being edited, the review the
+    // user went back from, or (on refresh) the comparison already shown.
+    const saved = this.state.settings;
+    const previousPlan: PreviousPlan | undefined = repeatedFrom
+      ? saved?.kind === 'captureSettings' && saved.capture_id === repeatedFrom && saved.settings.profile_composition ? { from: 'settings', captureID: repeatedFrom, plan: planFromSettings(saved)! }
+        : this.state.stage === 'review' && this.state.previousPlan?.captureID === repeatedFrom ? this.state.previousPlan : undefined
+      : this.priorPlan ? { from: 'preview', plan: this.priorPlan } : this.state.stage === 'review' && this.state.previousPlan?.from === 'preview' ? this.state.previousPlan : undefined;
     if (!this.receipt && this.state.draft.sharing?.length) {
       this.publish({ error: 'Capture-time sharing is not available for this recording review. Remove that instruction before preparing it.' }); return;
     }
@@ -331,9 +352,10 @@ export class Investigation {
     if (data.profile_composition === undefined || data.repeated_from_capture_id !== repeatedFrom) {
       this.publish({ error: 'The review response could not be verified. Refresh the review before continuing.' }); return;
     }
-    this.acceptPreview(data, input.target_ref!);
+    this.priorPlan = undefined;
+    this.acceptPreview(data, input.target_ref!, previousPlan);
   };
-  private acceptPreview(data: Preview, requested: Target) {
+  private acceptPreview(data: Preview, requested: Target, previousPlan?: PreviousPlan) {
     const pod = data.selected_pods?.[0];
     const recording = data.profile_composition !== undefined;
     if ((!recording && data.preset_ref?.name !== 'pod-status') || data.selected_pods?.length !== 1 ||
@@ -347,7 +369,7 @@ export class Investigation {
     }
     const remaining = Math.min(5_000, Date.parse(data.capture_assessment.validUntil) - Date.now(), Date.parse(data.expires_at) - Date.now());
     if (requestablePreview(data)) this.reviewed = { id: data.preview_id, expiresAt: Date.parse(data.expires_at), approvalRequired: data.approval_required };
-    this.publish({ stage: 'review', preview: data, repeatedFrom: data.repeated_from_capture_id, stale: remaining <= 0, expired: Date.parse(data.expires_at) <= Date.now() });
+    this.publish({ stage: 'review', preview: data, previousPlan, repeatedFrom: data.repeated_from_capture_id, stale: remaining <= 0, expired: Date.parse(data.expires_at) <= Date.now() });
     this.timer = setTimeout(() => this.publish({ stale: true }), Math.max(0, remaining));
     this.previewExpiry = setTimeout(() => this.publish({ expired: true }), Math.max(0, Date.parse(data.expires_at) - Date.now()));
   }

@@ -57,3 +57,8 @@ summary { cursor: pointer; min-height: 44px; padding: 8px 0; color: #126b54; }
 .recordings-panel .diagnostic label { display: flex; align-items: baseline; gap: .5rem; }
 
 .capture-reason { white-space: pre-wrap; overflow-wrap: anywhere; }
+.plan-diff { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 14px; }
+.plan-diff caption { text-align: left; font-weight: 500; padding: 8px 0; }
+.plan-diff th, .plan-diff td { text-align: left; vertical-align: top; padding: 6px 8px 6px 0; border-top: 1px solid #e3e6e9; overflow-wrap: anywhere; }
+.plan-diff-actions { list-style: none; padding: 0; margin: 8px 0; }
+.manifest { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
