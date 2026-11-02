@@ -1,7 +1,7 @@
 apiVersion: asservat.io/v1alpha1
 kind: CaptureProfile
 metadata:
-  name: process-context-v1
+  name: process-context.v1
   namespace: asservat-builtin-profiles
 spec:
   name: process-context

@@ -1,5 +1,31 @@
 # Sustained implementation progress
 
+## Console plan diff and Save as profile (2026-11-02)
+
+REQ-CPR-005, console only (no backend, contract or route change). A
+composition preview made from an existing plan shows a client-side
+before/after diff: "Change profiles" returns from the review to the composer
+with its selection and edits kept, and a history repeat with edits is compared
+with that capture's saved settings. Per action it lists changed effective
+mode/windows, authored edits (absent = profile default) and, preview against
+preview only, impact/quantities; added/removed actions; profile pins and
+aggregate bounds; ongoing versus per-incident combined costs, pod count and
+approval. A reviewed single-profile plan offers **Save as profile**: the
+console fetches the source definition (`get_capture_profile`) and known
+namespace versions, then renders a `CaptureProfile` JSON manifest
+(`metadata.name` = `<name>.<version>`, edits materialized at their typed recipe
+locations, editable fields kept, reviewed bounds as recipe totals, source as a
+non-executable `origins` entry, no grants/owners/recipients/approvals) with
+Copy/Download and `kubectl create -f <file> -n <namespace>` so an existing
+version is refused. Publication uses the user's own Kubernetes rights.
+
+Verification: `npm run check` (277 console tests, including real Ajv
+validation of the manifest against the CRD openAPIV3Schema and the canonical
+`capture-profile.schema.json`), `npm run build` and `make
+console-browser-check` pass. The checked-in `examples/capture-profile-*.yaml`
+now use the `metadata.name: <name>.<version>` form the CRD's CEL rule and the
+Kubernetes adapter require (they used `<name>-v1` before).
+
 
 ## Kubernetes peer membership verifier (2026-11-02)
 

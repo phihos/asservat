@@ -1,7 +1,7 @@
 apiVersion: asservat.io/v1alpha1
 kind: CaptureProfile
 metadata:
-  name: ledger-stall-v1
+  name: ledger-stall.v1
   namespace: payments
 spec:
   name: ledger-stall

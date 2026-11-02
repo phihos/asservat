@@ -1,7 +1,7 @@
 apiVersion: asservat.io/v1alpha1
 kind: CaptureProfile
 metadata:
-  name: go-cpu-v1
+  name: go-cpu.v1
   namespace: asservat-builtin-profiles
 spec:
   name: go-cpu

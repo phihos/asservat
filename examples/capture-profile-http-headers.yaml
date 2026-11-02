@@ -1,7 +1,7 @@
 apiVersion: asservat.io/v1alpha1
 kind: CaptureProfile
 metadata:
-  name: http-headers-v1
+  name: http-headers.v1
   namespace: asservat-builtin-profiles
 spec:
   name: http-headers
