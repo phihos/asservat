@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -212,5 +213,25 @@ func TestInvestigationCompositionExposesOnlyConfiguredCapabilities(t *testing.T)
 	cases.config.PublicOrigin = "https://other.invalid"
 	if _, err = NewInvestigationOperations(captures, cases); err == nil {
 		t.Fatal("mixed origins admitted")
+	}
+}
+
+// ADR-279: a raw packet capture is listed as raw with its broader content
+// notice, within the get_case output contract.
+func TestCaseProjectionLabelsRawPacketCaptures(t *testing.T) {
+	s, f, current := caseOperationsFixture(t)
+	current.i.Scopes = []string{"evidence:read"}
+	f.view.Artifacts[0].EvidenceType, f.view.Artifacts[0].DataClass = "packetCapture", "raw"
+	out, err := s.Call(t.Context(), current, "get_case", []byte(caseInput))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result struct{ Data ContextCaseData }
+	if json.Unmarshal(out.Body, &result) != nil || len(result.Data.Artifacts) != 1 {
+		t.Fatalf("%s", out.Body)
+	}
+	a := result.Data.Artifacts[0]
+	if a.DataClass != "raw" || !slices.Contains(a.HandlingNotice.MayContain, "userContent") {
+		t.Fatalf("raw listing %+v", a)
 	}
 }
