@@ -30,6 +30,14 @@ const operation = name => response => new URL(response.url()).pathname === '/api
 // aborted by the page, starting from the moment the wait is armed.
 const seen = [];
 page.on('response', response => seen.push(response));
+// Failure timeline of the console's own API calls: path, status and Chromium's
+// net error token with elapsed milliseconds only; never bodies or headers.
+const started = Date.now();
+const timeline = [];
+const apiPath = request => { const path = new URL(request.url()).pathname; return path.startsWith('/api/') ? path : null; };
+page.on('request', request => { const path = apiPath(request); if (path) timeline.push(`+${Date.now() - started}ms request ${request.method()} ${path}`); });
+page.on('response', response => { const path = apiPath(response.request()); if (path) timeline.push(`+${Date.now() - started}ms response ${response.status()} ${path}`); });
+page.on('requestfailed', request => { const path = apiPath(request); if (path) timeline.push(`+${Date.now() - started}ms failed ${/^net::ERR_[A-Z_]+$/.exec(request.failure()?.errorText ?? '')?.[0] ?? 'other'} ${path}`); });
 async function settled(name, from) {
   const end = Date.now() + 30_000;
   for (let i = from; Date.now() < end;) {
@@ -130,6 +138,9 @@ try {
   assert.deepEqual(errors, []);
   assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
   process.stdout.write(JSON.stringify({ Kind: 'captured', GrantID: grantID, PreviewID: preview.data.preview_id, Digest: preview.data.execution_digest, CaptureID: captureID, SettingsDigest: settings.data.settings_digest, SourceExpiresAt: settings.data.expires_at }) + '\n');
+} catch (error) {
+  process.stderr.write('installed history API timeline:\n' + timeline.slice(-60).join('\n') + '\n');
+  throw error;
 } finally {
   await context.close();
   await browser.close();
