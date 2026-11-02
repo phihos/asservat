@@ -78,15 +78,25 @@ export function ProfileCatalog({ session, scope, target, busy, onPreview, client
     } catch (e) { if (!scope.aborted) setError(operationMessage(e)); }
   };
   useEffect(() => { void call('list_capture_profiles', { target_ref: structuredClone(target) }).then(data => data && setProfiles(data.profiles)); }, [JSON.stringify(target)]); // eslint-disable-line react-hooks/exhaustive-deps
-  const update = (next: Added[]) => { setAdded(next); const b = defaultBounds(next); setBounds(next.length ? { bytes: String(b.bytes), duration: b.duration } : undefined); };
+  // Functional updates: a definition fetched for add() must not overwrite
+  // edits or removals made while it was loading.
+  const update = (change: (previous: Added[]) => Added[]) => setAdded(previous => {
+    const next = change(previous);
+    const b = defaultBounds(next);
+    setBounds(next.length ? { bytes: String(b.bytes), duration: b.duration } : undefined);
+    return next;
+  });
   const add = async (profile: Listed) => {
     setLoading(true); setError(undefined);
     const data = await call('get_capture_profile', { target_ref: structuredClone(target), profile_ref: structuredClone(profile.profile_ref) });
     setLoading(false);
-    if (data) update([...added, { id: componentID(profile.profile_ref.name, added.map(a => a.id)), ref: data.profile_ref, definition: data.definition, values: {} }]);
+    if (data) update(previous => previous.length >= 8 ? previous : [...previous, { id: componentID(profile.profile_ref.name, previous.map(a => a.id)), ref: data.profile_ref, definition: data.definition, values: {} }]);
   };
-  const setValue = (index: number, field: Field, value: string) => setAdded(added.map((a, i) => i === index ? { ...a, values: { ...a.values, [key(field)]: value } } : a));
-  const onTrigger = added.some(a => (a.definition.editableFields ?? []).some(f => f.field === 'actionExecutionMode' && a.values[key(f)] === 'onTrigger'));
+  const setValue = (id: string, field: Field, value: string) => setAdded(previous => previous.map(a => a.id === id ? { ...a, values: { ...a.values, [key(field)]: value } } : a));
+  // Actions switched to onTrigger whose history window is not yet 0s: the UI
+  // proposes that coupled change explicitly, never applies it silently.
+  const pending = added.flatMap(a => (a.definition.editableFields ?? []).filter(f => f.field === 'actionExecutionMode' && a.values[key(f)] === 'onTrigger').flatMap(mode =>
+    (a.definition.editableFields ?? []).filter(f => f.actionID === mode.actionID && (f.field === 'packetBefore' || f.field === 'syscallBefore') && (a.values[key(f)] ?? profileDefault(a.definition, f)) !== '0s').map(field => ({ id: a.id, field }))));
   const submit = () => {
     if (!bounds) return;
     const bytes = Number(bounds.bytes);
@@ -106,14 +116,15 @@ export function ProfileCatalog({ session, scope, target, busy, onPreview, client
       <Button className="button secondary" isDisabled={busy || loading || !profile.available || added.length >= 8} onPress={() => void add(profile)}>Add profile</Button>
     </article>)}
     {added.length > 0 && <fieldset disabled={busy}><legend>Selected profiles</legend>
-      {added.map((a, i) => <div className="profile-card" key={a.id}>
+      {added.map(a => <div className="profile-card" key={a.id}>
         <h4>{a.definition.displayName} <span className="field-help">({a.id})</span></h4>
         {(a.definition.editableFields ?? []).map(field => editable(field)
-          ? <label key={key(field)}>{field.label}<input type={numberFields.has(field.field) ? 'number' : 'text'} value={a.values[key(field)] ?? ''} placeholder={profileDefault(a.definition, field)} onChange={event => setValue(i, field, event.currentTarget.value)} />{field.description && <span className="field-help">{field.description}</span>}</label>
+          ? <label key={key(field)}>{field.label}<input type={numberFields.has(field.field) ? 'number' : 'text'} value={a.values[key(field)] ?? ''} placeholder={profileDefault(a.definition, field)} onChange={event => setValue(a.id, field, event.currentTarget.value)} />{field.description && <span className="field-help">{field.description}</span>}</label>
           : <p className="field-help" key={key(field)}>{field.label}: uses the profile's reviewed setting.</p>)}
-        <Button className="button secondary" onPress={() => update(added.filter((_, j) => j !== i))}>Remove</Button>
+        <Button className="button secondary" onPress={() => update(previous => previous.filter(other => other.id !== a.id))}>Remove</Button>
       </div>)}
-      {onTrigger && <p className="field-help">Collecting on trigger keeps no earlier history: also set the before window to 0s.</p>}
+      {pending.length > 0 && <div className="notice"><p>Starting on trigger keeps no earlier history, so its history window must be 0s.</p>
+        <Button className="button secondary" onPress={() => { for (const p of pending) setValue(p.id, p.field, '0s'); }}>Set history window to 0s</Button></div>}
       {bounds && <><label>Maximum total bytes<input type="number" min="1" step="1" value={bounds.bytes} onChange={event => setBounds({ ...bounds, bytes: event.currentTarget.value })} /></label>
         <label>Maximum duration<input value={bounds.duration} onChange={event => setBounds({ ...bounds, duration: event.currentTarget.value })} /></label>
         <p className="field-help">Computed from the selected profiles. You may lower them; administrator limits still apply.</p></>}
