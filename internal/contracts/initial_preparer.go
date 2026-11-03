@@ -7,6 +7,11 @@ import (
 
 const InitialSchemaProtocol = "asservat-initial-schema/v1"
 
+// InitialSchemaMaxHead bounds the five-digit migration identifier carried as
+// public provenance. It is not a supported-release selector: SQL/bootstrap
+// independently require the exact compiled bundle head and digest.
+const InitialSchemaMaxHead int64 = 99999
+
 const InitialPreparerFormat = "asservat-initial-preparer/v1"
 const InitialPreparationRootFormat = "asservat-initial-preparation-root/v1"
 const InitialPreparationActivationProtocol = "asservat-initial-preparation-activation/v1"

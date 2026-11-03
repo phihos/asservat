@@ -33,7 +33,13 @@ func TestInitialSchemaRequiresExplicitClosedProfileAndImmutableBinding(t *testin
 	if !s.validSchema(w) {
 		t.Fatal("original binding rejected")
 	}
+	w.Schema.Head = contracts.InitialSchemaMaxHead
+	if !s.validSchema(w) {
+		t.Fatal("five-digit provenance boundary rejected")
+	}
 	mutations := map[string]func(*contracts.InitialPreparationRoot){
+		"zero-head":            func(w *contracts.InitialPreparationRoot) { w.Schema.Head = 0 },
+		"six-digit-head":       func(w *contracts.InitialPreparationRoot) { w.Schema.Head = contracts.InitialSchemaMaxHead + 1 },
 		"early-create":         func(w *contracts.InitialPreparationRoot) { w.Creates = []contracts.InitialPreparationCreate{{}} },
 		"early-activation":     func(w *contracts.InitialPreparationRoot) { w.Activation = &contracts.InitialPreparationActivation{} },
 		"manager-replacement":  func(w *contracts.InitialPreparationRoot) { w.Schema.Manager.OID++ },
@@ -87,7 +93,7 @@ func TestInitialSchemaRootCASGatesDeclarationAndPreservesOriginal(t *testing.T) 
 	if _, e = s.EnsureNext(ctx); e == nil {
 		t.Fatal("declaration bypassed schema completion")
 	}
-	v := contracts.InitialPreparationSchema{BundleDigest: strings.Repeat("b", 64), Head: 48, DatabaseOID: 12000, PostmasterAt: time.Now().UTC().Truncate(time.Microsecond).Add(-time.Minute), DDLRole: contracts.InitialSQLHistoryManager{Name: "postgres", OID: 10}, Manager: *p.HistoryManager}
+	v := contracts.InitialPreparationSchema{BundleDigest: strings.Repeat("b", 64), Head: 129, DatabaseOID: 12000, PostmasterAt: time.Now().UTC().Truncate(time.Microsecond).Add(-time.Minute), DDLRole: contracts.InitialSQLHistoryManager{Name: "postgres", OID: 10}, Manager: *p.HistoryManager}
 	claimed, _, e := s.ClaimInitialSchema(ctx, v)
 	if e != nil || claimed.Schema == nil || claimed.RootUID != opened.RootUID {
 		t.Fatal("original claim", e)
@@ -103,6 +109,11 @@ func TestInitialSchemaRootCASGatesDeclarationAndPreservesOriginal(t *testing.T) 
 	bad.DatabaseOID++
 	if _, _, e = s.CompleteInitialSchema(ctx, bad); e == nil {
 		t.Fatal("completion changed original database")
+	}
+	bad = original
+	bad.Head++
+	if _, _, e = s.CompleteInitialSchema(ctx, bad); e == nil {
+		t.Fatal("completion changed original schema head")
 	}
 	completed, _, e := s.CompleteInitialSchema(ctx, original)
 	if e != nil || completed.Schema.CompletedAt == nil {

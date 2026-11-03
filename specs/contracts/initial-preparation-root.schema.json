@@ -214,9 +214,10 @@
           "pattern": "^[a-f0-9]{64}$"
         },
         "head": {
+          "description": "Five-digit migration identifier provenance; SQL/bootstrap independently require the exact compiled release head and bundle digest.",
           "type": "integer",
           "minimum": 1,
-          "maximum": 128
+          "maximum": 99999
         },
         "databaseOID": {
           "type": "integer",

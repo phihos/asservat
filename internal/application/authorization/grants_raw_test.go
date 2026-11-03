@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"testing"
 	"time"
@@ -10,6 +11,39 @@ import (
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 )
+
+func TestRawArgumentResultUsesExistingExactChild(t *testing.T) {
+	f := newGrantFixture(t)
+	in := f.input(7, f.access())
+	in.DataClass = "raw"
+	in.Reasons = []value.SensitiveReason{{ActionID: "a1", Code: "syscallArguments"}}
+	in.Review.Actions[0].Kind = "syscallTrace"
+	in.Scope = []byte(`{"schemaVersion":"recorder-preview/v1","actions":[{"actionID":"a1","kind":"syscallTrace","mode":"arguments"}]}`)
+	in.ExecutionDigest = sha256.Sum256(in.Scope)
+	dev := grantIdentity{f.requester, &f.now}
+	g, _, err := f.svc.Request(t.Context(), dev, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g = f.approve(t, g)
+	scope := artifact.DownloadScope{RootID: grantRoot, ArtifactID: grantID(507), CaptureID: g.CaptureID, ClusterID: f.target.ClusterID, NamespaceUID: f.target.NamespaceUID, WorkloadUID: f.target.WorkloadUID, PodUID: f.target.PodUID, Version: artifact.Digest{5}, Principal: f.requester.Principal}
+	f.store.locator[scope.ArtifactID] = g.CaptureID
+	if _, err := f.svc.CurrentResultAccess(t.Context(), dev, scope, "a1"); err != nil {
+		t.Fatal("argument result child refused", err)
+	}
+	use := value.GrantUse{Operation: value.GrantDownloadOperation, Bytes: 10, Operations: 1}
+	if err := f.svc.ReserveRawResult(t.Context(), dev, scope, grantID(600), use); err != nil {
+		t.Fatal("argument result spend refused", err)
+	}
+	if err := f.svc.ReserveRawResult(t.Context(), dev, scope, grantID(600), use); err != nil || f.store.rows[g.ID].Spent.Bytes != 10 {
+		t.Fatal("argument result replay refilled or repeated spend", err)
+	}
+	other := scope
+	other.Version[0]++
+	if err := f.svc.ReserveRawResult(t.Context(), dev, other, grantID(601), use); !errors.Is(err, value.ErrGrantScope) {
+		t.Fatal("argument version substitution admitted", err)
+	}
+}
 
 // rawGrant approves a raw ad hoc grant with result access and publishes one
 // artifact of its capture; it returns the requester's download scope.

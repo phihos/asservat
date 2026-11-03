@@ -123,3 +123,39 @@ func TestInitialBootstrapSchemaRetainsOriginalObservationAndParentDeadline(t *te
 		t.Fatal("completed schema ignored original cancellation")
 	}
 }
+
+// A structural root can retain future provenance, but this binary must never
+// resume or adopt a different release's SQL bundle.
+func TestInitialBootstrapSchemaCurrentReleaseBinding(t *testing.T) {
+	bundle, err := postgres.EmbeddedInitialSchema()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.Head < 1 || bundle.Head > contracts.InitialSchemaMaxHead {
+		t.Fatal("compiled release cannot be represented by protected root", bundle.Head)
+	}
+	for _, mutation := range []string{"exact", "head", "digest"} {
+		t.Run(mutation, func(t *testing.T) {
+			c, _, source := bootstrapSchemaFixture()
+			original := *source.current.Schema
+			original.Head, original.BundleDigest = bundle.Head, bundle.Digest
+			source.first.Schema = &original
+			observed := original
+			if mutation == "head" {
+				observed.Head++
+			}
+			if mutation == "digest" {
+				observed.BundleDigest = strings.Repeat("f", 64)
+			}
+			source.current.Schema = &observed
+			needed, err := initialBootstrapSchemaNeeded(t.Context(), source, c, bundle, time.Now)
+			if mutation == "exact" {
+				if err != nil || needed {
+					t.Fatal("current exact release refused", bundle.Head, needed, err)
+				}
+			} else if err == nil || needed {
+				t.Fatal("different release adopted", mutation, needed, err)
+			}
+		})
+	}
+}

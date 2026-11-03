@@ -3,6 +3,34 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Corrected candidate `1fa80a98` passed automated code review, but installed run
+[41630936553](https://github.com/phihos/asservat/actions/runs/41630936553)
+failed before collection in schema preparation (Go48.577s, exit1,
+sourceUnchanged true, cleanupFailures empty). The SQL bundle fix exposed another
+128-head ceiling in the protected Kubernetes root validator and canonical schema.
+The provenance bounds now match the five-digit migration identifier format
+(maximum99999), while exact compiled head/digest equality and immutable original
+root identity remain mandatory. Focused regressions cover current129, changed
+bundle refusal, zero/overflow and unchanged completion. Combined SQL/Kubernetes
+schema handover passed with the production loader against real Kubernetes,
+PostgreSQL, OpenBao and S3: Go148.397s, testExit0, sourceUnchanged true and
+cleanupFailures empty. It verified original schema replay, activation, native
+admission negatives, incarnation mismatch refusal and credential retirement.
+Reports are retained in `test/results/argument-schema-handover129`.
+Original reports are retained in `test/results/argument-native-41630936553`.
+
+CI41630403434 failed only the investigation descriptor-size regression:
+preview_capture grew to37,720 bytes against its36KiB budget. Reusing a local
+definition for the repeated actionID constraint and shortening redundant description
+text reduces it to36,582 bytes. Dereferenced input/output schemas remain identical;
+the complete contracts race suite passes against the unchanged size limit. A separate audit reproduced
+raw syscall native download being refused before the current grant facet; the
+narrow verified syscallArguments type is now admitted through that existing
+facet. Full authorization race tests pass, including same-human/client/version,
+revocation and replay-safe spend. Expanded argument preflight and full pre-push checks passed. Installed
+collection/download remains unqualified.
+
+
 [PR #148](https://github.com/phihos/asservat/pull/148) first candidate `44037bb6`
 failed [native run 41627837758](https://github.com/phihos/asservat/actions/runs/41627837758)
 during schema installation, before collection: the installer retained a
