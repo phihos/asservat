@@ -1,0 +1,113 @@
+{
+  "scope": "host/unit/compile-only final engine checkpoint; no BPF load",
+  "commands": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "./internal/adapters/syscalls",
+        "./internal/adapters/gadget",
+        "./internal/domain/collector",
+        "-count=1"
+      ],
+      "exit": 0,
+      "log": "checkpoint-0.log"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-tags",
+        "gadget",
+        "./internal/adapters/gadget",
+        "-run",
+        "^TestArgument",
+        "-count=1"
+      ],
+      "exit": 0,
+      "log": "checkpoint-1.log"
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "test/fixtures/syscall-argument-engine/main.go",
+        "test/fixtures/syscall-argument-engine/main_test.go"
+      ],
+      "exit": 0,
+      "log": "checkpoint-2.log"
+    },
+    {
+      "command": [
+        "go",
+        "vet",
+        "-tags",
+        "gadget",
+        "./internal/adapters/gadget",
+        "./internal/adapters/syscalls"
+      ],
+      "exit": 0,
+      "log": "checkpoint-3.log"
+    },
+    {
+      "command": [
+        "make",
+        "spec-check",
+        "architecture-check",
+        "go-architecture-check",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python"
+      ],
+      "exit": 0,
+      "log": "checkpoint-4.log"
+    },
+    {
+      "command": [
+        "python",
+        "scripts/package-argument-gadget.py",
+        "/home/phil/.cache/asservat-build/argument-runtime-package-final",
+        "--tmpdir",
+        "/home/phil/.cache/asservat-build"
+      ],
+      "exit": 0,
+      "log": "checkpoint-5.log"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "log": "checkpoint-6.log"
+    }
+  ],
+  "sourceHashes": {
+    "internal/adapters/gadget/arguments.go": "7b860f5e47e07504cc364be8e09523fea8e747977eb9ec58a09d247335b085e9",
+    "internal/adapters/gadget/arguments_stub.go": "405d6161682e89a9cdade7bc2078d3c185a72c550b4cfcc9b3f505f1c6190003",
+    "internal/adapters/gadget/arguments_test.go": "4e5ff070b8a30bedc19719e6ec56f841194665c16b7b6bf25bca22a5dcb9655d",
+    "internal/adapters/gadget/arguments_gadget.go": "74e9de7bb8ee3dc32bf45fdd2082aaaba1e5b747ac3b6369af745c68337b8aca",
+    "internal/adapters/gadget/arguments_gadget_test.go": "f72546d296a828c3cfebbb9af666c6235412ad4ff5b68675728c41ba30bfbcae",
+    "internal/adapters/syscalls/arguments.go": "a57b860782d0483b015d07c8ce17d3807508c1475918f523fce5cca787cb2e01",
+    "internal/adapters/syscalls/arguments_test.go": "247d71bca71e4ee659752a5668bf84723a3c7719c22a11ae4e8d5030a44bf0a0",
+    "internal/domain/collector/argument_observation_test.go": "463dee93174d8fa7df839f84285462b5b8278ffa43a0f85d5fd0bf8cf15439de",
+    "internal/domain/collector/argument_observation.go": "0f7eae17e718906bd7520dd45016bc8a5639078e47d71c5dad6e78a21769f31f",
+    "experiments/syscall-argument-budget/README.md": "103a0f3a25e1ec162431b5cd16972d4699e7e5d326ea4582b6247cfac54be46e",
+    "experiments/syscall-argument-budget/budget.h": "90b957d235dd8b7c557400930262ee954fdfaf086fef136bfa7290f57a456d99",
+    "experiments/syscall-argument-budget/budget_compile.bpf.c": "010920b56b82fb1c3fedaad7fe874d9a2b27b40141f6146c915e8003ee475c62",
+    "experiments/syscall-argument-budget/budget_test.c": "e4d6ddaedfead93d5a6cfd535ff598d391ada5be610e634a5d8fc9a262fa193a",
+    "experiments/syscall-argument-budget/pins.json": "cfe2a2da5fe2c20e3cb0a656729e9b4bc9ae4f4767d15647bd05f1db3c5cfa5a",
+    "experiments/syscall-argument-budget/prepare.py": "e9a41c9ac5aafb70c5bfdeb0ff994d6a14b671f6f645b764788a2a4918bafdb2",
+    "experiments/syscall-argument-budget/program.patch": "eb0fc9656a6af58a77305f1f39d82331078beeca8c823ec5c09f4a7803e92b45",
+    "experiments/syscall-argument-budget/test.py": "7802bfedeb0dfd1d7b54f7c3ac10a05a2f84c6fe2c574dfe71d2cb969f243a64",
+    "test/fixtures/syscall-argument-engine/main.go": "1f4c610d3838704e73fe05d83af9634e9dbf126201c505b117de1fd82dd531a9",
+    "test/fixtures/syscall-argument-engine/main_test.go": "cad8d8b480fb9252dc1fbac5fec328da251e3c32b3fe1eb64ca4a680e9336645",
+    "scripts/package-argument-gadget.py": "a189d00468fe5eba3fc0961015bdf685d6c75e74339e455e7717b803dd0edbe7",
+    "scripts/test-collector.py": "cb669cd1303b7811227bceafedd47e3402e7ef8e53506895e9cea369c82651a4"
+  },
+  "sourceUnchanged": true,
+  "compiledObjectSHA256": "4c548b54bf9cc0850352d8a4e4cc23cc5ddc7d50cfbc4bfb96913f319ec1784d",
+  "nativeQualification": "pending17casefocus"
+}

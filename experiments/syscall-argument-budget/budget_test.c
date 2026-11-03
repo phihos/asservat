@@ -8,7 +8,7 @@
 static struct asservat_argument_budget new_budget(unsigned long long events,
 						 unsigned long long bytes)
 {
-	return (struct asservat_argument_budget){events, bytes, 0, 1000, 1792};
+	return (struct asservat_argument_budget){events, bytes, 0, 1000, 1792, 0, 10000, 999990000};
 }
 
 static void boundaries(void)
@@ -44,6 +44,32 @@ static void boundaries(void)
 	assert(b.events_left == 2 && b.bytes_left == 512);
 }
 
+static void rate_boundaries(void)
+{
+	struct asservat_argument_budget b = new_budget(1000, 1000000);
+	b.deadline_boot_ns = 100000000000ULL;
+	b.rate_interval_ns = 333333334; /* rate=3, rounded DOWN throughput */
+	b.rate_burst_ns = 2 * b.rate_interval_ns;
+	assert(asservat_reserve_probe(&b, 256, 1));
+	assert(asservat_reserve_probe(&b, 256, 1));
+	assert(asservat_reserve_probe(&b, 256, 1));
+	assert(!asservat_reserve_probe(&b, 256, 1));
+	assert(b.events_left == 997 && b.bytes_left == 1000000 - 3*256);
+	/* Idle time cannot restart an exhausted/stopped instance. */
+	assert(!asservat_reserve_probe(&b, 256, 1000000001));
+	b = new_budget(1000, 1000000);
+	b.deadline_boot_ns = 100000000000ULL;
+	b.rate_interval_ns = 1000000000;
+	b.rate_burst_ns = 0; /* one probe per second, burst one */
+	assert(asservat_reserve_probe(&b, 256, 1));
+	assert(asservat_reserve_probe(&b, 256, 1000000001));
+	assert(!asservat_reserve_probe(&b, 256, 1000000001));
+	b = new_budget(1000, 1000000);
+	b.deadline_boot_ns = ~0ULL;
+	assert(!asservat_reserve_probe(&b, 256, ~0ULL - 100));
+	assert(b.events_left == 1000);
+}
+
 static struct asservat_argument_budget shared;
 static unsigned long long admitted, charged, reads;
 static pthread_barrier_t barrier;
@@ -66,6 +92,7 @@ static void *race(void *unused)
 int main(void)
 {
 	boundaries();
+	rate_boundaries();
 	unsigned long long minimum = ULLONG_MAX, maximum = 0;
 	for (int iteration = 0; iteration < 30; iteration++) {
 		pthread_t workers[16];
@@ -83,6 +110,21 @@ int main(void)
 		assert(shared.events_left <= 10000 && shared.bytes_left <= 2000000);
 		if (admitted < minimum) minimum = admitted;
 		if (admitted > maximum) maximum = admitted;
+	}
+	/* Same initial timestamp, many CPUs: no fixed-window rollover or
+	 * per-CPU burst can admit more than the single shared64-probe burst. */
+	{
+		pthread_t workers[16];
+		shared = new_budget(10000, 2000000);
+		shared.rate_interval_ns = 15625000;
+		shared.rate_burst_ns = 63 * shared.rate_interval_ns;
+		admitted = charged = reads = 0;
+		assert(!pthread_barrier_init(&barrier, NULL, 16));
+		for (int n = 0; n < 16; n++) assert(!pthread_create(&workers[n], NULL, race, NULL));
+		for (int n = 0; n < 16; n++) assert(!pthread_join(workers[n], NULL));
+		assert(!pthread_barrier_destroy(&barrier));
+		assert(admitted > 0 && admitted <= 64);
+		assert(10000 - shared.events_left <= 64 && shared.stopped == 1);
 	}
 	printf("Host race admitted probes: min=%llu max=%llu; early contention stop is permitted\n", minimum, maximum);
 	puts("PASS: boundary checks and 30 x 16-thread shared-budget races (host C model only)");

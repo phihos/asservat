@@ -23,6 +23,7 @@ import (
 	"time"
 	"unsafe"
 
+	"asservat.local/asservat/internal/adapters/syscalls"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
@@ -30,10 +31,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const objectSHA = "ae6a3e19c2bc4510f4665fb7cf9258559e45c11aaf475e227d4388095c0bec84"
+const objectSHA = "4c548b54bf9cc0850352d8a4e4cc23cc5ddc7d50cfbc4bfb96913f319ec1784d"
 
 type budget struct {
 	Events, Bytes, Stopped, DeadlineBootNS, MaxProbeBytes uint64
+	RateNextNS, RateIntervalNS, RateBurstNS               uint64
 }
 
 type counts struct {
@@ -110,6 +112,13 @@ func pinnedSpec(object, output string) *ebpf.CollectionSpec {
 		fmt.Fprintf(&listing, "%s\n%s\n", name, p.Instructions)
 	}
 	must(os.WriteFile(output, []byte(listing.String()), 0644))
+	inventory := map[string]any{}
+	for name, m := range spec.Maps {
+		inventory[name] = map[string]any{"keyBytes": m.KeySize, "valueBytes": m.ValueSize, "maxEntries": m.MaxEntries, "type": m.Type.String()}
+	}
+	encoded, e := json.MarshalIndent(inventory, "", "  ")
+	must(e)
+	must(os.WriteFile(output+".maps.json", append(encoded, '\n'), 0644))
 	return spec
 }
 
@@ -149,8 +158,10 @@ func (c *child) close() {
 }
 
 type workloadRequest struct {
-	Threads, Calls int
-	Exit, Fault    bool
+	Threads, Calls            int
+	Exit, Fault               bool
+	ReadBytes                 int
+	Zero, BadFD, ReturnLength bool
 }
 
 func (c *child) run(request workloadRequest) error {
@@ -196,6 +207,14 @@ func workload() {
 				var data [128]byte
 				copy(data[:], "synthetic argument budget fixture")
 				ptr := uintptr(unsafe.Pointer(&data[0]))
+				length := 128
+				if request.ReadBytes > 0 {
+					length = request.ReadBytes
+				}
+				if request.Zero {
+					length = 0
+				}
+				require(length >= 0 && length <= 128, "unbounded native length")
 				if request.Fault {
 					ptr = 1
 				}
@@ -203,12 +222,15 @@ func workload() {
 				if request.Exit {
 					nr, fd = unix.SYS_PREAD64, readFD
 				}
+				if request.BadFD {
+					fd = -1
+				}
 				<-start
 				for range request.Calls {
-					n, _, errno := unix.RawSyscall6(nr, uintptr(fd), ptr, 128, 0, 0, 0)
+					n, _, errno := unix.RawSyscall6(nr, uintptr(fd), ptr, uintptr(length), 0, 0, 0)
 					// /dev/null may accept a bad pointer without inspecting it;
 					// the BPF continuation still records the attempted read fault.
-					if (!request.Fault && (errno != 0 || n != 128)) || (request.Fault && errno != 0 && errno != unix.EFAULT) {
+					if (!request.Fault && !request.BadFD && (errno != 0 || n != uintptr(length))) || (request.BadFD && errno != unix.EBADF) || (request.Fault && errno != 0 && errno != unix.EFAULT) {
 						errs <- fmt.Errorf("synthetic syscall: n=%d errno=%v", n, errno)
 						return
 					}
@@ -235,11 +257,13 @@ type scenario struct {
 }
 
 type result struct {
-	Name                string
-	Initial, Final      budget
-	Counts              counts
-	Milliseconds        int64
-	DetachStoppedDebits bool
+	Name                                          string
+	Initial, Final                                budget
+	Counts                                        counts
+	Milliseconds                                  int64
+	DetachStoppedDebits                           bool
+	DecodedProbes, DecoderGaps, ContinuationBytes uint64
+	Threads                                       int
 }
 
 func runScenario(parent context.Context, original *ebpf.CollectionSpec, s scenario, dir string) (out result) {
@@ -270,6 +294,12 @@ func runScenario(parent context.Context, original *ebpf.CollectionSpec, s scenar
 			b.DeadlineBootNS = bootNS() - 1
 		}
 		b.MaxProbeBytes = 1792
+		b.RateIntervalNS = 10000
+		b.RateBurstNS = 999990000
+		if s.Name == "rate-exhaustion" {
+			b.RateIntervalNS = 333333334
+			b.RateBurstNS = 666666668
+		}
 	}
 	out.Initial = b
 	zero := uint32(0)
@@ -278,6 +308,9 @@ func runScenario(parent context.Context, original *ebpf.CollectionSpec, s scenar
 		must(budgetMap.Put(zero, b))
 	}
 	nr, definition := definitions(s.Request.Exit)
+	if s.Request.ReturnLength {
+		definition[1] = syscalls.ArgumentExitMask | syscalls.ArgumentReturnLength
+	}
 	defs := collection.Maps["syscalls"]
 	must(defs.Put(nr, definition))
 	must(collection.Maps["syscall_filters"].Put(nr, uint8(1)))
@@ -303,6 +336,16 @@ func runScenario(parent context.Context, original *ebpf.CollectionSpec, s scenar
 		}
 		readersWG.Wait()
 	}()
+	handle, _, handleErr := unix.NameToHandleAt(unix.AT_FDCWD, "/sys/fs/cgroup", 0)
+	must(handleErr)
+	require(handle.Size() == 8, "unsupported cgroup handle")
+	cgroupID := binary.LittleEndian.Uint64(handle.Bytes())
+	if s.Name != "wrong-cgroup" {
+		must(collection.Maps["asservat_cgroups"].Put(cgroupID, uint8(1)))
+	}
+	decoder, e := syscalls.NewArgumentDecoder([]string{"pread64", "pwrite64"}, true, 256, 4096)
+	must(e)
+	threadStarts := map[uint32]uint64{}
 	flushed := make(chan struct{}, s.Namespaces)
 	for range s.Namespaces {
 		c := startChild(ctx)
@@ -336,6 +379,21 @@ func runScenario(parent context.Context, original *ebpf.CollectionSpec, s scenar
 					out.Counts.Lost += record.LostSamples
 				} else if err := out.Counts.add(record.RawSample); err != nil {
 					readErr = err
+				} else {
+					probe, e := decoder.Add(record.RawSample)
+					if e != nil {
+						readErr = e
+					}
+					if probe != nil {
+						out.DecodedProbes++
+						if old := threadStarts[probe.Event.TID]; old != 0 && old != probe.Event.TaskStart {
+							readErr = errors.New("thread incarnation changed within synthetic child")
+						}
+						threadStarts[probe.Event.TID] = probe.Event.TaskStart
+						if probe.Memory != nil {
+							out.ContinuationBytes += uint64(len(probe.Memory.Data))
+						}
+					}
 				}
 				mu.Unlock()
 				if err != nil {
@@ -406,6 +464,15 @@ func runScenario(parent context.Context, original *ebpf.CollectionSpec, s scenar
 	}
 	mu.Lock()
 	must(readErr)
+	out.DecoderGaps = decoder.Flush()
+	out.Threads = len(threadStarts)
+	if s.Name == "interleaved-threads" {
+		require(out.Threads >= 2 && out.DecoderGaps == 0, "interleaved thread identity/correlation failed")
+	}
+	if s.Request.ReturnLength {
+		want := uint64(s.Request.Calls * s.Request.Threads * s.Request.ReadBytes)
+		require(out.ContinuationBytes == want && out.Counts.FailedReads == 0 && out.DecoderGaps == 0, "short/zero/negative result read mismatch")
+	}
 	validate(s, out)
 	mu.Unlock()
 	out.Milliseconds = time.Since(started).Milliseconds()
@@ -424,6 +491,8 @@ func validate(s scenario, r result) {
 	}
 	require(r.Counts.Lost == 0, "serial fixture lost events; cannot assert exact accounting")
 	switch s.Name {
+	case "wrong-cgroup":
+		require(r.Counts == (counts{}) && used == 0 && charged == 0, "foreign cgroup inspected/debited")
 	case "zero", "expired", "insufficient-first-read":
 		require(r.Counts == (counts{}) && r.Final.Stopped == 1, "denied probe emitted records")
 		if s.Name == "insufficient-first-read" {
@@ -431,19 +500,21 @@ func validate(s scenario, r result) {
 		} else {
 			require(used == 0 && charged == 0, "expired/zero allowance was debited")
 		}
+	case "rate-exhaustion":
+		require(used == 3 && charged == 1280 && r.Final.Stopped == 1 && r.Counts.Entries == 2 && r.Counts.Exits == 1 && r.Counts.Continuations == 2, "shared observed-probe rate mismatch")
 	case "event-exhaustion":
 		require(used == 7 && charged == 2816 && r.Final.Stopped == 1 && r.Counts.Entries == 4 && r.Counts.Exits == 3 && r.Counts.Continuations == 4, "entry/exit event exhaustion mismatch")
 	case "byte-exhaustion":
 		require(used == 3 && charged == 768 && r.Final.Stopped == 1 && r.Counts.Entries == 1 && r.Counts.Exits == 1 && r.Counts.Continuations == 1, "byte exhaustion mismatch")
 	default:
-		calls := uint64(s.Request.Calls)
+		calls := uint64(s.Request.Calls * max(s.Request.Threads, 1))
 		stopped := uint64(0)
 		if s.Name == "deadline-between-batches" {
 			stopped = 1
 		}
 		require(used == 2*calls && charged == 768*calls && r.Final.Stopped == stopped, "serial pre-read charge mismatch")
 		require(r.Counts.Entries == calls && r.Counts.Exits == calls && r.Counts.Continuations == calls, "entry/exit/continuation records mismatch")
-		if s.Request.Fault {
+		if s.Request.Fault && !s.Request.ReturnLength {
 			require(r.Counts.FailedReads == calls, "faulting reads were not reported/charged")
 		} else {
 			require(r.Counts.FailedReads == 0, "synthetic valid buffer faulted")
@@ -493,6 +564,11 @@ func main() {
 	exitFault.Fault = true
 	scenarios := []scenario{
 		{Name: "zero", Request: serial, Namespaces: 1},
+		{Name: "wrong-cgroup", Initial: budget{Events: 100, Bytes: 100000}, Request: serial, Namespaces: 1},
+		{Name: "short-read", Initial: budget{Events: 100, Bytes: 100000}, Request: workloadRequest{Threads: 1, Calls: 32, Exit: true, ReturnLength: true, ReadBytes: 4}, Namespaces: 1},
+		{Name: "zero-read", Initial: budget{Events: 100, Bytes: 100000}, Request: workloadRequest{Threads: 1, Calls: 32, Exit: true, ReturnLength: true, Zero: true, Fault: true}, Namespaces: 1},
+		{Name: "negative-read", Initial: budget{Events: 100, Bytes: 100000}, Request: workloadRequest{Threads: 1, Calls: 32, Exit: true, ReturnLength: true, BadFD: true}, Namespaces: 1},
+		{Name: "interleaved-threads", Initial: budget{Events: 1000, Bytes: 1000000}, Request: workloadRequest{Threads: 4, Calls: 8}, Namespaces: 1},
 		{Name: "expired", Initial: budget{Events: 100, Bytes: 100000}, Request: serial, Namespaces: 1, Expired: true},
 		{Name: "insufficient-first-read", Initial: budget{Events: 100, Bytes: 511}, Request: serial, Namespaces: 1},
 		{Name: "entry", Initial: budget{Events: 100, Bytes: 100000}, Request: serial, Namespaces: 1},
@@ -500,6 +576,7 @@ func main() {
 		{Name: "exit", Initial: budget{Events: 100, Bytes: 100000}, Request: exit, Namespaces: 1},
 		{Name: "fault-exit", Initial: budget{Events: 100, Bytes: 100000}, Request: exitFault, Namespaces: 1},
 		{Name: "deadline-between-batches", Initial: budget{Events: 100, Bytes: 100000}, Request: serial, Namespaces: 1},
+		{Name: "rate-exhaustion", Initial: budget{Events: 100, Bytes: 100000}, Request: serial, Namespaces: 1},
 		{Name: "event-exhaustion", Initial: budget{Events: 7, Bytes: 100000}, Request: serial, Namespaces: 1},
 		{Name: "byte-exhaustion", Initial: budget{Events: 100, Bytes: 1024}, Request: serial, Namespaces: 1},
 		{Name: "concurrent-two-namespaces", Initial: budget{Events: 10000, Bytes: 2000000}, Request: workloadRequest{Threads: 16, Calls: 1000}, Namespaces: 2},

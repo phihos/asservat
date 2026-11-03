@@ -297,3 +297,17 @@ of every user-memory helper call and does not implement ABI definitions,
 production grant slices, restart fencing, whole-Pod source lifecycle, approved
 argument inspection/download, revocation or installed argument-mode behavior.
 Those remaining product integrations are still required before enabling it.
+
+
+## Production argument-object follow-up (native qualification pending)
+
+The [runtime composition decision](../../docs/reviews/syscall-argument-runtime.md)
+adds shared pre-read event/byte-rate enforcement, fixed x86_64 definitions,
+zero/negative-length read refusal, thread/start provenance, cgroup membership
+and a one-use local loader. The published metadata object is unchanged. The
+new object pin supersedes the historical engine pin **for this branch only**;
+the eleven-case results above remain evidence for their old exact object.
+The updated disposable focus adds rate excess, foreign cgroup, short/zero/negative
+read and interleaved-thread cases with the production decoder. None has been
+run natively yet. Local host tests, race tests, compilation and source review
+are preparation, not transferred native qualification.
