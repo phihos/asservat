@@ -20,6 +20,7 @@ type LocalStartSpec struct {
 	AuthorityDigest    string `json:"authorityDigest"`
 	BudgetDigest       string `json:"budgetDigest"`
 	AuditDigest        string `json:"auditDigest"`
+	NativeType         string `json:"nativeType,omitempty"`
 	NativeBytes        int64  `json:"nativeBytes"`
 	NotBefore          string `json:"notBefore"`
 	NotAfter           string `json:"notAfter"`

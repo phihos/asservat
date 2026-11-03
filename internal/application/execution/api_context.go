@@ -232,6 +232,27 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		}
 		evidenceType = e.Type().EvidenceType
 	}
+	var profile *planning.ProfileContext
+	if e.Profile != nil {
+		if profile, err = compiler.ProfileContextFor(e.Profile); err != nil {
+			return out, nil, apiCheckStep{"Profile", value.ErrInvalid}
+		}
+		var refs []planning.ProfileRef
+		for _, c := range profile.Composition.Components {
+			if c.Profile.Catalog != "builtin" {
+				refs = append(refs, c.Profile)
+			}
+		}
+		if len(refs) > 0 {
+			if s.Profiles == nil {
+				return out, nil, apiCheckStep{"Profiles", value.ErrUnavailable}
+			}
+			if profile.Composition.Resolved, err = s.Profiles.ReadCatalogProfiles(ctx, t, refs); err != nil {
+				return out, nil, apiCheckStep{"Profiles", err}
+			}
+		}
+		evidenceType = e.Type().EvidenceType
+	}
 	snapshot, err := snapshotContext(w)
 	if err != nil {
 		return out, nil, apiCheckStep{"Snapshot", err}
@@ -244,12 +265,18 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		return out, nil, apiCheckStep{"Retention", err}
 	}
 	caseID := e.CaseID
-	if recorder != nil {
+	if recorder != nil || profile != nil {
 		caseID = "" // a recorder scope carries no case (ADR-243)
 	}
-	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: caseID, Executor: w.Actor, Deadline: w.Accepted.Deadline, Target: t, Capability: cap, Retention: retention, Recorder: recorder, Snapshot: snapshot, SnapshotSource: snapshotObserved}, s.Now())
+	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: caseID, Executor: w.Actor, Deadline: w.Accepted.Deadline, Target: t, Capability: cap, Retention: retention, Recorder: recorder, Profile: profile, Snapshot: snapshot, SnapshotSource: snapshotObserved}, s.Now())
 	if err != nil {
 		return out, nil, apiCheckStep{"Compile", err}
+	}
+	if profile != nil {
+		derived, actionID, err := compiler.ProfileForContext(plan)
+		if err != nil || actionID != e.ActionID || derived.TimeoutMillis != e.Profile.TimeoutMillis || derived.MaxBytes != e.Registration.NativeLimit || derived.SourceRef != e.Profile.SourceRef || derived.EndpointDigest != e.Profile.EndpointDigest || derived.Type != e.Profile.Type || derived.Mode != e.Profile.Mode || derived.DurationMillis != e.Profile.DurationMillis || derived.ForceGC != e.Profile.ForceGC {
+			return out, nil, apiCheckStep{"Profile", value.ErrInvalid}
+		}
 	}
 	var recovery artifact.RecoveryProof
 	if observedRecovery != nil {
@@ -418,7 +445,7 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	}
 	defer prepared.Close()
 	closer, ok := prepared.(evidence.StoredContextCloser)
-	if !ok && w.Accepted.Expectation.Recording == nil && w.Accepted.Expectation.Snapshot == nil {
+	if !ok && w.Accepted.Expectation.Recording == nil && w.Accepted.Expectation.Snapshot == nil && w.Accepted.Expectation.Profile == nil {
 		return zero, executeStep{"PrepareContext", value.ErrUnavailable}
 	}
 	// Queued recorders transfer ownership to the regional holder. Their joined
@@ -480,6 +507,22 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 		}
 		request := collector.SourceSnapshot{Binding: *w.SourceBinding, CaptureID: e.CaptureUID, AttemptID: e.Registration.Location.AttemptID, WriterPodUID: r.Process.PodUID, WriterEpoch: r.Process.ProcessEpoch, ExpectationDigest: [32]byte(evidence.ContextExpectationDigest(e)), Request: *e.Snapshot}
 		queued, startErr := snapshot.StartSourceSnapshot(startCtx, request)
+		if startErr == nil && !queued.IsZero() && queued.Before(d.ValidUntil) && !queued.Before(r.StartedAt) {
+			return ContextResult{State: "Recording"}, nil
+		}
+		result.CompletedAt, result.Phase = s.Now().UTC().Truncate(time.Microsecond), "captureFailed"
+		if startErr == nil {
+			startErr = value.ErrUnavailable
+		}
+		return s.finishAcquisition(ctx, w, prepared, closer, completionRecorder, result, startErr)
+	}
+	if e := w.Accepted.Expectation; e.Profile != nil {
+		profile, ok := prepared.(evidence.ProfileRecorder)
+		frozen, decodeErr := compiler.ProfileContextFor(e.Profile)
+		if !ok || decodeErr != nil {
+			return zero, executeStep{"StartProfile", value.ErrUnavailable}
+		}
+		queued, startErr := profile.StartProfile(startCtx, w.Accepted.Pin, r.StartedAt, d.ValidUntil, frozen.Endpoints[0].Request)
 		if startErr == nil && !queued.IsZero() && queued.Before(d.ValidUntil) && !queued.Before(r.StartedAt) {
 			return ContextResult{State: "Recording"}, nil
 		}

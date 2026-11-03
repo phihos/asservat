@@ -124,3 +124,23 @@ or reading credentials. `builtin/go-cpu/v1` selects a ten-second CPU interval;
 custom profiles may use the supported Go modes or the eBPF CPU sampler. Plans
 state raw native output and the required `liveProfile` approval reason. They
 remain unavailable for submission until acquisition is implemented and qualified.
+
+### Finite profile admission and custody
+
+A qualified manual Go endpoint acquisition is a distinct typed profile request,
+never a packet recorder. Persist the reviewed composition, expanded endpoint
+bindings, definition/endpoint digests, native byte ceiling and action timeout;
+re-resolve the exact endpoint before starting without rewriting the reviewed
+observation. `liveProfile` requires raw approval regardless of the installation's
+optional all-recordings approval setting. Existing same-human result-access
+children govern raw inspection/download; capture-time raw sharing stays refused
+until its separate approval contract is implemented.
+
+For native limits above 8 MiB, [ADR-290](../docs/decisions/290-one-shot-profile-streaming.md)
+requires atomic final and temporary multipart reservations and a single durable
+binding to the accepted connector process before storage. Its non-resumable
+writer may keep transition bookkeeping locally, but never reconstruct or retry
+an uncertain write or refund temporary charges before verified writer quiescence
+and complete backend inventory cleanup. Cancellation/Stop, no replacement
+profiling, protected publication and native download remain full workflow
+acceptance requirements; component checks do not qualify them.

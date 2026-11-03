@@ -100,7 +100,7 @@ func (q *Queries) InsertAPIExecution(ctx context.Context, arg InsertAPIExecution
 
 const listStartedRecordings = `-- name: ListStartedRecordings :many
 SELECT e.capture_id FROM context_execution e JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id
-WHERE e.root_id=$1 AND e.phase='started' AND e.started_at<=$2 AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType' IN ('pcapng','rawPcapng','httpHeaders','syscallRecords')
+WHERE e.root_id=$1 AND e.phase='started' AND e.started_at<=$2 AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType' IN ('pcapng','rawPcapng','httpHeaders','syscallRecords','pprof','goTrace')
 ORDER BY e.started_at LIMIT $3
 `
 

@@ -1,0 +1,12 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding
+    profile_admission_test.go:46: complete current retention policy unavailable
+--- FAIL: TestContextAdmissionWithRealServices (0.91s)
+    --- FAIL: TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding (0.50s)
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres
+    upgrade_schema_test.go:292: profile stream reserve/bind/no-reset guard, native projector and exact function rollback passed
+    upgrade_schema_test.go:301: upgrade schema: 122 to 123 by the schema owner, idempotent, floor "asservat:oldest-binary-schema=102", unknown history refused
+--- PASS: TestCustodyUpgradeSchemaWithRealPostgres (3.22s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	4.195s
+FAIL

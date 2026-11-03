@@ -585,7 +585,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	if recording {
 		rules = compiler.RecorderAssessmentRulesDigest()
 	}
-	if recording && p.IssuerEpoch == recovery.IssuerEpoch && p.AssessmentRulesDigest == rules && p.Storage != (value.ContextStorageSelection{}) && packetRecorderInput(p.Intent, p.ExecutionClass) {
+	if recording && p.IssuerEpoch == recovery.IssuerEpoch && p.AssessmentRulesDigest == rules && p.Storage != (value.ContextStorageSelection{}) && acquisitionInput(p.Intent, p.ExecutionClass) {
 		// Warm only this existing selection while the grant gate does I/O. The
 		// hint confers no authority; a refused/pending gate cancels and joins it.
 		// An approved retained preview can be expired here, so its post-grant
@@ -610,7 +610,7 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 				p.Deadline = identity.Earlier(p.Deadline, p.Intent.RepeatedFrom.ExpiresAt)
 			}
 		}
-		if p.Storage == (value.ContextStorageSelection{}) || !packetRecorderInput(p.Intent, p.ExecutionClass) {
+		if p.Storage == (value.ContextStorageSelection{}) || !acquisitionInput(p.Intent, p.ExecutionClass) {
 			return zero, value.ErrRecorderUnavailable
 		}
 	}
@@ -636,6 +636,12 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	var snapshotObserved *targets.SourceSnapshotResolution
 	if p.Intent.Snapshot != nil {
 		target, snapshotObserved, err = s.resolveSourceSnapshot(ctx, p.Intent.Snapshot)
+	} else if recording && s.Recorders != nil && profileRecorderInput(p.Intent) {
+		if profiles, ok := s.Recorders.(ProfileRecorders); ok {
+			target, err = profiles.ResolveProfileRecorder(ctx, p.Target)
+		} else {
+			err = targets.ErrUnsupported
+		}
 	} else if recording && s.Recorders != nil && syscallRecorderInput(p.Intent) {
 		if syscalls, ok := s.Recorders.(SyscallRecorders); ok {
 			target, err = syscalls.ResolveSyscallRecorder(ctx, p.Target)
@@ -735,6 +741,9 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		if err = s.recordingAssessment(p, plan); err != nil {
 			return zero, s.requestChanged("assessment")
 		}
+		if err = s.profileEndpointCurrent(ctx, plan); err != nil {
+			return zero, err
+		}
 		if err = s.peersCurrent(ctx, plan); err != nil {
 			return zero, err
 		}
@@ -748,10 +757,25 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 	if p.Intent.Snapshot != nil {
 		r.NativeLimit = p.Intent.Snapshot.Request.MaxBytes
 	}
+	if plan.Input.Profile != nil {
+		acquisition, _, err := compiler.ProfileForContext(plan)
+		if err != nil {
+			return zero, err
+		}
+		r.NativeLimit = acquisition.MaxBytes
+	}
 	if r.Validate() != nil {
 		return zero, value.ErrInvalid
 	}
-	if recording {
+	if plan.Input.Profile != nil {
+		acquisition, _, err := compiler.ProfileForContext(plan)
+		if err != nil {
+			return zero, err
+		}
+		if !s.Now().Add(time.Duration(acquisition.TimeoutMillis)*time.Millisecond + recordingCompletionMargin).Before(r.WriteUntil) {
+			return zero, value.ErrAcquisitionClosed
+		}
+	} else if recording {
 		// ADR-248: the node records for the accepted duration, then uploads;
 		// the stored result must land within the write window.
 		rec, _, err := compiler.RecordingForContext(plan)

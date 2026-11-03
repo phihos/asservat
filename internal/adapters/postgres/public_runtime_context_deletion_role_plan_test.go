@@ -40,6 +40,7 @@ func TestContextDeletionRolesHaveExactFixtureGrants(t *testing.T) {
 	acknowledge := join(common,
 		table("context_deletion_checkpoint", "UPDATE", "attempt_id", "audit_receipt_json", "audit_acknowledged_at"))
 	finalize := join(common, custody,
+		table("custody_stream", "SELECT"), table("custody_stream", "UPDATE", "attempt_id", "state", "revision", "released_at"),
 		table("policy_observation_session", "SELECT", "root_id", "capture_id"), table("policy_observation_session", "DELETE"),
 		table("context_deletion_checkpoint", "UPDATE", "attempt_id", "finalization_xid"),
 		table("custody_allocation", "UPDATE", "charged_bytes", "charged_objects"),

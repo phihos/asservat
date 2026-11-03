@@ -33,16 +33,40 @@ type SyscallRecorders interface {
 	ResolveSyscallRecorder(context.Context, targets.Request) (targets.PodResolution, error)
 }
 
+// ProfileRecorders is the optional qualified finite Go endpoint mechanism.
+type ProfileRecorders interface {
+	ProfileRecorder(context.Context, targets.PodResolution) error
+	ResolveProfileRecorder(context.Context, targets.Request) (targets.PodResolution, error)
+}
+
+func profileRecorderInput(intent value.ContextIntent) bool {
+	if intent.Composition == nil {
+		return false
+	}
+	kind, err := compiler.RecorderEvidenceType(*intent.Composition)
+	return err == nil && kind == "profile"
+}
+
+func acquisitionInput(intent value.ContextIntent, class artifact.ContextExecutionClass) bool {
+	return packetRecorderInput(intent, class) || class == artifact.ContextAPIExecution && profileRecorderInput(intent)
+}
+
 // packetRecorderAvailable reports whether this composition could be recorded
 // on the target's node now. Only a known unsupported result is plan-only;
 // operational failures must not create an inert reviewed scope.
 func (s ContextInvestigation) packetRecorderAvailable(ctx context.Context, intent value.ContextIntent, target targets.PodResolution) (bool, error) {
-	if s.Recorders == nil || !packetRecorderInput(intent, target.ExecutionClass) {
+	if s.Recorders == nil || !acquisitionInput(intent, target.ExecutionClass) {
 		return false, nil
 	}
 	mark := time.Now()
 	var err error
-	if syscallRecorderInput(intent) {
+	if profileRecorderInput(intent) {
+		profiles, ok := s.Recorders.(ProfileRecorders)
+		if !ok {
+			return false, nil
+		}
+		err = profiles.ProfileRecorder(ctx, target)
+	} else if syscallRecorderInput(intent) {
 		syscalls, ok := s.Recorders.(SyscallRecorders)
 		if !ok {
 			return false, nil
@@ -86,6 +110,13 @@ func (s ContextInvestigation) recordingPlan(ctx context.Context, p value.Context
 	if err := compiler.CatalogProfilesCurrent(*p.Intent.Composition, p.CanonicalScope); err != nil {
 		return planning.ContextPlan{}, previewFailure("profiles", err)
 	}
+	if profileRecorderInput(p.Intent) {
+		profile, err := compiler.ProfileContextFromScope(*p.Intent.Composition, p.Target, p.CanonicalScope)
+		if err != nil {
+			return planning.ContextPlan{}, err
+		}
+		return compiler.CompileContext(planning.ContextInput{CaptureID: p.CaptureID, CaseID: p.CaseID, Executor: p.Actor, Deadline: p.Deadline, Target: f.target, Retention: f.retention, Capability: f.capability, Profile: profile}, s.Now())
+	}
 	recorder, err := compiler.RecorderContextFromScope(*p.Intent.Composition, p.CanonicalScope)
 	if err != nil {
 		return planning.ContextPlan{}, err
@@ -123,7 +154,7 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	if err != nil {
 		return zero, previewFailure("compile", err)
 	}
-	recordable := compiler.AcceptableRecorder(plan).Acceptable()
+	recordable := compiler.AcceptableRecorder(plan).Acceptable() || compiler.AcceptableProfile(plan).Acceptable()
 	if _, _, policy := authorization.PolicyExecutor(i.Principal); policy {
 		// requireRecordingApproval above already checked the package-private
 		// accepted settings provenance. This structural plan is not a permit:
@@ -183,6 +214,9 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 // reviewed recorder assessment rules.
 func (s ContextInvestigation) recordingAssessment(p value.ContextPreview, plan planning.ContextPlan) error {
 	rp, err := compiler.RecorderPlanForContext(plan)
+	if plan.Input.Profile != nil {
+		rp, err = compiler.ProfilePlanForContext(plan)
+	}
 	if err != nil {
 		return err
 	}

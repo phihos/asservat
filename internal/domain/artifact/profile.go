@@ -75,3 +75,13 @@ func ValidGoProfile(typ, mode string, d time.Duration, forceGC bool) bool {
 	}
 	return false
 }
+
+// Clone isolates persisted acquisition input from mutable callers.
+func (p *GoProfileAcquisition) Clone() *GoProfileAcquisition {
+	if p == nil {
+		return nil
+	}
+	out := *p
+	out.Composition = append([]byte(nil), p.Composition...)
+	return &out
+}

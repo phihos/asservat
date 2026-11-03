@@ -171,6 +171,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("capture_history_quota", "UPDATE", "used")
 		add("capture_history_parameter", "UPDATE", "capture_id", "visible", "state", "write_id", "write_digest", "write_started_at", "write_until", "write_executor_epoch", "writer_completion_json", "copies_digest", "delete_id", "delete_executor_epoch", "delete_started_at", "delete_until", "delete_fence", "purge_completion_json")
 	case "capture-admit":
+		read("custody_stream")
+		add("custody_stream", "INSERT")
+		add("custody_stream", "UPDATE", "attempt_id") // row lock only; execution binds the writer
 		read("recording_save_group")
 		add("recording_save_group", "INSERT")
 		read("recording_save_reservation", "policy_workload_window")
@@ -477,6 +480,8 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			// admits its FOR UPDATE lock, and the guard trigger refuses changes.
 			add("context_deletion_checkpoint", "UPDATE", "attempt_id", "audit_receipt_json", "audit_acknowledged_at")
 		case "context-cleanup-finalize":
+			read("custody_stream")
+			add("custody_stream", "UPDATE", "attempt_id", "state", "revision", "released_at")
 			// ADR-261: only the exact expired observation child, protected by the
 			// existing audited finalization transaction; no pool counter updates.
 			add("policy_observation_session", "SELECT", "root_id", "capture_id")

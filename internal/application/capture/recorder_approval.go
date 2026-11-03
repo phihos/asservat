@@ -130,11 +130,10 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 	if err != nil {
 		return authorization.Grant{}, value.ErrUnavailable
 	}
-	if slices.ContainsFunc(actions, func(a planning.RecorderAction) bool { return a.Kind == "profile" }) {
-		// ADR-285: profile plans are plan-only until a node acquires them
-		// (S-05 increments 3 and 5); no review opens for a plan that cannot run.
+	if slices.ContainsFunc(actions, func(a planning.RecorderAction) bool { return a.Kind == "profile" }) && (len(actions) != 1 || actions[0].ProfileSource != "httpEndpoint" || p.Storage == (value.ContextStorageSelection{})) {
 		return authorization.Grant{}, value.ErrRecorderUnavailable
 	}
+
 	required, err := s.requireRecordingApproval(ctx, source, p.Actor)
 	if err != nil {
 		return authorization.Grant{}, err

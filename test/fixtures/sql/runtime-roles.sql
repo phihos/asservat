@@ -644,3 +644,12 @@ GRANT SELECT,INSERT ON recording_save_group TO capture_runtime;
 GRANT SELECT ON recording_save_group TO context_progress_read_runtime,context_deadline_runtime;
 GRANT UPDATE(id) ON recording_save_group TO context_progress_read_runtime; -- row lock (production hub-metadata-read)
 GRANT SELECT,DELETE ON recording_selection_set TO context_preview_cleanup_runtime;
+
+-- S-05: admission precharges a pending multipart obligation; the accepted
+-- connector preparation alone binds its immutable process, and the separately
+-- audited purge finalizer releases temporary charges after complete inventory.
+GRANT SELECT,INSERT ON custody_stream TO capture_runtime;
+GRANT UPDATE(attempt_id) ON custody_stream TO capture_runtime;
+GRANT SELECT ON custody_stream TO api_execution_prepare_runtime,context_cleanup_finalize_runtime;
+GRANT UPDATE(attempt_id,writer_epoch,plan_digest,revision) ON custody_stream TO api_execution_prepare_runtime;
+GRANT UPDATE(attempt_id,state,revision,released_at) ON custody_stream TO context_cleanup_finalize_runtime;

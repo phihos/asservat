@@ -24,7 +24,7 @@ type RecordingExecutions interface {
 // recording records captureFailed or storeUnconfirmed.
 func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork, r value.APIExecution, collector evidence.RecordingCollector) (ContextResult, error) {
 	e := w.Accepted.Expectation
-	if ctx == nil || collector == nil || s.Process == nil || s.Record == nil || s.Recovery == nil || s.Now == nil || (e.Recording == nil && e.Snapshot == nil) || r.Phase != "started" || r.ExpectationDigest != evidence.ContextExpectationDigest(e) {
+	if ctx == nil || collector == nil || s.Process == nil || s.Record == nil || s.Recovery == nil || s.Now == nil || (e.Recording == nil && e.Snapshot == nil && e.Profile == nil) || r.Phase != "started" || r.ExpectationDigest != evidence.ContextExpectationDigest(e) {
 		return ContextResult{}, executeStep{"collect", value.ErrInvalid}
 	}
 	completionRecorder, ok := s.Record.(APIStoredCompletionRecorder)

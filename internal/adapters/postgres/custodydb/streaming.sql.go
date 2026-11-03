@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bindPendingStream = `-- name: BindPendingStream :execrows
+UPDATE custody_stream SET writer_epoch=$2,plan_digest=$3,revision=revision+1
+WHERE attempt_id=$1 AND writer_epoch IS NULL AND plan_digest IS NULL AND released_at IS NULL
+`
+
+type BindPendingStreamParams struct {
+	AttemptID   pgtype.UUID
+	WriterEpoch pgtype.UUID
+	PlanDigest  []byte
+}
+
+func (q *Queries) BindPendingStream(ctx context.Context, arg BindPendingStreamParams) (int64, error) {
+	result, err := q.db.Exec(ctx, bindPendingStream, arg.AttemptID, arg.WriterEpoch, arg.PlanDigest)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const chargeStreaming = `-- name: ChargeStreaming :execrows
 UPDATE custody_allocation SET charged_bytes = charged_bytes + $2, charged_objects = charged_objects + $3
 WHERE id = $1 AND $2 <= byte_limit - charged_bytes AND $3 <= object_limit - charged_objects
@@ -28,6 +47,27 @@ func (q *Queries) ChargeStreaming(ctx context.Context, arg ChargeStreamingParams
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const insertPendingStream = `-- name: InsertPendingStream :exec
+INSERT INTO custody_stream(attempt_id,temporary_bytes,temporary_objects,state) VALUES($1,$2,$3,$4)
+`
+
+type InsertPendingStreamParams struct {
+	AttemptID        pgtype.UUID
+	TemporaryBytes   int64
+	TemporaryObjects int64
+	State            []byte
+}
+
+func (q *Queries) InsertPendingStream(ctx context.Context, arg InsertPendingStreamParams) error {
+	_, err := q.db.Exec(ctx, insertPendingStream,
+		arg.AttemptID,
+		arg.TemporaryBytes,
+		arg.TemporaryObjects,
+		arg.State,
+	)
+	return err
 }
 
 const insertStream = `-- name: InsertStream :exec

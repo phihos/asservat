@@ -135,6 +135,9 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 			out.ActionPhase = "Denied"
 			out.ReasonCode = "PodStatusDenied"
 			return out, nil
+		case "profilerBusy":
+			out.Phase, out.ActionPhase, out.ReasonCode = "Failed", "Failed", "ProfilerBusy"
+			return out, nil
 		case "peerMembershipChanged":
 			// ADR-283 part 3: the connector stopped (or never started) the
 			// recording because its frozen Kubernetes peers changed.

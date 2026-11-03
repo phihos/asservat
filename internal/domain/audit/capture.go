@@ -57,7 +57,7 @@ func (r CaptureIntent) Valid() bool {
 			return false
 		}
 	}
-	return r.Actor.Valid() && r.Target.Valid() && authorization.UUID(r.PermissionEpoch) && r.PermissionSequence > 0 && r.IdentityRevision.Valid() && r.ScopeDigest != (artifact.Digest{}) && r.SubmissionDigest != (artifact.Digest{}) && r.ExpectationDigest != (artifact.Digest{}) && !r.CreatedAt.IsZero() && r.CreatedAt.Before(r.Deadline) && r.CreatedAt.Before(r.ExpiresAt) && r.ExpiresAt.Before(r.DeleteBy) && r.ReservedBytes > 0 && r.ReservedBytes < 16<<20
+	return r.Actor.Valid() && r.Target.Valid() && authorization.UUID(r.PermissionEpoch) && r.PermissionSequence > 0 && r.IdentityRevision.Valid() && r.ScopeDigest != (artifact.Digest{}) && r.SubmissionDigest != (artifact.Digest{}) && r.ExpectationDigest != (artifact.Digest{}) && !r.CreatedAt.IsZero() && r.CreatedAt.Before(r.Deadline) && r.CreatedAt.Before(r.ExpiresAt) && r.ExpiresAt.Before(r.DeleteBy) && r.ReservedBytes > 0 && r.ReservedBytes <= (artifact.Registration{NativeLimit: artifact.MaxGoTraceBytes}).ReservedBytes()
 }
 
 func (r CaptureIntent) Requester() identity.Principal {
