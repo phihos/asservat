@@ -1,7 +1,7 @@
 # ADR-281 — Syscall argument tracing stays disabled with the published traceloop gadget
 
-Date: 2026-11-02. Status: accepted (agent decision); maintainer decision on an
-engine exception pending. Requirements: REQ-SYS-001, REQ-SYS-002 (arguments
+Date: 2026-11-02. Updated: 2026-11-03. Status: accepted; the maintainer
+approved the narrowly scoped engine exception, with native qualification pending. Requirements: REQ-SYS-001, REQ-SYS-002 (arguments
 mode), S-04 increment 15. Related: ADR-273, ADR-279, S-04 plan S1.
 
 ## Context
@@ -30,8 +30,12 @@ upstream gadgets pinned by digest; no custom kernel/eBPF program") excludes.
    disable that capability", specs/syscalls.md).
 2. No user-space approximation of the accounting is added: it would weaken
    observation limits.
-3. Lifting this needs a maintainer decision to allow an owned, digest-pinned
-   eBPF patch with a reproducible build (S1 exception). With it, the slices are:
+3. On 2026-11-03 the maintainer approved: “Allow the narrowly scoped patched
+   trace program, with native qualification.” This authorizes an owned,
+   digest-pinned traceloop patch with a reproducible build as a narrow S1
+   exception for pre-read observation accounting. It does not authorize other
+   custom eBPF collectors or enable argument capture before qualification.
+   The implementation slices are:
    engine patch and fixed definition table; event accounting rule and
    migration; planning/grant/node reuse of the ADR-279 ad hoc pool; raw native
    type and verifier; native `continuation-manual-syscall-args` focus.
@@ -41,3 +45,14 @@ upstream gadgets pinned by digest; no custom kernel/eBPF program") excludes.
 Benefit: a specified but uncommon sensitive opt-in. Cost without the exception:
 none (status quo plus this record). With it: an owned kernel program, its
 verifier behaviour and build pipeline become Asservat's responsibility.
+
+## Qualification required before enablement
+
+Pin the upstream source, patch, build inputs and resulting engine digest. Native
+tests must establish concurrent entry/exit budget exhaustion before user-memory
+reads, failed-read charging, no refill on restart, workload isolation, bounded
+map/ring behavior, and stop/revocation handling. Preserve metadata mode's empty
+definition map and absence of user-memory reads. Test decoded native artifacts,
+raw approval and authenticated download through the installed workflow; a verifier
+load or unit test alone cannot qualify arguments mode. Run the collector only in
+a disposable authorized environment, never on the developer workstation.
