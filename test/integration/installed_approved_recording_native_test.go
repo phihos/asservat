@@ -34,12 +34,13 @@ import (
 )
 
 type installedApprovedRecordingPreview struct {
-	ID       string    `json:"preview_id"`
-	Expires  time.Time `json:"expires_at"`
-	Approval bool      `json:"approval_required"`
-	Enabled  bool      `json:"capture_enabled"`
-	Digest   string    `json:"execution_digest"`
-	Blockers []struct {
+	ID          string          `json:"preview_id"`
+	Expires     time.Time       `json:"expires_at"`
+	Approval    bool            `json:"approval_required"`
+	Enabled     bool            `json:"capture_enabled"`
+	Digest      string          `json:"execution_digest"`
+	Composition json.RawMessage `json:"profile_composition"`
+	Blockers    []struct {
 		Code string `json:"code"`
 	} `json:"blockers"`
 	Pods      []struct{ UID, Name string } `json:"selected_pods"`
@@ -868,6 +869,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	if installedJourneyFocus() == "manual-profile" {
 		qualifyManualProfileNative(t, ctx, native, receipt.CaptureID)
+		qualifyManualProfileRepeatPreview(t, receipt.CaptureID, preview, invoke)
 		qualifyManualProfileStop(t, ctx, manualProfileStopArguments(cluster, namespace, workload), read, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
 			if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent installed profile Stop review", "idempotency_key": "approve-stop-" + grantID}, nil); code != "" {

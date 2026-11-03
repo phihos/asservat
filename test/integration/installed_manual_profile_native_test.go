@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,54 @@ import (
 // URL or select another container. Only the fixture's declared port matches.
 func manualProfileEndpoints() []contracts.RegionalProfileEndpoint {
 	return []contracts.RegionalProfileEndpoint{{Name: "go-pprof-loopback", Kind: "template", AddressModes: []string{"targetLoopback"}, LoopbackFamily: "ipv4", MinPort: 6060, MaxPort: 6060}}
+}
+
+// Exercise the installed history-read + target + recorder composition without
+// starting another capture. Each operation gets one attempt, so retries cannot
+// conceal the preview deadline failure this qualification is intended to detect.
+func qualifyManualProfileRepeatPreview(t *testing.T, captureID string, original installedApprovedRecordingPreview, invoke func(string, any) (installedJourneyEnvelope, string)) {
+	t.Helper()
+	type settings struct {
+		CaptureID       string         `json:"capture_id"`
+		Digest          string         `json:"settings_digest"`
+		ExecutionDigest string         `json:"original_execution_digest"`
+		ExpiresAt       time.Time      `json:"expires_at"`
+		Settings        map[string]any `json:"settings"`
+	}
+	read := func(name string, args, out any) {
+		t.Helper()
+		started := time.Now()
+		var reply installedJourneyEnvelope
+		var code string
+		defer func() {
+			t.Logf("manual profile history %s: single attempt elapsed=%s status=%s code=%s", name, time.Since(started), reply.Status, code)
+		}()
+		reply, code = invoke(name, args)
+		if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, out) != nil {
+			t.Fatal("manual profile history operation failed", name, reply.Status, code)
+		}
+	}
+	var source settings
+	read("get_capture_settings", map[string]string{"capture_id": captureID}, &source)
+	var originalComposition map[string]any
+	if json.Unmarshal(original.Composition, &originalComposition) != nil || len(originalComposition) != 3 || source.CaptureID != captureID || source.Digest == "" || source.ExecutionDigest != original.Digest || !time.Now().Before(source.ExpiresAt) || !reflect.DeepEqual(source.Settings["profile_composition"], originalComposition) {
+		t.Fatal("stored profile settings differ from the original reviewed composition")
+	}
+	var repeated struct {
+		installedApprovedRecordingPreview
+		RepeatedFrom string `json:"repeated_from_capture_id"`
+	}
+	read("preview_capture", map[string]string{"history_capture_id": captureID}, &repeated)
+	var repeatedComposition map[string]any
+	if !repeated.readyForApproval(time.Now()) || repeated.ID == original.ID || repeated.RepeatedFrom != captureID || json.Unmarshal(repeated.Composition, &repeatedComposition) != nil || !reflect.DeepEqual(repeatedComposition, originalComposition) {
+		t.Fatal("repeat preview lost fresh review or immutable authored/profile/action-map composition")
+	}
+	var after settings
+	read("get_capture_settings", map[string]string{"capture_id": captureID}, &after)
+	if !reflect.DeepEqual(source, after) || !time.Now().Before(after.ExpiresAt) {
+		t.Fatal("repeat preview changed original settings, digest or expiry")
+	}
+	t.Logf("manual profile %s: fresh repeat preview %s preserved original composition and source expiry %s; no repeat capture requested", captureID, repeated.ID, source.ExpiresAt.Format(time.RFC3339Nano))
 }
 
 func manualProfileStopArguments(cluster, namespace, workload string) map[string]any {
