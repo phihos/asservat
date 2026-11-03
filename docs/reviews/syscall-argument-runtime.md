@@ -126,3 +126,24 @@ Production composition must bind the canonical collector accounting rule,
 program and definition digests to original admitted slices, budget engine memory,
 package the object, persist typed raw evidence and qualify native download/Stop.
 This component alone enables no public capability.
+
+## Disposable native object qualification
+
+[Run 41605285070](https://github.com/phihos/asservat/actions/runs/41605285070)
+on `21d6177d` passed all seventeen cases in 3.07 seconds on Ubuntu 24.04.5,
+kernel 7.0.0-1017-azure, four CPUs, BTF and cgroup v2. The exact object was
+`4c548b54bf9cc0850352d8a4e4cc23cc5ddc7d50cfbc4bfb96913f319ec1784d`.
+Recorded source inventories matched, all post-detach debit checks passed,
+local handles closed and cleanup failures were empty. Original verifier output,
+report and log are in `test/results/syscall-argument-native-41605285070/`.
+
+The wrong-cgroup case spent nothing and emitted nothing. Short reads decoded
+128 total argument bytes across 32 calls; zero/negative returns decoded zero
+argument bytes. Four interleaved threads decoded 64 probes without a correlation
+gap. A three-probe burst stopped after exactly three debits. Event/byte exhaustion,
+faulting reads, expiry, deadline-between-batches and two-namespace concurrency
+also passed. This is exact-object/decoder mechanism qualification, not installed
+whole-Pod discovery, committed authority, native raw custody/download, public
+Stop or an overhead bound. The fixture provisions its own maps and memberships
+and does not independently count every user-memory helper invocation. Its
+2 MiB perf ceiling is the fixture setting, not a measured production footprint.
