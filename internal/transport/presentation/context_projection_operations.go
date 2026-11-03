@@ -29,6 +29,7 @@ type ContextProjectionOperations struct {
 	excerpts  ContextExcerptService
 	results   ContextQueryResults
 	headers   HTTPHeaderQueryService
+	profiles  ProfileSummaryQueryService
 	contracts *contracts.InvestigationContracts
 }
 
@@ -56,7 +57,7 @@ func (s *ContextProjectionOperations) WithHTTPHeaders(headers HTTPHeaderQuerySer
 
 // serves reports whether name is one of this composition's operations.
 func (s *ContextProjectionOperations) serves(name string) bool {
-	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil)
+	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil)
 }
 
 // toolNames are the operations this composition advertises.
@@ -64,6 +65,9 @@ func (s *ContextProjectionOperations) toolNames() []string {
 	names := []string{"get_file_excerpt", "get_query_result"}
 	if s.headers != nil {
 		names = append(names, "get_http_headers")
+	}
+	if s.profiles != nil {
+		names = append(names, "get_profile_summary")
 	}
 	return names
 }
@@ -81,6 +85,16 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var input analysisapp.ContextQueryInput
 	switch name {
+	case "get_profile_summary":
+		var in ProfileSummaryOperationInput
+		if json.Unmarshal(raw, &in) != nil {
+			return noDispatch, ErrOperationDelivery
+		}
+		selection, e := value.NormalizeProfileSummarySelection(in.SampleType, in.TopN)
+		if e != nil {
+			return noDispatch, ErrOperationDelivery
+		}
+		input.Profile = value.ProfileSummaryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: selection}
 	case "get_http_headers":
 		var in HTTPHeaderOperationInput
 		if json.Unmarshal(raw, &in) != nil {
@@ -126,6 +140,8 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var d *analysisapp.ContextProjectionDelivery
 	switch name {
+	case "get_profile_summary":
+		d, err = s.profiles.Begin(ctx, current, i, input.Profile)
 	case "get_file_excerpt":
 		d, err = s.excerpts.BeginExcerpt(ctx, current, i, input.Selection)
 	case "get_http_headers":
@@ -200,7 +216,7 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 	envelope := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: requestID,
 		DataClass: "metadata", Status: "ok", Warnings: []string{}, Provenance: []any{}}
 	switch {
-	case d.Pending() && name == "get_http_headers":
+	case d.Pending() && (name == "get_http_headers" || name == "get_profile_summary"):
 		// The canonical get_http_headers pending branch carries the handle only.
 		envelope.Status = "pending"
 		envelope.Data = struct {
@@ -214,6 +230,23 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 			RetryAfter  int    `json:"retry_after_seconds"`
 			queryViewTimes
 		}{d.Association().QueryID, 1, times}
+	case d.Tool() == "get_profile_summary":
+		summary, ok := d.ProfileSummary()
+		if !ok {
+			return nil, ErrOperationDelivery
+		}
+		artifactID, version := d.Provenance()
+		envelope.DataClass = "extract"
+		envelope.Warnings = []string{profileSummaryHandling}
+		if summary.SymbolStatus != "complete" {
+			envelope.Warnings = append(envelope.Warnings, "SymbolCoverage: Some or all function names are unavailable; unresolved samples remain in the totals.")
+		}
+		envelope.Provenance = []any{httpHeaderProvenance{ArtifactID: artifactID, Digest: hash(version)}}
+		envelope.Data = summary
+		if name == "get_query_result" {
+			envelope.Data = queryResult(d.Association().QueryID, d.Tool(), envelope, times)
+			envelope.Provenance = []any{}
+		}
 	case d.Tool() == "get_http_headers":
 		page, ok := d.HeaderPage()
 		if !ok {
@@ -258,7 +291,11 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 		}
 	}
 	body, err := json.Marshal(envelope)
-	if err != nil || s.contracts.ValidateOutput(name, body) != nil {
+	if err == nil && len(body) > contracts.InvestigationOutputLimit && d.Tool() == "get_profile_summary" {
+		clear(body)
+		body, err = json.Marshal(httpHeaderFailure(requestID, OperationFailure{Code: "AnalysisUnavailable", Message: "This profile summary does not fit the response limit. Select fewer hotspots.", Retryable: false}))
+	}
+	if err != nil || len(body) > contracts.InvestigationOutputLimit || s.contracts.ValidateOutput(name, body) != nil {
 		clear(body)
 		return nil, ErrOperationDelivery
 	}
@@ -278,7 +315,7 @@ func queryResult(queryID, tool string, inner OperationEnvelope, times queryViewT
 // refusal proven before any query effect.
 func (s *ContextProjectionOperations) refusal(requestID, name string, until time.Time, f OperationFailure, decision operationAuditDecision, effect operationAuditEffect, noDispatch bool) (OperationReply, error) {
 	body, err := json.Marshal(httpHeaderFailure(requestID, f))
-	if err != nil || s.contracts.ValidateOutput(name, body) != nil {
+	if err != nil || len(body) > contracts.InvestigationOutputLimit || s.contracts.ValidateOutput(name, body) != nil {
 		clear(body)
 		return OperationReply{auditNoDispatch: noDispatch, auditEffect: effect}, ErrOperationDelivery
 	}
@@ -308,3 +345,20 @@ func (g *contextProjectionGuard) Close(ctx context.Context) error {
 	g.invocation.close()
 	return g.delivery.Close(ctx)
 }
+
+// ProfileSummaryQueryService admits one closed aggregate through the existing
+// query pipeline. Installing this optional facet is a separate qualification gate.
+type ProfileSummaryQueryService interface {
+	Begin(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.ProfileSummaryRequest) (*analysisapp.ContextProjectionDelivery, error)
+}
+
+func (s *ContextProjectionOperations) WithProfileSummaries(profiles ProfileSummaryQueryService) (*ContextProjectionOperations, error) {
+	if s == nil || profiles == nil || s.profiles != nil {
+		return nil, ErrOperationsConfiguration
+	}
+	out := *s
+	out.profiles = profiles
+	return &out, nil
+}
+
+const profileSummaryHandling = "SensitiveDataHandling: Function names may contain user data. This summary omits raw samples, labels, paths and addresses. Automatic deletion covers Asservat-managed copies; copies already delivered cannot be recalled."

@@ -196,6 +196,35 @@ whole/resume and paced PCAPNG/profile transport regressions pass in 50.093
 seconds; the paced 64 MiB response takes 24.154 seconds with ten short-lease
 renewals. These are real TLS/component tests with synthetic stored bytes. Native collector and installed profile runs
 remain pending; these component results do not complete S-05.
+## Closed pprof summary ledger and optional presentation (2026-11-03)
+
+ADR-291 now composes streamed native pprof reads, closed aggregate authority,
+migration 127 accounting and an optional audited presentation handler. Public
+registration remains disabled; this is not installed S-05 qualification.
+The existing worker stays 256 MiB, with a truthful 256 MiB transient declaration;
+each summary conservatively charges ten units and permits one read batch.
+
+The owned SQL/S3/OpenBao `profile-summary127-ledger-fleet7` fixture passed in
+11.417s (Go package exit 0), sources unchanged and cleanup failures empty. It uses
+actual approved raw profile admission, API prepare/start/joined stored completion,
+independent publication and current ordinary read authority. It verifies exact
+1 MiB authored source limits, immutable selection/version, one-use read ownership,
+10-unit atomic accounting and replay, 20-unit quota refusal and atomic 127 downgrade
+refusal. Target/process/start observations and worker ownership are synthetic.
+The fixture found and fixed the catalog's erroneous exact 64 MiB requirement and
+the account trigger's old 1/2-unit-only mutation check; retained before reports are
+`profile-summary127-ledger-fleet4` and `fleet5` in `test/results/`.
+
+The optional public facet preserves the exact audited selection and pending/ready
+query identity, closes results at 24 KiB including the full envelope, and remains
+absent from ordinary tool discovery. Existing schemas and discovery descriptions
+retain their bounds. Domain/application/contracts races and affected bootstrap
+capacity races pass. The final migration upgrade/parity fixture passed in
+5.833s with source hashes unchanged and cleanup empty. Spec validation (13,476 assertions), architecture,
+Go dependency checks, complete PostgreSQL/application-authorization races and
+affected bootstrap capacity races passed. Installed runtime qualification remains
+pending.
+
 ## Profile summary internal authority checkpoint (2026-11-03)
 
 ADR-291 adds a closed pprof source/selection/result to the existing projection

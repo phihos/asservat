@@ -44,35 +44,49 @@ The result union admits only the selected closed summary and validates its
 selected sample type. The coordinator bounds its JSON to 24 KiB independently
 of analyzer validation.
 Copies own all hotspot/name/fraction pointers; closure clears retained output.
-Public routing and SQL admission remain disabled. The regional worker now
+Migration 127 admits this exact closed source through the existing SQL ledger.
+Public registration remains disabled. The optional presentation facet embeds the
+closed schema, binds the audited input and serializes pending/ready results;
+ordinary query construction does not install it. The regional worker now
 connects the existing native reader to the bounded analyzer through one delivery
 chunk buffer (256 KiB), retaining no whole compressed profile. The authenticated
 whole-file check and exact EOF must finish before a result is accepted. The
 source's authored native limit remains binding up to the format maximum; a
 16 MiB source does not become a 64 MiB source. Native transport carries the bare
 closed summary within 24 KiB and refuses oversized output without trimming. The public response must additionally fit its complete
-existing envelope budget before activation.
+existing 24 KiB envelope budget. An oversized selected result refuses and asks
+for fewer hotspots; it never silently trims the selection.
 
 ## Funding and resource boundary
 
 The S-05 plan's earlier two-query-unit estimate is not evidence for a 64 MiB
 profile. A conservative existing profile-window read plus metadata costs more
-than 72 MiB and fits ten existing 8 MiB query units. This is a proposed read-work
-reservation, not an implemented SQL charge or a complete memory qualification.
+than 72 MiB and fits ten existing 8 MiB query units. Migration 127 charges ten units atomically to the original root, workload and
+principal accounts. This conservative read-work reservation is not a measured
+physical memory bound.
 Stream verified native chunks into the analyzer rather than retaining another
 64 MiB compressed buffer. Parsing still owns the bounded decompressed input and
 its object graph. Neither post-parse counts nor a per-query Go memory setting
 provide a hard heap bound. Physical worker resources, pre-parse shape controls,
 all allocation dimensions and provider work must be measured and funded before
-admission is enabled. No worker template or accepted capacity profile changes in
-this checkpoint. Preserve the original 20-second projection operation bound
+admission is enabled. The physical worker remains 256 MiB. The original installed query declaration
+now declares the same 256 MiB as worker transient capacity, replacing its
+insufficient 8 MiB declaration. Summary admission independently requires both
+physical and declared transient capacity at least 256 MiB; older profiles still
+serve their existing tools and fail this new summary compatibility check. No new
+reacceptance state, worker template, credential or physical reservation is added. Preserve the original 20-second projection operation bound
 unless actual qualified measurements justify a separate change.
 
-SQL follow-up extends the existing closed scope/tool/audit functions, exact
-selection and query-unit charge, retaining migration 126's preview window.
+Migration 127 extends the existing closed scope/tool/audit functions, exact
+selection, ten-unit account increments and query charge, retaining migration 126's
+preview window. Downgrade refuses retained summary queries or invocation audit;
+on an empty history it restores the exact prior definitions.
 No new table, credential, network destination, worker kind or lifecycle state is
-required by this design. Resource/read bounds, actual SQL/key/worker composition,
-OOM and unjoined cleanup, and installed MCP/browser output remain unqualified.
+required by this design. The owned PostgreSQL/S3/OpenBao fixture proves actual approved profile
+admission, API execution completion, independent publication, current C-03
+read authority and SQL query accounting. Native target/process observations and
+worker ownership remain synthetic. Installed SQL/key/worker composition,
+cgroup lifecycle and MCP/browser output remain unqualified.
 
 ## Complexity gate
 
@@ -86,8 +100,8 @@ OOM and unjoined cleanup, and installed MCP/browser output remain unqualified.
 | 6. Added states | Zero persistent lifecycle states; existing pending/refused/uncertain closure. |
 | 7. Machinery configuration | None; operator resource limits still need qualification. |
 | 8. Dependencies | Existing google/pprof parser and worker process/cgroup lifecycle. |
-| 9. Aggregate cost | One worker and one read batch per summary; proposed ten read-work units, zero extra Jobs/PVCs/watches. Physical memory unresolved. |
-| 10. Rollback | No schema/layout changes here; zero fields omitted preserve existing scopes. New production route remains absent. SQL rollback follows in the funded increment. |
+| 9. Aggregate cost | One worker and one read batch per summary; ten read-work units, zero extra Jobs/PVCs/watches; declared transient 256 MiB reuses physical worker. Installed resource qualification pending. |
+| 10. Rollback | Migration 127 changes functions only; no new tables. Empty-history downgrade restores old definitions; retained summaries refuse atomically. Production route remains absent. |
 | 11. Smaller fix | A tool-name-only addition would bypass source, classification and funding checks. Reuse existing ports and keep activation closed. |
 
 ## Verification boundary

@@ -1,0 +1,47 @@
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-valid
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-top
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-sample
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-extra-selection
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-line-selection
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-headers
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-digest
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-format
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-version
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-trace
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-valid#01
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-top#01
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-sample#01
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-extra-selection#01
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-line-selection#01
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-headers#01
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-digest#01
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-format#01
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-version#01
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-trace#01
+=== NAME  TestCustodyUpgradeSchemaWithRealPostgres
+    upgrade_schema_test.go:239: summary127→126→127: exact query/audit restoration; fixed ten units, one batch, closed source/selection
+    upgrade_schema_test.go:359: upgrade schema: 126 to 127 by the schema owner, idempotent, floor "asservat:oldest-binary-schema=102", unknown history refused
+--- PASS: TestCustodyUpgradeSchemaWithRealPostgres (4.75s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-valid (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-top (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-sample (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-extra-selection (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-line-selection (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-headers (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-digest (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-format (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-version (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-trace (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-valid#01 (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-top#01 (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-sample#01 (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-extra-selection#01 (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-line-selection#01 (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-headers#01 (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-digest#01 (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-format#01 (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-version#01 (0.00s)
+    --- PASS: TestCustodyUpgradeSchemaWithRealPostgres/profile-summary-sql-trace#01 (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	5.833s

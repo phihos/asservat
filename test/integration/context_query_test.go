@@ -136,6 +136,15 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		environment := authapp.CurrentProjectionEnvironment{RootID: rootID, InstallationID: f.base.input.InstallationID, Policies: f.policies, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}
 		authorityGate := authapp.ContextProjectionAuthority{RootID: rootID, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: environment, Now: time.Now}
 		scope := value.ContextProjectionScope{RootID: rootID, CaseID: e.CaseID, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(published.Copies), SourceProjectionDigest: value.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: value.ContextDisplayVersion, Selection: value.LineSelection{LineStart: 1, MaxLines: 14}, Principal: principal}
+		profileSummary := e.NativeType == artifact.PprofArtifact
+		beginTool := "get_file_excerpt"
+		units := int64(1)
+		if profileSummary {
+			scope.NativeType, scope.SourceFormat, scope.DisplayVersion = artifact.PprofArtifact, artifact.PprofFormat, value.ProfileSummaryDisplayVersion
+			scope.SourceProjectionDigest, scope.Selection = artifact.Digest{}, value.LineSelection{}
+			scope.Profile = value.ProfileSummarySelection{SampleType: "cpu", TopN: 20}
+			beginTool, units = "get_profile_summary", value.ProfileSummaryQueryUnits
+		}
 		authority := func(principal identity.Principal) value.ContextProjectionAuthority {
 			t.Helper()
 			f.refresh(t)
@@ -148,7 +157,11 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 			selected.Principal = principal
 			a, err := authorityGate.CheckProjectionCurrent(ctx, querySQLIdentity{who}, selected)
 			if err != nil {
-				t.Fatal("current approved-only query authority", err)
+				var step interface{ FixedStep() string }
+				if errors.As(err, &step) {
+					t.Log("query authority refusal stage", step.FixedStep())
+				}
+				t.Fatal("current closed query authority", err)
 			}
 			return a
 		}
@@ -206,18 +219,18 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		charged := func(want int64) {
 			t.Helper()
 			var root, allocation, principal, queries int64
-			if err := admin.QueryRow(ctx, "SELECT b.allocated,a.allocated,p.allocated,(SELECT count(*) FROM context_query WHERE root_id=b.root_id) FROM context_query_backing b JOIN context_query_allocation a ON a.root_id=b.root_id JOIN context_query_principal p ON p.root_id=b.root_id WHERE b.root_id=$1", plan.RootID).Scan(&root, &allocation, &principal, &queries); err != nil || root != want || allocation != want || principal != want || queries != want {
+			if err := admin.QueryRow(ctx, "SELECT b.allocated,a.allocated,p.allocated,(SELECT count(*) FROM context_query WHERE root_id=b.root_id) FROM context_query_backing b JOIN context_query_allocation a ON a.root_id=b.root_id JOIN context_query_principal p ON p.root_id=b.root_id WHERE b.root_id=$1", plan.RootID).Scan(&root, &allocation, &principal, &queries); err != nil || root != want || allocation != want || principal != want || queries != want/units {
 				t.Fatal("query commitments mismatch", root, allocation, principal, queries, err)
 			}
 		}
 		// A receipt-free invocation cannot reserve even though source/identity are current.
-		unaudited, _ := invocation("get_file_excerpt", plan.Principal, false)
+		unaudited, _ := invocation(beginTool, plan.Principal, false)
 		a := authority(plan.Principal)
 		unpaid := makeQuery(unaudited, a)
 		if _, err = ledger.AdmitQuery(ctx, unpaid, unaudited, a); err == nil {
 			t.Fatal("unaudited query admitted")
 		}
-		request, intent := invocation("get_file_excerpt", plan.Principal, true)
+		request, intent := invocation(beginTool, plan.Principal, true)
 		a = authority(plan.Principal)
 		query := makeQuery(request, a)
 		t.Logf("original_evidence_seconds=%.0f original_query_remaining_ms=%d", e.Registration.ExpiresAt.Sub(e.Registration.AnchorAt).Seconds(), time.Until(query.Deadline).Milliseconds())
@@ -229,7 +242,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		if err != nil || replay.Fresh || !replay.Query.Equal(query) {
 			t.Fatal("query replay renewed or dispatched", err)
 		}
-		charged(1)
+		charged(units)
 		swapped := query
 		swapped.Scope.CaseID = custodyID()
 		if _, err = ledger.AdmitQuery(ctx, swapped, request, a); err == nil {
@@ -275,6 +288,55 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		if _, err = ledger.BeginReadBatch(ctx, query, request, worker.worker, custodyID(), a); err == nil {
 			t.Fatal("second batch overlapped active read")
 		}
+		if profileSummary {
+			// Positive closure remains mandatory even though this source has only
+			// one funded native read. There is no second scan after closure.
+			out := audit.OperationOutcome{Intent: intent, Status: "success", Reason: "prepared", Effect: "accepted", ClientReceipt: "unknown", OutputDigest: artifact.Digest{61}, OutputBytes: 12, MetadataUntil: intent.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
+			if err = auditor.Finish(ctx, out); err != nil {
+				t.Fatal("profile outcome", err)
+			}
+			if err = ledger.CompleteReadBatch(ctx, batch, querySQLClosed{batch}); err != nil {
+				t.Fatal("profile close", err)
+			}
+			poll, _ := invocation("get_query_result", plan.Principal, true)
+			a = authority(plan.Principal)
+			if err = ledger.AdmitQueryPoll(ctx, query, poll, a); err != nil {
+				t.Fatal("profile poll", err)
+			}
+			if _, err = ledger.BeginReadBatch(ctx, query, poll, worker.worker, custodyID(), a); err == nil {
+				t.Fatal("second native profile scan funded")
+			}
+			for _, mutate := range []func(*value.ContextQuery){
+				func(q *value.ContextQuery) { q.Scope.Profile.SampleType = "alloc_space" },
+				func(q *value.ContextQuery) { q.Scope.Profile.TopN = 21 },
+				func(q *value.ContextQuery) { q.Scope.Version[0] ^= 1 },
+				func(q *value.ContextQuery) { q.Scope.NativeType = artifact.PodStatusArtifact },
+			} {
+				swapped := query
+				mutate(&swapped)
+				if _, err = ledger.AdmitQuery(ctx, swapped, request, a); err == nil {
+					t.Fatal("profile source/selection swapped")
+				}
+			}
+			charged(units)
+			secondRequest, _ := invocation(beginTool, plan.Principal, true)
+			a = authority(plan.Principal)
+			secondQuery := makeQuery(secondRequest, a)
+
+			if _, err = ledger.AdmitQuery(ctx, secondQuery, secondRequest, a); err != nil {
+				t.Fatal("second separately funded summary", err)
+			}
+			charged(2 * units)
+			excessRequest, _ := invocation(beginTool, plan.Principal, true)
+			a = authority(plan.Principal)
+			if _, err = ledger.AdmitQuery(ctx, makeQuery(excessRequest, a), excessRequest, a); err == nil {
+				t.Fatal("summary exceeded original 20-unit reservation")
+			}
+			charged(2 * units)
+			refuseRetainedProfileSummaryDowngrade(t, f)
+			t.Logf("raw_source=%s authored_native_limit=%d query_units=%d admitted_queries=2 single_read_per_query=true original_worker_transient=%d", e.NativeType, e.Registration.NativeLimit, units, plan.Profile.Worker.WorkerTransientBytes)
+			return
+		}
 		// Independent narrowly credentialed SQL role can irreversibly spend only
 		// three prepaid slots; this is not native key-service qualification.
 		if _, err = admin.Exec(ctx, "INSERT INTO context_query_key_binding(batch_id,query_id,binding) VALUES($1,$2,$3)", batch.ID, query.ID, raw(map[string]string{"Purpose": value.ContextProjectionPurpose, "BatchID": batch.ID})); err != nil {
@@ -317,7 +379,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		if _, err = ledger.BeginReadBatch(ctx, query, blockedPoll, worker.worker, custodyID(), a); err == nil {
 			t.Fatal("expired lease fabricated private closure")
 		}
-		charged(1)
+		charged(units)
 		_, err = runtime.Exec(ctx, "UPDATE context_query_batch SET closed=true WHERE id=$1", batch.ID)
 		requireSQLCode(err, "23514", "batch close before acknowledged outcome")
 		if err = ledger.CompleteReadBatch(ctx, batch, querySQLClosed{batch}); err == nil {
@@ -352,10 +414,10 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		if err = ledger.CompleteReadBatch(ctx, second.Batch, nil); err == nil {
 			t.Fatal("missing closure released generation")
 		}
-		charged(1)
+		charged(units)
 		// Synchronize on a real SQL lock, then invalidate the accepted backing.
 		// The earlier independent guard return cannot authorize the later row.
-		blockedRequest, _ := invocation("get_file_excerpt", plan.Principal, true)
+		blockedRequest, _ := invocation(beginTool, plan.Principal, true)
 		blockedAuthority := authority(plan.Principal)
 		blockedQuery := makeQuery(blockedRequest, blockedAuthority)
 		ready, proceed := make(chan struct{}), make(chan struct{})
@@ -426,7 +488,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		backing.beforeSQL = nil
 		// Restore only through a fresh observation of the same accepted configuration.
 		f.refresh(t)
-		charged(1)
+		charged(units)
 		// A lost guard/commit response returns no Fresh result, while private lookup
 		// observes the original committed query and all aggregate accounts stay paid.
 		request2, _ := invocation("get_file_excerpt", otherClient, true)
@@ -443,7 +505,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal("unknown commit changed original query", err)
 		}
 		charged(2)
-		request3, _ := invocation("get_file_excerpt", plan.Principal, true)
+		request3, _ := invocation(beginTool, plan.Principal, true)
 		a3 := authority(plan.Principal)
 		query3 := makeQuery(request3, a3)
 		if _, err = ledger.AdmitQuery(ctx, query3, request3, a3); err == nil {

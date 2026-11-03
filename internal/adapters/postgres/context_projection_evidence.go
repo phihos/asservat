@@ -17,7 +17,8 @@ import (
 var _ authorizationapp.ContextProjectionCatalog = (*ContextPublications)(nil)
 
 // ContextProjectionEvidence returns the independently verified fixed context
-// profile, or an httpHeaders extract (ADR-282), and its original publication
+// profile, an httpHeaders extract (ADR-282), or retained raw pprof for the
+// closed summary (ADR-291), and its original publication
 // identity. The SELECT-only facet provides
 // no native content or read permit. C-03 checks ordinary target eligibility
 // before calling it, then current audience, retention and query-purpose state.
@@ -45,10 +46,10 @@ func (s *ContextPublications) ContextProjectionEvidence(ctx context.Context, art
 		if err != nil {
 			return err
 		}
-		// Exactly the pod-status metadata context or an httpHeaders extract
-		// (ADR-282); C-03 compares the source with the requested scope.
+		// Compare the registered source, retaining an authored pprof bound
+		// below the format maximum. C-03 binds it to the requested scope.
 		src, known := analysis.LookupProjectionSource(e.NativeType)
-		if e.Registration.Location.ArtifactID != artifactID || !known || e.DataClass != src.DataClass || e.Registration.NativeLimit != src.NativeLimit || e.Type().Format != src.Format {
+		if e.Registration.Location.ArtifactID != artifactID || !known || !src.Matches(e.NativeType, e.Type().Format, e.DataClass, e.Type().EvidenceType, e.Registration.NativeLimit, src.ProjectionDigest) {
 			return privacy.ErrFence
 		}
 		attempt, err := q.ReadAttempt(call, row.ContextCapture.AttemptID)

@@ -91,6 +91,7 @@ func (p ContextQueryPlan) Matches(s ContextProjectionScope) bool {
 		p.WorkloadUID == s.WorkloadUID && p.Principal == s.Principal &&
 		p.AllocationRevision > 0 && p.AllocationRevision <= 1<<60 && p.PoolSource.Valid() && p.PolicySource.Valid() &&
 		p.Profile.Valid() && p.Profile.Path.TargetClusterID == s.ClusterID &&
+		(s.NativeType != artifact.PprofArtifact || p.Profile.Worker.MemoryBytes >= ProfileSummaryWorkerBytes && p.Profile.Worker.WorkerTransientBytes >= ProfileSummaryWorkerBytes) &&
 		!p.ObservedAt.IsZero() && p.ValidUntil.After(p.ObservedAt) && !p.ValidUntil.After(p.ObservedAt.Add(5*time.Second)) &&
 		!p.HardUntil.Before(p.ValidUntil) && !p.EffectsUntil.Before(p.HardUntil) &&
 		!p.CleanupUntil.Before(p.EffectsUntil.Add(p.Profile.Worker.Cleanup)) && !p.RetireBy.Before(p.CleanupUntil)

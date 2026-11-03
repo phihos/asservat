@@ -22,10 +22,11 @@ func (r profileRouteFixture) ResolveProjectionRoute(context.Context, string, str
 // Synthetic admitted backing verifies only typed invocation/route composition;
 // production profile funding and worker parsing remain deliberately unavailable.
 func TestProfileSummaryAdmissionBindsOriginalToolInputAndRoute(t *testing.T) {
-	for _, mode := range []string{"pending", "ready", "disabled", "wrong-tool", "wrong-selection", "unacknowledged", "source-in-route", "cancelled"} {
+	for _, mode := range []string{"pending", "ready", "disabled", "wrong-tool", "wrong-selection", "unacknowledged", "source-in-route", "cancelled", "underfunded-worker"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newProjectionFixture(t)
 			f.ready = mode == "ready"
+			f.p.Profile.Worker.MemoryBytes, f.p.Profile.Worker.WorkerTransientBytes = value.ProfileSummaryWorkerBytes, value.ProfileSummaryWorkerBytes
 			f.s.Results.Reader = profileReaderFixture{f}
 			scope := &f.a.Scope
 			scope.NativeType, scope.SourceFormat, scope.DisplayVersion = artifact.PprofArtifact, artifact.PprofFormat, value.ProfileSummaryDisplayVersion
@@ -39,6 +40,8 @@ func TestProfileSummaryAdmissionBindsOriginalToolInputAndRoute(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			switch mode {
+			case "underfunded-worker":
+				f.p.Profile.Worker.WorkerTransientBytes = 8 << 20
 			case "disabled":
 				f.s.ProfileRoutes = nil
 			case "wrong-tool":

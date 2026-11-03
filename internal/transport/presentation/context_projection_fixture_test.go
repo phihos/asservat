@@ -111,7 +111,7 @@ func (f *bridgeFixture) ResolveContextProjection(ctx context.Context, _ value.Co
 }
 func (f *bridgeFixture) ResolveProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
 	c := f.a.Scope.Candidate()
-	c.Selection, c.NativeType, c.Headers = value.LineSelection{}, "", value.HTTPHeaderWindow{}
+	c.Selection, c.NativeType, c.Headers, c.Profile = value.LineSelection{}, "", value.HTTPHeaderWindow{}, value.ProfileSummarySelection{}
 	return c, nil
 }
 func (f *bridgeFixture) ResolveProjectionCurrent(context.Context, identities.CurrentIdentity, value.ContextProjectionCandidate) (value.ContextProjectionAuthority, error) {

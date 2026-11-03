@@ -107,7 +107,8 @@
                   "tool_name": {
                     "enum": [
                       "get_file_excerpt",
-                      "get_http_headers"
+                      "get_http_headers",
+                      "get_profile_summary"
                     ]
                   },
                   "result": {

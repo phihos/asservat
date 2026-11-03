@@ -219,6 +219,25 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		t.Log("resource projection Down restored exact validators and unchanged trust; Up restored104; no old-decoder rollback qualification")
 	}
+	if head == 127 {
+		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("profile summary Down", e)
+		}
+		var restored string
+		if e = conn.QueryRow(ctx, queryDefinitions).Scan(&restored); e != nil || restored != originalQueryFunctions {
+			t.Fatal("summary Down changed prior query/audit functions", e)
+		}
+		var profileValid bool
+		if e = conn.QueryRow(ctx, `SELECT context_query_scope_source_valid('{"NativeType":"pprof"}'::jsonb)`).Scan(&profileValid); e != nil || profileValid {
+			t.Fatal("Down kept summary source", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("summary Up after Down", from, to, e)
+		}
+		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
+		t.Log("summary127→126→127: exact query/audit restoration; fixed ten units, one batch, closed source/selection")
+	}
 	if head == 122 {
 		// The extract scope reserves two units and one read batch, admits
 		// get_http_headers as its begin tool and needs its record window; a

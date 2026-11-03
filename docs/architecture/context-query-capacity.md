@@ -195,3 +195,20 @@ projection conversation now also allow up to the evidence-read window, still
 bounded by each underlying value; a projection frame gate repeats its full
 SQL/peer check on every frame and closes on the first failure. Key permits
 remain five seconds per unwrap.
+
+## Closed profile summaries (ADR-291)
+
+Migration 127 admits one exact retained raw pprof source for a closed
+`get_profile_summary`, under ordinary current `evidence:read`, audience,
+retention and extract/profile client policy. It does not grant raw download or
+permit `ReadApproved` on arbitrary raw evidence. One summary reserves ten existing
+query units and allows one read batch: the complete 64 MiB maximum source,
+framing/index/manifest work and metadata fit the resulting 80 MiB read-work
+reservation. A smaller authored native ceiling stays smaller.
+
+The physical acquisition worker stays 256 MiB; its original query declaration now
+truthfully reserves 256 MiB transient worker capacity. Summary admission requires
+both bounds. Historical accepted 8 MiB transient profiles remain usable for older
+tools but cannot admit this summary. The existing root/workload/principal caps,
+nonrefundable uncertainty, audit, key slots and original deadlines stay binding.
+Public registration remains absent until installed qualification.

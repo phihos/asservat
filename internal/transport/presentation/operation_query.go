@@ -7,10 +7,25 @@ import (
 )
 
 func queryOperation(name string) bool {
-	return name == "get_file_excerpt" || name == "get_http_headers" || name == "get_query_result"
+	return name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || name == "get_query_result"
 }
 
 func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
+	if name == "get_profile_summary" {
+		var in ProfileSummaryOperationInput
+		if err := json.Unmarshal(raw, &in); err != nil {
+			return nil, err
+		}
+		selection, err := analysis.NormalizeProfileSummarySelection(in.SampleType, in.TopN)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(struct {
+			Tool, DisplayVersion, CaseID, ArtifactID, SampleType string
+			TopN                                                 int
+		}{name, analysis.ProfileSummaryDisplayVersion, in.CaseID, in.ArtifactID, selection.SampleType, selection.TopN})
+	}
+
 	if name == "get_http_headers" {
 		// The cursor is bound as supplied; a malformed one is still audited
 		// and answered as InvalidCursor without any lookup. An omitted limit
@@ -53,4 +68,13 @@ func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
 		Tool, DisplayVersion, CaseID, ArtifactID string
 		LineStart, MaxLines                      int
 	}{name, analysis.ContextDisplayVersion, in.CaseID, in.ArtifactID, selection.LineStart, selection.MaxLines})
+}
+
+// ProfileSummaryOperationInput is the exact closed selection bound by the
+// query invocation MAC. Registration remains a separate qualification gate.
+type ProfileSummaryOperationInput struct {
+	CaseID     string `json:"case_id"`
+	ArtifactID string `json:"artifact_id"`
+	SampleType string `json:"sample_type"`
+	TopN       int    `json:"top_n"`
 }

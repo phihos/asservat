@@ -21,6 +21,9 @@ const (
 	// ProfileSummaryQueryUnits conservatively funds the full 64 MiB native
 	// window (nine encrypted frames, two index pages) plus metadata.
 	ProfileSummaryQueryUnits = 10
+	// ProfileSummaryWorkerBytes is the whole physical worker memory bound,
+	// also declared as transient capacity before summary admission.
+	ProfileSummaryWorkerBytes = 256 << 20
 )
 
 // ProjectionResult is the approved result of one read batch. Exactly the

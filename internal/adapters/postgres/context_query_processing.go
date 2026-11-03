@@ -67,8 +67,8 @@ func (s *ProcessingReads) ContextProjectionProcessing(ctx context.Context, r app
 	return out, nil
 }
 
-// projectionSource accepts exactly the pod-status metadata context or an
-// httpHeaders extract (ADR-282), never another native type or class.
+// projectionSource accepts only registered closed sources, including the raw
+// pprof input of ADR-291; it never reclassifies that input as an extract.
 func projectionSource(r app.ContextProjectionEvidence) bool {
 	src, ok := value.LookupProjectionSource(r.NativeType)
 	return ok && src.Matches(r.NativeType, r.SourceFormat, r.DataClass, r.Retained.Input.EvidenceType, r.Retained.Registration.NativeLimit, r.SourceProjectionDigest)

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers"]
+NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary"]
 
 RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration"]
 
@@ -201,7 +201,7 @@ def main():
                 data["properties"]["logical_path"] = {"const": "pod-status.txt"}
                 data["properties"]["lines"]["maxItems"] = 14
             else:
-                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers"]}
+                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers", "get_profile_summary"]}
                 # The Go validator additionally applies the original output
                 # schema and relational request/timing checks to this object.
             output["allOf"] = [{"oneOf": branches}]
@@ -209,8 +209,8 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name == "get_http_headers":
-            # ADR-282: the whole canonical input and output. Each page is an
+        if name in ("get_http_headers", "get_profile_summary"):
+            # ADR-282/291: the whole canonical input and output. Each page is an
             # approved query: pending with its handle, the page served by
             # get_query_result. The cursor is the next record index bound to
             # the projection digest; provenance names the one artifact.
@@ -223,6 +223,11 @@ def main():
             output["properties"]["narrowing_hint"] = {"type": "null"}
             output["properties"]["next_cursor"] = {"anyOf": [{"type": "string", "pattern": "^[0-9]{1,7}:[0-9a-f]{32}$"}, {"type": "null"}]}
             output["properties"]["provenance"]["maxItems"] = 1
+            if name == "get_profile_summary":
+                output["properties"]["next_cursor"] = {"type": "null"}
+                output["properties"]["data_class"] = {"enum": ["metadata", "extract"]}
+                branches[0]["properties"]["data_class"] = {"const": "extract"}
+                branches[0]["properties"]["provenance"] = {"type": "array", "minItems": 1, "maxItems": 1}
             output["allOf"] = [{"oneOf": branches}]
             description["inputSchema"] = localize(description["inputSchema"])
             description["outputSchema"] = localize(output)
