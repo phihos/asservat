@@ -3,6 +3,26 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Manual argument capture is now installed-qualified and merged in
+[PR148](https://github.com/phihos/asservat/pull/148), merge `2a03d7a8` from qualified
+head `9a8e392e`. [Native41654508351](https://github.com/phihos/asservat/actions/runs/41654508351)
+and CI41654206768 passed. The public approved five-second buffer capture produced
+33,488 authenticated native bytes with the expected marker and immutable SQL
+source: 48 retained writes, 96 observed probes and 36,864 charged bytes within
+6,000-event / 96 MiB credit. Coverage remains explicitly unknown. Fresh repeat
+preview preserved composition and expiry; a separate scalar-only capture stopped
+while Running, joined cancellation, reached Cancelled and published no artifact.
+Go exited 0 in 627.735s; source hashes were unchanged, cleanup failures empty and
+build scratch removed. Original reports and synthetic JSONL are retained in
+`test/results/argument-native-41654508351`.
+
+The active candidate is finite recurring arguments plus independent existing-raw
+artifact download approval. It is rebased onto that merge; comparison with the
+previous checkpoint found no non-documentation/non-report file changes, so the
+recorded component and service evidence remains applicable. Its dedicated
+`continuation-policy-arguments` installed workflow is still pending. Grouped and
+ongoing argument sources, saved syscall projections and broader S-05 remain open.
+
 CI41651875701 passed for the native-format fix. The final test-only update reuses
 one compiled case fixture across all17 sequential format assertions (focused race
 2.618s), retains authenticated synthetic native bytes before semantic assertions
@@ -18,7 +38,7 @@ authenticated native download's filename, size and SHA-256 checks. It then faile
 the case-format assertion: `get_case` projected `native_format` only for runtime
 profiles, leaving it empty for the published syscall argument artifact. The
 failure occurs before the native fixture's semantic marker, repeat and Stop
-checks; those remain unqualified. Go632.347s exited1, sources unchanged and
+checks; those were unqualified at that checkpoint. Go632.347s exited1, sources unchanged and
 cleanupFailures empty. CI41647587881 passed; original reports are retained in
 `test/results/argument-native-41648031437`.
 
