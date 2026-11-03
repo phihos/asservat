@@ -12,7 +12,8 @@ import (
 )
 
 // ProfileSummaries exposes the typed internal admission only when explicitly
-// composed. No production constructor installs the route reader yet.
+// composed with the typed source route; the protected runtime also requires
+// a funded worker profile before it installs that route.
 func (s ContextProjectionService) ProfileSummaries() (ProfileSummaryReads, bool) {
 	return ProfileSummaryReads{Service: s, Routes: s.ProfileRoutes}, s.ProfileRoutes != nil
 }
