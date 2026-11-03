@@ -1,6 +1,7 @@
 package presentation
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"strings"
@@ -146,5 +147,25 @@ func TestProfileGrantReviewWire(t *testing.T) {
 	}
 	if json.Unmarshal(reply.Body, &out) != nil || len(out.Data.Actions) != 1 || out.Data.Actions[0].Profile == nil || out.Data.Actions[0].Profile.Type != "heap" || !out.Data.Actions[0].Profile.ForceGC || out.Data.Actions[0].Profile.Port != 6060 || strings.Contains(string(reply.Body), `"ring_max_bytes"`) {
 		t.Fatalf("profile review changed facts or invented ring: %s", reply.Body)
+	}
+}
+
+func TestGrantReviewPreservesArgumentEventBudget(t *testing.T) {
+	base, f := operationFixture(t, true)
+	v := grantView(f.i.VerifiedAt)
+	v.Grant.Reasons = []authorization.SensitiveReason{{ActionID: "a1", Code: "syscallArguments"}}
+	v.Review.ObservationLimits.MaxObservedEvents = 1234
+	uc := &grantUseCase{view: v, until: f.metadataUntil}
+	s, err := NewGrantOperations("https://console.invalid", base.config.Now, func() string { return "00000000-0000-4000-8000-000000000099" }, uc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply, err := s.Call(t.Context(), f, "get_grant", []byte(`{"grant_id":"00000000-0000-4000-8000-0000000009a1"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := reply.Body
+	if !bytes.Contains(raw, []byte(`"max_observed_events":1234`)) || !bytes.Contains(raw, []byte(`"syscallArguments"`)) {
+		t.Fatalf("event budget/reason lost: %s %v", raw, err)
 	}
 }

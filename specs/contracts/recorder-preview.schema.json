@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/recorder-preview.schema.json",
   "title": "Reviewed recorder and profile plan",
-  "description": "Canonical plan whose SHA-256 is the execution_digest of a composition preview. Acceptance is refused (acceptance recorderUnavailable) unless the plan is a manual networkHeaders packet capture whose target node's collector reports the packet recorder (acceptance nodeRecorder, ADR-248). The libpcap program is compiled on the hub with the pinned link type and snapshot length; the node never compiles.",
+  "description": "Canonical recorder and profile plan whose SHA-256 is the execution digest. Acceptance requires the target collector capability and all current authority. Packet filters and syscall argument program, definition and accounting pins are resolved independently of the authored recipe and included in the reviewed scope.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -14,7 +14,7 @@
         "recorderUnavailable",
         "nodeRecorder"
       ],
-      "description": "recorderUnavailable: no node recorder can run the plan (ADR-243). nodeRecorder: a manual networkHeaders plan whose target node's collector reported the packet recorder at preview; request_capture may accept it (ADR-248)."
+      "description": "recorderUnavailable: the target has no supported mechanism for this plan. nodeRecorder: the target collector reports the required mechanism; request_capture still checks current authority and any required approval."
     },
     "source": {
       "$ref": "https://asservat.io/spec/v1/collection-scope.schema.json#/properties/source"
@@ -217,6 +217,7 @@
                   "rawBytePredicate",
                   "rawPackets",
                   "httpHeaders",
+                  "syscallArguments",
                   "liveProfile",
                   "recordingApprovalRequired"
                 ]
@@ -251,6 +252,11 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 1000
+            },
+            "maxObservedEvents": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000000
             }
           },
           "required": [
@@ -346,6 +352,72 @@
           "definitionDigest",
           "endpointDigest",
           "resolvedAt"
+        ]
+      }
+    },
+    "argumentPrograms": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "actionID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "names": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            }
+          },
+          "programDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "definitionDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "accountingRule": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "maxProbeBytes": {
+            "enum": [
+              256,
+              512
+            ]
+          },
+          "maxBytesPerEvent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "maxBytesPerSecond": {
+            "const": 16777216
+          },
+          "captureBuffers": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "actionID",
+          "names",
+          "programDigest",
+          "definitionDigest",
+          "accountingRule",
+          "maxProbeBytes",
+          "maxBytesPerEvent",
+          "maxBytesPerSecond",
+          "captureBuffers"
         ]
       }
     }

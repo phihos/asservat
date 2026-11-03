@@ -60,3 +60,16 @@ program to enforce the existing pre-read observation budget. It changes the
 engine sourcing rule only; REQ-SYS-002 accounting, approval, isolation and native
 qualification remain mandatory. Arguments mode stays unavailable until that
 implementation passes its installed native acceptance tests.
+
+### Finite argument implementation boundary (ADR-281)
+
+The finite argument plan uses `onTrigger`, `before: 0s` and an explicit include
+list. The trusted compiler resolves the release's qualified definition table
+and pins the program, definition and accounting digests in the reviewed scope.
+`captureBuffers: false` disables selected buffer reads; selected path arguments
+still require reviewed user-memory access. Raw approval includes independent
+cumulative byte and eligible entry/exit event limits. Failed reads and observations
+later excluded by result filters consume credit; replay never refills it.
+The initial adapter supports only its closed qualified ABI table and refuses
+unknown names. Planning/component tests do not enable the installed capability;
+raw publication, authenticated download and stop still need composed qualification.

@@ -56,3 +56,21 @@ definition map and absence of user-memory reads. Test decoded native artifacts,
 raw approval and authenticated download through the installed workflow; a verifier
 load or unit test alone cannot qualify arguments mode. Run the collector only in
 a disposable authorized environment, never on the developer workstation.
+
+## Finite planner continuation
+
+The compiler now has a distinct optional argument-mechanism port. Without the
+qualified adapter it returns RecorderUnavailable. Supplied pins, selected names,
+read bounds and the canonical accounting rule enter the execution digest and
+frozen replay context; authored recipe fields cannot supply trusted pins.
+Raw approval and cumulative eligible-probe event limits accompany the existing
+byte pool. This does not enable a deployed argument collector.
+
+Incremental complexity: 0 new services, credentials, API reads, watches,
+background loops or configuration switches; 1 optional compiler interface and
+1 frozen mechanism record per finite action. Unsupported mechanism is the
+existing RecorderUnavailable state, not a fallback. Only sensitive opt-in
+captures pay the additional bounded compilation/serialization cost. Legacy
+packet/metadata scope bytes and assessment hashes retain their old form. The
+smaller alternative (using only the recipe or charging delivered events) cannot
+bind the reviewed engine or bound pre-read work and does not meet REQ-SYS-002.

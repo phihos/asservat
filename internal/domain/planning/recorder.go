@@ -41,7 +41,8 @@ const (
 	ReasonRawPackets = "rawPackets"
 	// ReasonHTTPHeaders: acquisition reads payload to project HTTP/1 headers
 	// (ADR-282); the output is an extract.
-	ReasonHTTPHeaders = "httpHeaders"
+	ReasonHTTPHeaders      = "httpHeaders"
+	ReasonSyscallArguments = "syscallArguments"
 	// ReasonLiveProfile: live profiling is intrusive for approval purposes
 	// even when the mechanism is an HTTP GET (REQ-PRF-002, ADR-285).
 	ReasonLiveProfile = "liveProfile"

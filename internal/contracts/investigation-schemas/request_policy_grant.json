@@ -290,6 +290,7 @@
                             "rawBytePredicate",
                             "rawPackets",
                             "httpHeaders",
+                            "syscallArguments",
                             "liveProfile",
                             "recordingApprovalRequired",
                             "policyCollection"
@@ -325,6 +326,11 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 1000
+                      },
+                      "max_observed_events": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000
                       }
                     },
                     "required": [
@@ -563,6 +569,7 @@
                               "rawBytePredicate",
                               "rawPackets",
                               "httpHeaders",
+                              "syscallArguments",
                               "liveProfile",
                               "recordingApprovalRequired"
                             ]

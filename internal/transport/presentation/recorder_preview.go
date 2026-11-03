@@ -211,7 +211,13 @@ func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResu
 			if slices.Contains(view.reasons, planning.ReasonHTTPHeaders) {
 				reads = "Projecting HTTP headers reads payload bytes" // ADR-282
 			}
+			if slices.Contains(view.reasons, planning.ReasonSyscallArguments) {
+				reads = "Syscall argument tracing permits bounded user-memory reads; disabling buffers does not disable path reads for selected path syscalls"
+			}
 			warnings = append(warnings, fmt.Sprintf("%s: the approval binds observation limits of %d s per session, %d bytes in total, %d bytes per second and %d concurrent session.", reads, l.MaxSessionSeconds, l.MaxObservedBytes, l.MaxBytesPerSecond, l.MaxConcurrentSessions))
+			if l.MaxObservedEvents > 0 {
+				warnings = append(warnings, fmt.Sprintf("The same approval also caps eligible entry and exit probes at %d events in total. Failed reads and later-filtered observations consume credit; restarting does not refill it.", l.MaxObservedEvents))
+			}
 		}
 	}
 	if !s.config.CollectionEnabled {
