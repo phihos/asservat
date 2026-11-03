@@ -1,12 +1,10 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/domain/planning"
 	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
-	"runtime/pprof"
 	"testing"
 	"time"
 
@@ -16,6 +14,8 @@ import (
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/planning"
+	"github.com/google/pprof/profile"
 )
 
 func (q *profileQueue) EnqueueProfileCancel(_ context.Context, _, _, _ string, _ time.Time) (collector.Work, error) {
@@ -107,7 +107,8 @@ func TestProfileStopJoinsRealWriterAndKeepsUncertainBackendEffects(t *testing.T)
 	}
 	stop := collector.ProfileStop{RootID: e.CaptureUID, ClusterID: e.Registration.Location.ClusterID, CaptureID: e.CaptureUID, AttemptID: e.Registration.Location.AttemptID, WriterPodUID: e.CaptureUID, WriterEpoch: e.CaptureUID, ExpectationDigest: evidence.ContextExpectationDigest(e), WriteUntil: e.Registration.WriteUntil}
 	var native bytes.Buffer
-	if err := pprof.WriteHeapProfile(&native); err != nil {
+	sample := &profile.Profile{SampleType: []*profile.ValueType{{Type: "alloc_objects", Unit: "count"}}, Sample: []*profile.Sample{{Value: []int64{1}}}}
+	if err := sample.Write(&native); err != nil {
 		t.Fatal(err)
 	}
 	result := collector.ProfileResult{WorkID: q.profiles[0].ID, CaptureID: e.CaptureUID, ExpectationDigest: stop.ExpectationDigest, EndpointDigest: e.Profile.EndpointDigest, Outcome: execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: now, MayHaveStarted: true, ResponseComplete: true, NativeBytes: int64(native.Len())}}

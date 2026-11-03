@@ -28,8 +28,15 @@ backend uncertainty remains charged. Spec (13,446 assertions), architecture,
 Go architecture and vet gates passed. Gadget-tag compilation passed; it is not
 native network-namespace qualification.
 
-Remaining: integrate capacity migration 125 and the installed manual-profile
-fixture, then qualify actual collector CPU/heap/redirect/Stop and the installed
+The combined acquisition/Stop/capacity/installed-fixture candidate passed all
+pre-push obligations; the first console check lacked local dependencies and the
+locked install plus console rerun passed (278 tests). Full race suites passed
+for bootstrap (77.492 seconds), capture, execution, contextstart, presentation
+and JOSE. The initial broad bootstrap run exposed a test-only heap profile size
+dependency; the blocked-writer fixture now uses a deterministic valid pprof.
+
+Remaining: integrate the final native owner-renewal capacity correction and
+preview audit timing migration, then qualify actual collector CPU/heap/redirect/Stop and the installed
 approval→publication→native download→local pprof workflow, including resources
 at supported limits. No installed profile result or completed S-05 is claimed.
 
