@@ -4,7 +4,7 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
-import { readInstalledHistoryResponse } from './installed-history-response.mjs';
+import { parseInstalledHistoryText, readInstalledHistoryResponse } from './installed-history-response.mjs';
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
 const first = await lines.next();
@@ -18,6 +18,26 @@ const browser = await chromium.launch({ headless: true, proxy: { server: config.
 const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 } });
 await context.addCookies(config.cookies);
 config.cookies = [];
+// Chromium can report net::ERR_ABORTED for a 200 operation reply that the
+// console had already read completely: the console continued with the data
+// (native run 41535385808: list_diagnostics "failed" and the console then
+// requested the history list). Keep the text the page itself received, keyed
+// by path and request body, so such a reply is still observed. In-page only;
+// never printed.
+await context.addInitScript(() => {
+  const original = window.fetch.bind(window);
+  const replies = new Map();
+  Object.defineProperty(window, '__installedReplies', { value: replies });
+  window.fetch = async (input, init) => {
+    const response = await original(input, init);
+    const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
+    if (path.startsWith('/api/v1/operations/') && response.status === 200) {
+      const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
+      response.clone().text().then(text => replies.set(key, text), () => {});
+    }
+    return response;
+  };
+});
 const page = await context.newPage();
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
@@ -30,6 +50,14 @@ const operation = name => response => new URL(response.url()).pathname === '/api
 // aborted by the page, starting from the moment the wait is armed.
 const seen = [];
 page.on('response', response => seen.push(response));
+// Failure timeline of the console's own API calls: path, status and Chromium's
+// net error token with elapsed milliseconds only; never bodies or headers.
+const started = Date.now();
+const timeline = [];
+const apiPath = request => { const path = new URL(request.url()).pathname; return path.startsWith('/api/') ? path : null; };
+page.on('request', request => { const path = apiPath(request); if (path) timeline.push(`+${Date.now() - started}ms request ${request.method()} ${path}`); });
+page.on('response', response => { const path = apiPath(response.request()); if (path) timeline.push(`+${Date.now() - started}ms response ${response.status()} ${path}`); });
+page.on('requestfailed', request => { const path = apiPath(request); if (path) timeline.push(`+${Date.now() - started}ms failed ${/^net::ERR_[A-Z_]+$/.exec(request.failure()?.errorText ?? '')?.[0] ?? 'other'} ${path}`); });
 async function settled(name, from) {
   const end = Date.now() + 30_000;
   for (let i = from; Date.now() < end;) {
@@ -37,16 +65,39 @@ async function settled(name, from) {
     const response = seen[i++];
     if (!operation(name)(response)) continue;
     const read = await readInstalledHistoryResponse(response);
-    if (read.requestFailed && read.readFailure.includes('ERR_ABORTED')) continue;
+    // A non-200 reply is final: the console cancels its body on purpose,
+    // which Chromium also reports as ERR_ABORTED (native run 41529848773:
+    // a 503 preview was skipped and the wait ended with no response).
+    if (read.requestFailed && read.readFailure.includes('ERR_ABORTED') && response.status() === 200) {
+      const consumed = await pageReply(response);
+      if (consumed === null) continue; // superseded by the page before it was read
+      return { pageConsumed: parseInstalledHistoryText(200, consumed), status: () => 200 };
+    }
     return response;
   }
   return null;
 }
-const waitOperation = name => settled(name, seen.length);
+// Arming clears this operation's cached page replies, and a read consumes its
+// entry: a retried identical request never reads an earlier attempt's text.
+const waitOperation = name => {
+  const from = seen.length;
+  const cleared = page.evaluate(prefix => { for (const k of [...window.__installedReplies.keys()]) if (k.startsWith(prefix)) window.__installedReplies.delete(k); }, '/api/v1/operations/' + name + '\n');
+  return cleared.then(() => settled(name, from));
+};
+async function pageReply(response) {
+  const key = new URL(response.url()).pathname + '\n' + (response.request().postData() ?? '');
+  for (const end = Date.now() + 2_000; Date.now() < end;) {
+    const text = await page.evaluate(k => { const v = window.__installedReplies.get(k) ?? null; window.__installedReplies.delete(k); return v; }, key);
+    if (text !== null) return text;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  return null;
+}
+const readSettled = response => response?.pageConsumed ? Promise.resolve({ ...response.pageConsumed, readFailure: 'page-consumed' }) : readInstalledHistoryResponse(response);
 const closedCodes = new Set(['NotAvailable', 'ParametersUnavailable', 'ProfileChanged', 'RequiresSelection', 'RecorderUnavailable', 'InvalidComposition', 'ProfileUnavailable', 'FilterRejected', 'ApprovalRequired', 'FilterCompilerUnavailable', 'UnsupportedRequest', 'SharingNotPermitted', 'TargetReplaced', 'ProcessingCoverageUnavailable', 'CapacityUnavailable']);
 async function readOperation(name, pending) {
   const response = await pending;
-  const { http, reply, status, body, readFailure = 'none', requestFailed = false } = await readInstalledHistoryResponse(response);
+  const { http, reply, status, body, readFailure = 'none', requestFailed = false } = await readSettled(response);
   // Never stringify settings, bodies, identities, credentials or provider text.
   const code = status === 'ok' ? 'none' : status === 'error' && closedCodes.has(reply?.data?.code) ? reply.data.code : 'other';
   const diagnostic = `installed history ${name} http=${http} status=${status} code=${code} body=${body} readFailure=${readFailure} requestFailed=${requestFailed}`;
@@ -93,7 +144,7 @@ try {
     }
     // ParametersUnavailable is the product's retryable answer when the saved
     // settings could not be read this time (a regional exchange failed).
-    if (attempt < 3 && previewResponse && (await readInstalledHistoryResponse(previewResponse)).reply?.data?.code === 'ParametersUnavailable') {
+    if (attempt < 3 && previewResponse && (await readSettled(previewResponse)).reply?.data?.code === 'ParametersUnavailable') {
       process.stderr.write(`installed history preview_capture ParametersUnavailable attempt=${attempt}; retrying\n`);
       await page.waitForTimeout(2000);
       continue;
@@ -130,6 +181,9 @@ try {
   assert.deepEqual(errors, []);
   assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
   process.stdout.write(JSON.stringify({ Kind: 'captured', GrantID: grantID, PreviewID: preview.data.preview_id, Digest: preview.data.execution_digest, CaptureID: captureID, SettingsDigest: settings.data.settings_digest, SourceExpiresAt: settings.data.expires_at }) + '\n');
+} catch (error) {
+  process.stderr.write('installed history API timeline:\n' + timeline.slice(-60).join('\n') + '\n');
+  throw error;
 } finally {
   await context.close();
   await browser.close();

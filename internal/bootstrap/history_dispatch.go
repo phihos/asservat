@@ -9,6 +9,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/contextstart"
 	"context"
+	"errors"
 	"time"
 )
 
@@ -55,6 +56,14 @@ func (d RegionalHistoryDispatch) attach(ctx context.Context, cluster, captureID 
 	a, e := d.Router.TryAttach(call, cluster, captureID)
 	reportHistoryDispatch(d.Report, call, "attach", began, until, e)
 	if e != nil {
+		if d.Report != nil {
+			// Fixed class key; the content-free standby counts are payload.
+			class := "unavailable"
+			if errors.Is(e, fleet.ErrCapacity) {
+				class = "capacity"
+			}
+			d.Report("attach-refused/"+class, d.Router.AttachState(cluster))
+		}
 		cancel()
 		return nil, nil, nil, time.Time{}, e
 	}
@@ -88,10 +97,14 @@ func (d RegionalHistoryDispatch) PrepareHistory(ctx context.Context, cluster, ca
 		a, call, cancel, until, e = d.attach(ctx, cluster, captureID)
 		if e == nil {
 			began := time.Now()
-			r, e = a.Receiver(call)
+			observed, diagnostics := contextstart.NewStreamDiagnosticContext(call)
+			r, e = a.Receiver(observed)
 			reportHistoryDispatch(d.Report, call, "receiver", began, until, e)
 			if e == nil {
 				break
+			}
+			if first := diagnostics.Interruption(); first.Present() && d.Report != nil {
+				d.Report("receiver-stream/"+first.Stage()+"/"+first.Reason(), "")
 			}
 			a.Close()
 			cancel()

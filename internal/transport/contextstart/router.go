@@ -454,13 +454,28 @@ func (r *Router) attach(ctx context.Context, cluster, capture string, wait bool,
 			return nil, fleet.ErrUnavailable
 		}
 		r.pruneLocked(cluster)
-		selected := r.selectLocked(cluster, deadline, func(*Standby) bool { return true })
+		// A TryAttach bound beyond ordinary work (history, up to
+		// TryAttachLimit) needs only a standby that covers ordinary work: an
+		// idle standby short of the whole bound is never retired, so requiring
+		// it left history refused until the standby aged out (installed native
+		// 41525755470). The newest standby is still preferred, and the
+		// attachment is narrowed to the selected standby's residency margin.
+		cover := deadline
+		if !wait {
+			if ordinary := time.Now().Add(standbyWork); ordinary.Before(cover) {
+				cover = ordinary
+			}
+		}
+		selected := r.selectLocked(cluster, cover, func(*Standby) bool { return true })
 		if selected != nil {
 			selected.attached = true
 			if r.lastAttach == nil {
 				r.lastAttach = map[string]time.Time{}
 			}
 			r.lastAttach[cluster] = time.Now()
+			if end, ok := selected.ctx.Deadline(); ok && end.Add(-standbyMargin).Before(deadline) {
+				deadline = end.Add(-standbyMargin)
+			}
 			call, cancel := context.WithDeadline(ctx, deadline)
 			a := &Attachment{router: r, standby: selected, capture: capture, ctx: call, cancel: cancel}
 			r.captures[capture] = a
@@ -616,8 +631,9 @@ func (r *Router) Close() {
 }
 
 // AttachState is a content-free diagnostic of one cluster's standbys for
-// attach refusal reports: live, idle, attached and query-busy counts and how
-// long ago the latest attachment consumed a standby. It grants nothing.
+// attach refusal reports: live, idle, attached and query-busy counts, how
+// long ago the latest attachment consumed a standby and the idle standbys'
+// longest remaining residency (bucketed). It grants nothing.
 func (r *Router) AttachState(cluster string) string {
 	if r == nil {
 		return "router=none"
@@ -625,6 +641,7 @@ func (r *Router) AttachState(cluster string) string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var live, idle, attached, busy int
+	var residency time.Duration
 	for _, s := range r.standby {
 		if s.channel.Connector.Binding.ClusterID != cluster || !s.liveLocked() {
 			continue
@@ -637,13 +654,18 @@ func (r *Router) AttachState(cluster string) string {
 			busy++
 		default:
 			idle++
+			if end, ok := s.ctx.Deadline(); ok && time.Until(end) > residency {
+				residency = time.Until(end)
+			}
 		}
 	}
 	since := "never"
 	if at, ok := r.lastAttach[cluster]; ok {
 		since = attachAgeBucket(time.Since(at))
 	}
-	return fmt.Sprintf("standbys live=%d idle=%d attached=%d query-busy=%d last-attach=%s", live, idle, attached, busy, since)
+	// idle-residency is the longest remaining residency among idle standbys:
+	// an idle standby can be too short for a longer work bound.
+	return fmt.Sprintf("standbys live=%d idle=%d attached=%d query-busy=%d last-attach=%s idle-residency=%s", live, idle, attached, busy, since, attachAgeBucket(residency))
 }
 
 func attachAgeBucket(d time.Duration) string {

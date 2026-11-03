@@ -133,10 +133,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if s == nil {
 			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 		}
+		// Failures are recorded for a caller's diagnostic context only, as
+		// for queries; they change neither the result nor the stream.
 		if e := s.pullSource(c); e != nil {
+			recordStreamDiagnostic(c, s, e, streamHubQuerySource)
 			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 		}
-		return check(c)
+		receiver, e := check(c)
+		if e != nil {
+			recordStreamDiagnostic(c, s, e, streamHubQueryCheck)
+		}
+		return receiver, e
 	}
 	standby, e := h.router.RegisterStandby(residence, receiver, attach)
 	stop()

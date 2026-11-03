@@ -32,6 +32,10 @@ type parameterReadFixture struct {
 	failPrepares, failExecutes int
 	executes                   int
 	completed                  bool
+	// exclusive refuses a session while another is open, as the router
+	// refuses a second attachment for the same capture.
+	exclusive bool
+	open      int
 }
 
 var fixtureHistoryBundle = value.HistoryCiphertexts{[]byte{1}, []byte{2}, []byte{3}, []byte{4}}
@@ -77,14 +81,20 @@ func (h *parameterReadFixture) AuthorizeHistoryRead(ctx context.Context, in valu
 }
 func (h *parameterReadFixture) PrepareHistory(context.Context, string, string) (fleetapp.HistorySession, error) {
 	h.prepares++
-	if h.prepares <= h.failPrepares {
+	if h.prepares <= h.failPrepares || h.exclusive && h.open > 0 {
 		return nil, value.ErrUnavailable
 	}
+	h.open++
 	return h, nil
 }
 func (h *parameterReadFixture) ExecutorEpoch() string { return fixtureID(99) }
 func (h *parameterReadFixture) NotAfter() time.Time   { return h.originalBound }
-func (h *parameterReadFixture) Close()                { h.closes++ }
+func (h *parameterReadFixture) Close() {
+	h.closes++
+	if h.open > 0 {
+		h.open--
+	}
+}
 func (h *parameterReadFixture) ExecuteHistory(ctx context.Context, a value.HistoryOperationAuthority, _ value.HistoryCiphertexts, _ artifact.Copies) (fleetapp.HistoryReply, error) {
 	if a.NotAfter.After(h.originalBound) || ctx.Err() != nil {
 		return fleetapp.HistoryReply{}, value.ErrDenied
@@ -430,7 +440,7 @@ func TestHistoryWriteRetriesSessionAndExecutionOnce(t *testing.T) {
 			if err != nil || accepted.HistoryParameters == nil {
 				t.Fatal("admission", err)
 			}
-			h.writable, h.failPrepares, h.failExecutes, h.prepares, h.executes = true, c.prepares, c.executes, 0, 0
+			h.writable, h.failPrepares, h.failExecutes, h.prepares, h.executes, h.exclusive = true, c.prepares, c.executes, 0, 0, true
 			err = svc.Persist(t.Context(), accepted, q.Identity, *accepted.HistoryParameters, nil)
 			if (err == nil) != c.ok || h.completed != c.ok || h.prepares != c.wantPrepares || h.executes != c.wantExecute {
 				t.Fatalf("err=%v completed=%t prepares=%d executes=%d", err, h.completed, h.prepares, h.executes)

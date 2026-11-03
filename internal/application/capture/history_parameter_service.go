@@ -171,6 +171,11 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 		// fresh regional session of the same executor process; the region
 		// accepts only byte-identical objects an earlier attempt created.
 		stage = "execute-retry"
+		// The failed session's attachment holds this capture's route: the
+		// router refuses a second attachment for the same capture, so the
+		// re-execution could never attach while it stayed open (installed
+		// native 41529853319: attach-refused/capacity with an idle standby).
+		session.Close()
 		if retry, e := s.Regional.PrepareHistory(operation, p.Target.ClusterID, accepted.CaptureID); e == nil {
 			if retry.ExecutorEpoch() == authority.ExecutorEpoch {
 				reply, err = retry.ExecuteHistory(operation, authority, bundle, artifact.Copies{})
