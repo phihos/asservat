@@ -66,3 +66,5 @@ summary { cursor: pointer; min-height: 44px; padding: 8px 0; color: #126b54; }
 .profile-summary { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
 .profile-summary th, .profile-summary td { text-align: left; vertical-align: top; padding: 6px 4px; border-top: 1px solid #e3e6e9; overflow-wrap: anywhere; }
 .profile-summary th:first-child { width: 40%; }
+.syscall-projection .filter-checkbox { flex-direction: row; align-items: center; min-height: 44px; }
+.syscall-projection input[type="checkbox"] { width: 20px; height: 20px; min-height: 20px; padding: 0; margin: 0; }

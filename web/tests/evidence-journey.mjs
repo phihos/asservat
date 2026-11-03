@@ -2,6 +2,7 @@
 // UI, static delivery, sessions, CSRF, C16 projection and HTTP routes are real.
 import { expect } from '@playwright/test';
 import assert from 'node:assert/strict';
+import { syscallJourney } from './syscall-journey.mjs';
 
 export async function evidenceJourney({ page, origin, output, scan, checks, captureControl, control, evidenceLoads }) {
   const caseID = '00000000-0000-4000-8000-000000000080';
@@ -219,7 +220,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
       await page.setViewportSize({ width: 1440, height: 1080 }); await page.reload();
       await expect(page.getByRole('heading', { name: 'Pod status', exact: true })).toBeVisible();
     }
-
+    await syscallJourney({ page, origin, output, scan, checks, wire });
   } finally {
     page.off('request', requestListener);
     page.off('download', downloadListener);

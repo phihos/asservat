@@ -345,7 +345,7 @@ try {
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
   assert.deepEqual(violations, []);
-  await writeFile(output + '/report.json', JSON.stringify({ passed: true, checks, errors, external, violations, authority: 'synthetic session, capture/C16 facts, intercepted profile-summary responses and grant store/projections; real C03 policy-manager eligibility/control, HTTPS Go handlers, canonical operations and built React; no native-download service, IdP/SQL/collection/audit/deployment qualification' }, null, 2) + '\n');
+  await writeFile(output + '/report.json', JSON.stringify({ passed: true, checks, errors, external, violations, authority: 'synthetic session, capture/C16 facts, intercepted profile-summary/approved-syscall-view responses and grant store/projections; real C03 policy-manager eligibility/control, HTTPS Go handlers, canonical operations and built React; no native-download service, IdP/SQL/collection/audit/deployment qualification' }, null, 2) + '\n');
   console.log(`Console browser checks passed: ${checks.length} journeys, ${scans} accessibility scans, no external requests or CSP/runtime errors.`);
 } catch (error) {
   const visiblePage = await page.locator('body').ariaSnapshot().catch(() => 'Page unavailable');
