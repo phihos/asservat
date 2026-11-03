@@ -69,9 +69,28 @@ func TestSyscallAdmissionBindsOriginalToolInputRouteAndResult(t *testing.T) {
 						t.Fatal("optional composition changed")
 					}
 					d, err := service.Begin(ctx, f, invocation, request)
-					if mode == "wrong-result" || mode == "invalid-cursor" {
+					if mode == "wrong-result" {
 						if err == nil || d != nil || f.admissions != 1 || f.starts != 1 || f.reads != 1 {
 							t.Fatal("invalid worker response was not refused after charging", err)
+						}
+						return
+					}
+					if mode == "invalid-cursor" {
+						if err != nil || d == nil || d.Refusal() != ContextProjectionInvalidCursor || d.Pending() || f.reads != 1 || f.completions != 0 || !f.active || f.lastRead.closed {
+							t.Fatal("typed refusal lost its live charged owner", err)
+						}
+						if _, ok := d.SyscallSummary(); ok {
+							t.Fatal("refusal disclosed summary")
+						}
+						if _, ok := d.SyscallEvents(); ok {
+							t.Fatal("refusal disclosed events")
+						}
+						if d.RefuseOversizedResult() {
+							t.Fatal("typed cursor refusal changed after preparation")
+						}
+						invocation.outcome = d
+						if err := d.Close(context.Background()); err != nil || f.completions != 1 || f.active {
+							t.Fatal("refusal cleanup", err)
 						}
 						return
 					}

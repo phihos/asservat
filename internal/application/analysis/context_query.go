@@ -89,6 +89,7 @@ type ContextProjectionDelivery struct {
 	syscallSummary                          *value.SyscallSummaryPage
 	syscallEvents                           *value.SyscallEventPage
 	pending                                 bool
+	refusal                                 ContextProjectionRefusal
 	batch                                   *value.ContextReadBatch
 	read                                    ContextProjectionRead
 	observedAt, queryDeadline, cleanupUntil time.Time
@@ -133,7 +134,7 @@ func (d *ContextProjectionDelivery) HeaderPage() (value.HTTPHeaderPage, bool) {
 	}
 	d.owner.mu.Lock()
 	defer d.owner.mu.Unlock()
-	if d.owner.closed {
+	if d.owner.closed || d.refusal != ContextProjectionNoRefusal {
 		return value.HTTPHeaderPage{}, false
 	}
 	p := d.page
@@ -147,7 +148,7 @@ func (d *ContextProjectionDelivery) Excerpt() (value.ContextExcerpt, bool) {
 	}
 	d.owner.mu.Lock()
 	defer d.owner.mu.Unlock()
-	if d.owner.closed {
+	if d.owner.closed || d.refusal != ContextProjectionNoRefusal {
 		return value.ContextExcerpt{}, false
 	}
 	x := d.excerpt
@@ -214,26 +215,7 @@ func (d *ContextProjectionDelivery) Close(ctx context.Context) error {
 		o.cancel()
 		o.mu.Lock()
 		o.closed = true
-		clear(d.excerpt.Lines)
-		d.excerpt = value.ContextExcerpt{}
-		clear(d.page.Records)
-		clear(d.page.CoverageGaps)
-		d.page = value.HTTPHeaderPage{}
-		if d.syscallSummary != nil {
-			clear(d.syscallSummary.Rows)
-			*d.syscallSummary = value.SyscallSummaryPage{}
-			d.syscallSummary = nil
-		}
-		if d.syscallEvents != nil {
-			clear(d.syscallEvents.Events)
-			*d.syscallEvents = value.SyscallEventPage{}
-			d.syscallEvents = nil
-		}
-		if d.summary != nil {
-			clear(d.summary.Top)
-			*d.summary = value.ProfileSummary{}
-			d.summary = nil
-		}
+		d.clearProjectionLocked()
 		o.mu.Unlock()
 		if d.read == nil {
 			return
@@ -777,13 +759,12 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	}
 	if invalidCursor {
 		// Judged by the worker against the rechecked document after current
-		// read rights; it discloses no record. The read stays charged.
-		_ = d.Close(context.WithoutCancel(o.ctx))
-		return nil, queryStepped("cursor", value.ErrInvalidCursor)
+		// read rights; it discloses no record. Keep the charged read alive until
+		// C-20 acknowledges this refusal's outcome, then joins final cleanup.
+		d.refusal = ContextProjectionInvalidCursor
 	}
 	if tooLarge {
-		_ = d.Close(context.WithoutCancel(o.ctx))
-		return nil, queryStepped("record-size", value.ErrRecordTooLarge)
+		d.refusal = ContextProjectionRecordTooLarge
 	}
 	return d, nil
 }

@@ -50,7 +50,7 @@ func (d *ContextProjectionDelivery) SyscallSummary() (value.SyscallSummaryPage, 
 	}
 	d.owner.mu.Lock()
 	defer d.owner.mu.Unlock()
-	if d.owner.closed || d.syscallSummary == nil {
+	if d.owner.closed || d.refusal != ContextProjectionNoRefusal || d.syscallSummary == nil {
 		return value.SyscallSummaryPage{}, false
 	}
 	return value.CloneSyscallSummaryPage(*d.syscallSummary), true
@@ -61,7 +61,7 @@ func (d *ContextProjectionDelivery) SyscallEvents() (value.SyscallEventPage, boo
 	}
 	d.owner.mu.Lock()
 	defer d.owner.mu.Unlock()
-	if d.owner.closed || d.syscallEvents == nil {
+	if d.owner.closed || d.refusal != ContextProjectionNoRefusal || d.syscallEvents == nil {
 		return value.SyscallEventPage{}, false
 	}
 	return value.CloneSyscallEventPage(*d.syscallEvents), true

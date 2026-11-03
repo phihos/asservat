@@ -16,10 +16,27 @@ no open findings. PR150 remains unmerged; no complete native qualification is cl
 The coordinator closes invalid-cursor/oversize reads before C-20 can acknowledge
 its audited refusal. SQL correctly requires that acknowledged outcome before
 batch completion. The early close discards the only handle, leaving conservative
-active state. A composed failing regression and retained-refusal delivery fix
-are in progress; the SQL fence, worker cap and charges remain mandatory. The
+active state. A composed regression reproduced all fourteen direct/poll cases for HTTP and
+both syscall sources (invalid cursor and record size), plus an oversized public
+profile envelope. The retained-refusal delivery fix passes that focused race
+regression in 24.230s. Final focused races passed (application 1.036s,
+presentation 55.359s), extending coverage to sixteen direct/poll refusals and
+four audit/cancellation/identity-loss/uncertain-close cases. Exact Finish and
+local acknowledgement precede batch completion; failed acknowledgement or
+private closure stays conservative. Final `make pre-push` returned 0, including
+369 console tests. Native qualification remains pending. SQL fences, worker caps
+and charges remain mandatory. The
 native inspector now reports the exact last worker/key/batch state on failure.
 No further hosted run has been scheduled.
+
+The existing background image prefetch for these two suites now includes the
+already pinned traceloop builder. Both latest jobs pulled it serially during the test step; arguments
+spent about 21 seconds pulling layers. Prefetch overlaps that same download with
+existing setup, adding no image, dependency, permission or job. The expected
+critical-path saving is not yet measured. The 20-minute job and 18-minute Go
+limits remain unchanged; successful last-worker proof and argument Stop checks
+must still run. Existing argument qualification measured about 20 seconds for
+the repeat/approval/Stop branch, so this overlap provides useful headroom.
 
 The first installed syscall qualification batch reached four successful views for
 both source formats: exact native summary, filtered first page, continuation and

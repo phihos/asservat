@@ -29,6 +29,7 @@ type contextQueryInvocation struct {
 	inputChecked         bool
 	delivery             *analysisapp.ContextProjectionDelivery
 	association          analysisapp.ContextProjectionAssociation
+	refusal              analysisapp.ContextProjectionRefusal
 	outputDigest         artifact.Digest
 	outputBytes          int64
 	metadataUntil        time.Time
@@ -171,6 +172,7 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		return ErrOperationDelivery
 	}
 	until := d.ValidUntil()
+	refusal := d.Refusal()
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	if !i.current(ctx) || !i.inputChecked || i.delivery != nil || !authorization.UUID(a.ID) ||
@@ -190,13 +192,14 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		if i.call.Tool == "get_query_result" {
 			expected = analysisapp.ContextQueryPollCharged
 		}
-		if a.BatchID != "" || a.Generation != 0 || d.Effect() != expected {
+		if a.BatchID != "" || a.Generation != 0 || d.Effect() != expected || refusal != analysisapp.ContextProjectionNoRefusal {
 			return ErrOperationDelivery
 		}
 	} else if !authorization.UUID(a.BatchID) || a.Generation < 1 || a.Generation > value.ContextMaxReadBatches || d.Effect() != analysisapp.ContextQueryReadCharged {
 		return ErrOperationDelivery
 	}
 	i.delivery, i.association, i.outputBytes, i.metadataUntil = d, a, bytes, until
+	i.refusal = refusal
 	return nil
 }
 
@@ -206,8 +209,18 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 func (i *contextQueryInvocation) acknowledge(ctx context.Context, out audit.OperationOutcome) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	status, reason := "success", "prepared"
+	switch i.refusal {
+	case analysisapp.ContextProjectionNoRefusal:
+	case analysisapp.ContextProjectionInvalidCursor:
+		status, reason = "invalid", "invalid_input"
+	case analysisapp.ContextProjectionRecordTooLarge:
+		status, reason = "denied", "not_available"
+	default:
+		return ErrOperationDelivery
+	}
 	if !i.current(ctx) || i.delivery == nil || i.acknowledged || !out.Valid() || out.Intent != i.intent ||
-		out.Status != "success" || out.Reason != "prepared" || out.Effect != "accepted" ||
+		out.Status != status || out.Reason != reason || out.Effect != "accepted" || i.delivery.Refusal() != i.refusal ||
 		out.OutputBytes != i.outputBytes || out.MetadataUntil.After(i.metadataUntil) || !i.now().Before(out.MetadataUntil) {
 		return ErrOperationDelivery
 	}
@@ -222,7 +235,7 @@ func (i *contextQueryInvocation) CheckOutcome(ctx context.Context, d *analysisap
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	if !i.current(ctx) || !i.acknowledged || i.outputDigest == (artifact.Digest{}) ||
-		i.delivery != d || d.Association() != i.association || !i.now().Before(i.metadataUntil) {
+		i.delivery != d || d.Association() != i.association || d.Refusal() != i.refusal || !i.now().Before(i.metadataUntil) {
 		return ErrOperationDelivery
 	}
 	return nil

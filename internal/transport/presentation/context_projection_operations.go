@@ -183,30 +183,6 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			}
 		}
 	}()
-	if d == nil && errors.Is(err, value.ErrInvalidCursor) && name != "get_file_excerpt" {
-		// The worker judged the cursor against the rechecked document after
-		// current read rights; the read stays charged and nothing is disclosed.
-		failure := httpHeaderInvalidCursor
-		if name == "get_query_result" {
-			failure.Message = "The cursor is not valid for this saved evidence view. Start again without a cursor."
-		}
-		if syscallQueryOperation(name) {
-			failure = syscallInvalidCursor
-		}
-		return s.refusal(record.ID, name, record.Until, failure, operationAuditInvalid, operationEffectAccepted, false)
-	}
-	if d == nil && errors.Is(err, value.ErrRecordTooLarge) && name != "get_file_excerpt" {
-		// The worker's first selected record alone exceeds the wire bound; the
-		// read stays charged and nothing is disclosed.
-		failure := httpHeaderTooLarge
-		if name == "get_query_result" {
-			failure.Message = "This saved evidence record does not fit the response limit."
-		}
-		if syscallQueryOperation(name) {
-			failure = syscallTooLarge
-		}
-		return s.refusal(record.ID, name, record.Until, failure, operationAuditDenied, operationEffectAccepted, false)
-	}
 	if d == nil && errors.Is(err, value.ErrBusy) && name == "get_http_headers" {
 		// ADR-282: the live worker caps are full; the query was not admitted
 		// or charged, and a later page request may succeed.
@@ -221,22 +197,24 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		return OperationReply{}, stopped("query-done", ErrOperationDelivery)
 	default:
 	}
-	body, err := s.serialize(call.requestID, name, d)
-	if errors.Is(err, value.ErrRecordTooLarge) && (d.Tool() == "get_profile_summary" || syscallQueryOperation(d.Tool())) {
-		failure := profileSummaryTooLarge
-		if syscallQueryOperation(d.Tool()) {
-			failure = syscallTooLarge
+	var reply OperationReply
+	if d.Refusal() != analysisapp.ContextProjectionNoRefusal {
+		reply, err = s.deliveryRefusal(record.ID, name, d)
+	} else {
+		reply.Body, err = s.serialize(call.requestID, name, d)
+		reply.ValidUntil, reply.auditEffect = d.ValidUntil(), operationEffectAccepted
+		if errors.Is(err, value.ErrRecordTooLarge) && d.RefuseOversizedResult() {
+			reply, err = s.deliveryRefusal(record.ID, name, d)
 		}
-		return s.refusal(record.ID, name, record.Until, failure, operationAuditDenied, operationEffectAccepted, false)
 	}
 	if err != nil {
 		return OperationReply{}, stopped("query-output", ErrOperationDelivery)
 	}
-	if i.bind(ctx, d, int64(len(body))) != nil {
-		clear(body)
+	if i.bind(ctx, d, int64(len(reply.Body))) != nil {
+		clear(reply.Body)
 		return OperationReply{}, stopped("query-bind", ErrOperationDelivery)
 	}
-	reply := OperationReply{Body: body, ValidUntil: d.ValidUntil(), auditEffect: operationEffectAccepted}
+	body := reply.Body
 	reply, err = ownOperationReply(ctx, reply, &contextProjectionGuard{delivery: d, invocation: i, preparedUntil: reply.ValidUntil},
 		identity.Earlier(record.WriteUntil, d.CleanupUntil()), i.acknowledge)
 	if err != nil {
@@ -325,8 +303,9 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 			return nil, ErrOperationDelivery
 		}
 		if inner.Status != "ok" {
-			// A record that cannot fit is the tool's explicit error.
-			envelope = inner
+			// Keep the charged delivery for the same acknowledged size-refusal
+			// lifecycle as a worker or complete profile envelope refusal.
+			return nil, value.ErrRecordTooLarge
 		} else if outer, ok := wrap(inner).(OperationEnvelope); ok {
 			envelope = outer
 		} else {
@@ -356,6 +335,35 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 		return nil, ErrOperationDelivery
 	}
 	return body, nil
+}
+
+// A charged refusal retains the same prepared body, exact invocation, live
+// guard and final cleanup owner. It must never become an unowned error reply.
+func (s *ContextProjectionOperations) deliveryRefusal(requestID, name string, d *analysisapp.ContextProjectionDelivery) (OperationReply, error) {
+	failure, decision := httpHeaderTooLarge, operationAuditDenied
+	switch d.Refusal() {
+	case analysisapp.ContextProjectionInvalidCursor:
+		failure, decision = httpHeaderInvalidCursor, operationAuditInvalid
+		if name == "get_query_result" {
+			failure.Message = "The cursor is not valid for this saved evidence view. Start again without a cursor."
+		}
+		if syscallQueryOperation(name) {
+			failure = syscallInvalidCursor
+		}
+	case analysisapp.ContextProjectionRecordTooLarge:
+		if name == "get_query_result" {
+			failure.Message = "This saved evidence record does not fit the response limit."
+		}
+		if syscallQueryOperation(name) {
+			failure = syscallTooLarge
+		}
+		if d.Tool() == "get_profile_summary" {
+			failure = profileSummaryTooLarge
+		}
+	default:
+		return OperationReply{}, ErrOperationDelivery
+	}
+	return s.refusal(requestID, name, d.ValidUntil(), failure, decision, operationEffectAccepted, false)
 }
 
 func queryResult(queryID, tool string, inner OperationEnvelope, times queryViewTimes) any {
