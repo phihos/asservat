@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Synthetic workload for native profile qualification. Never shipped in the product image.
 package main
 

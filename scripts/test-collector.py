@@ -177,7 +177,7 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
     if profile:
         profile_dir = work / "profile-image"
         profile_dir.mkdir()
-        subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(profile_dir / "profile-native"), "./test/fixtures/profile-native"], cwd=ROOT, env=env, check=True)
+        subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(profile_dir / "profile-native"), "./test/fixtures/profile-native/main.go"], cwd=ROOT, env=env, check=True)
         (profile_dir / "Dockerfile").write_text("FROM scratch\nCOPY profile-native /profile-native\nENTRYPOINT [\"/profile-native\"]\n")
         run(["docker", "build", "--network=none", "--label", "asservat.test=" + run_id, "-t", profile_tag, str(profile_dir)])
     config = work / "kind.json"
