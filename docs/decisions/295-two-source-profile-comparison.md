@@ -41,7 +41,11 @@ artifact AAD. Preserve legacy child identity/bytes; rollback refuses retained
 comparison state it cannot interpret. Recheck both original authorities after
 blocking work and use the earliest original deadline through SQL, key access,
 regional processing and guarded public delivery. Charged refusals retain the
-same owner through outcome acknowledgement and joined cleanup.
+same owner through outcome acknowledgement and joined cleanup. A valid output
+that exceeds the result bound, including its private/public envelopes, returns
+a content-free size refusal after both complete native authentications. It
+never substitutes for an input/parser limit, corruption or incomplete read;
+those remain unavailable. No result is truncated to fit.
 
 Aggregate every selected cumulative function value before ranking absolute
 incident-minus-baseline changes. Do not subtract truncated top-N summaries.

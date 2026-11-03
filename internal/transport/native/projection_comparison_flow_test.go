@@ -35,9 +35,10 @@ func pairedProtocolFixture(t *testing.T) projectionProtocolFixture {
 }
 
 type comparisonProtocolReader struct {
-	f        projectionProtocolFixture
-	calls    atomic.Int32
-	complete bool
+	f         projectionProtocolFixture
+	calls     atomic.Int32
+	complete  bool
+	oversized bool
 }
 
 func (r *comparisonProtocolReader) ReadApprovedContext(context.Context, evidence.NativeContextSource, value.NativeOperation, query.ContextProjectionScope, time.Time) (query.ProjectionResult, error) {
@@ -50,6 +51,9 @@ func (r *comparisonProtocolReader) ReadApprovedProfileComparison(ctx context.Con
 	}
 	// Typed mismatch is a positive, content-free result; public outcome remains
 	// separately audited. Objectstore tests establish the final-auth boundary.
+	if r.oversized {
+		return query.ProjectionResult{TooLarge: true}, nil
+	}
 	if r.complete {
 		facts := query.ProfileComparisonFacts{ProfileComparisonAcquisition: query.ProfileComparisonAcquisition{ProfileType: "heap", Mode: "snapshot"}, SymbolStatus: "missing"}
 		return query.ProjectionResult{Comparison: &query.ProfileComparison{SampleType: s.Profile.SampleType, Unit: "bytes", Normalization: query.ProfileComparisonRaw, Aggregation: "cumulative", Comparable: true, Baseline: facts, Incident: facts, BuildStatus: "unknown", SamplingStatus: "unknown", AcquisitionStatus: "same", Rows: []query.ProfileComparisonRow{}, Limitations: []string{}}}, nil
@@ -67,9 +71,14 @@ func TestNativeComparisonCommandAndTypedRefusalJoinExistingProtocol(t *testing.T
 	}
 }
 
-func runComparisonProtocol(t *testing.T, complete bool) {
+func TestNativeComparisonSizeRefusalJoinsExistingProtocol(t *testing.T) {
+	runComparisonProtocol(t, false, true)
+}
+
+func runComparisonProtocol(t *testing.T, complete bool, oversized ...bool) {
 	f := pairedProtocolFixture(t)
-	reader := &comparisonProtocolReader{f: f, complete: complete}
+	sizeRefusal := len(oversized) > 0 && oversized[0]
+	reader := &comparisonProtocolReader{f: f, complete: complete, oversized: sizeRefusal}
 	result, err := evidence.NewRegionalApprovedResult(f.ctx, f.target, reader, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +119,7 @@ func runComparisonProtocol(t *testing.T, complete bool) {
 		done <- projectionProtocolOutcome{state, err}
 	}()
 	got, err := op.Projection(f.ctx)
-	if err != nil || !got.Valid(f.scope) || got.IncompatibleProfiles == complete || (got.Comparison != nil) != complete {
+	if err != nil || !got.Valid(f.scope) || got.IncompatibleProfiles != (!complete && !sizeRefusal) || got.TooLarge != sizeRefusal || (got.Comparison != nil) != complete {
 		t.Fatal("typed comparison result", got, err)
 	}
 	if err := op.AcknowledgeProjection(f.ctx); err != nil {

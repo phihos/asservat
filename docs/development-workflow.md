@@ -13,7 +13,9 @@ exit and remaining gap. They do not independently run broad gates or dispatch
 hosted suites. Integrate completed changes promptly instead of building long
 chains of dependent branches.
 
-Before the installed test, follow the feature through installer output, public
+Before the first full CI push, finish the independent producer/consumer
+review, including private and public result envelopes and charged refusal
+ownership. Before the installed test, follow the feature through installer output, public
 request, approval/admission, dispatch, storage credentials, publication, native
 download, projection and cancellation. Check producer output against the real
 consumer, including evidence types, data classes, client policies and resource

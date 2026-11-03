@@ -80,15 +80,23 @@ func ReadProfileComparison(ctx context.Context, baseline, incident ProfileCompar
 		result.Clear()
 		return zero, query.ErrProfileIncompatible
 	}
+	if errors.Is(err, query.ErrRecordTooLarge) {
+		result.Clear()
+		return zero, query.ErrRecordTooLarge
+	}
 	if err != nil || !result.Valid(selection) || result.Baseline.ProfileComparisonAcquisition != facts[0] || result.Incident.ProfileComparisonAcquisition != facts[1] {
 		result.Clear()
 		return zero, query.ErrUnavailable
 	}
 	encoded, err := json.Marshal(result)
 	defer clear(encoded)
-	if err != nil || len(encoded) > query.ProfileComparisonBytes || ctx.Err() != nil {
+	if err != nil || ctx.Err() != nil {
 		result.Clear()
 		return zero, query.ErrUnavailable
+	}
+	if len(encoded) > query.ProfileComparisonBytes {
+		result.Clear()
+		return zero, query.ErrRecordTooLarge
 	}
 	return result, nil
 }

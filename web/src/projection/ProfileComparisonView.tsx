@@ -52,7 +52,7 @@ export function ProfileComparisonView({ controller, session, scope, caseID, arti
     </>}
     {state.phase === 'incompatible' && <p role="status">These profiles cannot be compared for the selected sample type and normalization.</p>}
     {state.phase === 'expired' && <p role="status">This comparison has expired. Compare again to request a fresh view.</p>}
-    {state.phase === 'unavailable' && <p role="alert">The saved comparison is unavailable or access to both profiles could not be checked.</p>}
+    {state.phase === 'unavailable' && <p role="alert">The saved comparison is unavailable. Check access to both profiles or select fewer functions.</p>}
     {!busy && <Button className="button secondary" isDisabled={!attached || !sampleType || !Number.isInteger(Number(topN)) || Number(topN) < 1 || Number(topN) > 100} onPress={() => void controller.inspectComparison({ sample_type: sampleType, normalization, top_n: Number(topN) })}>Compare profiles</Button>}
     {state.phase !== 'idle' && <Button className="button secondary" onPress={controller.close}>Close comparison</Button>}
   </section>;

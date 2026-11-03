@@ -55,6 +55,7 @@ type profileComparisonReply struct {
 	BaselineVersion, IncidentVersion artifact.Digest
 	Comparison                       *query.ProfileComparison `json:",omitempty"`
 	IncompatibleProfiles             bool                     `json:",omitempty"`
+	TooLarge                         bool                     `json:",omitempty"`
 }
 
 // encodeProjectionResult is the worker's payload for the scope's result. A
@@ -74,10 +75,18 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 	}
 	if scope.NativeType == artifact.PprofArtifact {
 		if scope.Comparison != (query.ProfileComparisonWindow{}) {
-			b, e := json.Marshal(profileComparisonReply{BaselineVersion: scope.Comparison.Baseline.Version, IncidentVersion: scope.Version, Comparison: r.Comparison, IncompatibleProfiles: r.IncompatibleProfiles})
-			if e != nil || len(b) > query.ContextResultBytes {
+			reply := profileComparisonReply{BaselineVersion: scope.Comparison.Baseline.Version, IncidentVersion: scope.Version, Comparison: r.Comparison, IncompatibleProfiles: r.IncompatibleProfiles, TooLarge: r.TooLarge}
+			b, e := json.Marshal(reply)
+			if e != nil {
 				clear(b)
 				return nil, contracts.ErrNativeProtocol
+			}
+			if len(b) > query.ContextResultBytes {
+				clear(b)
+				// The complete authenticated result is valid, but its private
+				// version envelope also spends the fixed result-byte allowance.
+				// Retain a positively acknowledged, content-free size refusal.
+				return json.Marshal(profileComparisonReply{BaselineVersion: scope.Comparison.Baseline.Version, IncidentVersion: scope.Version, TooLarge: true})
 			}
 			return b, nil
 		}
@@ -140,6 +149,7 @@ func decodeProjectionResult(b []byte, scope query.ContextProjectionScope) (query
 				return query.ProjectionResult{}, contracts.ErrNativeProtocol
 			}
 			r.Comparison, r.IncompatibleProfiles = reply.Comparison, reply.IncompatibleProfiles
+			r.TooLarge = reply.TooLarge
 			break
 		}
 		var summary query.ProfileSummary

@@ -235,8 +235,14 @@ func compareAggregates(ctx context.Context, b, i comparisonAggregate, s analysis
 	}
 	encoded, err := json.Marshal(out)
 	defer clear(encoded)
-	if err != nil || len(encoded) > analysis.ProfileComparisonBytes {
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
+	if err != nil {
 		return zero, artifact.ErrLimit
+	}
+	if len(encoded) > analysis.ProfileComparisonBytes {
+		return zero, analysis.ErrRecordTooLarge
 	}
 	return out, nil
 }

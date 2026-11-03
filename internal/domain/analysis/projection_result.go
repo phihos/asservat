@@ -53,7 +53,8 @@ type ProjectionResult struct {
 	SyscallEvents        *SyscallEventPage   `json:",omitempty"`
 	InvalidCursor        bool
 	// TooLarge refuses a page whose first selected record alone exceeds the
-	// wire bound; it discloses no record and paging cannot pass that record.
+	// wire bound, or an authenticated comparison that exceeds its result bound.
+	// It discloses no content and never denotes an input/parser budget failure.
 	TooLarge bool
 }
 
@@ -63,11 +64,11 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 		return false
 	}
 	if s.Comparison != (ProfileComparisonWindow{}) {
-		if r.PodStatus != (PodStatusProjection{}) || !r.Headers.empty() || r.Summary != nil || r.SyscallSummary != nil || r.SyscallEvents != nil || r.InvalidCursor || r.TooLarge {
+		if r.PodStatus != (PodStatusProjection{}) || !r.Headers.empty() || r.Summary != nil || r.SyscallSummary != nil || r.SyscallEvents != nil || r.InvalidCursor {
 			return false
 		}
-		if r.IncompatibleProfiles {
-			return r.Comparison == nil
+		if r.IncompatibleProfiles || r.TooLarge {
+			return r.Comparison == nil && r.IncompatibleProfiles != r.TooLarge
 		}
 		return r.Comparison != nil && r.Comparison.Valid(s.Comparison.Selection(s.Profile))
 	}

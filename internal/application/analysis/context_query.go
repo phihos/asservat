@@ -735,6 +735,8 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	switch {
 	case err != nil || !projection.Valid(scope):
 		err = value.ErrUnavailable
+	case scope.Comparison != (value.ProfileComparisonWindow{}) && projection.TooLarge:
+		tooLarge = true
 	case scope.Comparison != (value.ProfileComparisonWindow{}) && projection.IncompatibleProfiles:
 		incompatible = true
 	case scope.Comparison != (value.ProfileComparisonWindow{}):

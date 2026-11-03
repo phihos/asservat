@@ -78,6 +78,13 @@ cleanup. The schema133 installation handover also passed in a fresh owned cluste
 This is bootstrap/schema authority qualification, not installed comparison.
 Reviewed exact CI and the prepared native two-capture browser/MCP journey are
 next.
+Final independent boundary review reproduced a large-result refusal losing its
+native/public owner. The fix distinguishes authenticated output overflow from
+parser/input limits and preserves the exact paid refusal through native version
+wrapping, audit acknowledgement and joined close. Focused races passed across
+parser, reader, encrypted adapter and native transport; C18/C20 direct/poll,
+failed-audit and unknown-close comparisons passed in 1.073s / 23.349s. Original
+red reports remain archived. Native comparison qualification is still pending.
 No comparison requirement or installed result is marked complete. The argument job's cold-start/teardown
 headroom also needs improvement before later installed campaigns. No timeout was
 raised. These saved-view fixtures do not complete arbitrary `syscall_query`,

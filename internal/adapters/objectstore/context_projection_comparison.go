@@ -73,6 +73,9 @@ func (r *ContextProjectionReader) ReadProjectionComparisonNative(ctx context.Con
 	if errors.Is(err, query.ErrProfileIncompatible) {
 		return query.ProjectionResult{IncompatibleProfiles: true}, nil
 	}
+	if errors.Is(err, query.ErrRecordTooLarge) {
+		return query.ProjectionResult{TooLarge: true}, nil
+	}
 	if err != nil {
 		comparison.Clear()
 		return zero, query.ErrUnavailable
