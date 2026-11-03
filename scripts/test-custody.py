@@ -155,7 +155,7 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
                 s3_configuration.chmod(0o444)
                 s3_extra = ["-v", str(s3_configuration) + ":/config/s3.json:ro"]
                 s3_command = ["-s3.config=/config/s3.json"]
-            s3ip, _ = service("s3", SEAWEED, ["--user", "1000:1000", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-v", "/data", "-e", "AWS_ACCESS_KEY_ID=synthetic-only", "-e", "AWS_SECRET_ACCESS_KEY=synthetic-only-secret", *s3_extra, "--entrypoint", "/usr/bin/weed"], ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-admin.ui=false", "-s3.port=8333", *s3_command])
+            s3ip, s3name = service("s3", SEAWEED, ["--user", "1000:1000", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-v", "/data", "-e", "AWS_ACCESS_KEY_ID=synthetic-only", "-e", "AWS_SECRET_ACCESS_KEY=synthetic-only-secret", *s3_extra, "--entrypoint", "/usr/bin/weed"], ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-admin.ui=false", "-s3.port=8333", *s3_command])
             bao_endpoint = ""
             if fleet:
                 baoip, _ = service("kms", BAO, ["--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-e", "SKIP_SETCAP=true", "-e", "BAO_DISABLE_MLOCK=true", "--entrypoint", "/usr/bin/bao"], ["server", "-dev", "-dev-no-store-token", "-dev-root-token-id=synthetic-root", "-dev-listen-address=0.0.0.0:8200"])
@@ -208,7 +208,7 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
             run(["docker", "exec", pgname, "psql", "-U", "postgres", "-d", "custody_test", "-v", "ON_ERROR_STOP=1", "-c", (ROOT/"test/fixtures/sql/runtime-roles.sql").read_text()])
             path = work/"fixtures.json"
             path.touch(mode=0o600)
-            descriptor = {"postgres": dsn, "s3": "http://"+s3ip+":8333", "kms":bao_endpoint}
+            descriptor = {"postgres": dsn, "s3": "http://"+s3ip+":8333", "kms":bao_endpoint, "s3Container": s3name}
             if installed_evidence_delete:
                 descriptor["installedEvidenceDelete"] = True
             if native_statistics:

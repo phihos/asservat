@@ -166,3 +166,70 @@ A smaller record/account count reduces
 this cost linearly. No additional poll, renewal, rate limiter, credential or
 network call is introduced: the change funds existing successful-transfer
 updates rather than failing a slow download after its fifteenth owner update.
+
+## Write-only completion correction (2026-11-03)
+
+The installed connector has Write-only evidence credentials. The generic
+`StreamingWriter.Finish` also rereads the completed ciphertext; using it for
+profiles therefore refuses ordinary 16 MiB-limit captures, even when their
+actual native output fits one frame. The producer selects multipart from the
+admitted ceiling. Smaller bootstrap fixtures had hidden this composition error.
+
+The dedicated `PrepareOneShotProfileArtifact` factory now owns the private
+process-bound journal and selects explicit `FinishStored` completion. This
+method records the same one-use create/part/complete claims and acknowledged
+receipt, without GET. The receipt's size/hash describe the ciphertext sent,
+not an independently verified stored object. It grants no publication or
+read authority. Generic producers still use `Finish` with full readback.
+The profile factory cannot expose or release its journal; all temporary
+charges remain until the existing quiescence and complete-inventory cleanup.
+The independently credentialed publisher still reads and authenticates every
+ciphertext/native byte, checks the manifest and parses the complete profile
+before its existing audited publication boundary.
+
+Cost: no new credential, permission, service, worker, configuration, retry or
+fallback; one private completion selector and reuse of the existing journal.
+This removes the connector's unsupported full-data GET (up to 17 bounded range
+reads at the 128 MiB trace ceiling); publisher verification is unchanged.
+Producer failures report fixed storage stages through the existing connector
+logger, without backend messages, credentials or evidence contents.
+
+Verification records below distinguish the actual scoped-S3 component from
+installed qualification. Missing/corrupt ciphertext and invalid profile content
+must still fail independent publisher verification. A completion receipt alone
+must never be reported as that verification.
+
+The owned versioned-S3 regression
+`python3 scripts/test-custody.py --run
+'^TestCustodyProfileWriteOnlyWithRealServices$' --result-name profile-write-only-after-2`
+passed all five cases (2.197 seconds including race runtime):
+[terminal log](../../test/results/profile-write-only-after-2.log),
+[source freeze and cleanup](../../test/results/profile-write-only-after-2-environment.json).
+The 16 MiB registration stored a 127-byte valid synthetic CPU profile with
+actual Write-only credentials. GET, LIST and DELETE were independently denied
+by the backend. The generic writer still refused its readback after acknowledged
+completion; the dedicated writer succeeded. Separate Read-only publisher
+credentials accepted the valid profile and rejected a corrupted pinned-data
+response, an actually deleted exact data version, and a gzip-valid malformed
+profile. The corruption case modifies one ciphertext response byte in the TLS
+fixture while preserving its version, ETag and length; it is a deliberate fault,
+not a claim that S3 rewrote an immutable version. These are component verification
+verdicts, not installed catalog publication or SQL admission evidence.
+
+The [corrected pre-fix run](../../test/results/profile-write-only-before-2.log)
+failed at all four default-limit stores (0.822 seconds):
+[source freeze and cleanup](../../test/results/profile-write-only-before-2-environment.json).
+Two fixture errors are retained separately: the
+[first setup](../../test/results/profile-write-only-before.log) omitted bucket
+versioning, and the [first after-run](../../test/results/profile-write-only-after.log)
+used a synthetic positive profile without its required location information.
+The latter already passed write-only storage and all negative publisher cases;
+the publisher correctly refused that invalid positive sample. Every run reported
+unchanged sources and empty cleanup failures.
+
+Full local race suites passed for privacy (1.163 seconds), objectstore (5.966
+seconds) and bootstrap (78.978 seconds); affected vet, specification and both
+architecture gates passed. The moved private-journal tests retain uncertain
+create/part/complete, exact epoch/attempt, expiry, duplicate and no-release
+coverage. The dedicated factory rejects non-profile artifacts and invalid writer
+plans; generic producer preparation cannot select receipt-only completion.

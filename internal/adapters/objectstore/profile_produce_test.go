@@ -1,8 +1,9 @@
-package bootstrap
+package objectstore
 
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -80,7 +81,7 @@ func TestProfileStreamingNeverRepeatsUnknownEffectsOrReleasesCharges(t *testing.
 					if err != nil {
 						t.Fatal(err)
 					}
-					_, err = writer.Finish(ctx)
+					_, err = writer.FinishStored(ctx)
 					if (err != nil) != (failure == "complete") {
 						t.Fatal("complete result", err)
 					}
@@ -89,7 +90,7 @@ func TestProfileStreamingNeverRepeatsUnknownEffectsOrReleasesCharges(t *testing.
 				if err := writer.Write(ctx, []byte{1}); err == nil {
 					t.Fatal("finished or failed writer reused")
 				}
-				if _, err := writer.Finish(ctx); err == nil {
+				if _, err := writer.FinishStored(ctx); err == nil {
 					t.Fatal("finish repeated")
 				}
 				if objects.parts != beforeParts || objects.completes != beforeComplete {
@@ -127,5 +128,53 @@ func TestProfileStreamingRefusesReplacementAndExpiredContext(t *testing.T) {
 				t.Fatal("unbound effect", err)
 			}
 		})
+	}
+}
+
+func TestOneShotProfileFactoryRestrictsArtifactAndBoundPlan(t *testing.T) {
+	handle, e, _ := writerFixture(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Error("unexpected object effect during preparation") }))
+	store := handle.(*preparedContext).producer.store
+	const epoch = "00000000-0000-4000-8000-000000000001"
+	if _, err := PrepareOneShotProfileArtifact(t.Context(), store, contextWriterTestKeys{}, e, epoch, time.Now); err == nil {
+		t.Fatal("pod status selected profile completion")
+	}
+	e.Profile = &artifact.GoProfileAcquisition{SourceRef: "pprof", EndpointDigest: artifact.Digest{1}, Type: "cpu", Mode: "interval", DurationMillis: 10000}
+	e.NativeType, e.DataClass, e.ActionID = artifact.PprofArtifact, "raw", "a0123456789abcdef01234567"
+	e.Registration.NativeLimit = 16 << 20
+	if err := e.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, badEpoch := range []string{"", "not-an-epoch"} {
+		if _, err := PrepareOneShotProfileArtifact(t.Context(), store, contextWriterTestKeys{}, e, badEpoch, time.Now); err == nil {
+			t.Fatal("unbound profile", badEpoch)
+		}
+	}
+	prepared, err := PrepareOneShotProfileArtifact(t.Context(), store, contextWriterTestKeys{}, e, epoch, time.Now)
+	if err != nil || !prepared.storedOnly {
+		t.Fatal("protected profile factory", err)
+	}
+	journal, ok := prepared.producer.journal.(*profileStreamingJournal)
+	if !ok || !journal.plan.Equal(prepared.plan) || journal.plan.WriterEpoch != epoch {
+		t.Fatal("profile lost private exact journal")
+	}
+	generic, err := NewArtifactProducer(store, contextWriterTestKeys{}, journal, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ordinary, err := generic.Prepare(t.Context(), e, epoch)
+	if err != nil || ordinary.storedOnly {
+		t.Fatal("generic producer selected receipt-only mode", err)
+	}
+	e.Registration.NativeLimit = artifact.FrameBytes
+	if _, err := PrepareOneShotProfileArtifact(t.Context(), store, contextWriterTestKeys{}, e, epoch, time.Now); err == nil {
+		t.Fatal("small path accepted multipart plan")
+	}
+}
+
+func TestArtifactStoreDiagnosticDoesNotExposeCause(t *testing.T) {
+	secret := errors.New("synthetic backend credential or evidence")
+	err := artifactStoreError{"multipart-complete", secret}
+	if !errors.Is(err, secret) || err.Error() != "artifact store refused at multipart-complete" || err.FixedStep() != "multipart-complete" {
+		t.Fatal("unsafe store diagnostic")
 	}
 }

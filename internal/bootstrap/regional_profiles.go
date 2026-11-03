@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"io"
 	"sync"
 	"time"
@@ -146,6 +147,9 @@ func (h *ConnectorRecordings) DeliverProfile(ctx context.Context, node collector
 	held.prepared = nil
 	// Capacity becoming available cannot renew an expired/cancelled attempt.
 	if !h.waitStoreLocked(storeCtx, e.Registration.WriteUntil, maxStoringBytes) {
+		if h.log != nil {
+			h.log("connector profile store unconfirmed: admission-wait")
+		}
 		held.stopStore = nil
 		held.storing = false
 		held.outcome = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
@@ -161,6 +165,14 @@ func (h *ConnectorRecordings) DeliverProfile(ctx context.Context, node collector
 	stored := h.now().UTC().Truncate(time.Microsecond)
 	out := evidence.RecordingCollection{State: evidence.RecordingStored, Acquired: held.queued, Completion: artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: held.digest, Copies: copies, StoredAt: stored, ClosedAt: stored}}
 	if err != nil || !out.Valid(e.Registration) {
+		if h.log != nil {
+			stage := "completion"
+			var fixed interface{ FixedStep() string }
+			if errors.As(err, &fixed) {
+				stage = fixed.FixedStep()
+			}
+			h.log("connector profile store unconfirmed: " + stage)
+		}
 		out = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
 	}
 	h.mu.Lock()

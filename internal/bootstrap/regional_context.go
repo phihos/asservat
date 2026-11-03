@@ -19,7 +19,6 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/application/evidence"
-	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -317,20 +316,18 @@ func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.C
 		if o.recordings == nil || o.writerEpoch == "" {
 			return nil, value.ErrUnavailable
 		}
-		var journal privacyapp.StreamingJournal = noJournal{}
-		epoch := ""
 		if e.Registration.NativeLimit > artifact.FrameBytes {
-			epoch = o.writerEpoch
-			journal, err = newProfileStreamingJournal(e, epoch, o.now)
+			prepared, err := objectstore.PrepareOneShotProfileArtifact(ctx, o.store, seal, e, o.writerEpoch, o.now)
 			if err != nil {
 				return nil, err
 			}
+			return o.recordings.PrepareProfile(prepared, e), nil
 		}
-		producer, err := objectstore.NewArtifactProducer(o.store, seal, journal, o.now)
+		producer, err := objectstore.NewArtifactProducer(o.store, seal, noJournal{}, o.now)
 		if err != nil {
 			return nil, err
 		}
-		prepared, err := producer.Prepare(ctx, e, epoch)
+		prepared, err := producer.Prepare(ctx, e, "")
 		if err != nil {
 			return nil, err
 		}

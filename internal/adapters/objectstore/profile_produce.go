@@ -1,10 +1,11 @@
-package bootstrap
+package objectstore
 
 import (
 	"context"
 	"sync"
 	"time"
 
+	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/execution"
 )
@@ -52,4 +53,29 @@ func (j *profileStreamingJournal) AdvanceStreaming(ctx context.Context, plan art
 		next.Receipt = &receipt
 	}
 	return next, fresh, nil
+}
+
+// PrepareOneShotProfileArtifact is the protected connector's large-profile
+// composition. The caller supplies the already accepted expectation and bound
+// connector epoch; this factory grants no authority. It creates one private
+// no-release journal and one-use writer, never exposes a producer or an option
+// to bypass verification on another artifact. All charges remain until cleanup.
+func PrepareOneShotProfileArtifact(ctx context.Context, store *CustodyStore, keys evidence.KeySealer, e artifact.ContextExpectation, writerEpoch string, now func() time.Time) (*PreparedArtifact, error) {
+	if e.Profile == nil || e.Validate() != nil {
+		return nil, artifact.ErrInvalid
+	}
+	journal, err := newProfileStreamingJournal(e, writerEpoch, now)
+	if err != nil {
+		return nil, err
+	}
+	producer, err := NewArtifactProducer(store, keys, journal, now)
+	if err != nil {
+		return nil, err
+	}
+	prepared, err := producer.Prepare(ctx, e, writerEpoch)
+	if err != nil {
+		return nil, err
+	}
+	prepared.storedOnly = true
+	return prepared, nil
 }
