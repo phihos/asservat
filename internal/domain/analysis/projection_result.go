@@ -18,6 +18,9 @@ const (
 	// frame (NativeWindowReadWork) exceeds one pod-status unit's two 4 MiB
 	// batches, and two units cover it in every cost dimension.
 	HTTPHeaderQueryUnits = 2
+	// ProfileSummaryQueryUnits conservatively funds the full 64 MiB native
+	// window (nine encrypted frames, two index pages) plus metadata.
+	ProfileSummaryQueryUnits = 10
 )
 
 // ProjectionResult is the approved result of one read batch. Exactly the

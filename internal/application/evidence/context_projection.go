@@ -101,8 +101,9 @@ func ProjectionSourceMatches(s NativeContextSource, q value.ContextQuery, a valu
 func projectionExpectation(e artifact.ContextExpectation, scope value.ContextProjectionScope) bool {
 	src, ok := scope.Source()
 	kind := e.NativeType == artifact.PodStatusArtifact && e.ActionID == "pod-status" && e.Recording == nil ||
-		e.NativeType == artifact.HTTPHeadersArtifact && e.Recording != nil && e.Recording.Profile == "httpHeaders"
-	return ok && kind && e.NativeType == src.NativeType && e.Registration.NativeLimit == src.NativeLimit && e.DataClass == src.DataClass &&
+		e.NativeType == artifact.HTTPHeadersArtifact && e.Recording != nil && e.Recording.Profile == "httpHeaders" ||
+		e.NativeType == artifact.PprofArtifact && e.Profile != nil && e.Profile.NativeType() == artifact.PprofArtifact
+	return ok && kind && src.Matches(e.NativeType, e.Type().Format, e.DataClass, src.EvidenceType, e.Registration.NativeLimit, scope.SourceProjectionDigest) &&
 		e.CaseID == scope.CaseID && e.CaptureUID == scope.CaptureID && e.NamespaceUID == scope.NamespaceUID && e.WorkloadUID == scope.WorkloadUID &&
 		e.PodUID == scope.PodUID && e.Registration.Location.ArtifactID == scope.ArtifactID && e.Registration.Location.ClusterID == scope.ClusterID
 }
@@ -338,6 +339,10 @@ func (r *RegionalProjectionRead) Projection(ctx context.Context) (value.Projecti
 		return value.ProjectionResult{}, value.ErrUnavailable
 	}
 	out := r.projection
+	if out.Summary != nil {
+		summary := value.CloneProfileSummary(*out.Summary)
+		out.Summary = &summary
+	}
 	out.Headers.Records, out.Headers.CoverageGaps = slices.Clone(out.Headers.Records), slices.Clone(out.Headers.CoverageGaps)
 	return out, nil
 }

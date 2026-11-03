@@ -44,8 +44,13 @@ The result union admits only the selected closed summary and validates its
 selected sample type. The coordinator bounds its JSON to 24 KiB independently
 of analyzer validation.
 Copies own all hotspot/name/fraction pointers; closure clears retained output.
-Production public routing, SQL admission and worker parsing are not enabled by
-these internal types. The public response must additionally fit its complete
+Public routing and SQL admission remain disabled. The regional worker now
+connects the existing native reader to the bounded analyzer through one delivery
+chunk buffer (256 KiB), retaining no whole compressed profile. The authenticated
+whole-file check and exact EOF must finish before a result is accepted. The
+source's authored native limit remains binding up to the format maximum; a
+16 MiB source does not become a 64 MiB source. Native transport carries the bare
+closed summary within 24 KiB and refuses oversized output without trimming. The public response must additionally fit its complete
 existing envelope budget before activation.
 
 ## Funding and resource boundary

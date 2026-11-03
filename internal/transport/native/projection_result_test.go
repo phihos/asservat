@@ -143,3 +143,45 @@ func TestProjectionPayloadOversizedRecordIsTooLarge(t *testing.T) {
 		t.Fatal("oversized record not refused as TooLarge", err, string(b))
 	}
 }
+
+func TestProjectionPayloadProfileSummaryIsClosedAndBounded(t *testing.T) {
+	s := resultScope()
+	s.NativeType, s.SourceFormat, s.DisplayVersion, s.SourceProjectionDigest = artifact.PprofArtifact, artifact.PprofFormat, query.ProfileSummaryDisplayVersion, artifact.Digest{}
+	s.Selection = query.LineSelection{}
+	s.Profile = query.ProfileSummarySelection{SampleType: "cpu", TopN: 100}
+	name := "work"
+	fraction := 1.0
+	result := query.ProjectionResult{Summary: &query.ProfileSummary{SampleType: "cpu", Unit: "nanoseconds", Total: 1, SymbolStatus: "complete", Top: []query.ProfileHotspot{{Function: &name, Flat: 1, Cumulative: 1, Fraction: &fraction}}}}
+	b, err := encodeProjectionResult(result, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := decodeProjectionResult(b, s)
+	if err != nil || back.Summary == nil || *back.Summary.Top[0].Function != name {
+		t.Fatal("summary roundtrip", err)
+	}
+	for _, body := range [][]byte{append(b[:len(b)-1:len(b)-1], []byte(`,"labels":["secret"]}`)...), []byte(`null`), append(bytes.Repeat([]byte(" "), query.ProfileSummaryBytes), b...)} {
+		if _, err := decodeProjectionResult(body, s); err == nil {
+			t.Fatal("extra/oversized payload accepted")
+		}
+	}
+	if _, err := decodeProjectionResult(b, resultScope()); err == nil {
+		t.Fatal("summary substituted for metadata")
+	}
+	s.Profile.SampleType = "heap"
+	if _, err := decodeProjectionResult(b, s); err == nil {
+		t.Fatal("selection changed")
+	}
+	s.Profile.SampleType = "cpu"
+	huge := strings.Repeat("<", 512)
+	for i := range 30 {
+		n := huge[:500] + string(rune('a'+i))
+		result.Summary.Top = append(result.Summary.Top, query.ProfileHotspot{Function: &n, Fraction: new(float64)})
+	}
+	if !result.Valid(s) {
+		t.Fatal("oversize fixture structurally invalid")
+	}
+	if _, err := encodeProjectionResult(result, s); err == nil {
+		t.Fatal("oversized summary trimmed or emitted")
+	}
+}

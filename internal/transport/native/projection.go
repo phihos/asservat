@@ -52,6 +52,14 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 		}
 		return b, nil
 	}
+	if scope.NativeType == artifact.PprofArtifact {
+		b, e := json.Marshal(r.Summary)
+		if e != nil || len(b) > query.ProfileSummaryBytes {
+			clear(b)
+			return nil, contracts.ErrNativeProtocol
+		}
+		return b, nil
+	}
 	if r.InvalidCursor || r.TooLarge {
 		return json.Marshal(headerPageReply{InvalidCursor: r.InvalidCursor, TooLarge: r.TooLarge})
 	}
@@ -85,6 +93,12 @@ func decodeProjectionResult(b []byte, scope query.ContextProjectionScope) (query
 		if len(b) > query.ContextResultBytes || nativeDecode(b, &r.PodStatus) != nil {
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol
 		}
+	case artifact.PprofArtifact:
+		var summary query.ProfileSummary
+		if len(b) > query.ProfileSummaryBytes || nativeDecode(b, &summary) != nil {
+			return query.ProjectionResult{}, contracts.ErrNativeProtocol
+		}
+		r.Summary = &summary
 	case artifact.HTTPHeadersArtifact:
 		var reply headerPageReply
 		if len(b) > query.HTTPHeaderPageWireBytes || nativeDecode(b, &reply) != nil || (reply.Page != nil) == (reply.InvalidCursor || reply.TooLarge) {

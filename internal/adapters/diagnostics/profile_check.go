@@ -70,7 +70,7 @@ func parsePprof(r io.Reader, limit int64) (*profile.Profile, error) {
 		return nil, ErrNotProfile
 	}
 	if err := preflightPprof(plain.Bytes()); err != nil {
-		return err
+		return nil, err
 	}
 	p, err := profile.ParseUncompressed(plain.Bytes())
 	if err != nil || p.CheckValid() != nil {

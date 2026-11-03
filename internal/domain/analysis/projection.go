@@ -67,7 +67,7 @@ func LookupProjectionSource(nativeType string) (ProjectionSource, bool) {
 // Matches reports whether published facts are exactly this source.
 func (p ProjectionSource) Matches(nativeType, format, dataClass, evidenceType string, nativeLimit int64, digest artifact.Digest) bool {
 	return p.NativeType == nativeType && p.Format == format && p.DataClass == dataClass && p.EvidenceType == evidenceType &&
-		p.NativeLimit == nativeLimit && p.ProjectionDigest == digest
+		(p.NativeLimit == nativeLimit || p.NativeType == artifact.PprofArtifact && nativeLimit > 0 && nativeLimit <= p.NativeLimit) && p.ProjectionDigest == digest
 }
 
 func ContextSourceProjectionDigest() artifact.Digest {

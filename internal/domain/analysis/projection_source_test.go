@@ -105,3 +105,24 @@ func TestProjectionResultMatchesItsScope(t *testing.T) {
 		t.Fatal("page wire bound or query units changed")
 	}
 }
+
+func TestProfileProjectionSourcePreservesAuthoredLimit(t *testing.T) {
+	p, ok := LookupProjectionSource(artifact.PprofArtifact)
+	if !ok {
+		t.Fatal("missing profile source")
+	}
+	for _, limit := range []int64{1, 16 << 20, artifact.MaxPprofBytes} {
+		if !p.Matches(artifact.PprofArtifact, artifact.PprofFormat, "raw", "profile", limit, artifact.Digest{}) {
+			t.Fatal("authored finite bound refused", limit)
+		}
+	}
+	for _, limit := range []int64{0, -1, artifact.MaxPprofBytes + 1} {
+		if p.Matches(artifact.PprofArtifact, artifact.PprofFormat, "raw", "profile", limit, artifact.Digest{}) {
+			t.Fatal("invalid bound accepted", limit)
+		}
+	}
+	pod, _ := LookupProjectionSource(artifact.PodStatusArtifact)
+	if pod.Matches(pod.NativeType, pod.Format, pod.DataClass, pod.EvidenceType, pod.NativeLimit-1, pod.ProjectionDigest) {
+		t.Fatal("unrelated source exact bound changed")
+	}
+}

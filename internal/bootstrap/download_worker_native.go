@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/diagnostics"
 	"asservat.local/asservat/internal/adapters/httpheaders"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
@@ -236,6 +237,7 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 	case value.AcquisitionProjection:
 		// ADR-282: the approved read also pages httpHeaders extracts.
 		reader.ServeHTTPHeaderPages(httpheaders.RecordingPage{})
+		reader.ServeProfileSummaries(diagnostics.SummarizePprof)
 		result, err = evidence.NewRegionalApprovedResult(ctx, input.Target, reader, time.Now)
 	default:
 		return artifact.ErrInvalid

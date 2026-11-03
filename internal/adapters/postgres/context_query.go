@@ -388,5 +388,5 @@ func queryRefusal(step string, cause error) error {
 // closed projection source: pod-status metadata or an httpHeaders extract.
 func scopeSource(scope value.ContextProjectionScope, e artifact.ContextExpectation) bool {
 	src, ok := scope.Source()
-	return ok && e.NativeType == src.NativeType && e.DataClass == src.DataClass && e.Registration.NativeLimit == src.NativeLimit && e.Type().Format == src.Format
+	return ok && src.Matches(e.NativeType, e.Type().Format, e.DataClass, src.EvidenceType, e.Registration.NativeLimit, src.ProjectionDigest)
 }
