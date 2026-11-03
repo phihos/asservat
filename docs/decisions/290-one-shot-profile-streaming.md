@@ -128,6 +128,11 @@ Backup and WAL accounting use those same row/transition counts. Read funding is 
 funding is 256 MiB. These are prepaid ceilings, not retries after uncertain work
 or promises to refill spent resources. Typed per-session admission may reserve
 less; ordinary evidence does not have to reserve a maximum trace session.
+Profile download admission checks that independently accepted artifact type
+against the complete qualified owner transition allowance. Spare aggregate byte
+capacity on a legacy root cannot substitute for renewal funding: pprof and Go
+trace sessions are refused while that allowance is smaller. Ordinary evidence
+retains its previous admission arithmetic; retained legacy roots are not enlarged.
 
 The custody child preserves authored evidence funding up to the per-record
 maximum trace obligation: 136,740,864 final ciphertext bytes plus 135,266,304

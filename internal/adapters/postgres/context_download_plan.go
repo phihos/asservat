@@ -114,7 +114,7 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 		if e != nil {
 			return e
 		}
-		if !contextPlanBacking(limits, allocation, control, native, stop, pool, s.installation, now.Time) {
+		if !contextPlanBacking(limits, source.Expectation.Type(), allocation, control, native, stop, pool, s.installation, now.Time) {
 			return artifact.ErrDownloadUnavailable
 		}
 		// Every contributing original deadline survives the configuration and SQL
@@ -131,12 +131,18 @@ func (s *ContextDownloadPlans) ContextDownloadPlan(ctx context.Context, source e
 	}
 	return out, nil
 }
-func contextPlanBacking(l ContextDownloadPlanLimits, a artifact.DownloadAllocation, c custodydb.DownloadControlAllocation, n custodydb.DownloadNativeBacking, b custodydb.DownloadStopBacking, p custodydb.DownloadStopPool, installation string, now time.Time) bool {
+func contextPlanBacking(l ContextDownloadPlanLimits, typ artifact.NativeType, a artifact.DownloadAllocation, c custodydb.DownloadControlAllocation, n custodydb.DownloadNativeBacking, b custodydb.DownloadStopBacking, p custodydb.DownloadStopPool, installation string, now time.Time) bool {
 	control := downloadControl(c)
 	// Admission must leave room for one complete supported response. Later
 	// responses reserve again and cannot recycle uncertain window/key charges.
 	windows := max(int64(1), (min(l.OutputLimit, artifact.MaxGoTraceBytes)+artifact.DownloadWindowBytes-1)/artifact.DownloadWindowBytes)
 	transitions := max(int64(8), firstContextObserveTransitions+firstContextObserveTransitions+windows*firstContextContentTransitions+firstContextRetirementTransitions)
+	if typ.Name == artifact.PprofArtifact || typ.Name == artifact.GoTraceArtifact {
+		// Aggregate byte funding on a legacy root cannot replace a profile
+		// session's finite owner allowance. Require the qualified protocol's
+		// claim/close, renewal and retirement backing before admission.
+		transitions = artifact.ProfileDownloadNativeTransitions
+	}
 	var native authorization.NativeBacking
 	var stop audit.DownloadStopLifecyclePolicy
 	if !l.valid() || !a.Valid() || !control.Valid() || json.Unmarshal(n.PolicyJson, &native) != nil || !native.Valid() || json.Unmarshal(p.LifecyclePolicy, &stop) != nil || !stop.Valid() {
