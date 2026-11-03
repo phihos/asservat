@@ -169,7 +169,7 @@ func readAutomationBasis(ctx context.Context, q *custodydb.Queries, s custodydb.
 }
 
 func sameAutomationEnvelope(a, b authorization.AutomationEnvelope) bool {
-	return a.MaxLifetimeSeconds == b.MaxLifetimeSeconds && a.MaxExecutions == b.MaxExecutions && a.MaxBytes == b.MaxBytes && a.MaxObservedBytes == b.MaxObservedBytes && slices.Equal(a.AllowedActions, b.AllowedActions)
+	return a.MaxLifetimeSeconds == b.MaxLifetimeSeconds && a.MaxExecutions == b.MaxExecutions && a.MaxBytes == b.MaxBytes && a.MaxObservedBytes == b.MaxObservedBytes && a.MaxObservedEvents == b.MaxObservedEvents && slices.Equal(a.AllowedActions, b.AllowedActions)
 }
 
 func (r *AutomationAuthorities) PolicyWorkloadAutomation(ctx context.Context, target authorization.WorkloadTarget, basis identity.Revision) (authorization.WorkloadAutomationProjection, error) {
