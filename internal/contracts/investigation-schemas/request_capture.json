@@ -1,6 +1,6 @@
 {
   "name": "request_capture",
-  "description": "Submit the reviewed pod-status preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet/syscall plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads; submit the same preview again after approval.",
+  "description": "Submit the reviewed capture preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet, syscall or Go profile plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads; submit the same preview again after approval.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": true,
