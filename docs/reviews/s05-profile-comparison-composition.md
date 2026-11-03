@@ -109,7 +109,7 @@ native sample duration when calculating rates.
 | 2. Accepted risk | Yes: bounded regional Go analyzers and ordinary approved profile inspection are accepted. No additional raw-disclosure approval is proposed. |
 | 3. Typical path | Yes: two saved profiles served by a common installed reader. Other placements explicitly remain unavailable. |
 | 4. Precedent | Existing installed pprof summary/query/key/worker composition is reused. No claim of external-project research is made. |
-| 5. Added exposure | 0 services, Jobs beyond the existing one, credentials, key roots, RBAC permissions or public network endpoints. Existing SQL tables gain fixed pair references/children. |
+| 5. Added exposure | 0 services, Jobs beyond the existing one, credentials, key roots, RBAC permissions or public network endpoints. Existing SQL tables gain fixed pair references/children. The existing dispatch role adds one INSERT column for the optional baseline-allocation reference; the key-consumer role gains no INSERT. |
 | 6. Additional fallback states | 0. Existing unavailable and specified semantic-mismatch outcomes apply. |
 | 7. Machinery configuration | 0 new settings. |
 | 8. External dependence | 0 new dependencies; current PostgreSQL, Kubernetes, key service and object store remain required. |

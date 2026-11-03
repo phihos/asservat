@@ -17,7 +17,9 @@ Before the installed test, follow the feature through installer output, public
 request, approval/admission, dispatch, storage credentials, publication, native
 download, projection and cancellation. Check producer output against the real
 consumer, including evidence types, data classes, client policies and resource
-limits. Use a small composed regression for each discovered mismatch; do not
+limits. Service fixtures must exercise the compiled process SQL grants;
+administrator or ad hoc fixture roles can hide missing column and row-lock
+permissions. Protected installation-root fixtures each need a fresh database. Use a small composed regression for each discovered mismatch; do not
 build another test framework or duplicate the production workflow with mocks.
 
 ## Verification tiers

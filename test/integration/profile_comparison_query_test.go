@@ -77,8 +77,13 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 		}
 		return b
 	}
-	runtime := poolFor("context_query_runtime", "synthetic-context-query")
-	defer runtime.Close()
+	// Worker reservation uses the same already-provisioned process grant union
+	// as production and the shared projection lifecycle fixture. The historical
+	// query-only fixture login has no worker configuration/dispatch duties.
+	runtime := f.base.roles["hub-runtime"]
+	if runtime == nil {
+		t.Fatal("compiled ordinary hub runtime pool unavailable")
+	}
 	slots := poolFor("context_query_key_fixture", "synthetic-context-query-key")
 	defer slots.Close()
 	catalogPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")

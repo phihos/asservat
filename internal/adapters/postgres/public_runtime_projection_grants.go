@@ -51,7 +51,7 @@ func publicRuntimeProjectionGrants(purpose string) []publicRuntimeGrant {
 	}
 	add("context_query_batch", "UPDATE", "claim_id", "closed", "native_operation", "native_authority", "native_closed")
 	add("download_allocation", "SELECT")
-	add("download_worker", "INSERT", "query_id", "query_allocation_id")
+	add("download_worker", "INSERT", "query_id", "query_allocation_id", "baseline_query_allocation_id")
 	add("download_worker", "UPDATE", "audit_receipt_json", "id", "abandoned_at")
 	return out
 }
