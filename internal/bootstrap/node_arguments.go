@@ -243,6 +243,9 @@ func (n *nodePackets) runArguments(parent context.Context, epoch, workID string,
 	case completed:
 		footer.Outcome = "completed"
 	}
+	if footer.Outcome == "failed" && n.log != nil {
+		n.log("node collector: argument acquisition failed at " + gadget.ArgumentFailureStage(err))
+	}
 	out, encodeErr := syscalls.AppendArgumentLine(out, footer)
 	result := collector.PacketResult{WorkID: workID, CaptureID: p.CaptureID, StartedAt: started, EndedAt: footer.EndedAt, Retained: footer.Retained, Filtered: footer.Filtered, Malformed: footer.Malformed, OutputFull: outputFull, LostSamples: footer.LostSamples, CapturedBytes: int64(len(out)), Snaplen: 0, EngineVersion: syscalls.ArgumentDecoderVersion, NativeType: artifact.SyscallArgumentsArtifact}
 	result.Seen = result.Retained + result.Filtered + result.Malformed + result.OutputFull

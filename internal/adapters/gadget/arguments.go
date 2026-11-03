@@ -47,8 +47,11 @@ type ArgumentStats struct {
 	CoverageUnknown                                              bool
 }
 
+// StartBy bounds admission; Deadline bounds this running observation. An early
+// start can finish before StartBy. Both are independently enforced before load
+// and attachment; neither can renew the other.
 func (r ArgumentRequest) definitions() ([]syscalls.ArgumentDefinition, error) {
-	if r.AccountingRule != collector.ArgumentObservationAccountingRule() || !authorization.UUID(r.PodUID) || r.Events < 1 || r.Events > 1_000_000_000 || r.Bytes < 1 || r.Bytes > 1<<40 || r.EventsPerSecond < 1 || r.EventsPerSecond > 100000 || r.BytesPerSecond < 1 || r.BytesPerSecond > 1<<30 || r.MaxTrackedThreads < 1 || r.MaxTrackedThreads > 16384 || r.Deadline.IsZero() || r.StartBy.IsZero() || r.StartBy.After(r.Deadline) {
+	if r.AccountingRule != collector.ArgumentObservationAccountingRule() || !authorization.UUID(r.PodUID) || r.Events < 1 || r.Events > 1_000_000_000 || r.Bytes < 1 || r.Bytes > 1<<40 || r.EventsPerSecond < 1 || r.EventsPerSecond > 100000 || r.BytesPerSecond < 1 || r.BytesPerSecond > 1<<30 || r.MaxTrackedThreads < 1 || r.MaxTrackedThreads > 16384 || r.Deadline.IsZero() || r.StartBy.IsZero() {
 		return nil, ErrArgumentRequest
 	}
 	defs, err := syscalls.ArgumentDefinitions(r.Names, r.CaptureBuffers, r.MaxBytesPerEvent)
@@ -72,6 +75,39 @@ func ArgumentBudgetFor(r ArgumentRequest, now time.Time, bootNS uint64) (Argumen
 	interval := (uint64(time.Second) + effective - 1) / effective
 	return ArgumentBudget{Events: r.Events, Bytes: r.Bytes, DeadlineBootNS: bootNS + uint64(remaining), MaxProbeBytes: maximum, RateIntervalNS: interval, RateBurstNS: (effective - 1) * interval}, nil
 }
+
+// ArgumentFailureStage exposes only a fixed implementation stage to operator
+// logs, never probe bytes, target identities or the underlying provider error.
+func ArgumentFailureStage(err error) string {
+	var failure *argumentFailure
+	if errors.As(err, &failure) {
+		return failure.stage
+	}
+	switch {
+	case errors.Is(err, ErrArgumentRequest):
+		return "request"
+	case errors.Is(err, ErrArgumentReplay):
+		return "replay"
+	case errors.Is(err, ErrTargetNotFound):
+		return "target"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "deadline"
+	case errors.Is(err, context.Canceled):
+		return "cancelled"
+	case errors.Is(err, ErrEngineUnavailable):
+		return "engine"
+	default:
+		return "runtime"
+	}
+}
+
+type argumentFailure struct {
+	stage string
+	cause error
+}
+
+func (e *argumentFailure) Error() string { return "argument capture failed at " + e.stage }
+func (e *argumentFailure) Unwrap() error { return e.cause }
 
 // ArgumentRecorder is process-local one-shot ownership, not grant issuance.
 // A failed/unknown run consumes this instance; another process may not reconstruct

@@ -3,6 +3,41 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Installed run [41642778383](https://github.com/phihos/asservat/actions/runs/41642778383)
+on9db49637 passed public preview, independent review and approved submission,
+then failed at node acquisition (`CaptureFailed` / `AcquisitionFailed`). It exited1
+in606.646s with unchanged sources and cleanupFailures[]. CI41642770282 passed.
+Original reports are retained in `test/results/argument-native-41642778383`.
+The node log did not identify the failing boundary, so this is not collection,
+publication or download evidence.
+
+A composed local regression now calls the real argument-recorder constructor
+with the node's actual request. It reproduced rejection of early starts: the
+original latest-start can be10s away while a5s recording ends earlier. These
+bounds are independent. The recorder now permits either ordering while budget
+creation and attachment still enforce both original deadlines. The native input
+had this valid shape; another installed run is required to establish the complete
+outcome. Failure logs now report a fixed stage only, without underlying errors,
+target identity or observed bytes, so later boundary failures are diagnosable.
+Focused constructor/node races passed (1.022s / 2.336s), tagged Gadget argument
+checks passed (1.526s), and full `make argument-preflight pre-push` exited0.
+
+Manual compositions containing syscall arguments are explicitly refused during
+preview, before review persistence or recordable output. At this head, a packet
+plus arguments group already failed the combined assessment because its child
+rule identities differ; two syscall children are separately rejected as an
+acquisition conflict. Merely assigning each child its specific assessment digest
+would not complete execution: argument permit preparation looks up an exact
+child capture grant, whereas grouped approval is bound to the parent. Grouped
+arguments still require explicit parent/child grant membership and shared,
+nonrefundable event/byte budget accounting before a source session can be created
+and independently verified at publication. Single finite argument captures and
+packet plus metadata groups retain their existing paths. The focused regression
+checks both mixed-component orders, refusal before persistence, the existing
+metadata group and single-argument approval; this is local evidence, not installed
+group qualification.
+
+
 Candidate `370c706a` passed CI41638301511. Installed run
 [41638326430](https://github.com/phihos/asservat/actions/runs/41638326430)
 reached public argument preview/review but rejected approved submission as

@@ -183,6 +183,12 @@ func scanArgumentMembers(ctx context.Context, proc, cgroups, pod string, cgroupI
 }
 
 func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]byte), notice func(InputNotice)) (stats ArgumentStats, err error) {
+	stage := "request"
+	defer func() {
+		if err != nil {
+			err = &argumentFailure{stage: stage, cause: err}
+		}
+	}()
 	stats.ReservedEvents, stats.ReservedBytes = r.Events, r.Bytes
 	stats.CoverageUnknown = true // upstream map/record emission failures have no complete counter
 	defs, err := r.definitions()
@@ -194,6 +200,7 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 	if ctx.Err() != nil || !time.Now().Before(r.StartBy) {
 		return stats, context.DeadlineExceeded
 	}
+	stage = "object-read"
 	file, err := os.Open(ArgumentObjectPath)
 	if err != nil {
 		return stats, ErrEngineUnavailable
@@ -203,13 +210,16 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 	if err != nil || len(raw) != ArgumentObjectBytes || fmt.Sprintf("%x", sha256.Sum256(raw)) != ArgumentObjectSHA256 {
 		return stats, ErrEngineUnavailable
 	}
+	stage = "object-load"
 	spec, err := ebpf.LoadCollectionSpecFromReader(bytes.NewReader(raw))
 	if err != nil {
 		return stats, ErrEngineUnavailable
 	}
+	stage = "object-layout"
 	if len(spec.Programs) != 2 || spec.Programs["ig_traceloop_e"] == nil || spec.Programs["ig_traceloop_x"] == nil || spec.Maps["asservat_budget"] == nil || spec.Maps["asservat_budget"].ValueSize != 64 || spec.Maps["asservat_cgroups"] == nil {
 		return stats, ErrEngineUnavailable
 	}
+	stage = "cpu-layout"
 	cpus, err := ebpf.PossibleCPU()
 	if err != nil || cpus < 1 || cpus > 256 {
 		return stats, ErrEngineUnavailable
@@ -226,6 +236,7 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 		}
 		spec.Maps[name].MaxEntries = uint32(r.MaxTrackedThreads)
 	}
+	stage = "target-membership"
 	members, err := argumentMembers(ctx, r.PodUID)
 	if err != nil {
 		return stats, err
@@ -238,21 +249,25 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 			p.close()
 		}
 	}()
+	stage = "object-verifier"
 	collection, err := ebpf.NewCollection(spec)
 	if err != nil {
 		return stats, fmt.Errorf("%w: argument object or CO-RE unsupported: %v", ErrEngineUnavailable, err)
 	}
 	defer collection.Close()
+	stage = "perf-map"
 	inner, err := ebpf.NewMap(outer.InnerMap)
 	if err != nil {
 		return stats, err
 	}
 	defer inner.Close()
+	stage = "perf-reader"
 	reader, err := perf.NewReader(inner, 8*os.Getpagesize())
 	if err != nil {
 		return stats, err
 	}
 	defer reader.Close()
+	stage = "syscall-maps"
 	zero := uint32(0)
 	for _, d := range defs {
 		if err = collection.Maps["syscalls"].Put(uint64(d.Number), d.Lengths); err != nil {
@@ -265,10 +280,12 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 	if err = collection.Maps["syscall_enable_filters"].Put(zero, uint8(1)); err != nil {
 		return stats, err
 	}
+	stage = "clock"
 	var boot unix.Timespec
 	if err = unix.ClockGettime(unix.CLOCK_BOOTTIME, &boot); err != nil {
 		return stats, err
 	}
+	stage = "budget"
 	initial, err := ArgumentBudgetFor(r, time.Now(), uint64(boot.Nano()))
 	if err != nil {
 		return stats, err
@@ -276,6 +293,7 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 	if err = collection.Maps["asservat_budget"].Put(zero, initial); err != nil {
 		return stats, err
 	}
+	stage = "map-freeze"
 	for _, name := range []string{"asservat_budget", "syscalls", "syscall_filters", "syscall_enable_filters"} {
 		if err = collection.Maps[name].Freeze(); err != nil {
 			return stats, err
@@ -309,6 +327,7 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 		}
 		return nil
 	}
+	stage = "target-maps"
 	if err = reconcile(members); err != nil {
 		return stats, err
 	}
@@ -318,6 +337,7 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 			_ = l.Close()
 		}
 	}()
+	stage = "tracepoint-attach"
 	for _, p := range [][2]string{{"sys_enter", "ig_traceloop_e"}, {"sys_exit", "ig_traceloop_x"}} {
 		if ctx.Err() != nil || !time.Now().Before(r.StartBy) || !time.Now().Before(r.Deadline) {
 			return stats, context.DeadlineExceeded
@@ -331,6 +351,7 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 			return stats, context.DeadlineExceeded
 		}
 	}
+	stage = "observation"
 	var mu sync.Mutex
 	var lost atomic.Uint64
 	var joined sync.WaitGroup
@@ -426,9 +447,11 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 	links = nil
 	var final ArgumentBudget
 	if e := collection.Maps["asservat_budget"].Lookup(zero, &final); e != nil {
+		stage = "final-budget"
 		return stats, e
 	}
 	if final.Events > initial.Events || final.Bytes > initial.Bytes {
+		stage = "final-budget"
 		return stats, ErrEngineUnavailable
 	}
 	mu.Lock()

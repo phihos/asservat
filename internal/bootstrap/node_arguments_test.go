@@ -49,6 +49,9 @@ func TestNodeArgumentStopJoinsBeforeResourceReleaseAndPreservesUnknown(t *testin
 		if r.AccountingRule != collector.ArgumentObservationAccountingRule() || r.Events != 1000 || !r.StartBy.Equal(w.NotAfter) {
 			t.Error("original engine input changed")
 		}
+		if _, err := gadget.NewArgumentRecorder(r); err != nil {
+			t.Error("node request rejected by actual argument recorder", err)
+		}
 		wall, _ := bootWallClock()
 		boot := uint64(time.Now().Sub(wall))
 		le := binary.LittleEndian

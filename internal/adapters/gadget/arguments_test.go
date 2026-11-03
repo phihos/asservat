@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -78,5 +80,39 @@ func TestArgumentRecorderRefusesAnotherAccountingRule(t *testing.T) {
 	r.AccountingRule[0] ^= 1
 	if _, err := NewArgumentRecorder(r); err != ErrArgumentRequest {
 		t.Fatal(err)
+	}
+}
+
+// Latest admission and the running observation endpoint are independent bounds.
+// Starting early may finish the requested window before the latest start time.
+func TestArgumentBudgetAllowsEarlyStartWithoutExtendingObservation(t *testing.T) {
+	now := time.Now()
+	r := argumentRequest(now)
+	r.StartBy = now.Add(10 * time.Second)
+	r.Deadline = now.Add(5 * time.Second)
+	if _, err := NewArgumentRecorder(r); err != nil {
+		t.Fatal("early-start request refused", err)
+	}
+	b, err := ArgumentBudgetFor(r, now, 100)
+	if err != nil || b.DeadlineBootNS != 5_000_000_100 {
+		t.Fatal("observation endpoint changed", b, err)
+	}
+	if _, err = ArgumentBudgetFor(r, r.Deadline, 100); err == nil {
+		t.Fatal("latest start extended completed observation")
+	}
+	r.StartBy = now.Add(time.Second)
+	if _, err = ArgumentBudgetFor(r, r.StartBy, 100); err == nil {
+		t.Fatal("running endpoint extended expired start permission")
+	}
+}
+
+func TestArgumentFailureReportsOnlyFixedStage(t *testing.T) {
+	private := errors.New("synthetic private provider detail")
+	wrapped := &argumentFailure{stage: "object-verifier", cause: private}
+	if ArgumentFailureStage(wrapped) != "object-verifier" || !errors.Is(wrapped, private) || strings.Contains(wrapped.Error(), private.Error()) {
+		t.Fatal("failure stage lost cause or exposed details")
+	}
+	if ArgumentFailureStage(ErrArgumentRequest) != "request" || ArgumentFailureStage(private) != "runtime" {
+		t.Fatal("unexpected public diagnostic category")
 	}
 }
