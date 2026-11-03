@@ -12,6 +12,10 @@ type GoProfileAcquisition struct {
 	Type, Mode     string
 	DurationMillis int64 // zero for a snapshot or cumulative read
 	ForceGC        bool
+	// Admission inputs are absent on historical component-only artifacts.
+	TimeoutMillis int64  `json:",omitempty"`
+	MaxBytes      int64  `json:",omitempty"`
+	Composition   []byte `json:",omitempty"`
 }
 
 // Valid checks the request against the Go pprof HTTP subset.
