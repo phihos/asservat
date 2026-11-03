@@ -156,3 +156,87 @@ Remaining stages, in order:
   by this experiment, no CI run dispatched and no image published. Verifier,
   native accounting, fixed syscall definitions and production grant composition
   remain the next work; host model passes do not close ADR-281.
+
+## Disposable engine qualification focus (implemented; native run pending)
+
+`scripts/ci-native.sh collector-argument-engine` reuses `test-collector.py` and
+its mandatory `/etc/asservat-disposable-host` guard. **Do not run it on a
+workstation.** It builds this exact pinned object and the separate fixture in
+`test/fixtures/syscall-argument-engine/`, then runs one owned, network-disabled
+container on the authorized disposable host. It creates no Kubernetes cluster,
+SQL/S3 service, public capability or production permit. The fixture's explicit
+`pwrite64`/`pread64` definitions and independent namespaces are synthetic test
+inputs, not an approved syscall/ABI table or whole-Pod attribution proof.
+
+Eleven sequential cases check actual verifier loading, initialization before
+namespace exposure/attachment, userspace update refusal after freezing the
+budget/definition maps, continued kernel debits, zero and expired allowances,
+fixed entry/exit charges, faulting reads, event/byte exhaustion, expiry between
+two batches and 16 threads in each of two mount namespaces sharing one budget.
+Every case detaches both tracepoints and issues another synthetic batch, which
+must leave the counters unchanged. Reader flush joins drain the emitted records;
+all children/readers/links/maps are closed and the harness removes its container
+and fixture image even after failure. Reports preserve source hashes, original
+pins, verifier logs, instruction listing, counters, elapsed times and cleanup.
+
+Serial cases require zero perf loss before making exact emitted-record
+assertions. Concurrent cases record loss and remaining budget rather than assume
+either zero loss or usable throughput. The sticky boolean still cannot
+distinguish CAS8 contention from exhaustion/expiry. This is an explicit early-stop
+reporting and availability deficiency: the fixture does not change CAS behavior
+or call that deficiency qualified. Restart/replacement cannot be tested as a
+production authority guarantee until the durable session slices and loader exist.
+
+Emitted event/continuation counts are **not independent observations of every
+user-memory helper invocation**. A missing record may follow a read, and the
+upstream fallthrough can invoke two helpers for one continuation. These tests
+combine exact runtime counter assertions with source/compiled-control-flow
+review; they do not add a second tracing engine or claim a dynamic helper-call
+proof. Installed approval, rate limits, identity, raw publication/download and
+revocation remain separate required work.
+
+### Compiled control-flow review
+
+The unchanged object hash above was rebuilt in the pinned builder. The fixture's
+unprivileged `inspect OBJECT OUTPUT` mode uses the repository's existing cilium
+ELF reader to emit its instructions without any kernel load. In that listing,
+`ig_traceloop_e` looks up the budget at instruction 170, tests boot deadline and
+maximum charge before the event/byte CMPXCHG chains, and makes its final stopped
+check at 306. Its refusal branch at 312 deletes remembered state and exits at
+323; the success branch at 311 reaches the helper path, whose first user-read
+call is at 624. The six unrolled arguments each retain their conditional string,
+scalar and fixed-buffer helper paths. `ig_traceloop_x` looks up the budget at
+152, makes its final stopped check at 296 and branches at 301; refusal cleans up
+at 302, while the successful path reaches the bounded argument loop. Its three
+user-read helper sites are 434, 443 and 539. This confirms the pre-read placement
+and retained fallthrough for this build; it is not verifier or native evidence.
+
+### Incremental complexity assessment
+
+The observed gap is a required sensitive mode with no native accounting proof;
+the maintainer already approved this narrow patched-engine exception. This focus
+reuses the selected object, cilium loader and disposable-host harness. It adds
+zero production watches, RPCs, credentials, dependencies or configuration and
+zero kernel instrumentation programs. Test-only privileges stay in one disposable
+container, with no host-PID namespace or network. Eleven cases load two original
+programs sequentially; at most two tracepoint links, two child namespaces and 32
+synthetic workload threads are active. Perf storage is at most two arrays times
+64 pages per possible CPU; the shared budget is one 40-byte value plus map
+overhead. Existing upstream state maps remain capped at 1,024 entries. The test
+container is capped at 128 tasks and 512 MiB, each case at 15 seconds and the
+whole helper at two minutes (outer process timeout three minutes). These are
+configured test bounds, not measured production overhead or ABI qualification.
+
+Local checks (no kernel loading):
+
+```sh
+TMPDIR="$HOME/.cache/asservat-build/tmp" go test -race \
+  test/fixtures/syscall-argument-engine/main.go \
+  test/fixtures/syscall-argument-engine/main_test.go
+TMPDIR="$HOME/.cache/asservat-build/tmp" go build -o /path/out/qualify \
+  test/fixtures/syscall-argument-engine/main.go
+/path/out/qualify inspect /path/out/program.bpf.o /path/out/instructions.txt
+```
+
+The helper is excluded from ordinary product builds. Local fixture accounting
+tests and compilation pass; no native result is recorded for this focus yet.
