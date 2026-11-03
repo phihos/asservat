@@ -73,7 +73,7 @@ export async function syscallJourney({ page, origin, output, scan, checks, wire 
     await view.getByRole('button', { name: 'Next page', exact: true }).click();
     await expect(view.getByRole('cell', { name: 'write', exact: true })).toBeVisible();
     await expect(view.getByRole('button', { name: 'Next page', exact: true })).toHaveCount(0);
-    await view.getByLabel('Syscall view', { exact: true }).selectOption('events');
+    await view.getByRole('combobox', { name: 'Syscall view', exact: true }).selectOption('events');
     await expect(view.getByRole('table')).toHaveCount(0);
     await view.getByLabel('Rows per page', { exact: true }).fill('2');
     await view.getByLabel('Syscall names, separated by commas', { exact: true }).fill('write');

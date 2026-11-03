@@ -96,8 +96,11 @@ allowance for commit/manifest work (less than the reserved 16 MiB). Each filtere
 page pays for the entire source. The maximal comparable filter adds 24,695 bytes
 of escaped JSON to the prior 16 KiB key child: the purpose-specific ceiling is
 48 KiB for syscall scopes, retaining 16 KiB elsewhere. It fits existing query
-row/backing bounds and adds no key slots. SQL upgrade/rollback parity tests are
-prepared; real PostgreSQL execution is still pending.
+row/backing bounds and adds no key slots. SQL upgrade/rollback parity passed against real PostgreSQL (Go 4.598s),
+including canonical JSONB size, exact previous function restoration and unchanged
+trust. Initial-schema handover passed in 146.989s; both owned fixtures report
+unchanged sources and complete cleanup. These are component/installation-schema
+checks; installed syscall workflows remain pending.
 
 Public results preserve recorded unmatched, unfinished and unknown counts.
 Acquisition loss and truncation are nullable unknown values where these stored

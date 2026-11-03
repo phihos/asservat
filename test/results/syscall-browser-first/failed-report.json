@@ -1,0 +1,24 @@
+{
+  "passed": false,
+  "checks": [
+    "unavailable session stays hidden; local sign-in; 320px reflow",
+    "real cookie, CSRF and POST-refresh transport; no duplicate pageshow refresh or web storage",
+    "actual session handler rejects wrong-origin logout",
+    "canonical Discovery history read filter is accepted and empty without inventing a discovery producer",
+    "actual canonical catalog/preview, selected pod, custom retention, privacy and stale assessment without forced replacement preview",
+    "explicit same-key acquisition continuation uses retained receipt, no new request or preview; reload remains passive",
+    "same-user session refresh preserves only reviewed handle, uncertain commit retries same key, accepted Pending, Finalizing, exact progress reload, real operation CSRF denial",
+    "authorized capture case link; separate lazy bundle; actual C16 wire and user-data/deletion notices; verified artifact version never labeled as native SHA",
+    "share panel previews the recipient view and creates one share with CSRF and identical Idempotency-Key; Shares page lists and revokes it",
+    "idle artifact expiry removes Download and explains expiry without metadata polling or renewing retention",
+    "missing native-download runtime produces real unavailable response; original request retained; no invented file checksum, content path or successful transfer",
+    "expired or revoked case rights clear metadata on actual recheck without claiming session logout; exact case URL reload works through real static allowlist",
+    "revoked session removes the evidence workspace; sign-in returns to exact case; no browser persistence or synthetic native transfer",
+    "synthetic summary wire in actual built UI: explicit typed selection, no eager query, untrusted symbols rendered as text, nullable fraction, mobile reflow and close; Go trace has no pprof action"
+  ],
+  "errors": [],
+  "external": [],
+  "violations": [],
+  "failure": "TimeoutError: locator.selectOption: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('region', { name: 'Saved syscall views', exact: true }).getByLabel('Syscall view', { exact: true })\u001b[22m\n",
+  "visiblePage": "- link \"Skip to content\":\n  - /url: \"#main\"\n- banner:\n  - link \"Asservat\":\n    - /url: /\n  - button \"Sign out\"\n- main:\n  - heading \"Evidence\" [level=1]\n  - paragraph: Inspect the saved details, or download the native file for your preferred compatible local tools.\n  - region \"Pod status\":\n    - heading \"Pod status\" [level=2]\n    - paragraph: Approved metadata · complete\n    - paragraph: \"May contain user data: personal identifiers, network addresses, paths.\"\n    - term: Access until\n    - definition: 11/3/2026, 7:53:49 PM\n    - term: Managed deletion\n    - definition: By 11/3/2026, 7:58:49 PM\n    - region \"Saved pod status\":\n      - heading \"Saved pod status\" [level=3]\n      - button \"Inspect saved status\"\n    - button \"Download\"\n    - group: Share this artifact\n  - paragraph: Downloaded copies are outside Asservat's automatic deletion. Follow your organization's handling and deletion policy.\n  - button \"Refresh evidence details\""
+}

@@ -1,0 +1,8 @@
+{
+  "scope": "Standalone owned Chromium DOM containing the same wrapped label/select pattern; diagnosis only, not native service qualification",
+  "html": "<label>Syscall view <select><option value=\"summary\">Summary</option><option value=\"events\">Events</option></select></label>",
+  "exact_getByLabel_count": 0,
+  "exact_combobox_accessible_name_count": 1,
+  "accessible_name": "Syscall view",
+  "fix": "Select the exact combobox role and accessible name instead of matching label textContent that contains option text."
+}

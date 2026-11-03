@@ -3,30 +3,40 @@
 
 ## Current delivery workflow (2026-11-03)
 
-Saved syscall views now have integrated regional extraction, canonical native
-validation, complete-source authentication, private result encoding and audited
-public responses. Both source formats and both views pass focused component
-races, including filtered-empty pages, cursor/filter association, independent
-response bounds and cancellation. The public regression reproduced temporary
-rows being cleared before serialization; encoding now finishes before cleanup.
-The native handoff also preserves empty arrays through deep clones. SQL132 and
-the same-read native-type locator are prepared, with exact rollback tests and
-purpose-specific 48 KiB key-child bounds; real SQL upgrade qualification is next.
-Both physical and declared transient memory require 256 MiB; each full-source
-page spends two existing query units and three one-use keys.
+Saved syscall summaries/events are integrated through the regional reader,
+SQL132, audit, private result codec, browser/MCP and console. Both metadata and
+raw-argument sources return fixed extracts under ordinary current read rights;
+raw arguments remain regional. Full authenticated scans precede results, every
+page pays two existing query units/three keys, and both physical and declared
+worker memory require 256 MiB. Filters/cursors retain exact source/view binding;
+unknown loss/truncation and recorded unmatched/unfinished/unknown counts stay
+explicit. See [ADR-294](decisions/294-saved-syscall-projections.md).
 
-Six isolated maximum-input encrypted consumer measurements used 65,952–74,608
-KiB peak RSS and 0.489–0.621 seconds, with three synthetic unwraps. This includes
-framing/canonical validation/TLS object ranges/parser; it is not real SQL/KMS,
-CPU-limited worker or installed qualification. The report pins the exact measured
-binary; a later fixed-page provenance check is tested separately. Focused public
-races pass in 24.395s; domain audit 1.010s, query domain 1.010s, evidence 1.161s and query
-application 1.041s. Regional source races 5.166s/1.383s, native codec 1.172s, SQL unit
-parity 1.346s and bootstrap 27.221s pass. Reports and the original failed local
-regressions are retained in `test/results/syscall-projections-local/`. Console
-support and actual installed native-byte comparisons are being completed. No
-new PR, real-service SQL gate, installed workflow or broad final gate has passed
-for this candidate yet.
+Real SQL132 upgrade/rollback and source/tool/funding/audit/key-bound parity passed
+(Go 4.598s; 201 passed entries), followed by initial-schema handover (Go 146.989s).
+Both harnesses returned 0 with unchanged sources and empty cleanup failures.
+Original compressed reports are in `test/results/syscall-projections-local/`.
+The first pre-push found an embedded canonical-schema copy and a formatting-only
+blank line; both were repaired. Affected manifest/read races then passed
+1.121s/1.611s/1.153s. Final `make pre-push` returned 0; no push or PR yet.
+
+All 367 console tests and the production build passed. The first browser run
+passed native restart (2.47s) then failed the new scenario's exact label locator:
+Chromium exposes the wrapped select's correct accessible combobox name, while
+Playwright label-text matching includes option text. The exact role/name locator
+passes the real browser: 27 journeys/26 accessibility scans, 28.144s, no external,
+CSP/runtime or accessibility errors. Failure and passing reports are retained
+separately in `test/results/syscall-browser-first/` and
+`test/results/syscall-browser-focused/`. No product assertion was relaxed.
+
+Six earlier isolated maximum-input encrypted consumers used 65,952–74,608 KiB peak
+RSS and 0.489–0.621s with three synthetic unwraps. Those exact-binary measurements
+include framing/canonical validation/TLS ranges/parser; they are not real SQL/KMS
+or installed qualification. Native fixtures now independently compare both public
+views with downloaded JSONL, verify a read-only session cannot download, forbid
+actual captured sensitive buffer encodings, and inspect SQL/key/Pod accounting.
+They are compiled/prepared; actual installed manual-arguments and manual-syscall
+qualification remains pending after review/CI on the final frozen candidate.
 
 Finite argument policies and independent existing-raw download approval are
 installed-qualified and merged in [PR149](https://github.com/phihos/asservat/pull/149),
