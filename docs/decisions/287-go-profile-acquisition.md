@@ -121,6 +121,13 @@ but cannot bypass an earlier waiting profile. Cancellation/expiry removes only
 its own ticket and wakes the next waiter even when no active store releases
 capacity. Profile Stop retains its existing joined-writer outcome; snapshot
 cancellation still requires the existing node and local-writer receipts.
+While a snapshot is waiting, its holder retains the existing deadline context's
+cancel handle. A successfully queued snapshot cancellation signals that local
+wait directly: an unread HTTP/1 request need not observe its client's disconnect.
+A cancellation already recorded before delivery also refuses the wait unread.
+The handle is cleared under the holder lock before active Store begins, so active
+storage retains its stored-wins behavior. This adds one transient function field
+per holder and no timer, request, worker or synthetic cancellation receipt.
 
 This adds at most 64 small tickets/pointers (under 2 KiB), the packet wait's
 original-deadline context, and bounded O(64) removal/wakeup work. It reuses the

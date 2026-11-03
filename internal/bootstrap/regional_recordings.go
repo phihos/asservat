@@ -55,6 +55,7 @@ type recordingNodes interface {
 
 type heldRecording struct {
 	storing         bool
+	stopStoreWait   context.CancelFunc // only the unread FIFO wait, never an active Store
 	cancelID        string
 	cancelRequested bool
 	cancelOnly      bool
@@ -276,7 +277,13 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 	if held.stopPeers != nil {
 		held.stopPeers()
 	}
-	if !h.waitStoreLocked(storeCtx, e.Registration.WriteUntil, r.CapturedBytes) {
+	held.stopStoreWait = cancelStore
+	if held.cancelRequested {
+		cancelStore()
+	}
+	admitted := h.waitStoreLocked(storeCtx, e.Registration.WriteUntil, r.CapturedBytes)
+	held.stopStoreWait = nil // active Store keeps its existing stored-wins lifecycle
+	if !admitted {
 		held.storing = false
 		held.outcome = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
 		h.mu.Unlock()

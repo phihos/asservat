@@ -56,6 +56,11 @@ func (h *ConnectorRecordings) CancelSourceSnapshot(ctx context.Context, x collec
 		h.held[x.CaptureID] = held
 	}
 	held.cancelID, held.cancelRequested = work.ID, true
+	// An unread HTTP/1 body may not observe client disconnection. Stop only the
+	// local admission wait; node and local joins still establish cancellation.
+	if held.stopStoreWait != nil {
+		held.stopStoreWait()
+	}
 	return nil
 }
 
