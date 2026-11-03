@@ -45,6 +45,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "policy_observation_session", "", "INSERT"},
 		// ADR-279 manual raw: the ad hoc pool debit is one definer function.
 		{"function", "spend_adhoc_observed_bytes(uuid,uuid,bigint)", "", "EXECUTE"},
+		{"function", "spend_adhoc_observation(uuid,uuid,bigint,bigint)", "", "EXECUTE"},
 		{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"},
 		{"schema", "public", "", "USAGE"},
 		{"table", "authority_audit", "", "SELECT"},

@@ -1,0 +1,4 @@
+# asservat.local/asservat/test/integration [asservat.local/asservat/test/integration.test]
+test/integration/approved_recording_test.go:385:5: g.NotAfter undefined (type "asservat.local/asservat/internal/domain/authorization".Grant has no field or method NotAfter)
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

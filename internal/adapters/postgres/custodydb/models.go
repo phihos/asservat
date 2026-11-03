@@ -96,9 +96,10 @@ type AccessGrantUse struct {
 }
 
 type AdhocObservationSpend struct {
-	RootID  pgtype.UUID
-	GrantID pgtype.UUID
-	Spent   int64
+	RootID      pgtype.UUID
+	GrantID     pgtype.UUID
+	Spent       int64
+	EventsSpent int64
 }
 
 type ArtifactDownload struct {
