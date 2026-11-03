@@ -7,7 +7,7 @@ import { caseResult, session, id } from './test-fixtures';
 import { result } from '../capture/test-fixtures';
 import { validInput_request_raw_access, validOutput_request_raw_access } from '../generated/validate-approvals';
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 function artifact(n: number, size?: number): Artifact {
   const c = caseResult(); if (c.status !== 'ok') throw new Error();
   return { ...c.data.artifacts[0], artifact_id: id(n), digest: n.toString(16).padStart(64, '0'), data_class: 'raw', verified_native_bytes: size, target: { cluster_id: id(1), namespace_uid: 'ns', workload_uid: 'workload', pod_uid: 'pod', namespace: 'payments', workload_name: 'api' } };
@@ -61,4 +61,58 @@ it('cancels the request on session scope end without exposing a late approval', 
   await waitFor(() => expect(call.mock.calls[0][3]).toHaveProperty('aborted', true));
   expect(screen.queryByRole('link', { name: 'Review download approval' })).toBeNull();
   view.unmount();
+});
+
+const refusal = (retryable: boolean) => ({ ...result({ code: 'InvalidRequest', message: 'Choose a shorter approval period.', retryable }), status: 'error' });
+const jsonReply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+it('unlocks a definitive validated refusal and submits edited values with a new key', async () => {
+  const denied = refusal(false);
+  expect(validOutput_request_raw_access(denied)).toBe(true);
+  const fetch = vi.fn().mockResolvedValueOnce(jsonReply(denied)).mockResolvedValueOnce(jsonReply(result({ grant_id: id(41), phase: 'Pending' })));
+  vi.stubGlobal('fetch', fetch);
+  const newID = vi.fn().mockReturnValueOnce('first-key').mockReturnValueOnce('edited-key');
+  render(<RawAccessPanel session={session} scope={new AbortController().signal} caseID={id(2)} artifacts={[artifact(3, 512)]} newID={newID}/>);
+  fireEvent.click(screen.getByRole('checkbox'));
+  fireEvent.change(screen.getByLabelText('Reason for raw download'), { target: { value: 'Inspect incident' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
+  expect((await screen.findByRole('alert')).textContent).toBe('Choose a shorter approval period.');
+  expect(screen.getByRole('group')).toHaveProperty('disabled', false);
+  fireEvent.change(screen.getByLabelText('Approval period in seconds'), { target: { value: '300' } });
+  fireEvent.change(screen.getByLabelText('Reason for raw download'), { target: { value: 'Inspect selected incident' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
+  await screen.findByRole('link', { name: 'Review download approval' });
+  const first = JSON.parse(fetch.mock.calls[0][1].body);
+  const second = JSON.parse(fetch.mock.calls[1][1].body);
+  expect(first).toMatchObject({ idempotency_key: 'first-key', expires_in_seconds: 3600, reason: 'Inspect incident' });
+  expect(second).toEqual({ ...first, idempotency_key: 'edited-key', expires_in_seconds: 300, reason: 'Inspect selected incident' });
+  expect(fetch.mock.calls[1][1].headers['Idempotency-Key']).toBe('edited-key');
+  expect(newID).toHaveBeenCalledTimes(2);
+});
+
+it.each(['transport', 'http-refusal', 'invalid-envelope', 'retryable', 'pending'])('retains exact immutable request after %s uncertainty', async mode => {
+  const fetch = vi.fn();
+  if (mode === 'transport') fetch.mockRejectedValueOnce(new Error('connection lost'));
+  else if (mode === 'http-refusal') fetch.mockResolvedValueOnce(jsonReply(refusal(false), 403));
+  else if (mode === 'invalid-envelope') fetch.mockResolvedValueOnce(jsonReply({ status: 'error', data: refusal(false).data }));
+  else if (mode === 'retryable') fetch.mockResolvedValueOnce(jsonReply(refusal(true)));
+  else {
+    const pending = { ...result({ query_handle: 'pending-query', retry_after_seconds: 1 }), status: 'pending' };
+    expect(validOutput_request_raw_access(pending)).toBe(true);
+    fetch.mockResolvedValueOnce(jsonReply(pending));
+  }
+  fetch.mockResolvedValueOnce(jsonReply(result({ grant_id: id(41), phase: 'Pending' })));
+  vi.stubGlobal('fetch', fetch);
+  const newID = vi.fn(() => 'original-key');
+  render(<RawAccessPanel session={session} scope={new AbortController().signal} caseID={id(2)} artifacts={[artifact(3, 512)]} newID={newID}/>);
+  fireEvent.click(screen.getByRole('checkbox'));
+  fireEvent.change(screen.getByLabelText('Reason for raw download'), { target: { value: 'Inspect incident' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
+  await screen.findByRole('alert');
+  expect(screen.getByRole('group')).toHaveProperty('disabled', true);
+  fireEvent.click(screen.getByRole('button', { name: 'Retry same approval request' }));
+  await screen.findByRole('link', { name: 'Review download approval' });
+  expect(fetch.mock.calls[1][1].body).toBe(fetch.mock.calls[0][1].body);
+  expect(fetch.mock.calls[1][1].headers['Idempotency-Key']).toBe('original-key');
+  expect(newID).toHaveBeenCalledOnce();
 });

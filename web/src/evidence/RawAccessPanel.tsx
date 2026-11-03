@@ -57,7 +57,12 @@ export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArt
       const result = await client.call('request_raw_access', request.current, session.csrf_token, controller.signal);
       if (controller.signal.aborted) return;
       if (result.status === 'ok') setReply(result.data);
-      else setError(result.status === 'error' ? result.data.message : 'The request has not returned a final result. Retry the same request.');
+      else if (result.status === 'error') {
+        // Only a validated definitive refusal releases this request identity.
+        // Transport failures and pending/retryable replies may have persisted it.
+        if (result.data.retryable === false) request.current = undefined;
+        setError(result.data.message);
+      } else setError('The request has not returned a final result. Retry the same request.');
     } catch (e) { if (!controller.signal.aborted) setError(operationMessage(e)); }
     finally { scope.removeEventListener('abort', abort); if (!controller.signal.aborted) setBusy(false); }
   };

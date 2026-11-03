@@ -3,6 +3,16 @@
 
 ## Current delivery workflow (2026-11-03)
 
+PR149 review reproduced a raw-access form that stayed locked after a definitive
+refusal. It now releases the retained request only for a validated non-retryable
+error, preserves entered values, and assigns a new key on explicit resubmission.
+Actual HTTP-client regressions retain the identical request after transport or
+HTTP failure, malformed envelopes, retryable errors and pending replies. The
+focused test failed before the fix and passed all nine cases afterward (4.33s).
+The full console check passed all 321 tests, contract validators and TypeScript;
+`spec-check` passed. CI41657790707 was superseded by this correction, not treated
+as passing evidence.
+
 Manual argument capture is now installed-qualified and merged in
 [PR148](https://github.com/phihos/asservat/pull/148), merge `2a03d7a8` from qualified
 head `9a8e392e`. [Native41654508351](https://github.com/phihos/asservat/actions/runs/41654508351)
