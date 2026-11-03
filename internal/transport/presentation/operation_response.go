@@ -15,6 +15,9 @@ import (
 // copies of the one larger passive metadata preview. Other writers stay64KiB.
 const OperationRecordingSavePreviewFrameLimit = 256 << 10
 
+// Both SDK result copies and worst-case escaping, bounded for get_grant only.
+const OperationGrantReviewFrameLimit = 768 << 10
+
 // WriteOperationResponse retains the original delivery deadline through a
 // bounded write and flush. sent forbids appending an error after partial output.
 // The caller owns/join-closes its reply after this function and serialization
@@ -31,6 +34,9 @@ func WriteBrowserOperationResponse(ctx context.Context, w http.ResponseWriter, s
 		return WriteOperationReplyResponse(ctx, w, status, reply.Body, reply, until, reply.CheckDisclosure)
 	}
 	limit := 64 << 10
+	if name == "get_grant" && reply.grantReview {
+		limit = contracts.InvestigationGrantReviewOutputLimit
+	}
 	if name == "preview_recording_save" && reply.recordingSavePreview {
 		limit = contracts.InvestigationRecordingSavePreviewOutputLimit
 	}
@@ -81,6 +87,9 @@ func WriteOperationReplyResponse(ctx context.Context, w http.ResponseWriter, sta
 		return false, ErrOperationDelivery
 	}
 	if reply.owner == nil {
+		if reply.grantReview {
+			return writeOperationResponse(ctx, w, status, body, until, check, OperationGrantReviewFrameLimit)
+		}
 		if reply.recordingSavePreview {
 			return writeOperationResponse(ctx, w, status, body, until, check, OperationRecordingSavePreviewFrameLimit)
 		}

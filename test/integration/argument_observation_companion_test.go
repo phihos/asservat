@@ -96,6 +96,10 @@ func TestPolicyArgumentObservationFixtureCompiles(t *testing.T) {
 	}
 	a, preview := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, installedArgumentsCompiler{}, false, now)
 	requirePolicyRecorderAdmissionFixture(t, a, preview, now)
+	rules, err := planning.RecorderAssessmentRulesForScope(preview.CanonicalScope)
+	if err != nil || preview.AssessmentRulesDigest != rules {
+		t.Fatal("persisted argument assessment differs from frozen actions", err)
+	}
 	r, _, err := planning.RecordingForContext(a.Plan)
 	if err != nil || r.Arguments == nil || *r.Arguments != want || r.RequireApproval {
 		t.Fatal("actual finite recording fixture", err)

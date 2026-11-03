@@ -53,6 +53,10 @@ type authorizedContext struct {
 }
 
 func (s ContextCaseService) GetContextCase(ctx context.Context, source identities.CurrentIdentity, caseID string) (value.ContextCase, error) {
+	return s.getContextCase(ctx, source, caseID, nil)
+}
+
+func (s ContextCaseService) getContextCase(ctx context.Context, source identities.CurrentIdentity, caseID string, raw *rawCaseSelection) (value.ContextCase, error) {
 	var zero value.ContextCase
 	if ctx == nil || ctx.Err() != nil || source == nil || s.Routes == nil || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Recovery == nil || s.Processing == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) || !authorization.UUID(caseID) {
 		return zero, value.ErrUnavailable
@@ -60,8 +64,12 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	started := s.Now()
+	op := authorization.ReadApproved
+	if raw != nil {
+		op = authorization.DownloadApproved
+	}
 	i, err := source.ResolveIdentity(ctx)
-	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") {
+	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") || raw != nil && (i.Principal.Kind != identity.Human || !slices.Contains(i.Scopes, "evidence:download")) {
 		return zero, value.ErrUnavailable
 	}
 	recovery, err := s.Recovery.RecoveryState(ctx)
@@ -76,6 +84,22 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
+	if raw != nil {
+		var selected []value.ContextCaseRoute
+		for _, digest := range raw.digests {
+			var matches []value.ContextCaseRoute
+			for _, route := range routes.Routes {
+				if route.Version == digest {
+					matches = append(matches, route)
+				}
+			}
+			if len(matches) != 1 {
+				return zero, value.ErrUnavailable
+			}
+			selected = append(selected, matches[0])
+		}
+		routes.Routes = selected
+	}
 	var records []authorizedContext
 	for _, route := range routes.Routes {
 		// Target routing stays internal. Current whole-pod rights precede any
@@ -87,9 +111,12 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 		if err != nil {
 			return zero, value.ErrUnavailable
 		}
-		eligible := authorization.ScopeEligibility(i, p, authorization.ReadApproved, route.Target, s.Now())
+		eligible := authorization.ScopeEligibility(i, p, op, route.Target, s.Now())
 		var share *authorization.Share
 		if !eligible.Eligible {
+			if raw != nil {
+				return zero, value.ErrUnavailable
+			}
 			// Recipient branch: the caller's own shares of this artifact are
 			// read before, and instead of, any evidence lookup. No share, no
 			// catalog read.
@@ -101,6 +128,9 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 		if err != nil {
 			return zero, value.ErrUnavailable
 		}
+		if raw != nil && (!rawRecordValid(record, route, caseID) || record.Version != route.Version) {
+			return zero, value.ErrUnavailable
+		}
 		r := record.Retained
 		if !r.Valid() || r.RootID != s.RootID || r.Registration.Location.ArtifactID != route.ArtifactID || r.Input.Target != route.Target || !artifact.DownloadEvidenceType(r.Input.EvidenceType) || r.Input.PrivacyClass != "potentialPersonalData" || !identity.Text(record.PurposeRef, 128) || record.CaptureID != route.CaptureID || record.Version == (artifact.Digest{}) || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
 			return zero, value.ErrUnavailable
@@ -108,8 +138,11 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 		retained := authorization.Retained{ArtifactID: route.ArtifactID, Target: route.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
 		var initial authorization.Result
 		if share == nil {
-			initial = authorization.Evaluate(i, p, authorization.ReadApproved, route.Target, &retained, s.Now())
+			initial = authorization.Evaluate(i, p, op, route.Target, &retained, s.Now())
 			if !initial.Eligible {
+				if raw != nil {
+					return zero, value.ErrUnavailable
+				}
 				// Current whole-pod rights outside the retained audience: a
 				// share may still admit this caller to the artifact.
 				share, initial = s.shared(ctx, i, p, route, caseID, &retained, record.Version)
@@ -134,7 +167,7 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 			until = identity.Earlier(until, at)
 		}
 		retained.ExpiresAt = resolved.ExpiresAt
-		records = append(records, authorizedContext{artifact: value.ContextCaseArtifact{NativeBytes: record.NativeBytes, ArtifactID: route.ArtifactID, CaptureID: route.CaptureID, Target: route.Target, Version: record.Version, ExpiresAt: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Shared: share != nil, EvidenceType: r.Input.EvidenceType, NativeType: record.NativeType, DataClass: record.DataClass}, retained: retained, permission: p.Revision, record: record, processing: processing, share: share})
+		records = append(records, authorizedContext{artifact: value.ContextCaseArtifact{Namespace: record.Namespace, WorkloadKind: record.WorkloadKind, WorkloadName: record.WorkloadName, PodName: record.PodName, NativeBytes: record.NativeBytes, ArtifactID: route.ArtifactID, CaptureID: route.CaptureID, Target: route.Target, Version: record.Version, ExpiresAt: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Shared: share != nil, EvidenceType: r.Input.EvidenceType, NativeType: record.NativeType, DataClass: record.DataClass}, retained: retained, permission: p.Revision, record: record, processing: processing, share: share})
 	}
 	if len(records) == 0 {
 		return zero, value.ErrUnavailable
@@ -152,7 +185,7 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 		if err != nil || p.Revision != record.permission {
 			return zero, value.ErrUnavailable
 		}
-		eligible := authorization.Evaluate(current, p, authorization.ReadApproved, record.artifact.Target, &record.retained, s.Now())
+		eligible := authorization.Evaluate(current, p, op, record.artifact.Target, &record.retained, s.Now())
 		if record.share != nil {
 			// Re-read the share: a revocation or expiry since the first read
 			// refuses the whole response.
@@ -188,6 +221,10 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 	out.ValidUntil = until
 	if ctx.Err() != nil || !out.Valid(s.Now()) {
 		return zero, value.ErrUnavailable
+	}
+	if raw != nil {
+		raw.records = records
+		raw.until = out.ValidUntil
 	}
 	return out, nil
 }

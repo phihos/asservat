@@ -13,7 +13,7 @@ import (
 
 const chargeGrantArtifact = `-- name: ChargeGrantArtifact :one
 UPDATE access_grant SET artifacts_spent=artifacts_spent+1
-WHERE root_id=$1 AND id=$2 AND decision='approved' AND revoked_at IS NULL AND expires_at>clock_timestamp() AND artifacts_spent<max_artifacts RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent
+WHERE root_id=$1 AND id=$2 AND decision='approved' AND revoked_at IS NULL AND expires_at>clock_timestamp() AND artifacts_spent<max_artifacts RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query
 `
 
 type ChargeGrantArtifactParams struct {
@@ -87,6 +87,7 @@ func (q *Queries) ChargeGrantArtifact(ctx context.Context, arg ChargeGrantArtifa
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
 }
@@ -94,7 +95,7 @@ func (q *Queries) ChargeGrantArtifact(ctx context.Context, arg ChargeGrantArtifa
 const chargeGrantUse = `-- name: ChargeGrantUse :one
 UPDATE access_grant SET bytes_spent=bytes_spent+ $1::bigint, operations_spent=operations_spent+ $2::bigint
 WHERE root_id= $3::uuid AND id= $4::uuid AND decision='approved' AND revoked_at IS NULL AND expires_at>clock_timestamp()
- AND bytes_spent+ $1::bigint<=max_bytes AND operations_spent+ $2::bigint<=max_operations RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent
+ AND $1::bigint<=max_bytes-bytes_spent AND $2::bigint<=max_operations-operations_spent RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query
 `
 
 type ChargeGrantUseParams struct {
@@ -177,8 +178,32 @@ func (q *Queries) ChargeGrantUse(ctx context.Context, arg ChargeGrantUseParams) 
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
+}
+
+const countRegisteredGrantArtifacts = `-- name: CountRegisteredGrantArtifacts :one
+SELECT count(DISTINCT c.artifact_id)::bigint FROM access_grant_child c
+JOIN access_grant g ON g.root_id=c.root_id AND g.id=c.parent_id
+WHERE g.root_id=$1::uuid AND g.id=$2::uuid AND g.kind='adHocCapture'
+ AND c.artifact_id=ANY($3::uuid[])
+ AND (g.result_access->'clientIDs') ? c.client_id
+`
+
+type CountRegisteredGrantArtifactsParams struct {
+	RootID      pgtype.UUID
+	ParentID    pgtype.UUID
+	ArtifactIds []pgtype.UUID
+}
+
+// One bounded selection, not the parent's unrelated/hidden registered outputs.
+// Artifact capacity is shared across the parent's reviewed clients.
+func (q *Queries) CountRegisteredGrantArtifacts(ctx context.Context, arg CountRegisteredGrantArtifactsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countRegisteredGrantArtifacts, arg.RootID, arg.ParentID, arg.ArtifactIds)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const decideGrant = `-- name: DecideGrant :one
@@ -187,9 +212,9 @@ UPDATE access_grant g SET decision= $1::text, approver_issuer= $2::text, approve
  expires_at=CASE WHEN $1::text='approved' THEN CASE WHEN g.kind='policy' THEN g.policy_not_after ELSE LEAST(t.n+make_interval(secs => g.lifetime_seconds),COALESCE(g.not_after,'infinity'::timestamptz)) END END, revision=g.revision+1
 FROM (SELECT clock_timestamp() AS n) t
 WHERE t.n< $9::timestamptz AND g.root_id= $10::uuid AND g.id= $11::uuid AND g.decision IS NULL AND g.revoked_at IS NULL AND g.review_until>t.n AND g.revision=1
- AND (g.kind<>'policy' OR g.policy_not_after>t.n)
+ AND (g.kind<>'policy' OR g.policy_not_after>t.n) AND (g.kind<>'rawQuery' OR g.not_after>t.n)
  AND NOT (g.requester_issuer= $2::text AND g.requester_subject= $3::text)
-RETURNING g.id, g.root_id, g.kind, g.preview_id, g.capture_id, g.cluster_id, g.namespace_uid, g.workload_uid, g.pod_uid, g.execution_digest, g.result_access_digest, g.review_digest, g.data_class, g.reasons, g.review, g.scope, g.requester_issuer, g.requester_subject, g.requester_client, g.lifetime_seconds, g.result_access, g.not_after, g.max_artifacts, g.max_bytes, g.max_operations, g.artifacts_spent, g.bytes_spent, g.operations_spent, g.idempotency_key, g.request_digest, g.requested_at, g.review_until, g.decision, g.approver_issuer, g.approver_subject, g.approver_client, g.decision_reason, g.decision_acr, g.decision_auth_time, g.decided_at, g.decision_key, g.expires_at, g.revoked_at, g.revoker_issuer, g.revoker_subject, g.revoker_client, g.revoke_key, g.revision, g.requester_kind, g.request_operation, g.requester_key, g.policy_uid, g.policy_acceptance_id, g.policy_scope, g.policy_not_after, g.policy_max_executions, g.policy_max_bytes, g.policy_max_observed_bytes, g.policy_executions_spent, g.policy_bytes_spent, g.policy_observed_bytes_spent, g.policy_observed_events_spent
+RETURNING g.id, g.root_id, g.kind, g.preview_id, g.capture_id, g.cluster_id, g.namespace_uid, g.workload_uid, g.pod_uid, g.execution_digest, g.result_access_digest, g.review_digest, g.data_class, g.reasons, g.review, g.scope, g.requester_issuer, g.requester_subject, g.requester_client, g.lifetime_seconds, g.result_access, g.not_after, g.max_artifacts, g.max_bytes, g.max_operations, g.artifacts_spent, g.bytes_spent, g.operations_spent, g.idempotency_key, g.request_digest, g.requested_at, g.review_until, g.decision, g.approver_issuer, g.approver_subject, g.approver_client, g.decision_reason, g.decision_acr, g.decision_auth_time, g.decided_at, g.decision_key, g.expires_at, g.revoked_at, g.revoker_issuer, g.revoker_subject, g.revoker_client, g.revoke_key, g.revision, g.requester_kind, g.request_operation, g.requester_key, g.policy_uid, g.policy_acceptance_id, g.policy_scope, g.policy_not_after, g.policy_max_executions, g.policy_max_bytes, g.policy_max_observed_bytes, g.policy_executions_spent, g.policy_bytes_spent, g.policy_observed_bytes_spent, g.policy_observed_events_spent, g.raw_query
 `
 
 type DecideGrantParams struct {
@@ -286,6 +311,7 @@ func (q *Queries) DecideGrant(ctx context.Context, arg DecideGrantParams) (Acces
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
 }
@@ -314,7 +340,7 @@ SELECT $1::uuid, $2::uuid, 'adHocCapture', $3::uuid, $4::uuid, $5::uuid, $6::tex
  $16::text, $17::text, $18::text, $19::integer, $20::jsonb, $21::timestamptz,
  $22::integer, $23::bigint, $24::bigint, $25::text, $26::bytea, t.n, t.n+interval '1 hour'
 FROM (SELECT clock_timestamp() AS n) t
-RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent
+RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query
 `
 
 type InsertGrantParams struct {
@@ -440,6 +466,7 @@ func (q *Queries) InsertGrant(ctx context.Context, arg InsertGrantParams) (Acces
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
 }
@@ -524,9 +551,133 @@ func (q *Queries) InsertGrantUse(ctx context.Context, arg InsertGrantUseParams) 
 	return i, err
 }
 
+const insertRawQueryGrant = `-- name: InsertRawQueryGrant :one
+INSERT INTO access_grant(id,root_id,kind,execution_digest,review_digest,data_class,reasons,review,scope,
+ requester_issuer,requester_subject,requester_client,requester_kind,requester_key,request_operation,lifetime_seconds,raw_query,not_after,max_artifacts,max_bytes,max_operations,idempotency_key,request_digest,requested_at,review_until)
+SELECT $1::uuid,$2::uuid,'rawQuery',$3::bytea,$4::bytea,'raw',$5::jsonb,$6::bytea,$7::bytea,
+ $8::text,$9::text,$10::text,'human',$11::bytea,'requestRawAccess',$12::integer,$13::jsonb,$14::timestamptz,
+ $15::integer,$16::bigint,$17::bigint,$18::text,$19::bytea,t.n,LEAST(t.n+interval '1 hour',$14::timestamptz)
+FROM (SELECT clock_timestamp() AS n) t
+ON CONFLICT(root_id,requester_key,request_operation,idempotency_key) WHERE kind='rawQuery' DO NOTHING
+RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query
+`
+
+type InsertRawQueryGrantParams struct {
+	ID               pgtype.UUID
+	RootID           pgtype.UUID
+	ExecutionDigest  []byte
+	ReviewDigest     []byte
+	Reasons          []byte
+	Review           []byte
+	Scope            []byte
+	RequesterIssuer  string
+	RequesterSubject string
+	RequesterClient  string
+	RequesterKey     []byte
+	LifetimeSeconds  int32
+	RawQuery         []byte
+	NotAfter         pgtype.Timestamptz
+	MaxArtifacts     int32
+	MaxBytes         int64
+	MaxOperations    int64
+	IdempotencyKey   string
+	RequestDigest    []byte
+}
+
+func (q *Queries) InsertRawQueryGrant(ctx context.Context, arg InsertRawQueryGrantParams) (AccessGrant, error) {
+	row := q.db.QueryRow(ctx, insertRawQueryGrant,
+		arg.ID,
+		arg.RootID,
+		arg.ExecutionDigest,
+		arg.ReviewDigest,
+		arg.Reasons,
+		arg.Review,
+		arg.Scope,
+		arg.RequesterIssuer,
+		arg.RequesterSubject,
+		arg.RequesterClient,
+		arg.RequesterKey,
+		arg.LifetimeSeconds,
+		arg.RawQuery,
+		arg.NotAfter,
+		arg.MaxArtifacts,
+		arg.MaxBytes,
+		arg.MaxOperations,
+		arg.IdempotencyKey,
+		arg.RequestDigest,
+	)
+	var i AccessGrant
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.Kind,
+		&i.PreviewID,
+		&i.CaptureID,
+		&i.ClusterID,
+		&i.NamespaceUid,
+		&i.WorkloadUid,
+		&i.PodUid,
+		&i.ExecutionDigest,
+		&i.ResultAccessDigest,
+		&i.ReviewDigest,
+		&i.DataClass,
+		&i.Reasons,
+		&i.Review,
+		&i.Scope,
+		&i.RequesterIssuer,
+		&i.RequesterSubject,
+		&i.RequesterClient,
+		&i.LifetimeSeconds,
+		&i.ResultAccess,
+		&i.NotAfter,
+		&i.MaxArtifacts,
+		&i.MaxBytes,
+		&i.MaxOperations,
+		&i.ArtifactsSpent,
+		&i.BytesSpent,
+		&i.OperationsSpent,
+		&i.IdempotencyKey,
+		&i.RequestDigest,
+		&i.RequestedAt,
+		&i.ReviewUntil,
+		&i.Decision,
+		&i.ApproverIssuer,
+		&i.ApproverSubject,
+		&i.ApproverClient,
+		&i.DecisionReason,
+		&i.DecisionAcr,
+		&i.DecisionAuthTime,
+		&i.DecidedAt,
+		&i.DecisionKey,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.RevokerIssuer,
+		&i.RevokerSubject,
+		&i.RevokerClient,
+		&i.RevokeKey,
+		&i.Revision,
+		&i.RequesterKind,
+		&i.RequestOperation,
+		&i.RequesterKey,
+		&i.PolicyUid,
+		&i.PolicyAcceptanceID,
+		&i.PolicyScope,
+		&i.PolicyNotAfter,
+		&i.PolicyMaxExecutions,
+		&i.PolicyMaxBytes,
+		&i.PolicyMaxObservedBytes,
+		&i.PolicyExecutionsSpent,
+		&i.PolicyBytesSpent,
+		&i.PolicyObservedBytesSpent,
+		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
+	)
+	return i, err
+}
+
 const listPendingGrants = `-- name: ListPendingGrants :many
-SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent FROM access_grant WHERE root_id=$1 AND decision IS NULL AND revoked_at IS NULL AND review_until>clock_timestamp()
- AND (kind<>'policy' OR policy_not_after>clock_timestamp())
+SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1 AND decision IS NULL AND revoked_at IS NULL AND review_until>clock_timestamp()
+ AND (kind<>'policy' OR policy_not_after>clock_timestamp()) AND (kind<>'rawQuery' OR not_after>clock_timestamp())
 ORDER BY requested_at DESC, id LIMIT $2
 `
 
@@ -609,6 +760,7 @@ func (q *Queries) ListPendingGrants(ctx context.Context, arg ListPendingGrantsPa
 			&i.PolicyBytesSpent,
 			&i.PolicyObservedBytesSpent,
 			&i.PolicyObservedEventsSpent,
+			&i.RawQuery,
 		); err != nil {
 			return nil, err
 		}
@@ -621,7 +773,7 @@ func (q *Queries) ListPendingGrants(ctx context.Context, arg ListPendingGrantsPa
 }
 
 const listRequestedGrants = `-- name: ListRequestedGrants :many
-SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent FROM access_grant WHERE root_id=$1::uuid AND requester_issuer=$2::text AND requester_subject=$3::text
+SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1::uuid AND requester_issuer=$2::text AND requester_subject=$3::text
  AND requester_kind=$4::text
  AND (requester_kind='human' OR requester_client=$5::text)
 ORDER BY requested_at DESC, id LIMIT $6
@@ -715,6 +867,7 @@ func (q *Queries) ListRequestedGrants(ctx context.Context, arg ListRequestedGran
 			&i.PolicyBytesSpent,
 			&i.PolicyObservedBytesSpent,
 			&i.PolicyObservedEventsSpent,
+			&i.RawQuery,
 		); err != nil {
 			return nil, err
 		}
@@ -727,7 +880,7 @@ func (q *Queries) ListRequestedGrants(ctx context.Context, arg ListRequestedGran
 }
 
 const readGrant = `-- name: ReadGrant :one
-SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent FROM access_grant WHERE root_id=$1 AND id=$2
+SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1 AND id=$2
 `
 
 type ReadGrantParams struct {
@@ -801,12 +954,13 @@ func (q *Queries) ReadGrant(ctx context.Context, arg ReadGrantParams) (AccessGra
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
 }
 
 const readGrantByCapture = `-- name: ReadGrantByCapture :one
-SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent FROM access_grant WHERE root_id=$1 AND capture_id=$2
+SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1 AND capture_id=$2
 `
 
 type ReadGrantByCaptureParams struct {
@@ -880,13 +1034,14 @@ func (q *Queries) ReadGrantByCapture(ctx context.Context, arg ReadGrantByCapture
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
 }
 
 const readGrantByKey = `-- name: ReadGrantByKey :one
 
-SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent FROM access_grant WHERE root_id=$1 AND requester_issuer=$2 AND requester_subject=$3 AND idempotency_key=$4 AND kind='adHocCapture'
+SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1 AND requester_issuer=$2 AND requester_subject=$3 AND idempotency_key=$4 AND kind='adHocCapture'
 `
 
 type ReadGrantByKeyParams struct {
@@ -968,6 +1123,7 @@ func (q *Queries) ReadGrantByKey(ctx context.Context, arg ReadGrantByKeyParams) 
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
 }
@@ -1026,7 +1182,7 @@ func (q *Queries) ReadGrantChildByID(ctx context.Context, arg ReadGrantChildByID
 }
 
 const readGrantForUpdate = `-- name: ReadGrantForUpdate :one
-SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent FROM access_grant WHERE root_id=$1 AND id=$2 FOR UPDATE
+SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1 AND id=$2 FOR UPDATE
 `
 
 type ReadGrantForUpdateParams struct {
@@ -1100,6 +1256,7 @@ func (q *Queries) ReadGrantForUpdate(ctx context.Context, arg ReadGrantForUpdate
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
 }
@@ -1161,9 +1318,210 @@ func (q *Queries) ReadGrantUse(ctx context.Context, arg ReadGrantUseParams) (Acc
 	return i, err
 }
 
+const readRawQueryByKey = `-- name: ReadRawQueryByKey :one
+SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1 AND requester_key=$2 AND request_operation='requestRawAccess' AND idempotency_key=$3 AND kind='rawQuery'
+`
+
+type ReadRawQueryByKeyParams struct {
+	RootID         pgtype.UUID
+	RequesterKey   []byte
+	IdempotencyKey string
+}
+
+func (q *Queries) ReadRawQueryByKey(ctx context.Context, arg ReadRawQueryByKeyParams) (AccessGrant, error) {
+	row := q.db.QueryRow(ctx, readRawQueryByKey, arg.RootID, arg.RequesterKey, arg.IdempotencyKey)
+	var i AccessGrant
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.Kind,
+		&i.PreviewID,
+		&i.CaptureID,
+		&i.ClusterID,
+		&i.NamespaceUid,
+		&i.WorkloadUid,
+		&i.PodUid,
+		&i.ExecutionDigest,
+		&i.ResultAccessDigest,
+		&i.ReviewDigest,
+		&i.DataClass,
+		&i.Reasons,
+		&i.Review,
+		&i.Scope,
+		&i.RequesterIssuer,
+		&i.RequesterSubject,
+		&i.RequesterClient,
+		&i.LifetimeSeconds,
+		&i.ResultAccess,
+		&i.NotAfter,
+		&i.MaxArtifacts,
+		&i.MaxBytes,
+		&i.MaxOperations,
+		&i.ArtifactsSpent,
+		&i.BytesSpent,
+		&i.OperationsSpent,
+		&i.IdempotencyKey,
+		&i.RequestDigest,
+		&i.RequestedAt,
+		&i.ReviewUntil,
+		&i.Decision,
+		&i.ApproverIssuer,
+		&i.ApproverSubject,
+		&i.ApproverClient,
+		&i.DecisionReason,
+		&i.DecisionAcr,
+		&i.DecisionAuthTime,
+		&i.DecidedAt,
+		&i.DecisionKey,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.RevokerIssuer,
+		&i.RevokerSubject,
+		&i.RevokerClient,
+		&i.RevokeKey,
+		&i.Revision,
+		&i.RequesterKind,
+		&i.RequestOperation,
+		&i.RequesterKey,
+		&i.PolicyUid,
+		&i.PolicyAcceptanceID,
+		&i.PolicyScope,
+		&i.PolicyNotAfter,
+		&i.PolicyMaxExecutions,
+		&i.PolicyMaxBytes,
+		&i.PolicyMaxObservedBytes,
+		&i.PolicyExecutionsSpent,
+		&i.PolicyBytesSpent,
+		&i.PolicyObservedBytesSpent,
+		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
+	)
+	return i, err
+}
+
+const readRawQueryCandidates = `-- name: ReadRawQueryCandidates :many
+SELECT g.id, g.root_id, g.kind, g.preview_id, g.capture_id, g.cluster_id, g.namespace_uid, g.workload_uid, g.pod_uid, g.execution_digest, g.result_access_digest, g.review_digest, g.data_class, g.reasons, g.review, g.scope, g.requester_issuer, g.requester_subject, g.requester_client, g.lifetime_seconds, g.result_access, g.not_after, g.max_artifacts, g.max_bytes, g.max_operations, g.artifacts_spent, g.bytes_spent, g.operations_spent, g.idempotency_key, g.request_digest, g.requested_at, g.review_until, g.decision, g.approver_issuer, g.approver_subject, g.approver_client, g.decision_reason, g.decision_acr, g.decision_auth_time, g.decided_at, g.decision_key, g.expires_at, g.revoked_at, g.revoker_issuer, g.revoker_subject, g.revoker_client, g.revoke_key, g.revision, g.requester_kind, g.request_operation, g.requester_key, g.policy_uid, g.policy_acceptance_id, g.policy_scope, g.policy_not_after, g.policy_max_executions, g.policy_max_bytes, g.policy_max_observed_bytes, g.policy_executions_spent, g.policy_bytes_spent, g.policy_observed_bytes_spent, g.policy_observed_events_spent, g.raw_query FROM access_grant g
+WHERE g.root_id= $1::uuid AND g.kind='rawQuery' AND g.requester_key= $2::bytea
+ AND g.requester_issuer= $3::text AND g.requester_subject= $4::text AND g.requester_client= $5::text AND g.requester_kind='human'
+ AND g.decision='approved' AND g.revoked_at IS NULL AND g.expires_at>clock_timestamp()
+ AND g.raw_query @> $6::jsonb
+ AND EXISTS(SELECT 1 FROM jsonb_array_elements(g.raw_query->'Artifacts') a WHERE a#>>'{Output,ArtifactID}'= ($7::uuid)::text AND a#>'{Output,ArtifactDigest}'= $8::jsonb AND (a->>'ExpiresAt')::timestamptz>clock_timestamp())
+ AND $9::bigint<=g.max_bytes-g.bytes_spent AND $10::bigint<=g.max_operations-g.operations_spent
+ORDER BY EXISTS(SELECT 1 FROM access_grant_child c WHERE c.root_id=g.root_id AND c.parent_id=g.id AND c.artifact_id= $7::uuid AND c.client_id=g.requester_client) DESC,g.requested_at,g.id
+LIMIT 64
+`
+
+type ReadRawQueryCandidatesParams struct {
+	RootID           pgtype.UUID
+	RequesterKey     []byte
+	RequesterIssuer  string
+	RequesterSubject string
+	RequesterClient  string
+	Member           []byte
+	ArtifactID       pgtype.UUID
+	Version          []byte
+	Bytes            int64
+	Operations       int64
+}
+
+func (q *Queries) ReadRawQueryCandidates(ctx context.Context, arg ReadRawQueryCandidatesParams) ([]AccessGrant, error) {
+	rows, err := q.db.Query(ctx, readRawQueryCandidates,
+		arg.RootID,
+		arg.RequesterKey,
+		arg.RequesterIssuer,
+		arg.RequesterSubject,
+		arg.RequesterClient,
+		arg.Member,
+		arg.ArtifactID,
+		arg.Version,
+		arg.Bytes,
+		arg.Operations,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AccessGrant{}
+	for rows.Next() {
+		var i AccessGrant
+		if err := rows.Scan(
+			&i.ID,
+			&i.RootID,
+			&i.Kind,
+			&i.PreviewID,
+			&i.CaptureID,
+			&i.ClusterID,
+			&i.NamespaceUid,
+			&i.WorkloadUid,
+			&i.PodUid,
+			&i.ExecutionDigest,
+			&i.ResultAccessDigest,
+			&i.ReviewDigest,
+			&i.DataClass,
+			&i.Reasons,
+			&i.Review,
+			&i.Scope,
+			&i.RequesterIssuer,
+			&i.RequesterSubject,
+			&i.RequesterClient,
+			&i.LifetimeSeconds,
+			&i.ResultAccess,
+			&i.NotAfter,
+			&i.MaxArtifacts,
+			&i.MaxBytes,
+			&i.MaxOperations,
+			&i.ArtifactsSpent,
+			&i.BytesSpent,
+			&i.OperationsSpent,
+			&i.IdempotencyKey,
+			&i.RequestDigest,
+			&i.RequestedAt,
+			&i.ReviewUntil,
+			&i.Decision,
+			&i.ApproverIssuer,
+			&i.ApproverSubject,
+			&i.ApproverClient,
+			&i.DecisionReason,
+			&i.DecisionAcr,
+			&i.DecisionAuthTime,
+			&i.DecidedAt,
+			&i.DecisionKey,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+			&i.RevokerIssuer,
+			&i.RevokerSubject,
+			&i.RevokerClient,
+			&i.RevokeKey,
+			&i.Revision,
+			&i.RequesterKind,
+			&i.RequestOperation,
+			&i.RequesterKey,
+			&i.PolicyUid,
+			&i.PolicyAcceptanceID,
+			&i.PolicyScope,
+			&i.PolicyNotAfter,
+			&i.PolicyMaxExecutions,
+			&i.PolicyMaxBytes,
+			&i.PolicyMaxObservedBytes,
+			&i.PolicyExecutionsSpent,
+			&i.PolicyBytesSpent,
+			&i.PolicyObservedBytesSpent,
+			&i.PolicyObservedEventsSpent,
+			&i.RawQuery,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeGrant = `-- name: RevokeGrant :one
 UPDATE access_grant SET revoked_at=clock_timestamp(), revoker_issuer= $1::text, revoker_subject= $2::text, revoker_client= $3::text, revoke_key= $4::text, revision=revision+1
-WHERE root_id= $5::uuid AND id= $6::uuid AND revoked_at IS NULL AND revision= $7::smallint RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent
+WHERE root_id= $5::uuid AND id= $6::uuid AND revoked_at IS NULL AND revision= $7::smallint RETURNING id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query
 `
 
 type RevokeGrantParams struct {
@@ -1250,6 +1608,7 @@ func (q *Queries) RevokeGrant(ctx context.Context, arg RevokeGrantParams) (Acces
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
 }

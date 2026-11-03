@@ -41,7 +41,7 @@ FROM (SELECT clock_timestamp() AS n) t JOIN policy_grant_settings s ON s.root_id
 WHERE s.issuer=$12::text AND s.fresh_until>t.n
  AND s.source_uid=$23::text AND s.source_generation=$24::bigint AND s.source_digest=$25::bytea
  AND $22::timestamptz>t.n
-RETURNING access_grant.id, access_grant.root_id, access_grant.kind, access_grant.preview_id, access_grant.capture_id, access_grant.cluster_id, access_grant.namespace_uid, access_grant.workload_uid, access_grant.pod_uid, access_grant.execution_digest, access_grant.result_access_digest, access_grant.review_digest, access_grant.data_class, access_grant.reasons, access_grant.review, access_grant.scope, access_grant.requester_issuer, access_grant.requester_subject, access_grant.requester_client, access_grant.lifetime_seconds, access_grant.result_access, access_grant.not_after, access_grant.max_artifacts, access_grant.max_bytes, access_grant.max_operations, access_grant.artifacts_spent, access_grant.bytes_spent, access_grant.operations_spent, access_grant.idempotency_key, access_grant.request_digest, access_grant.requested_at, access_grant.review_until, access_grant.decision, access_grant.approver_issuer, access_grant.approver_subject, access_grant.approver_client, access_grant.decision_reason, access_grant.decision_acr, access_grant.decision_auth_time, access_grant.decided_at, access_grant.decision_key, access_grant.expires_at, access_grant.revoked_at, access_grant.revoker_issuer, access_grant.revoker_subject, access_grant.revoker_client, access_grant.revoke_key, access_grant.revision, access_grant.requester_kind, access_grant.request_operation, access_grant.requester_key, access_grant.policy_uid, access_grant.policy_acceptance_id, access_grant.policy_scope, access_grant.policy_not_after, access_grant.policy_max_executions, access_grant.policy_max_bytes, access_grant.policy_max_observed_bytes, access_grant.policy_executions_spent, access_grant.policy_bytes_spent, access_grant.policy_observed_bytes_spent, access_grant.policy_observed_events_spent
+RETURNING access_grant.id, access_grant.root_id, access_grant.kind, access_grant.preview_id, access_grant.capture_id, access_grant.cluster_id, access_grant.namespace_uid, access_grant.workload_uid, access_grant.pod_uid, access_grant.execution_digest, access_grant.result_access_digest, access_grant.review_digest, access_grant.data_class, access_grant.reasons, access_grant.review, access_grant.scope, access_grant.requester_issuer, access_grant.requester_subject, access_grant.requester_client, access_grant.lifetime_seconds, access_grant.result_access, access_grant.not_after, access_grant.max_artifacts, access_grant.max_bytes, access_grant.max_operations, access_grant.artifacts_spent, access_grant.bytes_spent, access_grant.operations_spent, access_grant.idempotency_key, access_grant.request_digest, access_grant.requested_at, access_grant.review_until, access_grant.decision, access_grant.approver_issuer, access_grant.approver_subject, access_grant.approver_client, access_grant.decision_reason, access_grant.decision_acr, access_grant.decision_auth_time, access_grant.decided_at, access_grant.decision_key, access_grant.expires_at, access_grant.revoked_at, access_grant.revoker_issuer, access_grant.revoker_subject, access_grant.revoker_client, access_grant.revoke_key, access_grant.revision, access_grant.requester_kind, access_grant.request_operation, access_grant.requester_key, access_grant.policy_uid, access_grant.policy_acceptance_id, access_grant.policy_scope, access_grant.policy_not_after, access_grant.policy_max_executions, access_grant.policy_max_bytes, access_grant.policy_max_observed_bytes, access_grant.policy_executions_spent, access_grant.policy_bytes_spent, access_grant.policy_observed_bytes_spent, access_grant.policy_observed_events_spent, access_grant.raw_query
 `
 
 type InsertPolicyGrantParams struct {
@@ -164,6 +164,7 @@ func (q *Queries) InsertPolicyGrant(ctx context.Context, arg InsertPolicyGrantPa
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
 }
@@ -405,7 +406,7 @@ func (q *Queries) ReadPolicyGrantAttachmentByKey(ctx context.Context, arg ReadPo
 }
 
 const readPolicyGrantByKey = `-- name: ReadPolicyGrantByKey :one
-SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent FROM access_grant WHERE root_id=$1::uuid AND kind='policy'
+SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent, policy_observed_events_spent, raw_query FROM access_grant WHERE root_id=$1::uuid AND kind='policy'
  AND requester_key=$2::bytea
  AND request_operation='requestPolicyGrant' AND idempotency_key=$3::text
 `
@@ -484,6 +485,7 @@ func (q *Queries) ReadPolicyGrantByKey(ctx context.Context, arg ReadPolicyGrantB
 		&i.PolicyBytesSpent,
 		&i.PolicyObservedBytesSpent,
 		&i.PolicyObservedEventsSpent,
+		&i.RawQuery,
 	)
 	return i, err
 }

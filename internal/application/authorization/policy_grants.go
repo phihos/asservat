@@ -89,6 +89,9 @@ func (s GrantService) workload(ctx context.Context, i identity.Identity, t value
 // grantEligibility dispatches on the stored scope kind, preserving strict
 // concrete-Pod checks for ad hoc grants and avoiding dummy Pod identifiers.
 func (s GrantService) grantEligibility(ctx context.Context, i identity.Identity, g value.Grant, op value.Operation) (value.Result, error) {
+	if g.Kind == value.GrantRawQuery {
+		return s.rawQueryEligibility(ctx, i, g, op)
+	}
 	if g.Kind == value.GrantPolicy {
 		if g.Policy == nil {
 			return value.Result{}, value.ErrGrantInvalid

@@ -29,6 +29,45 @@ mismatched tuples remain omitted. No schema expansion, new lookup or configurati
 is needed. `argument-preflight` now includes the case-projection boundary.
 Full presentation race tests passed (215.710s), browser/MCP case races passed
 (3.023s / 8.765s), and expanded `make argument-preflight pre-push` exited0.
+Integrated raw-access gates passed: `make pre-push console-browser-check` exited0,
+including315console tests, TypeScript/build, all repository contracts/architecture/
+SQL checks, and the built console's26journeys/25accessibility scans plus4native
+restart boundaries/2scans (Go27.586s). Full authorization domain/application,
+catalog and PostgreSQL races passed (1.627/1.621/1.029/3.123s). Browser fixtures use
+synthetic current identity/case data; these do not qualify installed raw approval.
+The dedicated installed policy-arguments fixture has passed authored-contract,
+topology and focused race checks (Go1.659s,27harness checks); it has not run natively.
+Manual fixes through50077ab1 are composed here, including independent early-start
+bounds and refusal to report setup timeout as a completed empty observation.
+
+The focused `existing-raw-grants-2` rerun passed (Go10.921s): policy argument
+admission/preparation5.83s and raw grants3.61s, including the new bounded selected
+registration lookup. Sources were unchanged, cleanupFailures empty. Schema131
+handover then passed against real Kubernetes/PostgreSQL/OpenBao/S3 (Go148.217s,
+exit0, unchanged sources, cleanup complete): original schema replay, protected
+native admission, activation, incarnation mismatch refusal and credential
+retirement. Reports are retained in `test/results/raw-grants-schema131`.
+The typed Download review and dedicated policy-arguments installed fixture are
+now composed and locally checked; installed qualification remains pending.
+
+The composed existing-artifact raw approval now uses the existing human grant,
+review, audit and child/use ledger, with SQL131 exact selected-artifact membership
+and nullable collection-only target fields. Browser/MCP request, review and case
+metadata are wired. The actual SDK retained all 64 selected artifact tuples in a
+99,005-byte canonical response / 218,810-byte text-plus-structured frame; ordinary
+MCP responses retain their 64 KiB frame bound. Affected browser/MCP races passed
+(6.470s / 21.859s). These are component checks, not installed raw-download proof.
+
+`existing-raw-grants-1` passed real raw-grant races and replay (4.36s), legacy
+approval/child/pool/revocation checks (5.94s), and SQL131 upgrade/downgrade (3.65s).
+The combined command exited1 (Go19.181s): its policy argument companion retained
+the generic fixture assessment digest after the manual argument-specific fix.
+The offline regression reproduced that mismatch, then passed with the digest
+bound to the actual compiled actions (Go1.135s). Sources remained unchanged and
+cleanup completed without failures. The subsequent focused rerun above passed.
+Installed policy capture plus independent raw approval/download and historical
+unknown-size recovery remain open; no feature exit is claimed by these SQL results.
+
 Follow-up real-service run `policy-arguments-native-length-1` passed the actual
 finite argument policy compiler → accepted team grant → admission/intent → API
 preparation path (6.94s). It verified concurrent one-session dual debit, exact
@@ -50,8 +89,9 @@ all tagged/untagged integration compilation passed. SQL130 adds verified native
 length from the existing complete verification pass, with no extra payload or
 key read; legacy unknown values and original audit serialization remain unchanged.
 Its component service qualification passed after the role fix. RawQuery domain membership,
-client, pool and original-expiry regressions pass; public standalone approval,
-SQL grant composition and legacy unknown-size recovery remain unimplemented.
+client, pool and original-expiry regressions pass. The later SQL131/public
+composition above supersedes their previous absence; historical unknown-size
+recovery and installed qualification remain pending.
 
 Installed run [41642778383](https://github.com/phihos/asservat/actions/runs/41642778383)
 on9db49637 passed public preview, independent review and approved submission,

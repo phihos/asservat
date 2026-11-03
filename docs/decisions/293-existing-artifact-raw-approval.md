@@ -81,6 +81,55 @@ PostgreSQL/S3 cases (`verified-native-length-2`, Go4.379s, unchanged sources,
 cleanup complete); empty upgrade/downgrade passed separately. The initial run
 exposed a missing INSERT column grant; the production verifier and fixture now
 have only the added `native_bytes` insertion permission, with forbidden-write
-regressions. This does not implement standalone raw grants or legacy size recovery.
+regressions. The subsequent SQL131 implementation below composes standalone raw grants;
+legacy size recovery remains pending.
 Canonical raw-query scope hashing stays in C-03 application code, alongside
 existing grant digests; domain validation remains a pure typed-value check.
+
+## Bounded public review
+
+The existing-artifact request keeps the canonical future raw-operation enum;
+only `download_artifact` is executable now, with an explicit unsupported-operation
+reply for other selections. Both selectors require at least one unique entry.
+The existing fixed 10,000-operation ceiling is visible in review, with no new
+user setting. Historical unknown native lengths remain unselectable.
+
+`get_grant` alone uses a 256 KiB response allowance in both browser and MCP so
+one review can retain all 64 exact artifacts without pagination or omitting
+approval facts. All other operation limits remain unchanged. With existing
+identity and DNS-name bounds, 64 maximal ASCII artifact rows measured 93,121
+bytes; HTML-escaped opaque UIDs raised those rows to 154,561 bytes. A generated
+browser-contract regression including long requester/reviewer identities,
+reason and per-artifact values measured 233,239 bytes and passed the actual
+browser client; a response above 256 KiB is refused. These are synthetic
+serialization and client checks, not installed workflow qualification. No extra
+API read, worker, watch, service, permission or configuration is introduced.
+
+
+SQL131 component qualification (`existing-raw-grants-1`) passed raw-request
+idempotency, exact selected membership, concurrent bounded spend, unchanged
+original uses after replacement approval, real NULL parent targets, the 1 TiB
+pool and rollback refusal (4.36s). Existing collection approval/child behavior
+also passed (5.94s), as did empty SQL131 upgrade/downgrade (3.65s). The combined
+command failed only the separate policy-companion fixture's stale assessment
+identity; source hashes were unchanged and cleanup complete. Its corrected
+fixture awaits a focused rerun. An actual TLS/Go SDK 64-artifact review passed
+with 99,005 canonical bytes and a 218,810-byte duplicated MCP frame, preserving
+every exact identity, size and label. The escaped browser stress case above
+measures serialization capacity, not domain acceptance of every synthetic UID.
+
+
+The focused composed rerun `existing-raw-grants-2` passed (Go10.921s, unchanged
+sources, complete cleanup), including policy argument admission/preparation and
+raw ledger replay/concurrent spend. Legacy covering-grant reuse now requires one
+remaining operation per selected file and adequate distinct-artifact capacity.
+If remaining artifact slots are insufficient, one bounded SQL aggregate counts
+only the selected (at most64) already registered artifacts across reviewed
+clients. Existing tables, indexes and SELECT permissions suffice.
+
+Fresh Download preparation uses already verified native length to check full-file
+coverage and returns a typed missing-approval result only after ordinary rights
+and dependency checks succeed. The console opens the existing review prefilled
+with that exact artifact and size; approval retries retain the original request.
+Existing sessions and in-flight transfers retain their original accounting and
+revalidation behavior. This adds no metadata/payload read or API request.

@@ -51,6 +51,16 @@ class RegionalContextSelection(unittest.TestCase):
         self.assertIn("[continuation-policy-recording]", suites)
         self.assertIn("ASSERVAT_JOURNEY_FOCUS=policy-recording", suites)
 
+    def test_policy_arguments_uses_guarded_focus_without_packet_tools(self):
+        source = (Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
+        guard = source.index("name: Disposable-host guard")
+        self.assertIn("matrix.suite == 'continuation-policy-arguments'", source[source.rfind("      - if:", 0, guard):guard])
+        reader = source.index("name: tshark")
+        self.assertIn("matrix.suite != 'continuation-policy-arguments'", source[source.rfind("      - if:", 0, reader):reader])
+        suites = Path(__file__).with_name("ci-native.sh").read_text()
+        self.assertIn("[continuation-policy-arguments]", suites)
+        self.assertIn("ASSERVAT_JOURNEY_FOCUS=policy-arguments", suites)
+
     def test_history_browser_report_uses_actual_current_guard_expression(self):
         tree = ast.parse(inspect.getsource(fixture.main))
         expressions = [node.value for node in ast.walk(tree)
@@ -65,6 +75,7 @@ class RegionalContextSelection(unittest.TestCase):
         for focus, collector, expected in (("approved-recording", True, True),
                                            ("native-paced", True, False),
                                            ("policy-recording", True, False),
+                                           ("policy-arguments", True, False),
                                            (None, False, False)):
             with self.subTest(focus=focus):
                 self.assertEqual(eval(expression, {}, {"focus": focus, "collector_qualification": collector}), expected)
@@ -162,7 +173,7 @@ class RegionalContextSelection(unittest.TestCase):
         self.assertEqual(measured.count("max_connections=48"), 1)
 
     def test_approved_recording_refuses_missing_disposable_guard_before_setup(self):
-        for focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "ongoing-mixed"):
+        for focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "policy-arguments", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "ongoing-mixed"):
             with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}), patch.object(fixture.Path, "is_file", return_value=False):
                 with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):
                     fixture.main(installer_continuation=True)
@@ -207,12 +218,12 @@ class RegionalContextSelection(unittest.TestCase):
             self.assertEqual(len(hashes[name]), 64)
 
     def test_approved_recording_has_finite_go_envelope(self):
-        for focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "ongoing-mixed"):
+        for focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "policy-arguments", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "ongoing-mixed"):
             with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}):
                 self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
 
     def test_installed_focus_topology_and_flags_reach_the_go_consumer(self):
-        for focus, expected in (("approved-recording", 2), ("manual-syscall", 2), ("manual-arguments", 2), ("manual-mixed", 2), ("manual-raw", 2), ("manual-http", 2), ("manual-peers", 2), ("manual-profile", 2), ("policy-recording", 2), ("ongoing-save", 2), ("ongoing-save-disk", 2), ("ongoing-incident", 2), ("ongoing-syscall", 2), ("ongoing-mixed", 2), ("native-paced", 2), ("journey", 2), ("browser", 2),
+        for focus, expected in (("approved-recording", 2), ("manual-syscall", 2), ("manual-arguments", 2), ("manual-mixed", 2), ("manual-raw", 2), ("manual-http", 2), ("manual-peers", 2), ("manual-profile", 2), ("policy-recording", 2), ("policy-arguments", 2), ("ongoing-save", 2), ("ongoing-save-disk", 2), ("ongoing-incident", 2), ("ongoing-syscall", 2), ("ongoing-mixed", 2), ("native-paced", 2), ("journey", 2), ("browser", 2),
                                 ("policy", 2), ("alert", 2), ("logresource", 2),
                                 ("restart", 2), ("upgrade", 2), ("share", 2),
                                 ("chain", 2), ("clusters", 3), ("", 3), ("unknown", 3)):

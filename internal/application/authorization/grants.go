@@ -54,6 +54,7 @@ type GrantObservationLimits = value.ObservationLimits
 // GrantReview is the bounded review summary stored with the request. The
 // frozen Scope remains the authority; this is its presentation.
 type GrantReview struct {
+	RawQuery                                       *RawQueryReview `json:",omitempty"`
 	Namespace, WorkloadKind, WorkloadName, PodName string
 	Actions                                        []GrantReviewAction
 	ObservationLimits                              *GrantObservationLimits `json:",omitempty"`
@@ -149,6 +150,8 @@ type GrantService struct {
 	PolicyPlans            PolicyGrantPlanReader
 	PolicyRequests         PolicyGrantRequestReader
 	ApprovalSettings       PolicyApprovalSettingsReader
+	RawStore               RawQueryGrantStore
+	RawSelections          RawQuerySelectionReader
 	Store                  GrantStore
 	Recovery               GrantRecovery
 	NewID                  func() string
@@ -456,7 +459,7 @@ func (s GrantService) Decide(ctx context.Context, current identities.CurrentIden
 	if err != nil {
 		return zero, false, err
 	}
-	if err = s.finalGrantMetadata(effect, current, i, g.Kind == value.GrantPolicy); err != nil {
+	if err = s.finalGrantMetadata(effect, current, i, g.Kind == value.GrantPolicy || g.Kind == value.GrantRawQuery); err != nil {
 		return zero, false, err
 	}
 	if !s.Now().Before(until) {
@@ -510,7 +513,7 @@ func (s GrantService) Revoke(ctx context.Context, current identities.CurrentIden
 	if err != nil {
 		return zero, false, err
 	}
-	if err = s.finalGrantMetadata(ctx, current, i, g.Kind == value.GrantPolicy); err != nil {
+	if err = s.finalGrantMetadata(ctx, current, i, g.Kind == value.GrantPolicy || g.Kind == value.GrantRawQuery); err != nil {
 		return zero, false, err
 	}
 	if g.Kind == value.GrantPolicy && !s.Now().Before(approver.ValidUntil) {
@@ -593,10 +596,10 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 	if json.Unmarshal(g.Review, &v.Review) != nil {
 		return GrantView{}, time.Time{}, ErrGrantUnavailable
 	}
-	if err = s.finalGrantMetadata(ctx, current, i, g.Kind == value.GrantPolicy); err != nil {
+	if err = s.finalGrantMetadata(ctx, current, i, g.Kind == value.GrantPolicy || g.Kind == value.GrantRawQuery); err != nil {
 		return GrantView{}, time.Time{}, err
 	}
-	if g.Kind == value.GrantPolicy && !s.Now().Before(until) {
+	if (g.Kind == value.GrantPolicy || g.Kind == value.GrantRawQuery) && !s.Now().Before(until) {
 		return GrantView{}, time.Time{}, ErrGrantNotFound
 	}
 	return v, until, nil
@@ -663,6 +666,20 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 			}
 			v.Approver, v.CanRevoke = approver, revoke
 			until = identity.Earlier(until, r.ValidUntil)
+		} else if g.Kind == value.GrantRawQuery {
+			if view == "pending" {
+				if sameHuman(g.Requester, i.Principal) || v.Phase != value.GrantPending {
+					continue
+				}
+				r, e := s.grantEligibility(ctx, i, g, value.ApproveAction)
+				if e != nil || !r.Eligible {
+					continue
+				}
+				v.Approver = true
+				until = identity.Earlier(until, r.ValidUntil)
+			} else if !grantRequesterMatches(g, i.Principal) || i.Principal.Kind != identity.Human {
+				return nil, time.Time{}, ErrGrantUnavailable
+			}
 		} else if view == "pending" {
 			if sameHuman(g.Requester, i.Principal) || v.Phase != value.GrantPending {
 				continue
@@ -687,7 +704,9 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 		}
 		out = append(out, v)
 	}
-	policyMetadata := slices.ContainsFunc(out, func(v GrantView) bool { return v.Grant.Kind == value.GrantPolicy })
+	policyMetadata := slices.ContainsFunc(out, func(v GrantView) bool {
+		return v.Grant.Kind == value.GrantPolicy || v.Grant.Kind == value.GrantRawQuery
+	})
 	if err = s.finalGrantMetadata(ctx, current, i, policyMetadata); err != nil {
 		return nil, time.Time{}, err
 	}
@@ -718,6 +737,9 @@ func (s GrantService) Materialize(ctx context.Context, parentID, clientID string
 	}
 	// The store decides "already registered" under the parent lock; checking
 	// with registered=true here only rejects scope and phase early.
+	if g.Kind == value.GrantRawQuery && (!RawQueryScopeMatches(g) || ReviewDigest(g, g.Review) != g.ReviewDigest) {
+		return zero, false, value.ErrGrantScope
+	}
 	if err = value.CheckMaterialize(g, output, clientID, true, s.Now()); err != nil {
 		return zero, false, err
 	}
@@ -754,21 +776,35 @@ func (s GrantService) Use(ctx context.Context, current identities.CurrentIdentit
 	if use.Bytes < 0 || use.Operations < 0 || use.Bytes+use.Operations == 0 {
 		return zero, false, value.ErrGrantInvalid
 	}
+	if g.Kind == value.GrantRawQuery && (!RawQueryScopeMatches(g) || ReviewDigest(g, g.Review) != g.ReviewDigest) {
+		return zero, false, value.ErrGrantScope
+	}
 	if err = value.CheckResultUse(g, c, i, use.Operation, s.Now()); err != nil {
 		return zero, false, err
 	}
-	eligible, err := s.collector(ctx, i, g.Target, value.DownloadApproved)
+	eligible, err := s.collector(ctx, i, c.Output.Target, value.DownloadApproved)
 	if err != nil {
 		return zero, false, err
 	}
 	if !eligible.Eligible {
 		return zero, false, identity.ErrDenied
 	}
-	out, replay, err := s.Store.ReserveGrantUse(ctx, GrantUseRequest{UseID: useID, ParentID: g.ID, ChildID: childID, Use: use}, recovery)
+	until := identity.Earlier(i.ValidUntil, identity.Earlier(eligible.ValidUntil, recovery.FreshUntil))
+	if !s.Now().Before(until) {
+		return zero, false, identity.ErrDenied
+	}
+	effect, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	out, replay, err := s.Store.ReserveGrantUse(effect, GrantUseRequest{UseID: useID, ParentID: g.ID, ChildID: childID, Use: use}, recovery)
 	if err != nil {
 		return zero, false, err
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	if g.Kind == value.GrantRawQuery {
+		err = s.finalRawQuery(effect, current, i, until)
+	} else {
+		err = s.final(effect, current, i)
+	}
+	if err != nil {
 		return zero, false, err
 	}
 	return out, replay, nil
@@ -801,7 +837,7 @@ func (s GrantService) rawParent(ctx context.Context, current identities.CurrentI
 		return identity.Identity{}, zero, value.ErrGrantScope
 	}
 	if !sameHuman(i.Principal, g.Requester) {
-		return identity.Identity{}, zero, value.ErrGrantPrincipal
+		return i, g, value.ErrGrantPrincipal
 	}
 	return i, g, nil
 }
@@ -812,13 +848,32 @@ func (s GrantService) rawParent(ctx context.Context, current identities.CurrentI
 // check then confirms it with a current parent. It returns when the child
 // stops admitting and reserves nothing.
 func (s GrantService) CurrentResultAccess(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, actionID string) (time.Time, error) {
-	i, g, err := s.rawParent(ctx, current, scope)
+	return s.currentResultAccess(ctx, current, scope, actionID, value.GrantUse{}, false)
+}
+
+// Preparation alone checks the known whole-file size. Continuing transfers keep
+// their existing per-use accounting and do not demand the original bytes again.
+func (s GrantService) CurrentResultAccessForPreparation(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, actionID string, nativeBytes *int64) (time.Time, error) {
+	use := value.GrantUse{Operation: value.GrantDownloadOperation, Operations: 1}
+	if nativeBytes != nil {
+		if *nativeBytes < 0 || *nativeBytes > artifact.MaxNativeBytes {
+			return time.Time{}, value.ErrGrantInvalid
+		}
+		use.Bytes = *nativeBytes
+	}
+	return s.currentResultAccess(ctx, current, scope, actionID, use, true)
+}
+
+func (s GrantService) currentResultAccess(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, actionID string, use value.GrantUse, preparing bool) (time.Time, error) {
+	i, g, output, err := s.rawParentFor(ctx, current, scope, actionID, use, preparing)
 	if err != nil {
 		return time.Time{}, err
 	}
-	output := value.VerifiedOutput{CaptureID: scope.CaptureID, ActionID: actionID, ArtifactID: scope.ArtifactID, ExecutionDigest: g.ExecutionDigest, ArtifactDigest: scope.Version, Target: g.Target}
 	c, _, err := s.Materialize(ctx, g.ID, i.Principal.ClientID, output)
 	if err != nil {
+		if preparing && errors.Is(err, value.ErrGrantPoolExhausted) {
+			return time.Time{}, value.ErrApprovalRequired
+		}
 		return time.Time{}, err
 	}
 	if c.Output != output {
@@ -830,7 +885,18 @@ func (s GrantService) CurrentResultAccess(ctx context.Context, current identitie
 	if err = s.final(ctx, current, i); err != nil {
 		return time.Time{}, err
 	}
-	return identity.Earlier(i.ValidUntil, g.ExpiresAt), nil
+	until := identity.Earlier(i.ValidUntil, g.ExpiresAt)
+	if g.Kind == value.GrantRawQuery {
+		for _, a := range g.RawQuery.Artifacts {
+			if a.Output == output {
+				until = identity.Earlier(until, a.ExpiresAt)
+			}
+		}
+		if err = s.finalRawQuery(ctx, current, i, until); err != nil {
+			return time.Time{}, err
+		}
+	}
+	return until, nil
 }
 
 // ReserveRawResult reserves one use of the calling client's existing child
@@ -838,17 +904,56 @@ func (s GrantService) CurrentResultAccess(ctx context.Context, current identitie
 // child is the one CurrentResultAccess materialized; useID is the batch or
 // window ID, so a retry is idempotent and spend is never refunded.
 func (s GrantService) ReserveRawResult(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope, useID string, use value.GrantUse) error {
-	i, g, err := s.rawParent(ctx, current, scope)
+	if ctx == nil || ctx.Err() != nil || !s.ready() || current == nil || !value.UUID(useID) || !scope.Valid() || scope.RootID != s.RootID || use.Operation != value.GrantDownloadOperation || use.Bytes < 0 || use.Operations < 0 || use.Bytes+use.Operations == 0 {
+		return value.ErrGrantInvalid
+	}
+	// An uncertain replay keeps the first parent/child forever. It cannot move
+	// to a newer grant after revocation, expiry or pool exhaustion.
+	if s.RawStore != nil {
+		caller, e := s.human(ctx, current, "evidence:download")
+		if e != nil {
+			return e
+		}
+		if caller.Principal != scope.Principal {
+			return value.ErrGrantPrincipal
+		}
+		prior, err := s.RawStore.GrantUseByID(ctx, useID)
+		if err == nil {
+			if prior.UseID != useID || prior.Use != use {
+				return ErrGrantConflict
+			}
+			c, e := s.Store.GrantChild(ctx, prior.ChildID)
+			if e != nil {
+				return e
+			}
+			if c.ParentID != prior.ParentID || !childMatchesScope(c, scope) {
+				return value.ErrGrantScope
+			}
+			_, _, e = s.Use(ctx, current, c.ID, useID, use)
+			return e
+		}
+		if !errors.Is(err, ErrGrantNotFound) {
+			return ErrGrantUnavailable
+		}
+	}
+	i, g, output, err := s.rawParentFor(ctx, current, scope, "", use, false)
 	if err != nil {
 		return err
 	}
 	c, err := s.Store.GrantChildFor(ctx, g.ID, scope.ArtifactID, i.Principal.ClientID)
+	if errors.Is(err, ErrGrantNotFound) && g.Kind == value.GrantRawQuery {
+		c, _, err = s.Materialize(ctx, g.ID, i.Principal.ClientID, output)
+	}
 	if err != nil {
 		return err
 	}
-	if c.ParentID != g.ID || c.ClientID != i.Principal.ClientID || c.Output.CaptureID != scope.CaptureID || c.Output.ArtifactID != scope.ArtifactID || c.Output.ArtifactDigest != scope.Version {
+	if c.ParentID != g.ID || !childMatchesScope(c, scope) {
 		return value.ErrGrantScope
 	}
 	_, _, err = s.Use(ctx, current, c.ID, useID, use)
 	return err
+}
+
+func childMatchesScope(c value.GrantChild, s artifact.DownloadScope) bool {
+	return c.ClientID == s.Principal.ClientID && c.Output.CaptureID == s.CaptureID && c.Output.ArtifactID == s.ArtifactID && c.Output.ArtifactDigest == s.Version && c.Output.Target == (value.Target{ClusterID: s.ClusterID, NamespaceUID: s.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.PodUID})
 }

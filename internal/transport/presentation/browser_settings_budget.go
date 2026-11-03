@@ -22,6 +22,9 @@ func browserSettingsView(ctx context.Context, name string) bool {
 	return ok
 }
 func (r OperationReply) preparedOutputLimit(name string) int {
+	if name == "get_grant" {
+		return contracts.InvestigationGrantReviewOutputLimit
+	}
 	if name == "preview_recording_save" {
 		return contracts.InvestigationRecordingSavePreviewOutputLimit
 	}

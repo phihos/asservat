@@ -475,12 +475,14 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.grants = authapp.GrantService{RootID: root, InstallationID: installation, Permissions: out.permissions, WorkloadPermissions: out.permissions, Store: grantStore, PolicyRequests: grantStore, ApprovalSettings: grantStore,
+	out.grants = authapp.GrantService{RootID: root, InstallationID: installation, Permissions: out.permissions, WorkloadPermissions: out.permissions, Store: grantStore, RawStore: grantStore, PolicyRequests: grantStore, ApprovalSettings: grantStore,
 		PolicyPlans: captureapp.PolicyGrantPlans{Accepted: out.policies, Sources: out.policies, Documents: out.hubPolicies, CompileRecorder: publicPolicyRecorderCompiler(out.investigation.Filters, out.investigation.Profiles), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now},
 		Recovery:    out.recovery, NewID: ownerRandomID, Now: time.Now}
-	out.investigation.Grants = out.grants
 	out.caseRoutes = routes
-	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares, Reviews: out.reviews}
+	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares, Reviews: out.reviews, Recovery: out.recovery, Now: time.Now}
+	// Freeze a fully initialized read service, never the earlier partial case value.
+	out.grants.RawSelections = out.cases
+	out.investigation.Grants = out.grants
 	if out.fleet, err = newPublicFleet(ctx, c, providers, pools, observer, probe, a); err != nil {
 		return nil, err
 	}

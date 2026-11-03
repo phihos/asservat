@@ -53,7 +53,7 @@ func (s *DownloadResponseAuthority) CheckDownloadCurrent(ctx context.Context, cu
 		}
 		cancel()
 	}()
-	a, err := s.service.checkDownloadCurrent(call, current, scope, &s.ordinary)
+	a, err := s.service.checkDownloadCurrent(call, current, scope, &s.ordinary, false)
 	if err != nil || call.Err() != nil || s.owner.Err() != nil || !a.Valid(s.service.Now()) {
 		s.ordinary, s.closed = nil, true
 		s.cancel()

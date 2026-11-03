@@ -1,6 +1,7 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import EvidenceWorkspace from './EvidenceWorkspace';
+import { result } from '../capture/test-fixtures';
 import { Evidence } from './evidence';
 import { SyntheticEvidence, session, caseResult, downloadResult, id } from './test-fixtures';
 import { caseIDFromPath, returnPath } from '../routes';
@@ -151,4 +152,43 @@ it('offers an explicit new download after the native link was requested while st
   await screen.findByRole('heading', { name: 'Preparing the native file' });
   expect(client.calls.map(c => c.name)).toEqual(['get_case', 'prepare_artifact_download', 'cancel_artifact_download', 'prepare_artifact_download']);
   expect(client.calls[3].input).not.toEqual(client.calls[1].input);
+});
+
+it('offers a separate existing-raw approval form without replacing a covering download', async () => {
+  const client = new SyntheticEvidence(); const value = caseResult(); if (value.status !== 'ok') throw new Error();
+  value.data.artifacts[0].data_class = 'raw'; value.data.artifacts[0].kind = 'syscallTrace';
+  value.data.artifacts[0].verified_native_bytes = 512;
+  value.data.artifacts[0].target = { cluster_id: id(1), namespace_uid: 'ns', workload_uid: 'workload', pod_uid: 'pod' };
+  client.responder = () => value; await mount(client);
+  expect(await screen.findByRole('heading', { name: 'Request raw download approval' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Download' })).toBeTruthy();
+  expect(screen.getByRole('checkbox')).toHaveProperty('disabled', false);
+  expect(client.calls.map(c => c.name)).toEqual(['get_case']);
+});
+
+function rawCaseForApproval() {
+ const value=caseResult(); if(value.status!=='ok')throw new Error();
+ Object.assign(value.data.artifacts[0],{data_class:'raw',kind:'syscallTrace',verified_native_bytes:512,target:{cluster_id:id(1),namespace_uid:'ns',workload_uid:'workload',pod_uid:'pod'}});
+ return value;
+}
+it('Download opens exact-size prefilled review only for typed missing approval and retains its preparation key',async()=>{
+ const client=new SyntheticEvidence();const value=rawCaseForApproval();
+ client.responder=name=>name==='get_case'?value:{...result({code:'RawApprovalRequired',message:'Whole-file approval required',retryable:false}),status:'error'};
+ await mount(client);fireEvent.click(await screen.findByRole('button',{name:'Download'}));
+ await waitFor(()=>expect(screen.getByRole('checkbox')).toHaveProperty('checked',true));
+ expect(screen.getByRole('heading',{name:'Request raw download approval'})).toBe(document.activeElement);
+ expect(screen.getByLabelText('Total download byte budget')).toHaveProperty('value','512');
+ expect(screen.getByText(/after approval, retry this same download request/)).toBeTruthy();
+ const first=client.calls.find(c=>c.name==='prepare_artifact_download')!;
+ client.responder=()=>downloadResult('Preparing');fireEvent.click(screen.getByRole('button',{name:'Retry same download request'}));
+ await screen.findByRole('heading',{name:'Preparing the native file'});
+ const prepares=client.calls.filter(c=>c.name==='prepare_artifact_download');expect(prepares).toHaveLength(2);expect(prepares[1].input).toEqual(first.input);
+});
+it('does not infer an approval request from unavailable service or denied ordinary rights',async()=>{
+ const client=new SyntheticEvidence();const value=rawCaseForApproval();
+ client.responder=name=>name==='get_case'?value:{...result({code:'NotAvailable',message:'Access unavailable',retryable:true}),status:'error'};
+ await mount(client);fireEvent.click(await screen.findByRole('button',{name:'Download'}));
+ await screen.findByRole('alert');expect(screen.getByRole('checkbox')).toHaveProperty('checked',false);
+ expect(screen.getByRole('heading',{name:'Request raw download approval'})).not.toBe(document.activeElement);
+ expect(screen.getByRole('button',{name:'Retry same download request'})).toBeTruthy();
 });

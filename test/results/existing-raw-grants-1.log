@@ -1,0 +1,17 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence
+=== RUN   TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence/argument-observation-companion
+    policy_recording_admission_test.go:441: real team recorder admission context admission inputs changed
+=== RUN   TestContextAdmissionWithRealServices/existing-artifact-raw-grants
+=== RUN   TestContextAdmissionWithRealServices/access-grant-approval-children-pool-revocation-and-expiry
+--- FAIL: TestContextAdmissionWithRealServices (15.46s)
+    --- FAIL: TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence (4.59s)
+        --- FAIL: TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence/argument-observation-companion (4.59s)
+    --- PASS: TestContextAdmissionWithRealServices/existing-artifact-raw-grants (4.36s)
+    --- PASS: TestContextAdmissionWithRealServices/access-grant-approval-children-pool-revocation-and-expiry (5.94s)
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres
+    upgrade_schema_test.go:437: upgrade schema: 130 to 131 by the schema owner, idempotent, floor "asservat:oldest-binary-schema=102", unknown history refused
+--- PASS: TestCustodyUpgradeSchemaWithRealPostgres (3.65s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	19.181s
+FAIL

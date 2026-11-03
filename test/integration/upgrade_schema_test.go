@@ -143,6 +143,20 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("original argument authority shape", e)
 		}
 	}
+	var originalRawGrantShape, originalRawGrantGuard, originalRawAuditFunctions string
+	const rawAuditFunctions = `SELECT pg_get_functiondef('public.operation_audit_lane(text)'::regprocedure)||pg_get_functiondef('public.operation_audit_human_input_valid(text,text)'::regprocedure)`
+	const rawGrantShape = `SELECT jsonb_build_object('constraints',(SELECT jsonb_agg(x ORDER BY x) FROM (SELECT pg_get_constraintdef(oid) x FROM pg_constraint WHERE conrelid IN ('access_grant'::regclass,'access_grant_child'::regclass)) q),'columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name,c.ordinal_position) FROM (SELECT table_name,column_name,ordinal_position,is_nullable,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('access_grant','access_grant_child')) c))::text`
+	if head == 131 {
+		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&originalRawAuditFunctions); e != nil {
+			t.Fatal(e)
+		}
+		if e = conn.QueryRow(ctx, rawGrantShape).Scan(&originalRawGrantShape); e != nil {
+			t.Fatal(e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.protect_access_grant()'::regprocedure)`).Scan(&originalRawGrantGuard); e != nil {
+			t.Fatal(e)
+		}
+	}
 	var originalNativeLengthGuard string
 	if head == 130 {
 		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.protect_context_verification()'::regprocedure)`).Scan(&originalNativeLengthGuard); e != nil {
@@ -393,6 +407,24 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		if _, e = p.Up(ctx); e != nil {
 			t.Fatal("native length Up", e)
+		}
+	}
+	if head == 131 {
+		if _, e = p.DownTo(ctx, 130); e != nil {
+			t.Fatal("empty raw grant Down", e)
+		}
+		var shape, guard, auditFunctions string
+		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&auditFunctions); e != nil || auditFunctions != originalRawAuditFunctions {
+			t.Fatal("raw Down changed audit functions", e)
+		}
+		if e = conn.QueryRow(ctx, rawGrantShape).Scan(&shape); e != nil || shape != originalRawGrantShape {
+			t.Fatal("raw Down changed old grant/child shape", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.protect_access_grant()'::regprocedure)`).Scan(&guard); e != nil || guard != originalRawGrantGuard {
+			t.Fatal("raw Down changed original grant guard", e)
+		}
+		if _, e = p.Up(ctx); e != nil {
+			t.Fatal("raw grant Up", e)
 		}
 	}
 	// A version this binary does not know is refused, not skipped.

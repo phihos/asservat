@@ -1,0 +1,13 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence
+=== RUN   TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence/argument-observation-companion
+    policy_recording_admission_test.go:477: actual Tick accepted executions=1; native output=8388608 grant executions=1 output=8388608 reservations=1
+    policy_recording_admission_test.go:479: actual raw policy admission replay retained capture/scope/deadline and require-all=false
+    policy_recording_admission_test.go:479: actual argument compiler -> accepted policy/grant -> admission/intent -> API prepare: expired source rolls entire graph back; exactly one dual debit; exact replay and replacement epoch refusal; historical publisher source uses narrow SELECT
+=== RUN   TestContextAdmissionWithRealServices/existing-artifact-raw-grants
+--- PASS: TestContextAdmissionWithRealServices (9.85s)
+    --- PASS: TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence (5.83s)
+        --- PASS: TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence/argument-observation-companion (5.83s)
+    --- PASS: TestContextAdmissionWithRealServices/existing-artifact-raw-grants (3.61s)
+PASS
+ok  	asservat.local/asservat/test/integration	10.921s

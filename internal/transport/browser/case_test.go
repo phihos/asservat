@@ -108,7 +108,7 @@ func TestCaseBrowserUsesCurrentSessionCSRFAndNoUnavailableRoutes(t *testing.T) {
 		})
 	}
 	code, b := sendCase(request())
-	if code != 200 || cases.calls != 1 || !strings.Contains(b, `"kind":"pod-status"`) || strings.Contains(b, "private-") {
+	if code != 200 || cases.calls != 1 || !strings.Contains(b, `"kind":"pod-status"`) || !strings.Contains(b, `"namespace_uid":"private-ns"`) || !strings.Contains(b, `"workload_uid":"private-workload"`) || !strings.Contains(b, `"pod_uid":"private-pod"`) {
 		t.Fatalf("valid case: %d %s", code, b)
 	}
 	// The final transport check happens after the mapper's output fence.

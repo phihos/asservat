@@ -29,6 +29,8 @@ func (q CaseRouteQuery) Valid(now time.Time) bool {
 // ContextCaseRoute contains published-only lookup keys. It is not a public DTO
 // and never substitutes for ordinary scope eligibility or retained audiences.
 type ContextCaseRoute struct {
+	// Version is internal published-copy routing, never disclosure authority.
+	Version               artifact.Digest
 	CaptureID, ArtifactID string
 	Target                authorization.Target
 }
@@ -66,6 +68,7 @@ type ContextCase struct {
 }
 
 type ContextCaseArtifact struct {
+	Namespace, WorkloadKind, WorkloadName, PodName string
 	// NativeBytes is the verified native length, nil for legacy unknown.
 	NativeBytes           *int64
 	ArtifactID, CaptureID string

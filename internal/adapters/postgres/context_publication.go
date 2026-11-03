@@ -414,7 +414,12 @@ func (s *ContextPublications) ContextDownloadEvidence(ctx context.Context, artif
 		if !identity.Fresh(started.Time, until, now.Time, 5*time.Second) {
 			return privacy.ErrExpired
 		}
-		out = authorizationapp.ContextDownloadEvidence{CaptureID: e.CaptureUID, CaseID: e.CaseID, NativeType: e.NativeType, DataClass: e.DataClass, ActionID: e.ActionID, PurposeRef: e.PurposeRef, Audience: e.Audience, Retained: retained, ObservedAt: started.Time, ValidUntil: until}
+		out = authorizationapp.ContextDownloadEvidence{ExecutionDigest: e.PlanDigest, Namespace: e.Namespace, CaptureID: e.CaptureUID, CaseID: e.CaseID, NativeType: e.NativeType, DataClass: e.DataClass, ActionID: e.ActionID, PurposeRef: e.PurposeRef, Audience: e.Audience, Retained: retained, ObservedAt: started.Time, ValidUntil: until}
+		labels, labelErr := requestRecordScope(capture)
+		if labelErr != nil {
+			return labelErr
+		}
+		out.WorkloadKind, out.WorkloadName, out.PodName = labels.WorkloadKind, labels.WorkloadName, labels.PodName
 		if row.ContextVerification.NativeBytes.Valid {
 			size := row.ContextVerification.NativeBytes.Int64
 			out.NativeBytes = &size

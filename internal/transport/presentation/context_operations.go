@@ -394,6 +394,7 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 type OperationReply struct {
 	// Only the named passive source preview producer sets this delivery budget.
 	recordingSavePreview bool
+	grantReview          bool // Only the authenticated get_grant producer sets this budget.
 	Body                 []byte
 	ValidUntil           time.Time
 

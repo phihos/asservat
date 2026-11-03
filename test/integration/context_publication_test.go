@@ -278,6 +278,18 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		})
 	}
 
+	t.Run("existing-artifact-raw-grants", func(t *testing.T) {
+		f := setup(t)
+		if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
+			t.Fatal(err)
+		}
+		record, err := f.reader.ContextDownloadEvidence(ctx, f.e.Registration.Location.ArtifactID)
+		if err != nil || record.NativeBytes == nil || record.ExecutionDigest != f.e.PlanDigest {
+			t.Fatal("verified raw-review metadata", err)
+		}
+		qualifyRawQueryGrants(t, ctx, admin, poolFor, f.scenario, f.e, record.Version, *record.NativeBytes)
+	})
+
 	qualifyPermissionPublicationAuditHistory(t, ctx, admin, func(t *testing.T) permissionPublicationAuditFixture {
 		f := setup(t)
 		return permissionPublicationAuditFixture{nativeBytes: f.nativeBytes, expectation: f.e, copies: f.copies, verify: f.verify, audit: f.audit, publish: f.publish, gate: f.gate, publisher: f.publisher}

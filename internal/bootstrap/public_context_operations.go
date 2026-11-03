@@ -175,6 +175,13 @@ func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicConte
 	s.Regional.Runner.Capabilities, s.Regional.Runner.Recovery, s.Regional.Runner.Now, s.Regional.Now = i.Capabilities, i.Recovery, c.Now, c.Now
 	p.Recovery, p.Now = i.Recovery, c.Now
 	k.Recovery, k.Now = i.Recovery, c.Now
+	// The raw selection reader uses the same initialized dependencies and clock
+	// as get_case, including assemblies with an explicitly injected clock.
+	if grants, ok := i.Grants.(authapp.GrantService); ok && grants.RawStore != nil {
+		grants.RawSelections = k
+		grants.Now, grants.NewID, grants.Recovery = c.Now, c.NewID, i.Recovery
+		i.Grants = grants
+	}
 	p.Navigation = captureapp.ContextCaseNavigator{Cases: k, Now: c.Now}
 	d.Recovery, d.Now, d.NewID = i.Recovery, c.Now, c.NewID
 	// ADR-194 D1: without a configured worker there is no native runtime and

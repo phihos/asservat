@@ -163,7 +163,7 @@ func validDataClass(c string) bool { return c == "metadata" || c == "extract" ||
 func (g Grant) Valid() bool {
 	if !UUID(g.ID) || !UUID(g.RootID) || !g.validKindScope() ||
 		g.ExecutionDigest == (artifact.Digest{}) || g.ReviewDigest == (artifact.Digest{}) || !validDataClass(g.DataClass) ||
-		len(g.Reasons) < 1 || len(g.Reasons) > GrantMaxReasons || len(g.Scope) < 2 || len(g.Scope) > GrantMaxScopeBytes || len(g.Review) < 2 || len(g.Review) > GrantMaxReviewBytes ||
+		len(g.Reasons) < 1 || len(g.Reasons) > GrantMaxReasons || len(g.Scope) < 2 || len(g.Scope) > GrantMaxScopeBytes || len(g.Review) < 2 || len(g.Review) > GrantReviewBytesLimit(g.Kind) ||
 		!g.Requester.Valid() ||
 		g.RequestedAt.IsZero() || !g.ReviewUntil.After(g.RequestedAt) || g.ReviewUntil.Sub(g.RequestedAt) > GrantReviewWindow ||
 		g.Revision < 1 || g.Revision > GrantMaxRevision {
@@ -445,4 +445,13 @@ func (g Grant) validApprovedExpiry(decided time.Time) bool {
 		return g.ExpiresAt.Equal(end)
 	}
 	return g.ExpiresAt.Equal(end)
+}
+
+// GrantReviewBytesLimit accommodates the existing-artifact review's up to64
+// exact target/file rows while retaining the original collection review limit.
+func GrantReviewBytesLimit(kind string) int {
+	if kind == GrantRawQuery {
+		return 128 << 10
+	}
+	return GrantMaxReviewBytes
 }

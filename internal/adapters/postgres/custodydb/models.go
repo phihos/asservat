@@ -15,8 +15,8 @@ type AccessGrant struct {
 	PreviewID                 pgtype.UUID
 	CaptureID                 pgtype.UUID
 	ClusterID                 pgtype.UUID
-	NamespaceUid              string
-	WorkloadUid               string
+	NamespaceUid              pgtype.Text
+	WorkloadUid               pgtype.Text
 	PodUid                    pgtype.Text
 	ExecutionDigest           []byte
 	ResultAccessDigest        []byte
@@ -71,6 +71,7 @@ type AccessGrant struct {
 	PolicyBytesSpent          int64
 	PolicyObservedBytesSpent  int64
 	PolicyObservedEventsSpent int64
+	RawQuery                  []byte
 }
 
 type AccessGrantChild struct {

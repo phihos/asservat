@@ -1,0 +1,297 @@
+{
+  "name": "request_raw_access",
+  "description": "Request independent approval to download whole existing raw artifacts. This creates no collection or disclosure. The current runtime supports download_artifact only; other declared operations return unsupported operation. Exact verified sizes, targets, requester/client and the fixed 10000-operation ceiling are reviewed. Retry an uncertain reply with the same selection and idempotency key; original expiry and spend do not reset.",
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "case_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "artifact_digests": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "maxItems": 64,
+        "minItems": 1,
+        "uniqueItems": true
+      },
+      "operations": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "read_memory",
+            "backtrace",
+            "threads",
+            "registers",
+            "frame_variables",
+            "managed_stack",
+            "heap_statistics",
+            "pcap_query",
+            "syscall_query",
+            "download_artifact"
+          ]
+        },
+        "maxItems": 16,
+        "minItems": 1,
+        "uniqueItems": true
+      },
+      "reason": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      },
+      "max_bytes": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1099511627776
+      },
+      "expires_in_seconds": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 28800
+      },
+      "idempotency_key": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "required": [
+      "case_id",
+      "artifact_digests",
+      "operations",
+      "reason",
+      "max_bytes",
+      "expires_in_seconds",
+      "idempotency_key"
+    ],
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "operations": {
+              "not": {
+                "contains": {
+                  "const": "download_artifact"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "max_bytes": {
+              "maximum": 1073741824
+            }
+          }
+        }
+      }
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "type": "null"
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "grant_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "phase": {
+                    "type": "string",
+                    "enum": [
+                      "Pending",
+                      "Approved",
+                      "Denied",
+                      "Expired",
+                      "Revoked"
+                    ]
+                  },
+                  "approval_uri": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "grant_id",
+                  "phase"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "retry_after_seconds"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

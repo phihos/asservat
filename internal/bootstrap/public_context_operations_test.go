@@ -16,6 +16,7 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/contextstart"
 	"asservat.local/asservat/internal/transport/presentation"
@@ -25,6 +26,8 @@ import (
 // These constructor tests supply no authority and do not manufacture successful
 // evidence. Identity rejection must precede every dependency below.
 type publicContextOperationPorts struct {
+	permissions.GrantStore
+	permissions.RawQueryGrantStore
 	captureapp.ContextPreviewStore
 	captureapp.ContextAdmissionReplay
 	captureapp.ReviewedAdmissionTransaction
@@ -270,5 +273,30 @@ func TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency(t *testin
 	_, e = operations.Call(ctx, caller, "get_case", json.RawMessage(inputs["get_case"]))
 	if e == nil || caller.calls != 1 {
 		t.Fatal("cancelled original request was replaced", e, caller.calls)
+	}
+}
+
+func TestPublicRawAccessUsesInitializedSharedCatalogAuthority(t *testing.T) {
+	c, s := publicContextOperationFixture(t)
+	ports := &publicContextOperationPorts{}
+	s.Investigation.Grants = permissions.GrantService{RootID: c.RootID, InstallationID: c.InstallationID, Permissions: s.Cases.Permissions, Store: ports, RawStore: ports, RawSelections: s.Cases}
+	use, err := composePublicContextUseCases(c, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grants, ok := use.submission.Grants.(permissions.GrantService)
+	if !ok {
+		t.Fatal("grant service replaced")
+	}
+	cases, ok := grants.RawSelections.(catalogapp.ContextCaseService)
+	if !ok || grants.RawStore != ports || grants.Store != ports || grants.Recovery != s.Investigation.Recovery || grants.Now == nil || grants.NewID == nil || cases.Recovery != s.Investigation.Recovery || cases.Now == nil || cases.Catalog != s.Cases.Catalog || cases.Routes != s.Cases.Routes || cases.Permissions != s.Cases.Permissions || cases.Retention != s.Cases.Retention || cases.Processing != s.Cases.Processing {
+		t.Fatal("raw selection captured an uninitialized or different authority")
+	}
+	ctx, cancel := context.WithTimeout(context.WithValue(t.Context(), publicOperationContextKey{}, "original"), time.Second)
+	defer cancel()
+	caller := &publicOperationDeniedIdentity{t: t, original: ctx}
+	_, _, err = grants.RequestRaw(ctx, caller, permissions.RawQueryRequestInput{CaseID: c.RootID, ArtifactDigests: []artifact.Digest{{1}}, Operations: []string{"download_artifact"}, Reason: "inspect", MaxBytes: 1, Lifetime: time.Hour, IdempotencyKey: "key"})
+	if !errors.Is(err, identity.ErrDenied) || caller.calls != 1 {
+		t.Fatal("identity did not precede private grant/catalog lookup", err, caller.calls)
 	}
 }

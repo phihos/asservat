@@ -43,7 +43,7 @@ func (m *memoryGrants) RequestGrant(_ context.Context, r StoredGrantRequest, _ a
 		k = "policy:" + policyRequestTestKey(r.Grant.Requester, r.IdempotencyKey)
 	}
 	if id, ok := m.keys[k]; ok {
-		if r.Grant.Kind == value.GrantPolicy && m.policyInputs[k] != r.RequestDigest {
+		if (r.Grant.Kind == value.GrantPolicy || r.Grant.Kind == value.GrantRawQuery) && m.policyInputs[k] != r.RequestDigest {
 			return value.Grant{}, false, ErrGrantConflict
 		}
 		return m.rows[id], true, nil
@@ -63,7 +63,7 @@ func (m *memoryGrants) RequestGrant(_ context.Context, r StoredGrantRequest, _ a
 		return value.Grant{}, false, value.ErrGrantInvalid
 	}
 	m.rows[g.ID], m.keys[k] = g, g.ID
-	if g.Kind == value.GrantPolicy {
+	if g.Kind == value.GrantPolicy || g.Kind == value.GrantRawQuery {
 		m.policyInputs[k] = r.RequestDigest
 	}
 	return g, false, nil
@@ -140,6 +140,9 @@ func (m *memoryGrants) DecideGrant(_ context.Context, in GrantDecisionInput, _ a
 		if g.Kind == value.GrantPolicy {
 			g.ExpiresAt = g.PolicyNotAfter
 		}
+		if g.RawQuery != nil {
+			g.ExpiresAt = identity.Earlier(g.ExpiresAt, g.RawQuery.NotAfter)
+		}
 		if g.ResultAccess != nil {
 			g.ExpiresAt = identity.Earlier(g.ExpiresAt, g.ResultAccess.NotAfter)
 		}
@@ -196,7 +199,7 @@ func (m *memoryGrants) MaterializeGrantChild(_ context.Context, in GrantChildReq
 	if err := value.CheckMaterialize(g, in.Output, in.ClientID, registered, m.now()); err != nil {
 		return value.GrantChild{}, false, err
 	}
-	if m.locator[in.Output.ArtifactID] != g.CaptureID {
+	if m.locator[in.Output.ArtifactID] != in.Output.CaptureID {
 		return value.GrantChild{}, false, value.ErrGrantScope
 	}
 	if !registered {
@@ -243,7 +246,7 @@ func (m *memoryGrants) ReserveGrantUse(_ context.Context, in GrantUseRequest, _ 
 		return value.Grant{}, false, value.ErrGrantRevoked
 	}
 	r := g.ResultAccess
-	if !value.PoolCovers(g, in.Use) || r == nil {
+	if !value.PoolCovers(g, in.Use) || r == nil && g.RawQuery == nil {
 		return value.Grant{}, false, value.ErrGrantPoolExhausted
 	}
 	g.Spent.Bytes += in.Use.Bytes
@@ -304,8 +307,9 @@ func newGrantFixture(t *testing.T) *grantFixture {
 	recovery := artifact.RecoveryProof{InstallationID: grantRoot, IssuerEpoch: grantRoot, Revision: rev, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}
 	f.svc = GrantService{RootID: grantRoot, InstallationID: grantRoot, Permissions: projectionFunc(func(t value.Target) value.Projection { return f.projection(t) }), Store: f.store,
 		Recovery: recoveryFunc(func() artifact.RecoveryProof {
-			recovery.ObservedAt, recovery.FreshUntil = f.now, f.now.Add(5*time.Second)
-			return recovery
+			current := recovery
+			current.ObservedAt, current.FreshUntil = f.now, f.now.Add(5*time.Second)
+			return current
 		}),
 		NewID: func() string { f.ids++; return grantID(100 + f.ids) }, Now: func() time.Time { return f.now }}
 	return f

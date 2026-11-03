@@ -1,6 +1,6 @@
 {
   "name": "prepare_artifact_download",
-  "description": "Prepare an ordinary pod-status native download with a stable idempotency key. Retry unknown replies with the same key. Only an explicit acknowledged continuation may repeat preparation automatically.",
+  "description": "Prepare a native download using a stable idempotency key. A covering grant proceeds without another review. RawApprovalRequired opens independent whole-file review prefilled from the selected existing artifact and verified size; retain the same download key after approval. Unknown preparation replies retain the same key. Only an acknowledged continuation may repeat preparation automatically.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": false,
@@ -119,7 +119,8 @@
                   "code": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 64
+                    "maxLength": 64,
+                    "description": "RawApprovalRequired is returned only for a fresh preparation whose ordinary access checks passed but no current whole-file grant covers it. Other failures must not open approval."
                   },
                   "message": {
                     "type": "string",

@@ -102,7 +102,7 @@ func TestCaseMCPDiscoveryAndCallsUseOnlyConfiguredService(t *testing.T) {
 				t.Fatal("unsupported input reached metadata service")
 			}
 			response, b = call(map[string]any{"case_id": mcpCaseID})
-			if response.StatusCode != 200 || !strings.Contains(string(b), `"structuredContent"`) || !strings.Contains(string(b), `"kind":"pod-status"`) || strings.Contains(string(b), "private-") {
+			if response.StatusCode != 200 || !strings.Contains(string(b), `"structuredContent"`) || !strings.Contains(string(b), `"kind":"pod-status"`) || !strings.Contains(string(b), `"namespace_uid":"private-ns"`) || !strings.Contains(string(b), `"workload_uid":"private-workload"`) || !strings.Contains(string(b), `"pod_uid":"private-pod"`) {
 				t.Fatalf("case call: %d %s", response.StatusCode, b)
 			}
 			// An actual SDK client validates the bounded output schema; JSON-RPC alone

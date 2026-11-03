@@ -24,7 +24,7 @@ function Rows({ rows, empty, label }: { rows?: ReviewRow[]; empty: string; label
   if (!rows) return null;
   if (rows.length === 0) return <p>{empty}</p>;
   return <ul className="progress-actions" aria-label={label}>{rows.map(row => <li key={row.grant_id}>
-    <span><a href={'/approvals/' + row.grant_id}>{row.target.workload_kind} {row.target.workload_name}</a> in {row.target.namespace} · {phases[row.phase] ?? row.phase} · requested by {row.requested_by.subject} {date(row.requested_at)}
+    <span><a href={'/approvals/' + row.grant_id}>{row.kind === 'rawQuery' ? `Download ${row.raw_access.artifact_count} existing artifacts` : `${row.target.workload_kind} ${row.target.workload_name}`}</a>{row.kind !== 'rawQuery' && <> in {row.target.namespace}</>} · {phases[row.phase] ?? row.phase} · requested by {row.requested_by.subject} {date(row.requested_at)}
       {row.phase === 'Pending' && <> · review until {date(row.review_until)}</>}</span>
   </li>)}</ul>;
 }
@@ -33,7 +33,15 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
   const [reason, setReason] = useState('');
   const policy = grant.kind === 'policy' ? grant.policy : undefined;
   return <>
-    <section className="review-section" aria-labelledby="approval-plan">
+    {grant.kind === 'rawQuery' ? <section className="review-section" aria-labelledby="approval-plan">
+      <h2 id="approval-plan">Download existing raw evidence</h2>
+      <p>Whole-file download of the selected existing artifacts. This approval starts no collection.</p>
+      <p>Requested by {grant.requested_by.subject} (client {grant.requested_by.client_id}). Reason: {grant.raw_access.reason}</p>
+      <table><thead><tr><th>Artifact</th><th>Target</th><th>Verified native size</th><th>Access until</th></tr></thead><tbody>{grant.raw_access.artifacts.map(a => <tr key={a.artifact_id}><td>{a.native_type} <span className="identifier">{a.artifact_id}</span><br/>Capture {a.capture_id}, action {a.action_id}<details><summary>Exact versions</summary>Copy {a.digest}<br/>Execution {a.execution_digest}</details></td><td>{a.target.workload_kind} {a.target.workload_name ?? a.target.workload_uid}, {a.target.namespace ?? a.target.namespace_uid}; Pod {a.target.pod_name ?? a.target.pod_uid}<br/>Cluster {a.target.cluster_id}<details><summary>Target identities</summary>Namespace {a.target.namespace_uid}<br/>Workload {a.target.workload_uid}<br/>Pod {a.target.pod_uid}</details></td><td>{new Intl.NumberFormat().format(a.native_bytes)} bytes</td><td>{date(a.expires_at)}</td></tr>)}</tbody></table>
+      <p>At most {new Intl.NumberFormat().format(grant.raw_access.max_bytes)} bytes and {grant.raw_access.max_operations} download operations until {date(grant.raw_access.not_after)}. Used: {grant.raw_access.bytes_used} bytes and {grant.raw_access.operations_used} operations. Retransmissions consume this shared budget.</p>
+      <p>Downloaded copies are outside Asservat's automatic deletion. Current permissions and retention still apply.</p>
+      <a href={'/cases/' + grant.raw_access.case_id}>Return to evidence</a>
+    </section> : <section className="review-section" aria-labelledby="approval-plan">
       <h2 id="approval-plan">What would be recorded</h2>
       <p>{grant.target.workload_kind} <strong>{grant.target.workload_name}</strong>{grant.kind === 'adHocCapture' && <>, Pod {grant.target.pod_name}</>} in namespace {grant.target.namespace} (cluster <span className="identifier">{grant.target.cluster_id}</span>). Data class: {grant.data_class}.</p>
       <p>Needs approval because {grant.reasons.map(r => reasons[r.code] ?? r.code).join('; ')}.</p>
@@ -57,7 +65,7 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
         <p className="field-help">Plan digest <span className="identifier">{grant.execution_digest}</span>. Requested by {grant.requested_by.subject} on {date(grant.requested_at)}. This approval expires {date(grant.not_after!)} from its original request; requester credentials do not renew team execution. Current team authority and permissions still apply.</p>
         <p>This approval grants no evidence access. Inspect or download gathered user data through your current evidence permissions.</p>
       </> : <p className="field-help">Plan digest <span className="identifier">{grant.execution_digest}</span>. Requested by {grant.requested_by.subject} (client {grant.requested_by.client_id}) on {date(grant.requested_at)}; the preview was valid until {date(grant.preview_deadline!)}. {grant.capture_deadline_rule === 'acceptanceWithinGrant' ? `After approval, submitting this plan starts a capture window of at most ${Math.round(grant.capture_window_seconds! / 60)} minutes, bounded by the approval expiry.` : 'This legacy plan must start before its preview deadline; create a new preview if it has expired.'} An approval lasts {Math.round(grant.lifetime_seconds / 60)} minutes and covers only this exact plan and requester.</p>}
-    </section>
+    </section>}
     <section className="review-section" aria-labelledby="approval-state">
       <h2 id="approval-state">Decision</h2>
       <p role="status">{phases[grant.phase] ?? grant.phase}{grant.phase === 'Pending' && <> until {date(grant.review_until)}</>}

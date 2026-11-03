@@ -33,7 +33,7 @@ export const operations: Operations = {
 // Only a paged list (allowCursor) may return a next_cursor.
 export async function postOperation(name: string, input: unknown, csrf: string, signal: AbortSignal, validInput: (value: unknown) => boolean, validOutput: (value: unknown) => boolean, idempotencyKey?: string, allowCursor = false): Promise<unknown> {
   if (!validInput(input)) throw new OperationFailure(400);
-  const responseLimit = name === 'get_capture_settings' ? 160 * 1024 : name === 'get_capture_profile' ? 64 * 1024 : name === 'preview_recording_save' ? 128 * 1024 : 32_768;
+  const responseLimit = name === 'get_grant' ? 256 * 1024 : name === 'get_capture_settings' ? 160 * 1024 : name === 'get_capture_profile' ? 64 * 1024 : name === 'preview_recording_save' ? 128 * 1024 : 32_768;
   const request = new AbortController();
   const abort = () => request.abort();
   signal.addEventListener('abort', abort, { once: true });

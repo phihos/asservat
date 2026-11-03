@@ -74,15 +74,27 @@ type ArtifactHandlingNotice struct {
 	PreservationException    bool      `json:"preservationException"`
 	AsOf                     time.Time `json:"asOf"`
 }
+type ContextCaseTargetData struct {
+	ClusterID    string `json:"cluster_id"`
+	NamespaceUID string `json:"namespace_uid"`
+	WorkloadUID  string `json:"workload_uid"`
+	PodUID       string `json:"pod_uid"`
+	Namespace    string `json:"namespace,omitempty"`
+	WorkloadKind string `json:"workload_kind,omitempty"`
+	WorkloadName string `json:"workload_name,omitempty"`
+	PodName      string `json:"pod_name,omitempty"`
+}
 type ContextCaseArtifactData struct {
-	NativeFormat   string                 `json:"native_format,omitempty"`
-	ArtifactID     string                 `json:"artifact_id"`
-	Digest         string                 `json:"digest"`
-	Kind           string                 `json:"kind"`
-	DataClass      string                 `json:"data_class"`
-	Completeness   string                 `json:"completeness"`
-	ExpiresAt      time.Time              `json:"expires_at"`
-	HandlingNotice ArtifactHandlingNotice `json:"handling_notice"`
+	VerifiedNativeBytes *int64                 `json:"verified_native_bytes,omitempty"`
+	Target              ContextCaseTargetData  `json:"target"`
+	NativeFormat        string                 `json:"native_format,omitempty"`
+	ArtifactID          string                 `json:"artifact_id"`
+	Digest              string                 `json:"digest"`
+	Kind                string                 `json:"kind"`
+	DataClass           string                 `json:"data_class"`
+	Completeness        string                 `json:"completeness"`
+	ExpiresAt           time.Time              `json:"expires_at"`
+	HandlingNotice      ArtifactHandlingNotice `json:"handling_notice"`
 }
 type ContextCaseData struct {
 	Case      ContextCaseSummary        `json:"case"`
@@ -145,7 +157,7 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 			if typ, known := artifact.LookupNativeType(a.NativeType); known && typ.EvidenceType == a.EvidenceType && typ.AllowsClass(a.DataClass) {
 				nativeFormat = typ.Format
 			}
-			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{NativeFormat: nativeFormat, ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
+			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{VerifiedNativeBytes: a.NativeBytes, Target: ContextCaseTargetData{ClusterID: a.Target.ClusterID, NamespaceUID: a.Target.NamespaceUID, WorkloadUID: a.Target.WorkloadUID, PodUID: a.Target.PodUID, Namespace: a.Namespace, WorkloadKind: a.WorkloadKind, WorkloadName: a.WorkloadName, PodName: a.PodName}, NativeFormat: nativeFormat, ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
 		}
 		out.Data = data
 	}
