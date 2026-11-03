@@ -79,6 +79,10 @@ mark, original process identity, held/released reservations and cancellation
 join. It uses the existing Docker/crictl fixture observation pattern, without
 new product instrumentation, permissions, listeners or transport connections.
 Go allocator residency after join is measured, not expected to vanish at once.
+Explicit Stop qualification requires both exact work/sequence acceptance receipts
+and a zero-reservation node observation before the earliest original upload
+deadline; natural deadline cleanup cannot satisfy it. The report records these
+event times alongside the original deadline.
 
 The additional test cost is three Restricted synthetic Pods (each 500m CPU and
 64 MiB memory maximum), 256 MiB of node-local endpoint input and bounded waits

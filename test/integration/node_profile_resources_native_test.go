@@ -212,18 +212,36 @@ func profileResourcesNative(t *testing.T, ctx context.Context, k kubernetes.Inte
 		t.Fatal("refusal lost held reservations")
 	}
 	stopped := time.Now()
+	uploadUntil := first.Profile.Request.Deadline.Add(delivery.PacketUploadMargin)
+	if other := second.Profile.Request.Deadline.Add(delivery.PacketUploadMargin); other.Before(uploadUntil) {
+		uploadUntil = other
+	}
+	var cancellationWork []collector.Work
 	for _, w := range []collector.Work{first, second} {
 		stop, cancel := context.WithTimeout(ctx, 5*time.Second)
 		until, _ := stop.Deadline()
-		_, err := ch.EnqueueProfileCancel(stop, original.Identity.NodeUID, w.Profile.CaptureID, w.ID, until)
+		cancelWork, err := ch.EnqueueProfileCancel(stop, original.Identity.NodeUID, w.Profile.CaptureID, w.ID, until)
 		cancel()
 		if err != nil {
 			t.Fatal(err)
 		}
+		cancellationWork = append(cancellationWork, cancelWork)
 	}
 	// A later actual report proves node upload goroutines returned and released
 	// local reservations. RSS may stay resident under Go's allocator afterwards.
-	wait("cancelled uploads joined", 20*time.Second, func() bool { v := current(); return v.ReportedAt.After(stopped) && v.Report.Budget.FrozenReserved == 0 })
+	acceptedStops := map[string]bool{}
+	var joinedReport collector.Report
+	wait("cancelled uploads joined before original expiry", min(20*time.Second, time.Until(uploadUntil)), func() bool {
+		v := current()
+		joined, err := profileResourceStopJoined(*v.Report, stopped, uploadUntil, cancellationWork, acceptedStops)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if joined {
+			joinedReport = *v.Report
+		}
+		return joined
+	})
 	close(sink.release)
 	released = true
 	for range 2 {
@@ -234,5 +252,34 @@ func profileResourcesNative(t *testing.T, ctx context.Context, k kubernetes.Inte
 		}
 	}
 	after, afterPeak := memory()
-	results["profileMaximumAcquisitionResources"] = map[string]any{"scope": "malformed input acquisition and parser refusal; no installed publication proof", "nativeBytesPerAttempt": artifact.MaxGoTraceBytes, "heldAttempts": 2, "heldReservationBytes": 2 * artifact.MaxGoTraceBytes, "baselineRSSBytes": baseline, "baselinePeakRSSBytes": baselinePeak, "blockedRSSBytes": rss, "peakRSSBytes": max(peak, afterPeak), "afterJoinRSSBytes": after, "installedMemoryLimitBytes": memoryLimit, "aggregateExcessRefused": true, "semanticPublicationEligible": false, "nodeEpoch": original.Identity.Epoch, "elapsedSeconds": time.Since(started).Seconds(), "cancelJoinSeconds": time.Since(stopped).Seconds()}
+	results["profileMaximumAcquisitionResources"] = map[string]any{"scope": "malformed input acquisition and parser refusal; no installed publication proof", "nativeBytesPerAttempt": artifact.MaxGoTraceBytes, "heldAttempts": 2, "heldReservationBytes": 2 * artifact.MaxGoTraceBytes, "baselineRSSBytes": baseline, "baselinePeakRSSBytes": baselinePeak, "blockedRSSBytes": rss, "peakRSSBytes": max(peak, afterPeak), "afterJoinRSSBytes": after, "installedMemoryLimitBytes": memoryLimit, "aggregateExcessRefused": true, "semanticPublicationEligible": false, "nodeEpoch": original.Identity.Epoch, "elapsedSeconds": time.Since(started).Seconds(), "cancelJoinSeconds": time.Since(stopped).Seconds(), "stopRequestedAt": stopped, "joinedReportObservedAt": joinedReport.ObservedAt, "originalUploadUntil": uploadUntil, "acceptedStopReceipts": len(acceptedStops)}
+}
+
+// An enqueued Stop and deadline cleanup are not interchangeable. Require exact
+// node acknowledgements plus a zero-reservation snapshot before either original
+// upload deadline, so a delayed control request cannot turn expiry into Stop.
+func profileResourceStopJoined(r collector.Report, stopped, uploadUntil time.Time, work []collector.Work, accepted map[string]bool) (bool, error) {
+	if !r.ObservedAt.After(stopped) {
+		return false, nil
+	}
+	if !r.ObservedAt.Before(uploadUntil) {
+		return false, errors.New("upload expiry cannot qualify explicit Stop")
+	}
+	for _, receipt := range r.Receipts {
+		for _, w := range work {
+			if receipt.WorkID != w.ID || receipt.Sequence != w.Sequence {
+				continue
+			}
+			if receipt.Outcome != collector.OutcomeAccepted || receipt.Reason != "" {
+				return false, errors.New("exact profile Stop was refused")
+			}
+			accepted[w.ID] = true
+		}
+	}
+	for _, w := range work {
+		if !accepted[w.ID] {
+			return false, nil
+		}
+	}
+	return len(work) == 2 && r.Budget.FrozenReserved == 0, nil
 }
