@@ -64,3 +64,25 @@ func CommonProfileComparisonReader(baseline, incident ContextProjectionEnvironme
 	b.TargetClusterID, i.TargetClusterID = "", ""
 	return b == i
 }
+
+// ProfileComparisonPlansMatch validates two historical backing snapshots. It
+// does not reserve or charge either workload. Admission must do that atomically.
+func ProfileComparisonPlansMatch(scope ContextProjectionScope, baseline, incident ContextQueryPlan) bool {
+	bs, bok := scope.BaselineScope()
+	is, iok := scope.IncidentScope()
+	if !bok || !iok || !baseline.Matches(bs) || !incident.Matches(is) ||
+		baseline.Profile.Worker.MemoryBytes < ProfileComparisonWorkerBytes || baseline.Profile.Worker.WorkerTransientBytes < ProfileComparisonWorkerBytes ||
+		incident.Profile.Worker.MemoryBytes < ProfileComparisonWorkerBytes || incident.Profile.Worker.WorkerTransientBytes < ProfileComparisonWorkerBytes ||
+		baseline.RootID != incident.RootID || baseline.InstallationID != incident.InstallationID ||
+		baseline.AcceptanceID != incident.AcceptanceID || baseline.AccountID != incident.AccountID ||
+		baseline.Principal != incident.Principal || baseline.Profile.SharedBudget() != incident.Profile.SharedBudget() {
+		return false
+	}
+	b, i := baseline.Profile.Path, incident.Profile.Path
+	b.ID, i.ID, b.TargetClusterID, i.TargetClusterID = "", "", "", ""
+	if b != i {
+		return false
+	}
+	sameWorkload := baseline.ClusterID == incident.ClusterID && baseline.NamespaceUID == incident.NamespaceUID && baseline.WorkloadUID == incident.WorkloadUID
+	return sameWorkload == (baseline.AllocationID == incident.AllocationID)
+}

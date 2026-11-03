@@ -27,6 +27,10 @@ const (
 	// ProfileSummaryWorkerBytes is the whole physical worker memory bound,
 	// also declared as transient capacity before summary admission.
 	ProfileSummaryWorkerBytes = 256 << 20
+	// ProfileComparisonWorkerBytes is the provisional physical and transient
+	// declaration for two-source comparisons, pending full native qualification.
+	// It adds 128 MiB per comparison-capable worker over the summary declaration.
+	ProfileComparisonWorkerBytes = 384 << 20
 	// SyscallProjectionQueryUnits funds one complete recording read (one 8 MiB
 	// frame, index and manifest) with the same backing as an HTTP-header page.
 	SyscallProjectionQueryUnits = 2

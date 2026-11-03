@@ -85,7 +85,7 @@ type ContextQueryPlan struct {
 }
 
 func (p ContextQueryPlan) Matches(s ContextProjectionScope) bool {
-	return s.Valid() && authorization.UUID(p.AcceptanceID) && authorization.UUID(p.AccountID) &&
+	return s.Valid() && s.Comparison == (ProfileComparisonWindow{}) && authorization.UUID(p.AcceptanceID) && authorization.UUID(p.AccountID) &&
 		authorization.UUID(p.AllocationID) && authorization.UUID(p.InstallationID) &&
 		p.RootID == s.RootID && p.ClusterID == s.ClusterID && p.NamespaceUID == s.NamespaceUID &&
 		p.WorkloadUID == s.WorkloadUID && p.Principal == s.Principal &&
@@ -109,6 +109,7 @@ type ContextQuery struct {
 	ID, OperationID, WorkerID                         string
 	Scope                                             ContextProjectionScope
 	Plan                                              ContextQueryPlan
+	BaselinePlan                                      ContextQueryPlan `json:",omitzero"`
 	RecoveryIssuerEpoch                               string
 	RecoveryRevision                                  identity.Revision
 	CreatedAt, Deadline, WorkerUntil, CredentialUntil time.Time
@@ -127,9 +128,10 @@ func (q ContextQuery) Valid() bool {
 	}
 
 	if !authorization.UUID(q.ID) || !authorization.UUID(q.OperationID) || !authorization.UUID(q.WorkerID) ||
-		!q.Plan.Matches(q.Scope) || !authorization.UUID(q.RecoveryIssuerEpoch) || !q.RecoveryRevision.Valid() || q.CreatedAt.IsZero() ||
+		!q.plansMatch() || !authorization.UUID(q.RecoveryIssuerEpoch) || !q.RecoveryRevision.Valid() || q.CreatedAt.IsZero() ||
 		!q.Deadline.After(q.CreatedAt) || q.Deadline.After(q.CreatedAt.Add(q.Plan.Profile.Lifetime)) ||
-		q.Deadline.After(q.Plan.HardUntil) {
+		q.Deadline.After(q.Plan.HardUntil) ||
+		(q.Scope.Comparison != (ProfileComparisonWindow{}) && q.Deadline.After(q.BaselinePlan.HardUntil)) {
 		return false
 	}
 	w := q.Plan.Profile.Worker
@@ -143,13 +145,14 @@ func (q ContextQuery) Valid() bool {
 			end = t
 		}
 	}
-	return !end.After(q.Plan.EffectsUntil) && q.CleanupUntil.Equal(contextQueryTime(end.Add(w.Cleanup))) && !q.CleanupUntil.After(q.Plan.CleanupUntil)
+	return !end.After(q.Plan.EffectsUntil) && q.CleanupUntil.Equal(contextQueryTime(end.Add(w.Cleanup))) && !q.CleanupUntil.After(q.Plan.CleanupUntil) &&
+		(q.Scope.Comparison == (ProfileComparisonWindow{}) || !end.After(q.BaselinePlan.EffectsUntil) && !q.CleanupUntil.After(q.BaselinePlan.CleanupUntil))
 }
 
 func NewContextQuery(id, operationID, workerID string, a ContextProjectionAuthority, p ContextQueryPlan, now time.Time) (ContextQuery, error) {
 	q := ContextQuery{ID: id, OperationID: operationID, WorkerID: workerID, Scope: a.Scope, Plan: p,
 		RecoveryIssuerEpoch: a.Environment.Recovery.IssuerEpoch, RecoveryRevision: a.Environment.Recovery.Revision, CreatedAt: contextQueryTime(now)}
-	if !a.Valid(now) || !p.Valid(a.Scope, now) || p.Profile.Path != a.Environment.Path || p.InstallationID != a.Environment.InstallationID {
+	if a.Baseline != nil || a.Scope.Comparison != (ProfileComparisonWindow{}) || !a.Valid(now) || !p.Valid(a.Scope, now) || p.Profile.Path != a.Environment.Path || p.InstallationID != a.Environment.InstallationID {
 		return ContextQuery{}, ErrUnavailable
 	}
 	var err error
@@ -173,11 +176,46 @@ func NewContextQuery(id, operationID, workerID string, a ContextProjectionAuthor
 	return q, nil
 }
 
+// NewProfileComparisonQuery retains both independently accepted plans. The
+// baseline is first, matching the optional plan-reader port's fixed pair order.
+func NewProfileComparisonQuery(id, operationID, workerID string, a ContextProjectionAuthority, baseline, incident ContextQueryPlan, now time.Time) (ContextQuery, error) {
+	bs, bok := a.Scope.BaselineScope()
+	is, iok := a.Scope.IncidentScope()
+	if !bok || !iok || !a.Valid(now) || !baseline.Valid(bs, now) || !incident.Valid(is, now) ||
+		!ProfileComparisonPlansMatch(a.Scope, baseline, incident) ||
+		baseline.Profile.Path != a.Baseline.Environment.Path || incident.Profile.Path != a.Environment.Path ||
+		baseline.InstallationID != a.Baseline.Environment.InstallationID || incident.InstallationID != a.Environment.InstallationID {
+		return ContextQuery{}, ErrUnavailable
+	}
+	// Reuse the single-source horizon calculation with the independently
+	// derived incident authority; apply the baseline's original cutoffs below.
+	single := a
+	single.Scope, single.Baseline = is, nil
+	q, err := NewContextQuery(id, operationID, workerID, single, incident, now)
+	if err != nil {
+		return ContextQuery{}, err
+	}
+	q.Scope, q.BaselinePlan = a.Scope, baseline
+	q.Deadline = contextQueryTime(identity.Earlier(q.Deadline, identity.Earlier(baseline.HardUntil, a.Baseline.AccessUntil)))
+	if !q.Deadline.After(now) || !q.Valid() {
+		return ContextQuery{}, ErrUnavailable
+	}
+	return q, nil
+}
+
+func (q ContextQuery) plansMatch() bool {
+	if q.Scope.Comparison == (ProfileComparisonWindow{}) {
+		return q.BaselinePlan == (ContextQueryPlan{}) && q.Plan.Matches(q.Scope)
+	}
+	return ProfileComparisonPlansMatch(q.Scope, q.BaselinePlan, q.Plan)
+}
+
 // Current binds each fresh authority to original query identity and bounds.
 // Later observations may shorten delivery; they cannot renew query, worker or
 // cleanup dates. SQL additionally checks monotonic current state after locks.
 func (q ContextQuery) Current(a ContextProjectionAuthority, now time.Time) bool {
-	return q.Valid() && a.Valid(now) && q.Scope == a.Scope && now.Before(q.Deadline) &&
+	return q.Valid() && a.Valid(now) && q.Scope == a.Scope &&
+		(q.Scope.Comparison == (ProfileComparisonWindow{}) || q.BaselinePlan.InstallationID == a.Baseline.Environment.InstallationID && q.BaselinePlan.Profile.Path == a.Baseline.Environment.Path) && now.Before(q.Deadline) &&
 		q.Plan.InstallationID == a.Environment.InstallationID && q.Plan.Profile.Path == a.Environment.Path &&
 		q.RecoveryIssuerEpoch == a.Environment.Recovery.IssuerEpoch && q.RecoveryRevision == a.Environment.Recovery.Revision
 }
@@ -207,7 +245,7 @@ type ContextQueryCall struct {
 func (r ContextQueryCall) Valid(now time.Time) bool {
 	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.InputFormat == "context-query-input/v1" &&
 		identity.Text(r.MACVersion, 64) && r.InputDigest != (artifact.Digest{}) && r.PrincipalDigest != (artifact.Digest{}) &&
-		(r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
+		(r.Tool == "get_file_excerpt" || r.Tool == "get_http_headers" || r.Tool == "get_profile_summary" || r.Tool == "compare_profiles" || r.Tool == "get_syscall_summary" || r.Tool == "get_syscall_events" || r.Tool == "get_query_result") && r.Principal.Valid() &&
 		identity.Fresh(r.StartedAt, r.Until, now, identity.EvidenceReadRequestWindow) && !r.WriteUntil.Before(r.Until) &&
 		!r.WriteUntil.After(r.StartedAt.Add(30*time.Second))
 }
@@ -256,7 +294,8 @@ type ContextReadStart struct {
 func (q ContextQuery) Equal(other ContextQuery) bool {
 	normalize := func(v ContextQuery) ContextQuery {
 		for _, t := range []*time.Time{&v.CreatedAt, &v.Deadline, &v.WorkerUntil, &v.CredentialUntil, &v.ProviderUntil, &v.CleanupUntil,
-			&v.Plan.ObservedAt, &v.Plan.ValidUntil, &v.Plan.HardUntil, &v.Plan.EffectsUntil, &v.Plan.CleanupUntil, &v.Plan.RetireBy} {
+			&v.Plan.ObservedAt, &v.Plan.ValidUntil, &v.Plan.HardUntil, &v.Plan.EffectsUntil, &v.Plan.CleanupUntil, &v.Plan.RetireBy,
+			&v.BaselinePlan.ObservedAt, &v.BaselinePlan.ValidUntil, &v.BaselinePlan.HardUntil, &v.BaselinePlan.EffectsUntil, &v.BaselinePlan.CleanupUntil, &v.BaselinePlan.RetireBy} {
 			*t = t.UTC()
 		}
 		return v

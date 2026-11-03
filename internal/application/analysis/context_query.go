@@ -38,8 +38,9 @@ type ContextProjectionService struct {
 	// HeaderRoutes, when composed, admits get_http_headers (ADR-282).
 	HeaderRoutes ContextProjectionRouteReader
 	// ProfileRoutes is opt-in; production composition remains disabled.
-	ProfileRoutes ContextProjectionRouteReader
-	SyscallRoutes SyscallProjectionRouteReader
+	ProfileRoutes    ContextProjectionRouteReader
+	SyscallRoutes    SyscallProjectionRouteReader
+	ComparisonRoutes ContextProjectionRouteReader
 }
 
 // HTTPHeaders is the get_http_headers admission over this same service, when
@@ -73,6 +74,7 @@ type ContextProjectionAssociation struct {
 	Headers                           value.HTTPHeaderWindow
 	Profile                           value.ProfileSummarySelection
 	Syscalls                          value.SyscallWindow
+	Comparison                        value.ProfileComparisonSelection
 }
 
 // ContextProjectionDelivery owns both the prepared result and its live request.
@@ -86,6 +88,7 @@ type ContextProjectionDelivery struct {
 	excerpt                                 value.ContextExcerpt
 	page                                    value.HTTPHeaderPage
 	summary                                 *value.ProfileSummary
+	comparison                              *value.ProfileComparison
 	syscallSummary                          *value.SyscallSummaryPage
 	syscallEvents                           *value.SyscallEventPage
 	pending                                 bool
@@ -526,11 +529,24 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten("resolved-authority/"+a.Bound, a.ValidUntil) {
 		return nil, queryCollapsed("authority", value.ErrUnavailable, err)
 	}
-	p, err := s.Plans.ContextQueryPlan(o.ctx, a)
-	if err != nil || !p.Valid(a.Scope, s.Results.Now()) || !o.shorten("plan", p.ValidUntil) {
-		return nil, queryCollapsed("plan", value.ErrUnavailable, err)
+	var q value.ContextQuery
+	if a.Scope.Comparison != (value.ProfileComparisonWindow{}) {
+		plans, ok := s.Plans.(ContextComparisonPlans)
+		if !ok {
+			return nil, queryStepped("comparison-plan", value.ErrUnavailable)
+		}
+		pair, e := plans.ContextComparisonPlans(o.ctx, a)
+		if e != nil || !o.shorten("comparison-plan", identity.Earlier(pair[0].ValidUntil, pair[1].ValidUntil)) {
+			return nil, queryCollapsed("comparison-plan", value.ErrUnavailable, e)
+		}
+		q, err = value.NewProfileComparisonQuery(s.Results.NewID(), o.request.Call.ID, s.Results.NewID(), a, pair[0], pair[1], s.Results.Now())
+	} else {
+		p, e := s.Plans.ContextQueryPlan(o.ctx, a)
+		if e != nil || !p.Valid(a.Scope, s.Results.Now()) || !o.shorten("plan", p.ValidUntil) {
+			return nil, queryCollapsed("plan", value.ErrUnavailable, e)
+		}
+		q, err = value.NewContextQuery(s.Results.NewID(), o.request.Call.ID, s.Results.NewID(), a, p, s.Results.Now())
 	}
-	q, err := value.NewContextQuery(s.Results.NewID(), o.request.Call.ID, s.Results.NewID(), a, p, s.Results.Now())
 	if err != nil {
 		return nil, queryStepped("query", err)
 	}
@@ -635,7 +651,10 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
-		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile, Syscalls: o.query.Scope.Syscalls}}
+		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile, Syscalls: o.query.Scope.Syscalls, Comparison: comparisonAssociationSelection(o.query.Scope)}}
+	if d.association.Comparison != (value.ProfileComparisonSelection{}) {
+		d.association.Profile = value.ProfileSummarySelection{}
+	}
 	if !authorization.UUID(d.association.ID) {
 		return nil, queryStepped("association", value.ErrUnavailable)
 	}
@@ -712,10 +731,18 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	projection, err := d.read.Projection(o.ctx)
 	auditapp.MarkStep(o.ctx, "q-projection", mark)
 	scope := o.query.Scope
-	invalidCursor, tooLarge := false, false
+	invalidCursor, tooLarge, incompatible := false, false, false
 	switch {
 	case err != nil || !projection.Valid(scope):
 		err = value.ErrUnavailable
+	case scope.Comparison != (value.ProfileComparisonWindow{}) && projection.IncompatibleProfiles:
+		incompatible = true
+	case scope.Comparison != (value.ProfileComparisonWindow{}):
+		if !boundedProfileComparison(projection.Comparison, scope.Comparison.Selection(scope.Profile)) {
+			err = value.ErrUnavailable
+		} else {
+			d.comparison, projection.Comparison = projection.Comparison, nil
+		}
 	case (scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) && projection.InvalidCursor:
 		invalidCursor = true
 	case (scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) && projection.TooLarge:
@@ -765,6 +792,9 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	}
 	if tooLarge {
 		d.refusal = ContextProjectionRecordTooLarge
+	}
+	if incompatible {
+		d.refusal = ContextProjectionIncompatibleProfiles
 	}
 	return d, nil
 }
