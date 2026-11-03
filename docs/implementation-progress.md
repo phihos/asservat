@@ -2,6 +2,20 @@
 
 ## Native profile results and installed failure fixes (2026-11-03)
 
+The combined installed-fix candidate also includes the measured pprof allocation
+preflight: repeated protobuf tables/labels are bounded before the maintained
+parser allocates them. Existing native CPU/heap bytes pass; all previously
+measured OOM inputs now return bounded refusals. See
+[the measurements and supported shape](reviews/pprof-allocation-preflight.md).
+No query analyzer is enabled by that guard. Complete pre-push gates pass on the
+combined source; diagnostics races pass in 11.118 seconds and PostgreSQL races
+in 2.850 seconds, with the capture suite reusing its unchanged-source pass.
+The [mixed-upload fairness plan](research/mixed-upload-fairness-plan.md) retains
+REQ-CAP-003 as unfinished: the current capacity wait handles transient contention
+but does not guarantee progress under continuously overlapping packet uploads.
+Rejecting incoming packets to favor profiles would discard one-shot evidence,
+so that proposed review patch is not adopted.
+
 At `78afa6ec`, [collector run 41592789877](https://github.com/phihos/asservat/actions/runs/41592789877)
 passed with `testExit: 0` and confirmed cluster/image cleanup. Genuine CPU
 loopback and heap Pod-IP profiles open with the native Go tool; the production
