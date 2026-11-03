@@ -8,6 +8,15 @@ the C-18 coordinator component are implemented. The
 [shared acquisition composition](../decisions/219-shared-approved-acquisition.md)
 is an implementation candidate; its installed qualification remains pending.
 
+## Profile summary internal extension
+
+[ADR-291](../decisions/291-bounded-profile-summary.md) adds a closed raw-pprof
+source, separate aggregate-read eligibility and source-aware result policy to
+the same query coordinator. The original raw source remains regional. The typed
+result is a bounded extract, with no raw share fallback or native-download
+authority. Production routes, funded SQL admission and qualified worker parsing
+remain absent; existing pod-status and HTTP-header scopes keep their wire form.
+
 ## Public composition candidate
 
 The protected installation may supply its complete `ContextProjectionService`

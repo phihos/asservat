@@ -15,7 +15,7 @@ func TestProjectionPoliciesUseExactSharedPlacementWithoutDownloadEntitlement(t *
 		t.Fatal(err)
 	}
 	path := f.policy.Paths[0]
-	out, err := s.ContextProjectionPolicy(context.Background(), path.TargetClusterID, path.StoreID)
+	out, err := s.ContextProjectionPolicy(context.Background(), path.TargetClusterID, path.StoreID, "")
 	if err != nil || !out.Valid(f.now) || out.Path.Purpose != value.ContextProjectionPurpose || out.Path.ID != path.ID || out.Path.WorkerConfiguration != path.WorkerConfiguration || f.policyReads != 1 {
 		t.Fatal("shared protected placement", err)
 	}
@@ -59,7 +59,7 @@ func TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement(t *testing.T) {
 				ctx, cancel = context.WithDeadline(ctx, f.now.Add(time.Second))
 				defer cancel()
 			}
-			out, err := s.ContextProjectionPolicy(ctx, path.TargetClusterID, path.StoreID)
+			out, err := s.ContextProjectionPolicy(ctx, path.TargetClusterID, path.StoreID, "")
 			if mode == "short-parent" {
 				d, _ := ctx.Deadline()
 				if err != nil || !out.FreshUntil.Equal(d) {
@@ -91,7 +91,7 @@ func TestProjectionPoliciesReuseTheSharedPolicyObservation(t *testing.T) {
 	}
 	path := f.policy.Paths[0]
 	for range 4 {
-		out, err := s.ContextProjectionPolicy(context.Background(), path.TargetClusterID, path.StoreID)
+		out, err := s.ContextProjectionPolicy(context.Background(), path.TargetClusterID, path.StoreID, "")
 		if err != nil || !out.Valid(f.now) || !out.ObservedAt.Equal(f.policy.ObservedAt) {
 			t.Fatal("shared placement observation refused", err)
 		}

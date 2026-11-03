@@ -196,6 +196,19 @@ whole/resume and paced PCAPNG/profile transport regressions pass in 50.093
 seconds; the paced 64 MiB response takes 24.154 seconds with ten short-lease
 renewals. These are real TLS/component tests with synthetic stored bytes. Native collector and installed profile runs
 remain pending; these component results do not complete S-05.
+## Profile summary internal authority checkpoint (2026-11-03)
+
+ADR-291 adds a closed pprof source/selection/result to the existing projection
+coordinator and a distinct ordinary aggregate-read operation. Exact verified raw
+provenance, retained audience, original bounds and metadata-only share refusal
+remain enforced. Client policy selects extract/profile output independently of
+raw processing. The service is opt-in and no production constructor enables it.
+No SQL funding, migration, worker resource, public tool or browser change is
+included. Component tests are separate from resource and installed qualification;
+measured parser shape containment and funded query composition remain next.
+Affected domain/application authorization and analysis race suites, repository-wide
+compile-only check, vet, spec, architecture and Go dependency gates pass. No
+external fixture or installed test was run for this checkpoint.
 
 ## Profile upload Stop and maximum-input fixture (2026-11-03)
 

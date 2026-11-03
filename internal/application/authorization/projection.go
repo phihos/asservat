@@ -117,9 +117,11 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	if s.Reviews != nil {
 		_ = s.Reviews.ReviewRecorded(call, i, target)
 	}
+	src, _ := analysis.LookupProjectionSource(candidate.NativeType)
+	operation := src.ReadOperation()
 	p, err := s.Permissions.Permissions(call, target)
 	p = cloneProjectionPermissions(p)
-	preliminary := value.ScopeEligibility(i, p, value.ReadApproved, target, s.Now())
+	preliminary := value.ScopeEligibility(i, p, operation, target, s.Now())
 	var expectedVersion artifact.Digest
 	if expected != nil {
 		expectedVersion = expected.Version
@@ -128,7 +130,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	// refuses, the caller's own shares of this one artifact; no share, no
 	// catalog read.
 	shares := func(retained *value.Retained, version artifact.Digest) (*value.Share, value.Result, error) {
-		if s.Shares == nil {
+		if s.Shares == nil || src.DataClass == "raw" {
 			return nil, value.Result{Reason: "NoEntitlement"}, nil
 		}
 		rows, e := s.Shares.RecipientShares(call, candidate.ArtifactID, i)
@@ -149,7 +151,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	// The protected source lookup follows current ordinary target eligibility.
 	record, err := s.Catalog.ContextProjectionEvidence(call, candidate.ArtifactID)
 	record = cloneProjectionEvidence(record)
-	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, NativeType: candidate.NativeType, Headers: candidate.Headers, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat}
+	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, NativeType: candidate.NativeType, Headers: candidate.Headers, Profile: candidate.Profile, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat}
 	if src, ok := analysis.LookupProjectionSource(candidate.NativeType); ok {
 		scope.DisplayVersion = src.DisplayVersion
 	}
@@ -157,10 +159,10 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		return zero, projectionRefused("catalog", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	r := record.Retained
-	retained := value.Retained{ArtifactID: scope.ArtifactID, Target: target, DataClass: record.DataClass, ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
+	retained := value.Retained{ArtifactID: scope.ArtifactID, Target: target, DataClass: record.DataClass, NativeType: record.NativeType, ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
 	var initial value.Result
 	if share == nil {
-		initial = value.Evaluate(i, p, value.ReadApproved, target, &retained, s.Now())
+		initial = value.Evaluate(i, p, operation, target, &retained, s.Now())
 		if !initial.Eligible {
 			// Whole-pod rights outside the retained audience: a share may admit.
 			if share, initial, err = shares(&retained, record.Version); err != nil {
@@ -210,7 +212,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	latest, err := s.Permissions.Permissions(call, target)
 	latest = cloneProjectionPermissions(latest)
 	retained.ExpiresAt = resolved.ExpiresAt
-	final := value.Evaluate(current, latest, value.ReadApproved, target, &retained, s.Now())
+	final := value.Evaluate(current, latest, operation, target, &retained, s.Now())
 	var latestShare value.Share
 	if share != nil && err == nil {
 		// A revocation or expiry since the first share read refuses.
@@ -250,7 +252,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		if share != nil {
 			return value.EvaluateShare(id, projection, target, &retained, latestShare, now).Eligible
 		}
-		return value.Evaluate(id, projection, value.ReadApproved, target, &retained, now).Eligible
+		return value.Evaluate(id, projection, operation, target, &retained, now).Eligible
 	}
 	if !now.Before(until) || !resolved.Proof.Valid(now) || !environment.Valid(now) || !eligibleAt(i, p) || !eligibleAt(lastIdentity, latest) {
 		return zero, projectionRefused("expired", analysis.ErrExpired, nil)

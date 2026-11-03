@@ -11,11 +11,12 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// ContextProjectionPolicies selects approved metadata placement from the same
+// ContextProjectionPolicies selects closed source/output placement from the same
 // protected installation configuration as native delivery, through the same
 // bounded installed observation (DownloadPolicyObservations). It never consumes a
 // DownloadAuthority or evaluates download entitlement. ReadApproved remains a
-// separate ordinary permission check by ContextProjectionAuthority.
+// separate ordinary permission check by ContextProjectionAuthority; raw pprof
+// input instead uses the distinct ReadProfileSummary aggregate operation.
 type ContextProjectionPolicies struct {
 	source DownloadPolicyReader
 	now    func() time.Time
@@ -28,9 +29,10 @@ func NewContextProjectionPolicies(source DownloadPolicyReader, now func() time.T
 	return &ContextProjectionPolicies{source, now}, nil
 }
 
-func (s *ContextProjectionPolicies) ContextProjectionPolicy(ctx context.Context, target, store string) (value.ContextProjectionPolicy, error) {
+func (s *ContextProjectionPolicies) ContextProjectionPolicy(ctx context.Context, target, store, nativeType string) (value.ContextProjectionPolicy, error) {
 	var out value.ContextProjectionPolicy
-	if s == nil || s.source == nil || s.now == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(target) || !authorization.UUID(store) {
+	source, known := value.LookupProjectionSource(nativeType)
+	if !known || s == nil || s.source == nil || s.now == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(target) || !authorization.UUID(store) {
 		return out, value.ErrUnavailable
 	}
 	call, stop := context.WithDeadline(ctx, s.now().Add(5*time.Second))
@@ -58,12 +60,13 @@ func (s *ContextProjectionPolicies) ContextProjectionPolicy(ctx context.Context,
 	if !found {
 		return value.ContextProjectionPolicy{}, projectionRefused("no-path", value.ErrUnavailable, nil)
 	}
+	out.NativeType = nativeType
 	out.RootID, out.InstallationID, out.RecoveryEpoch = raw.RootID, raw.InstallationID, raw.RecoveryEpoch
 	out.Revision, out.ProtectionDigest = raw.Revision, raw.ProtectionDigest
 	out.PermittedRegions = slices.Clone(raw.PermittedRegions)
 	out.Clients = []value.ContextProjectionClient{}
 	for _, c := range raw.Clients {
-		if !slices.Contains(c.PathIDs, out.Path.ID) || !slices.Contains(c.DataClasses, "metadata") || !slices.Contains(c.PrivacyClasses, "potentialPersonalData") || !slices.Contains(c.EvidenceTypes, "context") {
+		if !slices.Contains(c.PathIDs, out.Path.ID) || !slices.Contains(c.DataClasses, source.OutputClass()) || !slices.Contains(c.PrivacyClasses, "potentialPersonalData") || !slices.Contains(c.EvidenceTypes, source.EvidenceType) {
 			continue
 		}
 		out.Clients = append(out.Clients, value.ContextProjectionClient{Issuer: c.Issuer, ID: c.ID, Kind: c.Kind, Purposes: slices.Clone(c.Purposes)})

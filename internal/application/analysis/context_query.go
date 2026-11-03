@@ -37,6 +37,8 @@ type ContextProjectionService struct {
 	Workers  ContextProjectionWorkerAdmission
 	// HeaderRoutes, when composed, admits get_http_headers (ADR-282).
 	HeaderRoutes ContextProjectionRouteReader
+	// ProfileRoutes is opt-in; production composition remains disabled.
+	ProfileRoutes ContextProjectionRouteReader
 }
 
 // HTTPHeaders is the get_http_headers admission over this same service, when
@@ -62,12 +64,13 @@ const (
 )
 
 // Exactly one selection branch is set: the line selection of a pod-status
-// excerpt or the record window of an httpHeaders page (ADR-282).
+// excerpt, httpHeaders record window, or pprof sample type/top-N.
 type ContextProjectionAssociation struct {
 	ID, QueryID, OperationID, BatchID string
 	Generation                        int64
 	Selection                         value.LineSelection
 	Headers                           value.HTTPHeaderWindow
+	Profile                           value.ProfileSummarySelection
 }
 
 // ContextProjectionDelivery owns both the prepared result and its live request.
@@ -80,6 +83,7 @@ type ContextProjectionDelivery struct {
 	effect                                  ContextQueryEffect
 	excerpt                                 value.ContextExcerpt
 	page                                    value.HTTPHeaderPage
+	summary                                 *value.ProfileSummary
 	pending                                 bool
 	batch                                   *value.ContextReadBatch
 	read                                    ContextProjectionRead
@@ -211,6 +215,11 @@ func (d *ContextProjectionDelivery) Close(ctx context.Context) error {
 		clear(d.page.Records)
 		clear(d.page.CoverageGaps)
 		d.page = value.HTTPHeaderPage{}
+		if d.summary != nil {
+			clear(d.summary.Top)
+			*d.summary = value.ProfileSummary{}
+			d.summary = nil
+		}
 		o.mu.Unlock()
 		if d.read == nil {
 			return
@@ -630,7 +639,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
-		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers}}
+		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile}}
 	if !authorization.UUID(d.association.ID) {
 		return nil, queryStepped("association", value.ErrUnavailable)
 	}
@@ -711,6 +720,12 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	switch {
 	case err != nil || !projection.Valid(scope):
 		err = value.ErrUnavailable
+	case scope.NativeType == artifact.PprofArtifact:
+		if !boundedProfileSummary(projection.Summary, scope.Profile) {
+			err = value.ErrUnavailable
+		} else {
+			d.summary, projection.Summary = projection.Summary, nil
+		}
 	case scope.NativeType == artifact.HTTPHeadersArtifact && projection.InvalidCursor:
 		invalidCursor = true
 	case scope.NativeType == artifact.HTTPHeadersArtifact && projection.TooLarge:

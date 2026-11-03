@@ -1,10 +1,13 @@
 package analysis
 
-import "asservat.local/asservat/internal/domain/artifact"
+import (
+	"asservat.local/asservat/internal/domain/artifact"
+)
 
 // The approved read path carries exactly one result per read batch (ADR-282
 // slice 5): the pod-status DTO for a pod-status scope, or one httpHeaders page
-// (or an invalid-cursor refusal) for an extract scope.
+// (or an invalid-cursor refusal) for an extract scope, or the closed pprof
+// summary for its exact selected sample type.
 const (
 	// HTTPHeaderPageWireBytes bounds the encoded page in the 64 KiB native
 	// control frame (with its envelope). The worker sends the longest record
@@ -22,6 +25,7 @@ const (
 type ProjectionResult struct {
 	PodStatus     PodStatusProjection
 	Headers       HTTPHeaderPage
+	Summary       *ProfileSummary `json:",omitempty"`
 	InvalidCursor bool
 	// TooLarge refuses a page whose first selected record alone exceeds the
 	// wire bound; it discloses no record and paging cannot pass that record.
@@ -35,21 +39,27 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 	}
 	switch s.NativeType {
 	case artifact.PodStatusArtifact:
-		return !r.InvalidCursor && !r.TooLarge && r.Headers.empty() && r.PodStatus.Valid() && r.PodStatus.NamespaceUID == s.NamespaceUID && r.PodStatus.PodUID == s.PodUID
+		return !r.InvalidCursor && !r.TooLarge && r.Headers.empty() && r.Summary == nil && r.PodStatus.Valid() && r.PodStatus.NamespaceUID == s.NamespaceUID && r.PodStatus.PodUID == s.PodUID
 	case artifact.HTTPHeadersArtifact:
-		if r.PodStatus != (PodStatusProjection{}) {
+		if r.PodStatus != (PodStatusProjection{}) || r.Summary != nil {
 			return false
 		}
 		if r.InvalidCursor || r.TooLarge {
 			return r.InvalidCursor != r.TooLarge && r.Headers.empty()
 		}
 		return r.Headers.Valid(s.Headers.Selection(s.CaseID, s.ArtifactID))
+	case artifact.PprofArtifact:
+		return r.PodStatus == (PodStatusProjection{}) && r.Headers.empty() && !r.InvalidCursor && !r.TooLarge && r.Summary != nil && r.Summary.Valid(s.Profile)
 	}
 	return false
 }
 
 // Clear drops the transient record values.
 func (r *ProjectionResult) Clear() {
+	if r.Summary != nil {
+		clear(r.Summary.Top)
+		*r.Summary = ProfileSummary{}
+	}
 	clear(r.Headers.Records)
 	clear(r.Headers.CoverageGaps)
 	*r = ProjectionResult{}
@@ -62,6 +72,9 @@ func (p HTTPHeaderPage) empty() bool {
 
 // BeginTool is the public tool that admits a query of this scope.
 func (s ContextProjectionScope) BeginTool() string {
+	if s.NativeType == artifact.PprofArtifact {
+		return "get_profile_summary"
+	}
 	if s.NativeType == artifact.HTTPHeadersArtifact {
 		return "get_http_headers"
 	}
@@ -71,7 +84,7 @@ func (s ContextProjectionScope) BeginTool() string {
 // ReadBatches is the number of read batches a query of this scope may
 // start: one page read for an extract, the historical two for pod status.
 func (s ContextProjectionScope) ReadBatches() int64 {
-	if s.NativeType == artifact.HTTPHeadersArtifact {
+	if s.NativeType == artifact.HTTPHeadersArtifact || s.NativeType == artifact.PprofArtifact {
 		return 1
 	}
 	return ContextMaxReadBatches
