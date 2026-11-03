@@ -27,8 +27,16 @@ The integrated pre-push gates, 278 console tests, built console and browser
 journeys pass. The first complete Go run found a discovery descriptor at
 36,968 bytes, exceeding its existing 36 KiB ceiling. Shorter tool descriptions
 restore that bound without changing schemas or the 60 KiB discovery-page limit;
-the complete contract race suite passes. The broader Go rerun and CI are still
-in progress at this checkpoint. Native collector and installed profile runs
+the complete contract race suite passes. The first CI run then failed the
+unpaced maximum-window fixture during its third 64 MiB response. That fixture
+renewed its four-second lease only when deliberate sink pacing was enabled.
+The positive transport fixture now models normal lease renewal regardless of
+pacing; production lease/deadline limits are unchanged. The actual CI failure
+is retained in `test/results/profile-native-ci-lease-failure.log`. The broader
+Go rerun and final-candidate CI remain in progress at this checkpoint. All four
+whole/resume and paced PCAPNG/profile transport regressions pass in 50.093
+seconds; the paced 64 MiB response takes 24.154 seconds with ten short-lease
+renewals. These are real TLS/component tests with synthetic stored bytes. Native collector and installed profile runs
 remain pending; these component results do not complete S-05.
 
 ## Profile upload Stop and maximum-input fixture (2026-11-03)

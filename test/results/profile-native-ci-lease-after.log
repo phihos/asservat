@@ -1,0 +1,44 @@
+=== RUN   TestNativeTwoHopPCAPNGWindowChunksAndResume
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+--- PASS: TestNativeTwoHopPCAPNGWindowChunksAndResume (0.34s)
+=== RUN   TestNativeTwoHopSlowPCAPNGWindowChunksAndResume
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    pcapng_flow_test.go:342: window observer checks=70, lease renewals=2, bytes=8126572
+    pcapng_flow_test.go:347: paced two-hop window: 8126572 bytes, 6.239s, 1.242 MiB/s; same cursor per window
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    pcapng_flow_test.go:369: window observer checks=62, lease renewals=2, bytes=7073675
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    pcapng_flow_test.go:374: window observer checks=70, lease renewals=2, bytes=8126572
+--- PASS: TestNativeTwoHopSlowPCAPNGWindowChunksAndResume (18.25s)
+=== RUN   TestNativeTwoHopProfileMaximumWindowAndResume
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+--- PASS: TestNativeTwoHopProfileMaximumWindowAndResume (5.89s)
+=== RUN   TestNativeTwoHopPacedProfileMaximumWindow
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    flow_test.go:62: hub serve terminal <nil>
+    flow_test.go:62: connector serve terminal <nil>
+    pcapng_flow_test.go:342: window observer checks=440, lease renewals=10, bytes=67108864
+    pcapng_flow_test.go:347: paced two-hop window: 67108864 bytes, 24.154s, 2.650 MiB/s; same cursor per window
+--- PASS: TestNativeTwoHopPacedProfileMaximumWindow (24.50s)
+PASS
+ok  	asservat.local/asservat/internal/transport/native	50.093s
