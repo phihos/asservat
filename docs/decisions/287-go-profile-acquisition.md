@@ -23,6 +23,10 @@ recording. The node collector has no artifact key authority.
    node UID/boot/process and the original committed action deadline must agree.
    The API target remains an API-only whole-Pod pin. Node execution provenance
    is separate and never adds container permissions or public node selection.
+   Dispatch reuses the packet path's exact-Pod node lookup and current attested
+   node channel; the API endpoint plan intentionally has no node identity. A
+   separate mechanism pin carries the resolved node name/UID/boot/process.
+   Existing node-bound plans must also match their original node fields.
 3. The authenticated node channel carries dedicated profile work and result
    types. One HTTP GET uses the existing Go profile collector, with fixed path,
    no redirect/retry/DNS fallback and bounded response bytes. The node opens
@@ -85,7 +89,8 @@ cannot acknowledge or reconstruct the original attempt.
 ## Costs and validation
 
 The implementation plan records the cumulative complexity assessment. A capture
-adds one bounded endpoint resolution at start, one node work item, one endpoint
+adds one bounded endpoint resolution and the existing namespace/Pod GET pair
+for exact-Pod node selection at start, one node work item, one endpoint
 GET and one authenticated native upload. It adds no privileges, credentials,
 watch, listener or user-facing tuning setting. An explicit Stop adds one durable
 intent update, one regional control query, at most one node cancellation work item

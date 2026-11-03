@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Profile API target dispatch correction (2026-11-03)
+
+[Installed run41596255666](https://github.com/phihos/asservat/actions/runs/41596255666)
+at `e1ba4abe` passed approved request resolution and reached the committed start
+with at least two seconds remaining. It then failed in profile dispatch:
+`OutcomeUnknown` resolved to the original accepted capture in Failed state.
+The actual Go exit was1 after594.818 seconds; sources stayed unchanged and
+cleanup failures were empty. Original reports/logs are retained in
+`test/results/profile-native-41596255666/`. CI41596222941 passed on that head;
+the installed profile workflow is still unqualified.
+
+The regional endpoint resolver intentionally returns the public API-class pin
+without node name/UID/boot. The new dispatcher incorrectly looked up a collector
+by that empty node name. It now reuses the packet path's exact-Pod node lookup,
+selects the current attested node channel and builds a separate mechanism pin.
+The accepted API pin and endpoint digest stay unchanged. Existing node-bound
+plans still require their original node fields. The regression reproduces the
+empty-node refusal and checks successful API dispatch, changed/missing Pod or
+node, unavailable collector, original route expiry and cancellation.
+
+Complexity: one observed failure blocks every installed API-profile dispatch;
+the risk was not accepted. Existing packet dispatch supplies the precedent.
+Two GETs (namespace and exact Pod) per profile start reuse the existing
+context, permissions and UID/controller checks; zero new privileges, watches, configuration,
+services, durable state or fallback outcomes. Reusing this small existing port
+avoids changing the approved endpoint digest or public API target contract.
+Focused connector-profile race tests pass in1.064 seconds; the full bootstrap
+race suite passes in78.296 seconds and vet passes. Native rerun remains
+required after the parser and upload-admission review fixes.
+
 ## Native profile results and installed failure fixes (2026-11-03)
 
 The combined installed-fix candidate also includes the measured pprof allocation

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/netip"
 	"testing"
 	"time"
@@ -38,6 +39,12 @@ func (q *profileQueue) EnqueueProfile(_ context.Context, p collector.ProfileCapt
 
 type profilePlanReader struct{ plan planning.GoEndpointPlan }
 
+type profilePodNodeFunc func(context.Context, artifact.PinnedPod) (string, error)
+
+func (f profilePodNodeFunc) PodNode(ctx context.Context, pin artifact.PinnedPod) (string, error) {
+	return f(ctx, pin)
+}
+
 func (p *profilePlanReader) ResolveProfilePlan(context.Context, targets.ProfileEndpointRequest) (planning.GoEndpointPlan, error) {
 	return p.plan, nil
 }
@@ -55,9 +62,64 @@ func profileHolderFixture(t *testing.T) (*ConnectorRecordings, *profileQueue, *p
 	e := artifact.ContextExpectation{ExecutionClass: artifact.ContextAPIExecution, NativeType: artifact.PprofArtifact, DataClass: "raw", CaptureUID: id, PodUID: id, NamespaceUID: id, ActionID: "profile-cpu", Registration: artifact.Registration{Location: artifact.Location{ClusterID: id, ArtifactID: id, AttemptID: id}, AnchorAt: now, WriteUntil: now.Add(time.Minute)}, Profile: &artifact.GoProfileAcquisition{SourceRef: "pprof", EndpointDigest: endpoint.EndpointDigest, Type: "heap", Mode: "snapshot", TimeoutMillis: 5000, MaxBytes: 16 << 20, Composition: frozen}}
 	q := &profileQueue{node: collector.Identity{NodeUID: id, NodeName: "node", BootID: id, Epoch: id}, available: true}
 	reader := &profilePlanReader{planning.GoEndpointPlan{SourceRef: "pprof", Definition: planning.GoEndpointDefinition{Host: "localhost"}, DefinitionDigest: endpoint.DefinitionDigest, EndpointDigest: endpoint.EndpointDigest, Target: target, Pin: pin, NodeUID: id, NodeBootID: id, AddressMode: "targetLoopback", RouteIP: netip.MustParseAddr("127.0.0.1"), Port: 6060, Parameters: execution.GoProfileParameters{Type: "heap", Mode: "snapshot"}, NativeLimit: 16 << 20, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}}
-	h := NewConnectorRecordings(q, nil, func() time.Time { return now }, func(string) {})
+	h := NewConnectorRecordings(q, profilePodNodeFunc(func(context.Context, artifact.PinnedPod) (string, error) { return "node", nil }), func() time.Time { return now }, func(string) {})
 	h.profileEndpoints = reader
 	return h, q, reader, e, req, now
+}
+
+// Installed API-class endpoint plans intentionally carry no node identity.
+// The private mechanism must resolve the same Pod's current node, as packet
+// dispatch already does, while leaving the accepted API pin/digest untouched.
+func TestConnectorProfileDispatchesAPIPlanThroughExactPodNode(t *testing.T) {
+	for _, mode := range []string{"current", "pod-replaced", "unknown-node", "unavailable-node", "expired-route", "cancelled"} {
+		t.Run(mode, func(t *testing.T) {
+			h, q, reader, e, endpoint, now := profileHolderFixture(t)
+			reader.plan.Pin.NodeName, reader.plan.NodeUID, reader.plan.NodeBootID = "", "", ""
+			pin := reader.plan.Pin
+			original := reader.plan
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			reads := 0
+			h.pods = profilePodNodeFunc(func(call context.Context, got artifact.PinnedPod) (string, error) {
+				reads++
+				if call != ctx || got != pin {
+					t.Fatal("node lookup changed original context or accepted API pin")
+				}
+				switch mode {
+				case "pod-replaced":
+					return "", errors.New("exact Pod changed")
+				case "unknown-node":
+					return "replacement", nil
+				case "unavailable-node":
+					q.available = false
+				case "expired-route":
+					h.now = func() time.Time { return original.ValidUntil }
+				case "cancelled":
+					cancel()
+				}
+				return "node", nil
+			})
+			_, err := h.PrepareProfile(&objectstore.PreparedArtifact{}, e).StartProfile(ctx, pin, now, now.Add(time.Second), endpoint)
+			if reads != 1 {
+				t.Fatalf("exact Pod node lookup count=%d error=%v", reads, err)
+			}
+			if mode != "current" {
+				if err == nil || len(q.profiles) != 0 {
+					t.Fatal("changed or expired target queued profile", err)
+				}
+				return
+			}
+			if err != nil || len(q.profiles) != 1 {
+				t.Fatal("API endpoint plan did not reach its node", err)
+			}
+			work := q.profiles[0].Profile
+			mechanismPin := pin
+			mechanismPin.NodeName = "node"
+			if !work.Valid() || work.Request.Pin != mechanismPin || work.Request.NodeUID != q.node.NodeUID || work.Request.NodeBootID != q.node.BootID || work.CollectorEpoch != q.node.Epoch || work.Request.EndpointDigest != original.EndpointDigest || reader.plan.Pin != pin || reader.plan.NodeUID != "" || reader.plan.NodeBootID != "" {
+				t.Fatal("dispatch invented identity or changed accepted endpoint")
+			}
+		})
+	}
 }
 
 func TestConnectorProfileQueuesOriginalDeadlineAndCollectsFailureOnce(t *testing.T) {

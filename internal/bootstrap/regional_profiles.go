@@ -61,18 +61,31 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 		return time.Time{}, value.ErrDenied
 	}
 	nodes, ok := h.nodes.(profileNodes)
-	if !ok {
+	if !ok || h.pods == nil {
 		return time.Time{}, value.ErrUnavailable
 	}
-	node, ok := nodes.NodeByName(plan.Pin.NodeName)
-	if !ok || !node.RecorderAvailable(collector.MechanismProfile) || node.Identity.NodeUID != plan.NodeUID || node.Identity.BootID != plan.NodeBootID {
+	// API-class endpoint plans intentionally retain a node-free accepted pin.
+	// Reuse packet dispatch's exact Pod lookup, then bind the private mechanism
+	// to the current attested collector. Never invent a node identity or change
+	// the accepted pin/endpoint digest to make that dispatch possible.
+	name, err := h.pods.PodNode(ctx, pin)
+	if err != nil {
+		return time.Time{}, value.ErrUnavailable
+	}
+	node, ok := nodes.NodeByName(name)
+	if !ok || !node.RecorderAvailable(collector.MechanismProfile) ||
+		(plan.Pin.NodeName != "" && plan.Pin.NodeName != name) ||
+		(plan.NodeUID != "" && node.Identity.NodeUID != plan.NodeUID) ||
+		(plan.NodeBootID != "" && node.Identity.BootID != plan.NodeBootID) {
 		return time.Time{}, value.ErrUnavailable
 	}
 	deadline := started.Add(time.Duration(e.Profile.TimeoutMillis) * time.Millisecond)
 	if deadline.After(e.Registration.WriteUntil) {
 		return time.Time{}, value.ErrExpired
 	}
-	request := value.GoProfileRequest{Binding: e.Binding(), Pin: plan.Pin, NodeUID: plan.NodeUID, NodeBootID: plan.NodeBootID, SourceRef: plan.SourceRef, EndpointDigest: plan.EndpointDigest, Parameters: plan.Parameters, NativeLimit: plan.NativeLimit, NotBefore: started, Deadline: deadline}
+	mechanismPin := plan.Pin
+	mechanismPin.NodeName = name
+	request := value.GoProfileRequest{Binding: e.Binding(), Pin: mechanismPin, NodeUID: node.Identity.NodeUID, NodeBootID: node.Identity.BootID, SourceRef: plan.SourceRef, EndpointDigest: plan.EndpointDigest, Parameters: plan.Parameters, NativeLimit: plan.NativeLimit, NotBefore: started, Deadline: deadline}
 	work := collector.ProfileCapture{CaptureID: e.CaptureUID, ExpectationDigest: evidence.ContextExpectationDigest(e), DefinitionDigest: plan.DefinitionDigest, CollectorEpoch: node.Identity.Epoch, Request: request, AddressMode: plan.AddressMode, Address: plan.RouteIP, Port: plan.Port, Host: plan.Definition.Host}
 	startBy := deadline.Add(-request.Parameters.Duration - 2*time.Second)
 	if until.Before(startBy) {
