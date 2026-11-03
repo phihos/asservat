@@ -240,3 +240,24 @@ TMPDIR="$HOME/.cache/asservat-build/tmp" go build -o /path/out/qualify \
 
 The helper is excluded from ordinary product builds. Local fixture accounting
 tests and compilation pass; no native result is recorded for this focus yet.
+
+
+## First disposable native run and fixture correction
+
+[Run41596591270](https://github.com/phihos/asservat/actions/runs/41596591270)
+at `2eda3465` loaded the unchanged digest-pinned object successfully on Ubuntu
+24.04.5, kernel7.0.0-1017-azure. Zero-initialized, expired and insufficient-first-
+read budgets passed, including frozen-map refill refusal and unchanged counters
+after detach. The run then failed in the fixture's decoder: the entry case
+returned164 bytes for the160-byte upstream event ABI. The pinned cilium
+`perf.Record.RawSample` explicitly documents zero to seven trailing garbage
+bytes from kernel ring alignment. This is not an engine accounting failure,
+but the remaining scenarios did not run and are not qualified.
+
+The fixture now accepts only160..167 bytes and interprets only the160-byte ABI
+prefix. A regression with every padding size and nonzero padding fails before
+and passes after this correction; truncated, excessive and unknown-type records
+still refuse. Object/source/patch pins and all native budget assertions remain
+unchanged. Original report, log, verifier output and instructions are retained in
+`test/results/syscall-argument-native-41596591270/`; test exit1, source unchanged
+and empty cleanup failures are confirmed. A corrected native rerun is pending.

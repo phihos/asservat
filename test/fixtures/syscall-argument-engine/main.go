@@ -42,7 +42,10 @@ type counts struct {
 
 func (c *counts) add(raw []byte) error {
 	// Exact upstream syscall_event_t / syscall_event_cont_t layout, x86-64.
-	if len(raw) != 160 {
+	// perf.Record.RawSample documents 0..7 trailing garbage bytes from kernel
+	// ring alignment. Native run41596591270 delivered164 for the160-byte ABI.
+	// Only the ABI prefix is interpreted; padding never contributes counters.
+	if len(raw) < 160 || len(raw) > 167 {
 		return fmt.Errorf("unexpected traceloop record size %d", len(raw))
 	}
 	switch binary.LittleEndian.Uint32(raw[:4]) {

@@ -9,7 +9,7 @@ import (
 
 func TestNativeRecordAccountingRejectsMalformedAndSeparatesFailedReads(t *testing.T) {
 	var c counts
-	for _, n := range []int{0, 159, 161} {
+	for _, n := range []int{0, 159, 168} {
 		if c.add(make([]byte, n)) == nil {
 			t.Fatal("malformed record length accepted", n)
 		}
@@ -31,6 +31,21 @@ func TestNativeRecordAccountingRejectsMalformedAndSeparatesFailedReads(t *testin
 	binary.LittleEndian.PutUint32(raw, 3)
 	if c.add(raw) == nil {
 		t.Fatal("unknown record type accepted")
+	}
+}
+
+func TestNativeRecordAccountingIgnoresDocumentedPerfPadding(t *testing.T) {
+	for padding := 0; padding <= 7; padding++ {
+		raw := make([]byte, 160+padding)
+		binary.LittleEndian.PutUint32(raw, 2)
+		raw[153] = 1
+		for n := 160; n < len(raw); n++ {
+			raw[n] = 0xff // padding is not required to be zero
+		}
+		var c counts
+		if err := c.add(raw); err != nil || c != (counts{Continuations: 1, FailedReads: 1}) {
+			t.Fatalf("padding=%d: counts=%+v error=%v", padding, c, err)
+		}
 	}
 }
 
