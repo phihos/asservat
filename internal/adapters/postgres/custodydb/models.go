@@ -1224,6 +1224,7 @@ type ContextVerification struct {
 	AuditObjectEtag     pgtype.Text
 	AuditObjectBytes    pgtype.Int8
 	AuditObjectSha256   []byte
+	NativeBytes         pgtype.Int8
 }
 
 type ContextWriterCompletion struct {

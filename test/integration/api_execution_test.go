@@ -346,7 +346,7 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err = verify.RecordContextVerification(ctx, accepted.Expectation, changed.Copies, authority); err == nil {
+				if _, err = verify.RecordContextVerification(ctx, accepted.Expectation, changed.Copies, authority, 1); err == nil {
 					t.Fatal("publication accepted unrecorded copies")
 				}
 				var verificationRecords, catalogRecords int

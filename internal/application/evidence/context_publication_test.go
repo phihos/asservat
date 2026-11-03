@@ -11,13 +11,15 @@ import (
 )
 
 type publicationFixture struct {
-	e       artifact.ContextExpectation
-	copies  artifact.Copies
-	now     time.Time
-	calls   []string
-	failure string
-	record  audit.ContextVerification
-	change  func(string, *publicationFixture)
+	e            artifact.ContextExpectation
+	copies       artifact.Copies
+	now          time.Time
+	calls        []string
+	failure      string
+	nativeBytes  int64
+	recordChange func(*audit.ContextVerification)
+	record       audit.ContextVerification
+	change       func(string, *publicationFixture)
 }
 
 func (f *publicationFixture) step(name string) error {
@@ -37,12 +39,15 @@ func (f *publicationFixture) CheckContextPublication(context.Context, artifact.C
 	err := f.step("authority")
 	return artifact.PublicationAuthority{RootID: f.e.CaseID, CaptureID: f.e.CaptureUID, PermissionEpoch: f.e.OccurrenceID, PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, ExpectationDigest: ContextExpectationDigest(f.e), AuthorityDigest: artifact.Digest{2}, CheckedAt: f.now, ValidUntil: f.now.Add(time.Second)}, err
 }
-func (f *publicationFixture) VerifyContext(context.Context, artifact.ContextExpectation, artifact.Copies) error {
-	return f.step("verify")
+func (f *publicationFixture) VerifyContext(context.Context, artifact.ContextExpectation, artifact.Copies) (int64, error) {
+	return f.nativeBytes, f.step("verify")
 }
-func (f *publicationFixture) RecordContextVerification(_ context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority) (audit.ContextVerification, error) {
+func (f *publicationFixture) RecordContextVerification(_ context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, nativeBytes int64) (audit.ContextVerification, error) {
 	err := f.step("record")
-	f.record = audit.ContextVerification{RootID: a.RootID, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, AttemptID: e.Registration.Location.AttemptID, PermissionEpoch: a.PermissionEpoch, PermissionSequence: a.PermissionSequence, ScopeDigest: e.PlanDigest, ExpectationDigest: ContextExpectationDigest(e), CopiesDigest: ContextCopiesDigest(c), IntentDigest: artifact.Digest{3}, AuthorityDigest: a.AuthorityDigest, VerifiedAt: f.now, WriteUntil: e.Registration.WriteUntil, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
+	f.record = audit.ContextVerification{NativeBytes: &nativeBytes, RootID: a.RootID, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, AttemptID: e.Registration.Location.AttemptID, PermissionEpoch: a.PermissionEpoch, PermissionSequence: a.PermissionSequence, ScopeDigest: e.PlanDigest, ExpectationDigest: ContextExpectationDigest(e), CopiesDigest: ContextCopiesDigest(c), IntentDigest: artifact.Digest{3}, AuthorityDigest: a.AuthorityDigest, VerifiedAt: f.now, WriteUntil: e.Registration.WriteUntil, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
+	if f.recordChange != nil {
+		f.recordChange(&f.record)
+	}
 	return f.record, err
 }
 func (f *publicationFixture) WriteContextVerification(context.Context, audit.ContextVerification) (audit.Receipt, error) {
@@ -60,7 +65,7 @@ func publicationTest(t *testing.T) (*publicationFixture, ContextPublisher) {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	id := "11111111-1111-4111-8111-111111111111"
-	f := &publicationFixture{now: now, e: artifact.ContextExpectation{Registration: artifact.Registration{Location: artifact.Location{ClusterID: id, ArtifactID: id, AttemptID: id}, StoreID: id, AllocationID: id, PoolRevision: 1, AllocationRevision: 1, NativeLimit: 4096, AnchorAt: now, WriteUntil: now.Add(30 * time.Second), ExpiresAt: now.Add(time.Minute), DeleteBy: now.Add(90 * time.Second)}, CaseID: id, OccurrenceID: id, NodeUID: "node", NodeBootID: id, PodUID: "pod", Namespace: "app", NamespaceUID: "namespace", WorkloadUID: "workload", CollectorVersion: "test", CollectorImageDigest: artifact.Digest{1}, RecipeDigest: artifact.Digest{2}, PlanDigest: artifact.Digest{3}, CaptureUID: id, ActionID: "context", DataClass: "metadata", PurposeRef: "synthetic", Audience: []artifact.AudienceAssignment{{Kind: "Group", Issuer: "https://id.example.test", SubjectID: "team", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", AssignmentID: id, BasisDigest: artifact.Digest{4}}}, RequestedAgeSeconds: 60, MaximumAgeSeconds: 300, DeletionBudgetSeconds: 30, RetentionRules: []artifact.RetentionRule{{UID: "retention", Generation: 1, Digest: artifact.Digest{5}}}, TriggeredAt: now}}
+	f := &publicationFixture{nativeBytes: 353, now: now, e: artifact.ContextExpectation{Registration: artifact.Registration{Location: artifact.Location{ClusterID: id, ArtifactID: id, AttemptID: id}, StoreID: id, AllocationID: id, PoolRevision: 1, AllocationRevision: 1, NativeLimit: 4096, AnchorAt: now, WriteUntil: now.Add(30 * time.Second), ExpiresAt: now.Add(time.Minute), DeleteBy: now.Add(90 * time.Second)}, CaseID: id, OccurrenceID: id, NodeUID: "node", NodeBootID: id, PodUID: "pod", Namespace: "app", NamespaceUID: "namespace", WorkloadUID: "workload", CollectorVersion: "test", CollectorImageDigest: artifact.Digest{1}, RecipeDigest: artifact.Digest{2}, PlanDigest: artifact.Digest{3}, CaptureUID: id, ActionID: "context", DataClass: "metadata", PurposeRef: "synthetic", Audience: []artifact.AudienceAssignment{{Kind: "Group", Issuer: "https://id.example.test", SubjectID: "team", Role: "workload-maintainer", BasisKind: "AccessBinding", BasisUID: "binding", AssignmentID: id, BasisDigest: artifact.Digest{4}}}, RequestedAgeSeconds: 60, MaximumAgeSeconds: 300, DeletionBudgetSeconds: 30, RetentionRules: []artifact.RetentionRule{{UID: "retention", Generation: 1, Digest: artifact.Digest{5}}}, TriggeredAt: now}}
 	for i := range f.copies {
 		f.copies[i] = artifact.CopyReceipt{ETag: "synthetic", Bytes: 128, SHA256: artifact.Digest{byte(i + 1)}}
 	}
@@ -125,5 +130,38 @@ func TestContextPublicationRechecksAfterBlockingWork(t *testing.T) {
 	}
 	if _, err := p.Publish(context.Background(), f.e.CaptureUID, f.copies); err == nil {
 		t.Fatal("changed accepted audience published")
+	}
+}
+
+func TestContextPublicationRetainsOnlyVerifiedNativeLength(t *testing.T) {
+	f, p := publicationTest(t)
+	if _, err := p.Publish(t.Context(), f.e.CaptureUID, f.copies); err != nil {
+		t.Fatal(err)
+	}
+	if f.record.NativeBytes == nil || *f.record.NativeBytes != 353 {
+		t.Fatal("verified native length lost", f.record.NativeBytes)
+	}
+	for _, mode := range []string{"negative", "over-limit", "changed-record", "legacy-record"} {
+		t.Run(mode, func(t *testing.T) {
+			f, p := publicationTest(t)
+			switch mode {
+			case "negative":
+				f.nativeBytes = -1
+			case "over-limit":
+				f.nativeBytes = f.e.Registration.NativeLimit + 1
+			case "changed-record":
+				f.recordChange = func(r *audit.ContextVerification) { n := f.nativeBytes + 1; r.NativeBytes = &n }
+			case "legacy-record":
+				f.recordChange = func(r *audit.ContextVerification) { r.NativeBytes = nil }
+			}
+			_, err := p.Publish(t.Context(), f.e.CaptureUID, f.copies)
+			if mode == "legacy-record" {
+				if err != nil || f.record.NativeBytes != nil {
+					t.Fatal("historical audit rewritten/refused", err)
+				}
+			} else if !errors.Is(err, artifact.ErrIntegrity) {
+				t.Fatal("invalid length reached publication", err)
+			}
+		})
 	}
 }

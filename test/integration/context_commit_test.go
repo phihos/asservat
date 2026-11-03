@@ -202,7 +202,7 @@ func TestContextCommitWithRealServices(t *testing.T) {
 				}
 			}
 			time.Sleep(time.Until(e.Registration.WriteUntil) + 10*time.Millisecond)
-			if err := verifier.VerifyContext(ctx, e, copies); err == nil {
+			if _, err := verifier.VerifyContext(ctx, e, copies); err == nil {
 				t.Fatal("verification renewed the acquisition window")
 			}
 			body, err := nativeReader.ReadContext(ctx, e, copies, time.Now().Add(5*time.Second))

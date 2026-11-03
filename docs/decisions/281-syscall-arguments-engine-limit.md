@@ -142,3 +142,28 @@ component evidence only. Installed recurring capture and a separate exact-artifa
 human inspection/download approval remain required. A team collection grant never
 confers personal disclosure rights. The manual native qualification is tracked
 separately in implementation-progress.md.
+
+### Protected catalogs for recurring recipes
+
+Policy activation, grant review, status, trigger and existing-recording reads now
+pass their original operation context and exact observed or accepted workload
+scope into the shared compiler. Namespace and organization versions use the same
+protected catalog reader as manual captures; definitions never enter the authored
+policy or become caller-supplied resolved facts. Activation reuses its one workload
+observation and current delegation/permission projection before catalog lookup.
+Later operations retain accepted namespace/workload UIDs; the regional reader
+checks namespace continuity, and the trigger retains its existing workload-UID
+check before any occurrence effect. A changed definition changes scope and requires
+new acceptance. Missing, disabled or deleted versions cannot arm a source.
+
+Builtin-only compilation adds zero catalog reads. A nonbuiltin composition adds
+at most eight exact profile GETs and one namespace GET through the existing
+regional channel; organization versions remain in the protected hub namespace.
+No new listener, credentials, permissions, watch, cache or background loop is
+introduced. Trigger compilation reads the existing accepted authority before
+catalog lookup, including a coalesced busy tick; it still performs at most its
+existing single workload observation and never selects a Pod for catalog access.
+Source, identity, permission and acceptance deadlines bound those reads without
+renewal. Focused component tests cover scope/cancellation, current definitions and
+argument-pin serialization; installed recurring-policy qualification remains
+separate.

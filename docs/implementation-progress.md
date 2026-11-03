@@ -29,6 +29,29 @@ mismatched tuples remain omitted. No schema expansion, new lookup or configurati
 is needed. `argument-preflight` now includes the case-projection boundary.
 Full presentation race tests passed (215.710s), browser/MCP case races passed
 (3.023s / 8.765s), and expanded `make argument-preflight pre-push` exited0.
+Follow-up real-service run `policy-arguments-native-length-1` passed the actual
+finite argument policy compiler → accepted team grant → admission/intent → API
+preparation path (6.94s). It verified concurrent one-session dual debit, exact
+replay, expired-source transaction rollback, replacement-epoch refusal and scoped
+historical publisher reads. SQL130 empty upgrade/downgrade qualification passed
+(4.65s). The combined run failed both native-length cases because the verifier's
+INSERT column permission omitted the new field; fixture and production role
+projections now grant only INSERT(native_bytes), with a red/green role regression.
+The failed run had Go13.643s, exit1, sources unchanged and cleanup[]. The focused
+`verified-native-length-2` rerun passed both size cases (Go4.379s, exit0, unchanged
+sources, cleanup[]), including known-length replay, legacy audit compatibility,
+catalog projection and refusal to roll back retained size-bearing verification.
+This is passing policy component evidence, not installed recurring qualification.
+
+The protected policy compiler now resolves namespace/organization profile versions
+through the existing catalog reader after current eligibility, with original
+scope/deadlines and one workload observation. Focused capture/bootstrap races and
+all tagged/untagged integration compilation passed. SQL130 adds verified native
+length from the existing complete verification pass, with no extra payload or
+key read; legacy unknown values and original audit serialization remain unchanged.
+Its component service qualification passed after the role fix. RawQuery domain membership,
+client, pool and original-expiry regressions pass; public standalone approval,
+SQL grant composition and legacy unknown-size recovery remain unimplemented.
 
 Installed run [41642778383](https://github.com/phihos/asservat/actions/runs/41642778383)
 on9db49637 passed public preview, independent review and approved submission,

@@ -270,3 +270,27 @@ func TestContextCaseDoesNotProbeProcessingBeforeRights(t *testing.T) {
 		t.Fatal("processing lookup before eligibility", e, f.processingReads)
 	}
 }
+
+func TestContextCasePreservesVerifiedOrUnknownNativeLength(t *testing.T) {
+	for _, known := range []bool{false, true} {
+		f, s := newCaseFixture()
+		size := int64(353)
+		if known {
+			f.record.NativeBytes = &size
+		}
+		got, err := s.GetContextCase(t.Context(), f, f.routes.CaseID)
+		if err != nil || len(got.Artifacts) != 1 {
+			t.Fatal(err)
+		}
+		if known {
+			if got.Artifacts[0].NativeBytes == nil || *got.Artifacts[0].NativeBytes != size {
+				t.Fatal("verified length lost")
+			}
+		} else if got.Artifacts[0].NativeBytes != nil {
+			t.Fatal("legacy unknown replaced by configured bound")
+		}
+		if f.catalogReads != 1 {
+			t.Fatal("size required another catalog read", f.catalogReads)
+		}
+	}
+}

@@ -61,8 +61,15 @@ func (s PolicyGrantPlans) PolicyGrantPlan(ctx context.Context, policy, name stri
 	if source.Name != record.Source.Name || source.InstallationID != record.Source.InstallationID || source.ClusterID != record.Source.ClusterID || source.NamespaceUID != record.Source.NamespaceUID || source.CollectionDigest != record.Source.CollectionDigest {
 		return zero, authapp.ErrGrantUnavailable
 	}
-	compiled, err := CompilePolicyWithRecorders(spec, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
-	if err != nil || compiled.Recorder == nil {
+	catalogTarget, err := policyAcceptedCatalogTarget(spec, snapshot.Authority)
+	if err != nil {
+		return zero, authapp.ErrGrantUnavailable
+	}
+	compileUntil := minPolicyDeadline(source.FreshUntil, snapshot.FreshUntil, snapshot.Authority.NotAfter)
+	compileCtx, endCompile := context.WithDeadline(ctx, compileUntil)
+	defer endCompile()
+	compiled, err := CompilePolicyWithRecorders(compileCtx, catalogTarget, spec, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
+	if err != nil || compiled.Recorder == nil || compileCtx.Err() != nil || !s.Now().Before(compileUntil) {
 		return zero, authapp.ErrGrantUnavailable
 	}
 	a := snapshot.Authority

@@ -17,8 +17,11 @@ import (
 // ContextDownloadEvidence is a verified catalog/retention projection, not an
 // upload manifest. No native evidence or checksum is needed for authorization.
 type ContextDownloadEvidence struct {
-	PurposeRef string
-	CaptureID  string
+	// NativeBytes is verified publication metadata; nil means legacy unknown.
+	// It never substitutes the registration limit or ciphertext object length.
+	NativeBytes *int64
+	PurposeRef  string
+	CaptureID   string
 	// CaseID binds a recipient's share to the artifact's case (ADR-233).
 	CaseID string
 	// DataClass is the accepted expectation's class: metadata, raw for an

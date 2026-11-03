@@ -215,14 +215,14 @@ func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOpera
 	if !ok {
 		return nil, nil, presentation.ErrOperationsConfiguration
 	}
-	activation := captureapp.PolicyActivation{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Documents: pc.hubPolicies, Sources: pc.policies, Observer: observer, Ledger: pc.policyTriggers, Permissions: pc.permissions, Automation: pc.automation, Acceptor: pc.policies, Audit: pc.policyAudit, Recovery: v.submission.Recovery, Now: c.Now, Report: eventLog(os.Stderr, "policy activation refused"), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters), WorkloadAutomation: pc.automation, GrantAttachments: pc.policies}
-	status := captureapp.PolicyStatusService{CompileRecorder: recordingSavePolicyCompiler(v.submission.Filters), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
+	activation := captureapp.PolicyActivation{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Documents: pc.hubPolicies, Sources: pc.policies, Observer: observer, Ledger: pc.policyTriggers, Permissions: pc.permissions, Automation: pc.automation, Acceptor: pc.policies, Audit: pc.policyAudit, Recovery: v.submission.Recovery, Now: c.Now, Report: eventLog(os.Stderr, "policy activation refused"), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters, pc.investigation.Profiles), WorkloadAutomation: pc.automation, GrantAttachments: pc.policies}
+	status := captureapp.PolicyStatusService{CompileRecorder: recordingSavePolicyCompiler(v.submission.Filters, v.submission.Profiles), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
 	deactivation := captureapp.PolicyDeactivation{RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
 	operations, err := presentation.NewPolicyOperations(c.PublicOrigin, c.Now, c.NewID, activation, status, deactivation)
 	if err != nil {
 		return nil, nil, err
 	}
-	trigger := &captureapp.PolicyTrigger{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters), Ledger: pc.policyTriggers, Documents: pc.hubPolicies, Sources: pc.policies, Accepted: pc.policies, Observer: observer, Capture: v.submission, Audit: pc.policyAudit, Now: c.Now, Report: timedEventLog(os.Stderr, "policy trigger")}
+	trigger := &captureapp.PolicyTrigger{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), CompileRecorder: publicPolicyRecorderCompiler(pc.investigation.Filters, pc.investigation.Profiles), Ledger: pc.policyTriggers, Documents: pc.hubPolicies, Sources: pc.policies, Accepted: pc.policies, Observer: observer, Capture: v.submission, Audit: pc.policyAudit, Now: c.Now, Report: timedEventLog(os.Stderr, "policy trigger")}
 	if v.submission.RecordingSaveEnabled {
 		trigger.OngoingSources = s.ongoingSources
 		trigger.SourceSnapshots = v.submission
@@ -318,8 +318,8 @@ func previewDelegations(in []contracts.PermissionDelegation) ([]authapp.PreviewD
 }
 
 // Same manual composition/filter compiler, without inventing a preview or Pod.
-func publicPolicyRecorderCompiler(filters planningapp.FilterCompiler) captureapp.PolicyRecorderCompiler {
+func publicPolicyRecorderCompiler(filters planningapp.FilterCompiler, profiles captureapp.CatalogProfiles) captureapp.PolicyRecorderCompiler {
 	// Lifecycle comes from the normalized authored/default mode, never lookback.
 	// The existing source-capable compiler preserves explicit finite bytes.
-	return recordingSavePolicyCompiler(filters)
+	return recordingSavePolicyCompiler(filters, profiles)
 }

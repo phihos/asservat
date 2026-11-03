@@ -60,6 +60,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		scenario                       captureAdmissionScenario
 		e                              artifact.ContextExpectation
 		copies                         artifact.Copies
+		nativeBytes                    int64
 		verify, audit, publish, reader *postgres.ContextPublications
 		publisher                      evidence.ContextPublisher
 		gate                           contextPublicationTestGate
@@ -150,6 +151,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			t.Fatal(err)
 		}
 		defer clear(native)
+		f.nativeBytes = int64(len(native))
 		f.copies, err = prepared.StoreContext(ctx, native, at, at)
 		if err != nil {
 			t.Fatal(err)
@@ -188,9 +190,97 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 	}
 	setup := func(t *testing.T) fixture { return setupWithKeys(t, nil, nil) }
 
+	for _, legacy := range []bool{false, true} {
+		name := "verified-native-length"
+		if legacy {
+			name += "-legacy"
+		}
+		t.Run(name, func(t *testing.T) {
+			f := setup(t)
+			a, err := f.gate.CheckContextPublication(ctx, f.e)
+			if err != nil {
+				t.Fatal(err)
+			}
+			verified, err := f.publisher.Verifier.VerifyContext(ctx, f.e, f.copies)
+			if err != nil || verified != f.nativeBytes {
+				t.Fatal("actual native length", verified, f.nativeBytes, err)
+			}
+			record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, verified)
+			if err != nil || record.NativeBytes == nil || *record.NativeBytes != f.nativeBytes {
+				t.Fatal("recorded native length", record.NativeBytes, err)
+			}
+			if legacy {
+				// Explicit historical fixture: represent a pre-130 verification before
+				// writing its original size-omitting encrypted audit. Runtime cannot do this.
+				tx, err := admin.Begin(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer tx.Rollback(context.Background())
+				if _, err = tx.Exec(ctx, "ALTER TABLE context_verification DISABLE TRIGGER context_verification_immutable"); err != nil {
+					t.Fatal(err)
+				}
+				if _, err = tx.Exec(ctx, "UPDATE context_verification SET native_bytes=NULL WHERE capture_id=$1", f.e.CaptureUID); err != nil {
+					t.Fatal(err)
+				}
+				if _, err = tx.Exec(ctx, "ALTER TABLE context_verification ENABLE TRIGGER context_verification_immutable"); err != nil {
+					t.Fatal(err)
+				}
+				if err = tx.Commit(ctx); err != nil {
+					t.Fatal(err)
+				}
+				record.NativeBytes = nil
+			} else {
+				if _, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, verified+1); err == nil {
+					t.Fatal("verification replay changed native length")
+				}
+				// Check immutability before audit acknowledgement as well.
+				if _, err = admin.Exec(ctx, "UPDATE context_verification SET native_bytes=native_bytes+1 WHERE capture_id=$1", f.e.CaptureUID); err == nil {
+					t.Fatal("unaudited native length mutable")
+				}
+			}
+			receipt, err := f.publisher.Audit.WriteContextVerification(ctx, record)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = f.audit.AcknowledgeContextVerification(ctx, record, receipt); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = f.publish.PublishContext(ctx, f.e, f.copies, a); err != nil {
+				t.Fatal(err)
+			}
+			got, err := f.reader.ContextDownloadEvidence(ctx, f.e.Registration.Location.ArtifactID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if legacy {
+				if got.NativeBytes != nil {
+					t.Fatal("legacy unknown length invented", *got.NativeBytes)
+				}
+			} else if got.NativeBytes == nil || *got.NativeBytes != f.nativeBytes {
+				t.Fatal("catalog lost verified length", got.NativeBytes)
+			}
+			// Ordinary replay does not backfill or rewrite the old immutable audit.
+			replay, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, verified)
+			if err != nil || (replay.NativeBytes == nil) != legacy {
+				t.Fatal("replay changed legacy interpretation", err)
+			}
+			replayReceipt, err := f.publisher.Audit.WriteContextVerification(ctx, replay)
+			if err != nil || replayReceipt != receipt {
+				t.Fatal("immutable verification audit changed", err)
+			}
+			if _, err = admin.Exec(ctx, "UPDATE context_verification SET native_bytes=42 WHERE capture_id=$1", f.e.CaptureUID); err == nil {
+				t.Fatal("acknowledged native length mutable")
+			}
+			if !legacy {
+				qualifyNativeLengthRollbackRefusal(t, ctx, admin)
+			}
+		})
+	}
+
 	qualifyPermissionPublicationAuditHistory(t, ctx, admin, func(t *testing.T) permissionPublicationAuditFixture {
 		f := setup(t)
-		return permissionPublicationAuditFixture{expectation: f.e, copies: f.copies, verify: f.verify, audit: f.audit, publish: f.publish, gate: f.gate, publisher: f.publisher}
+		return permissionPublicationAuditFixture{nativeBytes: f.nativeBytes, expectation: f.e, copies: f.copies, verify: f.verify, audit: f.audit, publish: f.publish, gate: f.gate, publisher: f.publisher}
 	})
 
 	// Each version case starts with a new genuine published fixture and keeps the
@@ -354,12 +444,12 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err != nil {
 			t.Fatal(err)
 		}
-		record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a)
+		record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
 		check("Finalizing", "VerificationAuditPending", true)
-		if _, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a); err != nil {
+		if _, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes); err != nil {
 			t.Fatal(err)
 		}
 		check("Finalizing", "VerificationAuditPending", false)
@@ -393,7 +483,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 			if phase == "publication" {
-				record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a)
+				record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -409,7 +499,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 			if phase == "verification" {
-				_, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a)
+				_, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
 			} else {
 				_, err = f.publish.PublishContext(ctx, f.e, f.copies, a)
 			}
@@ -430,7 +520,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 			if phase == "publication" {
-				record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a)
+				record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -446,7 +536,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 			if phase == "verification" {
-				_, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a)
+				_, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
 			} else {
 				_, err = f.publish.PublishContext(ctx, f.e, f.copies, a)
 			}
@@ -567,7 +657,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err != nil {
 			t.Fatal(err)
 		}
-		record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a)
+		record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -1,6 +1,8 @@
 package capture
 
 import (
+	"asservat.local/asservat/internal/domain/targets"
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -31,13 +33,13 @@ func TestPolicyRecordingSaveOptInIsExplicitReviewedCollectionIntent(t *testing.T
 	spec := recorderPolicySpec()
 	spec["profileComposition"].(map[string]any)["components"].([]any)[0].(map[string]any)["overrides"] = []any{}
 	raw, _ := json.Marshal(spec)
-	ordinary, err := CompilePolicyWithRecorders(raw, "builtin-pod-status-v1", testRecipe, ongoingSaveCompiler)
+	ordinary, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, raw, "builtin-pod-status-v1", testRecipe, ongoingSaveCompiler)
 	if err != nil {
 		t.Fatal("ongoing baseline", err)
 	}
 	spec["recordingSaves"] = map[string]any{"enabled": true}
 	raw, _ = json.Marshal(spec)
-	enabled, err := CompilePolicyWithRecorders(raw, "builtin-pod-status-v1", testRecipe, ongoingSaveCompiler)
+	enabled, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, raw, "builtin-pod-status-v1", testRecipe, ongoingSaveCompiler)
 	if err != nil {
 		t.Fatal("explicit reviewed save opt-in refused for existing ongoing recorder", err)
 	}
@@ -53,7 +55,7 @@ func TestPolicyRecordingSaveOptInIsExplicitReviewedCollectionIntent(t *testing.T
 // compiles into two ongoing recorders, both delegated action kinds, and a
 // valid policy; a second packet component is an acquisition conflict.
 func TestPolicyComposesPacketAndSyscallRecorders(t *testing.T) {
-	recorders := func(raw json.RawMessage) ([]planvalue.PolicyRecorderConfiguration, error) {
+	recorders := func(_ context.Context, _ targets.Request, raw json.RawMessage) ([]planvalue.PolicyRecorderConfiguration, error) {
 		var wire contracts.CaptureComposition
 		if err := json.Unmarshal(raw, &wire); err != nil {
 			return nil, err
@@ -73,7 +75,7 @@ func TestPolicyComposesPacketAndSyscallRecorders(t *testing.T) {
 	composition["maxTotalBytes"], composition["maxDuration"] = 32<<20, "30s"
 	spec["recordingSaves"] = map[string]any{"enabled": true}
 	raw, _ := json.Marshal(spec)
-	p, err := CompilePolicyWithRecorders(raw, "builtin-pod-status-v1", testRecipe, recorders)
+	p, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, raw, "builtin-pod-status-v1", testRecipe, recorders)
 	if err != nil || !p.Valid() || len(p.Recorders()) != 2 || p.Recorder.Action.Kind != "packetCapture" || p.MoreRecorders[0].Action.Kind != "syscallTrace" {
 		t.Fatal("mixed policy", err)
 	}
@@ -83,7 +85,7 @@ func TestPolicyComposesPacketAndSyscallRecorders(t *testing.T) {
 	second := map[string]any{"id": "network2", "profileRef": network["profileRef"]}
 	composition["components"] = []any{network, second}
 	raw, _ = json.Marshal(spec)
-	if _, err = CompilePolicyWithRecorders(raw, "builtin-pod-status-v1", testRecipe, recorders); err == nil {
+	if _, err = CompilePolicyWithRecorders(context.Background(), targets.Request{}, raw, "builtin-pod-status-v1", testRecipe, recorders); err == nil {
 		t.Fatal("two packet recorders on the same Pods compiled")
 	}
 }

@@ -27,8 +27,8 @@ func (d publicationDiagnosticLedger) AcceptedContextForPublication(ctx context.C
 	return v, publicationStepError("accepted context", err)
 }
 
-func (d publicationDiagnosticLedger) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority) (audit.ContextVerification, error) {
-	v, err := d.ContextPublicationLedger.RecordContextVerification(ctx, e, c, a)
+func (d publicationDiagnosticLedger) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, nativeBytes int64) (audit.ContextVerification, error) {
+	v, err := d.ContextPublicationLedger.RecordContextVerification(ctx, e, c, a, nativeBytes)
 	return v, publicationStepError("verification record", err)
 }
 

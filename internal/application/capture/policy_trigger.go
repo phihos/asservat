@@ -229,14 +229,29 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 		}
 		return nil
 	}
+	accepted, err := t.Accepted.AcceptedPolicyAuthority(tick, p.PolicyUID)
+	if err != nil {
+		return staged("accepted", err)
+	}
+	a := accepted.Authority
+	catalogTarget, err := policyAcceptedCatalogTarget(spec, a)
+	if err != nil {
+		return err
+	}
+	compileUntil := minPolicyDeadline(source.FreshUntil, accepted.FreshUntil, a.NotAfter)
+	compileCtx, endCompile := context.WithDeadline(tick, compileUntil)
+	defer endCompile()
 	var compiled value.RestartPolicy
 	if t.CompileRecorder != nil {
-		compiled, err = CompilePolicyWithRecorders(spec, t.RecipeName, t.RecipeDigest, t.CompileRecorder)
+		compiled, err = CompilePolicyWithRecorders(compileCtx, catalogTarget, spec, t.RecipeName, t.RecipeDigest, t.CompileRecorder)
 	} else {
 		compiled, err = CompileRestartPolicy(spec, t.RecipeName, t.RecipeDigest)
 	}
 	if err != nil {
 		return err
+	}
+	if compileCtx.Err() != nil || !t.Now().Before(compileUntil) {
+		return value.ErrChanged
 	}
 	ongoing := compiled.Recorder != nil && compiled.Recorder.Action.ExecutionMode == "ongoing"
 	// Finite busy policies retain incident coalescing. Ongoing sources still
@@ -246,11 +261,6 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	}
 	// A finite recorder proceeds through the real preview/admission and typed
 	// source/observation start. No ordinary/manual raw path is enabled here.
-	accepted, err := t.Accepted.AcceptedPolicyAuthority(tick, p.PolicyUID)
-	if err != nil {
-		return staged("accepted", err)
-	}
-	a := accepted.Authority
 	if compiled.Recorder != nil && RecorderPolicyScopeDigest(source.Revision.UID, accepted.IntentVersion, source.CollectionDigest, compiled, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits) != a.ScopeDigest {
 		return value.ErrChanged
 	}

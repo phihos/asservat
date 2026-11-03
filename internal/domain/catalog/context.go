@@ -66,6 +66,8 @@ type ContextCase struct {
 }
 
 type ContextCaseArtifact struct {
+	// NativeBytes is the verified native length, nil for legacy unknown.
+	NativeBytes           *int64
 	ArtifactID, CaptureID string
 	NativeType            string               // verified format discriminator for supported views
 	Target                authorization.Target // internal navigation match; omit from public DTO
@@ -90,7 +92,7 @@ func (c ContextCase) Valid(now time.Time) bool {
 	}
 	seen := map[string]bool{}
 	for _, a := range c.Artifacts {
-		if !authorization.UUID(a.ArtifactID) || !authorization.UUID(a.CaptureID) || !a.Target.Valid() || a.Version == (artifact.Digest{}) || !now.Before(a.ExpiresAt) || !a.ExpiresAt.Before(a.DeleteBy) || c.ValidUntil.After(a.ExpiresAt) || seen[a.ArtifactID] {
+		if a.NativeBytes != nil && (*a.NativeBytes < 0 || *a.NativeBytes > artifact.MaxNativeBytes) || !authorization.UUID(a.ArtifactID) || !authorization.UUID(a.CaptureID) || !a.Target.Valid() || a.Version == (artifact.Digest{}) || !now.Before(a.ExpiresAt) || !a.ExpiresAt.Before(a.DeleteBy) || c.ValidUntil.After(a.ExpiresAt) || seen[a.ArtifactID] {
 			return false
 		}
 		seen[a.ArtifactID] = true

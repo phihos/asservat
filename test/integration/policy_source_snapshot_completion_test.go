@@ -56,8 +56,8 @@ func (s snapshotPublicationLedgerTrace) AcceptedContextForPublication(ctx contex
 	s.trace.failed("accepted", err)
 	return out, err
 }
-func (s snapshotPublicationLedgerTrace) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority) (auditvalue.ContextVerification, error) {
-	out, err := s.ContextPublicationFacets.RecordContextVerification(ctx, e, c, a)
+func (s snapshotPublicationLedgerTrace) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, nativeBytes int64) (auditvalue.ContextVerification, error) {
+	out, err := s.ContextPublicationFacets.RecordContextVerification(ctx, e, c, a, nativeBytes)
 	s.trace.failed("record", err)
 	return out, err
 }

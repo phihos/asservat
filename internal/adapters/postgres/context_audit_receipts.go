@@ -49,7 +49,7 @@ func currentPublishedContext(row custodydb.ReadPublishedContextRow) (artifact.Co
 	if err != nil {
 		return artifact.ContextExpectation{}, err
 	}
-	if !currentVerificationReceipt(v) || v.RootID != c.RootID || v.CaptureID != c.ID || !bytes.Equal(v.ExpectationDigest, digest(e)) || !bytes.Equal(v.IntentDigest, c.IntentDigest) || len(v.CopiesDigest) != 32 || bytes.Equal(v.CopiesDigest, make([]byte, 32)) || !row.PublishedAt.Valid || row.PublishedAt.Time.Before(v.AuditAcknowledgedAt.Time) || !row.PublishedAt.Time.Before(e.Registration.WriteUntil) {
+	if v.NativeBytes.Valid && (v.NativeBytes.Int64 < 0 || v.NativeBytes.Int64 > e.Registration.NativeLimit) || !currentVerificationReceipt(v) || v.RootID != c.RootID || v.CaptureID != c.ID || !bytes.Equal(v.ExpectationDigest, digest(e)) || !bytes.Equal(v.IntentDigest, c.IntentDigest) || len(v.CopiesDigest) != 32 || bytes.Equal(v.CopiesDigest, make([]byte, 32)) || !row.PublishedAt.Valid || row.PublishedAt.Time.Before(v.AuditAcknowledgedAt.Time) || !row.PublishedAt.Time.Before(e.Registration.WriteUntil) {
 		return artifact.ContextExpectation{}, privacy.ErrFence
 	}
 	return e, nil

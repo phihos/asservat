@@ -24,6 +24,7 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	planvalue "asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/conversion"
 	"asservat.local/asservat/internal/transport/presentation"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -84,7 +85,7 @@ func publicPolicySpec(t testing.TB, a authorization.AcceptedPolicyAuthority) []b
 
 func TestPublicPolicyGrantFixtureUsesSupportedCompilerInputs(t *testing.T) {
 	spec := publicPolicySpec(t, authorization.AcceptedPolicyAuthority{ClusterID: "11111111-1111-4111-8111-111111111111"})
-	compiled, err := captureapp.CompilePolicyWithRecorders(spec, planningapp.ContextRecipeName, planningapp.RecipeDigest(), publicPolicyCompile)
+	compiled, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, spec, planningapp.ContextRecipeName, planningapp.RecipeDigest(), publicPolicyCompile)
 	if err != nil || compiled.Recorder == nil {
 		t.Fatal("public fixture cannot compile actual protected configuration", err)
 	}

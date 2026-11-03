@@ -25,6 +25,7 @@ import (
 	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // These are two admitted shapes, not a Cartesian maximum or physical storage
@@ -51,7 +52,7 @@ func policyMetadataShapes(t *testing.T) []policyMetadataShape {
 		}
 		candidate := "(" + strings.Join(ports, " or ") + ") and (" + policyRawExpression + ")"
 		spec := bytes.ReplaceAll(publicPolicySpec(t, authorization.AcceptedPolicyAuthority{ClusterID: custodyID()}), []byte("tcp dst port 80"), []byte(candidate))
-		p, err := captureapp.CompilePolicyWithRecorders(spec, planning.ContextRecipeName, planning.RecipeDigest(), policyMetadataCompile(filters))
+		p, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, spec, planning.ContextRecipeName, planning.RecipeDigest(), policyMetadataCompile(filters))
 		if err != nil {
 			t.Logf("first compiler-refused next candidate clauses=%d filterBytes=%d", count, len(candidate))
 			break
@@ -116,7 +117,7 @@ func TestPolicyMetadataBoundaryShapesOffline(t *testing.T) {
 				a.Eligibility.DefaultAudience = append(a.Eligibility.DefaultAudience, next)
 			}
 			spec := bytes.ReplaceAll(publicPolicySpec(t, authorization.AcceptedPolicyAuthority{ClusterID: a.Storage.ClusterID}), []byte("tcp dst port 80"), []byte(shape.expression))
-			compiled, err := captureapp.CompilePolicyWithRecorders(spec, planning.ContextRecipeName, planning.RecipeDigest(), policyMetadataCompile(filters))
+			compiled, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, spec, planning.ContextRecipeName, planning.RecipeDigest(), policyMetadataCompile(filters))
 			if err != nil || compiled.Recorder == nil {
 				t.Fatal("real compiler shape", err)
 			}

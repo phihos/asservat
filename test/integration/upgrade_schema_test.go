@@ -143,6 +143,12 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("original argument authority shape", e)
 		}
 	}
+	var originalNativeLengthGuard string
+	if head == 130 {
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.protect_context_verification()'::regprocedure)`).Scan(&originalNativeLengthGuard); e != nil {
+			t.Fatal(e)
+		}
+	}
 	upgrade, e := postgres.NewUpgradeSchema(config)
 	if e != nil {
 		t.Fatal(e)
@@ -375,6 +381,19 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("argument authority Up after Down", from, to, e)
 		}
 		t.Log("SQL128 empty Down restored exact four functions/session constraints/column shapes; Up reapplied")
+	}
+	if head == 130 {
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("empty native length Down", e)
+		}
+		var guard string
+		var exists bool
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.protect_context_verification()'::regprocedure), EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='context_verification' AND column_name='native_bytes')`).Scan(&guard, &exists); e != nil || guard != originalNativeLengthGuard || exists {
+			t.Fatal("native length Down changed original shape", exists, e)
+		}
+		if _, e = p.Up(ctx); e != nil {
+			t.Fatal("native length Up", e)
+		}
 	}
 	// A version this binary does not know is refused, not skipped.
 	if _, e = conn.Exec(ctx, "INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", head+1); e != nil {

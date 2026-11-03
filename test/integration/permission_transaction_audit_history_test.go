@@ -12,6 +12,7 @@ import (
 )
 
 type permissionPublicationAuditFixture struct {
+	nativeBytes            int64
 	expectation            artifact.ContextExpectation
 	copies                 artifact.Copies
 	verify, audit, publish *postgres.ContextPublications
@@ -35,7 +36,7 @@ func qualifyPermissionPublicationAuditHistory(t *testing.T, ctx context.Context,
 				if err != nil {
 					t.Fatal(err)
 				}
-				record, err := f.verify.RecordContextVerification(ctx, f.expectation, f.copies, authority)
+				record, err := f.verify.RecordContextVerification(ctx, f.expectation, f.copies, authority, f.nativeBytes)
 				if err != nil {
 					t.Fatal(err)
 				}

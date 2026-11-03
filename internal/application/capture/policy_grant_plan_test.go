@@ -7,6 +7,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"
 	planning "asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/conversion"
 	"context"
 	"crypto/sha256"
@@ -220,7 +221,7 @@ func argumentGrantPlanFixture(t *testing.T, events int64) (*workloadActivationFi
 		s["profileComposition"] = map[string]any{"components": []any{map[string]any{"id": "calls", "profileRef": map[string]any{"catalog": "namespace", "name": "argument-capture", "version": "v1"}}}, "maxTotalBytes": 8 << 20, "maxDuration": "30s"}
 	}
 	source, spec, _ := f.ReadPolicy(t.Context(), "restarts", "policy-uid")
-	compiled, err := CompilePolicyWithRecorders(spec, plans.RecipeName, plans.RecipeDigest, plans.CompileRecorder)
+	compiled, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, spec, plans.RecipeName, plans.RecipeDigest, plans.CompileRecorder)
 	if err != nil {
 		t.Fatal(err)
 	}

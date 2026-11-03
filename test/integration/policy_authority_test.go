@@ -249,7 +249,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 	t.Run("policy-grants-public-request-review-attachment-audit", func(t *testing.T) {
 		s := newSetup(t, 64<<20)
 		spec := publicPolicySpec(t, s.input.Authority)
-		compiled, err := captureapp.CompilePolicyWithRecorders(spec, planningapp.ContextRecipeName, planningapp.RecipeDigest(), publicPolicyCompile)
+		compiled, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, spec, planningapp.ContextRecipeName, planningapp.RecipeDigest(), publicPolicyCompile)
 		if err != nil {
 			t.Fatal(err)
 		}

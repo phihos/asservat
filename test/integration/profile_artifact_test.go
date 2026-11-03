@@ -166,7 +166,7 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 	if err != nil {
 		t.Fatal("store pprof", err)
 	}
-	if err = v.VerifyContext(ctx, e, copies); err != nil {
+	if _, err = v.VerifyContext(ctx, e, copies); err != nil {
 		t.Fatal("pprof verification", err)
 	}
 	got, m := readBack(t, v, e, copies)
@@ -198,7 +198,7 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 	if err != nil {
 		t.Fatal("producer refused a gzip-valid stream", err)
 	}
-	if err = v.VerifyContext(ctx, e, copies); !errors.Is(err, artifact.ErrIntegrity) {
+	if _, err = v.VerifyContext(ctx, e, copies); !errors.Is(err, artifact.ErrIntegrity) {
 		t.Fatal("corrupted pprof verified", err)
 	}
 	// A stream that is not gzip never leaves the producer.
@@ -219,7 +219,7 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 	if err != nil {
 		t.Fatal("store trace", err)
 	}
-	if err = v.VerifyContext(ctx, e, copies); err != nil {
+	if _, err = v.VerifyContext(ctx, e, copies); err != nil {
 		t.Fatal("trace verification", err)
 	}
 	got, m = readBack(t, v, e, copies)
@@ -231,7 +231,7 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 	if v, copies, err = store1(t, e, tr.Bytes()[:tr.Len()/2]); err != nil {
 		t.Fatal("store truncated trace", err)
 	}
-	if err = v.VerifyContext(ctx, e, copies); !errors.Is(err, artifact.ErrIntegrity) {
+	if _, err = v.VerifyContext(ctx, e, copies); !errors.Is(err, artifact.ErrIntegrity) {
 		t.Fatal("truncated trace verified", err)
 	}
 	// A valid pprof larger than one storage frame exercises the real SQL
@@ -245,7 +245,7 @@ func qualifyProfileArtifacts(t *testing.T, ctx context.Context, store *objectsto
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = verifier.VerifyContext(ctx, large, copies); err != nil {
+		if _, err = verifier.VerifyContext(ctx, large, copies); err != nil {
 			t.Fatal("large profile verification", err)
 		}
 		got, metadata := readBack(t, verifier, large, copies)

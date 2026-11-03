@@ -339,7 +339,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Fatal(err)
 	}
 	begin = time.Now()
-	if err = verifier.VerifyContext(ctx, e, copies); err != nil {
+	if _, err = verifier.VerifyContext(ctx, e, copies); err != nil {
 		t.Fatal("full verification", err)
 	}
 	verified := time.Since(begin)
@@ -367,7 +367,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if x.Validate() != nil {
 			t.Fatal("mutated expectation invalid before verification", name)
 		}
-		if err = verifier.VerifyContext(ctx, x, copies); err == nil {
+		if _, err = verifier.VerifyContext(ctx, x, copies); err == nil {
 			t.Fatal("verification accepted a changed expectation", name)
 		}
 	}

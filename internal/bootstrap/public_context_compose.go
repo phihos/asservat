@@ -448,7 +448,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// Passive existing-source services reuse current protected ports. The later
 	// trusted composition requires collection capability and the complete source
 	// runtime; this unmerged candidate still requires installed qualification.
-	recordingPolicies := captureapp.CurrentRecordingPolicies{Documents: out.hubPolicies, Accepted: out.policies, CompileRecorder: recordingSavePolicyCompiler(out.investigation.Filters), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}
+	recordingPolicies := captureapp.CurrentRecordingPolicies{Documents: out.hubPolicies, Accepted: out.policies, CompileRecorder: recordingSavePolicyCompiler(out.investigation.Filters, out.investigation.Profiles), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now}
 	out.investigation.RecordingPolicies, out.investigation.PolicyAccepted = recordingPolicies, out.policies
 	out.investigation.RecordingSources, out.investigation.RecordingGroups = previews, admissionsSQL
 	out.recordings = &captureapp.RecordingSaves{Targets: queries, Investigation: out.investigation, Inventory: captureapp.RecordingInventory{RootID: root, Permissions: out.permissions, Eligibility: eligibility, Candidates: previews, Policies: recordingPolicies, Selections: previews, Accepted: out.policies, Now: time.Now, NewID: ownerRandomID}}
@@ -476,7 +476,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		return nil, mounts.ErrUnavailable
 	}
 	out.grants = authapp.GrantService{RootID: root, InstallationID: installation, Permissions: out.permissions, WorkloadPermissions: out.permissions, Store: grantStore, PolicyRequests: grantStore, ApprovalSettings: grantStore,
-		PolicyPlans: captureapp.PolicyGrantPlans{Accepted: out.policies, Sources: out.policies, Documents: out.hubPolicies, CompileRecorder: publicPolicyRecorderCompiler(out.investigation.Filters), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now},
+		PolicyPlans: captureapp.PolicyGrantPlans{Accepted: out.policies, Sources: out.policies, Documents: out.hubPolicies, CompileRecorder: publicPolicyRecorderCompiler(out.investigation.Filters, out.investigation.Profiles), RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Now: time.Now},
 		Recovery:    out.recovery, NewID: ownerRandomID, Now: time.Now}
 	out.investigation.Grants = out.grants
 	out.caseRoutes = routes

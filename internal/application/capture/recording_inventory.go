@@ -66,9 +66,16 @@ func (s CurrentRecordingPolicies) RecordingPolicy(ctx context.Context, name, uid
 	if err != nil {
 		return zero, err
 	}
-	p, err := CompilePolicyWithRecorders(raw, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
+	catalogTarget, err := policyAcceptedCatalogTarget(raw, accepted.Authority)
+	if err != nil {
+		return zero, err
+	}
+	compileUntil := minPolicyDeadline(source.FreshUntil, accepted.FreshUntil, accepted.Authority.NotAfter)
+	compileCtx, endCompile := context.WithDeadline(ctx, compileUntil)
+	defer endCompile()
+	p, err := CompilePolicyWithRecorders(compileCtx, catalogTarget, raw, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
 	a := accepted.Authority
-	if err != nil || !source.Valid(s.Now()) || source.Suspended || source.Deleted || !a.Valid(s.Now()) || !s.Now().Before(accepted.SourceUntil) || !p.RecordingSaves || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing" || RecorderPolicyScopeDigest(source.Revision.UID, accepted.IntentVersion, source.CollectionDigest, p, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits) != a.ScopeDigest {
+	if err != nil || compileCtx.Err() != nil || !s.Now().Before(compileUntil) || !source.Valid(s.Now()) || source.Suspended || source.Deleted || !a.Valid(s.Now()) || !s.Now().Before(accepted.SourceUntil) || !p.RecordingSaves || p.Recorder == nil || p.Recorder.Action.ExecutionMode != "ongoing" || RecorderPolicyScopeDigest(source.Revision.UID, accepted.IntentVersion, source.CollectionDigest, p, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits) != a.ScopeDigest {
 		return zero, value.ErrDenied
 	}
 	return RecordingPolicy{Policy: p, Accepted: accepted}, nil
