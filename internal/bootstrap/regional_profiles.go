@@ -122,21 +122,41 @@ func (h *ConnectorRecordings) DeliverProfile(ctx context.Context, node collector
 		h.mu.Unlock()
 		return nil
 	}
-	if h.storing != 0 {
-		held.prepared = nil
-		held.outcome = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
-		h.mu.Unlock()
-		return value.ErrUnavailable
-	}
-	h.storing += maxStoringBytes
+	// Claim the single delivery before releasing the lock, including its wait
+	// for the shared working budget. The completed body stays unread, and Stop
+	// cancels this same original-deadline context while waiting or storing.
 	held.storing = true
 	storeCtx, cancelStore := context.WithDeadline(ctx, held.expectation.Registration.WriteUntil)
 	defer cancelStore()
 	held.stopStore = cancelStore
 	p, e := held.prepared, held.expectation
 	held.prepared = nil
+	for h.storing != 0 && storeCtx.Err() == nil && h.now().Before(e.Registration.WriteUntil) {
+		if h.storeReleased == nil {
+			h.storeReleased = make(chan struct{})
+		}
+		released := h.storeReleased
+		h.mu.Unlock()
+		select {
+		case <-released:
+		case <-storeCtx.Done():
+		}
+		h.mu.Lock()
+	}
+	// Capacity becoming available cannot renew an expired/cancelled attempt.
+	if storeCtx.Err() != nil || !h.now().Before(e.Registration.WriteUntil) {
+		held.stopStore = nil
+		held.storing = false
+		held.outcome = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
+		if held.stop != nil {
+			held.outcome = h.profileCancelled(held, held.mayHaveStarted)
+		}
+		h.mu.Unlock()
+		return value.ErrUnavailable
+	}
+	h.storing += maxStoringBytes
 	h.mu.Unlock()
-	defer func() { h.mu.Lock(); h.storing -= maxStoringBytes; held.storing = false; h.mu.Unlock() }()
+	defer func() { h.mu.Lock(); h.releaseStoreLocked(maxStoringBytes); held.storing = false; h.mu.Unlock() }()
 	copies, err := p.Store(storeCtx, body, r.Outcome.StartedAt.UTC(), r.Outcome.CompletedAt.UTC())
 	stored := h.now().UTC().Truncate(time.Microsecond)
 	out := evidence.RecordingCollection{State: evidence.RecordingStored, Acquired: held.queued, Completion: artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: held.digest, Copies: copies, StoredAt: stored, ClosedAt: stored}}
