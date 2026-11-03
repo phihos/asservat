@@ -31,6 +31,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -562,7 +563,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					}
 					measurement = &nativePacingMeasurement{admin: admin, root: p.RootID, providers: providers, traffic: f.NativeTrafficHelper}
 				}
-				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID))
+				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID))
 			})
 			return
 		}
@@ -971,6 +972,12 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	records := int64(8)
 	if installedJourneyFocus() == "manual-profile" {
 		records = 10
+	}
+	// The saved-syscall journey performs five distinct paid queries, including
+	// the changed-filter cursor refusal. Retiring a worker never refunds a
+	// query unit; fund exactly five two-unit source reads in these two foci.
+	if installedJourneyFocus() == "manual-syscall" || installedJourneyFocus() == "manual-arguments" {
+		records = installedSyscallProjectionQueries * query.SyscallProjectionQueryUnits
 	}
 	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 128), Resolution: lane(4, 8), Processing: lane(2, 16)},

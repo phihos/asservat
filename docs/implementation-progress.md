@@ -3,6 +3,28 @@
 
 ## Current delivery workflow (2026-11-03)
 
+The first installed syscall qualification batch reached four successful views for
+both source formats: exact native summary, filtered first page, continuation and
+empty error-filter page. Each used the real 256 MiB Pod, two units and three
+one-use keys; read-only download denial, native-content comparison and recorded
+worker retirement also passed. The fifth changed-filter request failed because
+the fixture allocated eight units but five charged queries require ten. Go exited
+1 (arguments 871.253s, metadata 869.306s); both source inventories were unchanged and
+cleanup failures were empty. Workflow cancellation at the 20-minute cap followed.
+Original reports are retained in `test/results/syscall-native-41691601751/` and
+`test/results/syscall-native-41691604591/`; no complete qualification is claimed.
+
+The fixture now funds exactly ten units for these two workflows and overlaps
+terminal inspection in two-worker cohorts, preserving all five joined workers
+and the first four positive later-demand retirements. The preceding completed
+native download is closed and its exact original Job/Pod termination is observed
+before using both existing worker slots. No product default, cap, charge, source
+or deadline changes. Focused fixture races pass in 1.878s. CI also reproduced an old
+source-pin fixture omitting the now-required display identity; updating it and
+adding unknown/cross-display denials makes the entire PostgreSQL adapter race
+suite pass in 4.240s. Final `make pre-push` returned 0, including all 369 console tests. These
+corrections are ready for one explained qualification rerun.
+
 Saved syscall summaries/events are integrated through the regional reader,
 SQL132, audit, private result codec, browser/MCP and console. Both metadata and
 raw-argument sources return fixed extracts under ordinary current read rights;
@@ -32,8 +54,8 @@ separately in `test/results/syscall-browser-first/` and
 Review identified trailing commas/duplicate names producing a misleading access
 error. The two failing UI regressions now pass after trimming empty entries and
 deduplicating the comma-separated list; the controller/API retain strict typed
-selection checks. All38 affected tests and the updated complete browser gate
-passed (27 journeys/26 scans; Go39.110s including native restart). Reports are
+selection checks. All 38 affected tests and the updated complete browser gate
+passed (27 journeys/26 scans; Go 39.110s including native restart). Reports are
 retained in `test/results/syscall-filter-normalization/`. No Go/SQL source changed.
 
 Six earlier isolated maximum-input encrypted consumers used 65,952–74,608 KiB peak

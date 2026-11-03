@@ -14,11 +14,145 @@ import (
 	"testing"
 	"time"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/configuration"
+	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"k8s.io/client-go/rest"
 )
+
+const installedSyscallProjectionQueries = 5
+
+// The existing worker pool admits two workers. RPCs still run sequentially and
+// join their native responses; only independent terminal-lifetime inspection is
+// deferred so the two original worker periods can overlap. No charge is freed
+// by this bookkeeping. The next cohort's real admissions perform cleanup.
+type installedSyscallProofCohort struct {
+	pending                  []func() func()
+	retirement               []func()
+	queries, joined, retired int
+}
+
+func (c *installedSyscallProofCohort) add(t *testing.T, verify func() func()) {
+	t.Helper()
+	if verify == nil || len(c.pending) >= 2 || c.queries >= installedSyscallProjectionQueries {
+		t.Fatal("syscall fixture exceeded its two-worker cohort or funded query count")
+	}
+	c.pending = append(c.pending, verify)
+	c.queries++
+}
+
+func (c *installedSyscallProofCohort) flush(t *testing.T) {
+	t.Helper()
+	if len(c.pending) == 0 {
+		return
+	}
+	pending, previous := c.pending, c.retirement
+	c.pending = nil
+	next := make([]func(), len(pending))
+	defer func() { c.retirement = next }()
+	// Register each proof separately: even a failing assertion/Goexit must
+	// attempt the remaining known worker joins, including deferred cleanup.
+	for i := len(previous) - 1; i >= 0; i-- {
+		if previous[i] == nil {
+			continue
+		}
+		defer func(check func()) { check(); c.retired++ }(previous[i])
+	}
+	for i := len(pending) - 1; i >= 0; i-- {
+		defer func(index int, verify func() func()) {
+			retirement := verify()
+			if retirement == nil {
+				t.Fatal("syscall query lacks joined SQL/worker/key evidence")
+			}
+			next[index] = retirement
+			c.joined++
+		}(i, pending[i])
+	}
+}
+
+// This read-only observer never authorizes a worker launch or mutates a Job.
+// Historical termination inspection intentionally does not consume this guard.
+type installedTerminationOnlyConfiguration struct{}
+
+func (installedTerminationOnlyConfiguration) CurrentWorkerConfiguration(context.Context, value.DownloadWorkerProfile) (time.Time, error) {
+	return time.Time{}, artifact.ErrDownloadUnavailable
+}
+
+type installedStoppedDownloadCheck func(downloadID string) func()
+
+func finishInstalledSyscallNativeDownload(downloadID string, invoke func(string, any) (installedJourneyEnvelope, string), closed installedStoppedDownloadCheck) (func(), error) {
+	if !value.UUID(downloadID) || invoke == nil || closed == nil {
+		return nil, errors.New("missing original native-download close composition")
+	}
+	reply, code := invoke("cancel_artifact_download", map[string]string{"download_id": downloadID, "idempotency_key": "syscall-native-complete-" + downloadID})
+	var receipt installedJourneyStopReceipt
+	if code != "" || reply.Status != "ok" || installedJourneyDecode(reply.Data, &receipt) != nil || receipt.DownloadID != downloadID || (receipt.State != "Cancelled" && receipt.State != "AlreadyTerminal") || (receipt.AuditState != "pending" && receipt.AuditState != "recorded" && receipt.AuditState != "overdue") {
+		return nil, errors.New("completed native-download close was not acknowledged; no replay")
+	}
+	retirement := closed(downloadID)
+	if retirement == nil {
+		return nil, errors.New("original native-download worker has no terminal proof")
+	}
+	return retirement, nil
+}
+
+// Operator-only SQL/API readback observes the original download worker after a
+// public Close. It changes no session, lifetime, charge or workload object. The
+// next real query admission must record positive product retirement itself.
+func installedStoppedDownloadSQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api *rest.Config, root, cluster string) installedStoppedDownloadCheck {
+	return func(downloadID string) func() {
+		t.Helper()
+		var worker value.DownloadWorker
+		var rawIntent, rawJob, rawBinding []byte
+		var state string
+		var workers int
+		err := admin.QueryRow(ctx, `SELECT w.intent_json,w.job_json,w.binding_json,d.state,count(*) OVER () FROM download_worker w JOIN artifact_download d ON d.id=w.session_id AND d.root_id=w.root_id
+	 WHERE w.root_id=$1 AND w.session_id=$2 AND w.query_id IS NULL AND w.retired_proof_json IS NULL`, root, downloadID).Scan(&rawIntent, &rawJob, &rawBinding, &state, &workers)
+		if err != nil || workers != 1 || (state != "Cancelled" && state != "Completed") || json.Unmarshal(rawIntent, &worker.Intent) != nil || json.Unmarshal(rawJob, &worker.Job) != nil || json.Unmarshal(rawBinding, &worker.Binding) != nil || !worker.Valid() || worker.Intent.SessionID != downloadID || worker.Intent.Profile.ClusterID != cluster {
+			t.Fatal("original completed native worker was not retained after public Close", err, state)
+		}
+		profile := worker.Intent.Profile
+		client, err := kube.NewPermissionClient(api, cluster, configuration.NamespaceRef{Name: profile.Namespace, UID: profile.NamespaceUID}, time.Now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		jobs, err := kube.NewDownloadWorkerJobs(client, profile, installedTerminationOnlyConfiguration{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		started := time.Now()
+		limit, end := context.WithTimeout(ctx, 30*time.Second)
+		defer end()
+		for limit.Err() == nil {
+			proof, err := jobs.ObserveDownloadWorkerTermination(limit, worker)
+			if err == nil && proof.Valid(time.Now()) && proof.Worker == worker {
+				t.Logf("installed native download Close: exact original Job/Pod terminal observed after %s; original RunUntil=%s retained, no fixture refund", time.Since(started), worker.Intent.RunUntil.UTC().Format(time.RFC3339Nano))
+				return func() {
+					t.Helper()
+					var termination, retirement []byte
+					var abandoned bool
+					err := admin.QueryRow(ctx, `SELECT termination_json,retired_proof_json,abandoned_at IS NOT NULL FROM download_worker WHERE root_id=$1 AND id=$2 AND session_id=$3 AND query_id IS NULL`, root, worker.Intent.ID, downloadID).Scan(&termination, &retirement, &abandoned)
+					var term value.DownloadWorkerTermination
+					var retired value.DownloadWorkerRetirement
+					if err != nil || abandoned || json.Unmarshal(termination, &term) != nil || json.Unmarshal(retirement, &retired) != nil || !term.Valid(term.ObservedAt) || !retired.Valid(retired.ObservedAt) || term.Worker != worker || retired.Termination.Worker != worker || !reflect.DeepEqual(term, retired.Termination) {
+						t.Fatal("real query admission did not retain original native-worker positive retirement", err)
+					}
+					t.Log("installed native download Close: first real query admission persisted exact termination and retirement; both query-worker slots now available")
+				}
+			}
+			if installedJourneyPause(limit, 250*time.Millisecond) != nil {
+				break
+			}
+		}
+		t.Fatal("original native-download Job/Pod did not terminate after acknowledged public Close", limit.Err())
+		return nil
+	}
+}
 
 // The native file already passed independent download hash and capture-source
 // checks at each caller. This independent oracle does not call the production
@@ -170,9 +304,9 @@ type installedSyscallPage struct {
 	Expires  time.Time `json:"query_expires_at"`
 }
 
-func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version, nativeType, pod string, native []byte, expires time.Time, marker string, check installedProjectionCheck) {
+func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version, nativeType, pod string, native []byte, expires time.Time, marker string, check installedProjectionCheck, downloadRetirement func()) {
 	t.Helper()
-	if check == nil {
+	if check == nil || downloadRetirement == nil {
 		t.Fatal("syscall projections require independent SQL readback")
 	}
 	expectedEvents, expectedRows, expectedCounts, err := installedSyscallExpected(native, nativeType, pod)
@@ -224,15 +358,27 @@ func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, ident
 		t.Fatal("read-only syscall session obtained native download")
 	}
 	deniedCheck("", "")
-	// Each verify waits joined SQL/native closure and exact terminal Pod/Job.
-	// Only a subsequent real query supplies product demand cleanup; observe
-	// retirement of the first four without inventing a sixth query for the last.
-	var previousRetirement func()
+	// Every worker retains its original period and conservative charge. Read
+	// back terminal proofs in cohorts 1+2, 3+4 and 5 rather than serially waiting
+	// one full worker lifetime after each already-joined response.
+	var proofs installedSyscallProofCohort
+	defer proofs.flush(t)
 	run := func(tool string, args map[string]any, wantError string) (installedSyscallReply, installedSyscallPage) {
 		t.Helper()
+		if proofs.queries >= installedSyscallProjectionQueries {
+			t.Fatal("syscall fixture has no prepaid query unit for another call")
+		}
 		verify := check(artifactID)
 		out := call(tool, args)
 		operation, handle := out.RequestID, ""
+		// Queue as soon as the immutable operation is known, so a later poll or
+		// assertion failure still attempts this known worker's independent join.
+		proofs.add(t, func() func() { return verify(handle, operation) })
+		defer func() {
+			if len(proofs.pending) == 2 {
+				proofs.flush(t)
+			}
+		}()
 		var observed, until time.Time
 		for poll := 0; out.Status == "pending"; poll++ {
 			var pending struct {
@@ -278,14 +424,6 @@ func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, ident
 		} else if out.Status != "ok" || out.DataClass != "extract" || len(out.Provenance) != 1 || out.Provenance[0].ArtifactID != artifactID || out.Provenance[0].Digest != version {
 			t.Fatal("syscall result changed source/class", out.Status, installedSyscallFailureCode(out))
 		}
-		retired := verify(handle, operation)
-		if retired == nil {
-			t.Fatal("syscall query lacks joined SQL/worker/key evidence")
-		}
-		if previousRetirement != nil {
-			previousRetirement()
-		}
-		previousRetirement = retired
 		var page installedSyscallPage
 		if wantError != "" {
 			return out, page
@@ -308,6 +446,7 @@ func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, ident
 		return map[string]any{"case_id": caseID, "artifact_id": artifactID, "limit": 100}
 	}
 	_, summary := run("get_syscall_summary", base(), "")
+	downloadRetirement()
 	if summary.Kind != "syscallSummary" || len(summary.Events) != 0 || len(summary.Rows) == 0 || len(summary.Rows) > min(100, len(expectedRows)) || !reflect.DeepEqual(summary.Rows, expectedRows[:len(summary.Rows)]) {
 		t.Fatal("summary differs from independently counted downloaded native events")
 	}
@@ -354,6 +493,10 @@ func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, ident
 	args = base()
 	args["cursor"], args["syscall_names"], args["errors_only"] = first.Next, []string{name}, true
 	run("get_syscall_events", args, "InvalidCursor")
+	proofs.flush(t)
+	if proofs.queries != installedSyscallProjectionQueries || proofs.joined != installedSyscallProjectionQueries || proofs.retired != installedSyscallProjectionQueries-1 {
+		t.Fatal("syscall fixture did not observe all five joins and first four product retirements", proofs.queries, proofs.joined, proofs.retired)
+	}
 	// All five workers reached joined closure and their original terminal
 	// lifetime. The last retains its conservative charge until ordinary cleanup;
 	// this fixture does not claim a final retirement/refund it did not observe.

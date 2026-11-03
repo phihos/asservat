@@ -9,15 +9,27 @@ import (
 	"asservat.local/asservat/internal/domain/privacy"
 )
 
-// ADR-282: the query fence and the processing facet accept exactly the
-// pod-status metadata context or an httpHeaders extract of one frame.
+// Legacy source pins retain their exact native type/class/size and closed
+// display identity. Full authority/route validity is checked by their owner.
 func TestProjectionSourcePinsAreExact(t *testing.T) {
-	pod := analysis.ContextProjectionScope{}
-	http := analysis.ContextProjectionScope{NativeType: artifact.HTTPHeadersArtifact}
+	pod := analysis.ContextProjectionScope{DisplayVersion: analysis.ContextDisplayVersion}
+	http := analysis.ContextProjectionScope{NativeType: artifact.HTTPHeadersArtifact, DisplayVersion: analysis.HTTPHeadersDisplayVersion}
 	podStatus := artifact.ContextExpectation{DataClass: "metadata", Registration: artifact.Registration{NativeLimit: artifact.MaxContextBytes}}
 	extract := artifact.ContextExpectation{NativeType: artifact.HTTPHeadersArtifact, DataClass: "extract", Registration: artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}}
 	if !scopeSource(pod, podStatus) || !scopeSource(http, extract) || scopeSource(pod, extract) || scopeSource(http, podStatus) {
 		t.Fatal("scope source did not pin the published type")
+	}
+	for _, display := range []string{"", analysis.ProfileSummaryDisplayVersion, analysis.SyscallSummaryDisplayVersion, analysis.SyscallEventsDisplayVersion, "unknown"} {
+		badPod, badHTTP := pod, http
+		badPod.DisplayVersion, badHTTP.DisplayVersion = display, display
+		if scopeSource(badPod, podStatus) || scopeSource(badHTTP, extract) {
+			t.Fatalf("legacy source accepted unrelated display %q", display)
+		}
+	}
+	badPod, badHTTP := pod, http
+	badPod.DisplayVersion, badHTTP.DisplayVersion = analysis.HTTPHeadersDisplayVersion, analysis.ContextDisplayVersion
+	if scopeSource(badPod, podStatus) || scopeSource(badHTTP, extract) {
+		t.Fatal("known legacy displays crossed source kinds")
 	}
 	for name, e := range map[string]artifact.ContextExpectation{
 		"raw-pod-status": {DataClass: "raw", Registration: podStatus.Registration},
