@@ -59,11 +59,19 @@ configuration, normalization and both provenance entries belong in the same
 browser/MCP result contract; source-sensitive errors remain unavailable until
 both readers are authorized.
 
-The existing 256 MiB summary worker is a measurement starting point, not proof
-for two profiles. Qualify framing, crypto, parser object graphs, both complete
-maps, provider work, output, cancellation and actual terminal ownership together
-before enabling admission. Local allocation benchmarks and encrypted synthetic
-providers do not establish installed capacity or SQL/key authority.
+The comparison-only provisional floor is 384 MiB for both physical worker memory
+and transient memory. The existing summary floor stays 256 MiB. A fresh-process
+maximum-shape encrypted two-source probe reached 252.363 MiB RSS in 1.202 s,
+leaving only 3.637 MiB below the old floor before SQL, real provider and worker
+runtime composition. One unchanged-input 224 MiB Go soft-limit probe reached
+246.152 MiB; that small reduction does not justify adding a product tuning knob.
+The chosen floor costs 128 MiB more per active comparison-capable worker, using
+existing resource configuration. See the retained reports in
+`test/results/profile-comparison-memory`. These synthetic-process measurements
+are neither cgroup qualification nor a complete simultaneous parser maximum.
+Qualify framing, crypto, parser object graphs, both complete maps, actual provider
+and SQL work, output, cancellation and terminal ownership in the real worker
+before enabling admission. No new service or scheduling layer follows.
 
 This decision has zero new services, dependencies, watches, credentials or
 operator settings. Its required extra work is two full bounded native reads,

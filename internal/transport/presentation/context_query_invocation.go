@@ -91,7 +91,7 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 	var err error
 	switch i.call.Tool {
 	case "get_file_excerpt":
-		if !in.Selection.Valid() || in.QueryID != "" || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
+		if !in.Selection.Valid() || in.QueryID != "" || in.Comparison != (value.ProfileComparisonRequest{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(struct {
@@ -101,17 +101,24 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 			MaxLines   int    `json:"max_lines"`
 		}{in.Selection.CaseID, in.Selection.ArtifactID, in.Selection.Selection.LineStart, in.Selection.Selection.MaxLines})
 	case "get_http_headers":
-		if !in.Headers.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
+		if !in.Headers.Valid() || in.QueryID != "" || in.Comparison != (value.ProfileComparisonRequest{}) || in.Selection != (value.ContextExcerptSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(HTTPHeaderOperationInput{CaseID: in.Headers.CaseID, ArtifactID: in.Headers.ArtifactID, Cursor: httpHeaderCursorText(in.Headers), Limit: in.Headers.Limit})
+	case "compare_profiles":
+		if !in.Comparison.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
+			return ErrOperationDelivery
+		}
+		c := in.Comparison
+		raw, err = json.Marshal(ProfileComparisonOperationInput{CaseID: c.CaseID, ArtifactID: c.ArtifactID, BaselineCaseID: c.BaselineCaseID, BaselineArtifactID: c.BaselineArtifactID, SampleType: c.Selection.SampleType, Normalization: c.Selection.Normalization, TopN: c.Selection.TopN})
+
 	case "get_profile_summary":
-		if !in.Profile.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
+		if !in.Profile.Valid() || in.QueryID != "" || in.Comparison != (value.ProfileComparisonRequest{}) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(ProfileSummaryOperationInput{CaseID: in.Profile.CaseID, ArtifactID: in.Profile.ArtifactID, SampleType: in.Profile.Selection.SampleType, TopN: in.Profile.Selection.TopN})
 	case "get_syscall_summary", "get_syscall_events":
-		if !in.Syscalls.Valid() || in.Syscalls.Selection.View != syscallView(i.call.Tool) || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) {
+		if !in.Syscalls.Valid() || in.Syscalls.Selection.View != syscallView(i.call.Tool) || in.QueryID != "" || in.Comparison != (value.ProfileComparisonRequest{}) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) {
 			return ErrOperationDelivery
 		}
 		w := in.Syscalls.Selection
@@ -121,7 +128,7 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 		}
 		raw, err = json.Marshal(SyscallOperationInput{CaseID: in.Syscalls.CaseID, ArtifactID: in.Syscalls.ArtifactID, Cursor: cursor, Limit: w.Limit, Names: w.Selection(in.Syscalls.CaseID, in.Syscalls.ArtifactID).Names, ErrorsOnly: w.ErrorsOnly})
 	case "get_query_result":
-		if !authorization.UUID(in.QueryID) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
+		if !authorization.UUID(in.QueryID) || in.Comparison != (value.ProfileComparisonRequest{}) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(struct {
@@ -163,16 +170,20 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 	if a.Profile.Valid() {
 		branches++
 	}
+	if a.Comparison.Valid() {
+		branches++
+	}
 	if a.Syscalls.Valid() {
 		branches++
 	}
-	selected = branches == 1 && (a.Selection.Valid() || a.Selection == (value.LineSelection{})) && (a.Headers.Valid() || a.Headers == (value.HTTPHeaderWindow{})) && (a.Profile.Valid() || a.Profile == (value.ProfileSummarySelection{})) && (a.Syscalls.Valid() || a.Syscalls == (value.SyscallWindow{}))
+	selected = branches == 1 && (a.Selection.Valid() || a.Selection == (value.LineSelection{})) && (a.Headers.Valid() || a.Headers == (value.HTTPHeaderWindow{})) && (a.Profile.Valid() || a.Profile == (value.ProfileSummarySelection{})) && (a.Syscalls.Valid() || a.Syscalls == (value.SyscallWindow{})) && (a.Comparison.Valid() || a.Comparison == (value.ProfileComparisonSelection{}))
 
 	if !authorization.UUID(a.ID) || !authorization.UUID(a.QueryID) || !selected {
 		return ErrOperationDelivery
 	}
 	until := d.ValidUntil()
 	refusal := d.Refusal()
+	baseline, incident, hasComparisonSources := d.ProfileComparisonSources()
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	if !i.current(ctx) || !i.inputChecked || i.delivery != nil || !authorization.UUID(a.ID) ||
@@ -180,7 +191,12 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		!i.now().Before(until) || until.After(i.call.Until) || bytes <= 0 || bytes > audit.OperationOutputLimit {
 		return ErrOperationDelivery
 	}
-	if i.call.Tool == "get_file_excerpt" && (a.Selection != i.input.Selection.Selection || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Syscalls != (value.SyscallWindow{})) ||
+	if i.call.Tool == "compare_profiles" && (!hasComparisonSources || baseline.CaseID != i.input.Comparison.BaselineCaseID || baseline.ArtifactID != i.input.Comparison.BaselineArtifactID || incident.CaseID != i.input.Comparison.CaseID || incident.ArtifactID != i.input.Comparison.ArtifactID) {
+		return ErrOperationDelivery
+	}
+	if i.call.Tool != "compare_profiles" && i.call.Tool != "get_query_result" && a.Comparison != (value.ProfileComparisonSelection{}) ||
+		i.call.Tool == "compare_profiles" && (a.Comparison != i.input.Comparison.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Syscalls != (value.SyscallWindow{})) ||
+		i.call.Tool == "get_file_excerpt" && (a.Selection != i.input.Selection.Selection || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Syscalls != (value.SyscallWindow{})) ||
 		i.call.Tool == "get_http_headers" && (a.Headers != i.input.Headers.Window() || a.Selection != (value.LineSelection{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Syscalls != (value.SyscallWindow{})) ||
 		i.call.Tool == "get_profile_summary" && (a.Profile != i.input.Profile.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Syscalls != (value.SyscallWindow{})) ||
 		syscallQueryOperation(i.call.Tool) && (a.Syscalls != i.input.Syscalls.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{})) ||
@@ -214,7 +230,7 @@ func (i *contextQueryInvocation) acknowledge(ctx context.Context, out audit.Oper
 	case analysisapp.ContextProjectionNoRefusal:
 	case analysisapp.ContextProjectionInvalidCursor:
 		status, reason = "invalid", "invalid_input"
-	case analysisapp.ContextProjectionRecordTooLarge:
+	case analysisapp.ContextProjectionRecordTooLarge, analysisapp.ContextProjectionIncompatibleProfiles:
 		status, reason = "denied", "not_available"
 	default:
 		return ErrOperationDelivery

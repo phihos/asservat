@@ -26,12 +26,13 @@ type ContextQueryResults interface {
 // installation composition adds its two operations to InvestigationOperations;
 // the existing audit wrapper alone supplies each live invocation owner.
 type ContextProjectionOperations struct {
-	excerpts  ContextExcerptService
-	results   ContextQueryResults
-	headers   HTTPHeaderQueryService
-	profiles  ProfileSummaryQueryService
-	syscalls  SyscallQueryService
-	contracts *contracts.InvestigationContracts
+	excerpts    ContextExcerptService
+	results     ContextQueryResults
+	headers     HTTPHeaderQueryService
+	comparisons ProfileComparisonQueryService
+	profiles    ProfileSummaryQueryService
+	syscalls    SyscallQueryService
+	contracts   *contracts.InvestigationContracts
 }
 
 func NewContextProjectionOperations(excerpts ContextExcerptService, results ContextQueryResults) (*ContextProjectionOperations, error) {
@@ -58,7 +59,7 @@ func (s *ContextProjectionOperations) WithHTTPHeaders(headers HTTPHeaderQuerySer
 
 // serves reports whether name is one of this composition's operations.
 func (s *ContextProjectionOperations) serves(name string) bool {
-	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
+	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (name != "compare_profiles" || s.comparisons != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
 }
 
 // toolNames are the operations this composition advertises.
@@ -66,6 +67,9 @@ func (s *ContextProjectionOperations) toolNames() []string {
 	names := []string{"get_file_excerpt", "get_query_result"}
 	if s.headers != nil {
 		names = append(names, "get_http_headers")
+	}
+	if s.comparisons != nil {
+		names = append(names, "compare_profiles")
 	}
 	if s.profiles != nil {
 		names = append(names, "get_profile_summary")
@@ -103,6 +107,17 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 			return s.refusal(record.ID, name, record.Until, failure, decision, operationEffectNone, true)
 		}
 		input.Syscalls = value.SyscallQueryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: selection.Window()}
+	case "compare_profiles":
+		var in ProfileComparisonOperationInput
+		if json.Unmarshal(raw, &in) != nil {
+			return noDispatch, ErrOperationDelivery
+		}
+		selection, e := value.NormalizeProfileComparisonSelection(in.SampleType, in.Normalization, in.TopN)
+		if e != nil {
+			return noDispatch, ErrOperationDelivery
+		}
+		input.Comparison = value.ProfileComparisonRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, BaselineCaseID: in.BaselineCaseID, BaselineArtifactID: in.BaselineArtifactID, Selection: selection}
+
 	case "get_profile_summary":
 		var in ProfileSummaryOperationInput
 		if json.Unmarshal(raw, &in) != nil {
@@ -160,6 +175,8 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	switch name {
 	case "get_syscall_summary", "get_syscall_events":
 		d, err = s.syscalls.Begin(ctx, current, i, input.Syscalls)
+	case "compare_profiles":
+		d, err = s.comparisons.Begin(ctx, current, i, input.Comparison)
 	case "get_profile_summary":
 		d, err = s.profiles.Begin(ctx, current, i, input.Profile)
 	case "get_file_excerpt":
@@ -261,6 +278,33 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 			queryViewTimes
 		}{d.Association().QueryID, 1, times}
 
+	case d.Tool() == "compare_profiles":
+		comparison, ok := d.ProfileComparison()
+		baseline, incident, sourcesOK := d.ProfileComparisonSources()
+		if !ok || !sourcesOK {
+			return nil, ErrOperationDelivery
+		}
+		envelope.DataClass = "extract"
+		envelope.Warnings = []string{profileComparisonHandling}
+		envelope.Provenance = []any{httpHeaderProvenance{ArtifactID: baseline.ArtifactID, Digest: hash(baseline.Version)}}
+		if baseline.ArtifactID != incident.ArtifactID || baseline.Version != incident.Version {
+			envelope.Provenance = append(envelope.Provenance, httpHeaderProvenance{ArtifactID: incident.ArtifactID, Digest: hash(incident.Version)})
+		}
+		envelope.Data = struct {
+			value.ProfileComparison
+			CaseID                string `json:"case_id"`
+			ArtifactID            string `json:"artifact_id"`
+			BaselineCaseID        string `json:"baseline_case_id"`
+			BaselineArtifactID    string `json:"baseline_artifact_id"`
+			SourceVersion         string `json:"source_version"`
+			BaselineSourceVersion string `json:"baseline_source_version"`
+			queryViewTimes
+		}{comparison, incident.CaseID, incident.ArtifactID, baseline.CaseID, baseline.ArtifactID, hash(incident.Version), hash(baseline.Version), times}
+		if name == "get_query_result" {
+			envelope.Data = queryResult(d.Association().QueryID, d.Tool(), envelope, times)
+			envelope.Provenance = []any{}
+		}
+
 	case d.Tool() == "get_profile_summary":
 		summary, ok := d.ProfileSummary()
 		if !ok {
@@ -326,7 +370,7 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 		}
 	}
 	body, err := json.Marshal(envelope)
-	if err == nil && len(body) > contracts.InvestigationOutputLimit && d.Tool() == "get_profile_summary" {
+	if err == nil && len(body) > contracts.InvestigationOutputLimit && (d.Tool() == "get_profile_summary" || d.Tool() == "compare_profiles") {
 		clear(body)
 		return nil, value.ErrRecordTooLarge
 	}
@@ -350,6 +394,8 @@ func (s *ContextProjectionOperations) deliveryRefusal(requestID, name string, d 
 		if syscallQueryOperation(name) {
 			failure = syscallInvalidCursor
 		}
+	case analysisapp.ContextProjectionIncompatibleProfiles:
+		failure = profileComparisonIncompatible
 	case analysisapp.ContextProjectionRecordTooLarge:
 		if name == "get_query_result" {
 			failure.Message = "This saved evidence record does not fit the response limit."
@@ -359,6 +405,9 @@ func (s *ContextProjectionOperations) deliveryRefusal(requestID, name string, d 
 		}
 		if d.Tool() == "get_profile_summary" {
 			failure = profileSummaryTooLarge
+		}
+		if d.Tool() == "compare_profiles" {
+			failure = profileComparisonTooLarge
 		}
 	default:
 		return OperationReply{}, ErrOperationDelivery
@@ -428,3 +477,22 @@ func (s *ContextProjectionOperations) WithProfileSummaries(profiles ProfileSumma
 const profileSummaryHandling = "SensitiveDataHandling: Function names may contain user data. This summary omits raw samples, labels, paths and addresses. Automatic deletion covers Asservat-managed copies; copies already delivered cannot be recalled."
 
 var profileSummaryTooLarge = OperationFailure{Code: "AnalysisUnavailable", Message: "This profile summary does not fit the response limit. Select fewer hotspots.", Retryable: false}
+
+// WithProfileComparisons opts into the fixed two-source admission facet.
+type ProfileComparisonQueryService interface {
+	Begin(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, value.ProfileComparisonRequest) (*analysisapp.ContextProjectionDelivery, error)
+}
+
+func (s *ContextProjectionOperations) WithProfileComparisons(comparisons ProfileComparisonQueryService) (*ContextProjectionOperations, error) {
+	if s == nil || comparisons == nil || s.comparisons != nil {
+		return nil, ErrOperationsConfiguration
+	}
+	out := *s
+	out.comparisons = comparisons
+	return &out, nil
+}
+
+const profileComparisonHandling = "SensitiveDataHandling: Function names may contain user data. This comparison omits raw samples, labels, paths and addresses. Automatic deletion covers Asservat-managed copies; copies already delivered cannot be recalled."
+
+var profileComparisonIncompatible = OperationFailure{Code: "IncompatibleProfiles", Message: "The selected sample types, units or acquisition modes cannot be compared with this normalization.", Retryable: false}
+var profileComparisonTooLarge = OperationFailure{Code: "AnalysisUnavailable", Message: "This profile comparison does not fit the response limit. Select fewer functions.", Retryable: false}

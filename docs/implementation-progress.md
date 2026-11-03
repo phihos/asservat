@@ -33,9 +33,26 @@ There is no claim of last-worker capacity refund. Reports are retained in
 `test/results/syscall-native-41712531115/`. Original failed reports remain below.
 
 The next outcome is two-source `compare_profiles` under REQ-PRF-005 / SC-PRF-005.
-Pure components and fixed-pair contracts are prepared in an isolated local branch;
-paired current authority, atomic accounting/key children, worker/public composition
-and native comparison remain pending. The argument job's cold-start/teardown
+The integration candidate is `feature/profile-comparison` in
+`/home/phil/Projekte/asservat-profile-comparison`, based on main `d9e0bcd1`.
+Paired ordinary authority and exact plans are implemented locally, retaining both
+original cutoffs and one principal-account proposal. The internal service admits
+one compound query; typed semantic refusals retain the charged delivery through
+audit acknowledgement and joined close. Public composed tests pass for distinct
+sources, identical-artifact roles, pending/poll results, changed input, failed
+audit acknowledgement and uncertain close (presentation race: 56.429s; contract:
+1.461s; bootstrap: 4.582s). These are local component results, not SQL/installed
+qualification. Reports are in `test/results/profile-comparison-service/`.
+
+The measured heavy two-source encrypted parser peaked at 252.363 MiB RSS in
+1.202s, with synthetic key providers and no cgroup/whole-worker qualification.
+ADR-295 therefore selects a provisional comparison-only 384 MiB physical and
+transient floor (+128 MiB per active worker); summary limits remain unchanged.
+SQL133 atomic two-workload accounting and independent key children, complete
+native worker/public composition and the React baseline selection are being
+integrated. The next gate is the composed real-service fixture with frozen
+sources, followed by native comparison against both downloaded originals.
+No comparison requirement or installed result is marked complete. The argument job's cold-start/teardown
 headroom also needs improvement before later installed campaigns. No timeout was
 raised. These saved-view fixtures do not complete arbitrary `syscall_query`,
 grouped/ongoing arguments, a wider kernel matrix or a supported release.
