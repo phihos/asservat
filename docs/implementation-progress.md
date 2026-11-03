@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Capture-preview outer composition window (2026-11-03)
+
+[ADR-289](decisions/289-preview-composition-window.md) gives `preview_capture`
+a prospective fifteen-second outer request window through the existing shared
+browser/MCP/audit selector. Native run 41564008984 showed sequential history,
+target and recorder work exhaust the ordinary five-second request; a 1.917 s
+history exchange plus a 1.23 s target query left less than 0.5 s for the recorder.
+The settings and preview stages retain their five-second bounds; initial and
+current identity, all shorter observations, cancellation and review lifetime
+are unchanged. The composed synthetic regression uses actual audit and
+request-identity code and preserves denial on expiry/change/cancellation.
+Verification: the six-second composition regression fails at elapsed five
+seconds with the old selector and passes with the new one. Targeted race tests
+for preview/request-window/current-identity boundaries pass across audit,
+identity, presentation, browser and MCP; affected vet and spec/architecture/Go
+architecture gates pass. Installed qualification remains pending.
+
+
 ## Finite Go profile acquisition and Stop components (2026-11-03)
 
 [ADR-287](decisions/287-go-profile-acquisition.md) now has typed node acquisition,

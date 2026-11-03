@@ -1083,3 +1083,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-290: one-shot regional profile streaming](290-one-shot-profile-streaming.md): durable worst-case multipart reservation and immutable accepted connector binding, with private local one-use transitions and no early temporary refund; generic journaled streaming is unchanged.
 
 - [ADR-288: native profile streaming](288-profile-native-streaming.md): extend installed profile downloads through bounded accounting windows; implementation and native qualification pending.
+
+- [ADR-289: bounded capture-preview composition](289-preview-composition-window.md): fifteen-second outer request, unchanged original observation and five-second stage bounds; installed qualification pending.

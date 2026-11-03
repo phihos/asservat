@@ -18,6 +18,15 @@ Given two captures using different packet filters for the same Deployment, when 
 
 ## REQ-HIS-002 — Restore settings into a fresh, reviewable request
 
+The public `preview_capture` request has one original at-most-fifteen-second
+composition window for saved-settings lookup and a fresh preview, shared by
+browser and MCP ([ADR-289](../docs/decisions/289-preview-composition-window.md)).
+This is an outer processing bound only: settings and preview stages keep their
+five-second caps, and every contained identity/permission/target observation
+retains its original expiry and cancellation. No later observation may renew
+the request's original identity lifetime. The review lifetime of a resulting
+preview and subsequent acquisition bounds are separate and unchanged.
+
 **Repeat capture** restores a new draft from the immutable accepted request's parameter snapshot, not the current mutable recipe of the same name. Keep the original authored target, requested collection settings, fully expanded action recipe, immutable dependency versions/digests and requested retention. Preserve both requested and original effective values where administrative clamping occurred, so preview can explain changes. The stored snapshot is data, never delegated authority. No manual hash, UID or old grant entry is required.
 
 The normal path is select history entry → review restored settings and current differences → **Collect again**. Editing uses the existing capture editor and creates a new preview. Show original versus current effective pod count, capabilities, privacy/retention, budgets and approval needs. Preserve action DAG order/dependencies; unavailable or denied pinned versions are explicit blockers. Never silently switch to the latest recipe, image, runtime pack or projection. An intentional upgrade is an edited plan with a visible difference. Saving/previewing a repeated draft does not collect anything.

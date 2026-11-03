@@ -20,7 +20,7 @@ var (
 // EvidenceReadRequestWindow bounds one public evidence-read request
 // (get_file_excerpt, get_http_headers, get_query_result, prepare_artifact_download,
 // get_artifact_download); ordinary public requests keep five seconds except
-// RecordingSaveRequestWindow composition. Installed
+// RecordingSaveRequestWindow or CapturePreviewRequestWindow composition. Installed
 // native78-80 showed the approved read's audit, authorization, SQL fences,
 // worker wake-up, three key unwraps and the object read cannot complete within
 // five seconds. It bounds only the request itself: every identity, authority,
@@ -30,6 +30,10 @@ const EvidenceReadRequestWindow = 20 * time.Second
 // RecordingSaveRequestWindow bounds the composed admission/start/history request.
 // Each accepted snapshot retains its original T0+5s StartBy.
 const RecordingSaveRequestWindow = 15 * time.Second
+
+// CapturePreviewRequestWindow bounds history lookup plus fresh preview creation.
+// Settings and preview stages retain their independent five-second bounds.
+const CapturePreviewRequestWindow = 15 * time.Second
 
 type Kind string
 
