@@ -141,3 +141,33 @@ func TestKubernetesPeerRecordingSubmissionRechecksMembers(t *testing.T) {
 		t.Fatalf("unchanged peers not admitted: %v", err)
 	}
 }
+
+type fakeProfileEndpoints struct{ calls int }
+
+func (p *fakeProfileEndpoints) ResolveProfileEndpoint(_ context.Context, r targets.ProfileEndpointRequest) (targets.ProfileEndpointResolution, error) {
+	p.calls++
+	return targets.ProfileEndpointResolution{Request: r, SourceKind: targets.ProfileEndpointTemplateBinding, SourceName: "go-pprof-loopback", AddressMode: "targetLoopback", Port: 6060, DeclaredPortName: "diagnostics", PathPolicy: "go-pprof/v1", DefinitionDigest: artifact.Digest{1}, EndpointDigest: artifact.Digest{2}}, nil
+}
+
+func TestProfileEndpointPreviewRemainsPlanOnly(t *testing.T) {
+	f := newInvestigationFixture()
+	endpoints := &fakeProfileEndpoints{}
+	f.svc.ProfileEndpoints = endpoints
+	c := planning.ProfileComposition{Components: []planning.ProfileComponent{{ID: "cpu", Profile: planning.ProfileRef{Catalog: "builtin", Name: "go-cpu", Version: "v1"}}}, MaxTotalBytes: 16 << 20, MaxDuration: "30s"}
+	ctx := context.Background()
+	r, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(&c))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if endpoints.calls != 1 || r.Recordable || r.Plan.Approval == nil || len(r.Plan.Input.Endpoints) != 1 {
+		t.Fatalf("profile preview %+v calls=%d", r, endpoints.calls)
+	}
+	if _, err = f.request(t, r.Preview, "profile-1"); !errors.Is(err, value.ErrRecorderUnavailable) || f.admissions.Load() != 0 {
+		t.Fatal("profile reached admission", err)
+	}
+	f.identityChange = "scopes"
+	_, err = f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(&c))
+	if err == nil || endpoints.calls != 1 {
+		t.Fatal("ineligible caller resolved endpoint", err)
+	}
+}

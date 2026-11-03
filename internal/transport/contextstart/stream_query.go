@@ -32,6 +32,9 @@ const (
 	// ADR-283 PR 2: one action's Kubernetes packet peers in the target's
 	// namespace, resolved into frozen (UID, IP) members.
 	queryResolvePacketPeers = "resolve-packet-peers"
+	// ADR-285: one Go profile action's endpoint, resolved from the region's
+	// profile endpoint configuration and the exact Pod's port declarations.
+	queryResolveProfileEndpoint = "resolve-profile-endpoint"
 	// ADR-248: whether the target Pod's node collector offers the packet
 	// recorder now.
 	queryPacketRecorder        = "packet-recorder"
@@ -67,6 +70,12 @@ type ReviewTargets interface {
 type ProfileTargets interface {
 	ReadCaptureProfiles(context.Context, targets.ProfileCatalogRequest) (targets.ProfileCatalogAnswer, error)
 	ListCaptureProfiles(context.Context, targets.ProfileListRequest) (targets.ProfileCatalogAnswer, error)
+}
+
+// ProfileEndpointTargets is the region's optional Go profile endpoint
+// resolution (ADR-285). A region without it answers unsupported.
+type ProfileEndpointTargets interface {
+	ResolveProfileEndpoint(context.Context, targets.ProfileEndpointRequest) (targets.ProfileEndpointResolution, error)
 }
 
 // PeerTargets is the region's optional Kubernetes peer resolution (ADR-283
@@ -125,6 +134,10 @@ var queryFailures = []struct {
 	{"peer-unsupported", targets.ErrPeerUnsupported},
 	{"peer-missing", targets.ErrPeerMissing},
 	{"peer-busy", targets.ErrPeerVerifierBusy},
+	{"endpoint-unavailable", targets.ErrEndpointUnavailable},
+	{"endpoint-ambiguous", targets.ErrEndpointAmbiguous},
+	{"endpoint-denied", targets.ErrEndpointDenied},
+	{"endpoint-host-network", targets.ErrEndpointHostNetwork},
 	{"unscheduled", targets.ErrUnscheduled},
 	{"unsupported", targets.ErrUnsupported},
 	{"unavailable", targets.ErrUnavailable},
@@ -425,6 +438,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if resolver, ok := s.targets.(PeerTargets); ok {
 			out, e = resolver.ResolvePacketPeers(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryResolveProfileEndpoint:
+		var r targets.ProfileEndpointRequest
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(ProfileEndpointTargets); ok {
+			out, e = resolver.ResolveProfileEndpoint(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}

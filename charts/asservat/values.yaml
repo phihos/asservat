@@ -137,6 +137,23 @@ cluster:
   #   issuer: https://identity.example.invalid/realms/company
   #   usernamePrefix: "oidc:"
   #   groupsPrefix: "oidc:"
+  # ADR-285: administrator Go pprof endpoint templates and profiles. A
+  # template permits address modes and a port range; maintainers bind it to a
+  # declared Pod port by name in a capture profile's endpointBindings (the
+  # builtin go-cpu/v1 binds go-pprof-loopback to the port named diagnostics).
+  # A profile fixes one address mode and port. Paths are the fixed
+  # /debug/pprof allowlist; there is no URL, path, header or credential.
+  # namespaces limits an entry to those namespace names (empty: all).
+  # targetLoopback needs loopbackFamily. Previews resolve them without
+  # dialing; profiles are not acquired in this release. Regional executor
+  # only; changing them needs a connector reinstall.
+  profileEndpoints: []
+  # - name: go-pprof-loopback
+  #   kind: template
+  #   addressModes: [targetLoopback]
+  #   loopbackFamily: ipv4
+  #   minPort: 6060
+  #   maxPort: 6060
 
 # ADR-246 (S-04 increment 3): the `asservat node` collector DaemonSet, with
 # mode=cluster or mode=combined. Its namespace is the only one created with

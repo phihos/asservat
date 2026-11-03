@@ -21,7 +21,9 @@ var _ port.ProfileNetworkReader = (*PodTargets)(nil)
 // occurs, and the original outer interval covers all constituent reads.
 func (c *PodTargets) ObserveProfileNetwork(parent context.Context, r value.Request) (value.ProfileNetwork, error) {
 	var out value.ProfileNetwork
-	if parent == nil || c == nil || c.client == nil || c.executionClass != artifact.ContextNodeExecution || !r.Valid() || r.ClusterID != c.client.clusterID || len(validation.IsDNS1123Label(r.Namespace.Name)) != 0 || len(validation.IsDNS1123Subdomain(r.PodName)) != 0 {
+	// ADR-285: API-execution targets too; the node collector's work channel
+	// acquires their profiles (S-05 plan S1).
+	if parent == nil || c == nil || c.client == nil || !c.executionClass.Valid() || !r.Valid() || r.ClusterID != c.client.clusterID || len(validation.IsDNS1123Label(r.Namespace.Name)) != 0 || len(validation.IsDNS1123Subdomain(r.PodName)) != 0 {
 		return out, value.ErrInvalid
 	}
 	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
@@ -45,7 +47,9 @@ func (c *PodTargets) ObserveProfileNetwork(parent context.Context, r value.Reque
 	if err != nil {
 		return out, err
 	}
-	if resolved.PodResourceVersion != observed.RV || resolved.Pin.NodeName != observed.Node {
+	// An API-execution pin carries no node name; the equal resource version
+	// already binds the same Pod object version.
+	if resolved.PodResourceVersion != observed.RV || c.executionClass == artifact.ContextNodeExecution && resolved.Pin.NodeName != observed.Node {
 		return out, value.ErrChanged
 	}
 	resolved.ObservedAt = start

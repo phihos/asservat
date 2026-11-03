@@ -21,36 +21,68 @@ type ContextPeers interface {
 	ResolvePacketPeers(context.Context, targets.PeerRequest) (targets.PeerResolution, error)
 }
 
-// compileRecorderPeers compiles in; a plan with Kubernetes peers asks the
-// target's region once for their resolution and compiles again with it. The
-// caller has already checked current eligibility on the target, so the
-// region is asked about its namespace only for an eligible caller.
+// ContextProfileEndpoints resolves one Go profile action's endpoint in the
+// target's region (ADR-285): the region's protected endpoint configuration
+// and the exact Pod's port declarations, without dialing. The answer is an
+// observation for review; it grants nothing.
+type ContextProfileEndpoints interface {
+	ResolveProfileEndpoint(context.Context, targets.ProfileEndpointRequest) (targets.ProfileEndpointResolution, error)
+}
+
+// compileRecorderPeers compiles in; a plan with Kubernetes peers or a Go
+// profile endpoint asks the target's region once for the resolution and
+// compiles again with it. The caller has already checked current
+// eligibility on the target, so the region is asked about its namespace
+// only for an eligible caller. A manual plan records one evidence type, so
+// at most one resolution is needed; the region is never asked in a loop.
 func (s ContextInvestigation) compileRecorderPeers(ctx context.Context, in planning.RecorderInput) (planning.RecorderPlan, error) {
 	plan, err := compiler.CompileRecorder(in, s.Filters, s.Now())
 	var needed compiler.PeerResolutionNeeded
-	if !errors.As(err, &needed) {
+	var endpoint compiler.EndpointResolutionNeeded
+	switch {
+	case errors.As(err, &needed):
+		if s.Peers == nil {
+			return planning.RecorderPlan{}, planning.CompositionError{Code: planning.CompositionRecorderUnavailable, Path: needed.Path, Reason: "this installation cannot resolve Kubernetes peers; use cidrs entries"}
+		}
+		mark := time.Now()
+		r, err := s.Peers.ResolvePacketPeers(ctx, needed.Request)
+		auditapp.MarkStep(ctx, "p-peers", mark)
+		if err != nil {
+			return planning.RecorderPlan{}, compiler.PeerResolutionRefusal(needed, err)
+		}
+		// The hub's receipt time is the recorded generation time.
+		r.ResolvedAt = s.Now().UTC().Truncate(time.Microsecond)
+		if !r.Answers(needed.Request) || ctx.Err() != nil {
+			return planning.RecorderPlan{}, value.ErrUnavailable
+		}
+		in.Peers = append(slices.Clone(in.Peers), r.Clone())
+	case errors.As(err, &endpoint):
+		if s.ProfileEndpoints == nil {
+			return planning.RecorderPlan{}, planning.CompositionError{Code: planning.CompositionRecorderUnavailable, Path: endpoint.Path, Reason: "this installation cannot resolve profile endpoints"}
+		}
+		mark := time.Now()
+		r, err := s.ProfileEndpoints.ResolveProfileEndpoint(ctx, endpoint.Request)
+		auditapp.MarkStep(ctx, "p-endpoint", mark)
+		if err != nil {
+			return planning.RecorderPlan{}, compiler.EndpointResolutionRefusal(endpoint, err)
+		}
+		r.ResolvedAt = s.Now().UTC().Truncate(time.Microsecond)
+		if !r.Answers(endpoint.Request) || ctx.Err() != nil {
+			return planning.RecorderPlan{}, value.ErrUnavailable
+		}
+		in.Endpoints = append(slices.Clone(in.Endpoints), r.Clone())
+	default:
 		return plan, err
 	}
-	if s.Peers == nil {
-		return planning.RecorderPlan{}, planning.CompositionError{Code: planning.CompositionRecorderUnavailable, Path: needed.Path, Reason: "this installation cannot resolve Kubernetes peers; use cidrs entries"}
-	}
-	mark := time.Now()
-	r, err := s.Peers.ResolvePacketPeers(ctx, needed.Request)
-	auditapp.MarkStep(ctx, "p-peers", mark)
-	if err != nil {
-		return planning.RecorderPlan{}, compiler.PeerResolutionRefusal(needed, err)
-	}
-	// The hub's receipt time is the recorded generation time.
-	r.ResolvedAt = s.Now().UTC().Truncate(time.Microsecond)
-	if !r.Answers(needed.Request) || ctx.Err() != nil {
-		return planning.RecorderPlan{}, value.ErrUnavailable
-	}
-	in.Peers = append(slices.Clone(in.Peers), r.Clone())
 	plan, err = compiler.CompileRecorder(in, s.Filters, s.Now())
-	if errors.As(err, &needed) {
-		// One packet recorder per Pod: a second action is refused by the
-		// composition itself; never ask the region in a loop.
-		return planning.RecorderPlan{}, planning.CompositionError{Code: planning.CompositionRecorderUnavailable, Path: needed.Path, Reason: "only one packet action can select Kubernetes peers"}
+	if errors.As(err, &needed) || errors.As(err, &endpoint) {
+		// One packet recorder or profile per Pod: a second action is refused
+		// by the composition itself; never ask the region in a loop.
+		path := needed.Path
+		if path == "" {
+			path = endpoint.Path
+		}
+		return planning.RecorderPlan{}, planning.CompositionError{Code: planning.CompositionRecorderUnavailable, Path: path, Reason: "only one action can resolve Kubernetes peers or a profile endpoint"}
 	}
 	return plan, err
 }

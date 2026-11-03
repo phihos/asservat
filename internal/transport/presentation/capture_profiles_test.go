@@ -49,7 +49,7 @@ func TestCaptureProfileToolsProjectContract(t *testing.T) {
 			Profiles []ProfileRow `json:"profiles"`
 		} `json:"data"`
 	}
-	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.DataClass != "metadata" || len(out.Data.Profiles) != 2 || f.catalog != "builtin" || out.Data.Profiles[0].ExecutionModes[0] != "onTrigger" {
+	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.DataClass != "metadata" || len(out.Data.Profiles) != 3 || f.catalog != "builtin" || out.Data.Profiles[0].ExecutionModes[0] != "onTrigger" {
 		t.Fatalf("list = %s, %v", reply.Body, err)
 	}
 	reply, err = s.Call(context.Background(), f, "get_capture_profile", []byte(`{`+wireTarget+`,"profile_ref":{"catalog":"builtin","name":"network-connections","version":"v1"}}`))
