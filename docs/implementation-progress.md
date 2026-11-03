@@ -15,8 +15,9 @@ The regional endpoint resolver intentionally returns the public API-class pin
 without node name/UID/boot. The new dispatcher incorrectly looked up a collector
 by that empty node name. It now reuses the packet path's exact-Pod node lookup,
 selects the current attested node channel and builds a separate mechanism pin.
-The accepted API pin and endpoint digest stay unchanged. Existing node-bound
-plans still require their original node fields. The regression reproduces the
+The accepted API pin and endpoint digest stay unchanged. Any supplied plan node
+fields must match; this does not add node-bound public dispatch, which the
+production Pod lookup rejects. The regression reproduces the
 empty-node refusal and checks successful API dispatch, changed/missing Pod or
 node, unavailable collector, original route expiry and cancellation.
 

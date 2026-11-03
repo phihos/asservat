@@ -26,7 +26,8 @@ recording. The node collector has no artifact key authority.
    Dispatch reuses the packet path's exact-Pod node lookup and current attested
    node channel; the API endpoint plan intentionally has no node identity. A
    separate mechanism pin carries the resolved node name/UID/boot/process.
-   Existing node-bound plans must also match their original node fields.
+   Any supplied plan node fields must also match; the current production
+   resolver and Pod lookup support API-class, node-free accepted pins only.
 3. The authenticated node channel carries dedicated profile work and result
    types. One HTTP GET uses the existing Go profile collector, with fixed path,
    no redirect/retry/DNS fallback and bounded response bytes. The node opens
