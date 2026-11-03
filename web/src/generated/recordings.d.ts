@@ -82,6 +82,7 @@ export interface components {
                 maxExecutions: number;
                 maxBytes: number;
                 maxObservedBytes: number;
+                maxObservedEvents?: number;
             };
             /** @enum {unknown} */
             state: "Ready" | "DelegationRequired" | "Revoked" | "Expired" | "OwnerAssignmentChanged" | "ReapprovalRequired" | "Unavailable";

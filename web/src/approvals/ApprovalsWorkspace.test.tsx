@@ -213,3 +213,11 @@ it.each([40000, undefined])('shows only an explicitly reviewed observation event
   if (maximum === undefined) expect(limits.textContent).not.toMatch(/eligible entry and exit probes/);
   else expect(limits.textContent).toContain('40000 eligible entry and exit probes in total');
 });
+
+it('shows cumulative policy argument event reservations independently of bytes', async () => {
+ const client = new SyntheticApprovals(); client.detail = teamPolicyGrant();
+ Object.assign(client.detail.policy!, {max_observed_events:6000,observed_events_used:2000});
+ expect(validOutput_get_grant(result(client.detail))).toBe(true);
+ render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+ expect(await screen.findByText(/2000 of 6000 eligible entry and exit probes/)).toBeTruthy();
+});

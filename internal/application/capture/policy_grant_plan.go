@@ -76,7 +76,23 @@ func (s PolicyGrantPlans) PolicyGrantPlan(ctx context.Context, policy, name stri
 	for _, code := range action.Sensitive {
 		reasons = append(reasons, authorization.SensitiveReason{ActionID: action.ID, Code: code})
 	}
-	if slices.Contains(action.Sensitive, planning.ReasonRawBytePredicate) {
+	dataClass := "extract"
+	arguments := compiled.Recorder.Arguments
+	if arguments != nil {
+		// A policy collection approval never grants a human result access.
+		// Even without buffers, the qualified definitions can read raw paths.
+		dataClass = "raw"
+		duration, durationErr := time.ParseDuration(action.After)
+		timeout, timeoutErr := time.ParseDuration(action.Timeout)
+		observed := min(planning.SensitiveMaxObservedBytes, a.Limits.MaxObservedBytes)
+		if !arguments.Valid() || !slices.Contains(action.Sensitive, planning.ReasonSyscallArguments) || durationErr != nil || timeoutErr != nil || duration < time.Second || duration > time.Minute || timeout < duration || observed < arguments.MaxProbeBytes || a.Limits.MaxObservedEvents < 1 {
+			return zero, authapp.ErrGrantUnavailable
+		}
+		// Events and bytes here are shared recurring pools, not a per-capture
+		// rate-times-duration estimate. Prepare debits each original session
+		// from both the acceptance and attached grant before any observation.
+		review.ObservationLimits = &authapp.GrantObservationLimits{MaxSessionSeconds: int64(min(timeout, duration+10*time.Second) / time.Second), MaxObservedBytes: observed, MaxObservedEvents: a.Limits.MaxObservedEvents, MaxBytesPerSecond: arguments.MaxBytesPerSecond, MaxConcurrentSessions: 1}
+	} else if slices.Contains(action.Sensitive, planning.ReasonRawBytePredicate) {
 		duration, err := time.ParseDuration(action.Timeout)
 		observed := min(planning.SensitiveMaxObservedBytes, a.Limits.MaxObservedBytes)
 		if err != nil || duration < time.Second || observed < 1 {
@@ -92,5 +108,5 @@ func (s PolicyGrantPlans) PolicyGrantPlan(ctx context.Context, policy, name stri
 	if err != nil {
 		return zero, err
 	}
-	return authapp.PolicyGrantPlan{MaxStartsPerExecution: starts, Authority: a, RecipeDigest: compiled.Recorder.RecipeDigest, Scope: scope, Review: review, DataClass: "extract", Reasons: reasons, FreshUntil: until}, nil
+	return authapp.PolicyGrantPlan{MaxStartsPerExecution: starts, Authority: a, RecipeDigest: compiled.Recorder.RecipeDigest, Scope: scope, Review: review, DataClass: dataClass, Reasons: reasons, FreshUntil: until}, nil
 }

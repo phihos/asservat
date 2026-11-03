@@ -99,6 +99,36 @@ func TestRecorderPolicyActivationUsesTypedWorkloadWithoutDraftAuthority(t *testi
 		t.Fatal("fresh intent not distinguished", err)
 	}
 }
+
+func TestRecorderPolicyActivationPreservesEventEnvelope(t *testing.T) {
+	f, s := newWorkloadActivationFixture(t)
+	if _, err := s.Activate(t.Context(), f, "restarts", "legacy", true); err != nil {
+		t.Fatal(err)
+	}
+	legacy := f.accepted[0].Authority
+	if legacy.Limits.MaxObservedEvents != 0 {
+		t.Fatal("legacy envelope gained event authority")
+	}
+	f.envelope.MaxObservedEvents = 1_000_000_000
+	if _, err := s.Activate(t.Context(), f, "restarts", "event-ceiling", true); err != nil {
+		t.Fatal(err)
+	}
+	accepted := f.accepted[1].Authority
+	if accepted.Limits.MaxObservedEvents != f.envelope.MaxObservedEvents || accepted.ScopeDigest == legacy.ScopeDigest {
+		t.Fatal("event ceiling lost from accepted authority/scope", accepted.Limits)
+	}
+	f.status.ActiveID, f.status.Authority, f.status.NotAfter = "99999999-9999-4999-8999-999999999999", accepted, accepted.NotAfter
+	replay, err := s.Activate(t.Context(), f, "restarts", "replay", true)
+	if err != nil || !replay.Replay || len(f.accepted) != 2 {
+		t.Fatal("unchanged event envelope reissued acceptance", err)
+	}
+	for _, invalid := range []int64{-1, 1_000_000_001} {
+		f.envelope.MaxObservedEvents = invalid
+		if _, err := s.Activate(t.Context(), f, "restarts", "invalid", true); err == nil || len(f.accepted) != 2 {
+			t.Fatal("invalid event ceiling accepted", invalid, err)
+		}
+	}
+}
 func TestRecorderPolicyActivationPreservesCurrentDelegationAndDeniedWorkload(t *testing.T) {
 	for _, name := range []string{"no-envelope", "no-binding", "not-sponsor", "missing-action", "explicit-deny", "pod-review", "missing-intent", "stale-workload-rights"} {
 		t.Run(name, func(t *testing.T) {

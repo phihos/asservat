@@ -260,7 +260,7 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 	}
 	if spec.Automation != nil {
 		a := spec.Automation
-		b.Automation = &authorization.AutomationEnvelope{AllowedActions: a.AllowedActions, MaxLifetimeSeconds: a.MaxLifetimeSeconds, MaxExecutions: a.MaxExecutions, MaxBytes: a.MaxBytes, MaxObservedBytes: a.MaxObservedBytes}
+		b.Automation = &authorization.AutomationEnvelope{AllowedActions: a.AllowedActions, MaxLifetimeSeconds: a.MaxLifetimeSeconds, MaxExecutions: a.MaxExecutions, MaxBytes: a.MaxBytes, MaxObservedBytes: a.MaxObservedBytes, MaxObservedEvents: a.MaxObservedEvents}
 		if !b.Automation.Valid() {
 			return value.Binding{}, value.ErrUnavailable
 		}

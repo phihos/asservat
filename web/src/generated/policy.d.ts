@@ -206,6 +206,10 @@ export interface components {
                 attached_grant_id?: string;
                 /** @description Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter. */
                 max_grant_starts?: number;
+                /** @description Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation. */
+                max_observed_events?: number;
+                /** @description Conservative charged event units, including uncertain observations. */
+                observed_events_spent?: number;
             };
         } | {
             /** @constant */

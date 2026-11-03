@@ -131,6 +131,15 @@ facet. Full authorization race tests pass, including same-human/client/version,
 revocation and replay-safe spend. Expanded argument preflight and full pre-push checks passed. Installed
 collection/download remains unqualified.
 
+A separate follow-up implements finite policy compilation and event ceilings
+through protected configuration, acceptance, independent raw review, public
+requests/status and console controls. Focused backend race regressions and all
+30 policy/approval console tests pass. The compiler binds the release's actual
+argument definitions and object digest; missing event authority and changed pins
+are refused. Ongoing argument policies remain unavailable. No new SQL migration
+or runtime service is added. Installed recurring qualification and separate
+human raw-artifact approval/download composition remain pending.
+
 
 [PR #148](https://github.com/phihos/asservat/pull/148) first candidate `44037bb6`
 failed [native run 41627837758](https://github.com/phihos/asservat/actions/runs/41627837758)

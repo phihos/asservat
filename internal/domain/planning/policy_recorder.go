@@ -15,6 +15,7 @@ type PolicyRecorderConfiguration struct {
 	Profile     ResolvedProfile
 	Action      RecorderAction
 	Filter      *CompiledFilter
+	Arguments   *artifact.RecordingArguments `json:",omitempty"`
 	// SyscallInclude is a syscall source's sorted include list; empty
 	// records every call (ADR-273).
 	SyscallInclude       []string `json:",omitempty"`
@@ -23,9 +24,14 @@ type PolicyRecorderConfiguration struct {
 }
 
 func (p PolicyRecorderConfiguration) Valid() bool {
-	kind := p.Action.Kind == "packetCapture" && p.Action.PacketProfile == "networkHeaders" && len(p.SyscallInclude) == 0 ||
-		p.Action.Kind == "syscallTrace" && p.Action.SyscallMode == "metadata" && p.Action.ExecutionMode == "ongoing" && p.Filter == nil && len(p.SyscallInclude) <= 128 && slices.IsSorted(p.SyscallInclude)
+	arguments := p.Action.Kind == "syscallTrace" && p.Action.SyscallMode == "arguments" && p.Action.ExecutionMode == "onTrigger" && p.Filter == nil && p.Arguments.Valid() && slices.Contains(p.Action.Sensitive, ReasonSyscallArguments) && len(p.SyscallInclude) > 0 && len(p.SyscallInclude) <= 6 && slices.IsSorted(p.SyscallInclude)
+	kind := p.Arguments == nil && (p.Action.Kind == "packetCapture" && p.Action.PacketProfile == "networkHeaders" && len(p.SyscallInclude) == 0 ||
+		p.Action.Kind == "syscallTrace" && p.Action.SyscallMode == "metadata" && p.Action.ExecutionMode == "ongoing" && p.Filter == nil && len(p.SyscallInclude) <= 128 && slices.IsSorted(p.SyscallInclude)) || arguments
 	lifecycle := p.Action.ExecutionMode == "onTrigger" && p.Action.Before == "0s"
+	if arguments {
+		after, err := time.ParseDuration(p.Action.After)
+		lifecycle = lifecycle && err == nil && after >= time.Second && after <= time.Minute
+	}
 	if p.Action.ExecutionMode == "ongoing" {
 		before, e := time.ParseDuration(p.Action.Before)
 		after, e2 := time.ParseDuration(p.Action.After)

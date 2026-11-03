@@ -53,7 +53,7 @@ func compilePolicyRecorders(c value.ProfileComposition, filters FilterCompiler, 
 	for _, x := range actions {
 		ci := slices.IndexFunc(c.Components, func(p value.ProfileComponent) bool { return p.ID == x.componentID })
 		if x.packet == nil && x.syscall == nil || ci < 0 {
-			return nil, refuse(value.CompositionRecorderUnavailable, "profile_composition", "policy execution supports network-header packet and syscall metadata actions")
+			return nil, refuse(value.CompositionRecorderUnavailable, "profile_composition", "policy execution supports network-header packets, ongoing syscall metadata and finite syscall arguments")
 		}
 		one, err := compilePolicyAction(c, ci, x, profiles[ci], sources)
 		if err != nil {
@@ -74,8 +74,9 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 	if x.packet != nil && summary.PacketProfile != "networkHeaders" {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "only network-header recording is available")
 	}
-	if x.syscall != nil && (summary.SyscallMode != "metadata" || summary.ExecutionMode != "ongoing") {
-		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "syscall policies record metadata from an ongoing source")
+	finiteArguments := x.arguments != nil && summary.SyscallMode == "arguments" && summary.ExecutionMode == "onTrigger"
+	if x.syscall != nil && !finiteArguments && (summary.SyscallMode != "metadata" || summary.ExecutionMode != "ongoing") {
+		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "syscall policies require an ongoing metadata source or explicit finite approved arguments")
 	}
 	if summary.ExecutionMode != "onTrigger" && summary.ExecutionMode != "ongoing" || summary.ExecutionMode == "onTrigger" && summary.Before != "0s" {
 		return out, refuse(value.CompositionRecorderUnavailable, "profile_composition", "select an ongoing source or an explicit onTrigger recording with before 0s")
@@ -105,13 +106,19 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 	if err != nil {
 		return out, value.ErrInvalid
 	}
+	var argument *argumentProgramRecord
+	if finiteArguments {
+		p := argumentRecord(summary.ID, x.syscall.Syscalls.Names, *x.arguments)
+		argument = &p
+	}
 	record := struct {
-		Version  string                `json:"schemaVersion"`
-		Authored wireComposition       `json:"authored"`
-		Profile  wireResolved          `json:"profile"`
-		Recipe   json.RawMessage       `json:"recipe"`
-		Filter   *compiledFilterRecord `json:"filter,omitempty"`
-	}{"policy-recorder/v1", authored(c), profile.wire(component.ID), recipe, filter}
+		Version  string                 `json:"schemaVersion"`
+		Authored wireComposition        `json:"authored"`
+		Profile  wireResolved           `json:"profile"`
+		Recipe   json.RawMessage        `json:"recipe"`
+		Filter   *compiledFilterRecord  `json:"filter,omitempty"`
+		Argument *argumentProgramRecord `json:"argumentProgram,omitempty"`
+	}{"policy-recorder/v1", authored(c), profile.wire(component.ID), recipe, filter, argument}
 	scope, err := json.Marshal(record)
 	if err != nil {
 		return out, value.ErrInvalid
@@ -121,6 +128,10 @@ func compilePolicyAction(c value.ProfileComposition, ci int, x expandedAction, p
 		return out, value.ErrInvalid
 	}
 	out = value.PolicyRecorderConfiguration{Composition: *c.Clone(), Profile: value.ResolvedProfile{ComponentID: component.ID, Ref: component.Profile, DefinitionDigest: profile.Digest}, Action: summary, Recipe: recipe, RecipeDigest: recipeDigest, Scope: scope, Digest: digest}
+	if finiteArguments {
+		a := *x.arguments
+		out.Arguments = &a
+	}
 	if s := x.syscall; s != nil && s.Syscalls.Mode == "include" {
 		out.SyscallInclude = slices.Sorted(slices.Values(s.Syscalls.Names))
 	}

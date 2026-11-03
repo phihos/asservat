@@ -3653,7 +3653,8 @@ components:
                 detector:
                   type: object
                   additionalProperties: false
-                  description: The current DebugPolicy's detector configuration (no observed content).
+                  description: The current DebugPolicy's detector configuration (no observed
+                    content).
                   properties:
                     kind:
                       enum:
@@ -3721,7 +3722,12 @@ components:
                 sharing:
                   type: object
                   additionalProperties: false
-                  description: 'Recurring sharing of the acceptance (ADR-239). stopped: a manager stopped future sharing (stop_future_sharing; already claimed captures still publish); policyChanged: the DebugPolicy changed after acceptance, activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id and expected_revision = revision).'
+                  description: 'Recurring sharing of the acceptance (ADR-239). stopped:
+                    a manager stopped future sharing (stop_future_sharing; already claimed
+                    captures still publish); policyChanged: the DebugPolicy changed after
+                    acceptance, activate the new revision to share again. Existing shares
+                    stay until they expire or are revoked (revoke_share with sharing_intent_id
+                    = acceptance_id and expected_revision = revision).'
                   properties:
                     state:
                       enum:
@@ -3767,37 +3773,57 @@ components:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Conservative native-output reservations shared by this acceptance; uncertain spend remains charged. Not measured bytes.
+                  description: Conservative native-output reservations shared by this
+                    acceptance; uncertain spend remains charged. Not measured bytes.
                 max_collected_bytes:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Original accepted cumulative native-output ceiling, shared across grant replacements and controls.
+                  description: Original accepted cumulative native-output ceiling, shared
+                    across grant replacements and controls.
                 observed_bytes_spent:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Conservative pre-filter observation charges shared by this acceptance, including uncertain legacy spend. Not collected output.
+                  description: Conservative pre-filter observation charges shared by this
+                    acceptance, including uncertain legacy spend. Not collected output.
                 max_observed_bytes:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition.
+                  description: Original accepted cumulative pre-filter observation ceiling;
+                    zero permits no continuing acquisition.
                 collection_kind:
                   enum:
                   - podStatus
                   - packetCapture
                   - syscallTrace
-                  description: Accepted collection action; controls available approval commands, not acquisition authority.
+                  description: Accepted collection action; controls available approval
+                    commands, not acquisition authority.
                 attached_grant_id:
                   type: string
                   format: uuid
-                  description: Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection.
+                  description: Grant named by the current attachment pointer; does not
+                    assert that its authority, budget or recorder readiness currently
+                    permits collection.
                 max_grant_starts:
                   type: integer
                   minimum: 1
                   maximum: 10000
-                  description: Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter.
+                  description: Server-derived ceiling in action-start units for the currently
+                    accepted policy grant plan. Policy executions remain a separate once-per-Save
+                    counter.
+                max_observed_events:
+                  type: integer
+                  minimum: 0
+                  maximum: 1000000000
+                  description: Cumulative eligible entry and exit probe ceiling; zero
+                    or absent grants no argument observation.
+                observed_events_spent:
+                  type: integer
+                  minimum: 0
+                  maximum: 1000000000
+                  description: Conservative charged event units, including uncertain observations.
               required:
               - policy_uid
               - acceptance_id
@@ -4632,19 +4658,22 @@ components:
                       preview_deadline:
                         type: string
                         format: date-time
-                        description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy
-                          previewDeadline plans.
+                        description: Original passive preview expiry; bounds opening a
+                          new approval review, and also start for legacy previewDeadline
+                          plans.
                       capture_deadline_rule:
                         enum:
                         - previewDeadline
                         - acceptanceWithinGrant
                         - policyAuthority
-                        description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original
-                          request-anchored grant expiry.
+                        description: Manual preview/acceptance window, or the separately
+                          accepted team-policy authority bound by original request-anchored
+                          grant expiry.
                       capture_window_seconds:
                         type: integer
                         const: 300
-                        description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                        description: Maximum window fixed once at acceptance, never beyond
+                          original approval expiry.
                       policy:
                         type: object
                         additionalProperties: false
@@ -4703,6 +4732,18 @@ components:
                             type: integer
                             minimum: 0
                             maximum: 1099511627776
+                          max_observed_events:
+                            type: integer
+                            minimum: 0
+                            maximum: 1000000000
+                            description: Cumulative eligible entry and exit probe ceiling;
+                              zero or absent grants no argument observation.
+                          observed_events_used:
+                            type: integer
+                            minimum: 0
+                            maximum: 1000000000
+                            description: Conservative charged event units, including uncertain
+                              observations.
                         required:
                         - uid
                         - executor
@@ -9105,31 +9146,34 @@ components:
                 preview_deadline:
                   type: string
                   format: date-time
-                  description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy
-                    previewDeadline plans.
+                  description: Original passive preview expiry; bounds opening a new approval
+                    review, and also start for legacy previewDeadline plans.
                 capture_deadline_rule:
                   enum:
                   - previewDeadline
                   - acceptanceWithinGrant
                   - policyAuthority
-                  description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original
-                    request-anchored grant expiry.
+                  description: Manual preview/acceptance window, or the separately accepted
+                    team-policy authority bound by original request-anchored grant expiry.
                 capture_window_seconds:
                   type: integer
                   const: 300
-                  description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                  description: Maximum window fixed once at acceptance, never beyond original
+                    approval expiry.
                 can_resume:
                   type: boolean
-                  description: Advisory current original requester/client collection eligibility under this exact approved grant.
-                    Submission rechecks all authority.
+                  description: Advisory current original requester/client collection eligibility
+                    under this exact approved grant. Submission rechecks all authority.
                 can_resolve:
                   type: boolean
-                  description: Advisory original requester/client may recover a possibly accepted request after an approved decision.
-                    Never offered for pending or denied review; a missing acceptance closes the original intent.
+                  description: Advisory original requester/client may recover a possibly
+                    accepted request after an approved decision. Never offered for pending
+                    or denied review; a missing acceptance closes the original intent.
                 resume_requires_original_client:
                   type: boolean
-                  description: Guidance only for the same requesting human on another OAuth client while this marked plan is Approved.
-                    It confers no authority or grant transfer.
+                  description: Guidance only for the same requesting human on another
+                    OAuth client while this marked plan is Approved. It confers no authority
+                    or grant transfer.
                 policy:
                   type: object
                   additionalProperties: false
@@ -9188,6 +9232,18 @@ components:
                       type: integer
                       minimum: 0
                       maximum: 1099511627776
+                    max_observed_events:
+                      type: integer
+                      minimum: 0
+                      maximum: 1000000000
+                      description: Cumulative eligible entry and exit probe ceiling; zero
+                        or absent grants no argument observation.
+                    observed_events_used:
+                      type: integer
+                      minimum: 0
+                      maximum: 1000000000
+                      description: Conservative charged event units, including uncertain
+                        observations.
                   required:
                   - uid
                   - executor
@@ -14267,6 +14323,12 @@ components:
               type: integer
               minimum: 0
               maximum: 1099511627776
+            max_observed_events:
+              type: integer
+              minimum: 0
+              maximum: 1000000000
+              description: Cumulative eligible entry and exit probe ceiling; zero or absent
+                grants no argument observation.
           required:
           - max_executions
           - max_collected_bytes
@@ -14815,26 +14877,34 @@ components:
                 preview_deadline:
                   type: string
                   format: date-time
-                  description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
+                  description: Original passive preview expiry; bounds opening a new approval
+                    review, and also start for legacy previewDeadline plans.
                 capture_deadline_rule:
                   enum:
                   - previewDeadline
                   - acceptanceWithinGrant
                   - policyAuthority
-                  description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry.
+                  description: Manual preview/acceptance window, or the separately accepted
+                    team-policy authority bound by original request-anchored grant expiry.
                 capture_window_seconds:
                   type: integer
                   const: 300
-                  description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                  description: Maximum window fixed once at acceptance, never beyond original
+                    approval expiry.
                 can_resume:
                   type: boolean
-                  description: Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority.
+                  description: Advisory current original requester/client collection eligibility
+                    under this exact approved grant. Submission rechecks all authority.
                 can_resolve:
                   type: boolean
-                  description: Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent.
+                  description: Advisory original requester/client may recover a possibly
+                    accepted request after an approved decision. Never offered for pending
+                    or denied review; a missing acceptance closes the original intent.
                 resume_requires_original_client:
                   type: boolean
-                  description: Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer.
+                  description: Guidance only for the same requesting human on another
+                    OAuth client while this marked plan is Approved. It confers no authority
+                    or grant transfer.
                 policy:
                   type: object
                   additionalProperties: false
@@ -14893,6 +14963,18 @@ components:
                       type: integer
                       minimum: 0
                       maximum: 1099511627776
+                    max_observed_events:
+                      type: integer
+                      minimum: 0
+                      maximum: 1000000000
+                      description: Cumulative eligible entry and exit probe ceiling; zero
+                        or absent grants no argument observation.
+                    observed_events_used:
+                      type: integer
+                      minimum: 0
+                      maximum: 1000000000
+                      description: Conservative charged event units, including uncertain
+                        observations.
                   required:
                   - uid
                   - executor

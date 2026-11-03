@@ -4119,6 +4119,18 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 1099511627776
+                          },
+                          "max_observed_events": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000,
+                            "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
+                          },
+                          "observed_events_used": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000,
+                            "description": "Conservative charged event units, including uncertain observations."
                           }
                         },
                         "required": [
@@ -4874,6 +4886,18 @@
                                   "type": "integer",
                                   "minimum": 0,
                                   "maximum": 1099511627776
+                                },
+                                "max_observed_events": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000000000,
+                                  "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
+                                },
+                                "observed_events_used": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000000000,
+                                  "description": "Conservative charged event units, including uncertain observations."
                                 }
                               },
                               "required": [
@@ -8410,7 +8434,7 @@
     },
     {
       "name": "preview_capture",
-      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human\u2019s selected result inspection/download; never an issued grant.",
+      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human’s selected result inspection/download; never an issued grant.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -11749,7 +11773,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 512,
-            "description": "Optional 1\u2013512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
+            "description": "Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
           },
           "sharing": {
             "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
@@ -12907,7 +12931,7 @@
     },
     {
       "name": "cancel_artifact_download",
-      "description": "Stop this caller and client\u2019s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
+      "description": "Stop this caller and client’s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,
@@ -13815,6 +13839,18 @@
                         "minimum": 1,
                         "maximum": 10000,
                         "description": "Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter."
+                      },
+                      "max_observed_events": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000,
+                        "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
+                      },
+                      "observed_events_spent": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000,
+                        "description": "Conservative charged event units, including uncertain observations."
                       }
                     },
                     "required": [
@@ -15235,6 +15271,12 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 1099511627776
+              },
+              "max_observed_events": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000,
+                "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
               }
             },
             "required": [
@@ -16073,6 +16115,18 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 1099511627776
+                          },
+                          "max_observed_events": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000,
+                            "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
+                          },
+                          "observed_events_used": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000,
+                            "description": "Conservative charged event units, including uncertain observations."
                           }
                         },
                         "required": [

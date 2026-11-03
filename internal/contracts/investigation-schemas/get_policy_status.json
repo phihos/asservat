@@ -483,6 +483,18 @@
                     "minimum": 1,
                     "maximum": 10000,
                     "description": "Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter."
+                  },
+                  "max_observed_events": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000,
+                    "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
+                  },
+                  "observed_events_spent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000,
+                    "description": "Conservative charged event units, including uncertain observations."
                   }
                 },
                 "required": [

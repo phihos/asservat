@@ -182,6 +182,8 @@ type policySuppressionData struct {
 	LastAt  time.Time `json:"last_at"`
 }
 type policyStatusData struct {
+	MaxObservedEvents   int64                   `json:"max_observed_events,omitempty"`
+	ObservedEventsSpent int64                   `json:"observed_events_spent,omitempty"`
 	MaxGrantStarts      int64                   `json:"max_grant_starts,omitempty"`
 	AttachedGrantID     string                  `json:"attached_grant_id,omitempty"`
 	CollectionKind      string                  `json:"collection_kind"`
@@ -316,7 +318,7 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 			if acceptance == "" {
 				acceptance = st.DeactivatedID
 			}
-			data := policyStatusData{MaxGrantStarts: st.MaxGrantStarts, AttachedGrantID: st.AttachedGrantID, CollectedBytesSpent: st.CollectedBytesSpent, MaxCollectedBytes: st.MaxCollectedBytes, ObservedBytesSpent: st.ObservedBytesSpent, MaxObservedBytes: st.MaxObservedBytes, PolicyUID: st.PolicyUID, AcceptanceID: acceptance, State: policyState(st, s.now()), Generation: st.Generation, ExpiresAt: st.NotAfter.UTC(), Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, MaxExecutions: st.MaxExecutions, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
+			data := policyStatusData{MaxGrantStarts: st.MaxGrantStarts, AttachedGrantID: st.AttachedGrantID, CollectedBytesSpent: st.CollectedBytesSpent, MaxCollectedBytes: st.MaxCollectedBytes, ObservedBytesSpent: st.ObservedBytesSpent, MaxObservedBytes: st.MaxObservedBytes, MaxObservedEvents: st.MaxObservedEvents, ObservedEventsSpent: st.ObservedEventsSpent, PolicyUID: st.PolicyUID, AcceptanceID: acceptance, State: policyState(st, s.now()), Generation: st.Generation, ExpiresAt: st.NotAfter.UTC(), Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, MaxExecutions: st.MaxExecutions, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
 			data.CollectionKind = "podStatus"
 			for _, kind := range []string{"packetCapture", "syscallTrace"} {
 				if slices.Contains(st.Authority.Actions, kind) {

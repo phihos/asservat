@@ -522,6 +522,18 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 1099511627776
+                            },
+                            "max_observed_events": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000,
+                              "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
+                            },
+                            "observed_events_used": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000,
+                              "description": "Conservative charged event units, including uncertain observations."
                             }
                           },
                           "required": [

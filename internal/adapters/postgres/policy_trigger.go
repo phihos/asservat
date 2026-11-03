@@ -352,6 +352,7 @@ func (s *PolicyTriggers) Status(ctx context.Context, policy string) (value.Polic
 		out.Authority, out.ExecutionsSpent, out.MaxExecutions, out.NotAfter, out.AcceptedIntentVersion, out.AcceptedGeneration = a, accepted.ExecutionsSpent, a.Limits.MaxExecutions, a.NotAfter.UTC(), record.IntentVersion, record.Source.Revision.Generation
 		out.CollectedBytesSpent, out.MaxCollectedBytes = accepted.CollectedBytesSpent, a.Limits.MaxBytes
 		out.ObservedBytesSpent, out.MaxObservedBytes = accepted.ObservedBytesSpent, a.Limits.MaxObservedBytes
+		out.ObservedEventsSpent, out.MaxObservedEvents = accepted.ObservedEventsSpent, a.Limits.MaxObservedEvents
 		out.ClusterID, out.NamespaceUID, out.WorkloadUID = a.ClusterID, a.NamespaceUID, a.WorkloadUID
 		if row.GrantAttachmentID.Valid && row.ActiveID.Valid {
 			if !source.AttachedGrantID.Valid || !bytes.Equal(source.AttachedAuthorityDigest, a.ScopeDigest[:]) {

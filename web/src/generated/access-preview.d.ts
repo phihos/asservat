@@ -45,6 +45,7 @@ export interface components {
             maxExecutions: number;
             maxBytes: number;
             maxObservedBytes: number;
+            maxObservedEvents?: number;
         };
         Contract_permission_source_ad816c81a7733f89: {
             enabled: boolean;

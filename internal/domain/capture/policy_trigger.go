@@ -364,6 +364,7 @@ type PolicyStatus struct {
 	// Shared accepted pools: conservative charges/reservations, not measured output.
 	CollectedBytesSpent, MaxCollectedBytes int64
 	ObservedBytesSpent, MaxObservedBytes   int64
+	ObservedEventsSpent, MaxObservedEvents int64
 	NotAfter                               time.Time
 	WatchedPods, Occurrences, Captured     int64
 	Recent                                 []PolicyOccurrenceStatus

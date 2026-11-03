@@ -137,6 +137,7 @@ func (s *GrantOperations) Tool(name string) (contracts.InvestigationTool, bool) 
 
 // GrantOperationInput is the closed union of the four inputs.
 type policyGrantRequestLimits struct {
+	MaxObservedEvents int64 `json:"max_observed_events,omitempty"`
 	MaxExecutions     int64 `json:"max_executions"`
 	MaxCollectedBytes int64 `json:"max_collected_bytes"`
 	MaxObservedBytes  int64 `json:"max_observed_bytes"`
@@ -255,6 +256,8 @@ type grantResultAccess struct {
 }
 
 type grantPolicyData struct {
+	MaxObservedEvents  int64           `json:"max_observed_events,omitempty"`
+	ObservedEventsUsed int64           `json:"observed_events_used,omitempty"`
 	UID                string          `json:"uid"`
 	Executor           *grantPrincipal `json:"executor"`
 	AuthorityIssuedAt  time.Time       `json:"authority_issued_at"`
@@ -316,7 +319,7 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 	if g.Kind == authorization.GrantPolicy && g.Policy != nil {
 		p := g.Policy
 		d.Target.ClusterID, d.Target.NamespaceUID, d.Target.WorkloadUID, d.Target.PodName = p.Authority.ClusterID, p.Authority.NamespaceUID, p.Authority.WorkloadUID, ""
-		d.Policy = &grantPolicyData{UID: p.Authority.PolicyUID, Executor: principalView(p.Authority.Executor), AuthorityIssuedAt: p.Authority.IssuedAt.UTC(), AuthorityNotAfter: p.Authority.NotAfter.UTC(), MaxExecutions: p.Limits.MaxExecutions, MaxCollectedBytes: p.Limits.MaxBytes, MaxObservedBytes: p.Limits.MaxObservedBytes, ExecutionsUsed: g.PolicySpend.Executions, CollectedBytesUsed: g.PolicySpend.CollectedBytes, ObservedBytesUsed: g.PolicySpend.ObservedBytes}
+		d.Policy = &grantPolicyData{UID: p.Authority.PolicyUID, Executor: principalView(p.Authority.Executor), AuthorityIssuedAt: p.Authority.IssuedAt.UTC(), AuthorityNotAfter: p.Authority.NotAfter.UTC(), MaxExecutions: p.Limits.MaxExecutions, MaxCollectedBytes: p.Limits.MaxBytes, MaxObservedBytes: p.Limits.MaxObservedBytes, MaxObservedEvents: p.Limits.MaxObservedEvents, ObservedEventsUsed: g.PolicySpend.ObservedEvents, ExecutionsUsed: g.PolicySpend.Executions, CollectedBytesUsed: g.PolicySpend.CollectedBytes, ObservedBytesUsed: g.PolicySpend.ObservedBytes}
 		end := g.PolicyNotAfter.UTC()
 		d.NotAfter = &end
 		d.CaptureDeadlineRule = "policyAuthority"
@@ -452,7 +455,7 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 			operationErr = authapp.ErrGrantUnavailable
 			break
 		}
-		request := authapp.PolicyGrantRequestInput{PolicyUID: in.PolicyUID, PolicyName: in.PolicyName, IdempotencyKey: in.IdempotencyKey, Lifetime: time.Duration(in.LifetimeSeconds) * time.Second, Limits: authorization.AutomationLimits{MaxExecutions: in.Limits.MaxExecutions, MaxBytes: in.Limits.MaxCollectedBytes, MaxObservedBytes: in.Limits.MaxObservedBytes}}
+		request := authapp.PolicyGrantRequestInput{PolicyUID: in.PolicyUID, PolicyName: in.PolicyName, IdempotencyKey: in.IdempotencyKey, Lifetime: time.Duration(in.LifetimeSeconds) * time.Second, Limits: authorization.AutomationLimits{MaxExecutions: in.Limits.MaxExecutions, MaxBytes: in.Limits.MaxCollectedBytes, MaxObservedBytes: in.Limits.MaxObservedBytes, MaxObservedEvents: in.Limits.MaxObservedEvents}}
 		if in.Observation != nil {
 			o := in.Observation
 			request.Observation = &authorization.ObservationLimits{MaxSessionSeconds: o.MaxSessionSeconds, MaxObservedBytes: o.MaxObservedBytes, MaxBytesPerSecond: o.MaxBytesPerSecond, MaxConcurrentSessions: o.MaxConcurrentSessions, MaxObservedEvents: o.MaxObservedEvents}

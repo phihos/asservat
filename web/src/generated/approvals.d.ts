@@ -11,6 +11,8 @@ export interface components {
                 max_executions: number;
                 max_collected_bytes: number;
                 max_observed_bytes: number;
+                /** @description Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation. */
+                max_observed_events?: number;
             };
             observation_limits?: {
                 max_session_seconds: number;
@@ -222,6 +224,10 @@ export interface components {
                     max_observed_bytes: number;
                     collected_bytes_used: number;
                     observed_bytes_used: number;
+                    /** @description Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation. */
+                    max_observed_events?: number;
+                    /** @description Conservative charged event units, including uncertain observations. */
+                    observed_events_used?: number;
                 };
             } & (unknown & unknown & unknown);
         } | {
@@ -428,6 +434,10 @@ export interface components {
                     max_observed_bytes: number;
                     collected_bytes_used: number;
                     observed_bytes_used: number;
+                    /** @description Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation. */
+                    max_observed_events?: number;
+                    /** @description Conservative charged event units, including uncertain observations. */
+                    observed_events_used?: number;
                 };
             } & (unknown & unknown & unknown);
         } | {
@@ -571,6 +581,10 @@ export interface components {
                         max_observed_bytes: number;
                         collected_bytes_used: number;
                         observed_bytes_used: number;
+                        /** @description Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation. */
+                        max_observed_events?: number;
+                        /** @description Conservative charged event units, including uncertain observations. */
+                        observed_events_used?: number;
                     };
                 } & (unknown & unknown & unknown))[];
             };

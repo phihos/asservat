@@ -37,6 +37,7 @@ type AutomationEnvelope struct {
 	MaxExecutions      int64    `json:"maxExecutions"`
 	MaxBytes           int64    `json:"maxBytes"`
 	MaxObservedBytes   int64    `json:"maxObservedBytes"`
+	MaxObservedEvents  int64    `json:"maxObservedEvents,omitempty"`
 }
 type Selector struct {
 	MatchLabels map[string]string `json:"matchLabels"`

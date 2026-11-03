@@ -51,6 +51,11 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 1099511627776
+        },
+        "maxObservedEvents": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
         }
       },
       "required": [
@@ -181,6 +186,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 1099511627776
+            },
+            "maxObservedEvents": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
             }
           },
           "required": [
@@ -234,6 +244,11 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 1099511627776
+            },
+            "maxObservedEvents": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000000
             }
           },
           "required": [

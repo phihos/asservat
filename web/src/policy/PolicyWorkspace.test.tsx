@@ -36,6 +36,7 @@ class SyntheticPolicies implements Operations {
   unknown = false;
   kind: Kind = 'exit';
   packet = false;
+  arguments = false;
   saveLimit?: number;
   grantStartLimit?: number;
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string): Promise<Output<N>> {
@@ -46,6 +47,7 @@ class SyntheticPolicies implements Operations {
     if (reply.status==='ok' && this.packet) (reply.data as {collection_kind:string}).collection_kind='packetCapture';
     if(reply.status==='ok' && this.saveLimit!==undefined) Object.assign(reply.data,{max_executions:this.saveLimit,executions_spent:0});
     if(reply.status==='ok' && this.grantStartLimit!==undefined) Object.assign(reply.data,{max_grant_starts:this.grantStartLimit});
+    if(reply.status==='ok' && this.arguments) Object.assign(reply.data,{collection_kind:'syscallTrace',max_observed_bytes:100663296,max_observed_events:6000,observed_events_spent:2000});
     return reply as Output<N>;
   }
 }
@@ -257,4 +259,20 @@ it('uses the server source-start ceiling without autoenlarging the selected gran
  const input=screen.getByLabelText(/Maximum executions|Action starts/) as HTMLInputElement;
  expect(input.max).toBe('2');expect(input.value).toBe('1');fireEvent.change(input,{target:{value:'2'}});expect(input.validity.valid).toBe(true);
  fireEvent.click(screen.getByRole('button',{name:'Request policy approval'}));await screen.findByRole('link',{name:'View policy approval'});expect(calls).toHaveLength(1);expect(calls[0]).toMatchObject({limits:{max_executions:2}});expect(screen.getByText('0 of 1 used')).toBeTruthy();
+});
+
+it('keeps cumulative argument events in both requested pools and displays their spend', async () => {
+ const calls:unknown[]=[];
+ const grants:GrantOperations={call:async(_name,input)=>{calls.push(structuredClone(input));return result({grant_id:id(41),kind:'policy',approval_navigation_uri:'https://asservat.example.invalid/approvals/'+id(41)}) as unknown as GrantOutput<'request_policy_grant'> as never;}};
+ const {client}=mount(grants,true);client.arguments=true;
+ fireEvent.change(screen.getByLabelText('Policy name'),{target:{value:'p'}});
+ fireEvent.click(screen.getByRole('button',{name:'Show policy'}));
+ await screen.findByText('No policy grant is attached.');
+ expect(screen.getByText(/2,000 of 6,000 eligible entry and exit probes/)).toBeTruthy();
+ const events=screen.getByLabelText('Maximum observed events') as HTMLInputElement;
+ expect(events.max).toBe('6000');
+ fireEvent.change(events,{target:{value:'3000'}});
+ fireEvent.click(screen.getByRole('button',{name:'Request policy approval'}));
+ await screen.findByRole('link',{name:'View policy approval'});
+ expect(calls[0]).toMatchObject({limits:{max_observed_events:3000},observation_limits:{max_observed_events:3000}});
 });
