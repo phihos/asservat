@@ -31,7 +31,8 @@ counted; duplicate fields cannot reset counts. No input is truncated.
 | Samples, locations, functions | 100,000 each |
 | Mappings | 4,096 |
 | Sample types; period-type allocations | 16 each |
-| Labels, including numeric labels and units | 32,768 total; 64 per sample |
+| Labels, including numeric labels and units | 64 per sample; shared object allowance below |
+| Shared expensive-object allowance | `2*samples + locations + functions + 8*labels <= 662144` |
 | String-table entries | 300,000 |
 | Sample location references | 1,048,576 total; 4,096 per sample |
 | Inline line records | 1,048,576 total; 4,096 per location |
@@ -46,19 +47,88 @@ regression observes zero heap allocations. Shape excess returns `ErrLimit`;
 malformed wire returns `ErrNotProfile` or the unchanged parser's refusal.
 
 The table allowance supports the measured 100,000-distinct-table profile while
-leaving room for nested data. Label allowance was selected after a combined
+leaving room for nested data. The initial independent label limit was selected
+after a combined
 100,000-label numeric/unit shape reached about 258 MiB RSS and 253 MiB cgroup
 usage: too little margin for a 256 MiB worker. Reducing aggregate labels to
 32,768 brought the combined near-16-MiB maximum below 191 MiB process RSS,
 including the explicitly modeled 16 MiB buffer reserve. This is a supported
-shape decision, not an asserted universal Go allocation formula.
+shape decision, not an asserted universal Go allocation formula. The shared
+allowance below supersedes that independent 32,768-label ceiling.
 
 The old 330,000-table publisher experiment remains a real historical component
 result. The new 100,000-table allowance intentionally refuses that shape.
 The publisher's synthetic memory test now exercises the current supported
 shape; prior evidence was not rewritten as a passing qualification of it.
 
+## Native heap intersection and shared allowance
+
+Go's `runtime/pprof` heap writer (`src/runtime/pprof/protomem.go`) emits a
+numeric `bytes` label for each sample. An independent 32,768-label ceiling
+therefore unnecessarily rejects a heap with more than that many allocation
+buckets even if its other tables are small. A fresh owned Go process generated
+40,007 actual heap samples/bytes labels, 20 locations, 14 functions and 760,054
+location references: only 1,401,571 decompressed bytes (127,059 gzip bytes).
+The [native generator report](../../test/results/pprof-runtime-heap-generator.json)
+and [generator](../../experiments/pprof-runtime-heap/main.go) retain its exact
+hashes and Go version. This deliberately dense synthetic allocation-stack case
+shows native writer behavior; it is not a claim about deployment frequency.
+
+Use one common expensive-object allowance rather than separate publisher/query
+profiles: charge two units per sample, one per location/function and eight per
+label, capped at 662,144 units. These are fixed empirical structural units,
+**not heap bytes or a hard Go allocation guarantee**. The sample structure holds
+several slices/maps; labels add temporary records and up to three postdecode
+maps plus value/unit arrays. The larger label weight covers the observed numeric
+label overhead conservatively. Byte, strings, primitive array and per-record
+limits remain unchanged. No unit is discounted based on evidence contents or
+whether the analyzer displays a label.
+
+The ceiling is `2*100000 + 100000 + 100000 + 8*32768`: it retains the measured
+full-table shape without pretending every small-table heap has those other
+costs. The 40,007-sample native heap uses 400,104 units and now passes actual
+`inuse_space` summary analysis at 70.4 MiB peak RSS. The earlier full-table,
+100,000-label shape costs 1,200,000 units and is refused before object parsing.
+A native-shaped 40,000-sample regression failed with the old flat label cap,
+then passed with the shared allowance; the 100,000-sample/all-labeled shape
+still refuses. All caps intersect: neither 100,000 samples nor a label-count
+maximum is an independent acceptance promise.
+
+The [mixed-shape report](../../test/results/pprof-common-allowance-mixed/report.json)
+measures two additional near-ceiling combinations under the same 256 MiB process
+limit and modeled 16 MiB buffer reserve: 64,000 samples plus 64,000 numeric labels
+(640,257 units), and 100,000 samples plus 57,000 numeric labels (656,257 units).
+Both also contain approximately one million lines/references, 300,000 strings
+and nearly 16 MiB input. They pass at 181.7 and 183.4 MiB peak RSS. The
+[native heap summary report](../../test/results/pprof-common-allowance-heap/report.json)
+returns a valid typed result; the [refusal report](../../test/results/pprof-common-allowance-refused/report.json)
+keeps the original dense-sample, dense-function, two-million-label and expensive
+full-table failures below 60 MiB RSS with no OOM. These are a bounded empirical
+qualification corpus, not proof of every possible permitted combination or an
+installed worker qualification.
+
+This replaces one counter with a weighted counter, adding no purpose selector,
+parser fork, resource increase, configuration, I/O or fallback. The alternative
+was a fixed 100,000-label publisher limit under its existing 512 MiB process
+while keeping a smaller query limit. It preserves native downloads but would
+still reject this inexpensive heap summary, so the measured common allowance
+is the smaller usable contract. Process memory containment remains mandatory.
+
+One generator invocation continued after its helper compile failed and used the
+previous executable. Its [unqualified report](../../test/results/pprof-runtime-heap-generator-stale-build.json)
+is retained explicitly; the final native measurements use the rebuilt helper
+and matching source/binary hashes. No stale-build observation is claimed as the
+final source qualification. The measurement harness is retained in the isolated
+analyzer branch at commit `b992ae9d`, extending `bcacb89a`; it is not required
+by the publication parser. Reports bind the exact helper/runtime source hashes.
+
 ## Verification and practical limits
+
+The shared-allowance follow-up passed the full diagnostics race suite (12.127 s),
+affected `go vet`, and the same spec/architecture gates (13,475 assertions,
+1,330 architecture checks, 69 Go packages/426 edges). Its retained
+[fuzz log](../../test/results/pprof-common-allowance-fuzz.log) records 81,778
+executions in a 15-second two-worker smoke, with no failure.
 
 The red valid-label regression initially returned success. With preflight, the
 same valid oversized profile returns `ErrLimit` before the allocating parser.

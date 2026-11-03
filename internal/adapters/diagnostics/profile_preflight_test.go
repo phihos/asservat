@@ -3,9 +3,11 @@ package diagnostics
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"testing"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"github.com/google/pprof/profile"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 
@@ -78,7 +80,6 @@ func TestPprofPreflightShapeBoundaries(t *testing.T) {
 		per, total    int
 		message       bool
 	}{
-		{"aggregate labels", 2, 3, MaxPprofSampleLabels, MaxPprofLabels, true},
 		{"aggregate locations", 2, 1, MaxPprofSampleLocations, MaxPprofLocationReferences, false},
 		{"aggregate lines", 4, 4, MaxPprofLocationLines, MaxPprofLines, true},
 	} {
@@ -193,4 +194,46 @@ func FuzzPprofPreflight(f *testing.F) {
 			_ = CheckPprof(bytes.NewReader(gzipped(t, data)))
 		}
 	})
+}
+
+// Go's native heap writer emits a numeric bytes label for every sample.
+// Samples below the table bound must not be refused solely because the old
+// independent label ceiling assumed every other table was also maximal.
+func TestPprofHeapBytesLabelsShareObjectAllowance(t *testing.T) {
+	for _, n := range []int{32768, 40000, 100000} {
+		t.Run(fmt.Sprint(n), func(t *testing.T) {
+			p := validProfile()
+			p.SampleType = []*profile.ValueType{{Type: "alloc_objects", Unit: "count"}, {Type: "alloc_space", Unit: "bytes"}, {Type: "inuse_objects", Unit: "count"}, {Type: "inuse_space", Unit: "bytes"}}
+			p.Sample = make([]*profile.Sample, n)
+			for i := range p.Sample {
+				p.Sample[i] = &profile.Sample{Location: []*profile.Location{p.Location[0]}, Value: []int64{1, 64, 1, 64}, NumLabel: map[string][]int64{"bytes": {64}}}
+			}
+			if err := p.CheckValid(); err != nil {
+				t.Fatal(err)
+			}
+			err := CheckPprof(bytes.NewReader(encoded(t, p)))
+			if n <= 40000 && err != nil || n > 40000 && !errors.Is(err, artifact.ErrLimit) {
+				t.Fatal(n, err)
+			}
+		})
+	}
+}
+
+func TestPprofPreflightSharedObjectAllowance(t *testing.T) {
+	for _, labels := range []int{32768, 32769} {
+		var data []byte
+		for i := 0; i < MaxPprofSamples; i++ {
+			var sample []byte
+			if i < labels {
+				sample = wireBytes(3, nil)
+			}
+			data = append(data, wireBytes(2, sample)...)
+		}
+		data = append(data, bytes.Repeat(wireBytes(4, nil), MaxPprofLocations)...)
+		data = append(data, bytes.Repeat(wireBytes(5, nil), MaxPprofFunctions)...)
+		err := preflightPprof(data)
+		if labels == 32768 && err != nil || labels == 32769 && !errors.Is(err, artifact.ErrLimit) {
+			t.Fatal(labels, err)
+		}
+	}
 }

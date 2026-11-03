@@ -10,11 +10,15 @@ import (
 // These are input limits, not a per-query Go heap guarantee. The separately
 // contained process still supplies the hard memory and eventual-join boundary.
 const (
-	MaxPprofSamples            = 100000
-	MaxPprofLocations          = 100000
-	MaxPprofFunctions          = 100000
-	MaxPprofStrings            = 300000
-	MaxPprofLabels             = 32768
+	MaxPprofSamples   = 100000
+	MaxPprofLocations = 100000
+	MaxPprofFunctions = 100000
+	MaxPprofStrings   = 300000
+	// Empirical structural allowance, not Go heap bytes: sample=2,
+	// location/function=1, label=8. It preserves the qualified full-table
+	// shape while allowing ordinary heap bytes labels with smaller tables.
+	// Independent byte/array bounds and process containment still apply.
+	MaxPprofObjectUnits        = 662144
 	MaxPprofSampleLabels       = 64
 	MaxPprofLocationReferences = 1 << 20
 	MaxPprofSampleLocations    = 4096
@@ -23,7 +27,7 @@ const (
 	MaxPprofComments           = 4096
 )
 
-type pprofShape struct{ labels, locations, lines int }
+type pprofShape struct{ locations, lines, objects int }
 
 // preflightPprof counts allocation-bearing fields using the maintained wire
 // decoder. It has fixed nesting and does not interpret IDs, symbols or values.
@@ -37,6 +41,15 @@ func preflightPprof(data []byte) error {
 				return ErrNotProfile
 			}
 			tables[field]++
+			switch field {
+			case 2:
+				shape.objects += 2
+			case 4, 5:
+				shape.objects++
+			}
+			if shape.objects > MaxPprofObjectUnits {
+				return artifact.ErrLimit
+			}
 			limit := 0
 			switch field {
 			case 1, 11:
@@ -89,8 +102,11 @@ func (s *pprofShape) sample(data []byte) error {
 				return ErrNotProfile
 			}
 			labels++
-			s.labels++
-			if labels > MaxPprofSampleLabels || s.labels > MaxPprofLabels {
+			s.objects += 8
+			if s.objects > MaxPprofObjectUnits {
+				return artifact.ErrLimit
+			}
+			if labels > MaxPprofSampleLabels {
 				return artifact.ErrLimit
 			}
 		}

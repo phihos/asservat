@@ -106,3 +106,13 @@ process measurements and qualification limits. The pprof library remains the
 semantic parser. New unsupported shapes return the existing limit refusal,
 without truncation or mutation of old evidence/grants. No worker resource,
 query authority, privilege, migration or public activation changes here.
+
+The first fixed 32,768 aggregate-label limit was subsequently replaced by a
+shared structural allowance after an actual Go heap with 40,007 allocation
+buckets showed that the runtime emits one numeric `bytes` label per sample.
+The common preflight charges samples=2, locations/functions=1 and labels=8,
+with at most 662,144 empirical units plus the unchanged independent array/byte
+bounds. It accepts that native heap while refusing the measured expensive
+full-table shape; no separate publisher/query policy or memory increase is
+introduced. The review above records native-shaped regression and mixed-shape
+process measurements. Units are not a heap guarantee.
