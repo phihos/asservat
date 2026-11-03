@@ -198,6 +198,10 @@ func (approvalArgumentCompiler) CompileArguments(_ []string, buffers bool, maxim
 
 func TestArgumentRecorderApprovalRetainsCanonicalEventCeiling(t *testing.T) {
 	f := newInvestigationFixture()
+	retained := &retainedRecording{investigationFixture: f}
+	f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
+	f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+	f.svc.Previews, f.svc.Admission, f.svc.Recorders = retained, retained, bothRecorders{availableRecording{f}}
 	f.svc.Filters = &approvalArgumentCompiler{}
 	raw, err := os.ReadFile("../planning/profiles/syscall-activity-v1.json")
 	if err != nil {
@@ -225,6 +229,12 @@ func TestArgumentRecorderApprovalRetainsCanonicalEventCeiling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !preview.Recordable {
+		t.Fatal("argument preview not recordable")
+	}
+	if preview.Preview.AssessmentRulesDigest != preview.Assessment.RulesDigest {
+		t.Error("persisted preview lost argument assessment rule identity")
+	}
 	_, canonical, err := compiler.RecorderScopeSummary(preview.Preview.CanonicalScope)
 	if err != nil || canonical == nil || canonical.ObservationLimits == nil || canonical.ObservationLimits.MaxObservedEvents != 40000 {
 		t.Fatal("canonical argument event ceiling", canonical, err)
@@ -242,5 +252,19 @@ func TestArgumentRecorderApprovalRetainsCanonicalEventCeiling(t *testing.T) {
 	}
 	if f.admissions.Load() != 0 {
 		t.Fatal("review request acquired evidence")
+	}
+	f.now = preview.Preview.Deadline.Add(time.Minute)
+	grants.grant.ExpiresAt, grants.covering = access.NotAfter, nil
+	if _, err = f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), preview.Preview.ID, "argument-review", access); !errors.Is(err, reachedRecordingAdmission) || len(retained.seen) != 1 {
+		t.Fatal("approved argument assessment changed before admission", err)
+	}
+	stored := f.previews[preview.Preview.ID]
+	if stored.AssessmentRulesDigest != preview.Assessment.RulesDigest || !stored.Deadline.Equal(preview.Preview.Deadline) {
+		t.Fatal("original preview changed")
+	}
+	stored.AssessmentRulesDigest = compiler.RecorderAssessmentRulesDigest()
+	f.previews[stored.ID] = stored
+	if _, err = f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), stored.ID, "wrong-rules", access); err == nil || len(retained.seen) != 1 {
+		t.Fatal("generic rules accepted argument scope", err)
 	}
 }

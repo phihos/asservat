@@ -75,12 +75,7 @@ func TestReviewedMetadataAssessmentRemainsExact(t *testing.T) {
 }
 
 func TestReviewedFiniteRecorderAssessmentRemainsExact(t *testing.T) {
-	p, a := metadataReviewedBinding(t)
-	composition := planvalue.ProfileComposition{Components: []planvalue.ProfileComponent{{ID: "net", Profile: planvalue.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}}}, MaxTotalBytes: 16 << 20, MaxDuration: "10s"}
-	p.Intent.Diagnostic = ""
-	p.Intent.Composition = &composition
-	p.AssessmentRulesDigest = compiler.RecorderAssessmentRulesDigest()
-	a.Plan.Input.Recorder = &planvalue.RecorderContext{Composition: composition}
+	p, a := compiledReviewedSyscall(t, false)
 	if !app.ValidContextPreview(p) {
 		t.Fatal("finite recorder review structural baseline")
 	}

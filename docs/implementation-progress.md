@@ -3,6 +3,24 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Candidate `370c706a` passed CI41638301511. Installed run
+[41638326430](https://github.com/phihos/asservat/actions/runs/41638326430)
+reached public argument preview/review but rejected approved submission as
+`ReviewChanged`, before acquisition. Go608.312s, exit1, unchanged sources and
+cleanupFailures empty; reports are retained in `test/results/argument-native-41638326430`.
+The fixed diagnostic was `request/changed/assessment`: preview stored generic
+recorder rules while the displayed argument assessment used its distinct rule
+identity. A local preview → review → approved request regression reproduced both
+the mismatched stored identity and rejection before admission. All three consumers
+now derive rules from the same frozen actions: preview, request and SQL reviewed
+admission. Existing metadata/packet/profile rule identities remain unchanged.
+Full affected race suites passed: capture16.777s, planning1.614s and
+PostgreSQL3.240s; the regression submits the approved original argument plan after
+preview expiry and rejects a substituted generic rule identity. SQL matching now
+uses real compiled syscall scopes in its regression, including unchanged metadata
+rules. Repository pre-push gates passed. Installed acquisition remains unqualified.
+
+
 Candidate `fe9c4f19` passed CI41634155293 and automated review. Installed run
 [41634428539](https://github.com/phihos/asservat/actions/runs/41634428539)
 passed schema preparation but failed the first public argument preview before

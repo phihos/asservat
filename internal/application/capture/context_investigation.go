@@ -583,7 +583,10 @@ func (s ContextInvestigation) requestWithGroupBounds(ctx context.Context, source
 		rules = compiler.SourceSnapshotAssessmentRulesDigest()
 	}
 	if recording {
-		rules = compiler.RecorderAssessmentRulesDigest()
+		rules, err = compiler.RecorderAssessmentRulesForScope(p.CanonicalScope)
+		if err != nil {
+			return zero, s.requestChanged("assessment/scope")
+		}
 	}
 	if recording && p.IssuerEpoch == recovery.IssuerEpoch && p.AssessmentRulesDigest == rules && p.Storage != (value.ContextStorageSelection{}) && acquisitionInput(p.Intent, p.ExecutionClass) {
 		// Warm only this existing selection while the grant gate does I/O. The

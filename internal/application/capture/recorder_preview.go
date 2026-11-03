@@ -147,6 +147,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		return zero, previewFailure("compile", err)
 	}
 	p.CanonicalScope, p.ScopeDigest = slices.Clone(plan.CanonicalScope), plan.ScopeDigest
+	p.AssessmentRulesDigest = compiler.RecorderAssessmentRulesFor(plan.Actions)
 	assessment, err := compiler.AssessRecorder(plan, p.AssessmentID, s.Now())
 	if err != nil {
 		return zero, previewFailure("assessment", err)
