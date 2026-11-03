@@ -80,101 +80,13 @@ type summaryCount struct {
 
 func summarizePprof(ctx context.Context, p *profile.Profile, s analysis.ProfileSummarySelection) (analysis.ProfileSummary, error) {
 	var zero analysis.ProfileSummary
-	if len(p.Sample) > MaxSummarySamples || len(p.Location) > MaxSummaryLocations || len(p.Function) > MaxSummaryFunctions {
-		return zero, artifact.ErrLimit
+	aggregate, err := aggregatePprof(ctx, p, s.SampleType)
+	if err != nil {
+		return zero, err
 	}
-	sampleType := -1
-	for i, t := range p.SampleType {
-		if t.Type == s.SampleType {
-			if sampleType >= 0 {
-				return zero, ErrProfileSampleType
-			}
-			sampleType = i
-		}
-	}
-	if sampleType < 0 {
-		return zero, ErrProfileSampleType
-	}
-	if !analysis.ProfileSummaryText(p.SampleType[sampleType].Unit, 64) {
-		return zero, ErrNotProfile
-	}
-	out := analysis.ProfileSummary{SampleType: s.SampleType, Unit: p.SampleType[sampleType].Unit, Top: make([]analysis.ProfileHotspot, 0, s.TopN), SymbolStatus: "missing"}
-	if p.DurationNanos > 0 {
-		seconds := float64(p.DurationNanos) / 1e9
-		out.DurationSeconds = &seconds
-	}
-	counts := make(map[string]summaryCount)
-	visits := 0
-	named, missing, signed := false, false, false
-	for _, sample := range p.Sample {
-		if err := ctx.Err(); err != nil {
-			return zero, err
-		}
-		v := sample.Value[sampleType]
-		if !analysis.ProfileSummaryValue(v) || !addSummary(&out.Total, v) {
-			return zero, artifact.ErrLimit
-		}
-		signed = signed || v < 0
-		seen := make(map[string]bool)
-		frames := 0
-		addFrame := func(name string) error {
-			frames++
-			visits++
-			if frames > MaxSummarySampleFrames || visits > MaxSummaryFrameVisits {
-				return artifact.ErrLimit
-			}
-			if name == "" {
-				missing = true
-			} else {
-				if !analysis.ProfileSummaryText(name, 512) {
-					return artifact.ErrLimit
-				}
-				named = true
-			}
-			count := counts[name]
-			count.name = name
-			if frames == 1 && !addSummary(&count.flat, v) {
-				return artifact.ErrLimit
-			}
-			if !seen[name] {
-				if !addSummary(&count.cumulative, v) {
-					return artifact.ErrLimit
-				}
-				seen[name] = true
-			}
-			counts[name] = count
-			return nil
-		}
-		// Empty and stripped stacks remain explicitly unresolved, never named by
-		// a raw address, file path, mapping name or a guessed runtime function.
-		if len(sample.Location) == 0 {
-			if err := addFrame(""); err != nil {
-				return zero, err
-			}
-		}
-		for _, location := range sample.Location {
-			if err := ctx.Err(); err != nil {
-				return zero, err
-			}
-			if len(location.Line) == 0 {
-				if err := addFrame(""); err != nil {
-					return zero, err
-				}
-			}
-			// pprof locations and inline lines are ordered from leaf to caller.
-			for _, line := range location.Line {
-				if err := addFrame(line.Function.Name); err != nil {
-					return zero, err
-				}
-			}
-		}
-	}
-	if named {
-		out.SymbolStatus = "complete"
-		if missing {
-			out.SymbolStatus = "partial"
-		}
-	}
+	out := aggregate.summary
+	out.Top = make([]analysis.ProfileHotspot, 0, s.TopN)
+	counts, signed := aggregate.counts, aggregate.signed
 	top := &summaryHeap{}
 	for _, count := range counts {
 		if err := ctx.Err(); err != nil {
