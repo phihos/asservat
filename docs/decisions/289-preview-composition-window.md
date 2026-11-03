@@ -61,8 +61,12 @@ and carries no additional private values or I/O.
 8. No new external dependency; existing regional services remain required.
 9. Same API/object/key work and concurrency limits; each preview slot can be
    occupied at most 15 rather than 5 seconds. No new watches or retained memory.
-10. No migration, wire change or persistent state change; reverting the window
-    restores the earlier behavior without touching accepted previews.
+10. Migration 00126 gives PostgreSQL audit admission the same prospective
+    fifteen-second preview envelope. It adds no table or column and never
+    rewrites an existing intent. Its tested SQL Down restores five-second
+    preview admission; Up restores fifteen seconds with prior intent replay
+    and charges preserved. Running an older binary against new history is
+    not qualified by this SQL roundtrip.
 11. This one operation bound is smaller than adding combined workload/recorder
     RPC variants or splitting public preview into new resumable phases.
 
@@ -73,5 +77,11 @@ identity boundaries with synthetic regional stages taking 3+2+1 seconds.
 The old outer window refuses it; the new one permits it. Initial identity
 expiry, changed identity, cancellation and an expired individual observation
 remain refused. This proves the composition boundary, not native latency.
-The previous failed native run has unchanged source hashes and no cleanup
-failures. Qualification of this window remains pending.
+The real PostgreSQL/S3 regression first failed at audit Begin against schema
+125: the existing SQL trigger still allowed only five seconds. With migration
+00126, fifteen-second preview Begin/Finish and unchanged five-second ordinary
+requests pass; direct SQL insertions beyond either bound are rejected. Eight
+audit lock-expiry/history/accounting/overdue cases pass (132.083 seconds), as
+does an actual 126 Down/Up roundtrip (2.236 seconds). All reports record unchanged
+source and no cleanup failures. The previous failed native run also has unchanged
+source hashes and no cleanup failures. Installed qualification remains pending.

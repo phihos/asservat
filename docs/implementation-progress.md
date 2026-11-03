@@ -2,6 +2,23 @@
 
 ## Capture-preview outer composition window (2026-11-03)
 
+Migration 00126 now aligns the SQL audit trigger with this prospective
+fifteen-second preview window; ordinary operation admission remains five
+seconds. The actual PostgreSQL/S3 baseline at schema 125 failed preview audit
+Begin. After the migration, eight audit subtests passed in 132.083s, including
+post-lock original-expiry checks, accounting, historical verifier changes and
+overdue/uncertain-spend paths. A separate actual DownTo(125)/Up roundtrip passed
+in 2.236s: rollback rejected a new fifteen-second preview, reapplication retained
+the original accepted intent, exact replay and charges. Invalid SQL preview
+windows above fifteen seconds and ordinary windows above five seconds are
+refused independently of the Go input validator. All three fixture reports
+record unchanged source and empty cleanup failures; baseline exit 1 was the
+expected defect reproduction, and both corrected runs exited 0. Reports are
+`test/results/preview-audit-sql126-{before,after,roundtrip}-environment.json`.
+Migration 126 follows the complete profile 123–125 chain. This is component
+SQL proof, not installed preview qualification or old-binary rollback proof.
+
+
 [ADR-289](decisions/289-preview-composition-window.md) gives `preview_capture`
 a prospective fifteen-second outer request window through the existing shared
 browser/MCP/audit selector. Native run 41564008984 showed sequential history,
