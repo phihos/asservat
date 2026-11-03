@@ -225,6 +225,16 @@ Go dependency checks, complete PostgreSQL/application-authorization races and
 affected bootstrap capacity races passed. Installed runtime qualification remains
 pending.
 
+The combined parser/stream/SQL head `b35557c0` then passed the owned ledger
+fixture in 11.181s with unchanged source hashes and empty cleanup failures
+(`profile-summary127-combined`). It includes the shared parser object allowance
+and actual encrypted stream regression. Affected diagnostics, objectstore and
+evidence races passed in 17.768s/5.765s/2.047s; final spec validation has 13,484
+assertions and affected vet passes. The complete poll-envelope regression also
+passes (presentation races 8.782s): a bare summary that fits 24 KiB but whose
+provenance/warnings exceed the complete limit returns an audited fixed refusal,
+closes the result owner and preserves charged work without trimming hotspots.
+
 ## Profile summary internal authority checkpoint (2026-11-03)
 
 ADR-291 adds a closed pprof source/selection/result to the existing projection

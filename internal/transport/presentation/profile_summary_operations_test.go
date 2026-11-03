@@ -3,7 +3,9 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	analysisapp "asservat.local/asservat/internal/application/analysis"
@@ -110,5 +112,50 @@ func TestProfileSummaryAuditRefusesChangedOrMixedInput(t *testing.T) {
 				t.Fatal("unreviewed input dispatched")
 			}
 		})
+	}
+}
+
+// A parser result can fit its own limit while its full public provenance and
+// warning envelope does not. Refuse the selection rather than trim hotspots.
+func TestProfileSummaryBoundsFullPollEnvelopeWithoutTrimming(t *testing.T) {
+	s, f, _, _ := summaryBridge(t)
+	f.a.Scope.Profile.TopN = 100
+	summary := value.ProfileSummary{SampleType: "cpu", Unit: "nanoseconds", Total: 100, Top: []value.ProfileHotspot{}, SymbolStatus: "complete"}
+	for n := 0; n < 100; n++ {
+		name, fraction := fmt.Sprintf("%03d%s", n, strings.Repeat("x", 509)), .01
+		summary.Top = append(summary.Top, value.ProfileHotspot{Function: &name, Flat: 1, Cumulative: 1, Fraction: &fraction})
+		b, _ := json.Marshal(summary)
+		if len(b) > value.ProfileSummaryBytes {
+			summary.Top = summary.Top[:len(summary.Top)-1]
+			break
+		}
+	}
+	if !summary.Valid(f.a.Scope.Profile) {
+		t.Fatal("invalid bounded summary fixture")
+	}
+	f.result = &value.ProjectionResult{Summary: &summary}
+	f.ready = false
+	pending, err := s.Call(t.Context(), f, "get_profile_summary", summaryInput(100))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = pending.Close(context.Background())
+	f.ready = true
+	result, err := s.Call(t.Context(), f, "get_query_result", bridgePoll(f.q.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer result.Close(context.Background())
+	var envelope struct {
+		Status string `json:"status"`
+		Error  struct {
+			Code string `json:"code"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(result.Body, &envelope) != nil || envelope.Status != "error" || envelope.Error.Code != "AnalysisUnavailable" || len(result.Body) > value.ProfileSummaryBytes || strings.Contains(string(result.Body), `"top":`) {
+		t.Fatalf("oversized summary was not refused: %s", result.Body)
+	}
+	if f.admissions != 1 || f.reads != 1 || f.q.Scope.Profile.TopN != 100 {
+		t.Fatal("refusal reset accounting or mutated the selected result")
 	}
 }

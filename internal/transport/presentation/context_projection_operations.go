@@ -188,6 +188,9 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	default:
 	}
 	body, err := s.serialize(call.requestID, name, d)
+	if errors.Is(err, value.ErrRecordTooLarge) && d.Tool() == "get_profile_summary" {
+		return s.refusal(record.ID, name, record.Until, profileSummaryTooLarge, operationAuditDenied, operationEffectAccepted, false)
+	}
 	if err != nil {
 		return OperationReply{}, stopped("query-output", ErrOperationDelivery)
 	}
@@ -293,7 +296,7 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 	body, err := json.Marshal(envelope)
 	if err == nil && len(body) > contracts.InvestigationOutputLimit && d.Tool() == "get_profile_summary" {
 		clear(body)
-		body, err = json.Marshal(httpHeaderFailure(requestID, OperationFailure{Code: "AnalysisUnavailable", Message: "This profile summary does not fit the response limit. Select fewer hotspots.", Retryable: false}))
+		return nil, value.ErrRecordTooLarge
 	}
 	if err != nil || len(body) > contracts.InvestigationOutputLimit || s.contracts.ValidateOutput(name, body) != nil {
 		clear(body)
@@ -362,3 +365,5 @@ func (s *ContextProjectionOperations) WithProfileSummaries(profiles ProfileSumma
 }
 
 const profileSummaryHandling = "SensitiveDataHandling: Function names may contain user data. This summary omits raw samples, labels, paths and addresses. Automatic deletion covers Asservat-managed copies; copies already delivered cannot be recalled."
+
+var profileSummaryTooLarge = OperationFailure{Code: "AnalysisUnavailable", Message: "This profile summary does not fit the response limit. Select fewer hotspots.", Retryable: false}
