@@ -161,6 +161,8 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 	if err != nil || closed || receipt.CaptureID == "" {
 		t.Fatal("Stop profile was not admitted", err, closed)
 	}
+	admittedAt := time.Now()
+	t.Logf("manual profile Stop %s: admitted at %s", receipt.CaptureID, admittedAt.UTC().Format(time.RFC3339Nano))
 	var current struct {
 		CaptureID string `json:"capture_id"`
 		Phase     string `json:"phase"`
@@ -197,7 +199,17 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 		CaptureID string `json:"capture_id"`
 		Requested bool   `json:"cancellation_requested"`
 	}
-	read("cancel_capture", map[string]any{"capture_id": receipt.CaptureID, "expected_revision": current.Revision, "idempotency_key": "stop-" + receipt.CaptureID}, &stopped)
+	stopAt := time.Now()
+	reply, code := invoke("cancel_capture", map[string]any{"capture_id": receipt.CaptureID, "expected_revision": current.Revision, "idempotency_key": "stop-" + receipt.CaptureID})
+	t.Logf("manual profile Stop %s: single attempt at %s, since admission=%s, elapsed=%s, last phase=%s revision=%d, status=%s code=%s warnings=%v", receipt.CaptureID, stopAt.UTC().Format(time.RFC3339Nano), stopAt.Sub(admittedAt), time.Since(stopAt), current.Phase, current.Revision, reply.Status, code, reply.Warnings)
+	if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &stopped) != nil {
+		t.Fatal("live Stop request failed", reply.Status, code)
+	}
+	for _, warning := range reply.Warnings {
+		if strings.HasPrefix(warning, "Cancellation delivery is unconfirmed;") {
+			t.Fatal("live Stop was persisted but not confirmed delivered", warning)
+		}
+	}
 	if stopped.CaptureID != receipt.CaptureID || !stopped.Requested {
 		t.Fatal("live Stop was not accepted", stopped)
 	}
@@ -205,6 +217,9 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 		read("get_capture", map[string]string{"capture_id": receipt.CaptureID}, &current)
 		if current.Phase == "Cancelled" {
 			break
+		}
+		if current.Phase == "Succeeded" || current.Phase == "Failed" || current.Phase == "Partial" || current.Phase == "Indeterminate" {
+			t.Fatalf("profile ended without joined Stop after %s: %+v", time.Since(stopAt), current)
 		}
 		if err := installedJourneyPause(ctx, time.Second); err != nil {
 			t.Fatal(err)

@@ -699,6 +699,7 @@ func installedJourneyStoppedContent(response *http.Response) error {
 }
 
 type installedJourneyEnvelope struct {
+	Warnings  []string        `json:"warnings"`
 	RequestID string          `json:"request_id"`
 	Status    string          `json:"status"`
 	Data      json.RawMessage `json:"data"`

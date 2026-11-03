@@ -50,7 +50,26 @@ regression first failed on the missing selection, then passed with both actual
 wire schemas and the exact action/client/budget/expiry checks. The focused
 preflight now also runs the capture admission regressions that reject missing raw
 result access. No production authorization or capture contract is relaxed.
-Next: corrected installed Stop qualification and exact-candidate CI/review.
+The corrected request reached live Stop in
+[run 41614963286](https://github.com/phihos/asservat/actions/runs/41614963286)
+on `8dfa361e`: capture/native download/repeat/summary passed again, but Stop
+ended Succeeded. Go exited 1 after 796.389 seconds; sources were unchanged and
+cleanup failures empty. Exact CI 41614945923 passed and review threads were clear.
+Original reports are retained under `test/results/profile-native-41614963286/`.
+
+The public source signer incorrectly required an acquisition target for profile
+Stop, although that restrictive purpose deliberately has none. It refused before
+signing; the API persisted the request and returned the documented
+cancellation-delivery-unconfirmed warning. The installed helper had discarded
+warnings. The signer now delegates profile Stop to the existing purpose validator,
+which retains exact original writer/cluster/deadline checks. The regression failed
+before this one-line correction and passed afterward. The helper retains warnings,
+uses one timed Stop call, refuses unconfirmed delivery and reports other terminal
+outcomes immediately. Stored output still wins a genuine completion race; no
+cancellation request alone claims joined shutdown. The preflight includes the
+actual signing and framed source-query checks; the complete focused preflight
+exited 0, including the installed request checks (2.191s). Next: corrected
+installed Stop qualification on the final candidate.
 
 ## Fourth installed profile run and download correction (2026-11-03)
 

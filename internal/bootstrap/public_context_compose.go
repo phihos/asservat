@@ -79,7 +79,7 @@ func (s publicSigners) SignSourceWork(ctx context.Context, w fleetapp.SourceWork
 	if signer == nil {
 		return nil, fleet.ErrUnavailable
 	}
-	if !w.Stop && w.StopSnapshot == nil && w.Target.Request.ClusterID != w.Channel.Connector.Binding.ClusterID {
+	if !w.Stop && w.StopSnapshot == nil && w.StopProfile == nil && w.Target.Request.ClusterID != w.Channel.Connector.Binding.ClusterID {
 		return nil, fleet.ErrUnavailable
 	}
 	return signer.SignSourceWork(ctx, w)
