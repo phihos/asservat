@@ -130,6 +130,8 @@ type NodeWork struct {
 	Sequence             uint64              `json:"sequence"`
 	Kind                 string              `json:"kind"`
 	NotAfter             time.Time           `json:"notAfter"`
+	ProfileCapture       *NodeProfileCapture `json:"profileCapture,omitempty"`
+	CancelProfileCapture *NodePacketCancel   `json:"cancelProfileCapture,omitempty"`
 	PacketCapture        *NodePacketCapture  `json:"packetCapture,omitempty"`
 	PacketSource         *NodePacketSource   `json:"packetSource,omitempty"`
 	CancelSourceSnapshot *NodeSourceSnapshot `json:"cancelSourceSnapshot,omitempty"`

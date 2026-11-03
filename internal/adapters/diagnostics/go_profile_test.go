@@ -665,3 +665,55 @@ func TestGoProfileShortCallerCannotStartUnfinishableRecording(t *testing.T) {
 		t.Fatal("failed acquisition left prepared sink reusable", e)
 	}
 }
+
+// The node transport needs the bounded native stream, while ciphertext
+// creation stays in the connector. Native success must not need a fake layout.
+func TestGoProfileNativeStreamSharesHTTPAndLimitChecks(t *testing.T) {
+	for _, mode := range []string{"complete", "over-limit", "redirect", "short-writer"} {
+		t.Run(mode, func(t *testing.T) {
+			data := bytes.Repeat([]byte("profile-native"), 32)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/debug/pprof/heap" || r.URL.Query().Get("debug") != "0" {
+					t.Error("unreviewed path", r.URL)
+				}
+				if mode == "redirect" {
+					w.Header().Set("Location", "http://unapproved.invalid/")
+					w.WriteHeader(http.StatusFound)
+					return
+				}
+				w.Header().Set("Content-Type", value.GoProfileMediaType)
+				_, _ = w.Write(data)
+			}))
+			defer server.Close()
+			request := profileRequest()
+			if mode == "over-limit" {
+				request.NativeLimit = int64(len(data) - 1)
+			}
+			var calls atomic.Int32
+			c, err := diagnostics.NewGoProfileCollector(profileDialer(t, server, request, &calls, ""), profileGuardFunc(freshProfileGuard), time.Now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var destination bytes.Buffer
+			var writer io.Writer = &destination
+			if mode == "short-writer" {
+				writer = shortNativeProfileWriter{}
+			}
+			outcome, err := c.CollectGoProfileNative(context.Background(), request, writer)
+			if calls.Load() != 1 {
+				t.Fatal("HTTP acquisition retried", calls.Load())
+			}
+			if mode == "complete" {
+				if err != nil || !outcome.ResponseComplete || !outcome.MayHaveStarted || outcome.NativeBytes != int64(len(data)) || !bytes.Equal(destination.Bytes(), data) {
+					t.Fatalf("native result %+v %v", outcome, err)
+				}
+			} else if err == nil || outcome.ResponseComplete {
+				t.Fatalf("invalid output accepted %+v %v", outcome, err)
+			}
+		})
+	}
+}
+
+type shortNativeProfileWriter struct{}
+
+func (shortNativeProfileWriter) Write(p []byte) (int, error) { return 0, nil }

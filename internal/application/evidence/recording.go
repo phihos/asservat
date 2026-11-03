@@ -52,6 +52,7 @@ const (
 // (ADR-283 part 3). Like captureFailed they record no acquisition; the
 // committed start is not refunded.
 const (
+	RecordingProfilerBusy = "profilerBusy"
 	RecordingPeersChanged = "peerMembershipChanged"
 	RecordingPeersStale   = "peerMembershipStale"
 )
@@ -81,7 +82,7 @@ func (c RecordingCollection) Valid(r artifact.Registration) bool {
 	case RecordingCancelled:
 		return c.SnapshotCancellation != nil && c.SnapshotCancellation.Valid() && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && c.Failure == ""
 	case RecordingFailed:
-		return c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && (c.Failure == "captureFailed" || c.Failure == "storeUnconfirmed" || c.Failure == RecordingPeersChanged || c.Failure == RecordingPeersStale)
+		return c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && (c.Failure == "captureFailed" || c.Failure == "storeUnconfirmed" || c.Failure == RecordingProfilerBusy || c.Failure == RecordingPeersChanged || c.Failure == RecordingPeersStale)
 	}
 	return false
 }

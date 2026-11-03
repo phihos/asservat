@@ -83,6 +83,7 @@ declare -A suites=(
   # runner's kernel, so the harness refuses without the disposable-host guard
   # that native.yml creates on its fresh runner.
   [collector-packet]="python3 scripts/test-collector.py packet"
+  [collector-profile]="python3 scripts/test-collector.py profile"
   # S-04 row 17 (EXP-02 subset): the packet suite on the pinned Cilium chart.
   [collector-cilium]="python3 scripts/test-collector.py cilium"
   # ADR-278: the encrypted-disk ring volume on a real node (byte cap, crash

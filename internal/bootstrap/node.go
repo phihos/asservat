@@ -142,6 +142,9 @@ func RunNode(ctx context.Context, podUID string) error {
 	}
 	facts := probeNode()
 	mechanisms := collector.Assess(facts)
+	if gadget.ProfileDialAvailable() && facts.HostProcesses == collector.Supported {
+		mechanisms = append(mechanisms, collector.Availability{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable})
+	}
 	// The syscall recorder decodes x86_64 numbers only (ADR-273).
 	if runtime.GOARCH != "amd64" {
 		for i := range mechanisms {
@@ -168,6 +171,7 @@ func RunNode(ctx context.Context, podUID string) error {
 		budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr}
 	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
+	p.profiles = &nodeProfiles{identity: p.packetIdentity, acquire: acquireNodeProfile(p.packetIdentity, time.Now), upload: client.UploadProfileStream, now: time.Now, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
 	ringDir, removed := "", 0
 	if st, err := os.Stat(contracts.NodeRingDiskPath); err == nil && st.IsDir() && d.Ceilings.RingDiskBytes > 0 {
 		ringDir = contracts.NodeRingDiskPath
@@ -186,6 +190,7 @@ func RunNode(ctx context.Context, podUID string) error {
 	err = p.Run(ctx)
 	p.sources.Close()
 	p.packets.wg.Wait()
+	p.profiles.wg.Wait()
 	return err
 }
 
@@ -255,8 +260,10 @@ type nodeProcess struct {
 	sleep      func(context.Context, time.Duration, <-chan struct{}) error
 	log        io.Writer
 	// packets runs packet captures (ADR-248); nil refuses every item.
-	packets *nodePackets
-	sources *nodeSources
+	packets  *nodePackets
+	profiles *nodeProfiles
+	nodeName string
+	sources  *nodeSources
 	// root is the process context: captures outlive a re-enrollment.
 	root context.Context
 
@@ -271,7 +278,7 @@ type nodeProcess struct {
 func (p *nodeProcess) packetIdentity() collector.Identity {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return collector.Identity{NodeUID: p.nodeUID, PodUID: p.podUID, BootID: p.bootID, Epoch: p.epoch}
+	return collector.Identity{NodeName: p.nodeName, NodeUID: p.nodeUID, PodUID: p.podUID, BootID: p.bootID, Epoch: p.epoch}
 }
 
 var errNodeReenroll = errors.New("node channel: enroll again")
@@ -317,6 +324,7 @@ func (p *nodeProcess) enroll(ctx context.Context) (time.Time, error) {
 				notAfter, err = p.creds.Install(resp.Certificate, p.now())
 				if err == nil {
 					p.nodeUID = resp.NodeUID
+					p.nodeName = resp.NodeName
 				}
 				p.mu.Unlock()
 				if err == nil {
@@ -449,6 +457,16 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 			// Starting a capture takes the lock for the budget, so decide
 			// without holding it.
 			r := collector.Decide(w, p.now())
+			if w.Kind == collector.WorkProfileCapture && p.profiles != nil {
+				root := p.root
+				if root == nil {
+					root = ctx
+				}
+				r = p.profiles.start(root, p.epoch, w)
+			}
+			if w.Kind == collector.WorkCancelProfileCapture && p.profiles != nil {
+				r = p.profiles.stop(w)
+			}
 			if w.Kind == collector.WorkPacketCapture && p.packets != nil {
 				root := p.root
 				if root == nil {

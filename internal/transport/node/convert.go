@@ -103,7 +103,7 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 	}
 	for _, m := range s.Mechanisms {
 		a := collector.Availability{Mechanism: collector.Mechanism(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: collector.Adapter(m.Adapter), Hook: collector.Hook(m.Hook), Reasons: []collector.Reason{}}
-		if (a.Mechanism != collector.MechanismPacket && a.Mechanism != collector.MechanismSyscall) || (a.Adapter != collector.AdapterAvailable && a.Adapter != collector.AdapterUnavailable) ||
+		if (a.Mechanism != collector.MechanismProfile && a.Mechanism != collector.MechanismPacket && a.Mechanism != collector.MechanismSyscall) || (a.Adapter != collector.AdapterAvailable && a.Adapter != collector.AdapterUnavailable) ||
 			(a.Hook != collector.HookNone && a.Hook != collector.HookTCX && a.Hook != collector.HookTC) || len(m.Reasons) > 16 {
 			return collector.Report{}, false
 		}
@@ -136,6 +136,13 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 
 func WireWork(w collector.Work) contracts.NodeWork {
 	out := contracts.NodeWork{ID: w.ID, Sequence: w.Sequence, Kind: string(w.Kind), NotAfter: w.NotAfter.UTC()}
+	if w.Profile != nil {
+		p := WireProfile(*w.Profile)
+		out.ProfileCapture = &p
+	}
+	if w.CancelProfile != nil {
+		out.CancelProfileCapture = &contracts.NodePacketCancel{CaptureID: w.CancelProfile.CaptureID, WorkID: w.CancelProfile.WorkID}
+	}
 	if w.CancelSnapshot != nil {
 		snapshot := WireSourceSnapshot(*w.CancelSnapshot)
 		out.CancelSourceSnapshot = &snapshot
@@ -203,6 +210,18 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 		return collector.Work{}, false
 	}
 	out := collector.Work{ID: w.ID, Sequence: w.Sequence, Kind: collector.WorkKind(w.Kind), NotAfter: w.NotAfter.UTC().Truncate(time.Microsecond)}
+	if w.ProfileCapture != nil {
+		p, valid := DomainProfile(*w.ProfileCapture)
+		if !valid {
+			p = collector.ProfileCapture{}
+		}
+		out.Profile = &p
+		out.NotAfter = w.NotAfter.UTC()
+	}
+	if w.CancelProfileCapture != nil {
+		p := collector.PacketCancel{CaptureID: w.CancelProfileCapture.CaptureID, WorkID: w.CancelProfileCapture.WorkID}
+		out.CancelProfile = &p
+	}
 	if w.CancelSourceSnapshot != nil {
 		snapshot, valid := DomainSourceSnapshot(*w.CancelSourceSnapshot)
 		if !valid {

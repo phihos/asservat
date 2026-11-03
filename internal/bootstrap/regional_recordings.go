@@ -82,11 +82,13 @@ type ConnectorRecordings struct {
 	after func(time.Duration) <-chan time.Time
 	wg    sync.WaitGroup
 
-	mu        sync.Mutex
-	held      map[string]*heldRecording // by capture ID
-	storing   int64
-	peers     peerResolver
-	verifiers int // running peer verifiers, at most maxPeerVerifiers
+	mu               sync.Mutex
+	profileEndpoints profileEndpointPlans
+	profiles         map[string]*heldProfile
+	held             map[string]*heldRecording // by capture ID
+	storing          int64
+	peers            peerResolver
+	verifiers        int // running peer verifiers, at most maxPeerVerifiers
 }
 
 func NewConnectorRecordings(nodes recordingNodes, pods podNodes, now func() time.Time, log func(string)) *ConnectorRecordings {
@@ -97,6 +99,11 @@ func NewConnectorRecordings(nodes recordingNodes, pods podNodes, now func() time
 // A pending recording that expires keeps no keys: its PreparedArtifact is
 // dropped unused (the attempt stays charged until custody cleanup).
 func (h *ConnectorRecordings) expireLocked(now time.Time) {
+	for id, p := range h.profiles {
+		if !p.storing && !now.Before(p.expires) {
+			delete(h.profiles, id)
+		}
+	}
 	for id, r := range h.held {
 		if !r.storing && !now.Before(r.expires) {
 			delete(h.held, id)
@@ -177,7 +184,7 @@ func (h *ConnectorRecordings) start(ctx context.Context, p *objectstore.Prepared
 	defer h.mu.Unlock()
 	now := h.now()
 	h.expireLocked(now)
-	if _, exists := h.held[e.CaptureUID]; exists || len(h.held) >= maxHeldRecordings || !now.Before(until) {
+	if _, exists := h.held[e.CaptureUID]; exists || len(h.held)+len(h.profiles) >= maxHeldRecordings || !now.Before(until) {
 		return time.Time{}, value.ErrUnavailable
 	}
 	if peered && h.verifiers >= maxPeerVerifiers {
@@ -327,6 +334,9 @@ func (h *ConnectorRecordings) Collect(w fleet.APIContextWork) (evidence.Recordin
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.expireLocked(h.now())
+	if out, ok, err := h.collectProfile(w); ok {
+		return out, err
+	}
 	held := h.held[w.CaptureID]
 	if held == nil || held.expectation.Registration.Location.AttemptID != w.AttemptID || held.digest != w.ExpectationDigest {
 		return evidence.RecordingCollection{}, value.ErrUnavailable
@@ -439,7 +449,7 @@ func (p *preparedRecording) StartPolicyRecording(ctx context.Context, pin artifa
 	defer h.mu.Unlock()
 	now = h.now()
 	h.expireLocked(now)
-	if ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || len(h.held) >= maxHeldRecordings {
+	if ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || len(h.held)+len(h.profiles) >= maxHeldRecordings {
 		return time.Time{}, value.ErrUnavailable
 	}
 	if _, exists := h.held[e.CaptureUID]; exists {

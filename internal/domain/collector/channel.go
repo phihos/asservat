@@ -64,6 +64,8 @@ const (
 	// WorkPacketCapture is one finite manual networkHeaders capture
 	// (ADR-248). It is the only kind with a typed payload in this version.
 	WorkPacketCapture        WorkKind = "packetCapture"
+	WorkProfileCapture       WorkKind = "profileCapture"
+	WorkCancelProfileCapture WorkKind = "cancelProfileCapture"
 	WorkCancelSourceSnapshot WorkKind = "cancelSourceSnapshot"
 	WorkPacketSourceSnapshot WorkKind = "packetSourceSnapshot"
 	WorkPacketSource         WorkKind = "packetSource"
@@ -80,7 +82,7 @@ const (
 )
 
 func (k WorkKind) Valid() bool {
-	return k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource || k == WorkSyscallCapture || k == WorkCancelPacketCapture
+	return k == WorkProfileCapture || k == WorkCancelProfileCapture || k == WorkCancelSourceSnapshot || k == WorkPacketSourceSnapshot || k == WorkArmSource || k == WorkStopSource || k == WorkSnapshot || k == WorkPeerGeneration || k == WorkPacketCapture || k == WorkPacketSource || k == WorkStopPacketSource || k == WorkSyscallCapture || k == WorkCancelPacketCapture
 }
 
 // PacketCancel names one running finite packet capture by its capture ID and
@@ -100,6 +102,8 @@ type Work struct {
 	Kind     WorkKind
 	NotAfter time.Time
 	// Packet is the payload of exactly the packetCapture kind.
+	Profile        *ProfileCapture
+	CancelProfile  *PacketCancel
 	Packet         *PacketCapture
 	Source         *PacketSource
 	StopSource     *SourceBinding
@@ -274,7 +278,9 @@ type Receipt struct {
 func Decide(w Work, now time.Time) Receipt {
 	r := Receipt{WorkID: w.ID, Sequence: w.Sequence, Outcome: OutcomeRefused, Reason: ReasonRecorderNotImplemented}
 	switch {
-	case !w.Kind.Valid() || (w.Kind == WorkPacketCapture || w.Kind == WorkSyscallCapture) != (w.Packet != nil) || w.Packet != nil && (!w.Packet.Valid() || (w.Kind == WorkSyscallCapture) != (w.Packet.Syscalls != nil)) ||
+	case (w.Kind == WorkProfileCapture) != (w.Profile != nil) || w.Profile != nil && (!w.Profile.Valid() || w.NotAfter.After(w.Profile.Request.Deadline.Add(-w.Profile.Request.Parameters.Duration-2*time.Second))) ||
+		(w.Kind == WorkCancelProfileCapture) != (w.CancelProfile != nil) || w.CancelProfile != nil && !w.CancelProfile.Valid() ||
+		!w.Kind.Valid() || (w.Kind == WorkPacketCapture || w.Kind == WorkSyscallCapture) != (w.Packet != nil) || w.Packet != nil && (!w.Packet.Valid() || (w.Kind == WorkSyscallCapture) != (w.Packet.Syscalls != nil)) ||
 		(w.Kind == WorkPacketSource) != (w.Source != nil) || w.Source != nil && (!w.Source.Valid() || w.NotAfter.After(w.Source.Permit.DispatchUntil)) ||
 		(w.Kind == WorkCancelSourceSnapshot) != (w.CancelSnapshot != nil) || w.CancelSnapshot != nil && !w.CancelSnapshot.Valid() ||
 		(w.Kind == WorkPacketSourceSnapshot) != (w.Snapshot != nil) || w.Snapshot != nil && (!w.Snapshot.Valid() || w.NotAfter.After(w.Snapshot.Request.StartBy)) ||

@@ -158,6 +158,7 @@ type Mechanism string
 
 const (
 	MechanismPacket  Mechanism = "packetCapture"
+	MechanismProfile Mechanism = "goProfile"
 	MechanismSyscall Mechanism = "syscallTrace"
 )
 

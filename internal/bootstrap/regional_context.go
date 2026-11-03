@@ -19,6 +19,7 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/application/evidence"
+	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -279,7 +280,9 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if err != nil {
 		return &fixedStepError{"start-client", err}
 	}
-	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
+	output := r.output
+	output.writerEpoch = process.ProcessEpoch()
+	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings}, Local: preparer, Starts: r.journal, Output: output, Collector: r.collector, Source: r.source, Now: time.Now}
 	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.TrustSettings.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
@@ -301,13 +304,37 @@ type regionalArtifactOutput struct {
 	now      func() time.Time
 	// recordings holds started manual recordings (ADR-248); nil without the
 	// collector input, which refuses every recording.
-	recordings *ConnectorRecordings
+	recordings  *ConnectorRecordings
+	writerEpoch string
 }
 
 func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.ContextExpectation) (evidence.PreparedContext, error) {
 	seal, err := kms.NewRemoteSealer(o.endpoint, o.scope, e.Registration.Location.AttemptID, o.client)
 	if err != nil {
 		return nil, err
+	}
+	if e.Profile != nil {
+		if o.recordings == nil || o.writerEpoch == "" {
+			return nil, value.ErrUnavailable
+		}
+		var journal privacyapp.StreamingJournal = noJournal{}
+		epoch := ""
+		if e.Registration.NativeLimit > artifact.FrameBytes {
+			epoch = o.writerEpoch
+			journal, err = newProfileStreamingJournal(e, epoch, o.now)
+			if err != nil {
+				return nil, err
+			}
+		}
+		producer, err := objectstore.NewArtifactProducer(o.store, seal, journal, o.now)
+		if err != nil {
+			return nil, err
+		}
+		prepared, err := producer.Prepare(ctx, e, epoch)
+		if err != nil {
+			return nil, err
+		}
+		return o.recordings.PrepareProfile(prepared, e), nil
 	}
 	if e.Recording != nil || e.Snapshot != nil {
 		// ADR-248: one frame at most, so the artifact producer never needs
@@ -442,4 +469,14 @@ func (v reportedWorkVerifier) VerifyAPIContextWork(ctx context.Context, encoded 
 		v.report(step)
 	}
 	return out, err
+}
+
+// ResolveProfileRecorder observes the original API target and current profile
+// mechanism in the same bounded regional query, without probing the endpoint.
+func (t reportedTargets) ResolveProfileRecorder(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {
+	p, node, err := t.PodTargets.ResolvePacketPod(ctx, r)
+	if err != nil {
+		return targets.RecorderResolution{}, err
+	}
+	return t.packetTargetAvailability(ctx, p, node, false, collector.MechanismProfile), nil
 }

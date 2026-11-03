@@ -44,6 +44,7 @@ type collectorFixture struct {
 	ServerKey          string `json:"serverKey"`
 	Pause              string `json:"pause"`
 	Busybox            string `json:"busybox"`
+	ProfileImage       string `json:"profileImage"`
 	S3                 string `json:"s3"`
 	// CNI names the cluster network profile; "cilium" adds the S-04 row 17
 	// qualification phase. Empty is kind's default network.
@@ -302,7 +303,9 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 		t.Fatalf("status interval %v", interval)
 	}
 
-	if f.RingDiskBytes > 0 {
+	if f.ProfileImage != "" {
+		profileCaptureNative(t, ctx, k, s.Channel, second, workload, f.ProfileImage, f.Work, results)
+	} else if f.RingDiskBytes > 0 {
 		// 3a. ADR-278: byte cap, restart and full volume of the disk ring.
 		ringDiskNative(t, ctx, k, s.Channel, f.CollectorNamespace, f.RingDiskBytes, workload, f.Busybox, results)
 	} else {
