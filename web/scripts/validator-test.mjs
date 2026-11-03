@@ -66,6 +66,21 @@ for (const [file, validator] of [
   assert.equal(evidence[validator](value), true, file);
   assert.equal(evidence[validator]({ ...value, extra: 'unexpected' }), false, file + ' rejects extra field');
 }
+const profilePreview = {
+  target_ref: {cluster_id: id, namespace: 'payments', kind: 'Deployment', name: 'api'},
+  requested_retention_seconds: 600,
+  profile_composition: {components: [{id: 'cpu', profileRef: {catalog: 'builtin', name: 'go-cpu', version: 'v1'}, overrides: [{actionID: 'cpu', field: 'profileDuration', value: '30s'}]}], maxTotalBytes: 16777216, maxDuration: '45s'},
+};
+assert.equal(capture.validInput_preview_capture(profilePreview), true, 'profile duration uses the same closed browser/MCP contract');
+const arbitraryProfileEdit = structuredClone(profilePreview);
+arbitraryProfileEdit.profile_composition.components[0].overrides[0].field = 'profileURL';
+assert.equal(capture.validInput_preview_capture(arbitraryProfileEdit), false, 'profile duration never opens arbitrary endpoint editing');
+const profileCase = JSON.parse(await readFile(new URL('../../examples/mcp-shared-case-notice-result.json', import.meta.url), 'utf8'));
+profileCase.data.artifacts[0].kind = 'profile';
+profileCase.data.artifacts[0].data_class = 'raw';
+assert.equal(evidence.validOutput_get_case(profileCase), true, 'profile case preserves native kind and raw class');
+profileCase.data.artifacts[0].endpoint = 'http://unreviewed.invalid';
+assert.equal(evidence.validOutput_get_case(profileCase), false, 'case metadata does not expose arbitrary endpoint fields');
 const ready = JSON.parse(await readFile(new URL('../../examples/download-ready.json', import.meta.url), 'utf8'));
 delete ready.data.sha256;
 assert.equal(evidence.validOutput_get_artifact_download(ready), false, 'native metadata is an indivisible group');

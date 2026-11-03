@@ -16,7 +16,7 @@ DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
 NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers"]
 
-RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode"]
+RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration"]
 
 
 def history_subset(name, tool):
@@ -389,7 +389,7 @@ def main():
             artifacts = data["properties"]["artifacts"]
             artifacts["minItems"] = 1
             row = artifacts["items"]["properties"]
-            row["kind"] = {"enum": ["pod-status", "packetCapture", "syscallTrace"]}
+            row["kind"] = {"enum": ["pod-status", "packetCapture", "syscallTrace", "profile"]}
             # ADR-279: a raw packet capture is listed as raw; its download
             # needs the approved grant's result-access child. ADR-282: an
             # HTTP header projection is an extract.
@@ -419,7 +419,7 @@ def main():
             "name": name,
             "description": {
                 "list_diagnostics": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
-                "preview_capture": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, CIDR packetPeers or preview-only Kubernetes peers, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
+                "preview_capture": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata, go-cpu/v1 Go CPU profile) and typed overrides (pcap packetFilter, CIDR packetPeers or preview-only Kubernetes peers, windows, ring, timeout, mode, profileDuration; onTrigger recordings need before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
                 "request_capture": "Submit the reviewed pod-status preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet/syscall plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads; submit the same preview again after approval.",
                 "resolve_capture_request": tool["description"],
                 "get_capture": "Read authorized pod-status capture progress. No evidence bytes. Finalizing is not publication; Indeterminate must not be automatically recaptured.",

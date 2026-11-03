@@ -3177,6 +3177,28 @@
                 "maxLength": 63
               },
               "field": {
+                "const": "profileDuration"
+              },
+              "value": {
+                "$ref": "#/$defs/d8"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
                 "const": "syscallFilter"
               },
               "value": {

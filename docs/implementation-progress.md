@@ -33,6 +33,31 @@ fixture, then qualify actual collector CPU/heap/redirect/Stop and the installed
 approval→publication→native download→local pprof workflow, including resources
 at supported limits. No installed profile result or completed S-05 is claimed.
 
+## Profile public contract corrections (2026-11-03)
+
+The installed-profile fixture found two local workflow defects before a native
+run: `profileDuration` edits were absent from the closed runtime preview/history
+schema, and the case projection labeled profile evidence as `pod-status`.
+Regression tests reproduced both. The generated runtime subset now accepts the
+existing typed duration edit and `profile` case kind; the projection preserves
+that kind and its raw classification. Arbitrary endpoint edits remain refused.
+The canonical browser contract already covered both, so regenerating its assets
+made no changes; native ESM checks now exercise these profile values as well.
+
+Cost/benefit gate: two reproducible defects affect every custom-duration preview
+and every published profile respectively; the maintainer has not accepted them.
+This extends the existing public-contract/projection path, with zero new
+permissions, credentials, RPCs, background tasks, fallback states, configuration
+or external dependencies. Runtime validation adds one fixed edit/type choice;
+rollback is ordinary code rollback. A narrower change would leave the other
+public workflow defect. Existing profile admission and raw approvals still
+control collection and disclosure.
+
+Targeted contracts/presentation/integration race tests, affected vet, spec,
+architecture and Go architecture checks pass. Console contracts/typecheck and
+278 tests pass, as does the build. Installed profile qualification remains
+pending; no native run was dispatched for these corrections.
+
 
 ## Profile plans in manual preview (2026-11-03)
 

@@ -7,6 +7,22 @@ import (
 	"testing"
 )
 
+func TestInvestigationProfileDurationUsesClosedPublicEdit(t *testing.T) {
+	wire, err := NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const raw = `{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"},"profile_composition":{"components":[{"id":"cpu","profileRef":{"catalog":"builtin","name":"go-cpu","version":"v1"},"overrides":[{"actionID":"cpu","field":"profileDuration","value":"30s"}]}],"maxTotalBytes":16777216,"maxDuration":"45s"}}`
+	if err := wire.ValidateInput("preview_capture", []byte(raw)); err != nil {
+		t.Fatal("bounded profile edit refused", err)
+	}
+	for _, bad := range []string{strings.Replace(raw, "profileDuration", "profileURL", 1), strings.Replace(raw, `"30s"`, `"unbounded"`, 1)} {
+		if err := wire.ValidateInput("preview_capture", []byte(bad)); err == nil {
+			t.Fatal("unreviewed profile edit accepted")
+		}
+	}
+}
+
 func TestInvestigationInputsRejectUnsupportedOrAmbiguousValues(t *testing.T) {
 	s, err := NewInvestigationContracts()
 	if err != nil {

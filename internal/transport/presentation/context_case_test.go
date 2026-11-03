@@ -24,6 +24,26 @@ const caseID = "00000000-0000-4000-8000-000000000080"
 const artifactID = "00000000-0000-4000-8000-000000000081"
 const caseInput = `{"case_id":"` + caseID + `"}`
 
+func TestCaseProjectionProfileKeepsNativeKindAndRawClass(t *testing.T) {
+	s, f, current := caseOperationsFixture(t)
+	current.i.Scopes = []string{"evidence:read"}
+	f.view.Artifacts[0].EvidenceType = "profile"
+	f.view.Artifacts[0].DataClass = "raw"
+	reply, err := s.Call(t.Context(), current, "get_case", []byte(caseInput))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope struct {
+		Data ContextCaseData `json:"data"`
+	}
+	if err := json.Unmarshal(reply.Body, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if len(envelope.Data.Artifacts) != 1 || envelope.Data.Artifacts[0].Kind != "profile" || envelope.Data.Artifacts[0].DataClass != "raw" {
+		t.Fatal("profile was mislabeled as another native artifact", envelope.Data.Artifacts)
+	}
+}
+
 // Synthetic service data qualifies transport projection only, never the C-16
 // authorizer, outcome audit, publication or native evidence access.
 type caseProjectionFixture struct {

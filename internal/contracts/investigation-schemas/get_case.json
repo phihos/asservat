@@ -138,7 +138,8 @@
                           "enum": [
                             "pod-status",
                             "packetCapture",
-                            "syscallTrace"
+                            "syscallTrace",
+                            "profile"
                           ]
                         },
                         "data_class": {

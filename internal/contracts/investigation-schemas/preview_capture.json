@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, CIDR packetPeers or preview-only Kubernetes peers, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
+  "description": "Preview whole-Pod status or a finite typed recorder, selected Pod, impact and data handling. Passive operation. Optional result sharing needs evidence-owner and evidence:share: up to eight users/groups, default 24 hours, maximum seven days; get_capture reports sharing separately. Repeat with authorized history_capture_id from list_capture_history to restore the target and retention into a fresh checked preview. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata, go-cpu/v1 Go CPU profile) and typed overrides (pcap packetFilter, CIDR packetPeers or preview-only Kubernetes peers, windows, ring, timeout, mode, profileDuration; onTrigger recordings need before 0s) returns its lifecycle plan, compiled filter and assessment. Manual network-header capture (headers only, max 8 MiB) can be requested when its node recorder is available; ApprovalRequired and RecorderUnavailable identify the corresponding blockers.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -696,6 +696,28 @@
               },
               "value": {
                 "$ref": "#/$defs/d10"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "profileDuration"
+              },
+              "value": {
+                "$ref": "#/$defs/d6"
               }
             },
             "required": [
@@ -2015,6 +2037,28 @@
               },
               "value": {
                 "$ref": "#/$defs/d9"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "profileDuration"
+              },
+              "value": {
+                "$ref": "#/$defs/d5"
               }
             },
             "required": [

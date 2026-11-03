@@ -132,7 +132,7 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 		data := ContextCaseData{Case: ContextCaseSummary{CaseID: view.CaseID, Status: "Ready", Access: "ordinary"}, Artifacts: make([]ContextCaseArtifactData, 0, len(view.Artifacts)), Timeline: []any{}}
 		for _, a := range view.Artifacts {
 			kind := "pod-status"
-			if a.EvidenceType == "packetCapture" || a.EvidenceType == "syscallTrace" {
+			if a.EvidenceType == "packetCapture" || a.EvidenceType == "syscallTrace" || a.EvidenceType == "profile" {
 				kind = a.EvidenceType
 			}
 			if a.Shared {
