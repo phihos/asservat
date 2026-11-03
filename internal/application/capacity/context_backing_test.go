@@ -159,3 +159,22 @@ func TestCapacityBackingProductRejectsOverflow(t *testing.T) {
 		t.Fatal("exact finite boundary rejected")
 	}
 }
+
+func TestProfileCapacityFundsCompleteNativeWorkflow(t *testing.T) {
+	h := contextBackingHistoryFixture()
+	h.ProfileProtocol = ProfileProtocolVersion
+	r := artifact.Registration{NativeLimit: artifact.MaxGoTraceBytes}
+	stream := artifact.StreamingPlan{Registration: r}
+	slice := BudgetAmount{Bytes: r.ReservedBytes() + stream.TemporaryBytes(), Objects: int64(5 + stream.PartLimit())}
+	p, err := CompileContextProtocolBacking(slice, h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Format != ProfileContextBackingFormat || p.Evidence != slice || p.NativeTransitionsPerRow != 15 || p.Windows != p.Sessions*4 || p.NativeKeys != p.Windows || p.ContentUnwraps != p.Windows*3 || p.WindowObjects.Objects != p.Windows*2 || p.WindowObjects.Bytes != p.Windows*2*artifact.DownloadWindowAuditBytes || p.ReadBytes != p.Sessions*artifact.ProfileDownloadReadBytes || p.OutputBytes != p.Sessions*artifact.ProfileDownloadOutputBytes {
+		t.Fatalf("incomplete native profile backing: %+v", p)
+	}
+	h.ProfileProtocol = "future/unqualified"
+	if _, err = CompileContextProtocolBacking(slice, h); err == nil {
+		t.Fatal("unknown profile protocol accepted")
+	}
+}

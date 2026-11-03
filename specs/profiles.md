@@ -160,3 +160,9 @@ an uncertain write or refund temporary charges before verified writer quiescence
 and complete backend inventory cleanup. Cancellation/Stop, no replacement
 profiling, protected publication and native download remain full workflow
 acceptance requirements; component checks do not qualify them.
+
+Fresh qualified capacity roots select the immutable `go-profile/v1` protocol
+marker to fund the maximum native trace, one bounded additional response, and
+multipart temporary obligations within the authored workload slice. Legacy roots
+retain their original limits and charges; schema upgrade alone never enlarges
+their grants or funding. See ADR-290 for exact window, key and retirement costs.

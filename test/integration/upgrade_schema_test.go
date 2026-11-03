@@ -125,6 +125,10 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	if e = conn.QueryRow(ctx, profileCancelDefinition).Scan(&originalCancellation); e != nil {
 		t.Fatal(e)
 	}
+	var originalCapacityBacking string
+	if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.capacity_context_protocol_backing(jsonb,jsonb)'::regprocedure)`).Scan(&originalCapacityBacking); e != nil {
+		t.Fatal(e)
+	}
 	upgrade, e := postgres.NewUpgradeSchema(config)
 	if e != nil {
 		t.Fatal(e)
@@ -247,6 +251,20 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("http header query Up after Down", from, to, e)
 		}
 		t.Log("http header query functions: units/batches/tool/source pinned; Down restored exact functions; Up restored 122")
+	}
+	if head == 125 {
+		qualifyProfileCapacityParity(t, ctx, conn)
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("profile capacity Down", e)
+		}
+		var restored string
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.capacity_context_protocol_backing(jsonb,jsonb)'::regprocedure)`).Scan(&restored); e != nil || restored != originalCapacityBacking {
+			t.Fatal("profile capacity Down changed legacy compiler", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("profile capacity Up", from, to, e)
+		}
+		qualifyProfileCapacityParity(t, ctx, conn)
 	}
 	if head == 124 {
 		var updated string

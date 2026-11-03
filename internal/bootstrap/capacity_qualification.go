@@ -82,7 +82,7 @@ func buildCapacityQualification(p contracts.InstallerCapacitySettings, d capacit
 		StopRetainedSeconds: p.StopRetainedSeconds,
 	}
 	f := p.Footprints
-	in.ContextHistory = app.ContextBackingHistory{Capture: capture, CapturePurgeLeases: p.PurgeLeases,
+	in.ContextHistory = app.ContextBackingHistory{ProfileProtocol: app.ProfileProtocolVersion, Capture: capture, CapturePurgeLeases: p.PurgeLeases,
 		Native: authorization.NativeHistoryQualification{ID: newID(), Digest: profileDigest("native", f.Native), RowBytes: f.Native.RowBytes, TransitionWALBytes: f.Native.TransitionWALBytes, BackupCopies: b.BackupCopies, WALCopies: b.WALCopies},
 		Stop: audit.DownloadStopLifecyclePolicy{RootID: d.Root, InstallationID: d.Installation, StoreID: store, PolicyID: newID(), BackupProfileID: backup, QualificationID: newID(),
 			PolicyDigest: profileDigest("stop", p.StopRetainedSeconds), BackupProfileDigest: backupDigest, QualificationDigest: profileDigest("stop-history", f.Stop), Layout: audit.DownloadStopHistoryLayout,

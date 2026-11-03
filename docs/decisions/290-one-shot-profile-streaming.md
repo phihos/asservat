@@ -105,3 +105,38 @@ The intent now accepts only the derived final reservation through the supported
 128 MiB profile ceiling. Neither fix changes timestamps or allocation limits in
 order to make an expired real authority pass. Required installed/native tests
 above remain separate.
+
+## Qualified capacity version
+
+Migration 00125 adds the immutable `ContextHistory.ProfileProtocol` marker
+`go-profile/v1` for newly qualified roots. Missing markers retain the exact
+legacy Go/SQL compiler, root digests, child limits, dates and charged spend.
+The migration changes no stored row. An unknown marker is refused, and rollback
+refuses retained marked qualifications or root plans rather than shrinking
+obligations. Fresh installer qualifications select the marker and must fit the
+administrator's existing root envelope; no new operator tuning is added.
+
+Each qualified record funds two native responses and four content windows:
+one full 128 MiB trace and one separately admitted full response. This means
+four key rows, twelve content unwraps, eight window audit objects and fifteen
+owner transitions (preparation claim/close, two observation claim/close pairs,
+four content claim/close pairs, and retirement). Backup and WAL accounting use
+those same row/transition counts. Read funding is 311,164,928 bytes: four
+73.1875 MiB conservative window bounds plus 4 MiB metadata preparation. Output
+funding is 256 MiB. These are prepaid ceilings, not retries after uncertain work
+or promises to refill spent resources. Typed per-session admission may reserve
+less; ordinary evidence does not have to reserve a maximum trace session.
+
+The custody child preserves authored evidence funding up to the per-record
+maximum trace obligation: 136,740,864 final ciphertext bytes plus 135,266,304
+temporary multipart bytes, and at most 22 objects (four final objects, one upload,
+seventeen parts). Both byte and object limits are capped by the authored workload
+slice; the compiler never rounds insufficient funding up. Existing record and
+session ceilings stay unchanged. No additional storage, network request, role
+or credential is provisioned by the marker itself. The larger root metadata and
+key budgets are checked before a new qualified graph can be accepted.
+
+Required evidence includes exact Go/SQL parity for both versions, maximum and
+undersized workload slices, unchanged legacy function restoration on rollback,
+and a refusal to roll back a retained marked graph. These arithmetic and
+migration checks do not qualify installed profile acquisition or native delivery.

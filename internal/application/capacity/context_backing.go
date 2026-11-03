@@ -9,6 +9,8 @@ import (
 )
 
 const ContextBackingFormat = "protected-context-backing/v1"
+const ProfileContextBackingFormat = "protected-profile-context-backing/v1"
+const ProfileProtocolVersion = "go-profile/v1"
 
 // These are the existing first-profile protocol limits, not administrator or
 // capture-caller knobs. Two finite responses permit the initial content request
@@ -28,6 +30,9 @@ const (
 // binds these complete values and their qualification IDs/digests before SQL
 // may use the resulting arithmetic; no CRD status supplies them.
 type ContextBackingHistory struct {
+	// ProfileProtocol is selected only by a newly qualified immutable root.
+	// Its absence retains the exact legacy arithmetic and funding obligations.
+	ProfileProtocol    string `json:",omitempty"`
 	Capture            audit.OperationHistoryQualification
 	CapturePurgeLeases int64
 	Native             authorization.NativeHistoryQualification
@@ -58,6 +63,9 @@ type ContextProtocolBacking struct {
 // This function never rounds a too-small slice up to one record.
 func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHistory) (ContextProtocolBacking, error) {
 	var zero ContextProtocolBacking
+	if h.ProfileProtocol != "" && h.ProfileProtocol != ProfileProtocolVersion {
+		return zero, ErrBudgetInvalid
+	}
 	if !contextSlice.positive() || !h.Capture.Valid() || h.Capture.Layout != audit.CaptureOperationHistoryLayout || h.CapturePurgeLeases < 2 || h.CapturePurgeLeases > 32 || !h.Native.Valid() || !h.Stop.Valid() {
 		return zero, ErrBudgetInvalid
 	}
@@ -69,8 +77,19 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 	if n < 1 {
 		return zero, ErrBudgetFull
 	}
-	out := ContextProtocolBacking{Format: ContextBackingFormat, Records: n, ReplayRecords: n,
-		Sessions: n, RequestsPerSession: contextDownloadRequests, NativeTransitionsPerRow: contextNativeTransitions}
+	format, windows, transitions := ContextBackingFormat, contextDownloadResponses, contextNativeTransitions
+	output, read := 2*artifact.RecordingNativeLimit, contextDownloadReadBytes
+	evidenceUnit := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
+	evidenceObjects := int64(4)
+	if h.ProfileProtocol == ProfileProtocolVersion {
+		format, windows, transitions = ProfileContextBackingFormat, artifact.ProfileDownloadContentWindows, artifact.ProfileDownloadNativeTransitions
+		output, read = artifact.ProfileDownloadOutputBytes, artifact.ProfileDownloadReadBytes
+		r := artifact.Registration{NativeLimit: artifact.MaxGoTraceBytes}
+		stream := artifact.StreamingPlan{Registration: r}
+		evidenceUnit, evidenceObjects = r.ReservedBytes()+stream.TemporaryBytes(), int64(5+stream.PartLimit())
+	}
+	out := ContextProtocolBacking{Format: format, Records: n, ReplayRecords: n,
+		Sessions: n, RequestsPerSession: contextDownloadRequests, NativeTransitionsPerRow: transitions}
 	amount := func(bytes, objects int64) (BudgetAmount, error) {
 		v, ok := (BudgetAmount{Bytes: bytes, Objects: objects}).multiply(n)
 		if !ok {
@@ -82,15 +101,15 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 	if out.Evidence, e = amount(unit, 4); e != nil {
 		return zero, e
 	}
-	// Record, object and protocol work remain bounded by the small-context
-	// profile. Preserve authored evidence funding for the supported packet
-	// output cap instead of discarding it when objects bind the record count.
-	recordingUnit := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	recordingBytes, ok := capacityProduct(n, recordingUnit)
+	// Keep the existing record ceiling. Expose only authored evidence funding,
+	// capped by the selected protocol's final and temporary obligations; spare
+	// bytes or objects cannot create an unfunded record or session.
+	evidenceBytes, ok := capacityProduct(n, evidenceUnit)
 	if !ok {
 		return zero, ErrBudgetInvalid
 	}
-	out.Evidence.Bytes = min(contextSlice.Bytes, recordingBytes)
+	out.Evidence.Bytes = min(contextSlice.Bytes, evidenceBytes)
+	out.Evidence.Objects = min(contextSlice.Objects, n*evidenceObjects)
 	// Two maximum originals coexist. The deletion certificate can be written
 	// only after original absence; it does not add a third simultaneous object.
 	if out.CaptureObjects, e = amount(2*audit.OperationCipherLimit, 2); e != nil {
@@ -107,7 +126,7 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 	if out.PreparationObjects, e = amount(2*(128<<10), 2); e != nil {
 		return zero, e
 	}
-	if out.WindowObjects, e = amount(2*contextDownloadResponses*artifact.DownloadWindowAuditBytes, 2*contextDownloadResponses); e != nil {
+	if out.WindowObjects, e = amount(2*windows*artifact.DownloadWindowAuditBytes, 2*windows); e != nil {
 		return zero, e
 	}
 	stopCipher, stopKeys, stopBackup, stopWAL := h.Stop.SlotBacking()
@@ -122,14 +141,14 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 		}
 	}
 	captureBackup, captureWAL := h.Capture.SlotBacking(h.CapturePurgeLeases)
-	// The native protocol independently backs one owner and two content-key
-	// rows. Its existing formula has two residual row generations, but does
+	// The native protocol independently backs one owner and one content-key
+	// row per admitted window. Its existing formula has two residual row generations, but does
 	// not multiply the finite transition WAL by an additional factor of two.
-	nativeBackup, ok := capacityProduct(2, h.Native.RowBytes, h.Native.BackupCopies, 1+contextDownloadResponses)
+	nativeBackup, ok := capacityProduct(2, h.Native.RowBytes, h.Native.BackupCopies, 1+windows)
 	if !ok {
 		return zero, ErrBudgetInvalid
 	}
-	nativeWAL, ok := capacityProduct(h.Native.TransitionWALBytes, h.Native.WALCopies, contextNativeTransitions+4+8*contextDownloadResponses)
+	nativeWAL, ok := capacityProduct(h.Native.TransitionWALBytes, h.Native.WALCopies, transitions+4+8*windows)
 	if !ok {
 		return zero, ErrBudgetInvalid
 	}
@@ -137,12 +156,12 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 		dst       *int64
 		perRecord int64
 	}{
-		{&out.OutputBytes, 2 * artifact.RecordingNativeLimit}, {&out.ReadBytes, contextDownloadReadBytes},
-		{&out.Responses, contextDownloadResponses}, {&out.Windows, contextDownloadResponses}, {&out.NativeRows, 1}, {&out.NativeKeys, contextDownloadResponses},
+		{&out.OutputBytes, output}, {&out.ReadBytes, read},
+		{&out.Responses, contextDownloadResponses}, {&out.Windows, windows}, {&out.NativeRows, 1}, {&out.NativeKeys, windows},
 		// Per original phase: one seal, one self-open, two reconciliations.
 		// Certificate: sign/seal/self-open and two independent verifier opens.
 		{&out.CaptureKeyAttempts, contextCaptureKeyAttempts}, {&out.StopKeyAttempts, stopKeys},
-		{&out.ArtifactWraps, 3}, {&out.PreparationUnwraps, 3}, {&out.ContentUnwraps, 3 * contextDownloadResponses},
+		{&out.ArtifactWraps, 3}, {&out.PreparationUnwraps, 3}, {&out.ContentUnwraps, 3 * windows},
 		{&out.CaptureBackupBytes, captureBackup}, {&out.CaptureWALBytes, captureWAL},
 		{&out.NativeBackupBytes, nativeBackup}, {&out.NativeWALBytes, nativeWAL},
 		{&out.StopBackupBytes, stopBackup}, {&out.StopWALBytes, stopWAL},
