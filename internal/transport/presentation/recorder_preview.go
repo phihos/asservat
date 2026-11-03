@@ -69,6 +69,9 @@ func recorderWarnings(plan planning.RecorderPlan) []string {
 			}
 			out = append(out, fmt.Sprintf("%s %s profile (%s) runs only after the capture is requested; it provides no pre-trigger history. Native output is raw evidence and live profiling requires approval.", a.ProfileRuntime, a.ProfileType, timing))
 			for _, endpoint := range plan.Input.Endpoints {
+				if a.EndpointDigest == "" || hash(endpoint.EndpointDigest) != a.EndpointDigest {
+					continue
+				}
 				out = append(out, fmt.Sprintf("Endpoint %s: %s, TCP port %d, %s. Resolved at preview without probing; execution must recheck the reviewed definition and target.", boundedText(endpoint.SourceName, 63), endpoint.AddressMode, endpoint.Port, endpoint.PathPolicy))
 			}
 			continue
