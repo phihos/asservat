@@ -73,8 +73,11 @@ these SQL masks are not mTLS unwrap or installed-worker evidence.
 The original failed reports remain archived. Fixes covered SQL expression and
 rollback ordering, fresh databases for protected root fixtures, real process
 grant coverage (one new baseline-allocation INSERT column), and joined SQL role
-cleanup. The next gate is schema133 installation handover, then reviewed exact
-CI and the prepared native two-capture browser/MCP comparison journey.
+cleanup. The schema133 installation handover also passed in a fresh owned cluster
+(147.876s), with 4,061 independently matched source hashes and complete cleanup.
+This is bootstrap/schema authority qualification, not installed comparison.
+Reviewed exact CI and the prepared native two-capture browser/MCP journey are
+next.
 No comparison requirement or installed result is marked complete. The argument job's cold-start/teardown
 headroom also needs improvement before later installed campaigns. No timeout was
 raised. These saved-view fixtures do not complete arbitrary `syscall_query`,
