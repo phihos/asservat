@@ -143,6 +143,68 @@ architecture and Go architecture checks pass. Console contracts/typecheck and
 278 tests pass, as does the build. Installed profile qualification remains
 pending; no native run was dispatched for these corrections.
 
+## History timing recovery and bounded proof reuse (2026-11-03)
+
+Recovered Claude session 06c27237-b261-43c1-9d73-4b617059a89d's final timing
+pair, native runs 41541454985 and 41541459234 at
+`0f615b2f8a778a6ab1eb13a579f41c7c559ef507`: both failed. The first ended
+on repeat preview 503s; the second lost a later history write's reply before
+its original bound. The downloaded `context-storage.log` artifacts show all
+individual history object puts/gets and the combined regional storage effect
+below 100 ms; hub seal/open also stayed below 100 ms. The first run's slow
+write spent 500–1000 ms in signature/trust verification and 500–1000 ms in
+the final receiver's local proof; sending the reply (including that proof)
+took 1–2 s. These buckets overlap and must not be added. Its regional request
+counter reached 878 Kubernetes requests in ten seconds, with no limiter waits
+or individual requests of one second or longer. This points to cumulative
+proof cost, not slow object copies; it does not establish a single root cause
+for all preview failures.
+
+A failing regression reproduced one avoidable full-proof production: the
+three-second cache headroom rule also applied when the caller's original
+deadline was already covered by the cached proof. Reproduction cannot improve
+that deadline. The reader now retains the same current native recheck in this
+case, including exact process/source/guard checks and failure invalidation,
+without repeating the independent denial/TokenReview producer. Longer callers
+retain the original headroom rule. No request, proof or preview window grows.
+
+Complexity gate: (1) two measured failing installed runs; (2) no accepted risk
+is reopened; (3) ordinary final exchange checks benefit; (4) existing bounded
+cache reuse, no new mechanism; (5) zero privileges/credentials/exposure added;
+(6) zero failure/fallback states added; (7) zero configuration added;
+(8) no new external dependency; (9) fewer full proof API requests, unchanged
+memory/watch/background-task counts; (10) no migration or wire change, revert
+restores the prior selection rule; (11) one cache condition suffices, parallel
+object writes are unsupported by these measurements.
+
+Verification: the new earlier/equal-deadline regression failed before the fix
+and passes after it; all `TestConnectorAPIProof` tests pass. The affected
+`TestConnectorAPI(Proof|Setup)` selection passes with `-race -count=1`,
+Kubernetes package `go vet` and `make go-architecture-check` pass.
+`make spec-check architecture-check` passes using an isolated environment
+installed from `requirements-spec.txt`, including format extras (system Python
+initially lacked those dependencies). Both recovered native environment reports
+retain unchanged source hashes and empty cleanup-failure lists. Installed
+qualification of this change remains pending; neither recovered run is a success.
+PR #143 review found that a longer coalesced waiter could inherit the shorter
+initiator's headroom exception. A failing concurrent regression reproduced it
+for later and unbounded callers; bounded-reuse flights now require each waiter
+to fit their result interval or re-enter ordinary selection. Completed-flight
+expiry, cancellation and invalidation checks still run before reselection.
+The retry is iterative, with no stack growth or detached work.
+
+The one follow-up diagnostic run, 41564008984 at `d84e0cf8` (before the
+waiter correction), also failed: the capture's history write succeeded, but
+three repeat previews returned 503. Sampled history reads 1/2/4 completed
+below 500 ms total, while another dispatch still spent 1–2 s exchanging
+history, followed by a 1.23 s target query and a recorder deadline. A later
+preview failed at the target deadline. These samples do not establish a
+uniform latency improvement. The native job took 16m35s; its environment
+report records unchanged source hashes, test exit 1 and no cleanup failures.
+No second diagnostic run was dispatched. Remaining work is the composed
+repeat-preview latency, beyond the cache-selection defect fixed here.
+ Next: qualify the fixed candidate
+and inspect remaining repeat-preview timing if it still fails.
 
 ## Profile plans in manual preview (2026-11-03)
 

@@ -33,6 +33,7 @@ type connectorAPIProofFlight struct {
 	generation uint64
 	result     connectorAPIProof
 	err        error
+	bounded    bool // below-margin reuse only covers the initiating caller
 }
 type connectorAPIProofState struct {
 	mu         sync.Mutex
@@ -81,18 +82,31 @@ const proofReuseMargin = 3 * time.Second
 // may cancel independently, but can neither detach a producer nor prolong its
 // original interval. No goroutine, timer or refresh survives this call.
 func (s *connectorAPIProofState) read(ctx context.Context, now func() time.Time, produce func(context.Context) (connectorAPIProof, error), recheck func(context.Context, connectorAPIProof) (connectorAPIProof, error)) (connectorAPIProof, error) {
-	if ctx == nil || ctx.Err() != nil {
-		return connectorAPIProof{}, cfg.ErrUnavailable
-	}
-	s.mu.Lock()
-	if f := s.flight; f != nil {
-		s.mu.Unlock()
-		select {
-		case <-ctx.Done():
+	for {
+		if ctx == nil || ctx.Err() != nil {
 			return connectorAPIProof{}, cfg.ErrUnavailable
-		case <-f.done:
-			return s.finish(ctx, now, f)
 		}
+		s.mu.Lock()
+		if f := s.flight; f != nil {
+			s.mu.Unlock()
+			select {
+			case <-ctx.Done():
+				return connectorAPIProof{}, cfg.ErrUnavailable
+			case <-f.done:
+				p, err := s.finish(ctx, now, f)
+				if err != nil {
+					return connectorAPIProof{}, err
+				}
+				// A short final check cannot lend its headroom exception to
+				// a concurrent new start. Re-enter selection under this
+				// caller's own deadline, without growing the call stack.
+				if d, ok := ctx.Deadline(); f.bounded && (!ok || d.After(p.validUntil)) {
+					continue
+				}
+				return p, nil
+			}
+		}
+		break // own the next flight with the state mutex held
 	}
 	f := &connectorAPIProofFlight{done: make(chan struct{}), generation: s.generation}
 	s.flight = f
@@ -101,8 +115,17 @@ func (s *connectorAPIProofState) read(ctx context.Context, now func() time.Time,
 	// one-second headroom (installed native 41197238161: process@<0.5s).
 	// Produce a fresh one instead; no interval is extended.
 	if old != nil && !old.valid(now().Add(proofReuseMargin)) {
-		s.cached = nil
-		old = nil
+		// A final result check is already capped by its original work lease.
+		// Reproducing a proof cannot improve headroom when the retained proof
+		// covers that entire interval. Still perform the current native recheck;
+		// expiry, invalidation and failures retain their ordinary behavior.
+		deadline, bounded := ctx.Deadline()
+		if !bounded || deadline.After(old.validUntil) || !old.valid(now()) {
+			s.cached = nil
+			old = nil
+		} else {
+			f.bounded = true
+		}
 	}
 	s.mu.Unlock()
 	var p connectorAPIProof

@@ -83,17 +83,56 @@ and original request cutoffs. This does not extend payload disclosure: partial,
 failed, unaudited and unowned responses retain their original write fences, and
 cleanup remains synchronous with all slots held until joined. No fresh grace
 interval or client-receipt claim is created by HTTP completion.
-This narrow profile does not relax the following isolation and encrypted-scratch
-requirements for offline analysis or other evidence formats. Its implementation
-and native qualification remain pending.
+[ADR-286](../docs/decisions/286-bounded-go-analyzer-isolation.md) extends the
+regional worker boundary to explicitly qualified, maintained Go analyzers that
+only interpret data and produce a closed bounded projection. This is a
+maintainer-delegated architecture choice, not a claim that Go makes hostile
+parsing safe. The analyzer shares the worker's process and its scoped credentials;
+there is no intra-process security boundary. The hub still receives only an
+authorized projection and never artifact unwrap keys or raw parser input.
 
-Use separate acquisition, analysis and publication Jobs because network policy applies at pod scope. The acquisition Job receives one short-lived artifact-scoped decryption authorization, downloads the exact ciphertext and approved symbols/rootfs, verifies digests and writes bounded scratch. The analyzer has no credentials/token/network, runs non-root with read-only root filesystem, dropped capabilities, seccomp and resource/time/PID limits. Its input mount is read-only; output is separate and bounded.
+For this class, each admitted query MUST have finite compressed/native input,
+decompressed input, parser work/structure, output, CPU-rate and elapsed-time
+limits, plus a worker container memory limit. Enforce byte limits before growing
+buffers and bound parser structures where the library permits. Where a maintained
+parser allocates before validating object counts, input bounds and the worker
+process limit are the containment boundary; a post-parse count is not a hard
+allocation limit. Qualification MUST measure peak process memory and completion
+under adversarial maximum inputs, including decompression and reply buffers.
+`GOMEMLIMIT` is a process-wide soft GC target, not a per-query memory limit or a
+guarantee against OOM. CPU throttling bounds rate, not total work; it must be
+combined with the original finite operation deadline and verified worker shutdown.
 
-Separate Jobs cannot share emptyDir, including memory-backed emptyDir: it belongs to one Pod. For the separate-Job design, the currently specified feasible handoff is per-analysis qualified encrypted input/output PVCs; ordinary plaintext PVCs are disallowed. Job-private bounded tmpfs is permitted only within one phase, with pages charged separately from tool working memory. ADR-036 is accepted: a qualified encrypted scratch StorageClass is a required deployment prerequisite for first-release offline analysis. Installation can provide collection while that capability is unavailable; it must report the missing prerequisite explicitly. No storage-free cross-Job handoff is supported. [Kubernetes emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir).
+These analyzers MUST NOT invoke a shell, spawn tools, load plugins, execute
+scripts or evidence-supplied code, open evidence-selected host paths, fetch URLs,
+or perform symbol lookup over the network. Their parser API receives only
+bounded data and approved query parameters, with no network or credential
+callbacks. Worker transport retains only its existing protected control/storage/key
+paths; evidence cannot choose destinations. Local symbols, when supported, must
+be independently authorized, digest-bound inputs. Only the matched operation and
+artifact versions may consume key slots, quotas and raw-query grants. Current
+identity, permissions, retained audiences, retention and recovery checks, durable
+audit and original deadlines still gate every result. A library return never
+establishes authority or extract classification; output is independently checked
+against the operation's closed projection and byte/field limits before disclosure.
+
+Cancellation MUST close delivery immediately under its original authority fences
+and request parser shutdown. A canceled context or goroutine wait timeout does not
+prove the parser stopped. Until work joins or worker termination is independently
+observed, keep its capacity charged and prohibit reuse; do not start replacement
+parsers or silently retry uncertain work. OOM, panic, deadline and unjoined cleanup
+produce no approved result, no renewed authority and no refund of uncertain spend.
+Plaintext remains bounded transient memory, with existing core/swap/log protections;
+this exception creates no scratch file, stored derivative or plaintext cache.
+
+Use separate acquisition, analysis and publication Jobs for native-code analyzers,
+external tools, or any execution of evidence-supplied content. Network policy applies at pod scope. The acquisition Job receives one short-lived artifact-scoped decryption authorization, downloads the exact ciphertext and approved symbols/rootfs, verifies digests and writes bounded scratch. The analyzer has no credentials/token/network, runs non-root with read-only root filesystem, dropped capabilities, seccomp and resource/time/PID limits. Its input mount is read-only; output is separate and bounded.
+
+Separate Jobs cannot share emptyDir, including memory-backed emptyDir: it belongs to one Pod. For the separate-Job design, the currently specified feasible handoff is per-analysis qualified encrypted input/output PVCs; ordinary plaintext PVCs are disallowed. Job-private bounded tmpfs is permitted only within one phase, with pages charged separately from tool working memory. ADR-036 is accepted: a qualified encrypted scratch StorageClass is a required deployment prerequisite for this separate-Job analysis class, including native debugger tools. Qualified bounded Go worker projections do not require scratch PVCs. Installation can provide collection while that capability is unavailable; it must report the missing prerequisite explicitly. No storage-free cross-Job handoff is supported. [Kubernetes emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir).
 
 The encrypted-volume path requires fenced nonoverlapping phases: acquisition ends and releases writes before analyzer input mounts read-only; analyzer ends and releases writes before publication reads output. A qualified CSI ReadWriteOncePod mode may enforce exclusive mounting; ReadWriteOnce only constrains nodes and does not prevent concurrent Pods. Neither mode replaces readOnly mounts or controller fencing. Require verified old-writer termination/unmount before handoff; node-partition uncertainty blocks the next phase. Keep separate input/output volumes and do not give the analyzer service-account, KMS, object-store or network credentials. [Kubernetes access modes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes).
 
-Register scratch copies and their earliest parent deadlines before writing plaintext. Provision only from an operator-qualified encrypted StorageClass with bounded capacity, understood key lifecycle/reclaim behavior and automatic snapshots/backups disabled unless separately admitted into the copy ledger. An independent reconciler handles failure, cancellation, node loss and expiry; Job TTL deletion or issuing PVC delete is not verified storage deletion. Unknown/retained backend copies remain charged and overdue. A missing/unqualified scratch path makes affected offline analysis unavailable with a visible reason, without discarding safely collected encrypted evidence. Do not collapse credentials and untrusted analysis into one Pod or rely on a NetworkPolicy change between phases to avoid this prerequisite.
+Register scratch copies and their earliest parent deadlines before writing plaintext. Provision only from an operator-qualified encrypted StorageClass with bounded capacity, understood key lifecycle/reclaim behavior and automatic snapshots/backups disabled unless separately admitted into the copy ledger. An independent reconciler handles failure, cancellation, node loss and expiry; Job TTL deletion or issuing PVC delete is not verified storage deletion. Unknown/retained backend copies remain charged and overdue. A missing/unqualified scratch path makes affected offline analysis unavailable with a visible reason, without discarding safely collected encrypted evidence. For the separate-Job class, do not collapse credentials and untrusted analysis into one Pod or rely on a NetworkPolicy change between phases to avoid this prerequisite. The bounded Go worker exception above does not authorize such tools.
 
 Run tools from trusted digest-pinned analyzer images. Treat rootfs, binaries, debugger scripts, symbols and packet dissectors as untrusted input. Disable GDB init/auto-load and unapproved plugins; restrict tshark/Zeek scripts and external resolution. Built-in projections omit locals, raw memory, environment values and packet payload unless a matching raw query is authorized. A deterministic redaction pass follows projection; uncertain fields remain raw.
 
@@ -101,7 +140,20 @@ Offline analysis SHOULD use a qualified gVisor/Kata RuntimeClass where available
 
 ### SC-EVD-005
 
-Given an ELF file with auto-load scripts or a malformed capture, when analysis runs, then no network, host filesystem or KMS credential is available, scripts do not auto-run, and resource exhaustion ends that job without making its output an approved extract.
+Given an ELF file with auto-load scripts or a capture passed to a native tool,
+when analysis runs, then the separate analyzer has no network, host filesystem or
+KMS credential, scripts do not auto-run, and resource exhaustion ends that job
+without making its output an approved extract.
+
+Given a qualified Go projection worker with a hostile compressed profile or packet
+file, when its input, parser-work, output or original time bound is exceeded, then
+no partial or late output becomes an approved result. Test maximum-shape inputs,
+OOM and cancellation during parsing; verify the process's actual resource use,
+absence of symbol/URL requests, child processes and evidence-bearing logs, current
+rights at delivery, and charges retained until joined cleanup or observed worker
+termination. An expired, revoked or mismatched artifact cannot acquire fresh key
+slots through a parser retry. An unqualified analyzer stays unavailable; successful
+small fixtures do not establish the configured maximum.
 
 ## REQ-EVD-006 — Retention, holds and deletion
 

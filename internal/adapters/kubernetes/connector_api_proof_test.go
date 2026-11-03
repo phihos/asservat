@@ -319,3 +319,115 @@ func TestConnectorAPIProofNearExpiryIsProducedAgain(t *testing.T) {
 		}
 	}
 }
+
+// Final frame checks cannot gain headroom beyond their caller deadline.
+// Keep current native rechecks without reproducing a proof that already covers it.
+func TestConnectorAPIProofReusesWholeRemainingCallerInterval(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		extra       time.Duration
+		wantProduce bool
+	}{
+		{"earlier", -time.Second, false}, {"equal", 0, false}, {"later", time.Millisecond, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			start := time.Now().UTC()
+			proof := connectorCachedProof(t, start)
+			state := connectorAPIProofState{cached: &proof}
+			clock := start.Add(3 * time.Second)
+			ctx, cancel := context.WithDeadline(t.Context(), proof.validUntil.Add(tc.extra))
+			defer cancel()
+			produced, checked := false, false
+			got, err := state.read(ctx, func() time.Time { return clock }, func(context.Context) (connectorAPIProof, error) { produced = true; return proof, nil }, func(c context.Context, p connectorAPIProof) (connectorAPIProof, error) {
+				checked = true
+				if d, _ := c.Deadline(); d.After(proof.validUntil) {
+					t.Fatal("recheck extended original expiry")
+				}
+				return p, nil
+			})
+			if err != nil || produced != tc.wantProduce || checked == tc.wantProduce {
+				t.Fatalf("produced=%v checked=%v error=%v", produced, checked, err)
+			}
+			if got.observedAt != proof.observedAt || got.validUntil.After(proof.validUntil) {
+				t.Fatal("renewed proof")
+			}
+		})
+	}
+}
+
+func TestConnectorAPIProofBoundedReuseNeverFallsBackAfterFailedRecheck(t *testing.T) {
+	start := time.Now().UTC()
+	proof := connectorCachedProof(t, start)
+	state := connectorAPIProofState{cached: &proof}
+	ctx, cancel := context.WithDeadline(t.Context(), proof.validUntil)
+	defer cancel()
+	produced := false
+	_, err := state.read(ctx, func() time.Time { return start.Add(3 * time.Second) }, func(context.Context) (connectorAPIProof, error) { produced = true; return proof, nil }, func(context.Context, connectorAPIProof) (connectorAPIProof, error) {
+		return connectorAPIProof{}, cfg.ErrChanged
+	})
+	if err == nil || produced || state.cached != nil {
+		t.Fatalf("failed current check reused authority: err=%v produced=%v cached=%v", err, produced, state.cached != nil)
+	}
+}
+
+func TestConnectorAPIProofCoalescedWaiterKeepsOwnHeadroom(t *testing.T) {
+	for _, mode := range []string{"covered", "equal", "longer", "unbounded"} {
+		t.Run(mode, func(t *testing.T) {
+			start := time.Now().UTC()
+			proof := connectorCachedProof(t, start)
+			state := connectorAPIProofState{cached: &proof}
+			now := func() time.Time { return start.Add(3 * time.Second) }
+			short, cancel := context.WithDeadline(t.Context(), proof.validUntil)
+			defer cancel()
+			entered, release := make(chan struct{}), make(chan struct{})
+			var produced atomic.Int64
+			produce := func(context.Context) (connectorAPIProof, error) {
+				produced.Add(1)
+				return connectorCachedProof(t, now()), nil
+			}
+			check := func(_ context.Context, p connectorAPIProof) (connectorAPIProof, error) {
+				close(entered)
+				<-release
+				return p, nil
+			}
+			type result struct {
+				p connectorAPIProof
+				e error
+			}
+			first := make(chan result, 1)
+			go func() { p, e := state.read(short, now, produce, check); first <- result{p, e} }()
+			<-entered
+			waitCtx := t.Context()
+			if mode != "unbounded" {
+				until := proof.validUntil
+				if mode == "covered" {
+					until = until.Add(-time.Second)
+				}
+				if mode == "longer" {
+					until = until.Add(time.Second)
+				}
+				var stop context.CancelFunc
+				waitCtx, stop = context.WithDeadline(waitCtx, until)
+				defer stop()
+			}
+			waiter := &connectorProofWaitContext{Context: waitCtx, waiting: make(chan struct{})}
+			second := make(chan result, 1)
+			go func() { p, e := state.read(waiter, now, produce, check); second <- result{p, e} }()
+			<-waiter.waiting
+			close(release)
+			a, b := <-first, <-second
+			if a.e != nil || b.e != nil {
+				t.Fatalf("read errors: %v %v", a.e, b.e)
+			}
+			want := int64(0)
+			expectedStart := proof.observedAt
+			if mode == "longer" || mode == "unbounded" {
+				want = 1
+				expectedStart = now()
+			}
+			if produced.Load() != want || b.p.observedAt != expectedStart || a.p.observedAt != proof.observedAt {
+				t.Fatalf("waiter inherited wrong proof: producers=%d want=%d first=%v second=%v", produced.Load(), want, a.p.observedAt, b.p.observedAt)
+			}
+		})
+	}
+}
