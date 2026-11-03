@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/recorder-preview.schema.json",
-  "title": "Reviewed packet/syscall recorder plan (interim, ADR-243)",
+  "title": "Reviewed recorder and profile plan",
   "description": "Canonical plan whose SHA-256 is the execution_digest of a composition preview. Acceptance is refused (acceptance recorderUnavailable) unless the plan is a manual networkHeaders packet capture whose target node's collector reports the packet recorder (acceptance nodeRecorder, ADR-248). The libpcap program is compiled on the hub with the pinned link type and snapshot length; the node never compiles.",
   "type": "object",
   "additionalProperties": false,
@@ -10,7 +10,10 @@
       "const": "recorder-preview/v1"
     },
     "acceptance": {
-      "enum": ["recorderUnavailable", "nodeRecorder"],
+      "enum": [
+        "recorderUnavailable",
+        "nodeRecorder"
+      ],
       "description": "recorderUnavailable: no node recorder can run the plan (ADR-243). nodeRecorder: a manual networkHeaders plan whose target node's collector reported the packet recorder at preview; request_capture may accept it (ADR-248)."
     },
     "source": {
@@ -214,6 +217,7 @@
                   "rawBytePredicate",
                   "rawPackets",
                   "httpHeaders",
+                  "liveProfile",
                   "recordingApprovalRequired"
                 ]
               }
@@ -261,6 +265,89 @@
         "dataClass",
         "reasons"
       ]
+    },
+    "profileEndpoints": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "actionID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "sourceRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "sourceName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "sourceKind": {
+            "enum": [
+              "templateBinding",
+              "administratorProfile"
+            ]
+          },
+          "addressMode": {
+            "enum": [
+              "targetLoopback",
+              "podIP"
+            ]
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "declaredPortName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 15
+          },
+          "pathPolicy": {
+            "const": "go-pprof/v1"
+          },
+          "tls": {
+            "type": "boolean"
+          },
+          "credential": {
+            "type": "boolean"
+          },
+          "definitionDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "endpointDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "actionID",
+          "sourceRef",
+          "sourceName",
+          "sourceKind",
+          "addressMode",
+          "port",
+          "pathPolicy",
+          "tls",
+          "credential",
+          "definitionDigest",
+          "endpointDigest",
+          "resolvedAt"
+        ]
+      }
     }
   },
   "required": [

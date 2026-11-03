@@ -30,12 +30,6 @@ func TestProfileNetworkRetainsPodWideRoutingFacts(t *testing.T) {
 		{"old-target", func(p *ProfileNetwork) { p.Target.FreshUntil = now }},
 		{"invalid-protocol", func(p *ProfileNetwork) { p.Ports[0].Protocol = "HTTP" }},
 		{"invalid-port", func(p *ProfileNetwork) { p.Ports[0].Port = 0 }},
-		{"API-target", func(p *ProfileNetwork) {
-			p.Target.ExecutionClass = artifact.ContextAPIExecution
-			p.Target.NodeUID = ""
-			p.Target.NodeBootID = ""
-			p.Target.Pin.NodeName = ""
-		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := fixture()
@@ -48,7 +42,15 @@ func TestProfileNetworkRetainsPodWideRoutingFacts(t *testing.T) {
 			}
 		})
 	}
+	// ADR-285: the node collector's work channel acquires profiles for
+	// API-execution targets (S-05 plan S1), as it records packets.
 	p := fixture()
+	p.Target.ExecutionClass = artifact.ContextAPIExecution
+	p.Target.NodeUID, p.Target.NodeBootID, p.Target.Pin.NodeName = "", "", ""
+	if !p.Valid(now) {
+		t.Fatal("API-execution routing facts refused")
+	}
+	p = fixture()
 	p.PrimaryIP = netip.Addr{}
 	p.PodIPs = nil
 	if !p.Valid(now) {

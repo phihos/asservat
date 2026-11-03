@@ -78,7 +78,7 @@ func validRegionalAPIContext(c contracts.RegionalDeployment) bool {
 	if !ownerEndpoint(s.Endpoint) || !identity.Text(s.Region, 128) || !identity.Text(s.Bucket, 63) || !authorization.UUID(s.StoreID) || !ownerEndpoint(k.Endpoint) || !(authorization.KeyScope{InstallationID: c.InstallationID, Purpose: "artifact", KeyID: k.KeyID}).Valid() {
 		return false
 	}
-	if !ownerDialAddress(a.Owners.Address) || a.Alertmanager != "" && !kube.AlertmanagerURL(a.Alertmanager) || !kube.IdentityMappingsValid(a.IdentityMappings) {
+	if !ownerDialAddress(a.Owners.Address) || a.Alertmanager != "" && !kube.AlertmanagerURL(a.Alertmanager) || !kube.IdentityMappingsValid(a.IdentityMappings) || !kube.ProfileEndpointsValid(a.ProfileEndpoints) {
 		return false
 	}
 	_, err := regionalOwnerPool(c, a.Owners.Configuration)
@@ -187,6 +187,12 @@ func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in 
 	}
 	if len(a.IdentityMappings) > 0 {
 		if out.targets, err = out.targets.WithIdentityMappings(a.IdentityMappings); err != nil {
+			return nil, closers, mounts.ErrUnavailable
+		}
+	}
+	if len(a.ProfileEndpoints) > 0 {
+		// ADR-285: preview resolves Go profile endpoints in this region.
+		if out.targets, err = out.targets.WithProfileEndpoints(a.ProfileEndpoints); err != nil {
 			return nil, closers, mounts.ErrUnavailable
 		}
 	}

@@ -344,6 +344,24 @@ def check_cluster(directory):
     stray = json.loads(json.dumps(base))
     stray["cluster"]["identityMappings"] = mappings
     render(stray, ok=False)
+    # ADR-285: profile endpoint templates reach an executor's installer as
+    # JSON and add no RBAC; a free URL or a non-executor is refused.
+    endpoints = [{"name": "go-pprof-loopback", "kind": "template", "addressModes": ["targetLoopback"], "loopbackFamily": "ipv4", "minPort": 6060, "maxPort": 6060},
+                 {"name": "payments-pprof", "kind": "profile", "addressMode": "podIP", "port": 6060, "namespaces": ["payments"]}]
+    executor["cluster"]["profileEndpoints"] = endpoints
+    rendered = render(executor)
+    pod = next(r for r in rendered if r["kind"] == "Job")["spec"]["template"]["spec"]
+    assert pod["containers"][0]["command"][-2] == "--profile-endpoints" and json.loads(pod["containers"][0]["command"][-1]) == endpoints
+    role = next(r for r in rendered if r["kind"] == "ClusterRole")
+    assert not any("secrets" in r["resources"] and "list" in r["verbs"] for r in role["rules"])
+    executor["cluster"]["profileEndpoints"] = [{**endpoints[0], "url": "http://unapproved.invalid"}]
+    render(executor, ok=False)
+    executor["cluster"]["profileEndpoints"] = [{**endpoints[1], "minPort": 1}]
+    render(executor, ok=False)
+    executor["cluster"]["profileEndpoints"] = []
+    stray = json.loads(json.dumps(base))
+    stray["cluster"]["profileEndpoints"] = endpoints
+    render(stray, ok=False)
     stray = json.loads(json.dumps(base))
     stray["cluster"]["evidenceSecret"] = "operator-evidence"
     render(stray, ok=False)

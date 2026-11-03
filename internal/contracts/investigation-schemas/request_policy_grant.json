@@ -290,6 +290,7 @@
                             "rawBytePredicate",
                             "rawPackets",
                             "httpHeaders",
+                            "liveProfile",
                             "recordingApprovalRequired",
                             "policyCollection"
                           ]
@@ -561,6 +562,7 @@
                               "rawBytePredicate",
                               "rawPackets",
                               "httpHeaders",
+                              "liveProfile",
                               "recordingApprovalRequired"
                             ]
                           }

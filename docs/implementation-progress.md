@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## Profile plans in manual preview (2026-11-03)
+
+Recovered Claude session `06c27237-b261-43c1-9d73-4b617059a89d`, S-05
+increment 2, [ADR-285](decisions/285-profile-preview-plans.md). The shared
+compiler accepts bounded Go endpoint and eBPF CPU profile plans and the
+`builtin/go-cpu/v1` catalog entry. The target region resolves administrator
+endpoint templates/profiles from its protected installation projection using
+the exact Pod's declarations, with no probe or Secret read. The reviewed scope
+binds definition/endpoint digests and raw output with `liveProfile` approval.
+The shared browser/MCP preview describes timing, endpoint routing and impact;
+submission and policy execution remain refused.
+
+Local verification: `make pre-push` with the existing spec virtual environment
+passed (including spec, architecture, Go architecture, Helm, vet, SQL generation,
+console contracts/typecheck and 277 console tests). Race tests passed for planning,
+targets, capture, contextstart and the affected presentation and Kubernetes
+profile network/endpoint tests. The bootstrap package passed. Initial runs found
+two catalog-count assertions for the formerly two builtins; updated to three and
+rerun successfully. The unsharded entire Kubernetes package reached Go's default
+10-minute aggregate timeout during an unrelated public-projection test; it is
+not a full-suite pass. Native/installed qualification was not run. Logs remain
+under `/home/phil/.cache/asservat-build/profile-increment2-*.log`.
+
+Next: S-05 increment 3 connects actual node acquisition, fresh endpoint checks,
+profile admission, publication and native download, then qualifies the installed
+capture-to-local-tool workflow. This preview checkpoint does not complete S-05.
+
 ## Go pprof and execution-trace native types (2026-11-02)
 
 S-05 increment 1, [ADR-284](decisions/284-go-profile-native-types.md).

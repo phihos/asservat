@@ -226,6 +226,7 @@
                                   "rawBytePredicate",
                                   "rawPackets",
                                   "httpHeaders",
+                                  "liveProfile",
                                   "recordingApprovalRequired",
                                   "policyCollection"
                                 ]

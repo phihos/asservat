@@ -25,6 +25,11 @@ const (
 	// CompositionPeersChanged is a frozen Kubernetes peer set that no longer
 	// resolves to the reviewed members at submission (ADR-283 part 3).
 	CompositionPeersChanged = "PeerMembershipChanged"
+	// CompositionEndpointAmbiguous and CompositionEndpointDenied refuse a Go
+	// profile endpoint that resolves ambiguously or outside its template
+	// (REQ-PRF-001, ADR-285).
+	CompositionEndpointAmbiguous = "EndpointAmbiguous"
+	CompositionEndpointDenied    = "EndpointDenied"
 )
 
 // Sensitive-acquisition reasons (ADR-249). Either makes the plan need an
@@ -37,6 +42,9 @@ const (
 	// ReasonHTTPHeaders: acquisition reads payload to project HTTP/1 headers
 	// (ADR-282); the output is an extract.
 	ReasonHTTPHeaders = "httpHeaders"
+	// ReasonLiveProfile: live profiling is intrusive for approval purposes
+	// even when the mechanism is an HTTP GET (REQ-PRF-002, ADR-285).
+	ReasonLiveProfile = "liveProfile"
 	// ReasonRecordingApproval: the installation requires approval for every
 	// packet/syscall recording (REQ-SYS-002 "unless an administrator requires more").
 	ReasonRecordingApproval = "recordingApprovalRequired"
@@ -116,6 +124,10 @@ type RecorderInput struct {
 	// compiled with (ADR-283 PR 2), one per action with Kubernetes peers.
 	// They are observations frozen for review, never authority.
 	Peers []targets.PeerResolution `json:",omitempty"`
+	// Endpoints are the region's Go profile endpoint resolutions this plan
+	// was compiled with (ADR-285), one per httpEndpoint profile action:
+	// observations frozen for review, never authority.
+	Endpoints []targets.ProfileEndpointResolution `json:",omitempty"`
 }
 
 // RecorderAction is the normalized review summary of one expanded action.
@@ -143,6 +155,16 @@ type RecorderAction struct {
 	SyscallMode, SyscallSelection, Result            string
 	SyscallNames                                     int
 	MaxEvents, MaxEventsPerSecond, MaxTrackedThreads int64
+	// Profile actions (ADR-285): runtime, type, mode, the timed duration
+	// (empty for snapshots and cumulative counters), source kind, forced GC
+	// and the resolved endpoint digest (hex, Go endpoints only).
+	ProfileRuntime string `json:",omitempty"`
+	ProfileType    string `json:",omitempty"`
+	ProfileMode    string `json:",omitempty"`
+	ProfileSource  string `json:",omitempty"`
+	Duration       string `json:",omitempty"`
+	ForceGC        bool   `json:",omitempty"`
+	EndpointDigest string `json:",omitempty"`
 	// Sensitive lists the action's approval reason codes (ADR-249).
 	Sensitive []string
 }
