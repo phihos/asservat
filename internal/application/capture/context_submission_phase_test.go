@@ -9,6 +9,7 @@ import (
 
 	identities "asservat.local/asservat/internal/application/identity"
 	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // The actual investigation, request-owned identity and submission coordinator
@@ -50,6 +51,70 @@ type phaseStart struct {
 	delegate ContextAcceptedStart
 	f        *investigationFixture
 	before   func(context.Context) error
+}
+
+// Installed profile run 41592791975 spent about three seconds admitting the
+// request, leaving too little of a request-anchored five seconds for the start.
+// Model that delay with the real submission and sealed request identity. Each
+// phase is bounded independently inside the original public request window.
+func TestContextSubmissionSlowAdmissionLeavesBoundedStartPhase(t *testing.T) {
+	for _, mode := range []string{"success", "caller-expired", "identity-expired", "accepted-expired", "phase-expired", "cancelled", "fresh-start-denied"} {
+		t.Run(mode, func(t *testing.T) {
+			f, x, s, p := submissionTest(t)
+			original := f.now
+			if mode == "accepted-expired" {
+				f.svc.Lifetime = 6 * time.Second
+				p = f.preview(t)
+				s.ContextInvestigation = f.svc
+			}
+			callerUntil := original.Add(identity.RecordingSaveRequestWindow)
+			if mode == "caller-expired" {
+				callerUntil = original.Add(6 * time.Second)
+			}
+			ctx, cancel := context.WithDeadline(t.Context(), callerUntil)
+			defer cancel()
+			identityUntil := original.Add(time.Minute)
+			if mode == "identity-expired" {
+				identityUntil = original.Add(6 * time.Second)
+			}
+			var err error
+			x.current, _, err = identities.NewBearerRequestWithin(ctx, workflowIdentity{f: f, until: identityUntil}, "synthetic", func() time.Time { return f.now }, identity.RecordingSaveRequestWindow)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.afterAdmission = func() { f.now = original.Add(3 * time.Second) }
+			x.intentHook = func() {
+				f.now = original.Add(6 * time.Second)
+				if mode == "phase-expired" {
+					f.now = original.Add(8 * time.Second)
+				}
+				if mode == "cancelled" {
+					cancel()
+				}
+			}
+			s.Start = phaseStart{delegate: x, f: f, before: func(call context.Context) error {
+				if mode == "fresh-start-denied" {
+					return value.ErrDenied
+				}
+				until, _ := call.Deadline()
+				if !until.Equal(original.Add(8 * time.Second)) {
+					t.Errorf("start did not retain its original five-second phase bound: %v", until.Sub(original))
+				}
+				return nil
+			}}
+			a, err := s.Request(ctx, x.current, p.ID, "slow-admission")
+			if a.CaptureID != p.CaptureID || f.admissions.Load() != 1 || x.intentReads != 1 {
+				t.Fatalf("original admission lost or repeated: err=%v capture=%s admissions=%d intents=%d", err, a.CaptureID, f.admissions.Load(), x.intentReads)
+			}
+			if mode == "success" {
+				if err != nil || x.starts != 1 || !f.now.Before(a.MetadataValidUntil) {
+					t.Fatalf("slow admission starved independent start: err=%v starts=%d", err, x.starts)
+				}
+			} else if err == nil || x.starts != 0 {
+				t.Fatalf("expired or denied authority reached start: err=%v starts=%d", err, x.starts)
+			}
+		})
+	}
 }
 
 func (p phaseStart) StartContext(ctx context.Context, current identities.CurrentIdentity, id string) error {

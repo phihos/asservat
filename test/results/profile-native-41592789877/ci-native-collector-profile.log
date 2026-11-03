@@ -1,0 +1,179 @@
++ python3 scripts/test-collector.py profile
+{"runner": {"kernelRelease": "7.0.0-1017-azure", "btf": true, "cgroup2": true, "os": "Ubuntu 24.04.5 LTS", "cpus": 4}}
+=== RUN   TestNodeCollectorWithRealKubernetes
+    node_collector_native_test.go:76: connector node asservat-collector-7b8e1280-control-plane (uid 1dbc5dc8-0cf7-47d9-8167-186a3f8ee503) pod asservat-node-pbvd5 epoch 21ac2f42-2607-4634-947f-5c01910c746b runtime "containerd://2.3.4": enrolled, no report yet
+    node_collector_native_test.go:76: connector node asservat-collector-7b8e1280-control-plane (uid 1dbc5dc8-0cf7-47d9-8167-186a3f8ee503) pod asservat-node-pbvd5 epoch 21ac2f42-2607-4634-947f-5c01910c746b runtime "containerd://2.3.4": report 1 kernel 7.0.0-1017-azure btf supported tcx supported cgroup2 supported; packetCapture Available []; syscallTrace Available []; goProfile Available []
+    node_collector_native_test.go:76: connector node asservat-collector-7b8e1280-control-plane (uid 1dbc5dc8-0cf7-47d9-8167-186a3f8ee503) pod asservat-node-nsjm9 epoch a3c36c90-b3ef-4aa1-8b7e-182b076b40cb runtime "containerd://2.3.4": enrolled, no report yet
+    node_collector_native_test.go:76: connector node asservat-collector-7b8e1280-control-plane (uid 1dbc5dc8-0cf7-47d9-8167-186a3f8ee503) pod asservat-node-nsjm9 epoch a3c36c90-b3ef-4aa1-8b7e-182b076b40cb runtime "containerd://2.3.4": report 1 kernel 7.0.0-1017-azure btf supported tcx supported cgroup2 supported; packetCapture Available []; syscallTrace Available []; goProfile Available []
+--- PASS: TestNodeCollectorWithRealKubernetes (69.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	69.018s
+{
+  "suite": "collector-profile",
+  "runner": {
+    "kernelRelease": "7.0.0-1017-azure",
+    "btf": true,
+    "cgroup2": true,
+    "os": "Ubuntu 24.04.5 LTS",
+    "cpus": 4
+  },
+  "started": "2026-11-03T06:56:16Z",
+  "build": {
+    "seconds": 41.3,
+    "binaryBytes": 164490935,
+    "tags": "gadget,netgo,osusergo"
+  },
+  "cluster": {
+    "seconds": 38.0,
+    "node": "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5",
+    "kubernetes": "v1.37.0"
+  },
+  "testSeconds": 111.9,
+  "native": {
+    "budget": {
+      "Ceilings": {
+        "maxActiveSources": 16,
+        "inputBytesPerSecond": 16777216,
+        "inputBurstBytes": 16777216,
+        "RingBytes": 268435456,
+        "FrozenBytes": 268435456,
+        "UploadBytesPerSecond": 33554432,
+        "UploadBurstBytes": 67108864
+      },
+      "RingReserved": 0,
+      "FrozenReserved": 0,
+      "UploadAvailable": 67108864
+    },
+    "collectorLog": [
+      "node collector probe: kernel 7.0.0-1017-azure; btf supported; cgroup2 supported; bpf supported; tcx supported; tc supported; tracefs supported; hostpid supported; runtime containerd; engine linked=true initialized=true v0.57.0; packetCapture Available prerequisites=true hook=\"tc\" []; syscallTrace Available prerequisites=true hook=\"\" []; goProfile Available prerequisites=true hook=\"\" []",
+      "node collector ring medium: encrypted disk available=false removedEarlier=0",
+      "node collector: enrollment pending: connector unavailable",
+      "node collector enrolled: node asservat-collector-7b8e1280-control-plane, epoch 21ac2f42-2607-4634-947f-5c01910c746b, certificate until 2026-11-03T07:18:27Z",
+      "node collector: status pending: connector unavailable"
+    ],
+    "connectorLog": [
+      "connector node asservat-collector-7b8e1280-control-plane (uid 1dbc5dc8-0cf7-47d9-8167-186a3f8ee503) pod asservat-node-pbvd5 epoch 21ac2f42-2607-4634-947f-5c01910c746b runtime \"containerd://2.3.4\": enrolled, no report yet",
+      "connector node asservat-collector-7b8e1280-control-plane (uid 1dbc5dc8-0cf7-47d9-8167-186a3f8ee503) pod asservat-node-pbvd5 epoch 21ac2f42-2607-4634-947f-5c01910c746b runtime \"containerd://2.3.4\": report 1 kernel 7.0.0-1017-azure btf supported tcx supported cgroup2 supported; packetCapture Available []; syscallTrace Available []; goProfile Available []",
+      "connector node asservat-collector-7b8e1280-control-plane (uid 1dbc5dc8-0cf7-47d9-8167-186a3f8ee503) pod asservat-node-nsjm9 epoch a3c36c90-b3ef-4aa1-8b7e-182b076b40cb runtime \"containerd://2.3.4\": enrolled, no report yet",
+      "connector node asservat-collector-7b8e1280-control-plane (uid 1dbc5dc8-0cf7-47d9-8167-186a3f8ee503) pod asservat-node-nsjm9 epoch a3c36c90-b3ef-4aa1-8b7e-182b076b40cb runtime \"containerd://2.3.4\": report 1 kernel 7.0.0-1017-azure btf supported tcx supported cgroup2 supported; packetCapture Available []; syscallTrace Available []; goProfile Available []"
+    ],
+    "enrolledAfterSeconds": 2.808857953,
+    "facts": {
+      "KernelRelease": "7.0.0-1017-azure",
+      "Kernel": {
+        "Major": 7,
+        "Minor": 0,
+        "Patch": 0
+      },
+      "BTF": "supported",
+      "CgroupV2": "supported",
+      "BPF": "supported",
+      "TCX": "supported",
+      "TC": "supported",
+      "DebugFS": "supported",
+      "TraceFS": "supported",
+      "BPFFS": "unsupported",
+      "HostProcesses": "supported",
+      "Runtime": "containerd",
+      "Engine": {
+        "Linked": true,
+        "Initialized": true,
+        "Version": "v0.57.0"
+      }
+    },
+    "identity": {
+      "bootID": "bd1335f3-d4af-47c1-a52a-406fcd0a80df",
+      "epoch": "21ac2f42-2607-4634-947f-5c01910c746b",
+      "node": "asservat-collector-7b8e1280-control-plane",
+      "runtime": "containerd://2.3.4"
+    },
+    "mechanisms": [
+      {
+        "Mechanism": "packetCapture",
+        "Prerequisites": true,
+        "Adapter": "Available",
+        "Hook": "tc",
+        "Reasons": []
+      },
+      {
+        "Mechanism": "syscallTrace",
+        "Prerequisites": true,
+        "Adapter": "Available",
+        "Hook": "",
+        "Reasons": []
+      },
+      {
+        "Mechanism": "goProfile",
+        "Prerequisites": true,
+        "Adapter": "Available",
+        "Hook": "",
+        "Reasons": []
+      }
+    ],
+    "profile-cpu-loopback": {
+      "bytes": 900,
+      "completed": "2026-11-03T06:58:45.187712934Z",
+      "localTool": "go tool pprof -symbolize=none -top",
+      "nodeUID": "1dbc5dc8-0cf7-47d9-8167-186a3f8ee503",
+      "podUID": "f4627afc-da42-4f2e-b90a-245a2ebae78b",
+      "samples": 6,
+      "sha256": "fa99f979579c2dd431f385e983b36d934a5718ef83eed1d322a831e7e5ae1577",
+      "started": "2026-11-03T06:58:43.161096305Z"
+    },
+    "profile-heap-pod-ip": {
+      "bytes": 721,
+      "completed": "2026-11-03T06:58:48.728655824Z",
+      "localTool": "go tool pprof -symbolize=none -top",
+      "nodeUID": "1dbc5dc8-0cf7-47d9-8167-186a3f8ee503",
+      "podUID": "f4627afc-da42-4f2e-b90a-245a2ebae78b",
+      "samples": 3,
+      "sha256": "4b3b7ba7f0ed65736b8b53ca45ebea767be723dcb85f0d989adae7f64ea84aea",
+      "started": "2026-11-03T06:58:48.721003399Z"
+    },
+    "profile-trace-loopback": {
+      "bytes": 162116,
+      "parser": "production Go trace verifier",
+      "sha256": "93750f0bd1788b98c32d77b7ab24c2c5c4adf60fc7f2ae7f521eccb1e81466b5"
+    },
+    "profileCancellationUncertain": true,
+    "profileMaximumAcquisitionResources": {
+      "acceptedStopReceipts": 2,
+      "afterJoinRSSBytes": 369086464,
+      "aggregateExcessRefused": true,
+      "baselinePeakRSSBytes": 100065280,
+      "baselineRSSBytes": 100065280,
+      "blockedRSSBytes": 369025024,
+      "cancelJoinSeconds": 0.967616952,
+      "elapsedSeconds": 26.50737458,
+      "heldAttempts": 2,
+      "heldReservationBytes": 268435456,
+      "installedMemoryLimitBytes": 671088640,
+      "joinedReportObservedAt": "2026-11-03T06:59:26.755126278Z",
+      "nativeBytesPerAttempt": 134217728,
+      "nodeEpoch": "21ac2f42-2607-4634-947f-5c01910c746b",
+      "originalUploadUntil": "2026-11-03T06:59:55.34014Z",
+      "peakRSSBytes": 369086464,
+      "scope": "malformed input acquisition and parser refusal; no installed publication proof",
+      "semanticPublicationEligible": false,
+      "stopRequestedAt": "2026-11-03T06:59:25.879891283Z"
+    },
+    "profileRedirectRefused": true,
+    "restart": {
+      "newEpoch": "a3c36c90-b3ef-4aa1-8b7e-182b076b40cb",
+      "oldEpoch": "21ac2f42-2607-4634-947f-5c01910c746b",
+      "sameBoot": true,
+      "seconds": 1.603440881
+    },
+    "restrictedRejection": "pods \"collector-in-restricted\" is forbidden: violates PodSecurity \"restricted:latest\": host namespaces (hostPID=true), unrestricted capabilities (container \"node\" must not include \"BPF\", \"NET_ADMIN\", \"PERFMON\", \"SYS_ADMIN\", \"SYS_PTRACE\", \"SYS_RESOURCE\" in securityContext.capabilities.add), restricted volume types (volumes \"disposable-host\", \"debugfs\", \"tracefs\", \"bpffs\" use restricted volume type \"hostPath\"), runAsNonRoot != true (container \"node\" must not set securityContext.runAsNonRoot=false), runAsUser=0 (container \"node\" must not set runAsUser=0)",
+    "statusIntervalSeconds": 15.005339566,
+    "workloadUntouched": true
+  },
+  "testExit": 0,
+  "profileImageCleaned": true,
+  "cleanup": {
+    "cluster": true,
+    "image": true
+  },
+  "result": "passed",
+  "finished": "2026-11-03T06:59:35Z"
+}

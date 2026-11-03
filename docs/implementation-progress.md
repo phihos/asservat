@@ -1,5 +1,42 @@
 # Sustained implementation progress
 
+## Native profile results and installed failure fixes (2026-11-03)
+
+At `78afa6ec`, [collector run 41592789877](https://github.com/phihos/asservat/actions/runs/41592789877)
+passed with `testExit: 0` and confirmed cluster/image cleanup. Genuine CPU
+loopback and heap Pod-IP profiles open with the native Go tool; the production
+parser accepts a genuine short Go trace. Two deliberately malformed 128 MiB
+responses hold the 256 MiB collector reservation, reject a third acquisition,
+and peak at 351.99 MiB process RSS against the installed 640 MiB limit. Two
+accepted Stop receipts join and release reservations in 0.968 seconds, before
+the original upload deadline. This qualifies maximum-input resource/Stop
+behavior, not a valid 128 MiB trace or catalog publication. The immutable run
+head binds the checkout; this collector harness does not emit before/after
+source inventories. Original report, log and downloaded CPU/heap bytes are in
+`test/results/profile-native-41592789877/`.
+
+[Installed run 41592791975](https://github.com/phihos/asservat/actions/runs/41592791975)
+failed after approved submission returned `AcquisitionNotStarted`, then
+`resolve_capture_request` returned `OutcomeUnknown`. Actual Go test time was
+629.910 seconds; `goTestExit: 1`, `sourceUnchangedDuringTest: true` and empty
+`cleanupFailures` are retained with the original logs in
+`test/results/profile-native-41592791975/`. No acquired profile, download,
+history-repeat journey or installed Stop result is claimed from this run.
+
+The admission/start regression reproduces a normal three-second admission wait
+starving a later three-second start. [ADR-292](decisions/292-independent-submission-start-phase.md)
+gives that phase its own five-second limit inside the unchanged original
+fifteen-second request, identity and accepted-capture bounds. Negative tests
+retain caller/identity/capture/phase expiry, cancellation and fresh start denial.
+Focused submission/group/history race tests pass in 3.420 seconds. The full capture
+application race suite also passes in 16.583 seconds; vet, specification and
+architecture gates pass. A separate
+approved-profile request-resolution omission is being fixed with a real SQL
+regression; installed rerun remains required. Final-head CI 41592716399 and the
+full earlier Go run passed (68 package suites, 682 selected Kubernetes tests;
+one explicitly native-only skip). Those repository checks do not qualify the
+failed installed journey.
+
 ## Combined manual-profile candidate and review fixes (2026-11-03)
 
 [PR 147](https://github.com/phihos/asservat/pull/147) combines acquisition,

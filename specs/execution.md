@@ -81,6 +81,15 @@ must not read a replacement capture, extend stored dates, repeat admission or
 retry any effect. A failed lookup returns an error with the known admission;
 ordinary accepted replay remains passive.
 
+Under [ADR-292](../docs/decisions/292-independent-submission-start-phase.md),
+composed single submission gives admission and subsequent intent/start work
+their own at-most-five-second phase bounds, both inside the original
+fifteen-second request and any earlier caller/identity cutoff. The start phase
+begins after current admission metadata is consumed and obtains its own current
+authority. This does not extend any accepted capture, write, snapshot StartBy,
+observation or effect deadline. Advisory history uses the remaining original
+request window after the start.
+
 Before any capture exists, preview and request target resolution use pre-work
 target queries on an idle standby under
 [ADR-179](../docs/decisions/179-outbound-only-first-installed-profile.md). The

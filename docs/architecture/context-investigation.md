@@ -31,6 +31,12 @@ The original five-second identity and observation intervals bound all reads and
 the final response, including time spent writing the draft. A request cannot
 detach from the originating browser/MCP request by supplying another context.
 
+The composed submission owner bounds admission and single-start work separately
+under [ADR-292](../decisions/292-independent-submission-start-phase.md): each
+phase has at most five seconds within the original fifteen-second request.
+Consumed response metadata does not shorten a later independently authorized
+start, and no current authority observation or accepted deadline is extended.
+
 Installed preview refusals emit a bounded private stage diagnostic for initial
 identity/recovery/target resolution, each facts dependency, processing coverage,
 compilation, passive draft persistence and final checks. Dependency errors remain
