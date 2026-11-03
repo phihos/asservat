@@ -76,6 +76,20 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						json.Unmarshal(rawJob, &observed.Job) != nil || json.Unmarshal(rawBinding, &observed.Binding) != nil {
 						t.Fatal("approved query worker identity readback", err)
 					}
+					if intent.Query.Scope.NativeType == "pprof" {
+						if batches != 1 || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.ProfileSummaryWorkerBytes || intent.Query.Plan.Profile.Worker.MemoryBytes != query.ProfileSummaryWorkerBytes {
+							t.Fatal("profile summary did not retain its one-batch 256 MiB reservation")
+						}
+						var units int
+						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != 10 {
+							t.Fatal("profile summary source charge", units, err)
+						}
+						pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(limit, observed.Binding.Pod, meta.GetOptions{})
+						if err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != query.ProfileSummaryWorkerBytes {
+							t.Fatal("profile summary actual worker memory limit", err)
+						}
+						t.Log("installed profile summary: exact 256 MiB Pod limit and transient declaration, ten query units, one consumed three-key batch")
+					}
 					observed.Intent = intent.Worker
 					if !observed.Valid() {
 						t.Fatal("approved query worker binding unavailable")

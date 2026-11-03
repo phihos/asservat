@@ -44,6 +44,24 @@ func TestCaseProjectionProfileKeepsNativeKindAndRawClass(t *testing.T) {
 	}
 }
 
+func TestCaseProjectionDiscriminatesVerifiedProfileFormat(t *testing.T) {
+	for _, tc := range []struct{ native, want string }{{artifact.PprofArtifact, artifact.PprofFormat}, {artifact.GoTraceArtifact, artifact.GoTraceFormat}, {"unknown", ""}, {artifact.PodStatusArtifact, ""}} {
+		t.Run(tc.native, func(t *testing.T) {
+			s, f, current := caseOperationsFixture(t)
+			current.i.Scopes = []string{"evidence:read"}
+			f.view.Artifacts[0].EvidenceType, f.view.Artifacts[0].DataClass, f.view.Artifacts[0].NativeType = "profile", "raw", tc.native
+			reply, err := s.Call(t.Context(), current, "get_case", []byte(caseInput))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var envelope struct{ Data ContextCaseData }
+			if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Data.Artifacts[0].NativeFormat != tc.want {
+				t.Fatal("incorrect verified format", string(reply.Body))
+			}
+		})
+	}
+}
+
 // Synthetic service data qualifies transport projection only, never the C-16
 // authorizer, outcome audit, publication or native evidence access.
 type caseProjectionFixture struct {

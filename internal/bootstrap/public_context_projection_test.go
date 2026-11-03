@@ -17,6 +17,7 @@ type publicProjectionPorts struct {
 	analysisapp.ContextProjectionReader
 	analysisapp.ContextProjectionRecovery
 	analysisapp.ContextProjectionRoutes
+	analysisapp.ContextProjectionRouteReader
 	analysisapp.ContextQueryPlans
 	analysisapp.ContextProjectionWorkerAdmission
 }
@@ -56,6 +57,21 @@ func TestPublicContextProjectionRegistersOnlyCompleteInstalledComposition(t *tes
 		t.Fatal("read tied to collection enablement", err)
 	}
 }
+func TestPublicProfileSummaryRequiresInstalledTypedRoute(t *testing.T) {
+	c, services := publicContextOperationFixture(t)
+	services.Projection = publicProjectionFixture(c)
+	without, err := NewPublicContextOperations(c, services)
+	if err != nil || presentation.BrowserOperationSupported(without, "get_profile_summary") {
+		t.Fatal("summary enabled without typed source route", err)
+	}
+	services.Projection.ProfileRoutes = &publicProjectionPorts{}
+	c.CollectionEnabled = false
+	with, err := NewPublicContextOperations(c, services)
+	if err != nil || !presentation.BrowserOperationSupported(with, "get_profile_summary") || !slices.Contains(with.ToolNames(), "get_profile_summary") {
+		t.Fatal("complete retained summary composition unavailable", err)
+	}
+}
+
 func TestPublicContextProjectionRejectsPartialOrForeignServices(t *testing.T) {
 	for name, mutate := range map[string]func(*analysisapp.ContextProjectionService){
 		"root": func(s *analysisapp.ContextProjectionService) {

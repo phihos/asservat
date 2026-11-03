@@ -80,6 +80,8 @@ export interface components {
                     /** Format: date-time */
                     expires_at: string;
                     handling_notice: components["schemas"]["Contract_capture_assessment_896e91b8fce79799"];
+                    /** @description Verified native format, when supplied; used to choose a compatible saved-evidence view. It grants no download or analysis authority. */
+                    native_format?: string;
                 }[];
                 timeline: {
                     /** Format: date-time */

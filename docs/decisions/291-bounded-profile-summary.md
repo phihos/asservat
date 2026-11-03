@@ -1,6 +1,6 @@
 # ADR-291 — Bounded profile summary authority and query composition
 
-Date: 2026-11-03. Status: accepted internal contract; production composition and qualification pending.
+Date: 2026-11-03. Status: accepted implementation candidate; installed qualification pending.
 Requirements: REQ-PRF-003/005, REQ-EVD-005, REQ-MCP-003/005.
 Depends on [ADR-286](286-bounded-go-analyzer-isolation.md).
 
@@ -45,9 +45,13 @@ selected sample type. The coordinator bounds its JSON to 24 KiB independently
 of analyzer validation.
 Copies own all hotspot/name/fraction pointers; closure clears retained output.
 Migration 127 admits this exact closed source through the existing SQL ledger.
-Public registration remains disabled. The optional presentation facet embeds the
-closed schema, binds the audited input and serializes pending/ready results;
-ordinary query construction does not install it. The regional worker now
+The protected runtime installs the optional presentation facet only with its
+complete typed route and an accepted worker of at least 256 MiB. Per-query
+backing independently requires the matching transient declaration before
+admission. This is candidate activation for qualification; it does not establish
+an installed S-05 exit. The facet embeds the closed schema, binds audited input
+and serializes pending/ready results; ordinary query construction without the
+typed source route does not install it. The regional worker now
 connects the existing native reader to the bounded analyzer through one delivery
 chunk buffer (256 KiB), retaining no whole compressed profile. The authenticated
 whole-file check and exact EOF must finish before a result is accepted. The
@@ -56,6 +60,26 @@ source's authored native limit remains binding up to the format maximum; a
 closed summary within 24 KiB and refuses oversized output without trimming. The public response must additionally fit its complete
 existing 24 KiB envelope budget. An oversized selected result refuses and asks
 for fewer hotspots; it never silently trims the selection.
+
+## Browser and public timing
+
+Initial pending and ready summary data carry `query_observed_at` and
+`query_expires_at`, matching the existing saved-status tool. A resolved poll
+retains exactly the outer query times and request ID. These are the original
+query dates, not a new observation or renewed authority. The browser counts
+network delay in its monotonic cutoff, keeps the earliest cutoff, and clears
+results on close, source/version change, session loss or expiry. Its request
+transport ceiling is the existing server's 20-second evidence-read window;
+shorter server/request deadlines still win. It accepts at most the existing
+24 KiB envelope and refuses integers JavaScript cannot represent exactly.
+
+The authorized case row optionally exposes its verified `native_format`; this
+adds no lookup, native bytes, filename or plaintext checksum. The browser offers
+an explicit saved summary only for ordinary-access raw pprof rows. Go traces and
+metadata-only shares have no summary action. One transient controller owns each
+artifact/version; mounting starts no work. Sample type and top-N are explicit,
+function names are text, nullable percentages stay unavailable, and there is no
+background polling, external symbol lookup or browser persistence.
 
 ## Funding and resource boundary
 
@@ -86,7 +110,9 @@ required by this design. The owned PostgreSQL/S3/OpenBao fixture proves actual a
 admission, API execution completion, independent publication, current C-03
 read authority and SQL query accounting. Native target/process observations and
 worker ownership remain synthetic. Installed SQL/key/worker composition,
-cgroup lifecycle and MCP/browser output remain unqualified.
+cgroup lifecycle and public MCP output remain unqualified until the combined
+installed focus passes. Browser component and built-browser fixtures use
+explicitly synthetic summary responses; they do not substitute for that run.
 
 ## Complexity gate
 
@@ -101,8 +127,8 @@ cgroup lifecycle and MCP/browser output remain unqualified.
 | 7. Machinery configuration | None; operator resource limits still need qualification. |
 | 8. Dependencies | Existing google/pprof parser and worker process/cgroup lifecycle. |
 | 9. Aggregate cost | One worker and one read batch per summary; ten read-work units, zero extra Jobs/PVCs/watches; declared transient 256 MiB reuses physical worker. Installed resource qualification pending. |
-| 10. Rollback | Migration 127 changes functions only; no new tables. Empty-history downgrade restores old definitions; retained summaries refuse atomically. Production route remains absent. |
-| 11. Smaller fix | A tool-name-only addition would bypass source, classification and funding checks. Reuse existing ports and keep activation closed. |
+| 10. Rollback | Migration 127 changes functions only; no new tables. Empty-history downgrade restores old definitions; retained summaries refuse atomically. Removing the optional route disables new summary requests. |
+| 11. Smaller fix | A tool-name-only addition would bypass source, classification and funding checks. Reuse existing ports; qualify the complete optional runtime before release. |
 
 ## Verification boundary
 

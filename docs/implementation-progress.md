@@ -196,11 +196,52 @@ whole/resume and paced PCAPNG/profile transport regressions pass in 50.093
 seconds; the paced 64 MiB response takes 24.154 seconds with ten short-lease
 renewals. These are real TLS/component tests with synthetic stored bytes. Native collector and installed profile runs
 remain pending; these component results do not complete S-05.
+## Public saved-profile summary candidate (2026-11-03)
+
+ADR-291 now includes the protected optional runtime, browser view and a combined
+installed manual-profile qualification helper. Current ordinary `evidence:read`,
+retained audience/retention and extract/profile policy authorize only the closed
+summary. Raw native download keeps its separate approval. The server requires a
+complete typed route and accepted 256 MiB worker; funded SQL admission also checks
+the existing transient declaration. Older smaller accepted query profiles remain
+usable for their original tools and refuse this new summary.
+
+The browser uses explicit sample type/top-N, exact artifact version, a 24 KiB
+response ceiling and original query timestamps. It clears on close, expiry,
+source/session change, refuses unsafe JavaScript integers and renders names as
+text. Authorized case metadata identifies pprof versus Go trace without another
+lookup. Metadata-only shares have no profile-summary action.
+
+Local verification: `make console-check` passed 298 tests; the final stricter
+outer-class regression passed all 44 focused projection tests. The actual built
+Chromium fixture passed 26 journeys and 25 accessibility scans (final run 25.862s), including
+synthetic summary responses, 320px layout and no external requests. The retained
+[report](../test/results/profile-summary-browser/report.json) and
+[mobile view](../test/results/profile-summary-browser/profile-summary-mobile.png)
+record that component boundary. Its current
+identity/summary facts are synthetic. Affected C-03/C-16/contracts/presentation
+races passed (presentation 173.328s); protected bootstrap registration races passed
+22.092s, installed helper compilation/poll-bound tests and affected vet passed.
+Spec, architecture and Go architecture gates passed. These are local/component
+results, not installed SQL/key/worker/public-MCP qualification.
+
+The installed helper adds one real read-only OAuth query after the original
+profile download, verifies download denial, exact native CPU total and source
+version, at most four original-handle polls, one joined three-key batch, ten query
+units and the actual 256 MiB worker Pod limit. The manual-profile operator
+fixture funds ten record/query units instead of eight, enough for exactly one
+summary; other focuses retain eight and production accounting is unchanged.
+It waits that original worker's
+finite lifetime; it creates no extra capture or approval. No native run was
+started for this candidate. Acquisition publication must pass before running the
+combined summary focus; S-05 remains incomplete.
+
 ## Closed pprof summary ledger and optional presentation (2026-11-03)
 
 ADR-291 now composes streamed native pprof reads, closed aggregate authority,
 migration 127 accounting and an optional audited presentation handler. Public
-registration remains disabled; this is not installed S-05 qualification.
+registration was disabled at that checkpoint; the candidate above now wires it.
+This is not installed S-05 qualification.
 The existing worker stays 256 MiB, with a truthful 256 MiB transient declaration;
 each summary conservatively charges ten units and permits one read batch.
 

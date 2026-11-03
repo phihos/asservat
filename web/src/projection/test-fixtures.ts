@@ -15,3 +15,7 @@ export class SyntheticProjection implements Operations {
     return await this.responder(name) as Output<N>;
   }
 }
+
+export const profileVersion = '7'.repeat(64);
+export function profileSummary() { return { ...envelope, status: 'ok', data_class: 'extract', data: { sample_type: 'cpu', unit: 'nanoseconds', duration_seconds: 10, total: 100, top: [{ function: 'example.work', flat: 25, cumulative: 50, fraction: 0.25 as number | null }], symbol_status: 'partial', ...timing }, provenance: [{ artifactID: '00000000-0000-4000-8000-000000000003', digest: profileVersion }] }; }
+export function profileResult() { return { ...envelope, status: 'ok', data_class: 'extract', data: { query_handle: queryHandle, tool_name: 'get_profile_summary', result: profileSummary(), ...timing } }; }

@@ -1,10 +1,11 @@
 import type { components } from '../generated/projection';
 import * as validators from '../generated/validate-projection';
 
-export type Operation = 'get_file_excerpt' | 'get_query_result';
+export type Operation = 'get_file_excerpt' | 'get_profile_summary' | 'get_query_result';
 export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
 export type Excerpt = Extract<Output<'get_file_excerpt'>, { status: 'ok' }>['data'];
+export type Summary = Extract<Output<'get_profile_summary'>, { status: 'ok' }>['data'];
 export interface Operations {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>>;
 }
@@ -17,7 +18,7 @@ export const operations: Operations = {
     const request = new AbortController();
     const abort = () => request.abort();
     signal.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(abort, 5_000);
+    const timer = setTimeout(abort, 20_000);
     const chunks: Uint8Array[] = [];
     try {
       const response = await fetch('/api/v1/operations/' + name, {
@@ -36,7 +37,7 @@ export const operations: Operations = {
           const { value, done } = await reader.read();
           if (done) { complete = true; break; }
           size += value.length;
-          if (size > 65_536 || request.signal.aborted) { value.fill(0); throw new Error('Query unavailable'); }
+          if (size > 24_576 || request.signal.aborted) { value.fill(0); throw new Error('Query unavailable'); }
           chunks.push(value);
         }
       } finally { if (!complete) await reader.cancel(); reader.releaseLock(); }

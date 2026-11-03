@@ -6587,6 +6587,11 @@ components:
                         format: date-time
                       handling_notice:
                         $ref: https://asservat.io/spec/v1/capture-assessment.schema.json#/$defs/artifactNotice
+                      native_format:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                        description: Verified native format, when supplied; used to choose a compatible saved-evidence view. It grants no download or analysis authority.
                     required:
                     - artifact_id
                     - digest
@@ -7448,6 +7453,14 @@ components:
                   - complete
                   - partial
                   - missing
+                query_observed_at:
+                  type: string
+                  format: date-time
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                query_expires_at:
+                  type: string
+                  format: date-time
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - sample_type
               - unit
@@ -7455,6 +7468,8 @@ components:
               - total
               - top
               - symbol_status
+              - query_observed_at
+              - query_expires_at
           required:
           - status
           - data
@@ -7474,9 +7489,19 @@ components:
                   type: integer
                   minimum: 1
                   maximum: 60
+                query_observed_at:
+                  type: string
+                  format: date-time
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                query_expires_at:
+                  type: string
+                  format: date-time
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - query_handle
               - retry_after_seconds
+              - query_observed_at
+              - query_expires_at
           required:
           - status
           - data

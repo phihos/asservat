@@ -67,6 +67,7 @@ type ContextCase struct {
 
 type ContextCaseArtifact struct {
 	ArtifactID, CaptureID string
+	NativeType            string               // verified format discriminator for supported views
 	Target                authorization.Target // internal navigation match; omit from public DTO
 	// Version is the immutable verified artifact version: SHA256 of the
 	// existing versioned ciphertext-copy receipt serialization. It is NOT the native file SHA256.

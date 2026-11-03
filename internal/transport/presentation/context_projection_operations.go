@@ -219,7 +219,7 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 	envelope := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: requestID,
 		DataClass: "metadata", Status: "ok", Warnings: []string{}, Provenance: []any{}}
 	switch {
-	case d.Pending() && (name == "get_http_headers" || name == "get_profile_summary"):
+	case d.Pending() && name == "get_http_headers":
 		// The canonical get_http_headers pending branch carries the handle only.
 		envelope.Status = "pending"
 		envelope.Data = struct {
@@ -245,7 +245,10 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 			envelope.Warnings = append(envelope.Warnings, "SymbolCoverage: Some or all function names are unavailable; unresolved samples remain in the totals.")
 		}
 		envelope.Provenance = []any{httpHeaderProvenance{ArtifactID: artifactID, Digest: hash(version)}}
-		envelope.Data = summary
+		envelope.Data = struct {
+			value.ProfileSummary
+			queryViewTimes
+		}{summary, times}
 		if name == "get_query_result" {
 			envelope.Data = queryResult(d.Association().QueryID, d.Tool(), envelope, times)
 			envelope.Provenance = []any{}

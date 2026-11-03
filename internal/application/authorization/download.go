@@ -24,7 +24,9 @@ type ContextDownloadEvidence struct {
 	// DataClass is the accepted expectation's class: metadata, raw for an
 	// approved raw packet capture or runtime profile, or extract for an HTTP header
 	// projection (ADR-282). ActionID names its action.
-	DataClass, ActionID    string
+	DataClass, ActionID string
+	// NativeType is a verified format discriminator, never native content.
+	NativeType             string
 	Version                artifact.Digest
 	Audience               []artifact.AudienceAssignment
 	Retained               privacy.RetainedArtifact

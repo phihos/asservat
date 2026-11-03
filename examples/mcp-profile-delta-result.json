@@ -22,7 +22,9 @@
         "fraction": null
       }
     ],
-    "symbol_status": "complete"
+    "symbol_status": "complete",
+    "query_observed_at": "2026-11-03T09:00:00Z",
+    "query_expires_at": "2026-11-03T09:01:00Z"
   },
   "truncated": false,
   "next_cursor": null,

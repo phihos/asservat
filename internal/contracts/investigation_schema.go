@@ -177,7 +177,7 @@ func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 	if err := v.validate(name, b, true); err != nil {
 		return err
 	}
-	if name != "get_file_excerpt" && name != "get_query_result" {
+	if name != "get_file_excerpt" && name != "get_query_result" && name != "get_profile_summary" {
 		return nil
 	}
 	var out struct {
@@ -207,7 +207,7 @@ func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 	if out.Data.Tool != "get_file_excerpt" && out.Data.Tool != "get_http_headers" && out.Data.Tool != "get_profile_summary" || v.ValidateOutput(out.Data.Tool, out.Data.Result) != nil {
 		return ErrInvestigationWire
 	}
-	if out.Data.Tool == "get_http_headers" || out.Data.Tool == "get_profile_summary" {
+	if out.Data.Tool == "get_http_headers" {
 		// ADR-282: the page carries no query times; it is the same request's
 		// successful page.
 		var page struct {

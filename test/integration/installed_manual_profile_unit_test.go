@@ -77,3 +77,14 @@ func checkManualProfilePlan(t *testing.T, cluster string, input map[string]any) 
 		t.Fatal("profile plan cannot enter accepted context execution", err)
 	}
 }
+
+func TestInstalledManualProfileFundsOneConservativeSummary(t *testing.T) {
+	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "manual-profile")
+	if got := nativeCapacityProfile(); got.Records != 10 {
+		t.Fatal("summary lacks its ten query units", got.Records)
+	}
+	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "approved-recording")
+	if got := nativeCapacityProfile(); got.Records != 8 {
+		t.Fatal("unrelated fixture capacity changed", got.Records)
+	}
+}

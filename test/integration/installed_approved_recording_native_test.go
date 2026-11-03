@@ -271,7 +271,7 @@ func (b *installedBrowser) approvedRecordingStepUp(t *testing.T, ctx context.Con
 	b.csrf = view.CSRF
 }
 
-func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string)) {
+func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string), summaryCheck installedProjectionCheck) {
 	t.Helper()
 	// Initial MCP transport/read failures can diagnose and terminate inside
 	// helpers before recovery returns. Sample this one preview first, once.
@@ -717,10 +717,12 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	var evidence struct {
 		Artifacts []struct {
-			ID        string    `json:"artifact_id"`
-			DataClass string    `json:"data_class"`
-			Kind      string    `json:"kind"`
-			Expires   time.Time `json:"expires_at"`
+			ID           string    `json:"artifact_id"`
+			DataClass    string    `json:"data_class"`
+			Kind         string    `json:"kind"`
+			Digest       string    `json:"digest"`
+			NativeFormat string    `json:"native_format"`
+			Expires      time.Time `json:"expires_at"`
 		} `json:"artifacts"`
 	}
 	read("get_case", map[string]string{"case_id": progress.CaseID}, &evidence)
@@ -768,7 +770,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-http" {
 		wantClass = "extract"
 	}
-	if installedJourneyFocus() == "manual-profile" && evidence.Artifacts[0].Kind != "profile" {
+	if installedJourneyFocus() == "manual-profile" && (evidence.Artifacts[0].Kind != "profile" || evidence.Artifacts[0].NativeFormat != "pprof") {
 		t.Fatal("published profile is mislabeled", evidence.Artifacts[0].Kind)
 	}
 	if evidence.Artifacts[0].DataClass != wantClass {
@@ -870,6 +872,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-profile" {
 		qualifyManualProfileNative(t, ctx, native, receipt.CaptureID)
 		qualifyManualProfileRepeatPreview(t, receipt.CaptureID, preview, invoke)
+		qualifyInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, native, evidence.Artifacts[0].Expires, summaryCheck)
 		qualifyManualProfileStop(t, ctx, manualProfileStopArguments(cluster, namespace, workload), read, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
 			if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent installed profile Stop review", "idempotency_key": "approve-stop-" + grantID}, nil); code != "" {
