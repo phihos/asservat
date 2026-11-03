@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Third installed profile run (2026-11-03)
+
+[Installed run 41601165453](https://github.com/phihos/asservat/actions/runs/41601165453)
+at `7066e27a` passed approved submission and profile dispatch, but ended
+`Indeterminate / StorageOutcomeUnconfirmed`. Go exited 1 after 616.413 seconds;
+source inventories matched and cleanup reported no failures. Original artifacts
+are retained in `test/results/profile-native-41601165453/`. Exact-head CI
+41601083269 passed. Collection, publication and native download remain unqualified.
+
+Inspection identified a concrete composition mismatch: the default 16 MiB
+profile ceiling selects multipart storage, whose writer rereads the completed
+ciphertext, while installed regional evidence credentials permit writes only.
+A focused reproduction and correction are in progress. Independent publisher
+verification must still precede publication; no read privilege or successful
+verification is inferred from a completion receipt.
+
+The separate snapshot cancellation regression also reproduced an unread HTTP/1
+upload failing to observe peer cancellation while waiting for storage admission.
+The regional holder now connects an accepted snapshot-cancel operation to that
+specific wait context. Active storage retains its existing joined cancellation
+and stored-wins behavior. Real TLS regressions and `make pre-push` passed; this
+local fix does not qualify the installed workflow.
+
 ## Combined dispatch, parser and upload admission fixes (2026-11-03)
 
 The candidate after the second installed failure now includes exact-Pod node
