@@ -1,5 +1,27 @@
 # Sustained implementation progress
 
+## Combined dispatch, parser and upload admission fixes (2026-11-03)
+
+The candidate after the second installed failure now includes exact-Pod node
+dispatch, the shared pprof structural allowance and FIFO store admission.
+The FIFO regression first reproduced a later packet reserving capacity ahead
+of a waiting profile; afterward all four acquired bodies are stored exactly
+once. Waiting bodies remain unread, and cancellation/expiry removes only that
+waiter without refunding another writer. This prevents admission overtaking;
+REQ-CAP-003 byte-quantum workload fairness remains unfinished.
+
+The shared parser allowance accepts a genuine 40,007-sample Go heap while
+refusing the measured expensive shapes before object allocation. See
+[the empirical limits](reviews/pprof-allocation-preflight.md); these are not
+a universal heap guarantee or installed worker qualification.
+
+Combined `make pre-push` passed with the specification virtual environment.
+Full bootstrap races passed in 80.290 seconds; the integrated diagnostics
+race suite passed in 12.013 seconds. Independent review found no blocking
+identity/deadline defect in the node dispatch change. The next installed run
+must qualify the actual acquisition/publication/download/Stop journey; no
+installed success is inferred from these local results.
+
 ## Profile API target dispatch correction (2026-11-03)
 
 [Installed run41596255666](https://github.com/phihos/asservat/actions/runs/41596255666)
