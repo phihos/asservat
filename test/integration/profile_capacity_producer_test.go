@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -110,6 +111,43 @@ func TestProfileCapacityProducerWithRealPostgres(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		originalHead, err := provider.GetDBVersion(ctx)
+		if err != nil || originalHead < 125 {
+			t.Fatal("profile rollback fixture requires schema 125 or newer", originalHead, err)
+		}
+		// Test 125's refusal independently of later migrations. Always restore
+		// the original head, including after Fatal or a cancelled test context,
+		// so a shared fixture cannot strand later suites on an older schema.
+		restored := false
+		restore := func() error {
+			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			defer cancel()
+			if _, err := provider.UpTo(cleanup, originalHead); err != nil {
+				return err
+			}
+			head, err := provider.GetDBVersion(cleanup)
+			if err != nil {
+				return err
+			}
+			if head != originalHead {
+				return fmt.Errorf("restored schema %d, expected %d", head, originalHead)
+			}
+			restored = true
+			return nil
+		}
+		defer func() {
+			if !restored {
+				if err := restore(); err != nil {
+					t.Error("restore schema after profile rollback probe", err)
+				}
+			}
+		}()
+		if _, err = provider.DownTo(ctx, 125); err != nil {
+			t.Fatal("isolate profile capacity rollback", err)
+		}
+		if after := snapshot(); after != before {
+			t.Fatal("later rollback changed retained profile graph")
+		}
 		if _, err = provider.DownTo(ctx, 124); err == nil || !strings.Contains(err.Error(), "profile capacity rollback requires retirement of marked roots") {
 			t.Fatal("retained profile graph did not refuse rollback at its exact guard", err)
 		}
@@ -120,5 +158,12 @@ func TestProfileCapacityProducerWithRealPostgres(t *testing.T) {
 		if err = admin.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&head); err != nil || head != 125 {
 			t.Fatal("rollback changed schema head", head, err)
 		}
+		if err := restore(); err != nil {
+			t.Fatal("restore newer schema after profile rollback probe", err)
+		}
+		if after := snapshot(); after != before {
+			t.Fatal("schema restoration changed retained profile graph")
+		}
+		t.Logf("retained profile graph unchanged: schema %d -> 125 -> refused 124 -> %d", originalHead, originalHead)
 	})
 }
