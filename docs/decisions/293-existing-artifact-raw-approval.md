@@ -1,6 +1,7 @@
 # ADR-293 — Existing-artifact raw download approval
 
-Date: 2026-11-03. Status: implementation in progress; no installed qualification.
+Date: 2026-11-03. Status: native download implemented and installed-qualified on `af8d2b07`
+(Native41673309250); other raw operations remain unimplemented.
 Requirements: REQ-AUT-002–004, REQ-DLD-002, REQ-INV-002, REQ-SYS-003.
 
 ## Decision

@@ -139,7 +139,8 @@ Legacy packet/metadata scope bytes remain unchanged when arguments are absent.
 
 Focused compiler, authority, grant-plan, public-contract and console tests are
 component evidence only. Installed recurring capture and a separate exact-artifact
-human inspection/download approval remain required. A team collection grant never
+human download approval subsequently passed on `af8d2b07` (Native41673309250).
+Ongoing arguments remain unavailable. A team collection grant never
 confers personal disclosure rights. The manual native qualification is tracked
 separately in implementation-progress.md.
 

@@ -60,8 +60,9 @@ program to enforce the existing pre-read observation budget. It changes the
 engine sourcing rule only; REQ-SYS-002 accounting, approval, isolation and native
 qualification remain mandatory. The finite manual workflow passed its installed
 acceptance on `9a8e392e`; exact scope and evidence are recorded in
-[implementation progress](../docs/implementation-progress.md). Recurring and
-ongoing argument workflows require their own composed qualification.
+[implementation progress](../docs/implementation-progress.md). The finite recurring policy workflow also passed on `af8d2b07`, including
+independent personal raw-download approval. Ongoing argument workflows remain
+unavailable pending their own implementation and qualification.
 
 ### Finite argument implementation boundary (ADR-281)
 

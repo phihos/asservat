@@ -3,6 +3,31 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Finite argument policies and independent existing-raw download approval are
+installed-qualified and merged in [PR149](https://github.com/phihos/asservat/pull/149),
+merge `62ede0db` from qualified head `af8d2b07`. CI41672851629 and
+[Native41673309250](https://github.com/phihos/asservat/actions/runs/41673309250) passed.
+The actual policy restart produced 48 writes. Collection-only download was refused;
+independent exact-artifact personal approval admitted the original prepare retry.
+All 33,491 native bytes matched size/SHA and the expected marker, original SQL source
+and mechanism. Exactly one operation and 33,491 bytes were charged; original policy
+reservations remained intact. Footer accounting: 96 probes / 36,864 charged bytes
+within 6,000 events / 96 MiB, coverage explicitly unknown. Go exited 0 in 542.990s;
+sources unchanged, cleanup failures empty and scratch removed. Original reports
+and synthetic native bytes are retained in `test/results/policy-native-41673309250`.
+This supersedes the earlier pending qualification below; grouped/ongoing arguments
+and historical unknown-size recovery remain open.
+
+The next active slice is saved syscall summaries and filtered metadata events
+(REQ-SYS-003/SC-SYS-003). Local preparation shares the native event DTO with the
+encoder, uses a complete bounded stream for aggregate/page parsing, and binds
+continuations to source version, view and filter. Byte-bound pages retain a
+prefix and validate the tail; unmatched/unfinished/unknown are separate, and loss
+is never inferred as zero. Package races and architecture checks pass. This does
+not expose query tools: funded scope/admission/key/worker/result composition,
+raw-source approved projection, browser/MCP/console parity and native comparison
+against downloaded JSONL remain next. No second integration PR is open.
+
 Native41668728510 on `ecc0ef43` passed policy capture/publication, personal raw
 approval and authenticated download size/SHA checks. It failed the shared raw
 pool assertion: one operation was charged but zero bytes. Go533.422s exited1;
