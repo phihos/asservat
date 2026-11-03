@@ -78,6 +78,12 @@ type PolicyRecordingPreparer interface {
 	PreparePolicyRecording(context.Context, APIExecutionCheck, targets.PacketSourceObservation) (value.APIExecution, bool, collector.ObservationPermit, error)
 }
 
+// ArgumentRecordingPreparer is distinct from packet predicate observation.
+// The original API preparation and both event/byte pools commit atomically.
+type ArgumentRecordingPreparer interface {
+	PrepareArgumentRecording(context.Context, APIExecutionCheck, targets.PacketSourceObservation) (value.APIExecution, bool, collector.ArgumentObservationPermit, error)
+}
+
 type APIExecutionRecorder interface {
 	RecordAPIStart(context.Context, APIExecutionCheck, value.APIExecution, value.Disposition) (value.APIExecution, error)
 	RecordAPIOutcome(context.Context, value.APIExecution, value.APIProcessObservation) (value.APIExecution, error)
