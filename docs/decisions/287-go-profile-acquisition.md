@@ -105,6 +105,14 @@ storage can still exhaust that interval. Local real-writer regressions cover
 both packet and profile contention, single-use delivery, unread bodies, and
 Stop/caller/deadline termination without releasing another writer's capacity.
 
+This transient-contention fix does not complete REQ-CAP-003 upload fairness.
+Overlapping packet stores can keep a profile waiting until its original end;
+refusing those already-acquired packets would discard their one-shot results.
+The [mixed-upload fairness follow-up](../research/mixed-upload-fairness-plan.md)
+records the workload-aware bounded-quanta plan, its memory prerequisites and
+outstanding qualification. No type-priority policy or fairness guarantee is
+introduced by this decision.
+
 Local tests exercise exact endpoint/process binding, original start/deadline,
 one-use delivery, uncertain HTTP cancellation, immutable multipart claims and
 unknown create/part/complete results. Gadget-tag compilation is separate from
