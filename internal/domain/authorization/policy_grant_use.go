@@ -11,13 +11,16 @@ var ErrPolicyGrantBudgetExhausted = errors.New("policy grant budget exhausted")
 // PolicyGrantSpend is separate from the human result-disclosure counters.
 // Values count conservative reservations, including unknown effects; reporting
 // fewer retained bytes or replacing an attachment cannot refund these pools.
-type PolicyGrantSpend struct{ Executions, CollectedBytes, ObservedBytes int64 }
+type PolicyGrantSpend struct {
+	Executions, CollectedBytes, ObservedBytes int64
+	ObservedEvents                            int64 `json:",omitempty"`
+}
 
 func (s PolicyGrantSpend) valid(p *PolicyGrantScope) bool {
-	return p != nil && s.Executions >= 0 && s.Executions <= p.Limits.MaxExecutions && s.CollectedBytes >= 0 && s.CollectedBytes <= p.Limits.MaxBytes && s.ObservedBytes >= 0 && s.ObservedBytes <= p.Limits.MaxObservedBytes
+	return p != nil && s.Executions >= 0 && s.Executions <= p.Limits.MaxExecutions && s.CollectedBytes >= 0 && s.CollectedBytes <= p.Limits.MaxBytes && s.ObservedBytes >= 0 && s.ObservedBytes <= p.Limits.MaxObservedBytes && s.ObservedEvents >= 0 && s.ObservedEvents <= p.Limits.MaxObservedEvents
 }
 func (s PolicyGrantSpend) Exhausted(p *PolicyGrantScope) bool {
-	return p != nil && (s.Executions >= p.Limits.MaxExecutions || s.CollectedBytes >= p.Limits.MaxBytes || p.Observation != nil && s.ObservedBytes >= p.Limits.MaxObservedBytes)
+	return p != nil && (s.Executions >= p.Limits.MaxExecutions || s.CollectedBytes >= p.Limits.MaxBytes || p.Observation != nil && (s.ObservedBytes >= p.Limits.MaxObservedBytes || p.Limits.MaxObservedEvents > 0 && s.ObservedEvents >= p.Limits.MaxObservedEvents))
 }
 
 // CheckPolicyGrantCurrent is team-authority preflight, not an effect permit.
