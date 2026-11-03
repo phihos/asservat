@@ -62,6 +62,9 @@ func checkPprof(r io.Reader, limit int64) (err error) {
 	if _, err = br.ReadByte(); err != io.EOF { // nothing after the member
 		return ErrNotProfile
 	}
+	if err := preflightPprof(plain.Bytes()); err != nil {
+		return err
+	}
 	p, err := profile.ParseUncompressed(plain.Bytes())
 	if err != nil || p.CheckValid() != nil {
 		return ErrNotProfile

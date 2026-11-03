@@ -67,30 +67,7 @@ func TestProfileStopFencesLateStartAndNeedsJoinedResult(t *testing.T) {
 
 func TestProfileStopJoinsRealWriterAndKeepsUncertainBackendEffects(t *testing.T) {
 	h, q, reader, e, endpoint, now := profileHolderFixture(t)
-	_, _, _, x := sourceSnapshotPipelineFixture(t, nil)
-	base := snapshotExpected(t, x)
-	base.CaptureUID, base.PodUID, base.NamespaceUID = e.CaptureUID, e.PodUID, e.NamespaceUID
-	base.ActionID = "a0123456789abcdef01234567"
-	base.NativeType, base.DataClass, base.Profile = artifact.PprofArtifact, "raw", e.Profile.Clone()
-	base.Snapshot, base.SourceSnapshotManifest, base.Lifecycle = nil, nil, nil
-	base.Registration.Location = e.Registration.Location
-	base.TriggeredAt = now
-	base.Registration.AnchorAt = now
-	base.Registration.WriteUntil = now.Add(time.Minute)
-	base.Registration.ExpiresAt = now.Add(120 * time.Second)
-	base.Registration.DeleteBy = now.Add(180 * time.Second)
-	base.Registration.NativeLimit = 64 << 10
-	base.Profile.MaxBytes = 64 << 10
-	var frozen planning.ProfileContext
-	if err := json.Unmarshal(base.Profile.Composition, &frozen); err != nil {
-		t.Fatal(err)
-	}
-	frozen.Endpoints[0].Request.NativeLimit = 64 << 10
-	base.Profile.Composition, _ = json.Marshal(frozen)
-	// Small native test output exercises the actual prepared writer without a multipart fixture.
-	if err := base.Validate(); err != nil {
-		t.Fatal("profile writer fixture", err)
-	}
+	base := profileWriterExpectation(t, e, now)
 	entered, release := make(chan struct{}), make(chan struct{})
 	defer close(release)
 	prepared := preparedSnapshot(t, base, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -142,4 +119,33 @@ func TestProfileStopJoinsRealWriterAndKeepsUncertainBackendEffects(t *testing.T)
 	if err != nil || out.State != evidence.RecordingCancelled || out.ProfileCancellation == nil || !out.ProfileCancellation.MayHaveStarted || h.storing != 0 {
 		t.Fatal("writer join lost cancellation or reservation", out, h.storing, err)
 	}
+}
+
+func profileWriterExpectation(t *testing.T, e artifact.ContextExpectation, now time.Time) artifact.ContextExpectation {
+	t.Helper()
+	_, _, _, x := sourceSnapshotPipelineFixture(t, nil)
+	base := snapshotExpected(t, x)
+	base.CaptureUID, base.PodUID, base.NamespaceUID = e.CaptureUID, e.PodUID, e.NamespaceUID
+	base.ActionID = "a0123456789abcdef01234567"
+	base.NativeType, base.DataClass, base.Profile = artifact.PprofArtifact, "raw", e.Profile.Clone()
+	base.Snapshot, base.SourceSnapshotManifest, base.Lifecycle = nil, nil, nil
+	base.Registration.Location = e.Registration.Location
+	base.TriggeredAt = now
+	base.Registration.AnchorAt = now
+	base.Registration.WriteUntil = now.Add(time.Minute)
+	base.Registration.ExpiresAt = now.Add(120 * time.Second)
+	base.Registration.DeleteBy = now.Add(180 * time.Second)
+	base.Registration.NativeLimit = 64 << 10
+	base.Profile.MaxBytes = 64 << 10
+	var frozen planning.ProfileContext
+	if err := json.Unmarshal(base.Profile.Composition, &frozen); err != nil {
+		t.Fatal(err)
+	}
+	frozen.Endpoints[0].Request.NativeLimit = 64 << 10
+	base.Profile.Composition, _ = json.Marshal(frozen)
+	// Small native test output exercises the actual prepared writer without a multipart fixture.
+	if err := base.Validate(); err != nil {
+		t.Fatal("profile writer fixture", err)
+	}
+	return base
 }

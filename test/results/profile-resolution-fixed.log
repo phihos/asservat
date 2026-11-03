@@ -1,0 +1,10 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding
+=== RUN   TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding/before-endpoint
+=== RUN   TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding/after-endpoint
+--- PASS: TestContextAdmissionWithRealServices (5.63s)
+    --- PASS: TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding (5.21s)
+        --- PASS: TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding/before-endpoint (2.78s)
+        --- PASS: TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding/after-endpoint (2.43s)
+PASS
+ok  	asservat.local/asservat/test/integration	6.697s

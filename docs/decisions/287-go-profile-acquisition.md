@@ -45,7 +45,12 @@ recording. The node collector has no artifact key authority.
 6. Profile and recording holders share the existing 64-attempt and 32 MiB
    connector storage budget. A streaming profile reserves that entire working
    budget while storing, independent of its total native length; it uses the
-   unchanged 8 MiB frames and multipart writer. The profile writer's private
+   unchanged 8 MiB frames and multipart writer. A completed profile waits for
+   occupied storage capacity with its body unread, under the earlier original
+   upload/request and WriteUntil bounds. Existing writers signal capacity
+   release; Stop cancels and joins the wait as well as an active store. The
+   result remains single-use while waiting; no reacquisition or refund follows
+   cancellation or expiry. The profile writer's private
    one-shot state cannot release durable temporary charges. Process replacement
    cannot reconstruct it. Cleanup still needs writer quiescence and complete
    attempt-prefix inventory before releasing reservations. Generic resumable
@@ -89,6 +94,24 @@ at the admitted 16 MiB default (64 MiB profile/128 MiB trace maxima), under the
 existing aggregate budget. Connector buffering is frame bounded. The one-shot
 writer avoids up to 38 multipart journal control RPCs at the trace maximum;
 failed attempts retain their full temporary charge until normal cleanup.
+
+PR-147 review identified completed profiles being discarded whenever another
+recording held storage capacity. The bounded wait adds one lazily allocated
+broadcast channel per connector and uses the existing per-delivery deadline
+context; at most the existing 64 holders can wait. It adds zero polling timers,
+network requests, durable state, acquisition retries or buffer reservations
+during acquisition. Waiting consumes the original upload interval, so slow
+storage can still exhaust that interval. Local real-writer regressions cover
+both packet and profile contention, single-use delivery, unread bodies, and
+Stop/caller/deadline termination without releasing another writer's capacity.
+
+This transient-contention fix does not complete REQ-CAP-003 upload fairness.
+Overlapping packet stores can keep a profile waiting until its original end;
+refusing those already-acquired packets would discard their one-shot results.
+The [mixed-upload fairness follow-up](../research/mixed-upload-fairness-plan.md)
+records the workload-aware bounded-quanta plan, its memory prerequisites and
+outstanding qualification. No type-priority policy or fairness guarantee is
+introduced by this decision.
 
 Local tests exercise exact endpoint/process binding, original start/deadline,
 one-use delivery, uncertain HTTP cancellation, immutable multipart claims and

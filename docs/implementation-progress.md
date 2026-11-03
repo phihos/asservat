@@ -1,5 +1,126 @@
 # Sustained implementation progress
 
+## Native profile results and installed failure fixes (2026-11-03)
+
+The combined installed-fix candidate also includes the measured pprof allocation
+preflight: repeated protobuf tables/labels are bounded before the maintained
+parser allocates them. Existing native CPU/heap bytes pass; all previously
+measured OOM inputs now return bounded refusals. See
+[the measurements and supported shape](reviews/pprof-allocation-preflight.md).
+No query analyzer is enabled by that guard. Complete pre-push gates pass on the
+combined source; diagnostics races pass in 11.118 seconds and PostgreSQL races
+in 2.850 seconds, with the capture suite reusing its unchanged-source pass.
+The [mixed-upload fairness plan](research/mixed-upload-fairness-plan.md) retains
+REQ-CAP-003 as unfinished: the current capacity wait handles transient contention
+but does not guarantee progress under continuously overlapping packet uploads.
+Rejecting incoming packets to favor profiles would discard one-shot evidence,
+so that proposed review patch is not adopted.
+
+At `78afa6ec`, [collector run 41592789877](https://github.com/phihos/asservat/actions/runs/41592789877)
+passed with `testExit: 0` and confirmed cluster/image cleanup. Genuine CPU
+loopback and heap Pod-IP profiles open with the native Go tool; the production
+parser accepts a genuine short Go trace. Two deliberately malformed 128 MiB
+responses hold the 256 MiB collector reservation, reject a third acquisition,
+and peak at 351.99 MiB process RSS against the installed 640 MiB limit. Two
+accepted Stop receipts join and release reservations in 0.968 seconds, before
+the original upload deadline. This qualifies maximum-input resource/Stop
+behavior, not a valid 128 MiB trace or catalog publication. The immutable run
+head binds the checkout; this collector harness does not emit before/after
+source inventories. Original report, log and downloaded CPU/heap bytes are in
+`test/results/profile-native-41592789877/`.
+
+[Installed run 41592791975](https://github.com/phihos/asservat/actions/runs/41592791975)
+failed after approved submission returned `AcquisitionNotStarted`, then
+`resolve_capture_request` returned `OutcomeUnknown`. Actual Go test time was
+629.910 seconds; `goTestExit: 1`, `sourceUnchangedDuringTest: true` and empty
+`cleanupFailures` are retained with the original logs in
+`test/results/profile-native-41592791975/`. No acquired profile, download,
+history-repeat journey or installed Stop result is claimed from this run.
+
+The admission/start regression reproduces a normal three-second admission wait
+starving a later three-second start. [ADR-292](decisions/292-independent-submission-start-phase.md)
+gives that phase its own five-second limit inside the unchanged original
+fifteen-second request, identity and accepted-capture bounds. Negative tests
+retain caller/identity/capture/phase expiry, cancellation and fresh start denial.
+Focused submission/group/history race tests pass in 3.420 seconds. The full capture
+application race suite also passes in 16.583 seconds; vet, specification and
+architecture gates pass. The separate approved-profile request-resolution
+omission is now fixed with the real SQL regression below; installed rerun
+remains required. Final-head CI 41592716399 and the
+full earlier Go run passed (68 package suites, 682 selected Kubernetes tests;
+one explicitly native-only skip). Those repository checks do not qualify the
+failed installed journey.
+
+## Approved profile request recovery correction (2026-11-03)
+
+Installed profile run `41592791975` at frozen `78afa6ec` failed before acquisition.
+The initial start reported `AcquisitionNotStarted`; subsequent request resolution
+returned `OutcomeUnknown` in under 100 ms. The separate start-composition timing
+failure is not fixed by this change. Request resolution omitted profiles from
+its existing approved-acceptance timing branch, although reviewed admission
+already supports them. The one-line typed extension preserves the accepted
+write deadline, canonical digest/target/actor checks and current identity,
+permission and recovery authorization. It adds no retry or authority renewal.
+
+A compiler-backed unit test and actual SQL `ResolveOrCloseContextRequest` both
+reproduced `context admission unavailable` before the change. Afterward the
+owned SQL profile admission fixture passes both before/after-endpoint branches
+in 6.697 seconds, including recovery, stream binding and existing Stop checks.
+`test/results/profile-resolution-{reproduced,fixed}-environment.json` record
+respectively test exits 1 and 0, unchanged source hashes and empty cleanup
+failures. The first fixture attempt was a test compilation failure, retained in
+`profile-resolution-before`; it is not runtime evidence. Full PostgreSQL races
+with the maintained static libpcap pass in 2.848 seconds; full application
+capture races pass in 16.158 seconds. Malformed scope, digest, capture, target,
+missing approval/timing and unsupported version still refuse. This local SQL
+result does not qualify installed acquisition or complete S-05.
+
+Complexity gate: one observed installed workflow blocked; accepted risk: no;
+typical path: approved profile recovery. Existing recording/snapshot recovery
+provides the same timing precedent. Added privileges, credentials, requests,
+background work, configuration, dependencies and fallback states: zero. Runtime
+cost is one pointer comparison; memory/network growth: zero. No migration or
+new rollback procedure is required. The smaller one-line correction suffices.
+
+## Combined manual-profile candidate and review fixes (2026-11-03)
+
+[PR 147](https://github.com/phihos/asservat/pull/147) combines acquisition,
+Stop, native transfer and migrations 123–126 with current main. PR 146 is
+superseded so the preview audit migration cannot precede the profile chain.
+The installed fixture now also performs one history-based preview and checks
+that its original composition, versions and retained source remain unchanged.
+It makes no additional capture. Maximum-input resource assertions require exact
+accepted Stop receipts and released reservations observed before the original
+upload deadline; expiry cleanup cannot count as a successful Stop.
+
+Review reproduced two additional defects. Raw-profile downloads were rejected
+by the packet-only class selector; profiles now use the same exact, current
+result-access child, with raw cores and profile extracts still refused. Full
+application/domain authorization race suites pass (1.368/1.449 seconds).
+An unrelated packet/profile store could also discard a completed profile.
+Delivery now waits with its body unread for the existing shared working budget,
+within its original context and WriteUntil. One release notification replaces
+immediate failure; no polling, new acquisition, budget increase or refund is
+added. Real encrypted-writer regressions cover both competing writer kinds,
+Stop, caller cancellation and expiry. Focused races pass in 2.014 seconds and
+the full bootstrap race suite passes in 78.969 seconds.
+
+The integrated pre-push gates, 278 console tests, built console and browser
+journeys pass. The first complete Go run found a discovery descriptor at
+36,968 bytes, exceeding its existing 36 KiB ceiling. Shorter tool descriptions
+restore that bound without changing schemas or the 60 KiB discovery-page limit;
+the complete contract race suite passes. The first CI run then failed the
+unpaced maximum-window fixture during its third 64 MiB response. That fixture
+renewed its four-second lease only when deliberate sink pacing was enabled.
+The positive transport fixture now models normal lease renewal regardless of
+pacing; production lease/deadline limits are unchanged. The actual CI failure
+is retained in `test/results/profile-native-ci-lease-failure.log`. The broader
+Go rerun and final-candidate CI remain in progress at this checkpoint. All four
+whole/resume and paced PCAPNG/profile transport regressions pass in 50.093
+seconds; the paced 64 MiB response takes 24.154 seconds with ten short-lease
+renewals. These are real TLS/component tests with synthetic stored bytes. Native collector and installed profile runs
+remain pending; these component results do not complete S-05.
+
 ## Profile upload Stop and maximum-input fixture (2026-11-03)
 
 Blocked-upload regressions reproduced two Stop gaps: node cancellation reached
@@ -108,8 +229,7 @@ for bootstrap (77.492 seconds), capture, execution, contextstart, presentation
 and JOSE. The initial broad bootstrap run exposed a test-only heap profile size
 dependency; the blocked-writer fixture now uses a deterministic valid pprof.
 
-Remaining: integrate the final native owner-renewal capacity correction and
-preview audit timing migration, then qualify actual collector CPU/heap/redirect/Stop and the installed
+Remaining: qualify actual collector CPU/heap/redirect/Stop and the installed
 approval→publication→native download→local pprof workflow, including resources
 at supported limits. No installed profile result or completed S-05 is claimed.
 

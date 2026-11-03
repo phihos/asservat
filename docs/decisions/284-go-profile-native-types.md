@@ -55,12 +55,14 @@ check for either format.
      Version 1 traces (Go 1.21 and older) are refused rather than converted.
    - A parser panic is a refusal, not a publisher crash. Over-bound input is
      `ErrLimit`, never truncated.
-6. Bound measurement: parsing a 15.4 MB table-heavy synthetic profile
-   (330,000 distinct functions and locations) peaked at about 190 MiB of
-   sampled live heap in 0.23 s; 30 MB peaked at about 377 MiB. 16 MiB keeps
-   one check well inside the publisher's 512 MiB limit; 64 MiB would not. A
-   larger profile is refused by the producer at capture time, so the
-   refusal is visible rather than a silent loss.
+6. Historical bound measurement: parsing a 15.4 MB table-heavy synthetic
+   profile (330,000 distinct functions and locations) peaked at about
+   190 MiB of sampled live heap in 0.23 s; 30 MB peaked at about 377 MiB.
+   This informed the original 16 MiB decompression limit. The follow-up
+   below supersedes the assumption that this byte limit alone keeps all
+   profiles inside the publisher's 512 MiB process limit. The measured
+   330,000-table experiment remains historical evidence; that shape is no
+   longer supported by the preallocation limits.
 7. Dependencies: `github.com/google/pprof` pinned at
    `v0.0.0-20261016150608-1facf8f91b50` (upstream main, 2026-10-16; the
    project publishes no tags; Apache-2.0), only its `profile` package is
@@ -89,3 +91,18 @@ team libraries. 9: one bounded parse per published profile, ~12x the
 decompressed size in transient heap. 10: code-only registry; rollback removes
 the types. 11: a smaller check (header only) would publish unverifiable
 bytes from a hostile endpoint, contrary to ADR-244.
+
+## Follow-up: measured protobuf allocation amplification (2026-11-03)
+
+A valid synthetic profile with one sample and two million labels is only
+12,000,169 decompressed bytes, but the maintained parser exhausted both 256
+and 512 MiB bounded processes before semantic validation. Panic recovery does
+not catch process OOM. This observed case, plus dense table records, justifies
+one fixed preallocation shape check shared by publication and analysis.
+
+The [allocation preflight review](../reviews/pprof-allocation-preflight.md)
+records the supported bounds, maintained wire-library reuse, red regression,
+process measurements and qualification limits. The pprof library remains the
+semantic parser. New unsupported shapes return the existing limit refusal,
+without truncation or mutation of old evidence/grants. No worker resource,
+query authority, privilege, migration or public activation changes here.

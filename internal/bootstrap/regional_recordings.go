@@ -87,12 +87,23 @@ type ConnectorRecordings struct {
 	profiles         map[string]*heldProfile
 	held             map[string]*heldRecording // by capture ID
 	storing          int64
+	storeReleased    chan struct{} // broadcast on a storage reservation's release
 	peers            peerResolver
 	verifiers        int // running peer verifiers, at most maxPeerVerifiers
 }
 
 func NewConnectorRecordings(nodes recordingNodes, pods podNodes, now func() time.Time, log func(string)) *ConnectorRecordings {
 	return &ConnectorRecordings{nodes: nodes, pods: pods, now: now, log: log, after: time.After, held: map[string]*heldRecording{}}
+}
+
+// releaseStoreLocked wakes completed profile uploads without polling or
+// reserving their working memory during acquisition. Call with h.mu held.
+func (h *ConnectorRecordings) releaseStoreLocked(bytes int64) {
+	h.storing -= bytes
+	if h.storeReleased != nil {
+		close(h.storeReleased)
+		h.storeReleased = nil
+	}
 }
 
 // expireLocked drops outcomes and pending recordings past their deadline.
@@ -272,7 +283,7 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 	h.mu.Unlock()
 	defer func() {
 		h.mu.Lock()
-		h.storing -= r.CapturedBytes
+		h.releaseStoreLocked(r.CapturedBytes)
 		held.storing = false
 		h.mu.Unlock()
 	}()

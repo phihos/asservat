@@ -229,17 +229,17 @@ func nativeWindowWithPacing(t *testing.T, pace time.Duration, wholeOnly bool, so
 		var sequence atomic.Int64
 		sequence.Store(1)
 		var checks atomic.Int32
-		var observe []func(value.NativeLease) value.NativeLease
-		if slow {
-			observe = append(observe, func(l value.NativeLease) value.NativeLease {
-				checks.Add(1)
-				l.Sequence = sequence.Load()
-				l.ObservedAt = time.Now()
-				l.Until = identity.Earlier(l.ObservedAt.Add(4*time.Second), l.Operation.Until)
-				return l
-			})
+		// Even an unpaced 64 MiB response can outlive its first short lease
+		// on a constrained runner. Model the normal renewal path independently
+		// of deliberate sink pacing; never lengthen the lease to fit a test.
+		observe := func(l value.NativeLease) value.NativeLease {
+			checks.Add(1)
+			l.Sequence = sequence.Load()
+			l.ObservedAt = time.Now()
+			l.Until = identity.Earlier(l.ObservedAt.Add(4*time.Second), l.Operation.Until)
+			return l
 		}
-		response, client, _ := flowOperationWithConnector(t, ctx, source, value.NativeResponse, fence, lease, nil, observe...)
+		response, client, _ := flowOperationWithConnector(t, ctx, source, value.NativeResponse, fence, lease, nil, observe)
 		defer response.Close()
 		worker := flowRunWorker(t, ctx, client, target, result)
 		readWork := evidence.NativeWindowReadWork(source.Expectation.Type())
@@ -269,7 +269,7 @@ func nativeWindowWithPacing(t *testing.T, pace time.Duration, wholeOnly bool, so
 				}
 				for offset, end := lease.Offset, lease.Offset+lease.Length; offset < end; {
 					n := min(artifact.DeliveryBytes, end-offset)
-					if slow && time.Now().Add(2*time.Second).After(lease.Until) {
+					if time.Now().Add(2 * time.Second).After(lease.Until) {
 						observed := time.Now()
 						a.CheckedAt = observed
 						a.ValidUntil = observed.Add(4 * time.Second)
@@ -324,10 +324,11 @@ func nativeWindowWithPacing(t *testing.T, pace time.Duration, wholeOnly bool, so
 		}
 		got, e := io.ReadAll(reply.Body)
 		reply.Body.Close()
+		outcomeErr := <-outcome
 		if e != nil {
-			t.Fatal(e)
+			t.Fatalf("response body after %d bytes: %v; remote window: %v", len(got), e, outcomeErr)
 		}
-		outcomeErr, workerErr := <-outcome, <-worker
+		workerErr := <-worker
 		if outcomeErr != nil || workerErr != nil {
 			t.Fatal("remote window", outcomeErr, "worker", workerErr)
 		}

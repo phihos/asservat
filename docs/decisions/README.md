@@ -1064,7 +1064,7 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 
 - [ADR-271: two context-start standbys per cluster](271-two-standbys-per-cluster.md): maintainer reopened ADR-209; join reserves two per cluster, the region keeps two staggered exchanges per owner and an exhausted standby retires only beside another; installed qualification pending.
 
-- [ADR-272: advisory history after the start](272-advisory-history-after-start.md): starts take priority; history follows with its own at-most-five-second budget inside the original request window; unit tests pass, installed qualification pending.
+- [ADR-272: advisory history after the start](272-advisory-history-after-start.md): starts take priority; history follows with its own at-most-ten-second budget inside the original request window; unit tests pass, installed qualification pending.
 - [ADR-274: time-sliced ring segments](274-time-sliced-ring-segments.md): segments also rotate after MaxAge/MaxSegments, so sparse recent records never age out with an old one; at least MaxAge minus one slice of history.
 - [ADR-275: multi-source policy recorders](275-multi-source-policy-recorders.md): one policy arms one source per composed recorder (at most one packet and one syscall); incident captures per recorder via policy_occurrence_capture (00114); accepted, native mixed run passed.
 - [ADR-276: manual composition groups](276-manual-composition-groups.md): a manual packet + syscall composition becomes a reviewed group of byte-identical single manual recordings under a recorder-group/v1 parent scope (migration 00116); proposed.
@@ -1086,3 +1086,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 
 - [ADR-289: bounded capture-preview composition](289-preview-composition-window.md): fifteen-second outer request, unchanged original observation and five-second stage bounds; installed qualification pending.
 - [ADR-286: Bounded Go analyzer isolation](286-bounded-go-analyzer-isolation.md): maintainer-delegated M1 decision permits qualified data-only Go analyzers in the regional worker with bounded inputs, output and process resources, original authority and joined cancellation; native tools retain ADR-036. No analyzer is qualified by this contract amendment.
+
+- [ADR-292: independent submission start phase](292-independent-submission-start-phase.md): admission and start each retain at most five seconds inside the original request and authority bounds; installed profile rerun pending.

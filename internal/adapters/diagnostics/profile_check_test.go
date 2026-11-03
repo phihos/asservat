@@ -140,7 +140,11 @@ func TestCheckPprof(t *testing.T) {
 		},
 	}
 	for name, input := range refused {
-		if err := CheckPprof(bytes.NewReader(input())); !errors.Is(err, ErrNotProfile) {
+		want := ErrNotProfile
+		if name == "too many mappings" {
+			want = artifact.ErrLimit
+		}
+		if err := CheckPprof(bytes.NewReader(input())); !errors.Is(err, want) {
 			t.Fatal(name, err)
 		}
 	}
@@ -218,7 +222,7 @@ func TestPprofCheckMemory(t *testing.T) {
 	p := validProfile()
 	// Distinct locations and functions: the table shape that costs most per
 	// byte when parsed.
-	for i := uint64(2); len(p.Location) < 330_000; i++ {
+	for i := uint64(2); len(p.Location) < MaxPprofLocations; i++ {
 		f := &profile.Function{ID: i, Name: "main.synthetic" + string(rune('a'+i%26)), Filename: "synthetic.go"}
 		l := &profile.Location{ID: i, Mapping: p.Mapping[0], Address: 0x1000 + i, Line: []profile.Line{{Function: f, Line: int64(i)}}}
 		p.Function = append(p.Function, f)
