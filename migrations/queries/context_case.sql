@@ -1,5 +1,7 @@
 -- name: ReadContextCaseRoutes :many
-SELECT r.*, v.copies_digest AS version FROM context_case_locator r
+SELECT r.*, v.copies_digest AS version,
+ COALESCE(convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType','')::text AS native_type
+FROM context_case_locator r
 JOIN context_catalog cat ON cat.artifact_id=r.artifact_id AND cat.capture_id=r.capture_id AND cat.root_id=r.root_id
 JOIN context_capture c ON c.id=r.capture_id AND c.root_id=r.root_id
 JOIN context_verification v ON v.capture_id=r.capture_id AND v.root_id=r.root_id

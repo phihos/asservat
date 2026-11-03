@@ -18,6 +18,7 @@ type publicProjectionPorts struct {
 	analysisapp.ContextProjectionRecovery
 	analysisapp.ContextProjectionRoutes
 	analysisapp.ContextProjectionRouteReader
+	analysisapp.SyscallProjectionRouteReader
 	analysisapp.ContextQueryPlans
 	analysisapp.ContextProjectionWorkerAdmission
 }
@@ -69,6 +70,34 @@ func TestPublicProfileSummaryRequiresInstalledTypedRoute(t *testing.T) {
 	with, err := NewPublicContextOperations(c, services)
 	if err != nil || !presentation.BrowserOperationSupported(with, "get_profile_summary") || !slices.Contains(with.ToolNames(), "get_profile_summary") {
 		t.Fatal("complete retained summary composition unavailable", err)
+	}
+}
+
+func TestPublicSyscallViewsRequireInstalledTypedRoute(t *testing.T) {
+	c, services := publicContextOperationFixture(t)
+	services.Projection = publicProjectionFixture(c)
+	without, err := NewPublicContextOperations(c, services)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"get_syscall_summary", "get_syscall_events"} {
+		if presentation.BrowserOperationSupported(without, name) || slices.Contains(without.ToolNames(), name) {
+			t.Fatal("saved syscall view enabled without typed source route", name)
+		}
+	}
+	services.Projection.SyscallRoutes = &publicProjectionPorts{}
+	c.CollectionEnabled = false
+	with, err := NewPublicContextOperations(c, services)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"get_syscall_summary", "get_syscall_events"} {
+		if !presentation.BrowserOperationSupported(with, name) || !slices.Contains(with.ToolNames(), name) {
+			t.Fatal("retained syscall view missing from browser/MCP composition", name)
+		}
+	}
+	if presentation.BrowserOperationSupported(with, "syscall_query") || slices.Contains(with.ToolNames(), "syscall_query") || slices.Contains(with.ToolNames(), "request_capture") {
+		t.Fatal("approved saved views enabled a raw query or collection")
 	}
 }
 

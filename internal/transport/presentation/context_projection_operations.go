@@ -30,6 +30,7 @@ type ContextProjectionOperations struct {
 	results   ContextQueryResults
 	headers   HTTPHeaderQueryService
 	profiles  ProfileSummaryQueryService
+	syscalls  SyscallQueryService
 	contracts *contracts.InvestigationContracts
 }
 
@@ -57,7 +58,7 @@ func (s *ContextProjectionOperations) WithHTTPHeaders(headers HTTPHeaderQuerySer
 
 // serves reports whether name is one of this composition's operations.
 func (s *ContextProjectionOperations) serves(name string) bool {
-	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil)
+	return s != nil && queryOperation(name) && (name != "get_http_headers" || s.headers != nil) && (name != "get_profile_summary" || s.profiles != nil) && (!syscallQueryOperation(name) || s.syscalls != nil)
 }
 
 // toolNames are the operations this composition advertises.
@@ -68,6 +69,9 @@ func (s *ContextProjectionOperations) toolNames() []string {
 	}
 	if s.profiles != nil {
 		names = append(names, "get_profile_summary")
+	}
+	if s.syscalls != nil {
+		names = append(names, "get_syscall_summary", "get_syscall_events")
 	}
 	return names
 }
@@ -85,6 +89,20 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var input analysisapp.ContextQueryInput
 	switch name {
+	case "get_syscall_summary", "get_syscall_events":
+		var in SyscallOperationInput
+		if json.Unmarshal(raw, &in) != nil {
+			return noDispatch, ErrOperationDelivery
+		}
+		selection, e := value.NormalizeSyscallSelection(in.CaseID, in.ArtifactID, syscallView(name), in.Cursor, in.Limit, in.Names, in.ErrorsOnly)
+		if e != nil {
+			failure, decision := syscallNotAvailable, operationAuditDenied
+			if errors.Is(e, value.ErrInvalidCursor) {
+				failure, decision = syscallInvalidCursor, operationAuditInvalid
+			}
+			return s.refusal(record.ID, name, record.Until, failure, decision, operationEffectNone, true)
+		}
+		input.Syscalls = value.SyscallQueryRequest{CaseID: in.CaseID, ArtifactID: in.ArtifactID, Selection: selection.Window()}
 	case "get_profile_summary":
 		var in ProfileSummaryOperationInput
 		if json.Unmarshal(raw, &in) != nil {
@@ -140,6 +158,8 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	}
 	var d *analysisapp.ContextProjectionDelivery
 	switch name {
+	case "get_syscall_summary", "get_syscall_events":
+		d, err = s.syscalls.Begin(ctx, current, i, input.Syscalls)
 	case "get_profile_summary":
 		d, err = s.profiles.Begin(ctx, current, i, input.Profile)
 	case "get_file_excerpt":
@@ -166,12 +186,26 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	if d == nil && errors.Is(err, value.ErrInvalidCursor) && name != "get_file_excerpt" {
 		// The worker judged the cursor against the rechecked document after
 		// current read rights; the read stays charged and nothing is disclosed.
-		return s.refusal(record.ID, name, record.Until, httpHeaderInvalidCursor, operationAuditInvalid, operationEffectAccepted, false)
+		failure := httpHeaderInvalidCursor
+		if name == "get_query_result" {
+			failure.Message = "The cursor is not valid for this saved evidence view. Start again without a cursor."
+		}
+		if syscallQueryOperation(name) {
+			failure = syscallInvalidCursor
+		}
+		return s.refusal(record.ID, name, record.Until, failure, operationAuditInvalid, operationEffectAccepted, false)
 	}
 	if d == nil && errors.Is(err, value.ErrRecordTooLarge) && name != "get_file_excerpt" {
 		// The worker's first selected record alone exceeds the wire bound; the
 		// read stays charged and nothing is disclosed.
-		return s.refusal(record.ID, name, record.Until, httpHeaderTooLarge, operationAuditDenied, operationEffectAccepted, false)
+		failure := httpHeaderTooLarge
+		if name == "get_query_result" {
+			failure.Message = "This saved evidence record does not fit the response limit."
+		}
+		if syscallQueryOperation(name) {
+			failure = syscallTooLarge
+		}
+		return s.refusal(record.ID, name, record.Until, failure, operationAuditDenied, operationEffectAccepted, false)
 	}
 	if d == nil && errors.Is(err, value.ErrBusy) && name == "get_http_headers" {
 		// ADR-282: the live worker caps are full; the query was not admitted
@@ -188,8 +222,12 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	default:
 	}
 	body, err := s.serialize(call.requestID, name, d)
-	if errors.Is(err, value.ErrRecordTooLarge) && d.Tool() == "get_profile_summary" {
-		return s.refusal(record.ID, name, record.Until, profileSummaryTooLarge, operationAuditDenied, operationEffectAccepted, false)
+	if errors.Is(err, value.ErrRecordTooLarge) && (d.Tool() == "get_profile_summary" || syscallQueryOperation(d.Tool())) {
+		failure := profileSummaryTooLarge
+		if syscallQueryOperation(d.Tool()) {
+			failure = syscallTooLarge
+		}
+		return s.refusal(record.ID, name, record.Until, failure, operationAuditDenied, operationEffectAccepted, false)
 	}
 	if err != nil {
 		return OperationReply{}, stopped("query-output", ErrOperationDelivery)
@@ -216,6 +254,17 @@ type queryViewTimes struct {
 
 func (s *ContextProjectionOperations) serialize(requestID, name string, d *analysisapp.ContextProjectionDelivery) ([]byte, error) {
 	times := queryViewTimes{ObservedAt: d.ObservedAt(), ExpiresAt: d.QueryDeadline()}
+	if !d.Pending() && syscallQueryOperation(d.Tool()) {
+		body, err := renderSyscallResult(requestID, name, d, times)
+		if err != nil {
+			return nil, err
+		}
+		if s.contracts.ValidateOutput(name, body) != nil {
+			clear(body)
+			return nil, ErrOperationDelivery
+		}
+		return body, nil
+	}
 	envelope := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: requestID,
 		DataClass: "metadata", Status: "ok", Warnings: []string{}, Provenance: []any{}}
 	switch {
@@ -233,6 +282,7 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 			RetryAfter  int    `json:"retry_after_seconds"`
 			queryViewTimes
 		}{d.Association().QueryID, 1, times}
+
 	case d.Tool() == "get_profile_summary":
 		summary, ok := d.ProfileSummary()
 		if !ok {

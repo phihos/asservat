@@ -23,9 +23,17 @@ const maxMetadataLine = 16 << 10
 // check final whole-file authentication before releasing this result. No raw
 // argument format or external symbol/name lookup is accepted here.
 func SummarizeMetadata(ctx context.Context, source io.Reader, pod string, from, until time.Time) (analysis.SyscallAggregation, error) {
+	return summarizeEvents(func(visit func(event) error) (analysis.SyscallRecordCounts, error) {
+		return walkMetadata(ctx, source, pod, from, until, visit)
+	})
+}
+
+type metadataWalk func(func(event) error) (analysis.SyscallRecordCounts, error)
+
+func summarizeEvents(walk metadataWalk) (analysis.SyscallAggregation, error) {
 	var zero analysis.SyscallAggregation
 	counts := map[string]analysis.SyscallCount{}
-	stats, err := walkMetadata(ctx, source, pod, from, until, func(e event) error {
+	stats, err := walk(func(e event) error {
 		c := counts[e.Syscall]
 		c.Syscall = e.Syscall
 		c.Count++
@@ -102,15 +110,8 @@ func walkMetadata(ctx context.Context, source io.Reader, pod string, from, until
 // jsontext rejects duplicate members and malformed UTF-8. No field in the
 // native metadata event accepts JSON null (including optional fields).
 func decodeMetadataSummaryEvent(line []byte, out *event) error {
-	tokens := jsontext.NewDecoder(bytes.NewReader(line))
-	for {
-		token, err := tokens.ReadToken()
-		if err == io.EOF {
-			break
-		}
-		if err != nil || token.Kind() == 'n' {
-			return artifact.ErrInvalid
-		}
+	if !projectionNonNullJSON(line) {
+		return artifact.ErrInvalid
 	}
 	decoder := json.NewDecoder(bytes.NewReader(line))
 	decoder.DisallowUnknownFields()
@@ -122,4 +123,18 @@ func decodeMetadataSummaryEvent(line []byte, out *event) error {
 		return artifact.ErrInvalid
 	}
 	return nil
+}
+
+func projectionNonNullJSON(line []byte) bool {
+	tokens := jsontext.NewDecoder(bytes.NewReader(line))
+	for {
+		token, err := tokens.ReadToken()
+		if err == io.EOF {
+			break
+		}
+		if err != nil || token.Kind() == 'n' {
+			return false
+		}
+	}
+	return true
 }

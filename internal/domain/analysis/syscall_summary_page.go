@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"asservat.local/asservat/internal/domain/artifact"
+	"slices"
 	"unicode/utf8"
 )
 
@@ -37,7 +38,7 @@ func (p SyscallSummaryPage) Next(s SyscallSelection, version artifact.Digest) st
 	return s.Cursor(next, version)
 }
 func CloneSyscallEventPage(p SyscallEventPage) SyscallEventPage {
-	p.Events = append([]artifact.SyscallMetadataEvent(nil), p.Events...)
+	p.Events = slices.Clone(p.Events)
 	for i := range p.Events {
 		if p.Events[i].DurationNS != nil {
 			v := *p.Events[i].DurationNS
@@ -47,6 +48,6 @@ func CloneSyscallEventPage(p SyscallEventPage) SyscallEventPage {
 	return p
 }
 func CloneSyscallSummaryPage(p SyscallSummaryPage) SyscallSummaryPage {
-	p.Rows = append([]SyscallCount(nil), p.Rows...)
+	p.Rows = slices.Clone(p.Rows)
 	return p
 }

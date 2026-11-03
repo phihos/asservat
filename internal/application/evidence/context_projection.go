@@ -102,7 +102,9 @@ func projectionExpectation(e artifact.ContextExpectation, scope value.ContextPro
 	src, ok := scope.Source()
 	kind := e.NativeType == artifact.PodStatusArtifact && e.ActionID == "pod-status" && e.Recording == nil ||
 		e.NativeType == artifact.HTTPHeadersArtifact && e.Recording != nil && e.Recording.Profile == "httpHeaders" ||
-		e.NativeType == artifact.PprofArtifact && e.Profile != nil && e.Profile.NativeType() == artifact.PprofArtifact
+		e.NativeType == artifact.PprofArtifact && e.Profile != nil && e.Profile.NativeType() == artifact.PprofArtifact ||
+		e.NativeType == artifact.SyscallRecordsArtifact && (e.Recording != nil && e.Recording.Profile == "metadata" || e.Snapshot != nil) ||
+		e.NativeType == artifact.SyscallArgumentsArtifact && e.Recording != nil && e.Recording.Profile == "arguments"
 	return ok && kind && src.Matches(e.NativeType, e.Type().Format, e.DataClass, src.EvidenceType, e.Registration.NativeLimit, scope.SourceProjectionDigest) &&
 		e.CaseID == scope.CaseID && e.CaptureUID == scope.CaptureID && e.NamespaceUID == scope.NamespaceUID && e.WorkloadUID == scope.WorkloadUID &&
 		e.PodUID == scope.PodUID && e.Registration.Location.ArtifactID == scope.ArtifactID && e.Registration.Location.ClusterID == scope.ClusterID
@@ -342,6 +344,14 @@ func (r *RegionalProjectionRead) Projection(ctx context.Context) (value.Projecti
 	if out.Summary != nil {
 		summary := value.CloneProfileSummary(*out.Summary)
 		out.Summary = &summary
+	}
+	if out.SyscallSummary != nil {
+		summary := value.CloneSyscallSummaryPage(*out.SyscallSummary)
+		out.SyscallSummary = &summary
+	}
+	if out.SyscallEvents != nil {
+		events := value.CloneSyscallEventPage(*out.SyscallEvents)
+		out.SyscallEvents = &events
 	}
 	out.Headers.Records, out.Headers.CoverageGaps = slices.Clone(out.Headers.Records), slices.Clone(out.Headers.CoverageGaps)
 	return out, nil

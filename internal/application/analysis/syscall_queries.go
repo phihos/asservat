@@ -66,6 +66,21 @@ func (d *ContextProjectionDelivery) SyscallEvents() (value.SyscallEventPage, boo
 	}
 	return value.CloneSyscallEventPage(*d.syscallEvents), true
 }
+
+// SyscallSelection returns an owned display selection for encoding a cursor.
+// It supplies no read authority and cannot extend the admitted query.
+func (d *ContextProjectionDelivery) SyscallSelection() value.SyscallSelection {
+	if d == nil || d.owner == nil {
+		return value.SyscallSelection{}
+	}
+	d.owner.mu.Lock()
+	defer d.owner.mu.Unlock()
+	if d.owner.closed {
+		return value.SyscallSelection{}
+	}
+	s := d.owner.query.Scope
+	return s.Syscalls.Selection(s.CaseID, s.ArtifactID)
+}
 func boundedSyscallResult(result value.ProjectionResult) bool {
 	var body []byte
 	var err error

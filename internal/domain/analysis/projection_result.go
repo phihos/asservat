@@ -24,6 +24,12 @@ const (
 	// ProfileSummaryWorkerBytes is the whole physical worker memory bound,
 	// also declared as transient capacity before summary admission.
 	ProfileSummaryWorkerBytes = 256 << 20
+	// SyscallProjectionQueryUnits funds one complete recording read (one 8 MiB
+	// frame, index and manifest) with the same backing as an HTTP-header page.
+	SyscallProjectionQueryUnits = 2
+	// SyscallProjectionWorkerBytes reuses the existing regional worker bound.
+	// Composed maximum-input framing/parser qualification is recorded in ADR-294.
+	SyscallProjectionWorkerBytes = 256 << 20
 )
 
 // ProjectionResult is the approved result of one read batch. Exactly the

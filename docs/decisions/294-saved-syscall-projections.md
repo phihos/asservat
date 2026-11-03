@@ -69,3 +69,40 @@ and SQL admission, raw-source extraction, key/worker/result composition, browser
 MCP/console parity, service fixtures and native comparison with downloaded JSONL.
 The existing collector reports quiet metadata captures as failures without
 artifacts; quiet-success acquisition remains a separate limitation.
+
+## Integrated component checkpoint
+
+The fixed extractor now handles metadata and argument sources, with canonical
+manifest validation and full native authentication before either result or a
+cursor refusal. Regional startup and optional public composition retain the
+existing worker. SQL132 extends the closed scope/audit/tool mappings and spends
+two existing query units, one read batch and three one-use key slots. Both
+physical and declared transient worker memory must be at least 256 MiB. No
+service, watch, background task, Job type, credential, privilege or configuration
+is added.
+
+Local isolated consumers of approximately 8 MiB encrypted sources measured
+65,952–74,608 KiB peak process RSS (64.4–72.9 MiB) and
+0.489–0.621 seconds for repeated metadata, distinct metadata and arguments across
+both views. The exact report and binary digest are retained under
+`test/results/syscall-projections-local/`. This includes framed cryptography,
+canonical native validation, TLS object ranges and exactly three synthetic
+unwraps. It does not measure real SQL/KMS, CPU-limited deployed workers or
+installed end-to-end latency. A later fixed-page provenance check was added
+after that measured binary; final-source qualification remains required.
+
+Two units cover one native frame/index read plus another full 4 MiB context
+allowance for commit/manifest work (less than the reserved 16 MiB). Each filtered
+page pays for the entire source. The maximal comparable filter adds 24,695 bytes
+of escaped JSON to the prior 16 KiB key child: the purpose-specific ceiling is
+48 KiB for syscall scopes, retaining 16 KiB elsewhere. It fits existing query
+row/backing bounds and adds no key slots. SQL upgrade/rollback parity tests are
+prepared; real PostgreSQL execution is still pending.
+
+Public results preserve recorded unmatched, unfinished and unknown counts.
+Acquisition loss and truncation are nullable unknown values where these stored
+formats cannot establish them. Public and private envelopes are byte-bounded;
+public trimming retains a prefix with a cursor at the first omitted item. The
+temporary rows are cleared only after serialization. Empty filtered pages keep
+`[]`, full-source counters and unknown coverage. Browser/MCP response lifetime
+and exact invocation association remain in the shared query owner.

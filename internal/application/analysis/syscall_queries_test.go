@@ -22,9 +22,10 @@ func (r syscallRouteFixture) ResolveSyscallProjectionRoute(context.Context, stri
 func TestSyscallAdmissionBindsOriginalToolInputRouteAndResult(t *testing.T) {
 	for _, kind := range []string{artifact.SyscallRecordsArtifact, artifact.SyscallArgumentsArtifact} {
 		for _, view := range []value.SyscallView{value.SyscallSummaryView, value.SyscallEventsView} {
-			for _, mode := range []string{"pending", "ready", "disabled", "wrong-tool", "wrong-selection", "unacknowledged", "selection-in-route", "wrong-source", "cancelled", "wrong-result", "invalid-cursor"} {
+			for _, mode := range []string{"pending", "ready", "disabled", "wrong-tool", "wrong-selection", "unacknowledged", "selection-in-route", "wrong-source", "cancelled", "wrong-result", "invalid-cursor", "underfunded-worker"} {
 				t.Run(kind+"/"+string(view)+"/"+mode, func(t *testing.T) {
 					f := newProjectionFixture(t)
+					f.p.Profile.Worker.MemoryBytes, f.p.Profile.Worker.WorkerTransientBytes = value.SyscallProjectionWorkerBytes, value.SyscallProjectionWorkerBytes
 					f.ready = mode == "ready" || mode == "wrong-result" || mode == "invalid-cursor"
 					scope := &f.a.Scope
 					selection, err := value.NormalizeSyscallSelection(scope.CaseID, scope.ArtifactID, view, "", 1, nil, false)
@@ -44,6 +45,8 @@ func TestSyscallAdmissionBindsOriginalToolInputRouteAndResult(t *testing.T) {
 					ctx, cancel := context.WithCancel(t.Context())
 					defer cancel()
 					switch mode {
+					case "underfunded-worker":
+						f.p.Profile.Worker.WorkerTransientBytes = 8 << 20
 					case "disabled":
 						f.s.SyscallRoutes = nil
 					case "wrong-tool":

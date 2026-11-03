@@ -127,6 +127,9 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	if profile.MemoryBytes >= query.ProfileSummaryWorkerBytes {
 		service.ProfileRoutes = routes
 	}
+	if profile.MemoryBytes >= query.SyscallProjectionWorkerBytes {
+		service.SyscallRoutes = routes
+	}
 	// The peer adapter is retained by both native admissions. Configure it only
 	// during startup, before any listener/goroutine can observe the pointer.
 	peers, ok := d.Runtime.native.peers.(*mtls.NativePeerChecks)

@@ -78,7 +78,7 @@ func (s *ContextCaseReads) ResolveContextCase(ctx context.Context, request value
 			}
 			var version artifact.Digest
 			copy(version[:], row.Version)
-			out.Routes = append(out.Routes, value.ContextCaseRoute{Version: version, CaptureID: uid(row.CaptureID), ArtifactID: uid(row.ArtifactID), Target: authorization.Target{ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, PodUID: row.PodUid}})
+			out.Routes = append(out.Routes, value.ContextCaseRoute{Version: version, CaptureID: uid(row.CaptureID), ArtifactID: uid(row.ArtifactID), NativeType: row.NativeType, Target: authorization.Target{ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, PodUID: row.PodUid}})
 		}
 		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
 			return err

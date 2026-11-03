@@ -14,6 +14,12 @@ import (
 // selected page fills. A malformed tail, cancellation or source error returns
 // no partial page. The owner must still check final whole-file authentication.
 func ReadMetadataPage(ctx context.Context, source io.Reader, pod string, from, until time.Time, s analysis.SyscallSelection, version artifact.Digest) (analysis.SyscallEventPage, error) {
+	return readEventPage(func(visit func(event) error) (analysis.SyscallRecordCounts, error) {
+		return walkMetadata(ctx, source, pod, from, until, visit)
+	}, pod, from, until, s, version)
+}
+
+func readEventPage(walk metadataWalk, pod string, from, until time.Time, s analysis.SyscallSelection, version artifact.Digest) (analysis.SyscallEventPage, error) {
 	var zero analysis.SyscallEventPage
 	if !s.Valid() || s.View != analysis.SyscallEventsView {
 		return zero, analysis.ErrInvalid
@@ -23,7 +29,7 @@ func ReadMetadataPage(ctx context.Context, source io.Reader, pod string, from, u
 	}
 	out := analysis.SyscallEventPage{Version: version, Start: s.Start, Events: make([]artifact.SyscallMetadataEvent, 0, s.Limit)}
 	used, full := 1024, false // bounded fixed page metadata, separate from event bytes
-	stats, err := walkMetadata(ctx, source, pod, from, until, func(e event) error {
+	stats, err := walk(func(e event) error {
 		if !s.Includes(e.Syscall, e.Outcome) {
 			return nil
 		}

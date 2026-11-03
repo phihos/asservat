@@ -3,29 +3,30 @@
 
 ## Current delivery workflow (2026-11-03)
 
-Saved-syscall results now use closed summary/event branches in the existing query
-coordinator. The invocation, route, view/filter, worker response and result
-association remain exact; oversized encoded results and mixed branches fail
-closed. Returned pages own their slices and nested durations, and joined close
-drops retained values. The initial admission regression found the domain call's
-closed tool list missing both new names; extending that list makes all four
-source/view paths pass pending/ready/refusal tests. Application/domain analysis
-races pass (1.457s / 1.019s). These are component results: parser/raw extraction,
-source authentication, SQL/funding/key/transport and public composition are still
-being integrated; no new public tool is enabled or installed-qualified.
+Saved syscall views now have integrated regional extraction, canonical native
+validation, complete-source authentication, private result encoding and audited
+public responses. Both source formats and both views pass focused component
+races, including filtered-empty pages, cursor/filter association, independent
+response bounds and cancellation. The public regression reproduced temporary
+rows being cleared before serialization; encoding now finishes before cleanup.
+The native handoff also preserves empty arrays through deep clones. SQL132 and
+the same-read native-type locator are prepared, with exact rollback tests and
+purpose-specific 48 KiB key-child bounds; real SQL upgrade qualification is next.
+Both physical and declared transient memory require 256 MiB; each full-source
+page spends two existing query units and three one-use keys.
 
-[ADR-294](decisions/294-saved-syscall-projections.md) now records the saved-syscall
-source/authority contract. Exact source/view/filter scopes are comparable and
-retain legacy zero-field encoding. A regression reproduced accepting an events
-selection with the summary display identity; scope validation now rejects that
-mismatch. Raw syscall inputs use the distinct fixed-metadata read operation,
-which grants no raw download, profile-summary or other raw-source access.
-Composed authorization tests preserve original deadlines, current audiences and
-permissions, and prohibit metadata-share fallback for raw input. Domain analysis,
-domain authorization and application authorization races pass (1.026s / 1.552s /
-2.231s); Go architecture passes. Public query/funding/SQL/key/worker/result and
-raw-source extraction are still pending, so these prepared source types enable
-no public tool or key authority by themselves.
+Six isolated maximum-input encrypted consumer measurements used 65,952–74,608
+KiB peak RSS and 0.489–0.621 seconds, with three synthetic unwraps. This includes
+framing/canonical validation/TLS object ranges/parser; it is not real SQL/KMS,
+CPU-limited worker or installed qualification. The report pins the exact measured
+binary; a later fixed-page provenance check is tested separately. Focused public
+races pass in 24.395s; domain audit 1.010s, query domain 1.010s, evidence 1.161s and query
+application 1.041s. Regional source races 5.166s/1.383s, native codec 1.172s, SQL unit
+parity 1.346s and bootstrap 27.221s pass. Reports and the original failed local
+regressions are retained in `test/results/syscall-projections-local/`. Console
+support and actual installed native-byte comparisons are being completed. No
+new PR, real-service SQL gate, installed workflow or broad final gate has passed
+for this candidate yet.
 
 Finite argument policies and independent existing-raw download approval are
 installed-qualified and merged in [PR149](https://github.com/phihos/asservat/pull/149),
@@ -42,15 +43,11 @@ and synthetic native bytes are retained in `test/results/policy-native-416733092
 This supersedes the earlier pending qualification below; grouped/ongoing arguments
 and historical unknown-size recovery remain open.
 
-The next active slice is saved syscall summaries and filtered metadata events
-(REQ-SYS-003/SC-SYS-003). Local preparation shares the native event DTO with the
-encoder, uses a complete bounded stream for aggregate/page parsing, and binds
-continuations to source version, view and filter. Byte-bound pages retain a
-prefix and validate the tail; unmatched/unfinished/unknown are separate, and loss
-is never inferred as zero. Package races and architecture checks pass. This does
-not expose query tools: funded scope/admission/key/worker/result composition,
-raw-source approved projection, browser/MCP/console parity and native comparison
-against downloaded JSONL remain next. No second integration PR is open.
+The active slice is saved syscall summaries and filtered metadata events
+(REQ-SYS-003/SC-SYS-003), under [ADR-294](decisions/294-saved-syscall-projections.md).
+Next: finish console and installed comparisons, run the real SQL upgrade/ledger
+and final repository gates, then review and qualify one frozen candidate. No
+second integration PR is open.
 
 Native41668728510 on `ecc0ef43` passed policy capture/publication, personal raw
 approval and authenticated download size/SHA checks. It failed the shared raw

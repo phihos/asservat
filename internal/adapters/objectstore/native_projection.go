@@ -27,13 +27,24 @@ func (r *NativeContextReader) ReadApprovedContext(ctx context.Context, source ev
 		return zero, &readRefusal{e, &contextReadStage{"key-client", e}}
 	}
 	defer opener.Close()
-	reader, e := NewContextProjectionReader(r.store)
+	reader, e := r.projectionReader()
 	if e != nil {
 		return zero, &readRefusal{e, &contextReadStage{"store", e}}
 	}
+	return reader.ReadProjectionNative(ctx, source, scope, opener, end)
+}
+
+// Retain the same startup-installed closed interpreters when constructing the
+// per-operation reader. This creates no key authority or fallback interpreter.
+func (r *NativeContextReader) projectionReader() (*ContextProjectionReader, error) {
+	reader, err := NewContextProjectionReader(r.store)
+	if err != nil {
+		return nil, err
+	}
 	reader.pages = r.pages
 	reader.summarize = r.summarize
-	return reader.ReadProjectionNative(ctx, source, scope, opener, end)
+	reader.syscalls = r.syscalls
+	return reader, nil
 }
 
 // ServeHTTPHeaderPages installs the httpHeaders pager (ADR-282); without it
@@ -50,5 +61,13 @@ var _ evidence.NativeApprovedContextRead = (*NativeContextReader)(nil)
 func (r *NativeContextReader) ServeProfileSummaries(f evidence.ProfileSummarizer) {
 	if r != nil {
 		r.summarize = f
+	}
+}
+
+// ServeSyscallProjections installs only the fixed saved metadata views. It
+// neither permits native raw disclosure nor enables collection.
+func (r *NativeContextReader) ServeSyscallProjections(f evidence.SyscallProjector) {
+	if r != nil {
+		r.syscalls = f
 	}
 }

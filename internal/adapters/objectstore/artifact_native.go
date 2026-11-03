@@ -34,6 +34,8 @@ type FramedNativeSource struct {
 	full      bool
 	busy      bool
 	closed    bool
+
+	startedAt, completedAt time.Time // authenticated manifest interval; never caller supplied
 }
 
 var _ evidence.NativeResponseSource = (*FramedNativeSource)(nil)
@@ -73,7 +75,7 @@ func (v *ContextVerifier) openNative(ctx, opening context.Context, e artifact.Co
 	}
 	limit := min(nativeWindowReadLimit, work.DataBytes+work.IndexBytes)
 	owner, cancel := context.WithDeadline(ctx, until)
-	return &FramedNativeSource{owner: owner, cancel: cancel, reader: reader, readLimit: limit, metadata: artifact.NativeDownloadMetadata{
+	return &FramedNativeSource{owner: owner, cancel: cancel, reader: reader, readLimit: limit, startedAt: m.StartedAt, completedAt: m.CompletedAt, metadata: artifact.NativeDownloadMetadata{
 		Filename: t.Filename(e.Registration.Location.ArtifactID), Format: t.Format, ETag: evidence.NativeETag(evidence.ContextCopiesDigest(c)), Coverage: t.CoverageFor(e.Lifecycle),
 		Size: l.NativeBytes, SHA256: l.NativeSHA256, ReadUntil: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy,
 	}}, nil
@@ -111,6 +113,18 @@ func (s *FramedNativeSource) Metadata() artifact.NativeDownloadMetadata {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.metadata
+}
+
+// CaptureWindow returns the manifest-authenticated acquisition interval for
+// fixed regional projections. It is separate from native download metadata:
+// neither the caller nor a stored display selection can choose this interval.
+func (s *FramedNativeSource) CaptureWindow() (time.Time, time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed || s.owner.Err() != nil {
+		return time.Time{}, time.Time{}
+	}
+	return s.startedAt, s.completedAt
 }
 
 // ReadNext serves the regional download worker (ADR-248), whose admitted

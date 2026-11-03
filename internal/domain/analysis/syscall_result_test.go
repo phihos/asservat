@@ -146,3 +146,34 @@ func TestSyscallResultClonesAndClearOwnTransientValues(t *testing.T) {
 		t.Fatal("summary retained after clear")
 	}
 }
+
+func TestSyscallQueryRequiresDeclaredAnalyzerCapacity(t *testing.T) {
+	a := testAuthority()
+	p := queryPlan(a)
+	for _, kind := range []string{artifact.SyscallRecordsArtifact, artifact.SyscallArgumentsArtifact} {
+		scope, _ := syscallResultFixture(t, kind, SyscallSummaryView)
+		if p.Matches(scope) {
+			t.Fatal("small legacy declaration authorized syscall analyzer")
+		}
+		p.Profile.Worker.MemoryBytes = SyscallProjectionWorkerBytes
+		if p.Matches(scope) {
+			t.Fatal("physical memory replaced declared transient capacity")
+		}
+		p.Profile.Worker.WorkerTransientBytes = SyscallProjectionWorkerBytes
+		if !p.Matches(scope) || !p.Matches(a.Scope) {
+			t.Fatal("bounded shared worker refused")
+		}
+		p = queryPlan(a)
+	}
+}
+
+func TestSyscallEmptyPageClonePreservesClosedWireShape(t *testing.T) {
+	events := CloneSyscallEventPage(SyscallEventPage{Events: []artifact.SyscallMetadataEvent{}})
+	summary := CloneSyscallSummaryPage(SyscallSummaryPage{Rows: []SyscallCount{}})
+	if events.Events == nil || summary.Rows == nil {
+		t.Fatal("empty approved arrays became JSON null")
+	}
+	if CloneSyscallEventPage(SyscallEventPage{}).Events != nil || CloneSyscallSummaryPage(SyscallSummaryPage{}).Rows != nil {
+		t.Fatal("missing branch became a populated array")
+	}
+}

@@ -32,7 +32,10 @@ type ContextCaseRoute struct {
 	// Version is internal published-copy routing, never disclosure authority.
 	Version               artifact.Digest
 	CaptureID, ArtifactID string
-	Target                authorization.Target
+	// NativeType is a private routing observation, checked against the protected
+	// publication only after ordinary target eligibility. It grants no read.
+	NativeType string
+	Target     authorization.Target
 }
 
 func (r ContextCaseRoute) Valid() bool {

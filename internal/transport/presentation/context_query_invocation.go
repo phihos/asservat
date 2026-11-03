@@ -90,7 +90,7 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 	var err error
 	switch i.call.Tool {
 	case "get_file_excerpt":
-		if !in.Selection.Valid() || in.QueryID != "" || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) {
+		if !in.Selection.Valid() || in.QueryID != "" || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(struct {
@@ -100,17 +100,27 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 			MaxLines   int    `json:"max_lines"`
 		}{in.Selection.CaseID, in.Selection.ArtifactID, in.Selection.Selection.LineStart, in.Selection.Selection.MaxLines})
 	case "get_http_headers":
-		if !in.Headers.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) {
+		if !in.Headers.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(HTTPHeaderOperationInput{CaseID: in.Headers.CaseID, ArtifactID: in.Headers.ArtifactID, Cursor: httpHeaderCursorText(in.Headers), Limit: in.Headers.Limit})
 	case "get_profile_summary":
-		if !in.Profile.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) {
+		if !in.Profile.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(ProfileSummaryOperationInput{CaseID: in.Profile.CaseID, ArtifactID: in.Profile.ArtifactID, SampleType: in.Profile.Selection.SampleType, TopN: in.Profile.Selection.TopN})
+	case "get_syscall_summary", "get_syscall_events":
+		if !in.Syscalls.Valid() || in.Syscalls.Selection.View != syscallView(i.call.Tool) || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) {
+			return ErrOperationDelivery
+		}
+		w := in.Syscalls.Selection
+		cursor := ""
+		if w.Start != 0 {
+			cursor = strconv.Itoa(w.Start) + ":" + w.Binding
+		}
+		raw, err = json.Marshal(SyscallOperationInput{CaseID: in.Syscalls.CaseID, ArtifactID: in.Syscalls.ArtifactID, Cursor: cursor, Limit: w.Limit, Names: w.Selection(in.Syscalls.CaseID, in.Syscalls.ArtifactID).Names, ErrorsOnly: w.ErrorsOnly})
 	case "get_query_result":
-		if !authorization.UUID(in.QueryID) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) {
+		if !authorization.UUID(in.QueryID) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(struct {
@@ -141,7 +151,22 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		return ErrOperationDelivery
 	}
 	a := d.Association()
-	selected := a.Selection.Valid() && a.Headers == (value.HTTPHeaderWindow{}) && a.Profile == (value.ProfileSummarySelection{}) || a.Selection == (value.LineSelection{}) && a.Headers.Valid() && a.Profile == (value.ProfileSummarySelection{}) || a.Selection == (value.LineSelection{}) && a.Headers == (value.HTTPHeaderWindow{}) && a.Profile.Valid()
+	selected := false
+	branches := 0
+	if a.Selection.Valid() {
+		branches++
+	}
+	if a.Headers.Valid() {
+		branches++
+	}
+	if a.Profile.Valid() {
+		branches++
+	}
+	if a.Syscalls.Valid() {
+		branches++
+	}
+	selected = branches == 1 && (a.Selection.Valid() || a.Selection == (value.LineSelection{})) && (a.Headers.Valid() || a.Headers == (value.HTTPHeaderWindow{})) && (a.Profile.Valid() || a.Profile == (value.ProfileSummarySelection{})) && (a.Syscalls.Valid() || a.Syscalls == (value.SyscallWindow{}))
+
 	if !authorization.UUID(a.ID) || !authorization.UUID(a.QueryID) || !selected {
 		return ErrOperationDelivery
 	}
@@ -153,9 +178,10 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		!i.now().Before(until) || until.After(i.call.Until) || bytes <= 0 || bytes > audit.OperationOutputLimit {
 		return ErrOperationDelivery
 	}
-	if i.call.Tool == "get_file_excerpt" && (a.Selection != i.input.Selection.Selection || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{})) ||
-		i.call.Tool == "get_http_headers" && (a.Headers != i.input.Headers.Window() || a.Selection != (value.LineSelection{}) || a.Profile != (value.ProfileSummarySelection{})) ||
-		i.call.Tool == "get_profile_summary" && (a.Profile != i.input.Profile.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{})) ||
+	if i.call.Tool == "get_file_excerpt" && (a.Selection != i.input.Selection.Selection || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Syscalls != (value.SyscallWindow{})) ||
+		i.call.Tool == "get_http_headers" && (a.Headers != i.input.Headers.Window() || a.Selection != (value.LineSelection{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Syscalls != (value.SyscallWindow{})) ||
+		i.call.Tool == "get_profile_summary" && (a.Profile != i.input.Profile.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Syscalls != (value.SyscallWindow{})) ||
+		syscallQueryOperation(i.call.Tool) && (a.Syscalls != i.input.Syscalls.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{})) ||
 		i.call.Tool == "get_query_result" && a.QueryID != i.input.QueryID {
 		return ErrOperationDelivery
 	}

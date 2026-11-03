@@ -37,6 +37,20 @@ type headerPageReply struct {
 	TooLarge      bool                  `json:",omitempty"`
 }
 
+// syscallProjectionReply is a closed fixed-metadata result for exactly one
+// saved source and view. These fields carry no raw arguments or authority.
+// Unlike HTTP pages, the parser has already selected a byte-bounded prefix;
+// the codec must preserve that exact selection rather than trim it again.
+type syscallProjectionReply struct {
+	NativeType    string
+	View          query.SyscallView
+	Version       artifact.Digest
+	Summary       *query.SyscallSummaryPage `json:",omitempty"`
+	Events        *query.SyscallEventPage   `json:",omitempty"`
+	InvalidCursor bool                      `json:",omitempty"`
+	TooLarge      bool                      `json:",omitempty"`
+}
+
 // encodeProjectionResult is the worker's payload for the scope's result. A
 // page sends the longest record prefix within HTTPHeaderPageWireBytes; its
 // continuation starts at the first omitted record.
@@ -55,6 +69,18 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 	if scope.NativeType == artifact.PprofArtifact {
 		b, e := json.Marshal(r.Summary)
 		if e != nil || len(b) > query.ProfileSummaryBytes {
+			clear(b)
+			return nil, contracts.ErrNativeProtocol
+		}
+		return b, nil
+	}
+	if scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact {
+		reply := syscallProjectionReply{NativeType: scope.NativeType, View: scope.Syscalls.View, Version: scope.Version, Summary: r.SyscallSummary, Events: r.SyscallEvents, InvalidCursor: r.InvalidCursor, TooLarge: r.TooLarge}
+		if reply.Summary != nil && reply.Summary.Rows == nil || reply.Events != nil && reply.Events.Events == nil {
+			return nil, contracts.ErrNativeProtocol
+		}
+		b, e := json.Marshal(reply)
+		if e != nil || len(b) > query.ContextResultBytes {
 			clear(b)
 			return nil, contracts.ErrNativeProtocol
 		}
@@ -99,6 +125,15 @@ func decodeProjectionResult(b []byte, scope query.ContextProjectionScope) (query
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol
 		}
 		r.Summary = &summary
+	case artifact.SyscallRecordsArtifact, artifact.SyscallArgumentsArtifact:
+		var reply syscallProjectionReply
+		err := nativeDecodeBounded(b, &reply, query.ContextResultBytes)
+		r.SyscallSummary, r.SyscallEvents = reply.Summary, reply.Events
+		r.InvalidCursor, r.TooLarge = reply.InvalidCursor, reply.TooLarge
+		if err != nil || reply.NativeType != scope.NativeType || reply.View != scope.Syscalls.View || reply.Version != scope.Version || reply.Summary != nil && reply.Summary.Rows == nil || reply.Events != nil && reply.Events.Events == nil {
+			r.Clear()
+			return query.ProjectionResult{}, contracts.ErrNativeProtocol
+		}
 	case artifact.HTTPHeadersArtifact:
 		var reply headerPageReply
 		if len(b) > query.HTTPHeaderPageWireBytes || nativeDecode(b, &reply) != nil || (reply.Page != nil) == (reply.InvalidCursor || reply.TooLarge) {

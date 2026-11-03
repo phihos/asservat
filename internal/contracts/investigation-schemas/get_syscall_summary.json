@@ -1,0 +1,394 @@
+{
+  "name": "get_syscall_summary",
+  "description": "Read approved bounded syscall counts/errors/durations and coverage. No paths, pointers, arguments, buffers or live collection.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "case_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "artifact_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "cursor": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "case_id",
+      "artifact_id"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "type": "string",
+        "enum": [
+          "metadata",
+          "extract",
+          "raw"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string",
+            "pattern": "^[0-9]{1,7}:[0-9a-f]{32}$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/d0"
+        },
+        "maxItems": 1,
+        "minItems": 0,
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d1"
+              },
+              "data_class": {
+                "const": "extract"
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  },
+                  "query_observed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                  },
+                  "query_expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "retry_after_seconds"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
+      "d2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "dropped_events": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unmatched_events": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "truncated": {
+            "description": "Whether acquisition output was truncated, when independently known; null means the retained source does not establish it. Pagination does not imply acquisition truncation.",
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "minItems": 0,
+            "maxItems": 16
+          },
+          "record_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "unfinished_events": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "unknown_events": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        },
+        "required": [
+          "dropped_events",
+          "unmatched_events",
+          "truncated",
+          "gaps"
+        ]
+      },
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "syscallSummary"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "syscall": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "paired_count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "total_duration_ns": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "syscall",
+                "count",
+                "errors",
+                "paired_count",
+                "total_duration_ns"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "coverage": {
+            "$ref": "#/$defs/d2"
+          },
+          "query_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+          },
+          "query_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+          }
+        },
+        "required": [
+          "kind",
+          "rows",
+          "coverage"
+        ]
+      }
+    }
+  }
+}

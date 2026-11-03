@@ -25,6 +25,10 @@ type argumentsCheck struct {
 	events      uint64
 	total       int64
 	definitions []ArgumentDefinition
+	// projection uses authenticated manifest dates for an already published
+	// source. It never fabricates or replaces original publication source proof.
+	projection bool
+	visit      func(event) error
 }
 
 // NewArgumentCheck consumes independently resolved immutable source facts. The
@@ -101,6 +105,9 @@ func (c *argumentsCheck) record(b []byte) error {
 	if json.Unmarshal(b, &tag) != nil {
 		return artifact.ErrInvalid
 	}
+	if c.projection && !projectionArgumentNulls(b, tag.Record) {
+		return artifact.ErrInvalid
+	}
 	switch tag.Record {
 	case "header":
 		if c.header != nil {
@@ -111,12 +118,21 @@ func (c *argumentsCheck) record(b []byte) error {
 			return artifact.ErrInvalid
 		}
 		a := c.e.Recording.Arguments
-		if h.PodUID != c.e.PodUID || h.EngineDigest != hex.EncodeToString(a.ProgramDigest[:]) || h.DefinitionDigest != hex.EncodeToString(a.DefinitionDigest[:]) || h.AccountingRule != hex.EncodeToString(a.AccountingRule[:]) || h.StartedAt.Before(c.source.StartedAt) || !h.StartedAt.Before(c.source.StartBy) || h.NodeUID != c.source.NodeUID || h.BootID != c.source.BootID || h.CollectorPodUID != c.source.CollectorPodUID || h.SourceEpoch != c.source.CollectorEpoch || h.SessionID != c.source.SessionID || h.Fence != c.source.Fence || h.Format != ArgumentNativeFormat || h.Decoder != ArgumentDecoderVersion || h.ABI != ABI {
+		if h.PodUID != c.e.PodUID || h.EngineDigest != hex.EncodeToString(a.ProgramDigest[:]) || h.DefinitionDigest != hex.EncodeToString(a.DefinitionDigest[:]) || h.AccountingRule != hex.EncodeToString(a.AccountingRule[:]) || h.Format != ArgumentNativeFormat || h.Decoder != ArgumentDecoderVersion || h.ABI != ABI {
+			return artifact.ErrIntegrity
+		}
+		if c.projection {
+			if !h.StartedAt.Equal(c.from) {
+				return artifact.ErrIntegrity
+			}
+		} else if h.StartedAt.Before(c.source.StartedAt) || !h.StartedAt.Before(c.source.StartBy) || h.NodeUID != c.source.NodeUID || h.BootID != c.source.BootID || h.CollectorPodUID != c.source.CollectorPodUID || h.SourceEpoch != c.source.CollectorEpoch || h.SessionID != c.source.SessionID || h.Fence != c.source.Fence {
 			return artifact.ErrIntegrity
 		}
 		c.header = &h
 		c.from = h.StartedAt
-		c.until = c.source.Until
+		if !c.projection {
+			c.until = c.source.Until
+		}
 	case "event":
 		if c.header == nil {
 			return artifact.ErrIntegrity
@@ -229,12 +245,24 @@ func (c *argumentsCheck) record(b []byte) error {
 		if c.events > uint64(c.e.Recording.Syscalls.MaxEvents) {
 			return artifact.ErrLimit
 		}
+		if c.visit != nil {
+			metadata := event{Identity: identity{ProcessRef: e.Identity.ProcessRef, ThreadRef: e.Identity.ThreadRef, PodUID: e.Identity.PodUID}, Syscall: e.Syscall, ABI: e.ABI, Timestamp: e.Timestamp, DurationNS: e.DurationNS, Outcome: e.Outcome, Errno: e.Errno}
+			if !metadata.Valid(c.e.PodUID, c.from, c.until) {
+				return artifact.ErrInvalid
+			}
+			if err := c.visit(metadata); err != nil {
+				return err
+			}
+		}
 	case "footer":
 		if c.header == nil {
 			return artifact.ErrIntegrity
 		}
 		var f ArgumentFooter
 		if argumentDecode(b, &f) != nil || f.EndedAt.Before(c.from) || f.EndedAt.After(c.until) || f.Retained != c.events || (f.ObservedEvents == nil) != (f.ObservedBytes == nil) || !f.CoverageUnknown {
+			return artifact.ErrIntegrity
+		}
+		if c.projection && !f.EndedAt.Equal(c.until) {
 			return artifact.ErrIntegrity
 		}
 		if f.Outcome != "completed" && f.Outcome != "cancelled" && f.Outcome != "outputLimit" && f.Outcome != "observationStopped" && f.Outcome != "failed" {
