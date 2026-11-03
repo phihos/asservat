@@ -1,0 +1,70 @@
+--- a/program.bpf.c
++++ b/program.bpf.c
+@@ -5,6 +5,7 @@
+ #include <bpf/bpf_tracing.h>
+ #include <gadget/mntns.h>
+ #include <gadget/mntns_filter.h>
++#include "budget.h"
+ 
+ #ifndef TASK_COMM_LEN
+ #define TASK_COMM_LEN 16
+@@ -218,6 +219,35 @@
+ 	__type(key, __u32); // index: zero
+ 	__type(value, bool);
+ } syscall_enable_filters SEC(".maps");
++
++/* One shared session budget, never a per-CPU or per-container allowance.
++ * Future loader: freeze this map and syscalls before exposing perf namespaces. */
++struct {
++	__uint(type, BPF_MAP_TYPE_ARRAY);
++	__uint(max_entries, 1);
++	__type(key, __u32);
++	__type(value, struct asservat_argument_budget);
++} asservat_budget SEC(".maps");
++
++static __always_inline bool asservat_probe_allowed(struct syscall_def_t *def,
++						 bool exiting)
++{
++	__u32 zero = 0;
++	__u64 bytes = 256;
++#pragma unroll
++	for (int n = 0; n < SYSCALL_ARGS; n++) {
++		__u64 len = def->args_len[n];
++		bool at_exit = !!(len & PARAM_PROBE_AT_EXIT_MASK);
++		if (len && at_exit == exiting &&
++		    (exiting || len != USE_RET_AS_PARAM_LENGTH))
++			/* Upstream can fall through a successful small/string read
++			 * into a second 128-byte read. Reserve BOTH possible reads.
++			 * Keep upstream helper semantics unchanged in this prototype. */
++			bytes += 2 * PARAM_LEN;
++	}
++	return asservat_reserve_probe(bpf_map_lookup_elem(&asservat_budget, &zero),
++				     bytes, bpf_ktime_get_boot_ns());
++}
+ 
+ void *fake_stack_alloc(const void *event)
+ {
+@@ -339,6 +369,11 @@
+ 	if (syscall_def == NULL)
+ 		syscall_def = &default_definition;
+ 
++	if (!asservat_probe_allowed(syscall_def, false)) {
++		bpf_map_delete_elem(&probe_at_sys_exit, &pid);
++		goto end;
++	}
++
+ 	bpf_get_current_comm(sc->comm, sizeof(sc->comm));
+ 
+ 	ret = bpf_map_update_elem(&regs_map, &pid, &empty, BPF_NOEXIST);
+@@ -570,6 +605,11 @@
+ 	 */
+ 	sc->monotonic_timestamp = remembered->monotonic_timestamp;
+ 
++	if (!asservat_probe_allowed(syscall_def, true)) {
++		bpf_map_delete_elem(&probe_at_sys_exit, &pid);
++		goto end;
++	}
++
+ 	bpf_get_current_comm(sc->comm, sizeof(sc->comm));
+ 
+ 	bpf_debug_printk(
