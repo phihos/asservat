@@ -27,9 +27,20 @@ func TestNativeResponsePinsInitialProcessingIdentitySeparatelyFromDisclosureLeas
 		t.Fatal("unqualified initial processing identity")
 	}
 	bad = op
-	bad.Until = n.Add(20*time.Second + time.Microsecond)
+	bad.Until = n.Add(time.Minute + time.Microsecond)
 	if bad.Valid() {
 		t.Fatal("response original operation exceeded fixed ceiling")
+	}
+	long := op
+	long.Until = n.Add(time.Minute)
+	if !long.Valid() || !long.CurrentValid(n.Add(25*time.Second)) {
+		t.Fatal("bounded paced window refused")
+	}
+	if NativeLeaseWindow(NativeResponse) != 5*time.Second {
+		t.Fatal("conversation enlarged disclosure lease")
+	}
+	if op.CurrentValid(n.Add(21 * time.Second)) {
+		t.Fatal("new ceiling extended old operation")
 	}
 	if op.CurrentValid(op.Until) {
 		t.Fatal("response operation deadline revived")

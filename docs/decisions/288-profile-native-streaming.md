@@ -106,3 +106,43 @@ The two-window control regression also reproduced admission with only three
 remaining transitions; it now requires five (two claim/close pairs plus retirement).
 The source/plan regressions retain original expiry through reservation and keep
 small artifacts from consuming profile-sized reservations.
+
+## Paced delivery and renewal funding
+
+The 64 MiB paced two-hop TLS regression failed at 20.45 seconds under ADR-258's
+20-second response ownership ceiling. It passed after giving each newly admitted
+response conversation a fixed maximum of 60 seconds: 64 MiB in 24.354 seconds
+(2.628 MiB/s), with ten short-lease renewals and two key openings including
+preparation. This is synthetic-source transport evidence, not installed throughput.
+The initial failed follow-up kept the fixture's processing observation valid for
+the entire longer operation; it was corrected to an original five-second proof.
+Production processing/permission observation bounds were not enlarged.
+
+Sixty seconds is a rounded bound above twice the measured transfer duration.
+It does not guarantee every slow link can finish a full window; the original
+request, access, token, certificate, worker and session deadlines may stop earlier.
+Existing operations retain their recorded ends. Current native and disclosure
+leases stay at most five seconds. Metadata/projection request windows remain
+20 seconds. The transport permits waits up to the longest operation, while each
+purpose's gate and owning context enforce its earlier limit.
+
+This revises ADR-258's Kubernetes-only Pod/Job/account change observation tradeoff
+from at most 20 to at most 60 seconds within a response. There is no new watch,
+TokenReview loop, credential, queue, worker or retry. Exact initial attestation and
+actual credential expiry remain mandatory; current SQL permission/recovery/state
+checks continue. Buffer counts and byte limits remain unchanged; the same occupied
+slot may remain active longer, still within the original worker/session bound.
+Paced revocation, original-deadline and token-expiry-before-write negatives pass.
+
+Lease renewals already write the native-owner row. Claim/close-only funding was
+insufficient: four 64-chunk windows can require 63 renewals each after their first
+admitted chunk. The new profile capacity marker therefore funds 267 total owner
+transitions, including 252 renewals. Legacy allocations are unchanged. With the
+fixture's conservative 128 KiB WAL unit and three copies, this adds 94.5 MiB logical
+WAL reservation per session; it is not measured emitted WAL. The integrated
+capacity qualification documents complete envelope costs and finite exhaustion.
+No extra runtime writes are introduced by accounting for those existing renewals.
+
+Local before/after outputs: `test/results/profile-native-paced-before.log` and
+`test/results/profile-native-paced-after.log`. Actual installed aggregate cost,
+maximum node acquisition memory and full raw approval/download remain required.

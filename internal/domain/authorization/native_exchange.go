@@ -91,7 +91,10 @@ func NativeLeaseWindow(kind NativeOperationKind) time.Duration {
 // inside this fixed interval; none can extend the original operation.
 func NativeConversationWindow(kind NativeOperationKind) time.Duration {
 	if kind == NativeResponse {
-		return identity.EvidenceReadRequestWindow
+		// ADR-288: a 64 MiB response window needs more than the metadata request
+		// interval on ordinary slower links. This fixed ownership ceiling never
+		// extends the original parent/worker/access end or its five-second leases.
+		return time.Minute
 	}
 	return NativeLeaseWindow(kind)
 }

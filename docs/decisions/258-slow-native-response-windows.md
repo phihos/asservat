@@ -1,5 +1,10 @@
 # ADR-258 — Native response windows under slow delivery
 
+[ADR-288](288-profile-native-streaming.md) supersedes the twenty-second response
+conversation ceiling below with a sixty-second ceiling for newly admitted
+response windows. Original recorded ends and short disclosure leases are unchanged.
+The measurements below retain their original candidate scope.
+
 Date: 2026-10-27. Status: implemented candidate; selected qualification passed,
 installed aggregate-cost qualification pending.
 Requirements: REQ-DLD-002/003/004. Maintainer clarification: AGENTS.md, 2026-10-20.

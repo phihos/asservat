@@ -154,6 +154,34 @@ func TestNativeTwoHopProfileMaximumWindowAndResume(t *testing.T) {
 }
 
 func nativeWindowChunksAndResume(t *testing.T, slow bool, source evidence.NativeContextSource, body []byte) {
+	var pace time.Duration
+	if slow {
+		pace = 750 * time.Millisecond
+	}
+	nativeWindowWithPacing(t, pace, false, source, body)
+}
+
+// A 64 MiB window at an ordinary slower final sink must retain its cursor
+// beyond the earlier 20-second operation ceiling, under fresh short leases.
+func TestNativeTwoHopPacedProfileMaximumWindow(t *testing.T) {
+	source := flowSourceValue(t)
+	e := &source.Expectation
+	e.NativeType, e.DataClass, e.ActionID = artifact.PprofArtifact, "raw", "a0123456789abcdef01234567"
+	e.Profile = &artifact.GoProfileAcquisition{SourceRef: "go", EndpointDigest: artifact.Digest{1}, Type: "heap", Mode: "snapshot"}
+	e.Registration.NativeLimit = artifact.MaxPprofBytes
+	if !source.Valid(evidence.ContextCopiesDigest(source.Copies)) {
+		t.Fatal("invalid profile fixture")
+	}
+	body := bytes.Repeat([]byte{0x5a}, int(artifact.DownloadWindowBytes))
+	started := time.Now()
+	nativeWindowWithPacing(t, 350*time.Millisecond, true, source, body)
+	if time.Since(started) <= 20*time.Second {
+		t.Fatal("test did not cross old conversation ceiling")
+	}
+}
+
+func nativeWindowWithPacing(t *testing.T, pace time.Duration, wholeOnly bool, source evidence.NativeContextSource, body []byte) {
+	slow := pace > 0
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
@@ -220,13 +248,14 @@ func nativeWindowChunksAndResume(t *testing.T, slow bool, source evidence.Native
 			outcome <- func() error {
 				var writer http.ResponseWriter = w
 				if slow {
-					writer = &pacedNativeSink{ResponseWriter: w, ctx: r.Context(), delay: 750 * time.Millisecond}
+					writer = &pacedNativeSink{ResponseWriter: w, ctx: r.Context(), delay: pace}
 				}
 				factory := browser.HTTPDownloadResponseFactory{Writer: writer, Request: r}
 				if got, e := factory.SelectDownloadResponse(m); e != nil || got != selection {
 					return artifact.ErrIntegrity
 				}
-				work, stop := context.WithDeadline(r.Context(), now.Add(identity.EvidenceReadRequestWindow))
+				originalEnd, _ := ctx.Deadline()
+				work, stop := context.WithDeadline(r.Context(), originalEnd)
 				defer stop()
 				plan := artifact.DownloadResponse{ID: nativeID, SessionID: nativeID, OwnerID: nativeID, Generation: 1, Plan: artifact.DownloadResponsePlan{Version: 1, Selection: selection, WholeFile: selection.Offset == 0 && selection.Length == m.Size, WindowReadLimit: readWork}, StartedAt: now, Until: target.RunUntil}
 				sink, e := factory.OpenDownloadResponse(work, m, plan)
@@ -327,6 +356,12 @@ func nativeWindowChunksAndResume(t *testing.T, slow bool, source evidence.Native
 	}
 	if whole.Header.Get("ETag") != m.ETag {
 		t.Fatal("etag", whole.Header.Get("ETag"))
+	}
+	if wholeOnly {
+		if reader.opens.Load() != 2 {
+			t.Fatal("paced window reopened keys", reader.opens.Load())
+		}
+		return
 	}
 	// Resume after an interruption past the first chunk with If-Range.
 	from := int64(artifact.DeliveryBytes + 4321)
