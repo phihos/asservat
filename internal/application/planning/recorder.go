@@ -1137,6 +1137,7 @@ type reasonRecord struct {
 }
 
 type observationLimitsRecord struct {
+	MaxObservedEvents     int64 `json:"maxObservedEvents,omitempty"`
 	MaxSessionSeconds     int64 `json:"maxSessionSeconds"`
 	MaxObservedBytes      int64 `json:"maxObservedBytes"`
 	MaxBytesPerSecond     int64 `json:"maxBytesPerSecond"`
@@ -1356,7 +1357,7 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 			out.Approval.Reasons = append(out.Approval.Reasons, authorization.SensitiveReason{ActionID: r.ActionID, Code: r.Code})
 		}
 		if l := approval.ObservationLimits; l != nil {
-			out.Approval.ObservationLimits = &value.ObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
+			out.Approval.ObservationLimits = &value.ObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions, MaxObservedEvents: l.MaxObservedEvents}
 		}
 	}
 	recipeBytes, err := json.Marshal(expanded)
@@ -1483,7 +1484,7 @@ func RecorderScopeSummary(scope []byte) ([]value.RecorderAction, *value.Recorder
 		}
 	}
 	if l := doc.Approval.ObservationLimits; l != nil {
-		approval.ObservationLimits = &value.ObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
+		approval.ObservationLimits = &value.ObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions, MaxObservedEvents: l.MaxObservedEvents}
 	}
 	if len(approval.Reasons) == 0 {
 		return nil, nil, value.ErrInvalid

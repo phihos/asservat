@@ -56,6 +56,8 @@ const (
 
 // ObservationLimits are REQ-AUT-006 limits bound into the plan.
 type ObservationLimits struct {
+	// Omitted on legacy packet scopes; zero never authorizes argument probes.
+	MaxObservedEvents                                                             int64 `json:",omitempty"`
 	MaxSessionSeconds, MaxObservedBytes, MaxBytesPerSecond, MaxConcurrentSessions int64
 }
 
