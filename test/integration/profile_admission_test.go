@@ -123,6 +123,27 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if accepted.Expectation.Profile == nil || accepted.Expectation.Recording != nil || accepted.Expectation.DataClass != "raw" || accepted.Expectation.NativeType != artifact.PprofArtifact {
 					t.Fatal("profile admitted with wrong shape")
 				}
+				// Recovery resolves the original approved timing scope rather than
+				// comparing its zero review deadline to the accepted write deadline.
+				resolutionPool := poolFor("context_request_resolution_runtime", "synthetic-context-request-resolution")
+				defer resolutionPool.Close()
+				resolver, err := postgres.NewContextRequestResolutions(ctx, resolutionPool, p.RootID, s.recovery.guard)
+				if err != nil {
+					t.Fatal(err)
+				}
+				recovery, err := s.recovery.reader.RecoveryState(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				i := s.a.Eligibility.VerifiedIdentity
+				i.Scopes = append(append([]string(nil), i.Scopes...), "evidence:read")
+				i.VerifiedAt = time.Now().UTC().Truncate(time.Microsecond)
+				i.ValidUntil = i.VerifiedAt.Add(5 * time.Second)
+				query := capture.ReplayQuery{RootID: p.RootID, PreviewID: p.ID, IdempotencyKey: s.a.IdempotencyKey, SubmissionDigest: s.a.SubmissionDigest, Identity: i, Recovery: recovery}
+				resolved, err := resolver.ResolveOrCloseContextRequest(ctx, query)
+				if err != nil || resolved.State != capture.RequestAccepted || resolved.Accepted == nil || resolved.Accepted.CaptureID != accepted.CaptureID || !resolved.Accepted.Deadline.Equal(accepted.Deadline) {
+					t.Fatal("approved profile request resolution", resolved.State, err)
+				}
 				plan := artifact.StreamingPlan{Registration: *r, WriterEpoch: custodyID()}
 				var epoch *string
 				var state []byte

@@ -30,12 +30,43 @@ fifteen-second request, identity and accepted-capture bounds. Negative tests
 retain caller/identity/capture/phase expiry, cancellation and fresh start denial.
 Focused submission/group/history race tests pass in 3.420 seconds. The full capture
 application race suite also passes in 16.583 seconds; vet, specification and
-architecture gates pass. A separate
-approved-profile request-resolution omission is being fixed with a real SQL
-regression; installed rerun remains required. Final-head CI 41592716399 and the
+architecture gates pass. The separate approved-profile request-resolution
+omission is now fixed with the real SQL regression below; installed rerun
+remains required. Final-head CI 41592716399 and the
 full earlier Go run passed (68 package suites, 682 selected Kubernetes tests;
 one explicitly native-only skip). Those repository checks do not qualify the
 failed installed journey.
+
+## Approved profile request recovery correction (2026-11-03)
+
+Installed profile run `41592791975` at frozen `78afa6ec` failed before acquisition.
+The initial start reported `AcquisitionNotStarted`; subsequent request resolution
+returned `OutcomeUnknown` in under 100 ms. The separate start-composition timing
+failure is not fixed by this change. Request resolution omitted profiles from
+its existing approved-acceptance timing branch, although reviewed admission
+already supports them. The one-line typed extension preserves the accepted
+write deadline, canonical digest/target/actor checks and current identity,
+permission and recovery authorization. It adds no retry or authority renewal.
+
+A compiler-backed unit test and actual SQL `ResolveOrCloseContextRequest` both
+reproduced `context admission unavailable` before the change. Afterward the
+owned SQL profile admission fixture passes both before/after-endpoint branches
+in 6.697 seconds, including recovery, stream binding and existing Stop checks.
+`test/results/profile-resolution-{reproduced,fixed}-environment.json` record
+respectively test exits 1 and 0, unchanged source hashes and empty cleanup
+failures. The first fixture attempt was a test compilation failure, retained in
+`profile-resolution-before`; it is not runtime evidence. Full PostgreSQL races
+with the maintained static libpcap pass in 2.848 seconds; full application
+capture races pass in 16.158 seconds. Malformed scope, digest, capture, target,
+missing approval/timing and unsupported version still refuse. This local SQL
+result does not qualify installed acquisition or complete S-05.
+
+Complexity gate: one observed installed workflow blocked; accepted risk: no;
+typical path: approved profile recovery. Existing recording/snapshot recovery
+provides the same timing precedent. Added privileges, credentials, requests,
+background work, configuration, dependencies and fallback states: zero. Runtime
+cost is one pointer comparison; memory/network growth: zero. No migration or
+new rollback procedure is required. The smaller one-line correction suffices.
 
 ## Combined manual-profile candidate and review fixes (2026-11-03)
 
