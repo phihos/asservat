@@ -111,13 +111,33 @@ storage can still exhaust that interval. Local real-writer regressions cover
 both packet and profile contention, single-use delivery, unread bodies, and
 Stop/caller/deadline termination without releasing another writer's capacity.
 
-This transient-contention fix does not complete REQ-CAP-003 upload fairness.
-Overlapping packet stores can keep a profile waiting until its original end;
-refusing those already-acquired packets would discard their one-shot results.
-The [mixed-upload fairness follow-up](../research/mixed-upload-fairness-plan.md)
-records the workload-aware bounded-quanta plan, its memory prerequisites and
-outstanding qualification. No type-priority policy or fairness guarantee is
-introduced by this decision.
+The subsequent review identified a concrete overtaking schedule: two small
+packet stores overlap, a completed profile waits, and later packets repeatedly
+consume newly available capacity. Shared FIFO **admission** now orders packet
+and profile store claims. Both claim their single-use delivery before waiting;
+bodies remain unread until the queue head fits the unchanged working counter.
+An admitted packet can overlap another admitted packet within that counter,
+but cannot bypass an earlier waiting profile. Cancellation/expiry removes only
+its own ticket and wakes the next waiter even when no active store releases
+capacity. Profile Stop retains its existing joined-writer outcome; snapshot
+cancellation still requires the existing node and local-writer receipts.
+
+This adds at most 64 small tickets/pointers (under 2 KiB), the packet wait's
+original-deadline context, and bounded O(64) removal/wakeup work. It reuses the
+existing broadcast, adds no worker, polling loop, network request, privilege,
+codec change or concurrency-budget increase, and never refunds uncertain spend.
+The real encrypted-writer regression reproduces overtaking before the fix and
+then stores both original packets, the waiting profile and the later packet
+exactly once. Separate packet/profile parent-cancel, Stop and WriteUntil checks
+keep waiting bodies unread and other reservations held.
+
+FIFO admission does **not** complete REQ-CAP-003 workload upload fairness: an
+active whole artifact still keeps its storage reservation through completion.
+It is not bounded-byte-quanta scheduling, a hierarchical service lease or proof
+of a hard RSS ceiling. The [mixed-upload fairness follow-up](../research/mixed-upload-fairness-plan.md)
+retains that full requirement and the shared-workspace/retained-state work.
+This increment prevents admission overtaking without discarding already-acquired
+packet results or installing an artifact-type priority policy.
 
 Local tests exercise exact endpoint/process binding, original start/deadline,
 one-use delivery, uncertain HTTP cancellation, immutable multipart claims and

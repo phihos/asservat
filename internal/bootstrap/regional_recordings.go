@@ -87,7 +87,8 @@ type ConnectorRecordings struct {
 	profiles         map[string]*heldProfile
 	held             map[string]*heldRecording // by capture ID
 	storing          int64
-	storeReleased    chan struct{} // broadcast on a storage reservation's release
+	storeReleased    chan struct{}  // broadcast on store capacity or FIFO head change
+	storeWaiters     []*storeWaiter // bounded by the 64 one-use holders
 	peers            peerResolver
 	verifiers        int // running peer verifiers, at most maxPeerVerifiers
 }
@@ -96,14 +97,11 @@ func NewConnectorRecordings(nodes recordingNodes, pods podNodes, now func() time
 	return &ConnectorRecordings{nodes: nodes, pods: pods, now: now, log: log, after: time.After, held: map[string]*heldRecording{}}
 }
 
-// releaseStoreLocked wakes completed profile uploads without polling or
+// releaseStoreLocked wakes completed uploads without polling or
 // reserving their working memory during acquisition. Call with h.mu held.
 func (h *ConnectorRecordings) releaseStoreLocked(bytes int64) {
 	h.storing -= bytes
-	if h.storeReleased != nil {
-		close(h.storeReleased)
-		h.storeReleased = nil
-	}
+	h.notifyStoreLocked()
 }
 
 // expireLocked drops outcomes and pending recordings past their deadline.
@@ -268,18 +266,22 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		h.log("connector recording " + r.CaptureID + " failed on the node: " + string(r.Failure))
 		return nil
 	}
-	if h.storing+r.CapturedBytes > maxStoringBytes {
+	// Claim this body before entering the shared FIFO. A later delivery cannot
+	// replace it, including after cancellation or an expired wait.
+	held.storing = true
+	prepared, e := held.prepared, held.expectation
+	held.prepared = nil
+	storeCtx, cancelStore := context.WithDeadline(ctx, e.Registration.WriteUntil)
+	defer cancelStore()
+	if held.stopPeers != nil {
+		held.stopPeers()
+	}
+	if !h.waitStoreLocked(storeCtx, e.Registration.WriteUntil, r.CapturedBytes) {
+		held.storing = false
+		held.outcome = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
 		h.mu.Unlock()
-		_, _ = io.Copy(io.Discard, pcapng)
 		return value.ErrUnavailable
 	}
-	h.storing += r.CapturedBytes
-	held.storing = true
-	if held.stopPeers != nil {
-		held.stopPeers() // the node's capture ended; nothing more to verify
-	}
-	prepared, e := held.prepared, held.expectation
-	held.prepared = nil // single use, also after a failed store
 	h.mu.Unlock()
 	defer func() {
 		h.mu.Lock()
@@ -304,9 +306,9 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 	var err error
 	storeStarted := h.now()
 	if held.snapshot != nil {
-		copies, err = prepared.StoreSnapshot(ctx, pcapng, started, completed, *r.Snapshot)
+		copies, err = prepared.StoreSnapshot(storeCtx, pcapng, started, completed, *r.Snapshot)
 	} else {
-		copies, err = prepared.Store(ctx, pcapng, started, completed)
+		copies, err = prepared.Store(storeCtx, pcapng, started, completed)
 	}
 	stored := h.now().UTC().Truncate(time.Microsecond)
 	outcome := evidence.RecordingCollection{State: evidence.RecordingStored, Acquired: held.queued,
