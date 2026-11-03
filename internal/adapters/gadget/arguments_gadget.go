@@ -188,8 +188,8 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 	}
 	ctx, cancel := context.WithDeadline(parent, r.Deadline)
 	defer cancel()
-	if ctx.Err() != nil {
-		return stats, ctx.Err()
+	if ctx.Err() != nil || !time.Now().Before(r.StartBy) {
+		return stats, context.DeadlineExceeded
 	}
 	file, err := os.Open(ArgumentObjectPath)
 	if err != nil {
@@ -313,7 +313,7 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 		}
 	}()
 	for _, p := range [][2]string{{"sys_enter", "ig_traceloop_e"}, {"sys_exit", "ig_traceloop_x"}} {
-		if ctx.Err() != nil || !time.Now().Before(r.Deadline) {
+		if ctx.Err() != nil || !time.Now().Before(r.StartBy) || !time.Now().Before(r.Deadline) {
 			return stats, context.DeadlineExceeded
 		}
 		l, e := link.AttachRawTracepoint(link.RawTracepointOptions{Name: p[0], Program: collection.Programs[p[1]]})
@@ -321,6 +321,9 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 			return stats, e
 		}
 		links = append(links, l)
+		if ctx.Err() != nil || !time.Now().Before(r.StartBy) || !time.Now().Before(r.Deadline) {
+			return stats, context.DeadlineExceeded
+		}
 	}
 	var mu sync.Mutex
 	var lost atomic.Uint64

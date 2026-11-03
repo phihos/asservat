@@ -231,7 +231,14 @@ func DecodeArgumentRecord(raw []byte, defs []ArgumentDefinition) (ArgumentRecord
 		}
 		for i := range r.Scalar {
 			if r.ScalarMask&(1<<i) != 0 {
-				r.Scalar[i] = le.Uint64(raw[8+8*i:])
+				value := le.Uint64(raw[8+8*i:])
+				switch definition.ScalarNames[i] {
+				case "fd", "dirfd":
+					value = uint64(int64(int32(uint32(value))))
+				case "flags", "mode":
+					value = uint64(uint32(value))
+				}
+				r.Scalar[i] = value
 			}
 		}
 	}

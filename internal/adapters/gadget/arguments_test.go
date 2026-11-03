@@ -11,7 +11,7 @@ import (
 )
 
 func argumentRequest(now time.Time) ArgumentRequest {
-	return ArgumentRequest{AccountingRule: collector.ArgumentObservationAccountingRule(), PodUID: "11111111-1111-4111-8111-111111111111", Names: []string{"read", "write"}, CaptureBuffers: true, MaxBytesPerEvent: 256, MaxTrackedThreads: 4096, Events: 1000, Bytes: 1000000, EventsPerSecond: 1000, BytesPerSecond: 512 * 100, Deadline: now.Add(time.Second)}
+	return ArgumentRequest{AccountingRule: collector.ArgumentObservationAccountingRule(), PodUID: "11111111-1111-4111-8111-111111111111", Names: []string{"read", "write"}, CaptureBuffers: true, MaxBytesPerEvent: 256, MaxTrackedThreads: 4096, Events: 1000, Bytes: 1000000, EventsPerSecond: 1000, BytesPerSecond: 512 * 100, Deadline: now.Add(time.Second), StartBy: now.Add(time.Second)}
 }
 func TestArgumentBudgetPreservesBothAuthoredRates(t *testing.T) {
 	now := time.Now()

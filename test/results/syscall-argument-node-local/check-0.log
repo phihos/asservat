@@ -1,0 +1,9 @@
+ok  	asservat.local/asservat/internal/adapters/gadget	1.007s
+ok  	asservat.local/asservat/internal/adapters/syscalls	1.270s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	4.990s
+ok  	asservat.local/asservat/internal/domain/collector	1.016s
+ok  	asservat.local/asservat/internal/domain/artifact	5.464s
+ok  	asservat.local/asservat/internal/contracts	5.672s
+ok  	asservat.local/asservat/internal/application/delivery	1.055s
+ok  	asservat.local/asservat/internal/transport/node	1.532s
+ok  	asservat.local/asservat/internal/bootstrap	79.455s

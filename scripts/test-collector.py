@@ -166,6 +166,7 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
     # fixed path; nothing is pulled at runtime.
     subprocess.run([str(ROOT / "scripts/fetch-gadget.sh"), str(image_dir / "gadgets/tcpdump")], check=True)
     subprocess.run([str(ROOT / "scripts/fetch-gadget.sh"), str(image_dir / "gadgets/traceloop"), "traceloop"], check=True)
+    subprocess.run([sys.executable, str(ROOT / "scripts/package-argument-gadget.py"), str(image_dir / "gadgets/traceloop-arguments"), "--tmpdir", str(work)], check=True)
     (image_dir / "Dockerfile").write_text("FROM scratch\nCOPY asservat /asservat\nCOPY gadgets /usr/lib/asservat/gadgets\n")
     # The hub's filter compiler for the test process: static libpcap 1.11.0.
     subprocess.run(["make", "libpcap"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)

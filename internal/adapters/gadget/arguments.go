@@ -24,6 +24,7 @@ var ErrArgumentReplay = errors.New("argument engine attempt already consumed")
 // It supplies no authority itself. The node composition must bind exact Pod,
 // boot/process/session and original grant/deadline before constructing a recorder.
 type ArgumentRequest struct {
+	StartBy                                        time.Time
 	PodUID                                         string
 	AccountingRule                                 [32]byte
 	Names                                          []string
@@ -47,7 +48,7 @@ type ArgumentStats struct {
 }
 
 func (r ArgumentRequest) definitions() ([]syscalls.ArgumentDefinition, error) {
-	if r.AccountingRule != collector.ArgumentObservationAccountingRule() || !authorization.UUID(r.PodUID) || r.Events < 1 || r.Events > 1_000_000_000 || r.Bytes < 1 || r.Bytes > 1<<40 || r.EventsPerSecond < 1 || r.EventsPerSecond > 100000 || r.BytesPerSecond < 1 || r.BytesPerSecond > 1<<30 || r.MaxTrackedThreads < 1 || r.MaxTrackedThreads > 16384 || r.Deadline.IsZero() {
+	if r.AccountingRule != collector.ArgumentObservationAccountingRule() || !authorization.UUID(r.PodUID) || r.Events < 1 || r.Events > 1_000_000_000 || r.Bytes < 1 || r.Bytes > 1<<40 || r.EventsPerSecond < 1 || r.EventsPerSecond > 100000 || r.BytesPerSecond < 1 || r.BytesPerSecond > 1<<30 || r.MaxTrackedThreads < 1 || r.MaxTrackedThreads > 16384 || r.Deadline.IsZero() || r.StartBy.IsZero() || r.StartBy.After(r.Deadline) {
 		return nil, ErrArgumentRequest
 	}
 	defs, err := syscalls.ArgumentDefinitions(r.Names, r.CaptureBuffers, r.MaxBytesPerEvent)
@@ -63,7 +64,7 @@ func (r ArgumentRequest) definitions() ([]syscalls.ArgumentDefinition, error) {
 func ArgumentBudgetFor(r ArgumentRequest, now time.Time, bootNS uint64) (ArgumentBudget, error) {
 	defs, err := r.definitions()
 	remaining := r.Deadline.Sub(now)
-	if err != nil || bootNS == 0 || remaining <= 0 || remaining > time.Hour || uint64(remaining) > ^uint64(0)-bootNS {
+	if err != nil || !now.Before(r.StartBy) || bootNS == 0 || remaining <= 0 || remaining > time.Hour || uint64(remaining) > ^uint64(0)-bootNS {
 		return ArgumentBudget{}, ErrArgumentRequest
 	}
 	maximum := syscalls.ArgumentMaxProbeBytes(defs)

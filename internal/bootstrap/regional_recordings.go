@@ -149,7 +149,7 @@ func (h *ConnectorRecordings) Prepare(prepared *objectstore.PreparedArtifact, e 
 // start queues the recording on the Pod's node and holds the prepared keys.
 func (h *ConnectorRecordings) start(ctx context.Context, p *objectstore.PreparedArtifact, e artifact.ContextExpectation, pin artifact.PinnedPod, until time.Time) (time.Time, error) {
 	rec := e.Recording
-	if !rec.Valid() || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID {
+	if !rec.Valid() || rec.Arguments != nil || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID {
 		return time.Time{}, value.ErrInvalid
 	}
 	name, err := h.pods.PodNode(ctx, pin)
@@ -402,7 +402,7 @@ func (p *preparedRecording) StartRecording(ctx context.Context, pin artifact.Pin
 	// The legacy operation carries no committed input permit. Refuse before
 	// transferring prepared ownership; only the future typed policy start may
 	// carry a current exact source and the original SQL observation reservation.
-	if compiler.MeteredRecording(p.expectation.Recording) {
+	if p.expectation.Recording != nil && p.expectation.Recording.Arguments != nil || compiler.MeteredRecording(p.expectation.Recording) {
 		return time.Time{}, value.ErrUnavailable
 	}
 	p.mu.Lock()
@@ -430,7 +430,7 @@ func (p *preparedRecording) StartPolicyRecording(ctx context.Context, pin artifa
 	h, e := p.holder, p.expectation
 	r, b := e.Recording, permit.Binding
 	now := h.now()
-	if ctx == nil || ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || started.After(now) || started.Before(permit.StartedAt) || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID || source.PodUID != e.PodUID || !r.Valid() || !compiler.MeteredRecording(r) || b.CaptureID != e.CaptureUID || b.ActionID != e.ActionID || b.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch || b.ExpectationDigest != [32]byte(evidence.ContextExpectationDigest(e)) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || permit.SessionUntil.After(e.Registration.WriteUntil) {
+	if ctx == nil || ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || started.After(now) || started.Before(permit.StartedAt) || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID || source.PodUID != e.PodUID || !r.Valid() || r.Arguments != nil || !compiler.MeteredRecording(r) || b.CaptureID != e.CaptureUID || b.ActionID != e.ActionID || b.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch || b.ExpectationDigest != [32]byte(evidence.ContextExpectationDigest(e)) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || permit.SessionUntil.After(e.Registration.WriteUntil) {
 		return time.Time{}, value.ErrDenied
 	}
 	work := collector.PacketCapture{CaptureID: e.CaptureUID, PodUID: e.PodUID, Duration: permit.Duration, MaxBytes: r.MaxBytes, Observation: &permit}

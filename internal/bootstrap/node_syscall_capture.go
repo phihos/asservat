@@ -18,6 +18,9 @@ import (
 // JSON Lines and uploaded like a packet capture. Without a source permit, a
 // local events-per-second limit bounds retention.
 func (n *nodePackets) startSyscall(ctx context.Context, epoch string, w collector.Work) collector.Receipt {
+	if w.Packet != nil && w.Packet.Arguments != nil {
+		return n.startArguments(ctx, epoch, w)
+	}
 	r := collector.Decide(w, n.now())
 	if r.Reason == collector.ReasonWorkUnknown || r.Reason == collector.ReasonWorkExpired {
 		return r

@@ -197,3 +197,26 @@ func TestArgumentDecoderUsesActualCountForBufferTruncation(t *testing.T) {
 		}
 	}
 }
+
+func TestArgumentScalarsUseQualifiedABIWidths(t *testing.T) {
+	defs, _ := ArgumentDefinitions([]string{"openat"}, false, 128)
+	raw := make([]byte, 160)
+	le := binary.LittleEndian
+	le.PutUint32(raw, EventEnter)
+	le.PutUint64(raw[56:], 10)
+	le.PutUint64(raw[64:], 100)
+	le.PutUint32(raw[72:], 1)
+	le.PutUint16(raw[78:], 257)
+	raw[96] = 1
+	le.PutUint32(raw[104:], 2)
+	le.PutUint32(raw[108:], 1)
+	le.PutUint64(raw[112:], 1)
+	le.PutUint64(raw[120:], 1)
+	le.PutUint64(raw[8:], 0xdeadbeefffffff9c)
+	le.PutUint64(raw[24:], 0xdeadbeef00000040)
+	le.PutUint64(raw[32:], 0xdeadbeef00000180)
+	got, err := DecodeArgumentRecord(raw, defs)
+	if err != nil || int64(got.Scalar[0]) != -100 || got.Scalar[2] != 64 || got.Scalar[3] != 384 {
+		t.Fatal(got, err)
+	}
+}

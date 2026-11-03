@@ -169,7 +169,7 @@ func RunNode(ctx context.Context, podUID string) error {
 	defer client.CloseIdle()
 	p := &nodeProcess{client: client, creds: creds, token: readNodeToken, podUID: podUID, bootID: boot, epoch: uuid.NewString(), facts: facts, mechanisms: mechanisms,
 		budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr}
-	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
+	p.packets = &nodePackets{engine: gadget.CapturePackets, syscallTrace: syscallTraceIfAvailable(mechanisms), argumentTrace: argumentTraceIfAvailable(mechanisms), argumentResources: gadget.ArgumentWorkingBytes, observedEngine: gadget.CaptureObservedPackets, identity: p.packetIdentity, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
 		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
 	p.profiles = &nodeProfiles{identity: p.packetIdentity, acquire: acquireNodeProfile(p.packetIdentity, time.Now), upload: client.UploadProfileStream, now: time.Now, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
 	ringDir, removed := "", 0

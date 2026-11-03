@@ -501,6 +501,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 subprocess.run(["go", "build", "-tags", "gadget,netgo,osusergo", "-trimpath", "-buildvcs=false", "-o", str(collector_dir / "asservat"), "./cmd/asservat"], cwd=ROOT, env=build_env, check=True)
                 subprocess.run([str(ROOT / "scripts/fetch-gadget.sh"), str(collector_dir / "gadgets/tcpdump")], check=True)
                 subprocess.run([str(ROOT / "scripts/fetch-gadget.sh"), str(collector_dir / "gadgets/traceloop"), "traceloop"], check=True)
+                subprocess.run([sys.executable, str(ROOT / "scripts/package-argument-gadget.py"), str(collector_dir / "gadgets/traceloop-arguments"), "--tmpdir", str(work)], check=True)
                 (collector_dir / "Dockerfile").write_text("FROM scratch\nCOPY asservat /asservat\nCOPY gadgets /usr/lib/asservat/gadgets\n")
                 collector_tag = "asservat-approved-collector:" + run_id
                 run(["docker", "build", "--network=none", "--label", "asservat.test="+run_id, "-t", collector_tag, str(collector_dir)])
