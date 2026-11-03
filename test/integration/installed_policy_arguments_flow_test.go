@@ -358,9 +358,8 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 	if err != nil || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
 		t.Fatal("raw native size/hash", response.StatusCode, len(native), err)
 	}
-	must(requester, "get_grant", map[string]any{"grant_id": raw.ID}, &raw)
-	if raw.RawAccess == nil || raw.RawAccess.BytesUsed != int64(len(native)) || raw.RawAccess.OperationsUsed != 1 {
-		t.Fatal("standalone raw pool did not charge the exact single download", raw.RawAccess)
+	if err = os.WriteFile("../results/policy-arguments.jsonl", native, 0600); err != nil {
+		t.Fatal(err)
 	}
 	var originalGrant string
 	if err = admin.QueryRow(ctx, `SELECT grant_id::text FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2`, root, captureID).Scan(&originalGrant); err != nil || originalGrant != collection.ID {
@@ -370,6 +369,10 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 	footer, err := checkManualArgumentsNative(native, podUID, original)
 	if err != nil {
 		t.Fatal("policy argument original source/mechanism/counters", err)
+	}
+	must(requester, "get_grant", map[string]any{"grant_id": raw.ID}, &raw)
+	if raw.RawAccess == nil || raw.RawAccess.BytesUsed != int64(len(native)) || raw.RawAccess.OperationsUsed != 1 {
+		t.Fatal("standalone raw pool did not charge the exact single download", raw.RawAccess)
 	}
 	var status struct {
 		Kind       string `json:"collection_kind"`
@@ -382,9 +385,6 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 	must(requester, "get_policy_status", map[string]any{"policy_name": installedPolicyArgumentsName}, &status)
 	if status.Kind != "syscallTrace" || status.Grant != collection.ID || status.Executions != 1 || status.Output != artifact.RecordingNativeLimit || status.Bytes != original.ByteCredit || status.Events != original.EventCredit {
 		t.Fatal("original shared policy reservations", status)
-	}
-	if err = os.WriteFile("../results/policy-arguments.jsonl", native, 0600); err != nil {
-		t.Fatal(err)
 	}
 	report := map[string]any{"policyUID": active.PolicyUID, "acceptanceID": active.AcceptanceID, "captureID": captureID, "caseID": progress.CaseID, "collectionGrantID": collection.ID, "rawGrantID": raw.ID, "artifactVersion": a.Digest, "nativeBytes": len(native), "nativeSHA256": hex.EncodeToString(digest[:]), "source": original.Source, "eventCredit": original.EventCredit, "byteCredit": original.ByteCredit, "retainedEvents": footer.Retained, "collectionOnlyDownloadDenied": true, "rawRequestReplaySameGrant": true, "independentReviewer": identity.ReviewerSubject, "elapsedSeconds": time.Since(started).Seconds(), "authority": "installed protected namespace profile, team policy approval, real restart, independent exact-artifact human raw approval; SQL reads verify results only"}
 	body, err = json.MarshalIndent(report, "", "  ")

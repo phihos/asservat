@@ -298,7 +298,11 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		return artifact.ErrDownloadUnavailable
 	}
 	until = identityvalue.Earlier(until, metadata.ReadUntil)
-	raw := metadata.Format == artifact.RawPCAPNGFormat
+	nativeType, known := artifact.NativeTypeForFormat(metadata.Format)
+	// Every qualified raw-only native format uses the shared disclosure pool.
+	// Ordinary context metadata is not raw merely because its format registry
+	// also describes a future raw-context variant.
+	raw := known && len(nativeType.DataClasses) == 1 && nativeType.AllowsClass("raw")
 	if raw && t.RawResults == nil {
 		return artifact.ErrDownloadUnavailable
 	}

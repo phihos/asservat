@@ -3,6 +3,22 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Native41668728510 on `ecc0ef43` passed policy capture/publication, personal raw
+approval and authenticated download size/SHA checks. It failed the shared raw
+pool assertion: one operation was charged but zero bytes. Go533.422s exited1;
+sources unchanged, cleanup complete. Original compressed reports are retained in
+`test/results/policy-native-41668728510`. The native marker/footer/source checks
+were after that assertion and did not run; no completed qualification is claimed.
+
+A local transfer regression reproduced missing byte reservations for syscall
+arguments, pprof and Go trace: the response path recognized only raw PCAP.
+Classification now uses the existing registry's raw-only formats. All four raw
+formats reserve every output window before reading; refusal or a missing grant
+port prevents all content reads. Ordinary context, packet metadata, syscall
+metadata and HTTP extracts need no raw pool. Focused transfer/raw-download races
+passed (1.847s). The installed fixture now retains authenticated synthetic bytes
+and checks the original source/marker before the final accounting assertion.
+
 Native41659215769 on `a62854d5` failed while polling published argument progress
 (Go623.440s, source unchanged, cleanup complete). The publisher reported a
 publication, but progress reconstruction omitted SQL130's verified native size

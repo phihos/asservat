@@ -133,3 +133,14 @@ and dependency checks succeed. The console opens the existing review prefilled
 with that exact artifact and size; approval retries retain the original request.
 Existing sessions and in-flight transfers retain their original accounting and
 revalidation behavior. This adds no metadata/payload read or API request.
+
+## Native transfer accounting
+
+Every qualified raw-only format in the existing native registry reserves its
+window bytes in the shared grant pool before content read: raw PCAP, syscall
+arguments, pprof and Go trace. Metadata preparation retains its one-operation
+charge. The installed argument regression exposed an earlier PCAP-only format
+check in response transfer; transfer-level tests now exercise every current raw
+format, two-window totals, denied/missing reservation ports and ordinary approved
+formats. The registry lookup adds one local bounded lookup per response; no new
+permission, SQL state, service, request, watch or configuration is introduced.
