@@ -3,6 +3,45 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Saved syscall views are merged in [PR150](https://github.com/phihos/asservat/pull/150),
+main `381820beabb16caceb3b378e5f007e094cd1dd15`. Its full tree matches qualified
+head `c6682da6`. Exact-current CI41711981343 and Gitar passed with no open findings.
+The two owned native fixtures both returned Go exit 0:
+
+- [Metadata41712531115](https://github.com/phihos/asservat/actions/runs/41712531115):
+  842.843s; workflow succeeded; 472 events / 146,371 native bytes.
+- [Arguments41712526480](https://github.com/phihos/asservat/actions/runs/41712526480):
+  919.995s; all five views, fresh repeat preview and independently approved live
+  Stop passed. Stop joined cancellation and observed Cancelled without an artifact.
+  The Go test and cleanup completed successfully; the outer GitHub job was
+  nevertheless marked cancelled because its overall wall-clock limit was reached.
+  This records successful native Go qualification, not a green
+  argument-workflow claim. Its 34,839 native bytes matched the authenticated hash
+  and immutable source; 50 retained writes / 100 probes / 38,400 charged bytes
+  stayed within the original 6,000-event / 96 MiB observation credit. Loss remains
+  explicitly unknown.
+
+Both complete terminal reports show unchanged sources, removed scratch and
+cleanup failures `[]`. All 4,018 reported source hashes independently matched the
+qualified tree. Each fixture verified five distinct two-unit queries, one joined
+batch and three consumed keys per query, actual 256 MiB Pod/transient limits,
+read-only download denial, exact native summary/events/filter/continuation and
+changed-filter refusal with positive SQL/worker closure. All five workers reached
+original terminal lifetimes; later demand retained retirement for the first four.
+There is no claim of last-worker capacity refund. Reports are retained in
+`test/results/syscall-native-41712526480/` and
+`test/results/syscall-native-41712531115/`. Original failed reports remain below.
+
+The next outcome is two-source `compare_profiles` under REQ-PRF-005 / SC-PRF-005.
+Pure components and fixed-pair contracts are prepared in an isolated local branch;
+paired current authority, atomic accounting/key children, worker/public composition
+and native comparison remain pending. The argument job's cold-start/teardown
+headroom also needs improvement before later installed campaigns. No timeout was
+raised. These saved-view fixtures do not complete arbitrary `syscall_query`,
+grouped/ongoing arguments, a wider kernel matrix or a supported release.
+
+### Earlier checkpoints
+
 The second native batch on `07dbce30` reached all five requests for both source
 formats. Four views passed independent native-content, SQL/key/batch and Pod
 checks. The changed-filter request returned the expected error, but its SQL

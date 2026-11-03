@@ -1,6 +1,8 @@
 # ADR-294 — Fixed saved-syscall projections
 
-Date: 2026-11-03. Status: implementation in progress; public query and installed qualification pending.
+Date: 2026-11-03. Status: implemented; owned metadata/argument saved-view fixtures qualified.
+The argument Go test passed; its outer workflow was cancelled at the job limit.
+Broader query/kernel qualification remains open; see implementation progress.
 Requirements: REQ-SYS-003, SC-SYS-003, REQ-INV-002.
 
 ## Decision

@@ -20,13 +20,15 @@ public envelope that exceeds its bound discards its prepared content and uses
 the same owned refusal path. No refusal refunds read/key spend or proves remote
 retirement. An unknown close or audit acknowledgement remains conservative.
 
-## Saved syscall projection candidate
+## Saved syscall projections
 
 [ADR-294](../decisions/294-saved-syscall-projections.md) extends the same coordinator
 with fixed summary and event views of saved metadata or argument sources. The
-source/view/filter identity is separate from raw disclosure authority. Prepared
-values and eligibility do not enable a public route; funded SQL, worker/key,
-raw-source extraction and UI/MCP/native qualification remain in progress.
+source/view/filter identity is separate from raw disclosure authority. Funded
+SQL, worker/key, raw-source extraction and UI/MCP composition passed the two owned
+metadata/argument saved-view native fixtures. The argument Go test passed while
+its outer job was cancelled at the wall-clock limit. Exact reports, supported
+scope and remaining timing/qualification gaps are in implementation progress.
 
 ## Profile summary candidate
 

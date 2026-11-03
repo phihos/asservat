@@ -2,8 +2,9 @@
 
 [ADR-294 — Fixed saved-syscall projections](294-saved-syscall-projections.md)
 selects two version/filter-bound extracts using the existing regional worker.
-Source/eligibility preparation is implemented; public composition and installed
-qualification remain pending.
+Source authority, public composition and the two owned metadata/argument saved-view
+fixtures are implemented and qualified. The argument test passed with a cancelled
+outer job; broader scope and timing limits are explicit in implementation progress.
 
 [ADR-268 — Grouped Save dispatch](268-grouped-save-dispatch-window.md) removes
 the all-sibling intent barrier and gives the composed request a prospective
