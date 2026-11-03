@@ -18,6 +18,9 @@ type initialSchemaQuery interface {
 }
 
 func initialSchemaHistory(ctx context.Context, q initialSchemaQuery, maximum int64, owner uint32) (int64, bool, error) {
+	if maximum < 1 || maximum > currentSchemaVersion {
+		return 0, false, cfg.ErrChanged
+	}
 	var exists bool
 	if e := q.QueryRowContext(ctx, "SELECT to_regclass('public.goose_db_version') IS NOT NULL").Scan(&exists); e != nil {
 		return 0, false, cfg.ErrUnavailable
@@ -60,7 +63,8 @@ func initialSchemaHistory(ctx context.Context, q initialSchemaQuery, maximum int
 	if e != nil || i != len(expected) {
 		return 0, false, cfg.ErrChanged
 	}
-	rows, e = q.QueryContext(ctx, "SELECT id,version_id,is_applied,tstamp FROM public.goose_db_version ORDER BY id LIMIT 130")
+	// Include version zero and one overflow row beyond this compiled bundle.
+	rows, e = q.QueryContext(ctx, "SELECT id,version_id,is_applied,tstamp FROM public.goose_db_version ORDER BY id LIMIT $1", maximum+2)
 	if e != nil {
 		return 0, false, cfg.ErrUnavailable
 	}
@@ -87,7 +91,7 @@ type initialSchemaVersion struct {
 }
 
 func initialSchemaPrefix(entries []initialSchemaVersion, maximum int64) (int64, error) {
-	if len(entries) == 0 || len(entries) > int(maximum+1) || maximum < 1 || maximum > 128 {
+	if maximum < 1 || maximum > currentSchemaVersion || len(entries) == 0 || int64(len(entries)) > maximum+1 {
 		return 0, cfg.ErrChanged
 	}
 	var lastID int64

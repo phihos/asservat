@@ -240,7 +240,7 @@ profile-preflight:
 # Finite argument composition, without loading a collector or external services.
 .PHONY: argument-preflight
 argument-preflight:
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run 'Test.*(Argument|RecordingStop|RecordingCollection|SourceWork|PublicSnapshotCancellation)' ./internal/bootstrap ./internal/domain/artifact ./internal/domain/collector ./internal/domain/authorization ./internal/application/evidence ./internal/application/delivery ./internal/application/capture ./internal/application/execution ./internal/application/planning ./internal/adapters/gadget ./internal/adapters/postgres ./internal/adapters/jose ./internal/adapters/syscalls ./internal/adapters/objectstore/manifest ./internal/transport/contextstart
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run 'Test.*(Argument|InitialSchema|InitialInstallerSchema|RecordingStop|RecordingCollection|SourceWork|PublicSnapshotCancellation)' ./internal/bootstrap ./internal/domain/artifact ./internal/domain/collector ./internal/domain/authorization ./internal/application/evidence ./internal/application/delivery ./internal/application/capture ./internal/application/execution ./internal/application/planning ./internal/adapters/gadget ./internal/adapters/postgres ./internal/adapters/jose ./internal/adapters/syscalls ./internal/adapters/objectstore/manifest ./internal/transport/contextstart
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledManualArguments' ./test/integration
 
 # Owned SQL/S3 service composition, after local preflight and source freeze.

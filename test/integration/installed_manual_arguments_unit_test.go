@@ -66,8 +66,8 @@ func TestInstalledManualArgumentsRequestCompiles(t *testing.T) {
 			t.Fatal("argument plan lost raw reviewed event ceiling", plan.Approval)
 		}
 		recording, action, err := compiler.RecordingFor(plan)
-		mechanism, _ := (installedArgumentsCompiler{}).CompileArguments([]string{"write"}, true, 128)
-		if err != nil || recording.Arguments == nil || *recording.Arguments != mechanism || recording.Arguments.MaxProbeBytes != 512 || recording.DurationMillis != seconds*1000 || recording.Kind != "syscallTrace" || recording.Profile != "arguments" || recording.Syscalls.MaxEventsPerSecond != manualArgumentsRate || recording.Syscalls.MaxTrackedThreads != 64 || recording.Snaplen != 0 {
+		mechanism, _ := (installedArgumentsCompiler{}).CompileArguments([]string{"write"}, !stop, 128)
+		if err != nil || recording.Arguments == nil || *recording.Arguments != mechanism || recording.Arguments.CaptureBuffers == stop || recording.DurationMillis != seconds*1000 || recording.Kind != "syscallTrace" || recording.Profile != "arguments" || recording.Syscalls.MaxEventsPerSecond != manualArgumentsRate || recording.Syscalls.MaxTrackedThreads != 64 || recording.Snaplen != 0 {
 			t.Fatal("accepted argument recording", recording, err)
 		}
 		frozen, err := compiler.RecorderContextFor(&recording)

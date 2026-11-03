@@ -55,6 +55,7 @@ func manualArgumentsProfileDefinition() (map[string]any, error) {
 	params["syscalls"] = map[string]any{"mode": "include", "names": []string{"write"}}
 	params["arguments"] = map[string]any{"maxBytesPerEvent": 128, "captureBuffers": true}
 	params["maxEvents"], params["maxEventsPerSecond"], params["maxTrackedThreads"] = manualArgumentsRetained, manualArgumentsRate, 64
+	doc.Definition["editableFields"] = append(doc.Definition["editableFields"].([]any), map[string]any{"actionID": "syscalls", "field": "syscallArguments", "label": "Argument reads"})
 	return doc.Definition, nil
 }
 
@@ -68,7 +69,7 @@ func manualArgumentsCaptureInput(cluster, namespace, workload string, stop bool)
 		"requested_retention_seconds": 600,
 		"profile_composition": map[string]any{
 			"components": []any{map[string]any{"id": "calls", "profileRef": map[string]string{"catalog": "namespace", "name": manualArgumentsProfile, "version": "v1"},
-				"overrides": []any{map[string]any{"actionID": "syscalls", "field": "syscallAfter", "value": after}, map[string]any{"actionID": "syscalls", "field": "actionTimeout", "value": timeout}}}},
+				"overrides": []any{map[string]any{"actionID": "syscalls", "field": "syscallAfter", "value": after}, map[string]any{"actionID": "syscalls", "field": "actionTimeout", "value": timeout}, map[string]any{"actionID": "syscalls", "field": "syscallArguments", "value": map[string]any{"maxBytesPerEvent": 128, "captureBuffers": !stop}}}}},
 			"maxTotalBytes": artifact.RecordingNativeLimit, "maxDuration": duration,
 		},
 	}

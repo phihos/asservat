@@ -193,6 +193,15 @@ func (n *nodePackets) runArguments(parent context.Context, epoch, workID string,
 				return
 			}
 			if probe != nil {
+				observed := wall.Add(time.Duration(probe.Event.Boot))
+				if observed.Before(started) || observed.After(until) {
+					// Buffered delivery may finish after the kernel deadline;
+					// an out-of-window probe cannot extend the observation or
+					// complete a valid entry. Flush retains its missing-pair gap.
+					syscalls.ArgumentCall{Entry: probe}.Clear()
+					footer.Malformed++
+					return
+				}
 				for _, call := range pairer.Add(*probe) {
 					emit(call)
 				}
@@ -208,7 +217,14 @@ func (n *nodePackets) runArguments(parent context.Context, epoch, workID string,
 	mu.Lock()
 	footer.PairGaps += decoder.Flush()
 	pairer.Flush(emit)
-	footer.EndedAt = n.now().UTC()
+	joinedAt := n.now().UTC()
+	// EndedAt is the observation endpoint, bounded by the exact deadline
+	// enforced before kernel user-memory reads. Detach/perf flush may join
+	// later; delivery and resource release still wait for that actual join.
+	footer.EndedAt = joinedAt
+	if until.Before(footer.EndedAt) {
+		footer.EndedAt = until
+	}
 	footer.LostSamples = max(footer.LostSamples, stats.LostSamples)
 	footer.OutputFull = outputFull
 	if stats.AccountingKnown {
@@ -216,7 +232,7 @@ func (n *nodePackets) runArguments(parent context.Context, epoch, workID string,
 		footer.ObservedEvents = &events
 		footer.ObservedBytes = &credit
 	}
-	completed := !footer.EndedAt.Before(until) && parent.Err() == nil && (err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled))
+	completed := !joinedAt.Before(until) && parent.Err() == nil && (err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled))
 	switch {
 	case outputFull > 0:
 		footer.Outcome = "outputLimit"

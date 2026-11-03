@@ -33,8 +33,11 @@ build another test framework or duplicate the production workflow with mocks.
    Run the full Go gate once per final candidate, locally or in exact-commit CI;
    do not repeat unchanged package evidence merely because another agent also
    worked on the feature. Required checks and their assertions remain intact.
-3. With sources frozen: run the selected installed workflow in a fresh owned
-   environment. Record the exact commit, real exit, source inventory and cleanup.
+3. Before costly installed dispatch, inspect the automated review and resolve
+   concrete findings. For migration changes, run the initial-schema bundle/history
+   checks as well as the affected SQL fixture; ordinary migration success does not
+   prove the installation path accepts the release. With sources frozen, run the
+   selected installed workflow in a fresh owned environment. Record the exact commit, real exit, source inventory and cleanup.
    A failure returns to a focused reproduction and boundary review before another
    costly dispatch. No automatic full rerun after an unexplained failure.
 

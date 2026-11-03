@@ -130,3 +130,97 @@ func TestNodeArgumentRejectsReplacementAndInsufficientWorkingCapacity(t *testing
 		}
 	}
 }
+
+func TestNodeArgumentObservationEndsBeforeDelayedJoin(t *testing.T) {
+	n, w, results, bodies := nodeArgumentFixture(t)
+	a := w.Packet.Arguments
+	now := time.Now().UTC()
+	a.StartedAt = now.Add(-4 * time.Second)
+	a.StartBy = now.Add(100 * time.Millisecond)
+	a.SessionUntil = a.StartBy.Add(a.Duration)
+	a.LeaseUntil = a.SessionUntil
+	w.NotAfter = a.StartBy
+	deadlineReached, leave := make(chan time.Time, 1), make(chan struct{})
+	var release sync.Once
+	defer release.Do(func() { close(leave) })
+	n.argumentTrace = func(ctx context.Context, r gadget.ArgumentRequest, deliver func([]byte), _ func(gadget.InputNotice)) (gadget.ArgumentStats, error) {
+		if !r.StartBy.Equal(a.StartBy) || r.Deadline.After(a.SessionUntil) {
+			t.Error("original authority changed")
+		}
+		wall, _ := bootWallClock()
+		send := func(phase uint32, tid uint32, at time.Time) {
+			raw := make([]byte, 160)
+			le := binary.LittleEndian
+			le.PutUint32(raw, phase)
+			le.PutUint64(raw[56:], 10)
+			le.PutUint64(raw[64:], uint64(at.Sub(wall)))
+			le.PutUint32(raw[72:], 20)
+			le.PutUint16(raw[78:], 3)
+			le.PutUint32(raw[104:], tid)
+			le.PutUint32(raw[108:], 1)
+			le.PutUint64(raw[112:], 1)
+			le.PutUint64(raw[120:], 1)
+			deliver(raw)
+		}
+		// One complete call and one valid entry whose exit falls beyond the
+		// authorized observation window. Buffered delivery itself can be later.
+		send(0, 21, r.Deadline.Add(-100*time.Millisecond))
+		send(1, 21, r.Deadline.Add(-90*time.Millisecond))
+		send(0, 22, r.Deadline.Add(-10*time.Millisecond))
+		<-ctx.Done()
+		deadlineReached <- r.Deadline
+		<-leave
+		send(1, 22, r.Deadline.Add(100*time.Millisecond))
+		return gadget.ArgumentStats{AccountingKnown: true, ConsumedEvents: 4, ConsumedBytes: 1024, CoverageUnknown: true}, ctx.Err()
+	}
+	if got := n.startSyscall(t.Context(), n.identity().Epoch, w); got.Outcome != collector.OutcomeAccepted {
+		t.Fatal(got)
+	}
+	deadline := <-deadlineReached
+	// Deliberately retain the engine past the whole original session window.
+	timer := time.NewTimer(time.Until(a.SessionUntil.Add(30 * time.Millisecond)))
+	defer timer.Stop()
+	<-timer.C
+	select {
+	case r := <-results:
+		t.Fatalf("uploaded before detach/join: %+v", r)
+	default:
+	}
+	n.budgetMu.Lock()
+	count, _, _ := n.budget().SourceUsage()
+	n.budgetMu.Unlock()
+	if count != 1 {
+		t.Fatal("released source before detach/join")
+	}
+	release.Do(func() { close(leave) })
+	n.wg.Wait()
+	result, native := <-results, <-bodies
+	lines := strings.Split(strings.TrimSpace(string(native)), "\n")
+	var footer syscalls.ArgumentFooter
+	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &footer); err != nil {
+		t.Fatal(err)
+	}
+	if !result.EndedAt.Equal(deadline) || !footer.EndedAt.Equal(deadline) || footer.EndedAt.After(a.SessionUntil) {
+		t.Fatalf("observation endpoint includes delayed cleanup: result=%v footer=%v deadline=%v session=%v", result.EndedAt, footer.EndedAt, deadline, a.SessionUntil)
+	}
+	if footer.Outcome != "completed" || footer.Retained != 2 || footer.PairGaps != 1 || footer.Malformed != 1 || !footer.CoverageUnknown || footer.ObservedEvents == nil || *footer.ObservedEvents != 4 || footer.ObservedBytes == nil || *footer.ObservedBytes != 1024 {
+		t.Fatalf("window/gap/accounting semantics lost: %+v", footer)
+	}
+	var last syscalls.ArgumentEventLine
+	if err := json.Unmarshal([]byte(lines[len(lines)-2]), &last); err != nil || last.Event.Outcome != "unfinished" {
+		t.Fatalf("missing exit fabricated: %+v %v", last, err)
+	}
+	b := a.Binding
+	e := artifact.ContextExpectation{PodUID: b.PodUID, Recording: &artifact.Recording{MaxBytes: w.Packet.MaxBytes, Syscalls: &artifact.RecordingSyscalls{Names: w.Packet.Syscalls.Names, MaxEvents: w.Packet.Syscalls.MaxEvents}, Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest(b.ProgramDigest), DefinitionDigest: artifact.Digest(b.DefinitionDigest), AccountingRule: artifact.Digest(b.AccountingRule), MaxProbeBytes: a.MaxProbeBytes, MaxBytesPerEvent: a.MaxBytesPerEvent}}}
+	source := artifact.ArgumentSourceProvenance{PodUID: b.PodUID, NodeUID: b.NodeUID, BootID: b.BootID, CollectorPodUID: b.CollectorPodUID, CollectorEpoch: b.CollectorEpoch, SessionID: b.SessionID, Fence: b.Fence, StartedAt: a.StartedAt, StartBy: a.StartBy, Until: a.SessionUntil}
+	check, err := syscalls.NewArgumentCheck(e, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = check.Write(native); err != nil {
+		t.Fatalf("bounded artifact rejected by independent publisher: %v\n%s", err, native)
+	}
+	if err = check.Close(); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -459,6 +459,11 @@ func applyEdit(path string, e value.ProfileEdit, a *expandedAction) error {
 		a.syscall.Ring, err = ringValue()
 	case "syscallMode":
 		a.syscall.Mode, err = text()
+	case "syscallArguments":
+		if e.SyscallArguments == nil || !e.SyscallArguments.Bounded() {
+			return refuse(value.CompositionInvalid, path, "syscallArguments takes maxBytesPerEvent from 1 to 4096 and explicit captureBuffers")
+		}
+		a.syscall.Arguments, err = json.Marshal(e.SyscallArguments)
 	case "profileDuration":
 		a.profile.Duration, err = text()
 	case "syscallFilter":
@@ -1076,6 +1081,8 @@ func editValue(e value.ProfileEdit) any {
 		return editRing(e.Ring)
 	case e.Syscalls != nil:
 		return syscallSelection{Mode: e.Syscalls.Mode, Names: e.Syscalls.Names}
+	case e.SyscallArguments != nil:
+		return *e.SyscallArguments
 	case e.Peers != nil:
 		return peersEditWire(e.Peers)
 	case e.Number != 0:

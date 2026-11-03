@@ -147,7 +147,13 @@ func scanArgumentMembers(ctx context.Context, proc, cgroups, pod string, cgroupI
 			group, e := os.Open(filepath.Join(cgroups, strings.TrimPrefix(path, "/")))
 			if e != nil {
 				_ = ns.Close()
-				return out, ErrTargetNotFound
+				// A member can exit after its proc observation. Its removed
+				// cgroup does not invalidate other exact, pinned Pod members.
+				// Permission and malformed-path errors remain scan failures.
+				if errors.Is(e, os.ErrNotExist) {
+					continue
+				}
+				return out, e
 			}
 			pins := argumentPins{group, ns}
 			nsID, e1 := argumentInode(ns)
@@ -221,7 +227,10 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 		spec.Maps[name].MaxEntries = uint32(r.MaxTrackedThreads)
 	}
 	members, err := argumentMembers(ctx, r.PodUID)
-	if err != nil || len(members) == 0 {
+	if err != nil {
+		return stats, err
+	}
+	if len(members) == 0 {
 		return stats, ErrTargetNotFound
 	}
 	defer func() {

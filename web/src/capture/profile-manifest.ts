@@ -18,7 +18,7 @@ type Override = NonNullable<Composition['authored']['components'][number]['overr
 const locations: Record<string, readonly string[]> = {
   packetPeers: ['parameters', 'peers'], packetFilter: ['parameters', 'filter'], packetBefore: ['parameters', 'before'], packetAfter: ['parameters', 'after'], packetRing: ['parameters', 'ring'],
   syscallFilter: ['parameters', 'syscalls'], syscallMode: ['parameters', 'mode'], syscallBefore: ['parameters', 'before'], syscallAfter: ['parameters', 'after'], syscallRing: ['parameters', 'ring'],
-  syscallMaxEvents: ['parameters', 'maxEvents'], syscallRate: ['parameters', 'maxEventsPerSecond'],
+  syscallMaxEvents: ['parameters', 'maxEvents'], syscallRate: ['parameters', 'maxEventsPerSecond'], syscallArguments: ['parameters', 'arguments'],
   actionMaxBytes: ['limits', 'maxBytes'], actionTimeout: ['limits', 'timeout'], actionExecutionMode: ['executionMode'],
 };
 

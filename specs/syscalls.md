@@ -88,3 +88,9 @@ start, missing holder or Stop delivery failure cannot establish completion or
 refund observation spend. If storage already completed, the stored result wins;
 Stop does not delete it. This introduces no application-profiler uncertainty
 flag because the argument source is owned by Asservat.
+
+Argument JSONL `ended_at` denotes the observation endpoint, bounded by the
+original kernel-enforced deadline. Later perf-buffer draining and detachment
+do not extend it. Upload and resource release still await actual reader and
+attachment shutdown. Probes outside the accepted window are counted as malformed;
+unpaired in-window entries retain their unfinished/gap reporting.

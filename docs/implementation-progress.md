@@ -3,6 +3,31 @@
 
 ## Current delivery workflow (2026-11-03)
 
+[PR #148](https://github.com/phihos/asservat/pull/148) first candidate `44037bb6`
+failed [native run 41627837758](https://github.com/phihos/asservat/actions/runs/41627837758)
+during schema installation, before collection: the installer retained a
+128-migration ceiling while the release contains 129. Go exited 1 after 47.488s;
+sources matched and cleanup failures were empty. CI run 41627821687 failed
+only the affected installer/schema tests in shard 0; other shards and gates passed.
+The installer now bounds the bundle/history by the compiled release head, retains
+byte limits and reads one overflow row. Existing regressions reproduced the
+failure and now pass. Real PostgreSQL initial-schema qualification passed in
+22.386s with sourceUnchanged true and cleanup complete, including foreign history,
+original resume, role boundaries and activation-incarnation checks.
+
+Review also reproduced and fixed a disappearing member cgroup aborting valid
+peers, and late teardown exceeding the observation footer deadline. The exact
+original observation window remains bounded; actual cleanup still precedes
+delivery/resource release. Focused gadget/node races and independent semantic
+verification passed. Typed `syscallArguments` edits now retain explicit false
+through public validation, conversion, planning, console editing, Save and repeat.
+The installed fixture exercises true for downloaded buffers and false for Stop.
+The full pre-push gate, focused component races and built React browser checks
+(26 journeys/25 accessibility scans plus native-download restart boundaries)
+passed locally. The native fixture has not yet reached argument acquisition.
+Reports are retained under `test/results/argument-native-41627837758`,
+`argument-initial-schema129-1-*` and `argument-console-followup`.
+
 Active outcome: independently approved manual syscall arguments → prepaid bounded
 node acquisition → independent publication → native JSONL download → joined Stop.
 The existing argument branch is rebased on the verified profile base; node,
@@ -28,7 +53,7 @@ reconstructs current catalog inputs as the production runner does. Offline
 regressions reproduce the setup failures and preserve original scope/deadlines.
 The corrected `argument-manual-prepare-4` passed (Go4.041s, selected test2.60s):
 real manual approval/admission, encrypted intent, one immutable execution/session,
-100663296 prepaid bytes and6000 events, unchanged passive replay and target/epoch
+100663296 prepaid bytes and6,000 events, unchanged passive replay and target/epoch
 substitution refusal. Direct authority mutation through the actual hub-runtime
 credential was denied. Source inventories matched, testExit0 and cleanupFailures
 empty. Reports remain under `test/results/`.

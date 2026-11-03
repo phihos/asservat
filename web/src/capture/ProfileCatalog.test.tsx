@@ -1,10 +1,52 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ProfileCatalog, componentID, defaultBounds, seconds, type Composition } from './ProfileCatalog';
+import { ProfileCatalog, componentID, defaultBounds, seconds, type CatalogDraft, type Composition } from './ProfileCatalog';
 import { SyntheticOperations, profileResult, session, target } from './test-fixtures';
 
 describe('ProfileCatalog', () => {
   afterEach(cleanup);
+  it('edits complete argument settings, preserves false through the draft and omits unchanged defaults', async () => {
+    const profile = profileResult('syscall-activity');
+    if (profile.status !== 'ok') throw new Error();
+    const definition = profile.data.definition;
+    definition.editableFields.push({ actionID: 'syscalls', field: 'syscallArguments', label: 'Argument capture' });
+    Object.assign(definition.recipe.actions[0].parameters, { mode: 'arguments', arguments: { maxBytesPerEvent: 128, captureBuffers: true } });
+    let draft: CatalogDraft = { added: [{ id: 'calls', ref: profile.data.profile_ref, definition, values: {} }], bounds: { bytes: '8388608', duration: '15s' } };
+    const client = new SyntheticOperations();
+    client.responder = () => import('./test-fixtures').then(m => m.profilesResult());
+    const onPreview = vi.fn<(c: Composition) => void>();
+    const view = () => <ProfileCatalog session={session} scope={new AbortController().signal} target={target} busy={false} onPreview={onPreview} client={client} initial={draft} onDraft={next => { draft = next; }}/>;
+    const first = render(view());
+    expect((screen.getByLabelText('Maximum argument bytes per event') as HTMLInputElement).value).toBe('128');
+    expect((screen.getByLabelText('Capture buffer contents') as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Review combined recording' }));
+    expect(onPreview.mock.calls.at(-1)![0].components[0].overrides).toBeUndefined();
+    fireEvent.change(screen.getByLabelText('Maximum argument bytes per event'), { target: { value: '64' } });
+    fireEvent.click(screen.getByLabelText('Capture buffer contents'));
+    first.unmount();
+    render(view());
+    expect((screen.getByLabelText('Maximum argument bytes per event') as HTMLInputElement).value).toBe('64');
+    expect((screen.getByLabelText('Capture buffer contents') as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Review combined recording' }));
+    expect(onPreview.mock.calls.at(-1)![0].components[0].overrides).toEqual([{ actionID: 'syscalls', field: 'syscallArguments', value: { maxBytesPerEvent: 64, captureBuffers: false } }]);
+    onPreview.mockClear();
+    for (const value of ['0', '4097', '1.5', '']) {
+      fireEvent.change(screen.getByLabelText('Maximum argument bytes per event'), { target: { value } });
+      fireEvent.click(screen.getByRole('button', { name: 'Review combined recording' }));
+      expect(onPreview).not.toHaveBeenCalled();
+      expect(screen.getByRole('status').textContent).toBe('Argument bytes per event must be a whole number from 1 to 4096.');
+    }
+    for (const value of ['1', '4096']) {
+      fireEvent.change(screen.getByLabelText('Maximum argument bytes per event'), { target: { value } });
+      fireEvent.click(screen.getByRole('button', { name: 'Review combined recording' }));
+      expect(onPreview.mock.calls.at(-1)![0].components[0].overrides![0].value).toEqual({ maxBytesPerEvent: Number(value), captureBuffers: false });
+    }
+    fireEvent.change(screen.getByLabelText('Maximum argument bytes per event'), { target: { value: '128' } });
+    fireEvent.click(screen.getByLabelText('Capture buffer contents'));
+    fireEvent.click(screen.getByRole('button', { name: 'Review combined recording' }));
+    expect(onPreview.mock.calls.at(-1)![0].components[0].overrides).toBeUndefined();
+    await waitFor(() => expect(client.calls).toHaveLength(2));
+  });
   it('composes selected profiles with changed scalar fields and default bounds (REQ-CPR-005)', async () => {
     const client = new SyntheticOperations();
     client.responder = name => name === 'list_capture_profiles' ? import('./test-fixtures').then(m => m.profilesResult()) : profileResult('network-connections');

@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Passively preview whole-Pod status or a finite packet, syscall or Go profile capture: selected Pod, impact, data handling and blockers. Optional sharing needs evidence-owner and evidence:share; up to eight users/groups, default 24 hours, maximum seven days; get_capture reports its outcome. Use an authorized history_capture_id from list_capture_history for a fresh preview of the original target, retention and composition. profile_composition selects builtin network-connections/v1, syscall-activity/v1 or go-cpu/v1 with typed edits: packetFilter, packetPeers (CIDRs or preview-only Kubernetes peers), windows, ring, timeout, mode and profileDuration. onTrigger recordings require before 0s. Returns lifecycle, filter and assessment; ApprovalRequired and RecorderUnavailable identify unmet prerequisites.",
+  "description": "Passively preview whole-Pod status or a finite packet, syscall or Go profile capture: selected Pod, impact, data handling and blockers. Optional sharing needs evidence-owner and evidence:share; up to eight users/groups, default 24 hours, maximum seven days; get_capture reports its outcome. Use an authorized history_capture_id from list_capture_history for a fresh preview of the original target, retention and composition. profile_composition selects builtin network-connections/v1, syscall-activity/v1 or go-cpu/v1 with typed edits: packetFilter, packetPeers (CIDRs or preview-only Kubernetes peers), windows, ring, timeout, mode, syscallArguments (the complete byte-limit/buffer choice) and profileDuration. onTrigger recordings require before 0s. Returns lifecycle, filter and assessment; ApprovalRequired and RecorderUnavailable identify unmet prerequisites.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -395,11 +395,29 @@
         "$ref": "#/$defs/d10"
       },
       "d16": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxBytesPerEvent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "captureBuffers": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "maxBytesPerEvent",
+          "captureBuffers"
+        ]
+      },
+      "d17": {
         "type": "integer",
         "minimum": 1,
         "maximum": 1000000
       },
-      "d17": {
+      "d18": {
         "type": "integer",
         "minimum": 1,
         "maximum": 100000
@@ -846,7 +864,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "syscallMaxEvents"
+                "const": "syscallArguments"
               },
               "value": {
                 "$ref": "#/$defs/d16"
@@ -868,10 +886,32 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "syscallRate"
+                "const": "syscallMaxEvents"
               },
               "value": {
                 "$ref": "#/$defs/d17"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallRate"
+              },
+              "value": {
+                "$ref": "#/$defs/d18"
               }
             },
             "required": [
@@ -1181,12 +1221,12 @@
                     "$ref": "#/$defs/d0"
                   },
                   "lifecycle_plan": {
-                    "$ref": "#/$defs/d19"
+                    "$ref": "#/$defs/d20"
                   },
                   "capture_assessment": {
                     "allOf": [
                       {
-                        "$ref": "#/$defs/d20"
+                        "$ref": "#/$defs/d21"
                       },
                       {
                         "properties": {
@@ -1736,11 +1776,29 @@
         "$ref": "#/$defs/d9"
       },
       "d15": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxBytesPerEvent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "captureBuffers": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "maxBytesPerEvent",
+          "captureBuffers"
+        ]
+      },
+      "d16": {
         "type": "integer",
         "minimum": 1,
         "maximum": 1000000
       },
-      "d16": {
+      "d17": {
         "type": "integer",
         "minimum": 1,
         "maximum": 100000
@@ -2187,7 +2245,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "syscallMaxEvents"
+                "const": "syscallArguments"
               },
               "value": {
                 "$ref": "#/$defs/d15"
@@ -2209,10 +2267,32 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "syscallRate"
+                "const": "syscallMaxEvents"
               },
               "value": {
                 "$ref": "#/$defs/d16"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallRate"
+              },
+              "value": {
+                "$ref": "#/$defs/d17"
               }
             },
             "required": [
@@ -2347,7 +2427,7 @@
           "maxDuration"
         ]
       },
-      "d17": {
+      "d18": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2428,7 +2508,7 @@
           }
         ]
       },
-      "d18": {
+      "d19": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2467,7 +2547,7 @@
           "resolvedProfiles": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d17"
+              "$ref": "#/$defs/d18"
             },
             "minItems": 1,
             "maxItems": 8
@@ -2475,7 +2555,7 @@
           "actionMap": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d18"
+              "$ref": "#/$defs/d19"
             },
             "minItems": 1,
             "maxItems": 128
@@ -2487,7 +2567,7 @@
           "actionMap"
         ]
       },
-      "d19": {
+      "d20": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2707,15 +2787,15 @@
           }
         ]
       },
-      "d21": {
+      "d22": {
         "type": "string",
         "format": "uuid"
       },
-      "d22": {
+      "d23": {
         "type": "string",
         "pattern": "^[a-f0-9]{64}$"
       },
-      "d23": {
+      "d24": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2781,7 +2861,7 @@
           }
         ]
       },
-      "d25": {
+      "d26": {
         "type": "string",
         "enum": [
           "unknown",
@@ -2791,12 +2871,12 @@
           "verifiedNonPersonal"
         ]
       },
-      "d24": {
+      "d25": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "classification": {
-            "$ref": "#/$defs/d25"
+            "$ref": "#/$defs/d26"
           },
           "basis": {
             "enum": [
@@ -2899,7 +2979,7 @@
           }
         ]
       },
-      "d26": {
+      "d27": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -2928,7 +3008,7 @@
           "policyDigests": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d22"
+              "$ref": "#/$defs/d23"
             },
             "minItems": 1,
             "maxItems": 64,
@@ -2965,7 +3045,7 @@
           "deleteAgeSeconds"
         ]
       },
-      "d27": {
+      "d28": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -3022,7 +3102,7 @@
             "format": "date-time"
           },
           "environmentDigest": {
-            "$ref": "#/$defs/d22"
+            "$ref": "#/$defs/d23"
           },
           "coverage": {
             "type": "string",
@@ -3074,7 +3154,7 @@
           }
         ]
       },
-      "d20": {
+      "d21": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -3082,10 +3162,10 @@
             "const": "capture-assessment/v1"
           },
           "assessmentID": {
-            "$ref": "#/$defs/d21"
+            "$ref": "#/$defs/d22"
           },
           "planDigest": {
-            "$ref": "#/$defs/d22"
+            "$ref": "#/$defs/d23"
           },
           "generatedAt": {
             "type": "string",
@@ -3100,10 +3180,10 @@
             "additionalProperties": false,
             "properties": {
               "rulesDigest": {
-                "$ref": "#/$defs/d22"
+                "$ref": "#/$defs/d23"
               },
               "capabilityDigest": {
-                "$ref": "#/$defs/d22"
+                "$ref": "#/$defs/d23"
               },
               "metrics": {
                 "type": "object",
@@ -3176,7 +3256,7 @@
             ]
           },
           "combinedImpact": {
-            "$ref": "#/$defs/d23"
+            "$ref": "#/$defs/d24"
           },
           "actions": {
             "type": "array",
@@ -3196,18 +3276,18 @@
                   ]
                 },
                 "impact": {
-                  "$ref": "#/$defs/d23"
-                },
-                "data": {
                   "$ref": "#/$defs/d24"
                 },
+                "data": {
+                  "$ref": "#/$defs/d25"
+                },
                 "retention": {
-                  "$ref": "#/$defs/d26"
+                  "$ref": "#/$defs/d27"
                 },
                 "quantities": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/$defs/d27"
+                    "$ref": "#/$defs/d28"
                   },
                   "minItems": 0,
                   "maxItems": 4
@@ -3234,7 +3314,7 @@
           "combinedQuantities": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d27"
+              "$ref": "#/$defs/d28"
             },
             "minItems": 0,
             "maxItems": 16
