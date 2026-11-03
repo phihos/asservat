@@ -3,29 +3,40 @@
 
 ## Current delivery workflow (2026-11-03)
 
-Active outcome: approved profile capture → independent publication → native
-download → saved summary → joined Stop (S-05, PR #147). Argument work is parked
-at its signed checkpoints until this workflow passes. One integration candidate
-contains the download-client correction and immutable validator reuse; no new
-scheduler or shared codec arena is enabled.
+Active outcome: independently approved manual syscall arguments → prepaid bounded
+node acquisition → independent publication → native JSONL download → joined Stop.
+The existing argument branch is rebased on the verified profile base; node,
+compiler, review and SQL128 foundations are integrated. Execution/transport,
+processing/publication and finite-recording cancellation composition remain in
+progress. Native engine and SQL component evidence do not qualify this workflow.
+One integrator owns external fixtures and final installed qualification; agents
+have bounded file ownership. Policy argument compilation remains at its separate
+checkpoint until the manual workflow is composed.
 
-Use `make profile-preflight`, then `make profile-service-preflight` for the
-actual write-only SQL/S3 producer/publication and funded summary ledger. These
-are component checks, not the installed outcome. The integrator owns broad
-`make pre-push`, exact-commit CI and one frozen installed qualification. Earlier
-local full Go checking was interrupted at the maintainer's pause (exit 143);
-exact `7c869f8d` CI passed, but changed-source qualification remains required.
+## Approved profiles and saved summaries merged (2026-11-03)
 
-[Development workflow](development-workflow.md) records the agreed work limits,
-agent responsibilities and retained debug procedure. The last installed failure
-and focused correction are immediately below. The local preflight passed all selected race packages and installed-request
-checks. The combined SQL/S3/OpenBao preflight passed in 11.897s, with source
-inventories unchanged and cleanup empty; reports are retained as
-`test/results/profile-service-preflight-{environment.json,log}`. All pre-push
-components passed: the first console invocation lacked local dependencies;
-rerunning that component with the unchanged lockfile passed 299 tests. The
-read-only integration review found no further concrete blocker. Exact candidate CI 41611340296 passed on `ef2f379a`. The installed result
-and remaining Stop qualification are recorded below.
+[PR #147](https://github.com/phihos/asservat/pull/147) merged as `75506c4e`;
+authoritative read-back matched the complete tree of tested `8a081722`.
+[CI 41618246826](https://github.com/phihos/asservat/actions/runs/41618246826)
+passed, Gitar passed and review threads were clear.
+[Installed run 41618270958](https://github.com/phihos/asservat/actions/runs/41618270958)
+passed approved capture, encrypted publication, hash-matched native download
+(977 bytes, 11 CPU samples, opened by `go tool pprof`), fresh repeat preview,
+read-only client download denial and the exact CPU saved summary. The summary
+used ten units, the 256 MiB worker and one three-key batch; original worker/key
+closure passed. A separate 30-second profile was stopped while Running and
+reached terminal Cancelled without an artifact. This does not claim that the
+application's profiler stopped. Go exited 0 in 720.71s, source inventories matched,
+and cleanup failures were empty. Original reports are retained under
+`test/results/profile-native-41618270958/`.
+
+Focused preflight and the real SQL/S3/OpenBao preflight (11.897s) passed before
+installed dispatch. [Development workflow](development-workflow.md) documents
+staged checks and retained local debugging inputs. The profile installed job
+spent 42s installing unused Wireshark tools; that focus now skips this setup,
+while packet qualifications retain it. No qualification assertion or job limit
+changes. Remaining S-05 features and complete workload storage fairness remain
+unfinished; the following records preserve earlier failures and their fixes.
 
 
 ## Installed download and summary passed; Stop fixture corrected (2026-11-03)
