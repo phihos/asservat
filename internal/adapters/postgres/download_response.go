@@ -161,7 +161,7 @@ func (s *Downloads) beginDownloadResponse(ctx context.Context, sessionID string,
 			if e != nil {
 				return e
 			}
-			if !control.canRespond() {
+			if !control.canRespond(r.Plan) {
 				return artifact.ErrDownloadUnavailable
 			}
 		}

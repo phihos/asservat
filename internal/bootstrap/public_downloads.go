@@ -349,7 +349,7 @@ func (d *OwnerDeployment) workerSourceClients(observer, probe *kube.PermissionCl
 // download can be prepared (ADR-194 D1).
 type unconfiguredDownloadPlans struct{}
 
-func (unconfiguredDownloadPlans) ContextDownloadPlan(context.Context, artifact.DownloadScope) (evidence.ContextDownloadPlan, error) {
+func (unconfiguredDownloadPlans) ContextDownloadPlan(context.Context, evidence.ContextDownloadSource) (evidence.ContextDownloadPlan, error) {
 	return evidence.ContextDownloadPlan{}, artifact.ErrDownloadUnavailable
 }
 

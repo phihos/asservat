@@ -13,6 +13,7 @@ import (
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	capacityapp "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 )
 
 // promotedKeyNames are the installation-derived public key and role names
@@ -91,7 +92,7 @@ func derivePromotedOwner(in contracts.OwnerDeployment, x promotedOwnerParts, now
 		AuditStoreID:       q.RootBacking.Capture.Policy.StoreID, ArtifactKeyID: promotedArtifactKeyID(in.InstallationID),
 		WorkerConfiguration: x.Sources.WorkerConfiguration, WorkerPKI: pki,
 		DownloadEnvironment: contracts.OwnerPublicEnvironment{Source: x.Sources.DownloadEnvironment.Source, Guard: x.Sources.DownloadEnvironment.Guard, Paths: []contracts.DownloadEnvironmentPath{}},
-		DownloadPlan:        contracts.OwnerPublicDownloadPlan{OutputLimit: 16 << 20, ReadLimit: 24 << 20, RequestLimit: 4, DurationSeconds: 300}, // ADR-248: one 8 MiB recording and a resume
+		DownloadPlan:        contracts.OwnerPublicDownloadPlan{OutputLimit: artifact.ProfileDownloadOutputBytes, ReadLimit: artifact.ProfileDownloadReadBytes, RequestLimit: 4, DurationSeconds: 300}, // ADR-288: largest profile and one resume; sessions narrow to accepted type.
 		Port:                contracts.OwnerInstalledPublicPort, Version: p.Version,
 		OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4, DownloadsPerIdentity: 2, DownloadMaxSeconds: 3600,
 		OperationAudit:    contracts.OwnerPublicOperationAudit{RetentionSeconds: int(retention), NormalConcurrency: 8, ResolutionConcurrency: 2, PerPrincipalConcurrency: 2, NormalPerSecond: 50, ResolutionPerSecond: 10},

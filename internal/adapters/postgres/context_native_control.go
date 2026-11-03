@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// The first context source uses a single <=4096-byte response conversation.
+// Native responses use one conversation per bounded transfer window.
 // Each positively joined conversation costs one claim/replacement and one
 // close; final independently confirmed worker retirement costs another update.
 // An unknown close never refunds either allowance or establishes quiescence.
@@ -27,12 +27,18 @@ type contextNativeControl struct {
 	remaining                           int64
 }
 
-func (c contextNativeControl) canObserve() bool {
-	return !c.uncertain && !c.nativeBusy && !c.responseBusy && c.remaining >= firstContextObserveTransitions+firstContextContentTransitions+firstContextRetirementTransitions
+func (c contextNativeControl) canObserve(outputRemaining int64) bool {
+	// Before metadata is observed, reserve for the largest supported response
+	// that the remaining session output could cover. No native size enters SQL.
+	if outputRemaining < 0 {
+		return false
+	}
+	windows := max(int64(1), (min(outputRemaining, artifact.MaxGoTraceBytes)+artifact.DownloadWindowBytes-1)/artifact.DownloadWindowBytes)
+	return !c.uncertain && !c.nativeBusy && !c.responseBusy && c.remaining >= firstContextObserveTransitions+windows*firstContextContentTransitions+firstContextRetirementTransitions
 }
 
-func (c contextNativeControl) canRespond() bool {
-	return !c.uncertain && !c.nativeBusy && !c.responseBusy && c.remaining >= firstContextContentTransitions+firstContextRetirementTransitions
+func (c contextNativeControl) canRespond(plan artifact.DownloadResponsePlan) bool {
+	return plan.Valid() && plan.Selection.Length <= artifact.MaxGoTraceBytes && plan.Selection.Offset <= artifact.MaxGoTraceBytes-plan.Selection.Length && !c.uncertain && !c.nativeBusy && !c.responseBusy && c.remaining >= plan.Windows()*firstContextContentTransitions+firstContextRetirementTransitions
 }
 
 // This is eligibility for another bounded attempt, not proof that the remote

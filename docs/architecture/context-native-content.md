@@ -1,5 +1,13 @@
 # First-context native content
 
+[ADR-288](../decisions/288-profile-native-streaming.md) extends the registered profile path to
+two bounded 64 MiB response windows. Planning consumes the coordinator's exact
+published source observation and narrows session funding by its accepted native
+type and registration limit, reusing that source for preparation without another
+read or renewed deadline. Response/control admission accounts for both windows.
+The real SQL/S3 and TLS component results are recorded in that decision; installed
+profile qualification remains pending.
+
 [ADR-136](../decisions/136-first-context-native-content.md) joins the existing C14
 coordinator to regional acquisition and the native HTTP sink. C03 still owns current
 evidence authority, C02 owns each request or live-reader batch, C20 owns HTTP/native

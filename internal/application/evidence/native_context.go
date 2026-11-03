@@ -76,8 +76,9 @@ func sameNativeMetadata(a, b artifact.NativeDownloadMetadata) bool {
 
 // NativeWindowReadWork bounds the ciphertext one remote response window of
 // the source reads. Pod status keeps its historical fixed charge. Any other
-// type is at most one frame (ADR-248), read as that frame and one index page,
-// each with its fixed cipher overhead; the window's read limit and the session
+// recorder type is at most one frame (ADR-248); profiles use up to nine frames
+// per window. Include index pages and fixed cipher overhead; the window's
+// read limit and the session
 // read budget are charged with this bound, not with measured reads.
 func NativeWindowReadWork(t artifact.NativeType) int64 {
 	if t.Name == artifact.PodStatusArtifact {
@@ -86,7 +87,7 @@ func NativeWindowReadWork(t artifact.NativeType) int64 {
 	if t.DownloadLimit() > artifact.FrameBytes {
 		// A 64 MiB response window can straddle nine encrypted storage frames
 		// and two index pages. Charge this worst case even for a shorter range.
-		return 9*(artifact.FrameBytes+artifact.CipherOverhead) + 2*(artifact.PageBytes+artifact.CipherOverhead)
+		return artifact.ProfileDownloadWindowReadWork
 	}
 	return artifact.FrameBytes + artifact.CipherOverhead + artifact.PageBytes + artifact.CipherOverhead
 }

@@ -74,4 +74,63 @@ func TestContextPlanRequiresExactFiniteNativeControlAndStopBacking(t *testing.T)
 	if contextPlanBacking(limits, a, c, n, b, p, installation, until) {
 		t.Fatal("expired original backing accepted")
 	}
+	// Profile funding needs both windows and their independent key/audit slots.
+	limits.OutputLimit, limits.ReadLimit = artifact.ProfileDownloadOutputBytes, artifact.ProfileDownloadReadBytes
+	a.OutputLimit, a.ReadLimit = limits.OutputLimit, limits.ReadLimit
+	native.TransitionsPerRow, n.TransitionsPerRow = artifact.ProfileDownloadNativeTransitions, artifact.ProfileDownloadNativeTransitions
+	n.PolicyJson, _ = json.Marshal(native)
+	if !contextPlanBacking(limits, a, c, n, b, p, installation, now) {
+		t.Fatal("two-window funding refused")
+	}
+	cc := c
+	cc.ReservedWindows = 1
+	if contextPlanBacking(limits, a, cc, n, b, p, installation, now) {
+		t.Fatal("one remaining window funded two-window response")
+	}
+	cc = c
+	cc.ReservedAuditBytes = artifact.DownloadWindowAuditBytes
+	if contextPlanBacking(limits, a, cc, n, b, p, installation, now) {
+		t.Fatal("missing window audit funded")
+	}
+	nn := n
+	nn.ChargedKeys = 1
+	if contextPlanBacking(limits, a, c, nn, b, p, installation, now) {
+		t.Fatal("one remaining key funded two-window response")
+	}
+	native.TransitionsPerRow, n.TransitionsPerRow = 8, 8
+	n.PolicyJson, _ = json.Marshal(native)
+	if contextPlanBacking(limits, a, c, n, b, p, installation, now) {
+		t.Fatal("insufficient transitions funded")
+	}
+}
+
+func TestNativeDownloadPlanUsesAcceptedTypeAndSize(t *testing.T) {
+	ceilings := ContextDownloadPlanLimits{OutputLimit: artifact.ProfileDownloadOutputBytes, ReadLimit: artifact.ProfileDownloadReadBytes, RequestLimit: 4, Duration: 5 * time.Minute}
+	for _, name := range []string{artifact.PodStatusArtifact, artifact.PCAPNGArtifact, artifact.HTTPHeadersArtifact, artifact.PprofArtifact, artifact.GoTraceArtifact} {
+		typ, _ := artifact.LookupNativeType(name)
+		for _, size := range []int64{1, min(typ.MaxBytes, 16<<20), typ.MaxBytes} {
+			got, err := boundedNativeDownloadPlan(ceilings, typ, size)
+			if err != nil || !got.valid() {
+				t.Fatal(name, size, got, err)
+			}
+			if name == artifact.PodStatusArtifact || name == artifact.PCAPNGArtifact || name == artifact.HTTPHeadersArtifact {
+				if got.OutputLimit != 16<<20 || got.ReadLimit != 24<<20 {
+					t.Fatal("small source inflated to profile reservation", got)
+				}
+			} else {
+				if got.OutputLimit != max(artifact.MaxContextBytes, 2*size) || got.ReadLimit > ceilings.ReadLimit || got.ReadLimit < artifact.ProfileDownloadWindowReadWork {
+					t.Fatal("profile budget", got)
+				}
+			}
+		}
+		if _, err := boundedNativeDownloadPlan(ceilings, typ, typ.MaxBytes+1); err == nil {
+			t.Fatal("unsupported native limit")
+		}
+	}
+	typ, _ := artifact.LookupNativeType(artifact.GoTraceArtifact)
+	old := ceilings
+	old.ReadLimit = 24 << 20
+	if _, err := boundedNativeDownloadPlan(old, typ, artifact.MaxGoTraceBytes); err == nil {
+		t.Fatal("old installation ceiling silently enlarged")
+	}
 }

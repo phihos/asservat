@@ -10,6 +10,7 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 )
 
 // ADR-194 step 4: the derived promoted input passes the owner's own reader,
@@ -77,6 +78,9 @@ func TestDerivePromotedOwner(t *testing.T) {
 				return
 			}
 			p := out.Public
+			if p.DownloadPlan.OutputLimit < artifact.ProfileDownloadOutputBytes || p.DownloadPlan.ReadLimit < artifact.ProfileDownloadReadBytes {
+				t.Fatal("installed plan cannot fund supported native profiles", p.DownloadPlan)
+			}
 			if p.WorkSigning.KeyID != signing.Name+"-v1" || p.ProviderRecipeSHA256 == "" || p.AuditStoreID != q.RootBacking.Capture.Policy.StoreID || p.RuntimeProjection != x.Projection ||
 				out.Native.WorkerAPIs == nil || out.Native.RetentionTopologies == nil || p.WorkerConfiguration.Source != x.Sources.WorkerConfiguration.Source {
 				t.Fatal("derived input", p)

@@ -12,14 +12,14 @@ import (
 // or turn the retained uncertainty into metadata-observation admission.
 func TestFirstContextClosedLocalOwnersDoNotClearUncertainResponse(t *testing.T) {
 	c := contextNativeControl{remaining: 32, uncertain: true}
-	if c.canObserve() {
+	if c.canObserve(artifact.MaxGoTraceBytes) {
 		t.Fatal("closed local owners admitted another native observation despite retained failed/unknown output")
 	}
-	if c.canRespond() {
+	if c.canRespond(artifact.DownloadResponsePlan{Version: 1, Selection: artifact.DownloadSelection{Length: artifact.MaxGoTraceBytes}, WindowReadLimit: 80 << 20}) {
 		t.Fatal("failed response permitted another content admission")
 	}
 	c.uncertain = false
-	if !c.canObserve() {
+	if !c.canObserve(artifact.MaxGoTraceBytes) {
 		t.Fatal("known eligible bounded retry denied")
 	}
 }

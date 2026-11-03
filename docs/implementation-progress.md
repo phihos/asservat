@@ -26,6 +26,25 @@ under `/home/phil/.cache/asservat-build/profile-increment2-*.log`.
 Next: S-05 increment 3 connects actual node acquisition, fresh endpoint checks,
 profile admission, publication and native download, then qualifies the installed
 capture-to-local-tool workflow. This preview checkpoint does not complete S-05.
+## Multi-frame native profile download components (2026-11-03)
+
+ADR-288 now supports registered 64 MiB pprof and 128 MiB trace bounds through
+existing 64 MiB response windows. Exact two-window acknowledgement, native owner
+transition headroom and per-window key/audit admission are required. The installed
+plan ceiling covers a full trace plus one retry; accepted-source planning keeps
+smaller artifacts' reservations bounded and preserves original observation expiry.
+Existing capacity funding must remain immutable; newly qualified profile backing
+is being integrated separately before an installed workflow can pass.
+
+Real PostgreSQL/S3 component run `profile-streaming-s3-sql-3` passed (exit 0,
+source unchanged, cleanup failures empty): valid 12,502,769-byte pprof, encrypted
+multipart store, publisher verification, exact native readback and successful
+`go tool pprof -symbolize=none`. Runs 1/2 retain the fixture timestamp/PeriodType
+failures. Separate synthetic TLS tests passed 64 MiB whole/resumed transfers and
+128 MiB through two conversations with exact hashes and one key opening per window.
+These do not prove installed profile capture, raw grants, cancellation, resource
+qualification or complete S-05. Those remain the immediate continuation.
+
 
 ## Go pprof and execution-trace native types (2026-11-02)
 

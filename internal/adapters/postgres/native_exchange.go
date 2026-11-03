@@ -142,7 +142,7 @@ func (s *NativeOwners) claimNativeOperation(ctx context.Context, en value.Worker
 			if e != nil {
 				return e
 			}
-			if !control.canObserve() {
+			if !control.canObserve(p.OutputLimit - p.ChargedOutput) {
 				return artifact.ErrDownloadUnavailable
 			}
 		}

@@ -589,7 +589,7 @@ func TestCustodyWithRealServices(t *testing.T) {
 		qualifyRemoteNativeWindow(t, ctx, store)
 	})
 	t.Run("Go profile native types (ADR-284)", func(t *testing.T) {
-		qualifyProfileArtifacts(t, ctx, store)
+		qualifyProfileArtifacts(t, ctx, store, admin, ledger)
 	})
 }
 
