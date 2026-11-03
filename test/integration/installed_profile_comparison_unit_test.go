@@ -14,6 +14,9 @@ import (
 
 func TestInstalledProfileComparisonFocusPreflight(t *testing.T) {
 	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "profile-comparison")
+	if got := installedClusterCount(); got != 2 {
+		t.Fatalf("bootstrap consumer expects %d clusters; Python focus descriptor provides 2", got)
+	}
 	if !installedProfileFocus() || !installedRecordingFocus() || !installedFastFixture() || nativeCapacityProfile().Records != installedProfileComparisonQueries*query.ProfileComparisonQueryUnits || nativeCapacityProfile().Records != 40 {
 		t.Fatal("comparison focus not wired to exact two-query40-unit fixture")
 	}

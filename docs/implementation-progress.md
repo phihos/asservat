@@ -85,6 +85,16 @@ wrapping, audit acknowledgement and joined close. Focused races passed across
 parser, reader, encrypted adapter and native transport; C18/C20 direct/poll,
 failed-audit and unknown-close comparisons passed in 1.073s / 23.349s. Original
 red reports remain archived. Native comparison qualification is still pending.
+PR152 is open. The first native dispatch (41737480379, frozen75567e10)
+stopped before bootstrap: the Python harness supplied two clusters while the
+Go consumer expected three for the new focus. Go exited1 in0.020s; all4,064
+source hashes matched the frozen tree, cleanup was complete and build scratch
+was removed. It collected no profile and qualifies no comparison behavior.
+The shared profile-focus registration and actual consumer preflight are now
+fixed (red reproduced; focused race3.595s passed). The same already-required
+pinned builder is prefetched for this suite, overlapping its observed20s serial
+pull without adding an image or changing20m/18m limits. Original reports remain
+in `test/results/profile-comparison-native-41737480379/`.
 No comparison requirement or installed result is marked complete. The argument job's cold-start/teardown
 headroom also needs improvement before later installed campaigns. No timeout was
 raised. These saved-view fixtures do not complete arbitrary `syscall_query`,
