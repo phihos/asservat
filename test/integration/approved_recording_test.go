@@ -3,9 +3,12 @@ package integration
 import (
 	"context"
 	"crypto/sha256"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
@@ -25,10 +28,17 @@ var recordingScenarioSlots int64 = 1
 
 // Uses real SQL with explicit synthetic bootstrap and a synthetic approved
 // reviewer; independent reviewer/step-up qualification belongs to ADR-249.
-func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, create func(*testing.T) captureAdmissionScenario) {
+func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario) {
 	t.Helper()
+	t.Run("manual-argument-prepare", func(t *testing.T) { qualifyManualArgumentPreparation(t, ctx, admin, poolFor, store, keys, create(t)) })
 	t.Run("adhoc-observation-pool", func(t *testing.T) {
-		qualifyAdHocObservationPool(t, ctx, admin, poolFor, create(t))
+		qualifyAdHocObservationPool(t, ctx, admin, poolFor, create(t), "bytes")
+	})
+	t.Run("adhoc-observation-event-pool", func(t *testing.T) {
+		qualifyAdHocObservationPool(t, ctx, admin, poolFor, create(t), "events")
+	})
+	t.Run("adhoc-observation-expiry-after-pool-lock", func(t *testing.T) {
+		qualifyAdHocObservationPool(t, ctx, admin, poolFor, create(t), "expiry")
 	})
 	t.Run("recording-composition-group", func(t *testing.T) {
 		// Both recordings reserve storage in one allocation.
@@ -323,7 +333,8 @@ func qualifyCompositionGroup(t *testing.T, ctx context.Context, admin *pgxpool.P
 // ADR-279: the ad hoc observation pool of an approved grant debits its
 // reviewed maxObservedBytes once and monotonically; it is never refilled,
 // pending or revoked grants have none, and nothing can lower it.
-func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario) {
+func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, mode string) {
+	eventPool := mode != "bytes"
 	in := s.a.Plan.Input
 	in.Target.ExecutionClass, in.Capability.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
 	in.Target.NodeUID, in.Target.NodeBootID, in.Target.Pin.NodeName = "", "", ""
@@ -368,7 +379,14 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 	}
 	// The grant's frozen scope carries the reviewed observation limits.
 	scope := []byte(`{"timing":"approvedAcceptance/v1","approval":{"dataClass":"raw","observationLimits":{"maxSessionSeconds":60,"maxObservedBytes":100,"maxBytesPerSecond":16,"maxConcurrentSessions":1}}}`)
+	if eventPool {
+		scope = []byte(`{"timing":"approvedAcceptance/v1","approval":{"dataClass":"raw","observationLimits":{"maxSessionSeconds":60,"maxObservedBytes":100,"maxObservedEvents":10,"maxBytesPerSecond":16,"maxConcurrentSessions":1}}}`)
+	}
 	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: sha256.Sum256(scope), Scope: scope, Review: []byte(`{}`), DataClass: "raw", Reasons: []authorization.SensitiveReason{{ActionID: reviewed.Actions[0].ID, Code: planvalue.ReasonRawPackets}}, Lifetime: time.Hour, Revision: 1}
+	if mode == "expiry" {
+		g.ResultAccess = &authorization.ResultAccess{ActionIDs: []string{reviewed.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{"synthetic-observation-client"}, MaxArtifacts: 1, MaxBytes: 1, MaxOperations: 1, NotAfter: time.Now().UTC().Add(5 * time.Second).Truncate(time.Microsecond)}
+		g.ResultAccessDigest = authapp.ResultAccessDigest(g.CaptureID, g.ExecutionDigest, *g.ResultAccess)
+	}
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
 	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "raw", RequestDigest: sha256.Sum256([]byte("synthetic-raw-request"))}, s.a.Recovery)
 	if err != nil {
@@ -382,6 +400,17 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 		return ok
 	}
+	spendEvents := func(amount, events int64) bool {
+		t.Helper()
+		var ok bool
+		if err := grantPool.QueryRow(ctx, "SELECT spend_adhoc_observation($1,$2,$3,$4)", s.a.RootID, g.ID, amount, events).Scan(&ok); err != nil {
+			t.Fatal(err)
+		}
+		return ok
+	}
+	if spendEvents(5, 1) {
+		t.Fatal("pending grant spent events")
+	}
 	if spend(10) {
 		t.Fatal("a pending grant has an observation pool")
 	}
@@ -390,7 +419,52 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 	if g, _, err = grants.DecideGrant(ctx, authapp.GrantDecisionInput{GrantID: g.ID, Approve: true, Approver: approver, Reason: "synthetic raw review", ACR: "gold", AuthTime: time.Now().Add(-time.Second), IdempotencyKey: "approve"}, s.a.Recovery); err != nil {
 		t.Fatal("decision", err)
 	}
-	if !spend(60) || spend(41) || !spend(40) || spend(1) {
+	if mode == "expiry" {
+		qualifyObservationPoolLockExpiry(t, ctx, admin, grantPool, s.a.RootID, g.ID, g.ExpiresAt)
+		return
+	}
+	if spendEvents(0, 1) || spendEvents(1, -1) || spendEvents(-1, 1) || spendEvents(1, 1<<62) || !eventPool && spendEvents(1, 1) {
+		t.Fatal("invalid or unreviewed events spent")
+	}
+	if eventPool {
+		// Actual concurrent SQL debits share one immutable reviewed pool.
+		// Thirty-two callers compete for ten event units; refused work must
+		// consume neither bytes nor events, and legacy packet bytes share it.
+		var successes atomic.Int32
+		var wg sync.WaitGroup
+		errs := make(chan error, 32)
+		for i := 0; i < 32; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				var ok bool
+				err := grantPool.QueryRow(ctx, "SELECT spend_adhoc_observation($1,$2,5,1)", s.a.RootID, g.ID).Scan(&ok)
+				if err != nil {
+					errs <- err
+					return
+				}
+				if ok {
+					successes.Add(1)
+				}
+			}()
+		}
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			t.Fatal(err)
+		}
+		var usedBytes, usedEvents int64
+		if err := admin.QueryRow(ctx, "SELECT spent,events_spent FROM adhoc_observation_spend WHERE root_id=$1 AND grant_id=$2", s.a.RootID, g.ID).Scan(&usedBytes, &usedEvents); err != nil {
+			t.Fatal(err)
+		}
+		if successes.Load() != 10 || usedBytes != 50 || usedEvents != 10 || !spend(50) || spend(1) {
+			t.Fatal("shared event/byte pool", successes.Load(), usedBytes, usedEvents)
+		}
+		qualifyObservationPoolDowngradeRefusal(t, ctx, admin, g.ID)
+		if _, err := admin.Exec(ctx, "UPDATE adhoc_observation_spend SET events_spent=0 WHERE grant_id=$1", g.ID); err == nil {
+			t.Fatal("event spend lowered")
+		}
+	} else if !spend(60) || spend(41) || !spend(40) || spend(1) {
 		t.Fatal("pool not bounded by the reviewed maximum")
 	}
 	if _, err := admin.Exec(ctx, "UPDATE adhoc_observation_spend SET spent=0 WHERE grant_id=$1", g.ID); err == nil {
@@ -402,7 +476,7 @@ func qualifyAdHocObservationPool(t *testing.T, ctx context.Context, admin *pgxpo
 	if _, _, err = grants.RevokeGrant(ctx, authapp.GrantRevocationInput{GrantID: g.ID, Revoker: p.Actor, ExpectedRevision: g.Revision, IdempotencyKey: "revoke"}, s.a.Recovery); err != nil {
 		t.Fatal("revoke", err)
 	}
-	if spend(0) || spend(1) {
+	if spend(0) || spend(1) || spendEvents(1, 1) {
 		t.Fatal("revoked grant spent")
 	}
 }

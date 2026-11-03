@@ -2,10 +2,53 @@ package contracts
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 )
+
+func TestInvestigationArgumentEditsRetainBoundsWithSharedActionID(t *testing.T) {
+	wire, err := NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := func(action, value string) []byte {
+		return []byte(fmt.Sprintf(`{"target_ref":{"cluster_id":"00000000-0000-4000-8000-000000000001","namespace":"payments","kind":"Deployment","name":"api"},"profile_composition":{"components":[{"id":"calls","profileRef":{"catalog":"namespace","name":"arguments","version":"v1"},"overrides":[{"actionID":%q,"field":"syscallArguments","value":%s}]}],"maxTotalBytes":8388608,"maxDuration":"10s"}}`, action, value))
+	}
+	for _, action := range []string{"a", strings.Repeat("a", 63)} {
+		for _, value := range []string{`{"maxBytesPerEvent":1,"captureBuffers":false}`, `{"maxBytesPerEvent":4096,"captureBuffers":true}`} {
+			if err := wire.ValidateInput("preview_capture", input(action, value)); err != nil {
+				t.Fatal("bounded complete argument override refused", err)
+			}
+		}
+	}
+	for _, action := range []string{"", strings.Repeat("a", 64)} {
+		if wire.ValidateInput("preview_capture", input(action, `{"maxBytesPerEvent":128,"captureBuffers":false}`)) == nil {
+			t.Fatal("shared action ID schema lost bounds")
+		}
+	}
+	for _, value := range []string{
+		`{"maxBytesPerEvent":0,"captureBuffers":false}`,
+		`{"maxBytesPerEvent":4097,"captureBuffers":false}`,
+		`{"maxBytesPerEvent":1.5,"captureBuffers":false}`,
+		`{"maxBytesPerEvent":128}`,
+		`{"captureBuffers":false}`,
+		`{"maxBytesPerEvent":128,"captureBuffers":null}`,
+		`{"maxBytesPerEvent":128,"captureBuffers":"false"}`,
+		`{"maxBytesPerEvent":128,"captureBuffers":false,"extra":true}`,
+	} {
+		if wire.ValidateInput("preview_capture", input("calls", value)) == nil {
+			t.Fatal("invalid argument override accepted", value)
+		}
+	}
+	descriptor, _ := wire.Tool("preview_capture")
+	raw, err := json.Marshal(descriptor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("preview_capture descriptor: %d bytes (unchanged 36 KiB bound)", len(raw))
+}
 
 func TestInvestigationProfileDurationUsesClosedPublicEdit(t *testing.T) {
 	wire, err := NewInvestigationContracts()

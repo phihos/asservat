@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/syscall-arguments.schema.json",
+  "title": "Native bounded syscall arguments JSON Lines record",
+  "description": "Exactly one header, bounded event records, exactly one footer. Ordering, authority pins, sizes and reversible value encodings are also validated by the native reader.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "record": {
+          "const": "header"
+        },
+        "format": {
+          "const": "asservat-syscall-arguments/v1"
+        },
+        "pod_uid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "boot_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "source_epoch": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "engine_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "definition_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "accounting_rule": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "decoder": {
+          "const": "traceloop-x86_64-arguments-v1"
+        },
+        "abi": {
+          "const": "x86_64"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "node_uid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "collector_pod_uid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "session_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "fence": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "record",
+        "format",
+        "pod_uid",
+        "boot_id",
+        "source_epoch",
+        "engine_digest",
+        "definition_digest",
+        "accounting_rule",
+        "decoder",
+        "abi",
+        "started_at",
+        "node_uid",
+        "collector_pod_uid",
+        "session_id",
+        "fence"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "record": {
+          "const": "event"
+        },
+        "event": {
+          "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/rawEvent",
+          "properties": {
+            "arguments": {
+              "items": {
+                "properties": {
+                  "name": {
+                    "enum": [
+                      "fd",
+                      "count",
+                      "offset",
+                      "dirfd",
+                      "flags",
+                      "mode",
+                      "path",
+                      "buffer"
+                    ]
+                  },
+                  "value": {
+                    "maxLength": 179,
+                    "pattern": "^(?:decimal:-?(?:0|[1-9][0-9]*)|base64:(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?|unavailable:fault)$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "record",
+        "event"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "record": {
+          "const": "footer"
+        },
+        "ended_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "outcome": {
+          "enum": [
+            "completed",
+            "cancelled",
+            "outputLimit",
+            "observationStopped",
+            "failed"
+          ]
+        },
+        "retained": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "filtered": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "pair_gaps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "malformed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "faults": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "truncated": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lost_samples": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "coverage_unknown": {
+          "type": "boolean"
+        },
+        "observed_events": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_bytes": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "output_full": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "record",
+        "ended_at",
+        "outcome",
+        "retained",
+        "filtered",
+        "pair_gaps",
+        "malformed",
+        "faults",
+        "truncated",
+        "lost_samples",
+        "coverage_unknown",
+        "observed_events",
+        "observed_bytes",
+        "output_full"
+      ]
+    }
+  ]
+}

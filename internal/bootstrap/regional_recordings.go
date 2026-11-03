@@ -54,6 +54,10 @@ type recordingNodes interface {
 }
 
 type heldRecording struct {
+	argumentSource  *targets.PacketSourceObservation
+	recordingStop   *collector.RecordingStop
+	argumentResult  bool // original authenticated result arrived after engine return
+	argumentJoined  bool // result handling and local writer have returned
 	storing         bool
 	stopStoreWait   context.CancelFunc // only the unread FIFO wait, never an active Store
 	cancelID        string
@@ -143,13 +147,16 @@ func (h *ConnectorRecordings) PacketRecorder(ctx context.Context, r targets.Reco
 
 // prepare returns the prepared output of a recording expectation.
 func (h *ConnectorRecordings) Prepare(prepared *objectstore.PreparedArtifact, e artifact.ContextExpectation) *preparedRecording {
+	if e.Recording != nil && e.Recording.Arguments != nil {
+		e.Recording = e.Recording.Clone()
+	}
 	return &preparedRecording{holder: h, prepared: prepared, expectation: e}
 }
 
 // start queues the recording on the Pod's node and holds the prepared keys.
 func (h *ConnectorRecordings) start(ctx context.Context, p *objectstore.PreparedArtifact, e artifact.ContextExpectation, pin artifact.PinnedPod, until time.Time) (time.Time, error) {
 	rec := e.Recording
-	if !rec.Valid() || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID {
+	if !rec.Valid() || rec.Arguments != nil || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID {
 		return time.Time{}, value.ErrInvalid
 	}
 	name, err := h.pods.PodNode(ctx, pin)
@@ -257,6 +264,19 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		_, _ = io.Copy(io.Discard, pcapng)
 		return value.ErrDenied
 	}
+	if source := held.argumentSource; source != nil {
+		if node.BootID != source.BootID || node.PodUID != source.CollectorPodUID || node.Epoch != source.CollectorEpoch || r.Failure == "" && (r.StartedAt.Before(held.queued) || r.EndedAt.Before(r.StartedAt)) {
+			h.mu.Unlock()
+			_, _ = io.Copy(io.Discard, pcapng)
+			return value.ErrDenied
+		}
+		held.argumentResult = true
+		defer func() {
+			h.mu.Lock()
+			held.argumentJoined = true
+			h.mu.Unlock()
+		}()
+	}
 	if r.Failure != "" {
 		if held.stopPeers != nil {
 			held.stopPeers()
@@ -297,9 +317,11 @@ func (h *ConnectorRecordings) DeliverPacket(ctx context.Context, node collector.
 		h.mu.Unlock()
 	}()
 	// Finite recordings cannot predate queueing. An independently admitted
-	// source snapshot retains its original acquisition window instead.
+	// source snapshot retains its original acquisition window instead. Argument
+	// records retain the exact header/footer interval, validated above; changing
+	// nanoseconds here would disagree with the native bytes.
 	started, completed := r.StartedAt.UTC(), r.EndedAt.UTC()
-	if held.snapshot == nil {
+	if held.snapshot == nil && held.argumentSource == nil {
 		started = started.Truncate(time.Microsecond)
 		if started.Before(held.queued) {
 			started = held.queued
@@ -363,6 +385,10 @@ func (h *ConnectorRecordings) Collect(w fleet.APIContextWork) (evidence.Recordin
 	}
 	if held.cancelRequested && held.outcome.State != evidence.RecordingStored {
 		if !held.storing {
+			if receipt, ok := h.recordingCancellation(held); ok {
+				held.outcome = evidence.RecordingCollection{State: evidence.RecordingCancelled, RecordingCancellation: &receipt}
+				return held.outcome, nil
+			}
 			if receipt, ok := h.snapshotCancellation(held); ok {
 				held.outcome = evidence.RecordingCollection{State: evidence.RecordingCancelled, SnapshotCancellation: &receipt}
 				return held.outcome, nil
@@ -402,7 +428,7 @@ func (p *preparedRecording) StartRecording(ctx context.Context, pin artifact.Pin
 	// The legacy operation carries no committed input permit. Refuse before
 	// transferring prepared ownership; only the future typed policy start may
 	// carry a current exact source and the original SQL observation reservation.
-	if compiler.MeteredRecording(p.expectation.Recording) {
+	if p.expectation.Recording != nil && p.expectation.Recording.Arguments != nil || compiler.MeteredRecording(p.expectation.Recording) {
 		return time.Time{}, value.ErrUnavailable
 	}
 	p.mu.Lock()
@@ -430,7 +456,7 @@ func (p *preparedRecording) StartPolicyRecording(ctx context.Context, pin artifa
 	h, e := p.holder, p.expectation
 	r, b := e.Recording, permit.Binding
 	now := h.now()
-	if ctx == nil || ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || started.After(now) || started.Before(permit.StartedAt) || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID || source.PodUID != e.PodUID || !r.Valid() || !compiler.MeteredRecording(r) || b.CaptureID != e.CaptureUID || b.ActionID != e.ActionID || b.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch || b.ExpectationDigest != [32]byte(evidence.ContextExpectationDigest(e)) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || permit.SessionUntil.After(e.Registration.WriteUntil) {
+	if ctx == nil || ctx.Err() != nil || !source.Valid(now) || !permit.ValidFinite(now) || !now.Before(until) || started.After(now) || started.Before(permit.StartedAt) || pin.UID != e.PodUID || pin.NamespaceUID != e.NamespaceUID || source.PodUID != e.PodUID || !r.Valid() || r.Arguments != nil || !compiler.MeteredRecording(r) || b.CaptureID != e.CaptureUID || b.ActionID != e.ActionID || b.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch || b.ExpectationDigest != [32]byte(evidence.ContextExpectationDigest(e)) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || permit.SessionUntil.After(e.Registration.WriteUntil) {
 		return time.Time{}, value.ErrDenied
 	}
 	work := collector.PacketCapture{CaptureID: e.CaptureUID, PodUID: e.PodUID, Duration: permit.Duration, MaxBytes: r.MaxBytes, Observation: &permit}

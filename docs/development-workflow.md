@@ -23,7 +23,8 @@ build another test framework or duplicate the production workflow with mocks.
 ## Verification tiers
 
 1. While editing: run the failing regression and affected tests. Use
-   `make profile-preflight` for the current profile workflow. It runs local
+   `make profile-preflight` for profiles or `make argument-preflight` for the
+   finite syscall argument workflow. These run local
    race/component tests without Docker, collection, privileged access or a
    deployment; it does not establish installed qualification.
 2. Once integrated: run `make pre-push` and the affected service fixtures.
@@ -32,8 +33,11 @@ build another test framework or duplicate the production workflow with mocks.
    Run the full Go gate once per final candidate, locally or in exact-commit CI;
    do not repeat unchanged package evidence merely because another agent also
    worked on the feature. Required checks and their assertions remain intact.
-3. With sources frozen: run the selected installed workflow in a fresh owned
-   environment. Record the exact commit, real exit, source inventory and cleanup.
+3. Before costly installed dispatch, inspect the automated review and resolve
+   concrete findings. For migration changes, run the initial-schema bundle/history
+   checks as well as the affected SQL fixture; ordinary migration success does not
+   prove the installation path accepts the release. With sources frozen, run the
+   selected installed workflow in a fresh owned environment. Record the exact commit, real exit, source inventory and cleanup.
    A failure returns to a focused reproduction and boundary review before another
    costly dispatch. No automatic full rerun after an unexplained failure.
 

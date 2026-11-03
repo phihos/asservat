@@ -32,6 +32,28 @@ func RecorderAssessmentRulesDigest() artifact.Digest {
 	return artifact.Digest(sha256.Sum256([]byte(packetAssessmentRule + "\n" + rawAssessmentRule + "\n" + httpAssessmentRule + "\n" + syscallAssessmentRule + "\n" + goProfileAssessmentRule + "\n" + samplerProfileAssessmentRule)))
 }
 
+// RecorderAssessmentRulesFor preserves legacy rule identities while binding
+// the argument-reading rules for each argument action in the frozen plan.
+func RecorderAssessmentRulesFor(actions []value.RecorderAction) artifact.Digest {
+	out := RecorderAssessmentRulesDigest()
+	for _, a := range actions {
+		if a.Kind == "syscallTrace" && a.SyscallMode == "arguments" {
+			out = artifact.Digest(sha256.Sum256([]byte(string(out[:]) + "syscall-arguments-assessment/v1;pre-read-event-byte-credit;unknown-impact;raw-path-buffer-content;no-refund")))
+		}
+	}
+	return out
+}
+
+// RecorderAssessmentRulesForScope reads the same frozen actions used by
+// planning; possession of a scope or rule digest grants no execution authority.
+func RecorderAssessmentRulesForScope(scope []byte) (artifact.Digest, error) {
+	actions, _, err := RecorderScopeSummary(scope)
+	if err != nil {
+		return artifact.Digest{}, err
+	}
+	return RecorderAssessmentRulesFor(actions), nil
+}
+
 // RecorderCapabilityDigest identifies the absent recorder capability basis.
 func RecorderCapabilityDigest() artifact.Digest {
 	return artifact.Digest(sha256.Sum256([]byte(recorderCapabilityAbsent)))
@@ -68,7 +90,7 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 		MaximumAgeSeconds: r.MaximumSeconds, DeletionBudgetSeconds: r.DeletionBudgetSeconds, PolicyDigests: digests,
 	}
 	out := value.RecorderAssessment{
-		ID: assessmentID, PlanDigest: plan.ScopeDigest, RulesDigest: RecorderAssessmentRulesDigest(), CapabilityDigest: RecorderCapabilityDigest(),
+		ID: assessmentID, PlanDigest: plan.ScopeDigest, RulesDigest: RecorderAssessmentRulesFor(plan.Actions), CapabilityDigest: RecorderCapabilityDigest(),
 		GeneratedAt: now, ValidUntil: plan.ValidUntil, IncidentPods: 1,
 		Combined:    value.AssessmentImpact{Level: "unknown", HasUnknowns: true, Explanation: "Recorder overhead depends on traffic, call rate and placement and is not measured; no recorder runs in this release. Limits are not predictions."},
 		Interaction: "Current node and upload pressure and other recorders on the same node are not measured by this preview.",
@@ -131,6 +153,11 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 			assessed.Impact = value.AssessmentImpact{Level: "unknown", HasUnknowns: true, Effects: []string{"nodeCPU", "applicationCPU", "collectorMemory", "storageIO", "uploadContention"},
 				Explanation: "Kernel probes run on every system call of every pod process; event rate and probe cost are not measured. Limits bound retained events, not application latency."}
 			assessed.Exposure = value.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", RetainedPossible: []string{"personalIdentifiers"}, TransientOnly: []string{}}
+			if a.SyscallMode == "arguments" {
+				assessed.Impact.Explanation = "Selected syscall entry and exit probes reserve event and byte credit before bounded user-memory reads. Failed reads and observations later filtered out consume credit. Limits do not predict application latency."
+				assessed.Exposure = value.AssessmentExposure{Classification: "potentialPersonalData", Basis: "conservativeMechanism", RetainedPossible: []string{"paths", "userContent", "credentials", "personalIdentifiers"}, TransientOnly: []string{}}
+				out.Alternatives = append(out.Alternatives, value.AssessmentAlternative{ActionIDs: []string{a.ID}, Change: "narrowScope", Benefit: "Metadata mode avoids reading argument strings and buffers.", CoverageLoss: "Paths and buffer contents cannot be inspected."})
+			}
 			if a.SyscallSelection == "all" {
 				out.Alternatives = append(out.Alternatives, value.AssessmentAlternative{ActionIDs: []string{a.ID}, Change: "narrowScope", Benefit: "Selected syscall names reduce probe work and retained events.", CoverageLoss: "Calls outside the selection are not recorded."})
 			}

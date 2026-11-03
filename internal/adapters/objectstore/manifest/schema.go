@@ -22,7 +22,7 @@ type denyLoader struct{}
 
 func (denyLoader) Load(string) (any, error) { return nil, artifact.ErrInvalid }
 
-type Validator struct{ manifest, commit, pod, syscallEvent *jsonschema.Schema }
+type Validator struct{ manifest, commit, pod, syscallEvent, syscallArguments *jsonschema.Schema }
 
 // The embedded contracts are immutable for this process. Each validation
 // creates its own request state; sharing compiled schemas avoids one complete
@@ -57,7 +57,7 @@ func compileValidator() (*Validator, error) {
 	for _, pair := range []struct {
 		id  string
 		out **jsonschema.Schema
-	}{{"manifest.schema.json", &v.manifest}, {"framed-storage.schema.json#/$defs/commit", &v.commit}, {"pod-status.schema.json", &v.pod}, {"syscall-results.schema.json#/$defs/event", &v.syscallEvent}} {
+	}{{"manifest.schema.json", &v.manifest}, {"framed-storage.schema.json#/$defs/commit", &v.commit}, {"pod-status.schema.json", &v.pod}, {"syscall-results.schema.json#/$defs/event", &v.syscallEvent}, {"syscall-arguments.schema.json", &v.syscallArguments}} {
 		*pair.out, err = c.Compile("https://asservat.io/spec/v1/" + pair.id)
 		if err != nil {
 			return nil, artifact.ErrInvalid

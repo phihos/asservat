@@ -125,6 +125,13 @@ func (s ContextInvestigation) previewCompositionGroup(ctx context.Context, sourc
 		if len(plans[n].Actions) != 1 || !compiler.AcceptableRecorder(plans[n]).Acceptable() {
 			return zero, errRecordingNotAcceptable
 		}
+		if a := plans[n].Actions[0]; a.Kind == "syscallTrace" && a.SyscallMode == "arguments" {
+			// The argument observation permit consumes a grant for this exact
+			// capture. Groups have only a parent grant; shared parent/child
+			// event and byte accounting is not composed for argument children.
+			// Refuse before persisting a review or advertising recordability.
+			return zero, previewFailure("composition/arguments", value.ErrInvalid)
+		}
 		child.ActionID, child.CanonicalScope, child.ScopeDigest = plans[n].Actions[0].ID, slices.Clone(plans[n].CanonicalScope), plans[n].ScopeDigest
 		if assessments[n], err = compiler.AssessRecorder(plans[n], child.AssessmentID, s.Now()); err != nil {
 			return zero, previewFailure("assessment", err)

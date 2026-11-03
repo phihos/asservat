@@ -2,6 +2,8 @@ package conversion
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/planning"
@@ -37,6 +39,8 @@ func CompositionFromWire(in contracts.CaptureComposition) (*value.ProfileComposi
 				}
 				err = json.Unmarshal(o.Value, &f)
 				e.Syscalls = &value.SyscallSelection{Mode: f.Mode, Names: f.Names}
+			case "syscallArguments":
+				e.SyscallArguments, err = syscallArgumentsFromWire(o.Value)
 			default:
 				e.Unmodeled = true
 			}
@@ -46,6 +50,26 @@ func CompositionFromWire(in contracts.CaptureComposition) (*value.ProfileComposi
 			component.Edits = append(component.Edits, e)
 		}
 		out.Components = append(out.Components, component)
+	}
+	return out, nil
+}
+
+func syscallArgumentsFromWire(raw json.RawMessage) (*value.SyscallArgumentsEdit, error) {
+	var in struct {
+		MaxBytesPerEvent *int64 `json:"maxBytesPerEvent"`
+		CaptureBuffers   *bool  `json:"captureBuffers"`
+	}
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&in); err != nil {
+		return nil, err
+	}
+	if d.Decode(new(any)) != io.EOF || in.MaxBytesPerEvent == nil || in.CaptureBuffers == nil {
+		return nil, fmt.Errorf("syscallArguments requires maxBytesPerEvent and captureBuffers")
+	}
+	out := &value.SyscallArgumentsEdit{MaxBytesPerEvent: *in.MaxBytesPerEvent, CaptureBuffers: *in.CaptureBuffers}
+	if !out.Bounded() {
+		return nil, fmt.Errorf("syscallArguments maxBytesPerEvent must be from 1 to 4096")
 	}
 	return out, nil
 }

@@ -19,10 +19,11 @@ type SourceQueue interface {
 	EnqueueSourceStop(context.Context, collector.SourceBinding, time.Time) (collector.Work, error)
 }
 type SourceLocal struct {
-	Profiles  evidence.ProfileCanceller
-	Snapshots evidence.SourceSnapshotCanceller
-	Verifier  app.SourceWorkVerifier
-	Queue     SourceQueue
+	Recordings evidence.RecordingCanceller
+	Profiles   evidence.ProfileCanceller
+	Snapshots  evidence.SourceSnapshotCanceller
+	Verifier   app.SourceWorkVerifier
+	Queue      SourceQueue
 	// Report, when set, receives a refused verification's fixed step.
 	Report func(string)
 }
@@ -37,9 +38,19 @@ func sourceReply(w app.SourceWork, state string) contracts.SourceReply {
 		reply.CaptureID = w.StopProfile.CaptureID
 		reply.ProfileAttemptID = w.StopProfile.AttemptID
 	}
+	if w.StopRecording != nil {
+		reply.CaptureID = w.StopRecording.CaptureID
+		reply.RecordingAttemptID = w.StopRecording.AttemptID
+	}
 	return reply
 }
 func matchingSourceReply(w app.SourceWork, r contracts.SourceReply) bool {
+	if w.StopRecording != nil {
+		return r.SourceID == "" && r.Fence == "" && r.SnapshotID == "" && r.ProfileAttemptID == "" && r.CaptureID == w.StopRecording.CaptureID && r.RecordingAttemptID == w.StopRecording.AttemptID
+	}
+	if r.RecordingAttemptID != "" {
+		return false
+	}
 	if w.StopProfile != nil {
 		return r.SourceID == "" && r.Fence == "" && r.SnapshotID == "" && r.CaptureID == w.StopProfile.CaptureID && r.ProfileAttemptID == w.StopProfile.AttemptID
 	}
@@ -81,7 +92,13 @@ func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, signed []b
 		return contracts.SourceReply{}, targets.ErrUnavailable
 	}
 	var effectErr error
-	if w.StopProfile != nil {
+	if w.StopRecording != nil {
+		if local.Recordings == nil {
+			effectErr = fleet.ErrUnavailable
+		} else {
+			effectErr = local.Recordings.CancelRecording(call, *w.StopRecording)
+		}
+	} else if w.StopProfile != nil {
 		if local.Profiles == nil {
 			effectErr = fleet.ErrUnavailable
 		} else {

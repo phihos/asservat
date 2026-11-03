@@ -214,13 +214,14 @@ type NodeSourceRingLimits struct {
 // ProgramDigest its SHA-256 over little-endian struct sock_filter bytes in
 // lowercase hex (empty with an empty program).
 type NodePacketCapture struct {
-	CaptureID      string                 `json:"captureID"`
-	PodUID         string                 `json:"podUID"`
-	Program        []NodeBPFInstruction   `json:"program"`
-	ProgramDigest  string                 `json:"programDigest"`
-	DurationMillis int64                  `json:"durationMillis"`
-	MaxBytes       int64                  `json:"maxBytes"`
-	Observation    *NodeObservationPermit `json:"observation,omitempty"`
+	CaptureID      string                         `json:"captureID"`
+	PodUID         string                         `json:"podUID"`
+	Program        []NodeBPFInstruction           `json:"program"`
+	ProgramDigest  string                         `json:"programDigest"`
+	DurationMillis int64                          `json:"durationMillis"`
+	MaxBytes       int64                          `json:"maxBytes"`
+	Observation    *NodeObservationPermit         `json:"observation,omitempty"`
+	Arguments      *NodeArgumentObservationPermit `json:"arguments,omitempty"`
 	// Syscalls and MaxEventsPerSecond make this a finite syscall metadata
 	// recording (B3, work kind syscallCapture).
 	Syscalls           *NodeSyscallFilter `json:"syscalls,omitempty"`

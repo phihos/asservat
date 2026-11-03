@@ -369,9 +369,10 @@ var editBinding = map[string][]string{
 }
 
 type expandedAction struct {
-	action  recipeAction
-	packet  *packetParameters
-	syscall *syscallParameters
+	action    recipeAction
+	packet    *packetParameters
+	syscall   *syscallParameters
+	arguments *artifact.RecordingArguments
 	// profile is a profile action (ADR-285); bindings are its component's
 	// expanded endpoint bindings and endpoint the region's frozen answer.
 	profile  *profileParameters
@@ -458,6 +459,11 @@ func applyEdit(path string, e value.ProfileEdit, a *expandedAction) error {
 		a.syscall.Ring, err = ringValue()
 	case "syscallMode":
 		a.syscall.Mode, err = text()
+	case "syscallArguments":
+		if e.SyscallArguments == nil || !e.SyscallArguments.Bounded() {
+			return refuse(value.CompositionInvalid, path, "syscallArguments takes maxBytesPerEvent from 1 to 4096 and explicit captureBuffers")
+		}
+		a.syscall.Arguments, err = json.Marshal(e.SyscallArguments)
 	case "profileDuration":
 		a.profile.Duration, err = text()
 	case "syscallFilter":
@@ -656,6 +662,7 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 		return refuse(value.CompositionInvalid, path+".dependsOn", "a recorder cannot depend on another action")
 	}
 	raw, http := false, false
+	arguments := a.syscall != nil && a.syscall.Mode == "arguments"
 	if a.packet != nil {
 		var kind struct {
 			Kind string `json:"kind"`
@@ -671,7 +678,10 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 	if http && a.action.Impact != "sensitiveRead" {
 		return refuse(value.CompositionInvalid, path+".impact", "HTTP header recordings read payload and have impact sensitiveRead")
 	}
-	if !raw && !http && a.action.Impact != "observe" {
+	if arguments && a.action.Impact != "sensitiveRead" {
+		return refuse(value.CompositionInvalid, path+".impact", "syscall arguments read user memory and have impact sensitiveRead")
+	}
+	if !raw && !http && !arguments && a.action.Impact != "observe" {
 		return refuse(value.CompositionInvalid, path+".impact", "metadata recordings have impact observe")
 	}
 	var beforeText, afterText string
@@ -714,8 +724,15 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 		beforeText, afterText, r, frozen, snapshots = a.packet.Before, a.packet.After, a.packet.Ring, a.packet.MaxFrozenBytes, a.packet.MaxConcurrentSnapshots
 	} else {
 		s := a.syscall
-		if s.Mode != "metadata" || len(s.Arguments) != 0 {
-			return refuse(value.CompositionApproval, path+".parameters.mode", "syscall argument tracing needs sensitive observation approval and a recorder that this release does not have; use metadata")
+		if arguments {
+			resolved, err := resolveArgumentProgram(path, s, compiler)
+			if err != nil {
+				return err
+			}
+			a.arguments = &resolved
+			a.sensitive = append(a.sensitive, value.ReasonSyscallArguments)
+		} else if s.Mode != "metadata" || len(s.Arguments) != 0 {
+			return refuse(value.CompositionInvalid, path+".parameters.mode", "metadata has no argument settings; argument mode requires explicit bounded settings")
 		}
 		if s.Processes != "allPodProcesses" {
 			return refuse(value.CompositionInvalid, path+".parameters.processes", "syscall tracing covers all pod processes")
@@ -763,6 +780,9 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peer
 	}
 	// ADR-279: raw packets are finite for now; rings, Saves and longer
 	// recordings follow in later slices.
+	if arguments && (mode != "onTrigger" || after < time.Second || after > maxSyscallAfter) {
+		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "argument recording currently requires onTrigger, before 0s and an after interval of 1 to 60s")
+	}
 	if raw && (mode != "onTrigger" || after > maxRawAfter) {
 		return refuse(value.CompositionRecorderUnavailable, path+".executionMode", "raw packets are recorded finitely for now: set actionExecutionMode onTrigger, before 0s and after at most 15s")
 	}
@@ -1061,6 +1081,8 @@ func editValue(e value.ProfileEdit) any {
 		return editRing(e.Ring)
 	case e.Syscalls != nil:
 		return syscallSelection{Mode: e.Syscalls.Mode, Names: e.Syscalls.Names}
+	case e.SyscallArguments != nil:
+		return *e.SyscallArguments
 	case e.Peers != nil:
 		return peersEditWire(e.Peers)
 	case e.Number != 0:
@@ -1137,6 +1159,7 @@ type reasonRecord struct {
 }
 
 type observationLimitsRecord struct {
+	MaxObservedEvents     int64 `json:"maxObservedEvents,omitempty"`
 	MaxSessionSeconds     int64 `json:"maxSessionSeconds"`
 	MaxObservedBytes      int64 `json:"maxObservedBytes"`
 	MaxBytesPerSecond     int64 `json:"maxBytesPerSecond"`
@@ -1161,6 +1184,7 @@ type recorderScope struct {
 	// ProfileEndpoints are the reviewed Go profile endpoints (ADR-285);
 	// absent without profile actions, so recorder scopes are unchanged.
 	ProfileEndpoints []profileEndpointRecord `json:"profileEndpoints,omitempty"`
+	ArgumentPrograms []argumentProgramRecord `json:"argumentPrograms,omitempty"`
 }
 
 // normalizedRecorderAction is shared by manual and policy compilation. It
@@ -1297,6 +1321,10 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 		if filter != nil {
 			scope.Filters = append(scope.Filters, *filter)
 		}
+		if x.arguments != nil {
+			scope.ArgumentPrograms = append(scope.ArgumentPrograms, argumentRecord(id, x.syscall.Syscalls.Names, *x.arguments))
+			approval.DataClass = "raw"
+		}
 		if x.endpoint != nil {
 			scope.ProfileEndpoints = append(scope.ProfileEndpoints, endpointRecord(id, *x.endpoint))
 		}
@@ -1324,16 +1352,24 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 		if slices.Contains(x.sensitive, value.ReasonRawPackets) {
 			approval.DataClass = "raw" // ADR-279: payload prefixes are raw output
 		}
-		if slices.Contains(x.sensitive, value.ReasonRawBytePredicate) || slices.Contains(x.sensitive, value.ReasonRawPackets) || slices.Contains(x.sensitive, value.ReasonHTTPHeaders) {
+		if slices.Contains(x.sensitive, value.ReasonRawBytePredicate) || slices.Contains(x.sensitive, value.ReasonRawPackets) || slices.Contains(x.sensitive, value.ReasonHTTPHeaders) || slices.Contains(x.sensitive, value.ReasonSyscallArguments) {
 			// REQ-AUT-006: a payload-sensitive predicate, raw recording or
 			// HTTP header projection (ADR-282, class extract) needs finite
 			// observation limits before any byte reaches it.
 			t, _ := durationValue(a.Limits.Timeout, false)
 			limits := observationLimitsRecord{MaxSessionSeconds: int64(min(t, time.Hour) / time.Second), MaxObservedBytes: value.SensitiveMaxObservedBytes, MaxBytesPerSecond: value.SensitiveMaxBytesPerSecond, MaxConcurrentSessions: 1}
+			if x.arguments != nil {
+				// Prepay eligible entry/exit activity, including one initial burst.
+				after, _ := durationValue(x.syscall.After, false)
+				seconds := int64((after + time.Second - 1) / time.Second)
+				rate := min(x.syscall.MaxEventsPerSecond, limits.MaxBytesPerSecond/x.arguments.MaxProbeBytes)
+				limits.MaxObservedEvents = rate * (seconds + 1)
+			}
 			if approval.ObservationLimits == nil {
 				approval.ObservationLimits = &limits
 			} else {
 				approval.ObservationLimits.MaxSessionSeconds = max(approval.ObservationLimits.MaxSessionSeconds, limits.MaxSessionSeconds)
+				approval.ObservationLimits.MaxObservedEvents += limits.MaxObservedEvents
 			}
 		}
 		scope.Provenance.ActionMap = append(scope.Provenance.ActionMap, wireAlias{x.componentID, x.localID, id, false})
@@ -1356,7 +1392,7 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 			out.Approval.Reasons = append(out.Approval.Reasons, authorization.SensitiveReason{ActionID: r.ActionID, Code: r.Code})
 		}
 		if l := approval.ObservationLimits; l != nil {
-			out.Approval.ObservationLimits = &value.ObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
+			out.Approval.ObservationLimits = &value.ObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions, MaxObservedEvents: l.MaxObservedEvents}
 		}
 	}
 	recipeBytes, err := json.Marshal(expanded)
@@ -1483,7 +1519,7 @@ func RecorderScopeSummary(scope []byte) ([]value.RecorderAction, *value.Recorder
 		}
 	}
 	if l := doc.Approval.ObservationLimits; l != nil {
-		approval.ObservationLimits = &value.ObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
+		approval.ObservationLimits = &value.ObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions, MaxObservedEvents: l.MaxObservedEvents}
 	}
 	if len(approval.Reasons) == 0 {
 		return nil, nil, value.ErrInvalid

@@ -134,6 +134,7 @@ type PacketCapture struct {
 	Duration      time.Duration
 	MaxBytes      int64
 	Observation   *ObservationPermit
+	Arguments     *ArgumentObservationPermit `json:",omitempty"`
 	// Syscalls and MaxEventsPerSecond make this a finite syscall metadata
 	// recording (B3, WorkSyscallCapture): no program, at most a minute.
 	Syscalls           *SyscallFilter `json:",omitempty"`
@@ -181,6 +182,9 @@ const MaxSyscallCaptureDuration = time.Minute
 // Valid checks the payload's own bounds; the node checks the digest against
 // the program it received.
 func (p PacketCapture) Valid() bool {
+	if a := p.Arguments; a != nil && (p.Syscalls == nil || p.Observation != nil || p.Raw != nil || p.HTTP != nil || len(p.Program) != 0 || p.ProgramDigest != [32]byte{} || !a.ValidFinite(a.StartedAt) || a.Duration != p.Duration || a.Binding.CaptureID != p.CaptureID || a.Binding.PodUID != p.PodUID || a.EventsPerSecond != p.MaxEventsPerSecond || a.MaxTrackedThreads != p.Syscalls.MaxTrackedThreads || len(p.Syscalls.Names) < 1 || len(p.Syscalls.Names) > 6) {
+		return false
+	}
 	if o := p.Observation; o != nil && (!o.ValidFinite(o.StartedAt) || o.Duration != p.Duration || o.Binding.CaptureID != p.CaptureID || o.Binding.PodUID != p.PodUID || o.Binding.ProgramDigest != p.ProgramDigest) {
 		return false
 	}
@@ -254,7 +258,7 @@ func (r PacketResult) Valid() bool {
 	dropped := r.Filtered + r.Unsupported + r.Fragment + r.Extension + r.Malformed + r.OutputFull
 	failure := r.Failure == "" || r.Failure == ReasonTargetNotFound || r.Failure == ReasonTargetHostNet || r.Failure == ReasonCaptureFailed
 	return validUUID(r.WorkID) && validUUID(r.CaptureID) && !r.StartedAt.IsZero() && !r.EndedAt.Before(r.StartedAt) && r.Retained+dropped == r.Seen &&
-		r.CapturedBytes > 0 && r.CapturedBytes <= MaxPacketCaptureBytes && (r.NativeType == "" || r.NativeType == artifact.SyscallRecordsArtifact || r.NativeType == artifact.RawPCAPNGArtifact || r.NativeType == artifact.HTTPHeadersArtifact && r.Snaplen == artifact.MaxRawSnaplen) && r.Snaplen > 0 && r.Snaplen <= 1500 && len(r.EngineVersion) <= 64 && failure
+		r.CapturedBytes > 0 && r.CapturedBytes <= MaxPacketCaptureBytes && (r.NativeType == "" || r.NativeType == artifact.SyscallArgumentsArtifact || r.NativeType == artifact.SyscallRecordsArtifact || r.NativeType == artifact.RawPCAPNGArtifact || r.NativeType == artifact.HTTPHeadersArtifact && r.Snaplen == artifact.MaxRawSnaplen) && ((r.NativeType == artifact.SyscallArgumentsArtifact && r.Snaplen == 0 && r.ProgramDigest == [32]byte{} && r.Snapshot == nil) || (r.NativeType != artifact.SyscallArgumentsArtifact && r.Snaplen > 0 && r.Snaplen <= 1500)) && len(r.EngineVersion) <= 64 && failure
 }
 
 // Outcome of one work item, reported in the next status.

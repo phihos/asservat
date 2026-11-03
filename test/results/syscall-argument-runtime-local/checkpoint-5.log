@@ -1,0 +1,4 @@
+patching file program.bpf.c
+BPF object SHA-256: 4c548b54bf9cc0850352d8a4e4cc23cc5ddc7d50cfbc4bfb96913f319ec1784d
+Compiled only: verifier, kernel behavior, OCI packaging and runtime authority remain unqualified.
+Packaged verified local ELF only; no registry, BPF load, capability or public activation

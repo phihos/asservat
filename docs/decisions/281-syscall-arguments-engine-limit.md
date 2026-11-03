@@ -38,7 +38,7 @@ upstream gadgets pinned by digest; no custom kernel/eBPF program") excludes.
    The implementation slices are:
    engine patch and fixed definition table; event accounting rule and
    migration; planning/grant/node reuse of the ADR-279 ad hoc pool; raw native
-   type and verifier; native `continuation-manual-syscall-args` focus.
+   type and verifier; native `continuation-manual-arguments` focus.
 
 ## Complexity gate
 
@@ -56,3 +56,64 @@ definition map and absence of user-memory reads. Test decoded native artifacts,
 raw approval and authenticated download through the installed workflow; a verifier
 load or unit test alone cannot qualify arguments mode. Run the collector only in
 a disposable authorized environment, never on the developer workstation.
+
+## Finite planner continuation
+
+The compiler now has a distinct optional argument-mechanism port. Without the
+qualified adapter it returns RecorderUnavailable. Supplied pins, selected names,
+read bounds and the canonical accounting rule enter the execution digest and
+frozen replay context; authored recipe fields cannot supply trusted pins.
+Raw approval and cumulative eligible-probe event limits accompany the existing
+byte pool. This does not enable a deployed argument collector.
+
+Incremental complexity: 0 new services, credentials, API reads, watches,
+background loops or configuration switches; 1 optional compiler interface and
+1 frozen mechanism record per finite action. Unsupported mechanism is the
+existing RecorderUnavailable state, not a fallback. Only sensitive opt-in
+captures pay the additional bounded compilation/serialization cost. Legacy
+packet/metadata scope bytes and assessment hashes retain their old form. The
+smaller alternative (using only the recipe or charging delivered events) cannot
+bind the reviewed engine or bound pre-read work and does not meet REQ-SYS-002.
+
+## Runtime composition continuation
+
+The manual path composes the distinct argument source resolver and prepaid
+permit with the existing regional recorder, node work queue and encrypted
+producer. SQL129 admits the exact raw argument type into processing lineage and
+the existing collection loop. Independent publication resolves historical source
+facts from the original immutable observation row through the existing verifier
+credential and checks them during the same authenticated native stream. It adds
+one bounded SQL read per argument verification, no additional key unwrap or
+object download. Existing context-verifier SELECT permission is sufficient.
+
+Finite argument Stop reuses the existing cancellation request/join columns and
+node cancellation queue, with a distinct typed argument Stop and completion
+proof. A request acknowledgement cannot prove detachment; the original node
+result and regional writer must join. A bounded holder retained before enqueue
+preserves uncertain-start state. A restrictive tombstone can fence a delayed
+start but cannot establish a joined result. Stored output wins over Stop.
+
+Incremental cost: 0 new services, credentials, privileges, watches, background
+loops or configuration; 1 source SELECT per publication and existing bounded
+holder/queue capacity per active attempt. Pending, uncertain, cancelled and
+stored states reuse the existing lifecycle. Downgrade refuses retained argument
+captures; empty-schema rollback restores the prior functions. These changes
+address required publication and cancellation of the sensitive opt-in path;
+installed qualification remains required before the capability is advertised.
+
+Containerd creates a private cgroup namespace for nonprivileged cgroup-v2
+containers even when they use host PID visibility
+([containerd v2.1.4](https://github.com/containerd/containerd/blob/v2.1.4/internal/cri/server/container_create.go#L923-L929),
+[containerd v2.3.4](https://github.com/containerd/containerd/blob/v2.3.4/internal/cri/server/container_create.go#L821-L827)).
+The argument membership scan therefore uses the existing locked-thread pattern
+from profile dialing to enter `/proc/1/ns/cgroup`, reads Pod membership against
+`/proc/1/root/sys/fs/cgroup`, and restores the original thread namespace before
+returning pinned descriptors. Both paths select the node's view, including
+[Kind's nested private cgroup namespace](https://github.com/kubernetes-sigs/kind/blob/v0.33.0/pkg/cluster/internal/providers/docker/provision.go#L170-L175).
+This uses the collector's existing SYS_ADMIN/SYS_PTRACE capabilities: no new
+privileges, host mounts, configuration or discovery loop. Each existing initial
+or one-second scan adds two namespace switches and one short joined goroutine;
+cancellation waits for scan/restoration, and restoration failure closes returned
+pins and retires the locked thread. The existing 128-member bound and original
+capture deadline remain unchanged. Injected namespace tests do not qualify
+native namespace entry; the installed argument workflow must exercise it.

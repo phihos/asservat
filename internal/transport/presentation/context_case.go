@@ -142,10 +142,8 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 				data.Case.Access = "shared"
 			}
 			nativeFormat := ""
-			if kind == "profile" {
-				if typ, known := artifact.LookupNativeType(a.NativeType); known && typ.EvidenceType == "profile" {
-					nativeFormat = typ.Format
-				}
+			if typ, known := artifact.LookupNativeType(a.NativeType); known && typ.EvidenceType == a.EvidenceType && typ.AllowsClass(a.DataClass) {
+				nativeFormat = typ.Format
 			}
 			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{NativeFormat: nativeFormat, ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
 		}

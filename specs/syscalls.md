@@ -60,3 +60,37 @@ program to enforce the existing pre-read observation budget. It changes the
 engine sourcing rule only; REQ-SYS-002 accounting, approval, isolation and native
 qualification remain mandatory. Arguments mode stays unavailable until that
 implementation passes its installed native acceptance tests.
+
+### Finite argument implementation boundary (ADR-281)
+
+The finite argument plan uses `onTrigger`, `before: 0s` and an explicit include
+list. The trusted compiler resolves the release's qualified definition table
+and pins the program, definition and accounting digests in the reviewed scope.
+`captureBuffers: false` disables selected buffer reads; selected path arguments
+still require reviewed user-memory access. Raw approval includes independent
+cumulative byte and eligible entry/exit event limits. Failed reads and observations
+later excluded by result filters consume credit; replay never refills it.
+The initial adapter supports only its closed qualified ABI table and refuses
+unknown names. Planning/component tests do not enable the installed capability;
+raw publication, authenticated download and stop still need composed qualification.
+
+Publication verifies argument JSONL against the immutable prepaid observation
+session as well as the accepted engine/definition/accounting pins. Native header
+values cannot supply their own trusted source identity. This historical lookup
+does not renew collection authority or require the original observation lease
+to remain active.
+
+For a finite argument capture, Stop is restricted to its original attempt and
+regional writer. A node acknowledgement means only that cancellation was
+requested. `Cancelled` requires the original acquisition result after reader
+and attachment shutdown, together with regional writer completion. An uncertain
+start, missing holder or Stop delivery failure cannot establish completion or
+refund observation spend. If storage already completed, the stored result wins;
+Stop does not delete it. This introduces no application-profiler uncertainty
+flag because the argument source is owned by Asservat.
+
+Argument JSONL `ended_at` denotes the observation endpoint, bounded by the
+original kernel-enforced deadline. Later perf-buffer draining and detachment
+do not extend it. Upload and resource release still await actual reader and
+attachment shutdown. Probes outside the accepted window are counted as malformed;
+unpaired in-window entries retain their unfinished/gap reporting.

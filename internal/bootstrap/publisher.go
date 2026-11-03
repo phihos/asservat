@@ -41,16 +41,17 @@ import (
 // workload guard and recovery state, and its verifier key exists only in
 // this process.
 type Publisher struct {
-	config    contracts.PublisherDeployment
-	queue     *postgres.ContextPublicationQueue
-	ledger    evidence.ContextPublicationFacets
-	gate      *postgres.APIContextPublicationGate
-	audit     *objectstore.ContextVerificationObjects
-	custody   *objectstore.CustodyStore
-	keys      *http.Client
-	scope     authorization.KeyScope
-	providers *kms.InstalledPublisherProviderEffects
-	verifier  *mtls.VerifierCredentials
+	argumentSources argumentSourceReader
+	config          contracts.PublisherDeployment
+	queue           *postgres.ContextPublicationQueue
+	ledger          evidence.ContextPublicationFacets
+	gate            *postgres.APIContextPublicationGate
+	audit           *objectstore.ContextVerificationObjects
+	custody         *objectstore.CustodyStore
+	keys            *http.Client
+	scope           authorization.KeyScope
+	providers       *kms.InstalledPublisherProviderEffects
+	verifier        *mtls.VerifierCredentials
 	// catalog is the guarded cluster catalog as read at start; a changed
 	// digest restarts the process (ADR-203 decision 6).
 	catalog publicCatalog
@@ -284,6 +285,7 @@ func NewPublisher(ctx context.Context, files *os.Root) (_ *Publisher, err error)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	out.argumentSources = verify
 	out.ledger = evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audited, ContextCatalogPublisher: publish}
 	if out.queue, err = postgres.NewContextPublicationQueue(startup, pools["context-verify"], root); err != nil {
 		return nil, mounts.ErrUnavailable
@@ -392,6 +394,9 @@ func (p *Publisher) publish(ctx context.Context, item postgres.PendingContextPub
 	// bounds; an execution trace is read to its end within an event cap.
 	verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })
 	verifier.WithStreamCheck(artifact.GoTraceArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewGoTraceCheck() })
+	verifier.WithContextStreamCheck(artifact.SyscallArgumentsArtifact, func(ctx context.Context, e artifact.ContextExpectation) (objectstore.StreamCheck, error) {
+		return publisherArgumentCheck(ctx, p.argumentSources, e)
+	})
 	_, err = evidence.ContextPublisher{Ledger: p.ledger, Authority: p.gate, Verifier: verifier, Audit: p.audit, Now: time.Now}.Publish(ctx, item.CaptureID, item.Copies)
 	return err
 }

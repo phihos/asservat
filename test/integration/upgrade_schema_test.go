@@ -129,6 +129,20 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.capacity_context_protocol_backing(jsonb,jsonb)'::regprocedure)`).Scan(&originalCapacityBacking); e != nil {
 		t.Fatal(e)
 	}
+	// SQL128 extends existing counters/session fields; empty downgrade must
+	// restore exact old functions, constraints and column shapes, not merely
+	// decrement goose's recorded version.
+	const argumentAuthorityShape = `SELECT jsonb_build_object(
+ 'functions',(SELECT jsonb_object_agg(f,pg_get_functiondef(f::regprocedure)) FROM unnest(ARRAY['public.spend_adhoc_observed_bytes(uuid,uuid,bigint)','public.protect_adhoc_observation_spend()','public.protect_policy_collection_spend()','public.protect_access_grant()']) f),
+ 'constraints',(SELECT jsonb_object_agg(conname,pg_get_constraintdef(oid)) FROM pg_constraint WHERE conrelid='public.policy_observation_session'::regclass),
+ 'columns',(SELECT jsonb_agg(jsonb_build_array(table_name,column_name,data_type,is_nullable,column_default) ORDER BY table_name,ordinal_position) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('policy_observation_session','policy_acceptance','access_grant','adhoc_observation_spend'))
+ )::text`
+	var originalArgumentAuthority string
+	if head == 128 {
+		if e = conn.QueryRow(ctx, argumentAuthorityShape).Scan(&originalArgumentAuthority); e != nil {
+			t.Fatal("original argument authority shape", e)
+		}
+	}
 	upgrade, e := postgres.NewUpgradeSchema(config)
 	if e != nil {
 		t.Fatal(e)
@@ -348,6 +362,19 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("profile Up after Down", from, to, e)
 		}
 		t.Log("profile stream reserve/bind/no-reset guard, native projector and exact function rollback passed")
+	}
+	if head == 128 {
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("argument authority empty Down", e)
+		}
+		var restored string
+		if e = conn.QueryRow(ctx, argumentAuthorityShape).Scan(&restored); e != nil || restored != originalArgumentAuthority {
+			t.Fatal("argument authority Down changed legacy functions/constraints/columns", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("argument authority Up after Down", from, to, e)
+		}
+		t.Log("SQL128 empty Down restored exact four functions/session constraints/column shapes; Up reapplied")
 	}
 	// A version this binary does not know is refused, not skipped.
 	if _, e = conn.Exec(ctx, "INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", head+1); e != nil {

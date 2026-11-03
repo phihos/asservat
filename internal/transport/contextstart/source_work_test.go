@@ -85,6 +85,21 @@ func (c *sourceProfileCanceller) CancelProfile(ctx context.Context, x collector.
 	return nil
 }
 
+type sourceRecordingCanceller struct {
+	calls int
+	last  collector.RecordingStop
+	fail  bool
+}
+
+func (c *sourceRecordingCanceller) CancelRecording(ctx context.Context, x collector.RecordingStop) error {
+	c.calls++
+	c.last = x
+	if ctx.Err() != nil || c.fail {
+		return fleet.ErrUnavailable
+	}
+	return nil
+}
+
 type freshConnectorSource struct{ countingLocal }
 
 func (freshConnectorSource) ReadConnectorIdentitySource(context.Context) (fleet.ConnectorIdentitySource, error) {
@@ -96,7 +111,7 @@ func (freshConnectorSource) ReadConnectorIdentitySource(context.Context) (fleet.
 // the real router. Real signature purpose/key checks have their JOSE test.
 // Every source delivery is one query: the standby stays idle for a Save.
 func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
-	for _, mode := range []string{"arm", "stop", "queue-refusal", "cancel", "cancel-refused", "profile-cancel", "profile-cancel-refused", "sign-failure"} {
+	for _, mode := range []string{"arm", "stop", "queue-refusal", "cancel", "cancel-refused", "profile-cancel", "profile-cancel-refused", "recording-cancel", "recording-cancel-refused", "sign-failure"} {
 		t.Run(mode, func(t *testing.T) {
 			w, r := sourceStreamWorkFixture()
 			switch mode {
@@ -106,6 +121,10 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 				now := w.IssuedAt()
 				x := collector.ProfileStop{RootID: w.Channel.RootID, ClusterID: w.Channel.Connector.Binding.ClusterID, CaptureID: "44444444-4444-4444-8444-444444444444", AttemptID: "55555555-5555-4555-8555-555555555555", WriterPodUID: w.Channel.Executor.PodUID, WriterEpoch: w.Channel.Executor.ProcessEpoch, ExpectationDigest: artifact.Digest{5}, WriteUntil: now.Add(time.Minute)}
 				w = app.SourceWork{Channel: w.Channel, StopProfile: &x, StopIssuedAt: now, NotAfter: w.NotAfter}
+			case "recording-cancel", "recording-cancel-refused":
+				now := w.IssuedAt()
+				x := collector.RecordingStop{RootID: w.Channel.RootID, ClusterID: w.Channel.Connector.Binding.ClusterID, CaptureID: "44444444-4444-4444-8444-444444444444", AttemptID: "55555555-5555-4555-8555-555555555555", WriterPodUID: w.Channel.Executor.PodUID, WriterEpoch: w.Channel.Executor.ProcessEpoch, ExpectationDigest: artifact.Digest{5}, WriteUntil: now.Add(time.Minute)}
+				w = app.SourceWork{Channel: w.Channel, StopRecording: &x, StopIssuedAt: now, NotAfter: w.NotAfter}
 			case "cancel", "cancel-refused":
 				now := w.IssuedAt()
 				b := w.Binding()
@@ -127,7 +146,8 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 			queue := &sourceQueue{fail: mode == "queue-refusal"}
 			snapshots := &sourceSnapshotCanceller{fail: mode == "cancel-refused"}
 			profiles := &sourceProfileCanceller{fail: mode == "profile-cancel-refused"}
-			region.sourceWork = &SourceLocal{Queue: queue, Snapshots: snapshots, Profiles: profiles, Verifier: sourceWorkVerifierFunc(func(_ context.Context, b []byte, current fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
+			recordings := &sourceRecordingCanceller{fail: mode == "recording-cancel-refused"}
+			region.sourceWork = &SourceLocal{Recordings: recordings, Queue: queue, Snapshots: snapshots, Profiles: profiles, Verifier: sourceWorkVerifierFunc(func(_ context.Context, b []byte, current fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
 				if current.Channel != w.Channel || string(b) != "synthetic-source-signature" {
 					return app.AuthenticatedSourceWork{}, fleet.ErrDenied
 				}
@@ -162,7 +182,7 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 				return w, []byte("synthetic-source-signature"), nil
 			})
 			switch mode {
-			case "queue-refusal", "cancel-refused", "profile-cancel-refused":
+			case "queue-refusal", "cancel-refused", "profile-cancel-refused", "recording-cancel-refused":
 				if !errors.Is(err, fleet.ErrUnavailable) {
 					t.Fatal("effect refusal lost", err)
 				}
@@ -185,6 +205,10 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 				if profiles.calls != 1 || !profiles.last.Equal(*w.StopProfile) || queue.calls != 0 || snapshots.calls != 0 {
 					t.Fatal("profile cancellation changed attempt or replayed", profiles.calls, queue.calls, snapshots.calls)
 				}
+			case mode == "recording-cancel" || mode == "recording-cancel-refused":
+				if recordings.calls != 1 || !recordings.last.Equal(*w.StopRecording) || queue.calls != 0 || snapshots.calls != 0 {
+					t.Fatal("recording cancellation changed attempt or replayed", recordings.calls, queue.calls, snapshots.calls)
+				}
 			case cancelling:
 				if snapshots.calls != 1 || !snapshots.last.Equal(*w.StopSnapshot) || queue.calls != 0 {
 					t.Fatal("cancellation became source arm/stop or replayed", snapshots.calls, queue.calls)
@@ -206,5 +230,31 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 			}
 			a.Close()
 		})
+	}
+}
+
+func TestRecordingStopReplyCannotChangeAttemptOrVariant(t *testing.T) {
+	w, _ := sourceStreamWorkFixture()
+	stop := collector.RecordingStop{CaptureID: "11111111-1111-4111-8111-111111111111", AttemptID: "22222222-2222-4222-8222-222222222222"}
+	w = app.SourceWork{StopRecording: &stop}
+	reply := sourceReply(w, "queued")
+	if !matchingSourceReply(w, reply) {
+		t.Fatal("original reply refused")
+	}
+	for _, mode := range []string{"attempt", "profile", "source", "snapshot"} {
+		changed := reply
+		switch mode {
+		case "attempt":
+			changed.RecordingAttemptID = stop.CaptureID
+		case "profile":
+			changed.ProfileAttemptID = stop.AttemptID
+		case "source":
+			changed.SourceID = stop.CaptureID
+		case "snapshot":
+			changed.SnapshotID = stop.AttemptID
+		}
+		if matchingSourceReply(w, changed) {
+			t.Fatal("reply substitution", mode)
+		}
 	}
 }

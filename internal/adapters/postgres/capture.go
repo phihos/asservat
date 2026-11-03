@@ -660,18 +660,10 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if err != nil {
 				return value.ErrInvalid
 			}
-			expected.NativeType, expected.ActionID, expected.Recording = artifact.PCAPNGArtifact, actionID, &recording
+			expected.NativeType, expected.DataClass = recordingNativeClass(recording)
+			expected.ActionID, expected.Recording = actionID, &recording
 			if group != nil && group.Composition {
 				expected.CompositionGroup = &artifact.CompositionGroupBinding{ParentCaptureID: group.Preview.CaptureID, ChildIndex: group.ChildIndex, ChildCount: len(group.Preview.CompositionGroup.Children)}
-			}
-			if recording.Kind == "syscallTrace" {
-				expected.NativeType = artifact.SyscallRecordsArtifact // B3 manual syscall metadata
-			}
-			if recording.Profile == "rawPackets" {
-				expected.NativeType, expected.DataClass = artifact.RawPCAPNGArtifact, "raw" // ADR-279
-			}
-			if recording.Profile == "httpHeaders" {
-				expected.NativeType, expected.DataClass = artifact.HTTPHeadersArtifact, "extract" // ADR-282
 			}
 		}
 		if in.Profile != nil {
@@ -857,4 +849,21 @@ func contextMetadataDeadline(ctx context.Context, deadlines ...time.Time) time.T
 func recordingGroupChildRequestKey(parent string, index int) []byte {
 	digest := sha256.Sum256([]byte("asservat-recording-save-group-child/v1\x00" + parent + "\x00" + strconv.Itoa(index)))
 	return digest[:]
+}
+
+// recordingNativeClass classifies an already validated frozen recording.
+func recordingNativeClass(r artifact.Recording) (string, string) {
+	if r.Kind == "syscallTrace" {
+		if r.Profile == "arguments" {
+			return artifact.SyscallArgumentsArtifact, "raw"
+		}
+		return artifact.SyscallRecordsArtifact, "metadata"
+	}
+	if r.Profile == "rawPackets" {
+		return artifact.RawPCAPNGArtifact, "raw"
+	}
+	if r.Profile == "httpHeaders" {
+		return artifact.HTTPHeadersArtifact, "extract"
+	}
+	return artifact.PCAPNGArtifact, "metadata"
 }

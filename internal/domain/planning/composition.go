@@ -44,6 +44,17 @@ type SyscallSelection struct {
 	Names []string `json:",omitempty"`
 }
 
+// SyscallArgumentsEdit replaces the complete, explicitly exposed arguments value.
+// CaptureBuffers is always present, including false; it has no implicit default.
+type SyscallArgumentsEdit struct {
+	MaxBytesPerEvent int64 `json:"maxBytesPerEvent"`
+	CaptureBuffers   bool  `json:"captureBuffers"`
+}
+
+func (a SyscallArgumentsEdit) Bounded() bool {
+	return a.MaxBytesPerEvent >= 1 && a.MaxBytesPerEvent <= 4096
+}
+
 // PeerSelection is the typed value of a packetPeers edit (ADR-283): each
 // CIDRs entry lists prefixes and each Kubernetes entry selects Pods or names
 // one resource; all entries are ORed. The wire form lists the cidrs entries
@@ -66,14 +77,15 @@ type PeerSelection struct {
 // marks a text field sent as the empty string, so the field's own validator
 // answers with its remedy instead of a generic malformed-composition error.
 type ProfileEdit struct {
-	ActionID, Field string
-	Text            string            `json:",omitempty"`
-	Number          int64             `json:",omitempty"`
-	Ring            *RingSettings     `json:",omitempty"`
-	Syscalls        *SyscallSelection `json:",omitempty"`
-	Peers           *PeerSelection    `json:",omitempty"`
-	Unmodeled       bool              `json:",omitempty"`
-	TextSet         bool              `json:",omitempty"`
+	ActionID, Field  string
+	Text             string                `json:",omitempty"`
+	Number           int64                 `json:",omitempty"`
+	Ring             *RingSettings         `json:",omitempty"`
+	Syscalls         *SyscallSelection     `json:",omitempty"`
+	SyscallArguments *SyscallArgumentsEdit `json:",omitempty"`
+	Peers            *PeerSelection        `json:",omitempty"`
+	Unmodeled        bool                  `json:",omitempty"`
+	TextSet          bool                  `json:",omitempty"`
 }
 
 // ProfileComponent selects one profile version and its edits.
@@ -133,12 +145,15 @@ func (e ProfileEdit) valid() bool {
 		return false
 	}
 	set := 0
-	for _, present := range []bool{e.Text != "" || e.TextSet, e.Number != 0, e.Ring != nil, e.Syscalls != nil, e.Peers != nil, e.Unmodeled} {
+	for _, present := range []bool{e.Text != "" || e.TextSet, e.Number != 0, e.Ring != nil, e.Syscalls != nil, e.SyscallArguments != nil, e.Peers != nil, e.Unmodeled} {
 		if present {
 			set++
 		}
 	}
 	if set != 1 {
+		return false
+	}
+	if e.SyscallArguments != nil && !e.SyscallArguments.Bounded() {
 		return false
 	}
 	if e.Ring != nil && (len(e.Ring.MaxAge) > 16 || len(e.Ring.Medium) > 16 || len(e.Ring.StorageProfileRef) > 63) {
@@ -186,6 +201,10 @@ func (c *ProfileComposition) clone() *ProfileComposition {
 	for i, component := range c.Components {
 		component.Edits = append([]ProfileEdit(nil), component.Edits...)
 		for j, e := range component.Edits {
+			if e.SyscallArguments != nil {
+				a := *e.SyscallArguments
+				component.Edits[j].SyscallArguments = &a
+			}
 			if e.Ring != nil {
 				r := *e.Ring
 				component.Edits[j].Ring = &r

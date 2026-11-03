@@ -1,0 +1,6 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/15 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 15/15 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 86092 (28692/sec), new interesting: 0 (total: 15)
+fuzz: elapsed: 5s, execs: 142870 (28156/sec), new interesting: 0 (total: 15)
+PASS
+ok  	asservat.local/asservat/internal/adapters/syscalls	5.026s

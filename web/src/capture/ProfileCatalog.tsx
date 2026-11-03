@@ -8,17 +8,29 @@ type Listed = Data<'list_capture_profiles'>['profiles'][number];
 type Definition = Data<'get_capture_profile'>['definition'];
 type Ref = Listed['profile_ref'];
 type Field = NonNullable<Definition['editableFields']>[number];
+type Override = NonNullable<Composition['components'][number]['overrides']>[number];
+type ArgumentSettings = Extract<Override, { field: 'syscallArguments' }>['value'];
 type Added = { id: string; ref: Ref; definition: Definition; values: Record<string, string> };
 // Composer state the workspace keeps while the user reviews a plan, so
 // "Change profiles" returns to the same selection and edits.
 export type CatalogDraft = { added: Added[]; bounds?: { bytes: string; duration: string } };
 
-// Typed scalar edits this panel offers; structured settings (rings, peers,
+// Typed edits this panel offers; other structured settings (rings, peers,
 // filters, process selectors) keep the profile's reviewed defaults here.
 const textFields = new Set(['packetFilter', 'packetBefore', 'packetAfter', 'syscallBefore', 'syscallAfter', 'syscallMode', 'actionTimeout', 'actionExecutionMode', 'profileDuration', 'filePath']);
 const numberFields = new Set(['actionMaxBytes', 'syscallMaxEvents', 'syscallRate']);
-const editable = (field: Field) => textFields.has(field.field) || numberFields.has(field.field);
+const editable = (field: Field) => textFields.has(field.field) || numberFields.has(field.field) || field.field === 'syscallArguments';
 const key = (field: Field) => field.actionID + '/' + field.field;
+
+function argumentValues(a: Added, field: Field) {
+  const action = a.definition.recipe.actions.find(action => action.id === field.actionID);
+  const defaults = (action?.parameters as { arguments?: ArgumentSettings } | undefined)?.arguments;
+  const bytes = a.values[key(field) + '/maxBytesPerEvent'] ?? String(defaults?.maxBytesPerEvent ?? '');
+  const buffers = a.values[key(field) + '/captureBuffers'];
+  const captureBuffers = buffers === undefined ? defaults?.captureBuffers ?? false : buffers === 'true';
+  const changed = bytes !== String(defaults?.maxBytesPerEvent ?? '') || captureBuffers !== (defaults?.captureBuffers ?? false);
+  return { bytes, captureBuffers, changed };
+}
 
 // The profile's own default for a scalar field, shown as the placeholder.
 export function profileDefault(definition: Definition, field: Field): string {
@@ -51,15 +63,19 @@ export function componentID(name: string, taken: string[]): string {
   return id;
 }
 
-// The composition submitted for preview: only changed scalar values become
+// The composition submitted for preview: only changed values become
 // overrides; the server resolves every pin and validates the whole plan.
 export function composition(added: Added[], bytes: number, duration: string): Composition {
   return {
     components: added.map(a => {
-      const overrides = (a.definition.editableFields ?? []).filter(editable).flatMap(field => {
+      const overrides = (a.definition.editableFields ?? []).filter(editable).flatMap<Override>(field => {
+        if (field.field === 'syscallArguments') {
+          const value = argumentValues(a, field);
+          return value.changed ? [{ actionID: field.actionID, field: 'syscallArguments', value: { maxBytesPerEvent: Number(value.bytes), captureBuffers: value.captureBuffers } }] : [];
+        }
         const raw = a.values[key(field)]?.trim();
         if (!raw || raw === profileDefault(a.definition, field)) return [];
-        return [{ actionID: field.actionID, field: field.field, value: numberFields.has(field.field) ? Number(raw) : raw }];
+        return [{ actionID: field.actionID, field: field.field, value: numberFields.has(field.field) ? Number(raw) : raw } as Override];
       });
       return { id: a.id, profileRef: structuredClone(a.ref), ...(overrides.length > 0 && { overrides }) };
     }),
@@ -96,7 +112,7 @@ export function ProfileCatalog({ session, scope, target, busy, onPreview, client
     setLoading(false);
     if (data) update(previous => previous.length >= 8 ? previous : [...previous, { id: componentID(profile.profile_ref.name, previous.map(a => a.id)), ref: data.profile_ref, definition: data.definition, values: {} }]);
   };
-  const setValue = (id: string, field: Field, value: string) => setAdded(previous => previous.map(a => a.id === id ? { ...a, values: { ...a.values, [key(field)]: value } } : a));
+  const setValue = (id: string, field: Field, value: string, member?: keyof ArgumentSettings) => setAdded(previous => previous.map(a => a.id === id ? { ...a, values: { ...a.values, [key(field) + (member ? '/' + member : '')]: value } } : a));
   // Actions switched to onTrigger whose history window is not yet 0s: the UI
   // proposes that coupled change explicitly, never applies it silently.
   const pending = added.flatMap(a => (a.definition.editableFields ?? []).filter(f => f.field === 'actionExecutionMode' && a.values[key(f)] === 'onTrigger').flatMap(mode =>
@@ -105,6 +121,12 @@ export function ProfileCatalog({ session, scope, target, busy, onPreview, client
     if (!bounds) return;
     const bytes = Number(bounds.bytes);
     if (!Number.isSafeInteger(bytes) || bytes < 1 || seconds(bounds.duration) <= 0) { setError('Enter a positive byte limit and a duration such as 30s.'); return; }
+    for (const a of added) for (const field of a.definition.editableFields ?? []) {
+      if (field.field !== 'syscallArguments') continue;
+      const value = argumentValues(a, field), limit = Number(value.bytes);
+      if (value.changed && (!Number.isSafeInteger(limit) || limit < 1 || limit > 4096)) { setError('Argument bytes per event must be a whole number from 1 to 4096.'); return; }
+    }
+    setError(undefined);
     onPreview(composition(added, bytes, bounds.duration));
   };
   return <section className="review-section profile-catalog" aria-label="Capture profiles" aria-busy={loading || busy}>
@@ -122,7 +144,13 @@ export function ProfileCatalog({ session, scope, target, busy, onPreview, client
     {added.length > 0 && <fieldset disabled={busy}><legend>Selected profiles</legend>
       {added.map(a => <div className="profile-card" key={a.id}>
         <h4>{a.definition.displayName} <span className="field-help">({a.id})</span></h4>
-        {(a.definition.editableFields ?? []).map(field => editable(field)
+        {(a.definition.editableFields ?? []).map(field => field.field === 'syscallArguments'
+          ? <fieldset key={key(field)}><legend>{field.label}</legend>
+            <label>Maximum argument bytes per event<input type="number" min="1" max="4096" step="1" value={argumentValues(a, field).bytes} onChange={event => setValue(a.id, field, event.currentTarget.value, 'maxBytesPerEvent')} /></label>
+            <label><input type="checkbox" checked={argumentValues(a, field).captureBuffers} onChange={event => setValue(a.id, field, String(event.currentTarget.checked), 'captureBuffers')} />Capture buffer contents</label>
+            {field.description && <p className="field-help">{field.description}</p>}
+          </fieldset>
+          : editable(field)
           ? <label key={key(field)}>{field.label}<input type={numberFields.has(field.field) ? 'number' : 'text'} value={a.values[key(field)] ?? ''} placeholder={profileDefault(a.definition, field)} onChange={event => setValue(a.id, field, event.currentTarget.value)} />{field.description && <span className="field-help">{field.description}</span>}</label>
           : <p className="field-help" key={key(field)}>{field.label}: uses the profile's reviewed setting.</p>)}
         <Button className="button secondary" onPress={() => update(previous => previous.filter(other => other.id !== a.id))}>Remove</Button>

@@ -60,7 +60,7 @@ type ContextExpectation struct {
 // as an HTTP header projection. It is not access: a raw
 // disclosure still needs its approved grant child.
 func (e ContextExpectation) ServedClass() bool {
-	return e.DataClass == "metadata" || e.DataClass == "raw" && (e.NativeType == RawPCAPNGArtifact || e.NativeType == PprofArtifact || e.NativeType == GoTraceArtifact) || e.DataClass == "extract" && e.NativeType == HTTPHeadersArtifact
+	return e.DataClass == "metadata" || e.DataClass == "raw" && (e.NativeType == RawPCAPNGArtifact || e.NativeType == SyscallArgumentsArtifact || e.NativeType == PprofArtifact || e.NativeType == GoTraceArtifact) || e.DataClass == "extract" && e.NativeType == HTTPHeadersArtifact
 }
 
 // Type returns the registered native type; Validate rejects unknown names.
@@ -90,13 +90,13 @@ func (e ContextExpectation) Validate() error {
 	// ADR-282: so do the httpHeaders profile, its JSON type and extract.
 	raw := e.Recording != nil && e.Recording.Profile == "rawPackets"
 	http := e.Recording != nil && e.Recording.Profile == "httpHeaders"
-	recording := (e.NativeType == PCAPNGArtifact && e.Recording != nil && e.Recording.Kind == "packetCapture" && !raw && !http && e.DataClass == "metadata" || e.NativeType == RawPCAPNGArtifact && raw && e.DataClass == "raw" || e.NativeType == HTTPHeadersArtifact && http && e.DataClass == "extract" || e.NativeType == SyscallRecordsArtifact && e.Recording != nil && e.Recording.Kind == "syscallTrace" && e.DataClass == "metadata") && recorderActionID(e.ActionID) && r.NativeLimit == RecordingNativeLimit && e.Recording.Valid() && e.Lifecycle == nil
+	recording := (e.NativeType == PCAPNGArtifact && e.Recording != nil && e.Recording.Kind == "packetCapture" && !raw && !http && e.DataClass == "metadata" || e.NativeType == RawPCAPNGArtifact && raw && e.DataClass == "raw" || e.NativeType == HTTPHeadersArtifact && http && e.DataClass == "extract" || e.NativeType == SyscallRecordsArtifact && e.Recording != nil && e.Recording.Kind == "syscallTrace" && e.Recording.Profile == "metadata" && e.DataClass == "metadata" || e.NativeType == SyscallArgumentsArtifact && e.Recording != nil && e.Recording.Kind == "syscallTrace" && e.Recording.Profile == "arguments" && e.DataClass == "raw") && recorderActionID(e.ActionID) && r.NativeLimit == RecordingNativeLimit && e.Recording.Valid() && e.Lifecycle == nil
 	snapshot := (e.NativeType == PCAPNGArtifact || e.NativeType == SyscallRecordsArtifact) && recorderActionID(e.ActionID) && e.DataClass == "metadata" && e.Recording == nil && e.Snapshot != nil && e.Snapshot.Valid() && e.SourceSnapshotManifest.Valid() && e.Snapshot.MaxBytes == r.NativeLimit && !e.Snapshot.ProcessingUntil.After(r.WriteUntil) && e.Snapshot.T0.Equal(e.TriggeredAt) && SourceSnapshotAnchor(*e.Snapshot).Equal(r.AnchorAt) && e.Lifecycle != nil && e.Lifecycle.SourceSessionID == e.Snapshot.SourceID && e.Lifecycle.SnapshotID == e.Snapshot.SnapshotID && e.Lifecycle.SourceStartedAt.Equal(e.Snapshot.SourceStartedAt) && e.Lifecycle.RequestedBefore == e.Snapshot.Before && e.Lifecycle.After == e.Snapshot.After
 	// ADR-284: a Go endpoint profile is a finite onTrigger raw artifact whose
 	// native type follows its accepted profile type.
 	profile := e.Profile.Valid() && e.Profile.NativeType() == e.NativeType && e.DataClass == "raw" && recorderActionID(e.ActionID) && e.Recording == nil && e.Snapshot == nil && e.Lifecycle == nil && e.CompositionGroup == nil
 	isProfile := e.NativeType == PprofArtifact || e.NativeType == GoTraceArtifact
-	if e.CompositionGroup != nil && (!e.CompositionGroup.Valid() || !recording) || e.NativeType == HTTPHeadersArtifact && !recording || (isProfile || e.Profile != nil) && !profile ||
+	if e.CompositionGroup != nil && (!e.CompositionGroup.Valid() || !recording) || (e.NativeType == HTTPHeadersArtifact || e.NativeType == SyscallArgumentsArtifact) && !recording || (isProfile || e.Profile != nil) && !profile ||
 		e.ExecutionClass == ContextAPIExecution && !podStatus && !recording && !snapshot && !profile || e.Recording != nil && !recording || e.Snapshot != nil && !snapshot || e.SourceSnapshotManifest != nil && !snapshot {
 		return ErrInvalid
 	}

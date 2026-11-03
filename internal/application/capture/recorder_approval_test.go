@@ -2,15 +2,19 @@ package capture
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
 	authapp "asservat.local/asservat/internal/application/authorization"
 	identities "asservat.local/asservat/internal/application/identity"
+	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
 )
@@ -181,5 +185,86 @@ func TestRecorderSubmissionRejectsAnotherIssuersApprovalSettings(t *testing.T) {
 	f.svc.Approvals = fixedApprovalSettings{policy: policy}
 	if _, err = f.request(t, p.Preview, "other-issuer"); !errors.Is(err, value.ErrUnavailable) || f.admissions.Load() != 0 {
 		t.Fatal("foreign settings supplied approval authority", err)
+	}
+}
+
+// Only the mechanism pins are synthetic; the catalog, planner, canonical scope
+// and review request producer use their normal application path.
+type approvalArgumentCompiler struct{ stubFilters }
+
+func (approvalArgumentCompiler) CompileArguments(_ []string, buffers bool, maximum int64) (artifact.RecordingArguments, error) {
+	return artifact.RecordingArguments{ProgramDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AccountingRule: artifact.Digest(collector.ArgumentObservationAccountingRule()), MaxProbeBytes: 512, MaxBytesPerEvent: maximum, MaxBytesPerSecond: planning.SensitiveMaxBytesPerSecond, CaptureBuffers: buffers}, nil
+}
+
+func TestArgumentRecorderApprovalRetainsCanonicalEventCeiling(t *testing.T) {
+	f := newInvestigationFixture()
+	retained := &retainedRecording{investigationFixture: f}
+	f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
+	f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+	f.svc.Previews, f.svc.Admission, f.svc.Recorders = retained, retained, bothRecorders{availableRecording{f}}
+	f.svc.Filters = &approvalArgumentCompiler{}
+	raw, err := os.ReadFile("../planning/profiles/syscall-activity-v1.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err = json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["name"] = "argument-review"
+	a := doc["definition"].(map[string]any)["recipe"].(map[string]any)["actions"].([]any)[0].(map[string]any)
+	a["impact"], a["executionMode"] = "sensitiveRead", "onTrigger"
+	params := a["parameters"].(map[string]any)
+	params["mode"], params["before"], params["after"] = "arguments", "0s", "3s"
+	params["syscalls"] = map[string]any{"mode": "include", "names": []string{"read", "write"}}
+	params["arguments"] = map[string]any{"maxBytesPerEvent": 128, "captureBuffers": false}
+	raw, err = json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := planning.ProfileRef{Catalog: "namespace", Name: "argument-review", Version: "v1"}
+	f.svc.Profiles = &catalogFixture{profiles: []planning.CatalogProfile{{Ref: ref, SourceClusterID: fixtureID(4), SourceNamespaceUID: "ns", SourceUID: "argument-profile", Document: raw, Enabled: true}}}
+	composition := &planning.ProfileComposition{Components: []planning.ProfileComponent{{ID: "calls", Profile: ref}}, MaxTotalBytes: 16 << 20, MaxDuration: "30s"}
+	preview, err := f.svc.PreviewComposition(t.Context(), f.source(t, t.Context()), f.compositionIntent(composition))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !preview.Recordable {
+		t.Fatal("argument preview not recordable")
+	}
+	if preview.Preview.AssessmentRulesDigest != preview.Assessment.RulesDigest {
+		t.Error("persisted preview lost argument assessment rule identity")
+	}
+	_, canonical, err := compiler.RecorderScopeSummary(preview.Preview.CanonicalScope)
+	if err != nil || canonical == nil || canonical.ObservationLimits == nil || canonical.ObservationLimits.MaxObservedEvents != 40000 {
+		t.Fatal("canonical argument event ceiling", canonical, err)
+	}
+	grants := &fakeGrants{}
+	f.svc.Grants = grants
+	access := &authorization.ResultAccess{ActionIDs: []string{preview.Plan.Actions[0].ID}, Operations: []string{authorization.GrantDownloadOperation}, ClientIDs: []string{"console"}, MaxArtifacts: 1, MaxBytes: 16 << 20, MaxOperations: 1, NotAfter: f.now.Add(time.Hour)}
+	_, err = f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), preview.Preview.ID, "argument-review", access)
+	if !errors.Is(err, authorization.ErrApprovalRequired) || len(grants.requests) != 1 {
+		t.Fatal("review request", err)
+	}
+	got := grants.requests[0].Review.ObservationLimits
+	if got == nil || got.MaxObservedEvents != canonical.ObservationLimits.MaxObservedEvents {
+		t.Fatalf("GrantReview lost canonical event ceiling: got %+v, want %d", got, canonical.ObservationLimits.MaxObservedEvents)
+	}
+	if f.admissions.Load() != 0 {
+		t.Fatal("review request acquired evidence")
+	}
+	f.now = preview.Preview.Deadline.Add(time.Minute)
+	grants.grant.ExpiresAt, grants.covering = access.NotAfter, nil
+	if _, err = f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), preview.Preview.ID, "argument-review", access); !errors.Is(err, reachedRecordingAdmission) || len(retained.seen) != 1 {
+		t.Fatal("approved argument assessment changed before admission", err)
+	}
+	stored := f.previews[preview.Preview.ID]
+	if stored.AssessmentRulesDigest != preview.Assessment.RulesDigest || !stored.Deadline.Equal(preview.Preview.Deadline) {
+		t.Fatal("original preview changed")
+	}
+	stored.AssessmentRulesDigest = compiler.RecorderAssessmentRulesDigest()
+	f.previews[stored.ID] = stored
+	if _, err = f.svc.RequestWithResultAccess(t.Context(), f.source(t, t.Context()), stored.ID, "wrong-rules", access); err == nil || len(retained.seen) != 1 {
+		t.Fatal("generic rules accepted argument scope", err)
 	}
 }

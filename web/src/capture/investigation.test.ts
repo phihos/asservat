@@ -39,6 +39,20 @@ it('reviews edited recorder parameters under the same source and version pins wi
   expect(client.calls.some(c => c.name === 'request_capture')).toBe(false);
   expect(edited.components.map(c => c.profileRef)).toEqual(saved.data.profile_composition!.authored.components.map(c => c.profileRef));
 });
+it('preserves typed argument settings and false when repeating and refreshing a capture review', async () => {
+  const { controller, client } = await ready();
+  client.responder = () => recordingPreviewResult(id(41));
+  const saved = recordingPreviewResult(); if (saved.status !== 'ok') throw new Error();
+  const edited = structuredClone(saved.data.profile_composition!.authored);
+  edited.components[0].profileRef = { catalog: 'namespace', name: 'argument-capture', version: 'v2' };
+  edited.components[0].overrides = [{ actionID: 'syscalls', field: 'syscallArguments', value: { maxBytesPerEvent: 128, captureBuffers: false } }];
+  await controller.previewComposition(edited, id(41));
+  await controller.preview();
+  const calls = client.calls.filter(c => c.name === 'preview_capture').slice(-2);
+  expect(calls).toHaveLength(2);
+  for (const call of calls) expect(JSON.parse(JSON.stringify(call.input))).toMatchObject({ target_ref: target, profile_composition: edited, repeated_from_capture_id: id(41) });
+  expect(client.calls.some(c => c.name === 'request_capture')).toBe(false);
+});
 it('preserves explicit current policy Pod selection and edited retention on refresh', async () => {
   const { controller, client } = await ready();
   client.responder = () => recordingPreviewResult(id(41));

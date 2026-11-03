@@ -85,18 +85,26 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 	if s := a.Plan.Input.Snapshot; s != nil && s.ActionKind == "syscallTrace" {
 		action = s.ActionKind
 	}
+	var recording *artifact.Recording
+	if a.Plan.Input.Recorder != nil {
+		r, _, err := planning.RecordingForContext(a.Plan)
+		if err != nil {
+			return nil, value.ErrInvalid
+		}
+		recording = &r
+		if r.Kind == "syscallTrace" && r.Profile == "arguments" {
+			action = "syscallTrace"
+		}
+	}
 	if !slices.Contains(record.Authority.Actions, action) {
 		return nil, value.ErrDenied
 	}
 	output := int64(artifact.MaxContextBytes)
-	required, raw := false, false
-	if a.Plan.Input.Recorder != nil {
-		recording, _, err := planning.RecordingForContext(a.Plan)
-		if err != nil {
-			return nil, value.ErrInvalid
-		}
-		output, required = recording.MaxBytes, policyRecordingNeedsGrant(&recording)
-		raw = recording.Filter != nil && planning.RawBytePredicate(recording.Filter.Expression)
+	required, raw, arguments := false, false, false
+	if recording != nil {
+		output, required = recording.MaxBytes, policyRecordingNeedsGrant(recording)
+		arguments = recording.Kind == "syscallTrace" && recording.Profile == "arguments"
+		raw = arguments || recording.Filter != nil && planning.RawBytePredicate(recording.Filter.Expression)
 	}
 	if saved := a.Plan.Input.Snapshot; saved != nil {
 		if saved.PolicyUID != policy || saved.ExecutionDigest != record.Authority.ScopeDigest || (manual == nil && (saved.TriggerKind != "policy" || !saved.Request.T0.Equal(occurrence.CreatedAt.Time))) || (manual != nil && saved.TriggerKind != "recordingSave") {
@@ -136,7 +144,7 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 			}
 			return nil, value.ErrDenied
 		}
-		if raw && (grant.Policy.Observation == nil || grant.Policy.Limits.MaxObservedBytes < 1) {
+		if raw && (grant.Policy.Observation == nil || grant.Policy.Limits.MaxObservedBytes < 1 || arguments && grant.Policy.Limits.MaxObservedEvents < 1) {
 			return nil, value.ErrDenied
 		}
 		if grant.Policy.RecipeDigest != a.Plan.RecipeDigest || a.Plan.Input.Deadline.After(grant.PolicyNotAfter) {
@@ -283,5 +291,5 @@ func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, ro
 // Raw sensitivity is separate from Recording.RequireApproval's immutable
 // protected require-all setting. Do not rewrite that setting on replay.
 func policyRecordingNeedsGrant(r *artifact.Recording) bool {
-	return r != nil && (r.RequireApproval || r.Filter != nil && planning.RawBytePredicate(r.Filter.Expression))
+	return r != nil && (r.RequireApproval || r.Kind == "syscallTrace" && r.Profile == "arguments" || r.Filter != nil && planning.RawBytePredicate(r.Filter.Expression))
 }

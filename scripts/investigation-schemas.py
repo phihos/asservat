@@ -16,7 +16,7 @@ DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
 NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary"]
 
-RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration"]
+RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallArguments", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration"]
 
 
 def history_subset(name, tool):
@@ -128,6 +128,15 @@ def main():
     composition = documents["capture-composition.schema.json"]
     composition.pop("x-field-bindings")  # annotation of the canonical registry
     composition["$defs"]["override"]["oneOf"] = [o for o in composition["$defs"]["override"]["oneOf"] if o["properties"]["field"]["const"] in RECORDER_EDITS]
+    # Each typed override carries the same action ID bounds. Share that exact
+    # schema through the existing local-reference pass to keep discovery small.
+    overrides = composition["$defs"]["override"]["oneOf"]
+    action_id = overrides[0]["properties"]["actionID"]
+    composition["$defs"]["overrideActionID"] = copy.deepcopy(action_id)
+    for override in overrides:
+        if override["properties"]["actionID"] != action_id:
+            raise ValueError("Override action ID bounds differ; preserve the distinct schema")
+        override["properties"]["actionID"] = {"$ref": PREFIX + "capture-composition.schema.json#/$defs/overrideActionID"}
     # ADR-283: packetPeers takes cidrs entries and, since PR 2, the
     # Kubernetes podSelector/resourceRef entries resolved at preview.
     peers = copy.deepcopy(documents["packet-capture.schema.json"]["properties"]["peers"])
@@ -424,7 +433,7 @@ def main():
             "name": name,
             "description": {
                 "list_diagnostics": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
-                "preview_capture": "Passively preview whole-Pod status or a finite packet, syscall or Go profile capture: selected Pod, impact, data handling and blockers. Optional sharing needs evidence-owner and evidence:share; up to eight users/groups, default 24 hours, maximum seven days; get_capture reports its outcome. Use an authorized history_capture_id from list_capture_history for a fresh preview of the original target, retention and composition. profile_composition selects builtin network-connections/v1, syscall-activity/v1 or go-cpu/v1 with typed edits: packetFilter, packetPeers (CIDRs or preview-only Kubernetes peers), windows, ring, timeout, mode and profileDuration. onTrigger recordings require before 0s. Returns lifecycle, filter and assessment; ApprovalRequired and RecorderUnavailable identify unmet prerequisites.",
+                "preview_capture": "Passively preview whole-Pod status or a finite packet, syscall or Go profile capture. Use profile_composition for versioned profiles and typed edits; onTrigger requires before 0s. History IDs from list_capture_history restore target, retention and composition for a fresh preview. Returns Pod selection, lifecycle, impact, data handling and blockers. Sharing requires evidence-owner and evidence:share (up to eight users/groups; default 24 hours, maximum seven days).",
                 "request_capture": "Submit the reviewed capture preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet, syscall or Go profile plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads; submit the same preview again after approval.",
                 "resolve_capture_request": tool["description"],
                 "get_capture": "Read authorized pod-status capture progress. No evidence bytes. Finalizing is not publication; Indeterminate must not be automatically recaptured.",

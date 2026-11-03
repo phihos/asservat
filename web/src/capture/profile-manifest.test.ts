@@ -81,6 +81,21 @@ describe('profileManifest (REQ-CPR-005 Save as profile)', () => {
     expect(derived.recipe.actions[0]).toMatchObject({ parameters: { syscalls: { mode: 'include', names: ['openat'] }, maxEvents: 5000 } });
   });
 
+  it('saves complete argument settings including false as schema-valid defaults without mutating the source', () => {
+    const source = builtin('syscall-activity');
+    source.editableFields.push({ actionID: 'syscalls', field: 'syscallArguments', label: 'Argument capture' });
+    Object.assign(source.recipe.actions[0].parameters, { mode: 'arguments', arguments: { maxBytesPerEvent: 128, captureBuffers: true } });
+    const reviewed = composition([{ actionID: 'syscalls', field: 'syscallArguments', value: { maxBytesPerEvent: 64, captureBuffers: false } }], 'syscall-activity');
+    const manifest = profileManifest({ namespace: 'payments', name: 'argument-capture', version: 'v1', displayName: 'Argument capture', source, composition: reviewed });
+    expect(manifest.spec.definition.recipe.actions[0]).toMatchObject({ parameters: { arguments: { maxBytesPerEvent: 64, captureBuffers: false } } });
+    expect(source.recipe.actions[0]).toMatchObject({ parameters: { arguments: { maxBytesPerEvent: 128, captureBuffers: true } } });
+    const canonical = canonicalValidator(), crd = crdValidator();
+    expect(canonical(manifest), JSON.stringify(canonical.errors)).toBe(true);
+    expect(crd.validate(manifest), JSON.stringify(crd.validate.errors)).toBe(true);
+    const roundtrip = JSON.parse(JSON.stringify(manifest)).spec.definition;
+    expect(applyOverrides(roundtrip, reviewed.authored.components[0].overrides!)).toEqual(manifest.spec.definition);
+  });
+
   it('refuses existing versions, invalid names, unmodeled fields and multi-profile plans', () => {
     const source = builtin('network-connections');
     const base = { namespace: 'payments', name: 'net', version: 'v2', displayName: 'x', source, composition: composition([]) };

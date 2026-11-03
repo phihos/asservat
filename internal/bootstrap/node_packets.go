@@ -35,15 +35,17 @@ type nodePackets struct {
 	observedEngine observedPacketEngine
 	// syscallTrace runs finite syscall recordings (B3); nil when the
 	// syscall mechanism is not available.
-	syscallTrace syscallTraceEngine
-	identity     func() collector.Identity
-	upload       packetUploader
-	available    bool // the packet mechanism assessed Available
-	version      string
-	now          func() time.Time
-	log          func(string)
-	budget       func() *collector.Budget
-	budgetMu     *sync.Mutex
+	syscallTrace      syscallTraceEngine
+	argumentTrace     argumentTraceEngine
+	argumentResources func(int) (int64, error)
+	identity          func() collector.Identity
+	upload            packetUploader
+	available         bool // the packet mechanism assessed Available
+	version           string
+	now               func() time.Time
+	log               func(string)
+	budget            func() *collector.Budget
+	budgetMu          *sync.Mutex
 	// Protected by budgetMu; same-epoch poll resets cannot refill one permit.
 	// At most MaxQueuedWork capture IDs, each retained only until StartBy.
 	observations map[string]time.Time

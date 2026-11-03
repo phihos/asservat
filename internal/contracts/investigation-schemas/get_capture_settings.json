@@ -100,7 +100,7 @@
                     "$ref": "#/$defs/d0"
                   },
                   {
-                    "$ref": "#/$defs/d32"
+                    "$ref": "#/$defs/d34"
                   }
                 ]
               },
@@ -2776,13 +2776,13 @@
       "d20": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 4096,
-        "pattern": "\\S"
+        "maxLength": 63
       },
       "d21": {
         "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
+        "minLength": 1,
+        "maxLength": 4096,
+        "pattern": "\\S"
       },
       "d22": {
         "type": "string",
@@ -2790,6 +2790,11 @@
         "maxLength": 16
       },
       "d23": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      },
+      "d24": {
         "oneOf": [
           {
             "type": "object",
@@ -2828,20 +2833,10 @@
           }
         ]
       },
-      "d24": {
+      "d25": {
         "enum": [
           "metadata",
           "arguments"
-        ]
-      },
-      "d25": {
-        "anyOf": [
-          {
-            "const": "0s"
-          },
-          {
-            "$ref": "#/$defs/d8"
-          }
         ]
       },
       "d26": {
@@ -2855,14 +2850,42 @@
         ]
       },
       "d27": {
-        "$ref": "#/$defs/d12"
+        "anyOf": [
+          {
+            "const": "0s"
+          },
+          {
+            "$ref": "#/$defs/d8"
+          }
+        ]
       },
       "d28": {
+        "$ref": "#/$defs/d12"
+      },
+      "d29": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxBytesPerEvent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "captureBuffers": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "maxBytesPerEvent",
+          "captureBuffers"
+        ]
+      },
+      "d30": {
         "type": "integer",
         "minimum": 1,
         "maximum": 1000000
       },
-      "d29": {
+      "d31": {
         "type": "integer",
         "minimum": 1,
         "maximum": 100000
@@ -2874,9 +2897,7 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
                 "const": "packetPeers"
@@ -3084,34 +3105,10 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
                 "const": "packetFilter"
-              },
-              "value": {
-                "$ref": "#/$defs/d20"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
-              },
-              "field": {
-                "const": "packetBefore"
               },
               "value": {
                 "$ref": "#/$defs/d21"
@@ -3128,12 +3125,10 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
-                "const": "packetAfter"
+                "const": "packetBefore"
               },
               "value": {
                 "$ref": "#/$defs/d22"
@@ -3150,9 +3145,27 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
+              },
+              "field": {
+                "const": "packetAfter"
+              },
+              "value": {
+                "$ref": "#/$defs/d23"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "$ref": "#/$defs/d20"
               },
               "field": {
                 "const": "packetRing"
@@ -3172,9 +3185,7 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
                 "const": "profileDuration"
@@ -3194,34 +3205,10 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
                 "const": "syscallFilter"
-              },
-              "value": {
-                "$ref": "#/$defs/d23"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
-              },
-              "field": {
-                "const": "syscallMode"
               },
               "value": {
                 "$ref": "#/$defs/d24"
@@ -3238,12 +3225,10 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
-                "const": "syscallBefore"
+                "const": "syscallMode"
               },
               "value": {
                 "$ref": "#/$defs/d25"
@@ -3260,12 +3245,10 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
-                "const": "syscallAfter"
+                "const": "syscallBefore"
               },
               "value": {
                 "$ref": "#/$defs/d26"
@@ -3282,12 +3265,10 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
-                "const": "syscallRing"
+                "const": "syscallAfter"
               },
               "value": {
                 "$ref": "#/$defs/d27"
@@ -3304,12 +3285,10 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
-                "const": "syscallMaxEvents"
+                "const": "syscallRing"
               },
               "value": {
                 "$ref": "#/$defs/d28"
@@ -3326,12 +3305,10 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
-                "const": "syscallRate"
+                "const": "syscallArguments"
               },
               "value": {
                 "$ref": "#/$defs/d29"
@@ -3348,9 +3325,47 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
+              },
+              "field": {
+                "const": "syscallMaxEvents"
+              },
+              "value": {
+                "$ref": "#/$defs/d30"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "$ref": "#/$defs/d20"
+              },
+              "field": {
+                "const": "syscallRate"
+              },
+              "value": {
+                "$ref": "#/$defs/d31"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "$ref": "#/$defs/d20"
               },
               "field": {
                 "const": "actionMaxBytes"
@@ -3372,9 +3387,7 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
                 "const": "actionTimeout"
@@ -3394,9 +3407,7 @@
             "additionalProperties": false,
             "properties": {
               "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
+                "$ref": "#/$defs/d20"
               },
               "field": {
                 "const": "actionExecutionMode"
@@ -3469,7 +3480,7 @@
           "maxDuration"
         ]
       },
-      "d30": {
+      "d32": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -3550,7 +3561,7 @@
           }
         ]
       },
-      "d31": {
+      "d33": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -3589,7 +3600,7 @@
           "resolvedProfiles": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d30"
+              "$ref": "#/$defs/d32"
             },
             "minItems": 1,
             "maxItems": 8
@@ -3597,7 +3608,7 @@
           "actionMap": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d31"
+              "$ref": "#/$defs/d33"
             },
             "minItems": 1,
             "maxItems": 128
@@ -3696,11 +3707,11 @@
           "navigation_uri"
         ]
       },
-      "d33": {
+      "d35": {
         "type": "string",
         "pattern": "^[a-f0-9]{64}$"
       },
-      "d32": {
+      "d34": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -3732,10 +3743,10 @@
             "format": "date-time"
           },
           "settings_digest": {
-            "$ref": "#/$defs/d33"
+            "$ref": "#/$defs/d35"
           },
           "original_execution_digest": {
-            "$ref": "#/$defs/d33"
+            "$ref": "#/$defs/d35"
           },
           "settings": {
             "type": "object",
@@ -3763,7 +3774,7 @@
                     "maxLength": 64
                   },
                   "executionDigest": {
-                    "$ref": "#/$defs/d33"
+                    "$ref": "#/$defs/d35"
                   }
                 },
                 "required": [

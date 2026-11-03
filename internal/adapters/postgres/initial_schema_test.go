@@ -67,6 +67,24 @@ func TestInitialSchemaHistoryRequiresOriginalOrderedUpPrefix(t *testing.T) {
 	}
 }
 
+func TestInitialSchemaHistoryUsesCompiledReleaseBound(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	entries := make([]initialSchemaVersion, currentSchemaVersion+1)
+	for i := range entries {
+		entries[i] = initialSchemaVersion{ID: int64(i + 1), Version: int64(i), Applied: true, At: now}
+	}
+	if head, err := initialSchemaPrefix(entries, currentSchemaVersion); err != nil || head != currentSchemaVersion {
+		t.Fatal("complete release history refused", head, err)
+	}
+	entries = append(entries, initialSchemaVersion{ID: currentSchemaVersion + 2, Version: currentSchemaVersion + 1, Applied: true, At: now})
+	if _, err := initialSchemaPrefix(entries, currentSchemaVersion); err == nil {
+		t.Fatal("foreign migration beyond compiled release accepted")
+	}
+	if _, err := initialSchemaPrefix(entries, currentSchemaVersion+1); err == nil {
+		t.Fatal("caller extended compiled release bound")
+	}
+}
+
 type expiredInitialSchemaRoot struct{ reads int }
 
 func (r *expiredInitialSchemaRoot) ReadInitialSchema(ctx context.Context) (contracts.InitialPreparationRoot, time.Time, error) {

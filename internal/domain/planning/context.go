@@ -101,12 +101,19 @@ func (s *SourceSnapshotContext) Clone() *SourceSnapshotContext {
 type RecorderContext struct {
 	Composition ProfileComposition
 	Filters     []CompiledExpression `json:",omitempty"`
+	Arguments   []CompiledArguments  `json:",omitempty"`
 	// RequireApproval is the installation's ADR-249 switch as frozen in
 	// the reviewed plan.
 	RequireApproval bool `json:",omitempty"`
 	// Peers are the frozen Kubernetes peer resolutions of the reviewed plan
 	// (ADR-283 part 3), so acceptance recompiles the exact reviewed scope.
 	Peers []targets.PeerResolution `json:",omitempty"`
+}
+
+// CompiledArguments is one release-qualified selection, frozen with approval.
+type CompiledArguments struct {
+	Names     []string
+	Mechanism artifact.RecordingArguments
 }
 
 // CompiledExpression is one frozen filter compilation.
@@ -121,6 +128,10 @@ func (r *RecorderContext) Clone() *RecorderContext {
 		return nil
 	}
 	out := RecorderContext{Composition: *r.Composition.Clone(), RequireApproval: r.RequireApproval}
+	for _, a := range r.Arguments {
+		a.Names = append([]string(nil), a.Names...)
+		out.Arguments = append(out.Arguments, a)
+	}
 	for _, p := range r.Peers {
 		out.Peers = append(out.Peers, p.Clone())
 	}

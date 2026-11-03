@@ -10,8 +10,8 @@ func automationFixture() (AcceptedPolicyAuthority, AutomationProjection, PolicyU
 	human, q, _, now := fixture()
 	d := q.Revision
 	d.UID = q.Allows[0].Audience.BasisUID
-	a := AcceptedPolicyAuthority{InstallationID: q.Target.ClusterID, PolicyUID: "policy-uid", Creator: human.Principal, Executor: PolicyPrincipal(q.Target.ClusterID, "policy-uid"), ScopeDigest: artifact.Digest{8}, ClusterID: q.Target.ClusterID, NamespaceUID: q.Target.NamespaceUID, WorkloadUID: q.Target.WorkloadUID, Delegation: d, Owners: []artifact.AudienceAssignment{q.Allows[0].Audience}, Actions: []string{"packetCapture"}, Limits: AutomationLimits{10, 1000, 2000}, IssuedAt: now.Add(-time.Hour), NotAfter: now.Add(time.Hour)}
-	p := AutomationProjection{InstallationID: a.InstallationID, Delegation: d, Envelope: AutomationEnvelope{[]string{"packetCapture"}, 86400, 10, 1000, 2000}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Permissions: q}
+	a := AcceptedPolicyAuthority{InstallationID: q.Target.ClusterID, PolicyUID: "policy-uid", Creator: human.Principal, Executor: PolicyPrincipal(q.Target.ClusterID, "policy-uid"), ScopeDigest: artifact.Digest{8}, ClusterID: q.Target.ClusterID, NamespaceUID: q.Target.NamespaceUID, WorkloadUID: q.Target.WorkloadUID, Delegation: d, Owners: []artifact.AudienceAssignment{q.Allows[0].Audience}, Actions: []string{"packetCapture"}, Limits: AutomationLimits{MaxExecutions: 10, MaxBytes: 1000, MaxObservedBytes: 2000}, IssuedAt: now.Add(-time.Hour), NotAfter: now.Add(time.Hour)}
+	p := AutomationProjection{InstallationID: a.InstallationID, Delegation: d, Envelope: AutomationEnvelope{AllowedActions: []string{"packetCapture"}, MaxLifetimeSeconds: 86400, MaxExecutions: 10, MaxBytes: 1000, MaxObservedBytes: 2000}, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Permissions: q}
 	return a, p, PolicyUse{a.PolicyUID, a.ScopeDigest, q.Target, PolicyIncident}, now
 }
 

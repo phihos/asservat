@@ -2,8 +2,9 @@
 // decoding Inspektor Gadget traceloop v0.57.0 kernel records, pairing enter
 // and exit, a fixed ring record, errno/syscall naming, the JSON Lines window
 // encoder (syscall-results.schema.json#/$defs/event) and an event rate
-// bucket. It performs no I/O and loads no eBPF. Only metadata leaves this
-// package: the task name (comm) and argument registers are never retained.
+// bucket. It performs no I/O and loads no eBPF. The metadata API never retains the task name (comm) or argument registers.
+// The separate argument decoder consumes only the approved argument object and
+// closed definitions; it is never selected by metadata recording.
 package syscalls
 
 import (

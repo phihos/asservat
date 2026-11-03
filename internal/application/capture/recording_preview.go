@@ -167,6 +167,7 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 		return zero, errRecordingNotAcceptable
 	}
 	p.CanonicalScope, p.ScopeDigest = slices.Clone(plan.CanonicalScope), plan.ScopeDigest
+	p.AssessmentRulesDigest = compiler.RecorderAssessmentRulesFor(plan.Actions)
 	processingStarted := time.Now()
 	coverage, err := s.processingCoverage(ctx, p, f, recovery, i.ValidUntil)
 	auditapp.MarkStep(ctx, "p-processing", processingStarted)

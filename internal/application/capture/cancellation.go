@@ -23,6 +23,7 @@ type SnapshotCancellationGroup struct {
 }
 
 type SnapshotCancellationWork struct {
+	Recording *collector.RecordingStop
 	Profile   *collector.ProfileStop
 	Group     *SnapshotCancellationGroup
 	Decision  value.Cancellation
@@ -87,7 +88,7 @@ func (s CaptureCancellation) Cancel(ctx context.Context, current identities.Curr
 		return zero, value.ErrChanged
 	}
 	if group := work.Group; group != nil {
-		if work.Snapshot != nil || work.Profile != nil || group.ParentCaptureID != request.CaptureID || len(group.Targets) > value.MaxRecordingSaveGroupChildren {
+		if work.Snapshot != nil || work.Profile != nil || work.Recording != nil || group.ParentCaptureID != request.CaptureID || len(group.Targets) > value.MaxRecordingSaveGroupChildren {
 			return zero, value.ErrChanged
 		}
 		seen := map[string]bool{}
@@ -115,10 +116,21 @@ func (s CaptureCancellation) Cancel(ctx context.Context, current identities.Curr
 		dispatcher, ok := s.Dispatcher.(interface {
 			CancelProfile(context.Context, string, collector.ProfileStop) error
 		})
-		if !ok || work.Snapshot != nil || work.Group != nil || !decision.Requested || !stop.Valid() || stop.CaptureID != request.CaptureID || stop.RootID != s.RootID || stop.ClusterID != work.ClusterID {
+		if !ok || work.Snapshot != nil || work.Group != nil || work.Recording != nil || !decision.Requested || !stop.Valid() || stop.CaptureID != request.CaptureID || stop.RootID != s.RootID || stop.ClusterID != work.ClusterID {
 			return zero, value.ErrChanged
 		}
 		if err = dispatcher.CancelProfile(bounded, work.ClusterID, *stop); err != nil {
+			return decision, err
+		}
+	}
+	if stop := work.Recording; stop != nil {
+		dispatcher, ok := s.Dispatcher.(interface {
+			CancelRecording(context.Context, string, collector.RecordingStop) error
+		})
+		if !ok || work.Snapshot != nil || work.Group != nil || work.Profile != nil || !decision.Requested || decision.ApplicationStopUnknown || !stop.Valid() || stop.CaptureID != request.CaptureID || stop.RootID != s.RootID || stop.ClusterID != work.ClusterID {
+			return zero, value.ErrChanged
+		}
+		if err = dispatcher.CancelRecording(bounded, work.ClusterID, *stop); err != nil {
 			return decision, err
 		}
 	}

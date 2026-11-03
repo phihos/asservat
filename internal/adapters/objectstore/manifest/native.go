@@ -44,6 +44,8 @@ func (v *Validator) NativeCheck(e artifact.ContextExpectation, m ContextManifest
 		return &pcapngCheck{}, nil
 	case artifact.RawPCAPNGArtifact:
 		return &pcapngCheck{}, nil // caps are rechecked by packets.CheckRaw
+	case artifact.SyscallArgumentsArtifact:
+		return newArgumentsCheck(v, e, m)
 	case artifact.SyscallRecordsArtifact:
 		return &syscallCheck{v: v, pod: e.PodUID, from: m.StartedAt, until: m.CompletedAt}, nil
 	case artifact.PprofArtifact:

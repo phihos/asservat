@@ -1025,6 +1025,43 @@
                 }
               }
             }
+          },
+          {
+            "properties": {
+              "target": {
+                "properties": {
+                  "scope": {
+                    "const": "pod"
+                  }
+                }
+              },
+              "kind": {
+                "const": "syscallTrace"
+              },
+              "format": {
+                "const": "asservat-syscall-arguments/v1"
+              },
+              "mediaType": {
+                "const": "application/x-ndjson"
+              },
+              "dataClass": {
+                "const": "raw"
+              },
+              "collectionProvenance": {
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  }
+                }
+              },
+              "sizes": {
+                "properties": {
+                  "plaintextBytes": {
+                    "maximum": 8388608
+                  }
+                }
+              }
+            }
           }
         ]
       }

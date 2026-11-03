@@ -47,7 +47,7 @@ func contextRecorderAcceptance(plan value.RecorderPlan) RecorderAcceptance {
 
 func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance {
 	if len(plan.Actions) != 1 {
-		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only a single packet capture action can be recorded in this release"}
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only one recorder action can run in a capture"}
 	}
 	a := plan.Actions[0]
 	if a.PeerEndpoints > 0 && (policy || len(plan.Input.Peers) != 1) {
@@ -58,13 +58,16 @@ func recorderAcceptance(plan value.RecorderPlan, policy bool) RecorderAcceptance
 	if a.Kind == "syscallTrace" {
 		// B3: one finite syscall metadata recording of the after window.
 		after, ok := durationValue(a.After, true)
-		if a.SyscallMode != "metadata" || !ok || after < time.Second || after > maxSyscallAfter {
-			return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.after", "a manual syscall recording records metadata for 1 to 60 seconds after it starts"}
+		if a.SyscallMode != "metadata" && a.SyscallMode != "arguments" || !ok || after < time.Second || after > maxSyscallAfter {
+			return RecorderAcceptance{"RecorderUnavailable", "profile_composition.components[0] action " + a.LocalID + ".parameters.after", "a finite syscall recording captures 1 to 60 seconds after it starts"}
+		}
+		if a.SyscallMode == "arguments" && (a.ExecutionMode != "onTrigger" || a.Before != "0s" || plan.Approval == nil || plan.Approval.DataClass != "raw" || plan.Approval.ObservationLimits == nil || plan.Approval.ObservationLimits.MaxObservedEvents < 1) {
+			return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "argument tracing requires finite on-trigger execution and reviewed byte and event limits"}
 		}
 		return maxBytesAcceptance(plan)
 	}
 	if a.Kind != "packetCapture" || a.PacketProfile != "networkHeaders" && a.PacketProfile != "rawPackets" && a.PacketProfile != "httpHeaders" {
-		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only network-header, raw and HTTP header packet and syscall metadata captures can be recorded in this release"}
+		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "only supported packet and syscall recorder modes can run in this release"}
 	}
 	http := a.PacketProfile == "httpHeaders"
 	if http && (plan.Approval == nil || plan.Approval.DataClass != "extract" || plan.Approval.ObservationLimits == nil) {
@@ -113,7 +116,7 @@ func ManualObservationIssued(actions []value.RecorderAction, approval *value.Rec
 		return false
 	}
 	codes := actions[0].Sensitive
-	return approval.DataClass == "raw" && slices.Contains(codes, value.ReasonRawPackets) || approval.DataClass == "extract" && slices.Contains(codes, value.ReasonHTTPHeaders)
+	return approval.DataClass == "raw" && (slices.Contains(codes, value.ReasonRawPackets) || slices.Contains(codes, value.ReasonSyscallArguments) && approval.ObservationLimits.MaxObservedEvents > 0) || approval.DataClass == "extract" && slices.Contains(codes, value.ReasonHTTPHeaders)
 }
 
 func maxBytesAcceptance(plan value.RecorderPlan) RecorderAcceptance {
@@ -159,6 +162,13 @@ func RecordingFor(plan value.RecorderPlan) (artifact.Recording, string, error) {
 			s.Names = slices.Sorted(slices.Values(params.Syscalls.Names))
 		}
 		r.Kind, r.Profile, r.Snaplen, r.Syscalls = "syscallTrace", "metadata", artifact.RecordingSyscallSnaplen, s
+		if params.Mode == "arguments" {
+			pins, err := frozenArgumentFor(scope, a.ID, params)
+			if err != nil {
+				return artifact.Recording{}, "", err
+			}
+			r.Profile, r.Snaplen, r.Arguments = "arguments", 0, &pins
+		}
 		if !r.Valid() || r.MaxBytes < 64<<10 {
 			return artifact.Recording{}, "", value.ErrInvalid
 		}
@@ -247,6 +257,9 @@ func RecorderContextFor(r *artifact.Recording) (*value.RecorderContext, error) {
 		return nil, value.ErrInvalid
 	}
 	out := &value.RecorderContext{Composition: c, RequireApproval: r.RequireApproval}
+	if r.Arguments != nil {
+		out.Arguments = []value.CompiledArguments{{Names: slices.Clone(r.Syscalls.Names), Mechanism: *r.Arguments}}
+	}
 	frozen, ok, err := FrozenRecordingPeers(r)
 	if err != nil {
 		return nil, value.ErrInvalid
@@ -291,7 +304,7 @@ func compileRecorderContext(in value.ContextInput, now time.Time) (value.Context
 	if err != nil || in.Retention.EvidenceType != evidence {
 		return bad()
 	}
-	plan, err := CompileRecorder(value.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: in.Recorder.Composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: in.Recorder.RequireApproval, Peers: in.Recorder.Peers}, frozenFilters(in.Recorder.Filters), now)
+	plan, err := CompileRecorder(value.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: in.Recorder.Composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: in.Recorder.RequireApproval, Peers: in.Recorder.Peers}, frozenRecorderCompiler{in.Recorder}, now)
 	if err != nil || !contextRecorderAcceptance(plan).Acceptable() {
 		return bad()
 	}
@@ -308,7 +321,7 @@ func RecorderPlanForContext(p value.ContextPlan) (value.RecorderPlan, error) {
 	if in.Recorder == nil {
 		return value.RecorderPlan{}, value.ErrInvalid
 	}
-	plan, err := CompileRecorder(value.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: in.Recorder.Composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: in.Recorder.RequireApproval, Peers: in.Recorder.Peers}, frozenFilters(in.Recorder.Filters), p.CompiledAt)
+	plan, err := CompileRecorder(value.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: in.Recorder.Composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: in.Recorder.RequireApproval, Peers: in.Recorder.Peers}, frozenRecorderCompiler{in.Recorder}, p.CompiledAt)
 	if err != nil || plan.ScopeDigest != p.ScopeDigest {
 		return value.RecorderPlan{}, value.ErrInvalid
 	}
@@ -345,6 +358,13 @@ func RecorderContextFromScope(c value.ProfileComposition, canonicalScope []byte)
 		}
 	}
 	out := &value.RecorderContext{Composition: *c.Clone(), Filters: filters, RequireApproval: required}
+	for _, a := range scope.ArgumentPrograms {
+		mechanism, err := a.mechanism()
+		if err != nil {
+			return nil, err
+		}
+		out.Arguments = append(out.Arguments, value.CompiledArguments{Names: slices.Clone(a.Names), Mechanism: mechanism})
+	}
 	for _, f := range scope.Filters {
 		if f.Peers == nil || f.Peers.Kubernetes == nil {
 			continue

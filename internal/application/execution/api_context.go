@@ -78,6 +78,12 @@ type PolicyRecordingPreparer interface {
 	PreparePolicyRecording(context.Context, APIExecutionCheck, targets.PacketSourceObservation) (value.APIExecution, bool, collector.ObservationPermit, error)
 }
 
+// ArgumentRecordingPreparer is distinct from packet predicate observation.
+// The original API preparation and both event/byte pools commit atomically.
+type ArgumentRecordingPreparer interface {
+	PrepareArgumentRecording(context.Context, APIExecutionCheck, targets.PacketSourceObservation) (value.APIExecution, bool, collector.ArgumentObservationPermit, error)
+}
+
 type APIExecutionRecorder interface {
 	RecordAPIStart(context.Context, APIExecutionCheck, value.APIExecution, value.Disposition) (value.APIExecution, error)
 	RecordAPIOutcome(context.Context, value.APIExecution, value.APIProcessObservation) (value.APIExecution, error)
@@ -170,6 +176,24 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		}
 		snapshotObserved = &observed
 		t = targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: observed.Original.Request, Pin: observed.Original.Pin}
+	} else if argumentRecording(w) {
+		resolveStep = "ResolveArgumentSource"
+		resolver, ok := s.Targets.(interface {
+			ResolveArgumentSource(context.Context, targets.Request) (targets.RecorderResolution, error)
+		})
+		if !ok {
+			return out, nil, apiCheckStep{resolveStep, value.ErrUnavailable}
+		}
+		resolved, resolveErr := resolver.ResolveArgumentSource(ctx, w.Target)
+		err = resolveErr
+		if err == nil && !resolved.ValidSource(s.Now()) {
+			err = value.ErrDenied
+		}
+		if err == nil {
+			t = resolved.Target
+			copy := *resolved.Recorder.Source
+			source = &copy
+		}
 	} else if meteredRecording(w) {
 		resolveStep = "ResolvePacketSource"
 		resolver, ok := s.Targets.(interface {
@@ -293,6 +317,9 @@ func (s APIContextRunner) checkObserved(ctx context.Context, current identities.
 		return out, nil, apiCheckStep{"Process", err}
 	}
 	until := identity.Earlier(original, start.Add(5*time.Second))
+	if argumentRecording(w) && source != nil {
+		until = identity.Earlier(until, source.FreshUntil)
+	}
 	for _, d := range []time.Time{plan.ValidUntil, eligible.ValidUntil, recovery.FreshUntil, process.ValidUntil, e.Registration.WriteUntil} {
 		until = identity.Earlier(until, d)
 	}
@@ -401,7 +428,14 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	var r value.APIExecution
 	var mayCreate bool
 	var permit collector.ObservationPermit
-	if source != nil {
+	var argumentPermit collector.ArgumentObservationPermit
+	if argumentRecording(w) {
+		preparer, ok := s.Prepare.(ArgumentRecordingPreparer)
+		if !ok || source == nil {
+			return zero, executeStep{"PrepareArgumentRecording", value.ErrUnavailable}
+		}
+		r, mayCreate, argumentPermit, err = preparer.PrepareArgumentRecording(startCtx, check, *source)
+	} else if source != nil {
 		preparer, ok := s.Prepare.(PolicyRecordingPreparer)
 		if !ok {
 			return zero, executeStep{"PreparePolicyRecording", value.ErrUnavailable}
@@ -539,7 +573,13 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 		// the stored completion (CollectRecording). Only a start the region
 		// refused is recorded as failed now.
 		var queued time.Time
-		if source != nil {
+		if argumentRecording(w) {
+			recorder, ok := prepared.(evidence.ArgumentContextRecorder)
+			if !ok || source == nil {
+				return zero, executeStep{"StartArgumentRecording", value.ErrUnavailable}
+			}
+			queued, err = recorder.StartArgumentRecording(startCtx, w.Accepted.Pin, r.StartedAt, d.ValidUntil, *source, argumentPermit)
+		} else if source != nil {
 			sensitive, ok := prepared.(evidence.PolicyContextRecorder)
 			if !ok {
 				return zero, executeStep{"StartPolicyRecording", value.ErrUnavailable}
@@ -678,6 +718,11 @@ func captureFailurePhase(err error) string {
 		return "denied"
 	}
 	return "captureFailed"
+}
+
+func argumentRecording(w APIContextWork) bool {
+	r := w.Accepted.Expectation.Recording
+	return r != nil && r.Arguments != nil
 }
 
 // meteredRecording selects the finite observation companion without changing

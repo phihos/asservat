@@ -171,6 +171,9 @@ func WireWork(w collector.Work) contracts.NodeWork {
 		if p.ProgramDigest != ([32]byte{}) {
 			c.ProgramDigest = hex.EncodeToString(p.ProgramDigest[:])
 		}
+		if p.Arguments != nil {
+			c.Arguments = wireArgumentObservation(*p.Arguments)
+		}
 		if p.Observation != nil {
 			c.Observation = wireObservation(*p.Observation)
 		}
@@ -296,6 +299,15 @@ func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 			}
 			p.HTTP = &collector.HTTPProjection{MaxFlows: h.MaxFlows, MaxHeaderBytes: h.MaxHeaderBytes, MaxFlowBytes: h.MaxFlowBytes, MaxTotalBytes: h.MaxTotalBytes, IdleTimeout: time.Duration(h.IdleTimeoutMillis) * time.Millisecond}
 		}
+		if c.Arguments != nil {
+			permit, valid := domainArgumentObservation(c.Arguments)
+			if !valid {
+				out.Packet = &collector.PacketCapture{}
+				return out, true
+			}
+			p.Arguments = permit
+			out.NotAfter = w.NotAfter.UTC()
+		}
 		if c.Observation != nil {
 			permit, valid := domainObservation(c.Observation)
 			if !valid {
@@ -335,6 +347,10 @@ func DomainPacketResult(w contracts.NodePacketResult) (collector.PacketResult, b
 	r := collector.PacketResult{WorkID: w.WorkID, CaptureID: w.CaptureID, StartedAt: w.StartedAt.UTC().Truncate(time.Microsecond), EndedAt: w.EndedAt.UTC().Truncate(time.Microsecond),
 		Seen: w.Seen, Retained: w.Retained, Filtered: w.Filtered, Unsupported: w.Unsupported, Fragment: w.Fragment, Extension: w.Extension, Malformed: w.Malformed,
 		OutputFull: w.OutputFull, LostSamples: w.LostSamples, WireBytes: w.WireBytes, CapturedBytes: w.CapturedBytes, Snaplen: w.Snaplen, EngineVersion: w.EngineVersion, ProgramDigest: d, Failure: collector.Reason(w.Failure), NativeType: w.NativeType}
+	if r.NativeType == artifact.SyscallArgumentsArtifact {
+		r.StartedAt = w.StartedAt.UTC()
+		r.EndedAt = w.EndedAt.UTC()
+	}
 	if w.Snapshot != nil {
 		o, valid := DomainSnapshotOutcome(*w.Snapshot)
 		if !valid {

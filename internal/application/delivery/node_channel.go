@@ -474,15 +474,25 @@ func (c *NodeChannel) enqueue(nodeUID string, kind collector.WorkKind, notAfter 
 	// This check and insertion share the same mutex: a replaced collector
 	// cannot inherit work observed for an earlier process or boot.
 	if expected != nil {
+		mechanism := collector.MechanismPacket
+		if packet != nil && packet.Arguments != nil {
+			mechanism = collector.MechanismSyscall
+		}
 		if ctx == nil || ctx.Err() != nil || !expected.Valid(now) || packet == nil ||
 			packet.PodUID != expected.PodUID || e.id.NodeUID != expected.NodeUID ||
 			e.id.BootID != expected.BootID || e.id.PodUID != expected.CollectorPodUID ||
-			e.id.Epoch != expected.CollectorEpoch || !c.view(e, now).PacketRecorderAvailable() ||
+			e.id.Epoch != expected.CollectorEpoch || !c.view(e, now).RecorderAvailable(mechanism) ||
 			notAfter.After(now.Add(collector.PacketCaptureStartWithin)) {
 			return collector.Work{}, ErrNodeUnavailable
 		}
 		if deadline, ok := ctx.Deadline(); ok && !now.Before(deadline) {
 			return collector.Work{}, ErrNodeUnavailable
+		}
+		if a := packet.Arguments; a != nil {
+			b := a.Binding
+			if !a.ValidFinite(now) || !a.StartBy.Equal(notAfter) || a.Duration != packet.Duration || b.CaptureID != packet.CaptureID || b.PodUID != packet.PodUID || b.NodeUID != e.id.NodeUID || b.BootID != e.id.BootID || b.CollectorPodUID != e.id.PodUID || b.CollectorEpoch != e.id.Epoch {
+				return collector.Work{}, ErrNodeUnavailable
+			}
 		}
 		if permit := packet.Observation; permit != nil {
 			b := permit.Binding

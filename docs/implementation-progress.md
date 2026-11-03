@@ -3,29 +3,222 @@
 
 ## Current delivery workflow (2026-11-03)
 
-Active outcome: approved profile capture → independent publication → native
-download → saved summary → joined Stop (S-05, PR #147). Argument work is parked
-at its signed checkpoints until this workflow passes. One integration candidate
-contains the download-client correction and immutable validator reuse; no new
-scheduler or shared codec arena is enabled.
+CI41651875701 passed for the native-format fix. The final test-only update reuses
+one compiled case fixture across all17 sequential format assertions (focused race
+2.618s), retains authenticated synthetic native bytes before semantic assertions
+(focused native-fixture race2.527s), and waits for the sharing form's async reset.
+The last pre-push run failed only that synchronous sharing assertion; all other
+gates passed. The focused13 sharing tests and full console recheck (304 tests,
+contracts and TypeScript) passed after the correction. Original failure and
+recheck logs are retained in `test/results/argument-final-fixture-checks`.
 
-Use `make profile-preflight`, then `make profile-service-preflight` for the
-actual write-only SQL/S3 producer/publication and funded summary ledger. These
-are component checks, not the installed outcome. The integrator owns broad
-`make pre-push`, exact-commit CI and one frozen installed qualification. Earlier
-local full Go checking was interrupted at the maintainer's pause (exit 143);
-exact `7c869f8d` CI passed, but changed-source qualification remains required.
+Installed run [41648031437](https://github.com/phihos/asservat/actions/runs/41648031437)
+on50077ab1 passed approved submission, actual acquisition/publication and the
+authenticated native download's filename, size and SHA-256 checks. It then failed
+the case-format assertion: `get_case` projected `native_format` only for runtime
+profiles, leaving it empty for the published syscall argument artifact. The
+failure occurs before the native fixture's semantic marker, repeat and Stop
+checks; those remain unqualified. Go632.347s exited1, sources unchanged and
+cleanupFailures empty. CI41647587881 passed; original reports are retained in
+`test/results/argument-native-41648031437`.
 
-[Development workflow](development-workflow.md) records the agreed work limits,
-agent responsibilities and retained debug procedure. The last installed failure
-and focused correction are immediately below. The local preflight passed all selected race packages and installed-request
-checks. The combined SQL/S3/OpenBao preflight passed in 11.897s, with source
-inventories unchanged and cleanup empty; reports are retained as
-`test/results/profile-service-preflight-{environment.json,log}`. All pre-push
-components passed: the first console invocation lacked local dependencies;
-rerunning that component with the unchanged lockfile passed 299 tests. The
-read-only integration review found no further concrete blocker. Exact candidate CI 41611340296 passed on `ef2f379a`. The installed result
-and remaining Stop qualification are recorded below.
+The actual public case-operation regression reproduced this omission for syscall,
+packet, HTTP extract and context formats. Case projection now uses the existing
+verified native registry when evidence type and data class match; unknown or
+mismatched tuples remain omitted. No schema expansion, new lookup or configuration
+is needed. `argument-preflight` now includes the case-projection boundary.
+Full presentation race tests passed (215.710s), browser/MCP case races passed
+(3.023s / 8.765s), and expanded `make argument-preflight pre-push` exited0.
+
+Installed run [41642778383](https://github.com/phihos/asservat/actions/runs/41642778383)
+on9db49637 passed public preview, independent review and approved submission,
+then failed at node acquisition (`CaptureFailed` / `AcquisitionFailed`). It exited1
+in606.646s with unchanged sources and cleanupFailures[]. CI41642770282 passed.
+Original reports are retained in `test/results/argument-native-41642778383`.
+The node log did not identify the failing boundary, so this is not collection,
+publication or download evidence.
+
+A composed local regression now calls the real argument-recorder constructor
+with the node's actual request. It reproduced rejection of early starts: the
+original latest-start can be10s away while a5s recording ends earlier. These
+bounds are independent. The recorder now permits either ordering while budget
+creation and attachment still enforce both original deadlines. The native input
+had this valid shape; another installed run is required to establish the complete
+outcome. Failure logs now report a fixed stage only, without underlying errors,
+target identity or observed bytes, so later boundary failures are diagnosable.
+Focused constructor/node races passed (1.022s / 2.336s), tagged Gadget argument
+checks passed (1.526s), and full `make argument-preflight pre-push` exited0.
+A further composed regression reproduced a setup timeout being reported as an
+empty completed capture before any attachment. Normal completion now also
+requires the engine's existing final-accounting fact; a known empty observation
+still succeeds. Node argument race tests passed (4.196s), including unchanged
+Stop, delayed cleanup and partial-output behavior. No new lifecycle state or
+deadline is introduced. CI41646362415 was cancelled for this superseding fix.
+
+Manual compositions containing syscall arguments are explicitly refused during
+preview, before review persistence or recordable output. At this head, a packet
+plus arguments group already failed the combined assessment because its child
+rule identities differ; two syscall children are separately rejected as an
+acquisition conflict. Merely assigning each child its specific assessment digest
+would not complete execution: argument permit preparation looks up an exact
+child capture grant, whereas grouped approval is bound to the parent. Grouped
+arguments still require explicit parent/child grant membership and shared,
+nonrefundable event/byte budget accounting before a source session can be created
+and independently verified at publication. Single finite argument captures and
+packet plus metadata groups retain their existing paths. The focused regression
+checks both mixed-component orders, refusal before persistence, the existing
+metadata group and single-argument approval; this is local evidence, not installed
+group qualification.
+
+
+Candidate `370c706a` passed CI41638301511. Installed run
+[41638326430](https://github.com/phihos/asservat/actions/runs/41638326430)
+reached public argument preview/review but rejected approved submission as
+`ReviewChanged`, before acquisition. Go608.312s, exit1, unchanged sources and
+cleanupFailures empty; reports are retained in `test/results/argument-native-41638326430`.
+The fixed diagnostic was `request/changed/assessment`: preview stored generic
+recorder rules while the displayed argument assessment used its distinct rule
+identity. A local preview → review → approved request regression reproduced both
+the mismatched stored identity and rejection before admission. All three consumers
+now derive rules from the same frozen actions: preview, request and SQL reviewed
+admission. Existing metadata/packet/profile rule identities remain unchanged.
+Full affected race suites passed: capture16.777s, planning1.614s and
+PostgreSQL3.240s; the regression submits the approved original argument plan after
+preview expiry and rejects a substituted generic rule identity. SQL matching now
+uses real compiled syscall scopes in its regression, including unchanged metadata
+rules. Repository pre-push gates passed. Installed acquisition remains unqualified.
+
+
+Candidate `fe9c4f19` passed CI41634155293 and automated review. Installed run
+[41634428539](https://github.com/phihos/asservat/actions/runs/41634428539)
+passed schema preparation but failed the first public argument preview before
+acquisition. Go exited1 after481.005s; sourceUnchangedDuringTest was true and
+cleanupFailures empty. Timings reached preview persistence; no contemporaneous
+SQL error was reported. A local regression using actual argument definitions,
+release gadget pins and the public operation reproduced a271-character warning
+against the unchanged256-character response bound. Splitting the read explanation
+from the numeric limits fixes the message without changing authority or schema.
+Expanded argument preflight passed, including presentation/MCP races and
+installed-fixture preflight (Go2.096s); full repository pre-push gates passed. This run is not
+evidence of argument collection or publication. Terminal reports are retained in
+`test/results/argument-native-41634428539`.
+
+
+Corrected candidate `1fa80a98` passed automated code review, but installed run
+[41630936553](https://github.com/phihos/asservat/actions/runs/41630936553)
+failed before collection in schema preparation (Go48.577s, exit1,
+sourceUnchanged true, cleanupFailures empty). The SQL bundle fix exposed another
+128-head ceiling in the protected Kubernetes root validator and canonical schema.
+The provenance bounds now match the five-digit migration identifier format
+(maximum99999), while exact compiled head/digest equality and immutable original
+root identity remain mandatory. Focused regressions cover current129, changed
+bundle refusal, zero/overflow and unchanged completion. Combined SQL/Kubernetes
+schema handover passed with the production loader against real Kubernetes,
+PostgreSQL, OpenBao and S3: Go148.397s, testExit0, sourceUnchanged true and
+cleanupFailures empty. It verified original schema replay, activation, native
+admission negatives, incarnation mismatch refusal and credential retirement.
+Reports are retained in `test/results/argument-schema-handover129`.
+Original reports are retained in `test/results/argument-native-41630936553`.
+
+CI41630403434 failed only the investigation descriptor-size regression:
+preview_capture grew to37,720 bytes against its36KiB budget. Reusing a local
+definition for the repeated actionID constraint and shortening redundant description
+text reduces it to36,582 bytes. Dereferenced input/output schemas remain identical;
+the complete contracts race suite passes against the unchanged size limit. A separate audit reproduced
+raw syscall native download being refused before the current grant facet; the
+narrow verified syscallArguments type is now admitted through that existing
+facet. Full authorization race tests pass, including same-human/client/version,
+revocation and replay-safe spend. Expanded argument preflight and full pre-push checks passed. Installed
+collection/download remains unqualified.
+
+
+[PR #148](https://github.com/phihos/asservat/pull/148) first candidate `44037bb6`
+failed [native run 41627837758](https://github.com/phihos/asservat/actions/runs/41627837758)
+during schema installation, before collection: the installer retained a
+128-migration ceiling while the release contains 129. Go exited 1 after 47.488s;
+sources matched and cleanup failures were empty. CI run 41627821687 failed
+only the affected installer/schema tests in shard 0; other shards and gates passed.
+The installer now bounds the bundle/history by the compiled release head, retains
+byte limits and reads one overflow row. Existing regressions reproduced the
+failure and now pass. Real PostgreSQL initial-schema qualification passed in
+22.386s with sourceUnchanged true and cleanup complete, including foreign history,
+original resume, role boundaries and activation-incarnation checks.
+
+Review also reproduced and fixed a disappearing member cgroup aborting valid
+peers, and late teardown exceeding the observation footer deadline. The exact
+original observation window remains bounded; actual cleanup still precedes
+delivery/resource release. Focused gadget/node races and independent semantic
+verification passed. Typed `syscallArguments` edits now retain explicit false
+through public validation, conversion, planning, console editing, Save and repeat.
+The installed fixture exercises true for downloaded buffers and false for Stop.
+The full pre-push gate, focused component races and built React browser checks
+(26 journeys/25 accessibility scans plus native-download restart boundaries)
+passed locally. The native fixture has not yet reached argument acquisition.
+Reports are retained under `test/results/argument-native-41627837758`,
+`argument-initial-schema129-1-*` and `argument-console-followup`.
+
+Active outcome: independently approved manual syscall arguments → prepaid bounded
+node acquisition → independent publication → native JSONL download → joined Stop.
+The existing argument branch is rebased on the verified profile base; node,
+compiler, review and SQL128 foundations are integrated. Execution/transport,
+processing/publication and finite-recording cancellation are composed. The local
+race preflight passed across 15 packages; installed request/Stop fixture preflight
+and gadget-tag namespace tests passed. The actual packaging command reproduced
+the pinned argument ELF without loading BPF. Native engine and SQL component
+evidence do not qualify the installed workflow.
+One integrator owns external fixtures and final installed qualification; agents
+have bounded file ownership. Policy argument compilation remains at its separate
+checkpoint until the manual workflow is composed.
+
+The owned SQL/S3 run `argument-processing129-1` passed the SQL128 dual-pool and
+SQL129 processing/Stop/rollback branch (4.82s), but its manual preparation branch
+failed on colliding fixture role names. The manual-only rerun
+`argument-manual-prepare-2` then exposed a retired standalone role name;
+`argument-manual-prepare-3` exposed missing current namespace-profile facts in
+fixture plan reconstruction. All three runs exited 1, retained unchanged source
+inventories and completed cleanup. These failures are not passing preparation
+evidence. The fixture now uses the actual installed hub-runtime credential and
+reconstructs current catalog inputs as the production runner does. Offline
+regressions reproduce the setup failures and preserve original scope/deadlines.
+The corrected `argument-manual-prepare-4` passed (Go4.041s, selected test2.60s):
+real manual approval/admission, encrypted intent, one immutable execution/session,
+100663296 prepaid bytes and6,000 events, unchanged passive replay and target/epoch
+substitution refusal. Direct authority mutation through the actual hub-runtime
+credential was denied. Source inventories matched, testExit0 and cleanupFailures
+empty. Reports remain under `test/results/`.
+
+Repository pre-push gates passed except for the cleanup self-test's outdated
+mock of the newly added packaging command. The exact command mock was corrected
+without weakening cleanup assertions; the full self-test target then passed.
+Final spec/architecture/Go-architecture/format checks passed. Runtime boundary
+review also corrected native timestamp rounding and immutable Stop-proof replay,
+and added cgroup namespace handling with existing capabilities. Installed
+qualification must exercise actual namespace entry and the complete raw workflow.
+
+## Approved profiles and saved summaries merged (2026-11-03)
+
+[PR #147](https://github.com/phihos/asservat/pull/147) merged as `75506c4e`;
+authoritative read-back matched the complete tree of tested `8a081722`.
+[CI 41618246826](https://github.com/phihos/asservat/actions/runs/41618246826)
+passed, Gitar passed and review threads were clear.
+[Installed run 41618270958](https://github.com/phihos/asservat/actions/runs/41618270958)
+passed approved capture, encrypted publication, hash-matched native download
+(977 bytes, 11 CPU samples, opened by `go tool pprof`), fresh repeat preview,
+read-only client download denial and the exact CPU saved summary. The summary
+used ten units, the 256 MiB worker and one three-key batch; original worker/key
+closure passed. A separate 30-second profile was stopped while Running and
+reached terminal Cancelled without an artifact. This does not claim that the
+application's profiler stopped. Go exited 0 in 720.71s, source inventories matched,
+and cleanup failures were empty. Original reports are retained under
+`test/results/profile-native-41618270958/`.
+
+Focused preflight and the real SQL/S3/OpenBao preflight (11.897s) passed before
+installed dispatch. [Development workflow](development-workflow.md) documents
+staged checks and retained local debugging inputs. The profile installed job
+spent 42s installing unused Wireshark tools; that focus now skips this setup,
+while packet qualifications retain it. No qualification assertion or job limit
+changes. Remaining S-05 features and complete workload storage fairness remain
+unfinished; the following records preserve earlier failures and their fixes.
 
 
 ## Installed download and summary passed; Stop fixture corrected (2026-11-03)

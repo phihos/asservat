@@ -24,8 +24,11 @@ func EmbeddedInitialSchema() (InitialSchemaBundle, error) {
 }
 func initialSchemaBundle(source fs.FS, head int64) (InitialSchemaBundle, error) {
 	var zero InitialSchemaBundle
+	if head < 1 || head > currentSchemaVersion {
+		return zero, cfg.ErrInvalid
+	}
 	entries, e := fs.ReadDir(source, ".")
-	if e != nil || len(entries) == 0 || len(entries) > 128 || int64(len(entries)) != head {
+	if e != nil || int64(len(entries)) != head {
 		return zero, cfg.ErrInvalid
 	}
 	sum := sha256.New()

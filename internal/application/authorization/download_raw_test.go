@@ -27,6 +27,9 @@ func (p *rawResultsProbe) CurrentResultAccess(_ context.Context, _ identities.Cu
 func rawDownload(f *downloadAuthorityFixture, s *ContextDownloadAuthority, evidenceType string) *rawResultsProbe {
 	f.record.DataClass, f.record.ActionID = "raw", "a0123456789abcdef01234567"
 	f.record.Retained.Input.EvidenceType = evidenceType
+	if evidenceType == "syscallTrace" {
+		f.record.NativeType = artifact.SyscallArgumentsArtifact
+	}
 	p := &rawResultsProbe{until: f.now.Add(2 * time.Second)}
 	s.RawResults = p
 	return p
@@ -35,7 +38,7 @@ func rawDownload(f *downloadAuthorityFixture, s *ContextDownloadAuthority, evide
 // ADR-279: a raw artifact needs ordinary eligibility and a current grant
 // child, folded into the authority; nothing else admits it.
 func TestContextDownloadAuthorityRawNeedsResultAccess(t *testing.T) {
-	for _, evidenceType := range []string{"packetCapture", "profile"} {
+	for _, evidenceType := range []string{"packetCapture", "profile", "syscallTrace"} {
 		t.Run(evidenceType, func(t *testing.T) {
 			f, s, scope := newDownloadAuthorityFixture()
 			p := rawDownload(f, &s, evidenceType)
@@ -76,7 +79,7 @@ func TestContextDownloadAuthorityRawNeedsResultAccess(t *testing.T) {
 
 // No share admits raw, even one naming exactly this artifact and version.
 func TestContextDownloadAuthorityRawRefusesShareRecipient(t *testing.T) {
-	for _, evidenceType := range []string{"packetCapture", "profile"} {
+	for _, evidenceType := range []string{"packetCapture", "profile", "syscallTrace"} {
 		t.Run(evidenceType, func(t *testing.T) {
 			f, _, s, scope := shareDownloadFixture()
 			p := rawDownload(f, &s, evidenceType)
@@ -90,7 +93,7 @@ func TestContextDownloadAuthorityRawRefusesShareRecipient(t *testing.T) {
 // A response-owned entitlement is never kept for raw: every check of the
 // same response repeats ordinary rights and the grant facet.
 func TestDownloadResponseNeverCachesRaw(t *testing.T) {
-	for _, evidenceType := range []string{"packetCapture", "profile"} {
+	for _, evidenceType := range []string{"packetCapture", "profile", "syscallTrace"} {
 		t.Run(evidenceType, func(t *testing.T) {
 			f, s, scope := newDownloadAuthorityFixture()
 			p := rawDownload(f, &s, evidenceType)
@@ -115,6 +118,19 @@ func TestDownloadResponseNeverCachesRaw(t *testing.T) {
 			p.err = value.ErrGrantRevoked
 			if _, err = owner.CheckDownloadCurrent(t.Context(), current, scope); err == nil {
 				t.Fatal("revoked grant admitted within the response")
+			}
+		})
+	}
+}
+
+func TestSyscallArgumentDownloadRejectsOtherNativeTypes(t *testing.T) {
+	for _, native := range []string{"", artifact.SyscallRecordsArtifact, artifact.PprofArtifact, artifact.GoTraceArtifact, "core"} {
+		t.Run(native, func(t *testing.T) {
+			f, s, scope := newDownloadAuthorityFixture()
+			p := rawDownload(f, &s, "syscallTrace")
+			f.record.NativeType = native
+			if _, err := s.CheckDownload(t.Context(), "synthetic-token", scope); err == nil || p.calls != 0 {
+				t.Fatal("unverified syscall native type reached raw approval", err, p.calls)
 			}
 		})
 	}

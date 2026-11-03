@@ -1,0 +1,13 @@
+{
+  "upstream_commit": "29d60de9f7924607784915533dd5f3cc0052ee1a",
+  "upstream_version": "v0.57.0",
+  "upstream_program_sha256": "f5d56c122c0cef9b1a6300504ade14400ef495ee5ae05bd8ee826fa14545f50e",
+  "patched_program_sha256": "a38029124e5460aaaa64c306efe5685a843fe2568e366069039937982eab7f8d",
+  "patch_sha256": "eb0fc9656a6af58a77305f1f39d82331078beeca8c823ec5c09f4a7803e92b45",
+  "budget_header_sha256": "90b957d235dd8b7c557400930262ee954fdfaf086fef136bfa7290f57a456d99",
+  "builder_linux_amd64": "ghcr.io/inspektor-gadget/gadget-builder@sha256:e98c89cfdff9f945588cb4df120afe4fcf6543196e8e46edb82a8725c7845e21",
+  "bpf_target": "bpfel",
+  "bpf_cpu": "v3",
+  "target_arch": "x86",
+  "compiled_object_sha256": "4c548b54bf9cc0850352d8a4e4cc23cc5ddc7d50cfbc4bfb96913f319ec1784d"
+}

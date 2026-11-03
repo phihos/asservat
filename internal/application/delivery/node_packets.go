@@ -81,7 +81,7 @@ func (v NodeView) RecorderAvailable(mechanism collector.Mechanism) bool {
 // bounds when the node may still start it; the result is accepted until
 // startBy plus the duration plus PacketUploadMargin.
 func (c *NodeChannel) EnqueuePacket(nodeUID string, p collector.PacketCapture, startBy time.Time) (collector.Work, error) {
-	if !p.Valid() || p.Observation != nil {
+	if !p.Valid() || p.Observation != nil || p.Arguments != nil {
 		return collector.Work{}, ErrNodeInvalid
 	}
 	packet := p
@@ -112,7 +112,18 @@ func (c *NodeChannel) EnqueuePacketExpected(ctx context.Context, expected target
 		permit := *p.Observation
 		packet.Observation = &permit
 	}
-	return c.enqueue(expected.NodeUID, collector.WorkPacketCapture, startBy, &packet, ctx, &expected)
+	kind := collector.WorkPacketCapture
+	if p.Arguments != nil {
+		a := *p.Arguments
+		packet.Arguments = &a
+		kind = collector.WorkSyscallCapture
+	}
+	if p.Syscalls != nil {
+		filter := *p.Syscalls
+		filter.Names = append([]string(nil), filter.Names...)
+		packet.Syscalls = &filter
+	}
+	return c.enqueue(expected.NodeUID, kind, startBy, &packet, ctx, &expected)
 }
 
 // DeliverPacket hands one node's result for a queued capture to the sink.

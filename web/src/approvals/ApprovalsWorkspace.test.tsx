@@ -203,3 +203,13 @@ it('shows profile parameters and endpoint without a fabricated recording ring', 
   const missing = structuredClone(client.detail); delete missing.actions[0].profile;
   expect(validOutput_get_grant(result(missing))).toBe(false);
 });
+
+it.each([40000, undefined])('shows only an explicitly reviewed observation event ceiling (%s)', async maximum => {
+  const client = new SyntheticApprovals();
+  client.detail = { ...grant, observation_limits: { ...grant.observation_limits!, ...(maximum === undefined ? {} : { max_observed_events: maximum }) } };
+  expect(validOutput_get_grant(result(client.detail))).toBe(true);
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+  const limits = await screen.findByText(/Observation limits bound by this approval/);
+  if (maximum === undefined) expect(limits.textContent).not.toMatch(/eligible entry and exit probes/);
+  else expect(limits.textContent).toContain('40000 eligible entry and exit probes in total');
+});

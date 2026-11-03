@@ -166,6 +166,7 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
     # fixed path; nothing is pulled at runtime.
     subprocess.run([str(ROOT / "scripts/fetch-gadget.sh"), str(image_dir / "gadgets/tcpdump")], check=True)
     subprocess.run([str(ROOT / "scripts/fetch-gadget.sh"), str(image_dir / "gadgets/traceloop"), "traceloop"], check=True)
+    subprocess.run([sys.executable, str(ROOT / "scripts/package-argument-gadget.py"), str(image_dir / "gadgets/traceloop-arguments"), "--tmpdir", str(work)], check=True)
     (image_dir / "Dockerfile").write_text("FROM scratch\nCOPY asservat /asservat\nCOPY gadgets /usr/lib/asservat/gadgets\n")
     # The hub's filter compiler for the test process: static libpcap 1.11.0.
     subprocess.run(["make", "libpcap"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
@@ -264,9 +265,66 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
         report["cleanup"] = {"cluster": name not in run(["kind", "get", "clusters"]).split(), "image": subprocess.run(["docker", "image", "inspect", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0}
 
 
+def argument_engine(work, report):
+    """ADR-281: exact experimental object, no product enablement or cluster."""
+    experiment = ROOT / "experiments/syscall-argument-budget"
+    fixture = ROOT / "test/fixtures/syscall-argument-engine"
+    inputs = [ROOT / "go.mod", ROOT / "go.sum", Path(__file__), ROOT / "scripts/ci-native.sh",
+              *sorted(experiment.glob("*")), *sorted(fixture.glob("*.go")),
+              *sorted((ROOT / "internal/adapters/syscalls").glob("*.go")),
+              *sorted((ROOT / "internal/adapters/gadget").glob("arguments*.go"))]
+    def hashes():
+        return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in inputs if p.is_file()}
+    report["sourceHashes"] = hashes()
+    report["pins"] = json.loads((experiment / "pins.json").read_text())
+    name = "asservat-argument-engine-" + secrets.token_hex(4)
+    tag = name + ":fixture"
+    output = work / "output"
+    output.mkdir()
+    results = ROOT / "test/results"
+    cleanup = []
+    try:
+        # prepare.py checks every source/build digest and only compiles; the
+        # privileged container below is the sole kernel-loading operation.
+        subprocess.run([sys.executable, str(experiment / "prepare.py"), str(work / "engine"), "--compile"], cwd=ROOT, check=True, timeout=180)
+        subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(work / "qualify"), str(fixture / "main.go")],
+                       cwd=ROOT, env=dict(os.environ, TMPDIR=str(work), CGO_ENABLED="0"), check=True, timeout=180)
+        (work / "Dockerfile").write_text("FROM scratch\nCOPY qualify /qualify\nCOPY engine/program.bpf.o /program.bpf.o\nENTRYPOINT [\"/qualify\", \"/program.bpf.o\", \"/output\"]\n")
+        run(["docker", "build", "--network=none", "--label", "asservat.test=" + name, "-t", tag, str(work)])
+        started = time.monotonic()
+        completed = subprocess.run(["docker", "run", "--name", name, "--label", "asservat.test=" + name,
+                                    "--privileged", "--network=none", "--read-only", "--pids-limit=128", "--memory=512m",
+                                    "--mount", "type=bind,src=" + str(GUARD) + ",dst=" + str(GUARD) + ",readonly",
+                                    "--mount", "type=bind,src=" + str(output) + ",dst=/output",
+                                    "--mount", "type=bind,src=/sys/kernel/btf,dst=/sys/kernel/btf,readonly", tag], timeout=180)
+        report["testExit"] = completed.returncode
+        report["testSeconds"] = round(time.monotonic() - started, 2)
+        if completed.returncode != 0:
+            raise RuntimeError("argument engine qualification failed")
+    finally:
+        # There are no pinned maps/links, host-PID access, Kubernetes objects,
+        # product credentials or services. Removing this owned process tree
+        # closes every remaining FD, including after a failed verifier/test.
+        subprocess.run(["docker", "rm", "-f", "-v", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if subprocess.run(["docker", "container", "inspect", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+            cleanup.append("container")
+        subprocess.run(["docker", "image", "rm", "-f", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if subprocess.run(["docker", "image", "inspect", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+            cleanup.append("image")
+        report["cleanup"] = cleanup
+        report["sourceUnchanged"] = report["sourceHashes"] == hashes()
+        if (output / "native-results.json").exists():
+            report["native"] = json.loads((output / "native-results.json").read_text())
+        for p in [*output.glob("*.txt"), *output.glob("*.maps.json")]:
+            shutil.copy(p, results / ("collector-argument-engine-" + p.name))
+        if cleanup or not report["sourceUnchanged"]:
+            raise RuntimeError("argument engine cleanup/source freeze failed")
+
+
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium", "ringdisk", "profile"):
-        raise SystemExit("usage: test-collector.py packet|cilium|ringdisk|profile")
+    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium", "ringdisk", "profile", "argument-engine"):
+        raise SystemExit("usage: test-collector.py packet|cilium|ringdisk|profile|argument-engine")
     if not GUARD.is_file():
         raise SystemExit(f"refused: {GUARD} is absent. Collector suites load BPF programs and run only on disposable CI runners or VMs.")
     results = ROOT / "test/results"
@@ -277,7 +335,10 @@ def main():
     base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="collector-", dir=base))
     try:
-        packet(work, report, "cilium" if sys.argv[1] == "cilium" else "", ring_disk=sys.argv[1] == "ringdisk", profile=sys.argv[1] == "profile")
+        if sys.argv[1] == "argument-engine":
+            argument_engine(work, report)
+        else:
+            packet(work, report, "cilium" if sys.argv[1] == "cilium" else "", ring_disk=sys.argv[1] == "ringdisk", profile=sys.argv[1] == "profile")
         report["result"] = "passed"
     except BaseException:
         report["result"] = "failed"

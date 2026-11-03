@@ -37,6 +37,7 @@ declare -A suites=(
   [continuation-journey]="env ASSERVAT_JOURNEY_FOCUS=journey $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-approved-recording]="env ASSERVAT_JOURNEY_FOCUS=approved-recording $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-manual-syscall]="env ASSERVAT_JOURNEY_FOCUS=manual-syscall $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  [continuation-manual-arguments]="env ASSERVAT_JOURNEY_FOCUS=manual-arguments $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-manual-mixed]="env ASSERVAT_JOURNEY_FOCUS=manual-mixed $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-manual-raw]="env ASSERVAT_JOURNEY_FOCUS=manual-raw $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-manual-http]="env ASSERVAT_JOURNEY_FOCUS=manual-http $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
@@ -85,6 +86,7 @@ declare -A suites=(
   # that native.yml creates on its fresh runner.
   [collector-packet]="python3 scripts/test-collector.py packet"
   [collector-profile]="python3 scripts/test-collector.py profile"
+  [collector-argument-engine]="python3 scripts/test-collector.py argument-engine"
   # S-04 row 17 (EXP-02 subset): the packet suite on the pinned Cilium chart.
   [collector-cilium]="python3 scripts/test-collector.py cilium"
   # ADR-278: the encrypted-disk ring volume on a real node (byte cap, crash

@@ -133,3 +133,25 @@ func TestLegacyRecordingStartCannotQueueRawPredicate(t *testing.T) {
 		t.Fatal("caller could not close refused preparation")
 	}
 }
+
+func TestLegacyRecordingStartCannotQueueArguments(t *testing.T) {
+	now := time.Date(2026, 10, 28, 1, 0, 0, 0, time.UTC)
+	nodes := &fakeRecordingNodes{available: true}
+	holder := NewConnectorRecordings(nodes, fakePodNodes{}, func() time.Time { return now }, func(string) {})
+	e := recordingExpectation(now)
+	e.Recording.Arguments = &artifact.RecordingArguments{ProgramDigest: artifact.Digest{1}}
+	keys := &objectstore.PreparedArtifact{}
+	prepared := holder.Prepare(keys, e)
+	pin := artifact.PinnedPod{UID: e.PodUID, NamespaceUID: e.NamespaceUID, Namespace: "app", Name: "web"}
+	queued, err := prepared.StartRecording(context.Background(), pin, now, now.Add(time.Second))
+	if !errors.Is(err, value.ErrUnavailable) || !queued.IsZero() || len(nodes.work) != 0 {
+		t.Fatal("legacy start bypassed required observation permit", queued, err, len(nodes.work))
+	}
+	if prepared.prepared != keys {
+		t.Fatal("refused legacy raw start transferred prepared ownership")
+	}
+	prepared.Close()
+	if prepared.prepared != nil {
+		t.Fatal("caller could not close refused preparation")
+	}
+}

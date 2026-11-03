@@ -237,6 +237,13 @@ profile-preflight:
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestInstalledProfile|TestDownloadWorkerProfileAndPathTemplate|TestPublicProfileSummary|TestPublicSnapshotCancellation|TestSourceWork|TestConnectorProfile|TestProfile|TestSharedManifest|TestNativeTypeRegistry|TestNodeProfile|TestOneShotProfile|TestCurrentDownloadEnvironment)' ./internal/bootstrap ./internal/domain/privacy ./internal/domain/artifact ./internal/domain/analysis ./internal/application/authorization ./internal/application/capture ./internal/application/analysis ./internal/adapters/objectstore ./internal/adapters/objectstore/manifest ./internal/adapters/jose ./internal/transport/contextstart
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledManualProfile' ./test/integration
 
+# Finite argument composition, without loading a collector or external services.
+.PHONY: argument-preflight
+argument-preflight:
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m ./internal/contracts
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run 'Test.*(Argument|CaseProjection|InitialSchema|InitialBootstrapSchema|InitialInstallerSchema|RecordingStop|RecordingCollection|SourceWork|PublicSnapshotCancellation)' ./internal/bootstrap ./internal/adapters/kubernetes ./internal/domain/artifact ./internal/domain/collector ./internal/domain/authorization ./internal/application/evidence ./internal/application/delivery ./internal/application/capture ./internal/application/execution ./internal/application/planning ./internal/adapters/gadget ./internal/adapters/postgres ./internal/adapters/jose ./internal/adapters/syscalls ./internal/adapters/objectstore/manifest ./internal/transport/contextstart ./internal/transport/presentation ./internal/transport/mcp
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledManualArguments' ./test/integration
+
 # Owned SQL/S3 service composition, after local preflight and source freeze.
 .PHONY: profile-service-preflight
 profile-service-preflight:

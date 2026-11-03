@@ -221,6 +221,7 @@ type grantProfile struct {
 }
 
 type grantLimits struct {
+	MaxObservedEvents     int64 `json:"max_observed_events,omitempty"`
 	MaxSessionSeconds     int64 `json:"max_session_seconds"`
 	MaxObservedBytes      int64 `json:"max_observed_bytes"`
 	MaxBytesPerSecond     int64 `json:"max_bytes_per_second"`
@@ -334,7 +335,7 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 		d.Reasons = append(d.Reasons, grantReason{x.ActionID, x.Code})
 	}
 	if l := r.ObservationLimits; l != nil {
-		d.ObservationLimits = &grantLimits{l.MaxSessionSeconds, l.MaxObservedBytes, l.MaxBytesPerSecond, l.MaxConcurrentSessions}
+		d.ObservationLimits = &grantLimits{MaxObservedEvents: l.MaxObservedEvents, MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
 	}
 	if x := g.Decision; x != nil {
 		decision := "denied"

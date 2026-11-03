@@ -13,10 +13,11 @@ import (
 type AutomationEnvelope struct {
 	AllowedActions                                                []string
 	MaxLifetimeSeconds, MaxExecutions, MaxBytes, MaxObservedBytes int64
+	MaxObservedEvents                                             int64 `json:",omitempty"`
 }
 
 func (e AutomationEnvelope) Valid() bool {
-	if len(e.AllowedActions) == 0 || !identity.Strings(e.AllowedActions, 14, 32) || e.MaxLifetimeSeconds < 1 || e.MaxLifetimeSeconds > 31536000 || e.MaxExecutions < 1 || e.MaxExecutions > 10000 || e.MaxBytes < 1 || e.MaxBytes > 1<<40 || e.MaxObservedBytes < 0 || e.MaxObservedBytes > 1<<40 {
+	if len(e.AllowedActions) == 0 || !identity.Strings(e.AllowedActions, 14, 32) || e.MaxLifetimeSeconds < 1 || e.MaxLifetimeSeconds > 31536000 || e.MaxExecutions < 1 || e.MaxExecutions > 10000 || e.MaxBytes < 1 || e.MaxBytes > 1<<40 || e.MaxObservedBytes < 0 || e.MaxObservedBytes > 1<<40 || e.MaxObservedEvents < 0 || e.MaxObservedEvents > 1_000_000_000 {
 		return false
 	}
 	for _, a := range e.AllowedActions {
@@ -46,7 +47,10 @@ func PolicyPrincipal(installationID, policyUID string) identity.Principal {
 // end to end; the 15-second trigger poll refreshes it.
 const PolicySourceInterval = 30 * time.Second
 
-type AutomationLimits struct{ MaxExecutions, MaxBytes, MaxObservedBytes int64 }
+type AutomationLimits struct {
+	MaxExecutions, MaxBytes, MaxObservedBytes int64
+	MaxObservedEvents                         int64 `json:",omitempty"`
+}
 
 // AcceptedPolicyAuthority is loaded from protected accepted execution, never
 // authored fields or a CRD status. Creator is historical provenance only.
@@ -129,7 +133,7 @@ func (p AcceptedPolicyAuthority) Valid(now time.Time) bool {
 	if !UUID(p.InstallationID) || !identity.Text(p.PolicyUID, 64) || !p.Creator.Valid() || p.Executor != PolicyPrincipal(p.InstallationID, p.PolicyUID) || p.ScopeDigest == (artifact.Digest{}) || !UUID(p.ClusterID) || !identity.Text(p.NamespaceUID, 64) || !identity.Text(p.WorkloadUID, 64) || !p.Delegation.Valid() || !identity.Fresh(p.IssuedAt, p.NotAfter, now, 365*24*time.Hour) || len(p.Owners) < 1 || len(p.Owners) > 8 {
 		return false
 	}
-	e := AutomationEnvelope{p.Actions, int64(p.NotAfter.Sub(p.IssuedAt) / time.Second), p.Limits.MaxExecutions, p.Limits.MaxBytes, p.Limits.MaxObservedBytes}
+	e := AutomationEnvelope{AllowedActions: p.Actions, MaxLifetimeSeconds: int64(p.NotAfter.Sub(p.IssuedAt) / time.Second), MaxExecutions: p.Limits.MaxExecutions, MaxBytes: p.Limits.MaxBytes, MaxObservedBytes: p.Limits.MaxObservedBytes, MaxObservedEvents: p.Limits.MaxObservedEvents}
 	if !e.Valid() || p.NotAfter.Sub(p.IssuedAt)%time.Second != 0 {
 		return false
 	}
@@ -173,7 +177,7 @@ func evaluatePolicyTarget(a AcceptedPolicyAuthority, p AutomationProjection, use
 	if p.InstallationID != a.InstallationID || p.Delegation != a.Delegation || p.Disabled || !p.Envelope.Valid() || !identity.Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) {
 		return deny("AutomationUnavailable")
 	}
-	if (!p.NotAfter.IsZero() && !now.Before(p.NotAfter)) || a.NotAfter.After(a.IssuedAt.Add(time.Duration(p.Envelope.MaxLifetimeSeconds)*time.Second)) || a.Limits.MaxExecutions > p.Envelope.MaxExecutions || a.Limits.MaxBytes > p.Envelope.MaxBytes || a.Limits.MaxObservedBytes > p.Envelope.MaxObservedBytes {
+	if (!p.NotAfter.IsZero() && !now.Before(p.NotAfter)) || a.NotAfter.After(a.IssuedAt.Add(time.Duration(p.Envelope.MaxLifetimeSeconds)*time.Second)) || a.Limits.MaxExecutions > p.Envelope.MaxExecutions || a.Limits.MaxBytes > p.Envelope.MaxBytes || a.Limits.MaxObservedBytes > p.Envelope.MaxObservedBytes || a.Limits.MaxObservedEvents > p.Envelope.MaxObservedEvents {
 		return deny("OutsideDelegation")
 	}
 	for _, action := range a.Actions {

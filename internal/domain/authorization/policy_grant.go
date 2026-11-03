@@ -76,10 +76,10 @@ func (p PolicyGrantScope) Workload() WorkloadTarget {
 
 func (p PolicyGrantScope) valid(issuedAt time.Time) bool {
 	a := p.Authority
-	if p.Observation == nil && p.Limits.MaxObservedBytes != 0 || p.Observation != nil && (!p.Observation.Valid() || p.Observation.MaxObservedBytes != p.Limits.MaxObservedBytes) {
+	if p.Observation == nil && (p.Limits.MaxObservedBytes != 0 || p.Limits.MaxObservedEvents != 0) || p.Observation != nil && (!p.Observation.Valid() || p.Observation.MaxObservedBytes != p.Limits.MaxObservedBytes || p.Observation.MaxObservedEvents != p.Limits.MaxObservedEvents) {
 		return false
 	}
-	return p.RecipeDigest != (artifact.Digest{}) && p.ApprovalMaxAge >= time.Second && p.ApprovalMaxAge <= PolicyGrantMaximumLifetime && p.ApprovalMaxAge%time.Second == 0 && a.Valid(issuedAt) && p.Workload().Valid() && p.ApprovalPolicyRef.Valid() && p.Limits.MaxExecutions > 0 && p.MaxStartsPerExecution >= 0 && p.MaxStartsPerExecution <= 16 && p.Limits.MaxExecutions <= p.executionStartCeiling() && p.Limits.MaxBytes > 0 && p.Limits.MaxBytes <= a.Limits.MaxBytes && p.Limits.MaxObservedBytes >= 0 && p.Limits.MaxObservedBytes <= a.Limits.MaxObservedBytes
+	return p.RecipeDigest != (artifact.Digest{}) && p.ApprovalMaxAge >= time.Second && p.ApprovalMaxAge <= PolicyGrantMaximumLifetime && p.ApprovalMaxAge%time.Second == 0 && a.Valid(issuedAt) && p.Workload().Valid() && p.ApprovalPolicyRef.Valid() && p.Limits.MaxExecutions > 0 && p.MaxStartsPerExecution >= 0 && p.MaxStartsPerExecution <= 16 && p.Limits.MaxExecutions <= p.executionStartCeiling() && p.Limits.MaxBytes > 0 && p.Limits.MaxBytes <= a.Limits.MaxBytes && p.Limits.MaxObservedBytes >= 0 && p.Limits.MaxObservedBytes <= a.Limits.MaxObservedBytes && p.Limits.MaxObservedEvents >= 0 && p.Limits.MaxObservedEvents <= a.Limits.MaxObservedEvents
 }
 
 func (p PolicyGrantScope) executionStartCeiling() int64 {

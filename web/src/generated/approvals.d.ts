@@ -76,13 +76,14 @@ export interface components {
                 reasons: {
                     action_id: string;
                     /** @enum {unknown} */
-                    code: "rawBytePredicate" | "rawPackets" | "httpHeaders" | "liveProfile" | "recordingApprovalRequired" | "policyCollection";
+                    code: "rawBytePredicate" | "rawPackets" | "httpHeaders" | "syscallArguments" | "liveProfile" | "recordingApprovalRequired" | "policyCollection";
                 }[];
                 observation_limits?: {
                     max_session_seconds: number;
                     max_observed_bytes: number;
                     max_bytes_per_second: number;
                     max_concurrent_sessions: number;
+                    max_observed_events?: number;
                 };
                 requested_by: {
                     issuer: string;
@@ -138,7 +139,7 @@ export interface components {
                     max_bytes: number;
                     ring_max_bytes?: number;
                     ring_max_age?: string;
-                    sensitive: ("rawBytePredicate" | "rawPackets" | "httpHeaders" | "liveProfile" | "recordingApprovalRequired")[];
+                    sensitive: ("rawBytePredicate" | "rawPackets" | "httpHeaders" | "syscallArguments" | "liveProfile" | "recordingApprovalRequired")[];
                     profile?: {
                         /** @constant */
                         runtime: "go";
@@ -281,13 +282,14 @@ export interface components {
                 reasons: {
                     action_id: string;
                     /** @enum {unknown} */
-                    code: "rawBytePredicate" | "rawPackets" | "httpHeaders" | "liveProfile" | "recordingApprovalRequired" | "policyCollection";
+                    code: "rawBytePredicate" | "rawPackets" | "httpHeaders" | "syscallArguments" | "liveProfile" | "recordingApprovalRequired" | "policyCollection";
                 }[];
                 observation_limits?: {
                     max_session_seconds: number;
                     max_observed_bytes: number;
                     max_bytes_per_second: number;
                     max_concurrent_sessions: number;
+                    max_observed_events?: number;
                 };
                 requested_by: {
                     issuer: string;
@@ -343,7 +345,7 @@ export interface components {
                     max_bytes: number;
                     ring_max_bytes?: number;
                     ring_max_age?: string;
-                    sensitive: ("rawBytePredicate" | "rawPackets" | "httpHeaders" | "liveProfile" | "recordingApprovalRequired")[];
+                    sensitive: ("rawBytePredicate" | "rawPackets" | "httpHeaders" | "syscallArguments" | "liveProfile" | "recordingApprovalRequired")[];
                     profile?: {
                         /** @constant */
                         runtime: "go";
@@ -488,13 +490,14 @@ export interface components {
                     reasons: {
                         action_id: string;
                         /** @enum {unknown} */
-                        code: "rawBytePredicate" | "rawPackets" | "httpHeaders" | "liveProfile" | "recordingApprovalRequired" | "policyCollection";
+                        code: "rawBytePredicate" | "rawPackets" | "httpHeaders" | "syscallArguments" | "liveProfile" | "recordingApprovalRequired" | "policyCollection";
                     }[];
                     observation_limits?: {
                         max_session_seconds: number;
                         max_observed_bytes: number;
                         max_bytes_per_second: number;
                         max_concurrent_sessions: number;
+                        max_observed_events?: number;
                     };
                     requested_by: {
                         issuer: string;
