@@ -261,3 +261,39 @@ still refuse. Object/source/patch pins and all native budget assertions remain
 unchanged. Original report, log, verifier output and instructions are retained in
 `test/results/syscall-argument-native-41596591270/`; test exit1, source unchanged
 and empty cleanup failures are confirmed. A corrected native rerun is pending.
+
+
+## Corrected disposable native qualification
+
+[Run41597115616](https://github.com/phihos/asservat/actions/runs/41597115616)
+at `bc91486a` passed all eleven engine scenarios in2.47 seconds with unchanged
+source hashes, `testExit:0`, closed local handles and empty cleanup failures.
+The object digest remains `ae6a3e19c2bc4510f4665fb7cf9258559e45c11aaf475e227d4388095c0bec84`.
+Runner profile: Ubuntu24.04.5, kernel7.0.0-1017-azure, four possible CPUs,
+BTF and cgroupv2; perf-buffer ceiling2MiB. The result does not qualify another
+architecture or kernel version.
+
+Entry/exit and faulting-entry/faulting-exit cases each emitted32 entries,
+32 exits and32 continuations against64 event debits and24,576 conservative
+byte charges. Fault cases recorded32 failed reads; serial perf loss was zero.
+Expiry between batches allowed the original batch and denied the later one.
+Seven-event exhaustion produced4 entries/3 exits; byte exhaustion consumed the
+failed reservation's event without refund. Zero and already-expired budgets
+emitted nothing. Every case confirmed frozen userspace writes were refused and
+a post-detach syscall batch left counters unchanged.
+
+The two-namespace,32-thread case consumed5,208 events and1,999,616 bytes,
+leaving4,792 events and384 bytes with the sticky stop set. It emitted2,604
+entries,2,603 exits and2,604 continuations with zero observed perf loss. This
+particular run reached byte exhaustion; the earlier host CAS contention tests
+still demonstrate possible early refusal, and the boolean cannot distinguish
+its reason. No claim of sustained throughput or production overhead follows.
+Original report, logs, verifier outputs and compiled instruction listing are in
+`test/results/syscall-argument-native-41597115616/`.
+
+The result establishes this engine's tested budget/freeze/detach behavior plus
+the separately reviewed compiled control flow. It is not an independent count
+of every user-memory helper call and does not implement ABI definitions,
+production grant slices, restart fencing, whole-Pod source lifecycle, approved
+argument inspection/download, revocation or installed argument-mode behavior.
+Those remaining product integrations are still required before enabling it.

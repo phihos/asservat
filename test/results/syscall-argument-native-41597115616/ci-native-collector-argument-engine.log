@@ -1,0 +1,402 @@
++ python3 scripts/test-collector.py argument-engine
+{"runner": {"kernelRelease": "7.0.0-1017-azure", "btf": true, "cgroup2": true, "os": "Ubuntu 24.04.5 LTS", "cpus": 4}}
+patching file program.bpf.c
+Unable to find image 'ghcr.io/inspektor-gadget/gadget-builder@sha256:e98c89cfdff9f945588cb4df120afe4fcf6543196e8e46edb82a8725c7845e21' locally
+ghcr.io/inspektor-gadget/gadget-builder@sha256:e98c89cfdff9f945588cb4df120afe4fcf6543196e8e46edb82a8725c7845e21: Pulling from inspektor-gadget/gadget-builder
+774043ccc8cc: Pulling fs layer
+5c3742811e33: Pulling fs layer
+893cf07c5297: Pulling fs layer
+836059ce7367: Pulling fs layer
+01079cb1ae79: Pulling fs layer
+7def9a272540: Pulling fs layer
+bbca17f93407: Pulling fs layer
+95e58d319a25: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+9f9d0111a178: Pulling fs layer
+1a864c43719a: Pulling fs layer
+bbca17f93407: Waiting
+95e58d319a25: Waiting
+4f4fb700ef54: Waiting
+9f9d0111a178: Waiting
+1a864c43719a: Waiting
+01079cb1ae79: Waiting
+836059ce7367: Waiting
+7def9a272540: Waiting
+774043ccc8cc: Verifying Checksum
+774043ccc8cc: Download complete
+774043ccc8cc: Pull complete
+836059ce7367: Verifying Checksum
+836059ce7367: Download complete
+5c3742811e33: Verifying Checksum
+5c3742811e33: Download complete
+7def9a272540: Verifying Checksum
+7def9a272540: Download complete
+893cf07c5297: Verifying Checksum
+893cf07c5297: Download complete
+bbca17f93407: Verifying Checksum
+bbca17f93407: Download complete
+4f4fb700ef54: Verifying Checksum
+4f4fb700ef54: Download complete
+95e58d319a25: Verifying Checksum
+95e58d319a25: Download complete
+9f9d0111a178: Verifying Checksum
+9f9d0111a178: Download complete
+1a864c43719a: Verifying Checksum
+1a864c43719a: Download complete
+01079cb1ae79: Verifying Checksum
+01079cb1ae79: Download complete
+5c3742811e33: Pull complete
+893cf07c5297: Pull complete
+836059ce7367: Pull complete
+01079cb1ae79: Pull complete
+7def9a272540: Pull complete
+bbca17f93407: Pull complete
+95e58d319a25: Pull complete
+4f4fb700ef54: Pull complete
+9f9d0111a178: Pull complete
+1a864c43719a: Pull complete
+Digest: sha256:e98c89cfdff9f945588cb4df120afe4fcf6543196e8e46edb82a8725c7845e21
+Status: Downloaded newer image for ghcr.io/inspektor-gadget/gadget-builder@sha256:e98c89cfdff9f945588cb4df120afe4fcf6543196e8e46edb82a8725c7845e21
+BPF object SHA-256: ae6a3e19c2bc4510f4665fb7cf9258559e45c11aaf475e227d4388095c0bec84
+Compiled only: verifier, kernel behavior, OCI packaging and runtime authority remain unqualified.
+{
+  "suite": "collector-argument-engine",
+  "runner": {
+    "kernelRelease": "7.0.0-1017-azure",
+    "btf": true,
+    "cgroup2": true,
+    "os": "Ubuntu 24.04.5 LTS",
+    "cpus": 4
+  },
+  "started": "2026-11-03T07:35:40Z",
+  "sourceHashes": {
+    "go.mod": "850718a60344e7154eb841a4c92ec9421bca0ae698097ccb1030da2680f8d8af",
+    "go.sum": "36544f466a0257c2997d0a9b7a24e9b743ffa3d44a9d8621ddcdb03219c0e955",
+    "scripts/test-collector.py": "b60ccda4c00e128bd0834a08e6074589951de47d57f43393108e781c826dcdb3",
+    "scripts/ci-native.sh": "f9834dbe825c6bdab687899aeb10b4541e18015bc1c0e39c48975898bb118008",
+    "experiments/syscall-argument-budget/README.md": "d3e0b1e369b061bf8d1b1a767ccd0846a64e6214408469f78b0dbb3f84b874a0",
+    "experiments/syscall-argument-budget/budget.h": "70e76fdb6c04851943c1049e53882e6337fa3519a6138c8514c8808f7df02687",
+    "experiments/syscall-argument-budget/budget_compile.bpf.c": "010920b56b82fb1c3fedaad7fe874d9a2b27b40141f6146c915e8003ee475c62",
+    "experiments/syscall-argument-budget/budget_test.c": "98274c288b815a9e05713c2369a0bc7993fce094a95b46730185e21a4fcb8e7a",
+    "experiments/syscall-argument-budget/pins.json": "551db8a7a5fa712de3d461171904b10622f623c09ed1b59c60c84c244dffa6cf",
+    "experiments/syscall-argument-budget/prepare.py": "e9a41c9ac5aafb70c5bfdeb0ff994d6a14b671f6f645b764788a2a4918bafdb2",
+    "experiments/syscall-argument-budget/program.patch": "ac7c6b1c041069b42cc392649159799466850d5e7eb68f90d91f72501a83df8e",
+    "experiments/syscall-argument-budget/test.py": "7802bfedeb0dfd1d7b54f7c3ac10a05a2f84c6fe2c574dfe71d2cb969f243a64",
+    "test/fixtures/syscall-argument-engine/main.go": "0ccd04290a65a236e1ea5ade04f4a72c3cceda3451a95661d7b5fb95213116bd",
+    "test/fixtures/syscall-argument-engine/main_test.go": "cad8d8b480fb9252dc1fbac5fec328da251e3c32b3fe1eb64ca4a680e9336645"
+  },
+  "pins": {
+    "upstream_commit": "29d60de9f7924607784915533dd5f3cc0052ee1a",
+    "upstream_version": "v0.57.0",
+    "upstream_program_sha256": "f5d56c122c0cef9b1a6300504ade14400ef495ee5ae05bd8ee826fa14545f50e",
+    "patched_program_sha256": "f2a79934798e605e935b404638290f5ff4ac1fca09a24cc9d67cd534f17ea75c",
+    "patch_sha256": "ac7c6b1c041069b42cc392649159799466850d5e7eb68f90d91f72501a83df8e",
+    "budget_header_sha256": "70e76fdb6c04851943c1049e53882e6337fa3519a6138c8514c8808f7df02687",
+    "builder_linux_amd64": "ghcr.io/inspektor-gadget/gadget-builder@sha256:e98c89cfdff9f945588cb4df120afe4fcf6543196e8e46edb82a8725c7845e21",
+    "bpf_target": "bpfel",
+    "bpf_cpu": "v3",
+    "target_arch": "x86",
+    "compiled_object_sha256": "ae6a3e19c2bc4510f4665fb7cf9258559e45c11aaf475e227d4388095c0bec84"
+  },
+  "testExit": 0,
+  "testSeconds": 2.47,
+  "cleanup": [],
+  "sourceUnchanged": true,
+  "native": {
+    "localHandlesClosed": true,
+    "objectSHA256": "ae6a3e19c2bc4510f4665fb7cf9258559e45c11aaf475e227d4388095c0bec84",
+    "perfBufferBytesCeiling": 2097152,
+    "possibleCPUs": 4,
+    "results": [
+      {
+        "Name": "zero",
+        "Initial": {
+          "Events": 0,
+          "Bytes": 0,
+          "Stopped": 0,
+          "DeadlineBootNS": 0,
+          "MaxProbeBytes": 0
+        },
+        "Final": {
+          "Events": 0,
+          "Bytes": 0,
+          "Stopped": 1,
+          "DeadlineBootNS": 0,
+          "MaxProbeBytes": 0
+        },
+        "Counts": {
+          "Entries": 0,
+          "Exits": 0,
+          "Continuations": 0,
+          "FailedReads": 0,
+          "Lost": 0
+        },
+        "Milliseconds": 32,
+        "DetachStoppedDebits": true
+      },
+      {
+        "Name": "expired",
+        "Initial": {
+          "Events": 100,
+          "Bytes": 100000,
+          "Stopped": 0,
+          "DeadlineBootNS": 161299880976,
+          "MaxProbeBytes": 1792
+        },
+        "Final": {
+          "Events": 100,
+          "Bytes": 100000,
+          "Stopped": 1,
+          "DeadlineBootNS": 161299880976,
+          "MaxProbeBytes": 1792
+        },
+        "Counts": {
+          "Entries": 0,
+          "Exits": 0,
+          "Continuations": 0,
+          "FailedReads": 0,
+          "Lost": 0
+        },
+        "Milliseconds": 29,
+        "DetachStoppedDebits": true
+      },
+      {
+        "Name": "insufficient-first-read",
+        "Initial": {
+          "Events": 100,
+          "Bytes": 511,
+          "Stopped": 0,
+          "DeadlineBootNS": 171329270615,
+          "MaxProbeBytes": 1792
+        },
+        "Final": {
+          "Events": 99,
+          "Bytes": 511,
+          "Stopped": 1,
+          "DeadlineBootNS": 171329270615,
+          "MaxProbeBytes": 1792
+        },
+        "Counts": {
+          "Entries": 0,
+          "Exits": 0,
+          "Continuations": 0,
+          "FailedReads": 0,
+          "Lost": 0
+        },
+        "Milliseconds": 29,
+        "DetachStoppedDebits": true
+      },
+      {
+        "Name": "entry",
+        "Initial": {
+          "Events": 100,
+          "Bytes": 100000,
+          "Stopped": 0,
+          "DeadlineBootNS": 171357717435,
+          "MaxProbeBytes": 1792
+        },
+        "Final": {
+          "Events": 36,
+          "Bytes": 75424,
+          "Stopped": 0,
+          "DeadlineBootNS": 171357717435,
+          "MaxProbeBytes": 1792
+        },
+        "Counts": {
+          "Entries": 32,
+          "Exits": 32,
+          "Continuations": 32,
+          "FailedReads": 0,
+          "Lost": 0
+        },
+        "Milliseconds": 28,
+        "DetachStoppedDebits": true
+      },
+      {
+        "Name": "fault-entry",
+        "Initial": {
+          "Events": 100,
+          "Bytes": 100000,
+          "Stopped": 0,
+          "DeadlineBootNS": 171387094834,
+          "MaxProbeBytes": 1792
+        },
+        "Final": {
+          "Events": 36,
+          "Bytes": 75424,
+          "Stopped": 0,
+          "DeadlineBootNS": 171387094834,
+          "MaxProbeBytes": 1792
+        },
+        "Counts": {
+          "Entries": 32,
+          "Exits": 32,
+          "Continuations": 32,
+          "FailedReads": 32,
+          "Lost": 0
+        },
+        "Milliseconds": 29,
+        "DetachStoppedDebits": true
+      },
+      {
+        "Name": "exit",
+        "Initial": {
+          "Events": 100,
+          "Bytes": 100000,
+          "Stopped": 0,
+          "DeadlineBootNS": 171416032258,
+          "MaxProbeBytes": 1792
+        },
+        "Final": {
+          "Events": 36,
+          "Bytes": 75424,
+          "Stopped": 0,
+          "DeadlineBootNS": 171416032258,
+          "MaxProbeBytes": 1792
+        },
+        "Counts": {
+          "Entries": 32,
+          "Exits": 32,
+          "Continuations": 32,
+          "FailedReads": 0,
+          "Lost": 0
+        },
+        "Milliseconds": 28,
+        "DetachStoppedDebits": true
+      },
+      {
+        "Name": "fault-exit",
+        "Initial": {
+          "Events": 100,
+          "Bytes": 100000,
+          "Stopped": 0,
+          "DeadlineBootNS": 171445680649,
+          "MaxProbeBytes": 1792
+        },
+        "Final": {
+          "Events": 36,
+          "Bytes": 75424,
+          "Stopped": 0,
+          "DeadlineBootNS": 171445680649,
+          "MaxProbeBytes": 1792
+        },
+        "Counts": {
+          "Entries": 32,
+          "Exits": 32,
+          "Continuations": 32,
+          "FailedReads": 32,
+          "Lost": 0
+        },
+        "Milliseconds": 29,
+        "DetachStoppedDebits": true
+      },
+      {
+        "Name": "deadline-between-batches",
+        "Initial": {
+          "Events": 100,
+          "Bytes": 100000,
+          "Stopped": 0,
+          "DeadlineBootNS": 163474860467,
+          "MaxProbeBytes": 1792
+        },
+        "Final": {
+          "Events": 36,
+          "Bytes": 75424,
+          "Stopped": 1,
+          "DeadlineBootNS": 163474860467,
+          "MaxProbeBytes": 1792
+        },
+        "Counts": {
+          "Entries": 32,
+          "Exits": 32,
+          "Continuations": 32,
+          "FailedReads": 0,
+          "Lost": 0
+        },
+        "Milliseconds": 2027,
+        "DetachStoppedDebits": true
+      },
+      {
+        "Name": "event-exhaustion",
+        "Initial": {
+          "Events": 7,
+          "Bytes": 100000,
+          "Stopped": 0,
+          "DeadlineBootNS": 173504349431,
+          "MaxProbeBytes": 1792
+        },
+        "Final": {
+          "Events": 0,
+          "Bytes": 97184,
+          "Stopped": 1,
+          "DeadlineBootNS": 173504349431,
+          "MaxProbeBytes": 1792
+        },
+        "Counts": {
+          "Entries": 4,
+          "Exits": 3,
+          "Continuations": 4,
+          "FailedReads": 0,
+          "Lost": 0
+        },
+        "Milliseconds": 29,
+        "DetachStoppedDebits": true
+      },
+      {
+        "Name": "byte-exhaustion",
+        "Initial": {
+          "Events": 100,
+          "Bytes": 1024,
+          "Stopped": 0,
+          "DeadlineBootNS": 173534226193,
+          "MaxProbeBytes": 1792
+        },
+        "Final": {
+          "Events": 97,
+          "Bytes": 256,
+          "Stopped": 1,
+          "DeadlineBootNS": 173534226193,
+          "MaxProbeBytes": 1792
+        },
+        "Counts": {
+          "Entries": 1,
+          "Exits": 1,
+          "Continuations": 1,
+          "FailedReads": 0,
+          "Lost": 0
+        },
+        "Milliseconds": 29,
+        "DetachStoppedDebits": true
+      },
+      {
+        "Name": "concurrent-two-namespaces",
+        "Initial": {
+          "Events": 10000,
+          "Bytes": 2000000,
+          "Stopped": 0,
+          "DeadlineBootNS": 173563364615,
+          "MaxProbeBytes": 1792
+        },
+        "Final": {
+          "Events": 4792,
+          "Bytes": 384,
+          "Stopped": 1,
+          "DeadlineBootNS": 173563364615,
+          "MaxProbeBytes": 1792
+        },
+        "Counts": {
+          "Entries": 2604,
+          "Exits": 2603,
+          "Continuations": 2604,
+          "FailedReads": 0,
+          "Lost": 0
+        },
+        "Milliseconds": 50,
+        "DetachStoppedDebits": true
+      }
+    ],
+    "scope": "engine only; no product authority/publication; emitted counts do not independently observe every user-memory helper call"
+  },
+  "result": "passed",
+  "finished": "2026-11-03T07:36:15Z"
+}
