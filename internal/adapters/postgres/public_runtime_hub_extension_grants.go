@@ -40,7 +40,9 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "access_grant", "id", "UPDATE"},
 		// ADR-261 finite policy-only once-only input reservation, not renewals.
 		{"table", "access_grant", "policy_observed_bytes_spent", "UPDATE"},
+		{"table", "access_grant", "policy_observed_events_spent", "UPDATE"},
 		{"table", "policy_acceptance", "observed_bytes_spent", "UPDATE"},
+		{"table", "policy_acceptance", "observed_events_spent", "UPDATE"},
 		{"table", "policy_observation_session", "", "SELECT"},
 		{"table", "policy_observation_session", "", "INSERT"},
 		// ADR-279 manual raw: the ad hoc pool debit is one definer function.
@@ -120,6 +122,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "retention_source", "root_id", "UPDATE"},
 	},
 	"context-verify": {
+		{"table", "policy_observation_session", "", "SELECT"},
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_capture", "id", "UPDATE"},

@@ -36,3 +36,29 @@ SELECT spend_adhoc_observed_bytes(sqlc.arg(root_id)::uuid,sqlc.arg(grant_id)::uu
 -- name: CountActiveAdHocObservations :one
 SELECT count(*) FROM policy_observation_session
 WHERE root_id=$1 AND grant_id=$2 AND acceptance_id IS NULL AND ended_at IS NULL AND lease_until>clock_timestamp();
+
+-- name: SpendAdHocObservation :one
+SELECT spend_adhoc_observation(sqlc.arg(root_id)::uuid,sqlc.arg(grant_id)::uuid,sqlc.arg(bytes)::bigint,sqlc.arg(events)::bigint)::boolean;
+
+-- name: SpendPolicyObservation :execrows
+UPDATE policy_acceptance SET observed_bytes_spent=observed_bytes_spent+sqlc.arg(bytes)::bigint, observed_events_spent=observed_events_spent+sqlc.arg(events)::bigint
+WHERE root_id=sqlc.arg(root_id)::uuid AND id=sqlc.arg(id)::uuid
+ AND executions_spent>0 AND sqlc.arg(bytes)::bigint>0 AND sqlc.arg(events)::bigint>0
+ AND observed_bytes_spent<=(record#>>'{Authority,Limits,MaxObservedBytes}')::bigint-sqlc.arg(bytes)::bigint
+ AND observed_events_spent<=COALESCE((record#>>'{Authority,Limits,MaxObservedEvents}')::bigint,0)-sqlc.arg(events)::bigint;
+
+-- name: SpendPolicyGrantObservation :execrows
+UPDATE access_grant SET policy_observed_bytes_spent=policy_observed_bytes_spent+sqlc.arg(bytes)::bigint, policy_observed_events_spent=policy_observed_events_spent+sqlc.arg(events)::bigint
+WHERE root_id=sqlc.arg(root_id)::uuid AND id=sqlc.arg(id)::uuid AND kind='policy'
+ AND decision='approved' AND revoked_at IS NULL AND clock_timestamp()<policy_not_after
+ AND sqlc.arg(bytes)::bigint>0 AND sqlc.arg(events)::bigint>0
+ AND policy_observed_bytes_spent<=policy_max_observed_bytes-sqlc.arg(bytes)::bigint
+ AND policy_observed_events_spent<=COALESCE((policy_scope#>>'{Limits,MaxObservedEvents}')::bigint,0)-sqlc.arg(events)::bigint;
+
+-- name: InsertArgumentObservation :one
+INSERT INTO policy_observation_session(id,root_id,policy_uid,acceptance_id,grant_id,capture_id,attempt_id,fence,
+ action_id,pod_uid,node_uid,boot_id,collector_pod_uid,collector_epoch,expectation_digest,program_digest,binding_scope,accounting_rule,
+ source_observed_at,source_fresh_until,started_at,session_until,lease_until,start_by,duration_millis,sequence,credit,max_bytes_per_second,
+ argument_definition_digest,event_credit,max_events_per_second,max_probe_bytes,max_bytes_per_event,max_tracked_threads,capture_buffers)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$22,$23,$24,1,$25,$26,$27,$28,$29,$30,$31,$32,$33)
+RETURNING *;

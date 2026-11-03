@@ -9,67 +9,68 @@ import (
 )
 
 type AccessGrant struct {
-	ID                       pgtype.UUID
-	RootID                   pgtype.UUID
-	Kind                     string
-	PreviewID                pgtype.UUID
-	CaptureID                pgtype.UUID
-	ClusterID                pgtype.UUID
-	NamespaceUid             string
-	WorkloadUid              string
-	PodUid                   pgtype.Text
-	ExecutionDigest          []byte
-	ResultAccessDigest       []byte
-	ReviewDigest             []byte
-	DataClass                string
-	Reasons                  []byte
-	Review                   []byte
-	Scope                    []byte
-	RequesterIssuer          string
-	RequesterSubject         string
-	RequesterClient          string
-	LifetimeSeconds          int32
-	ResultAccess             []byte
-	NotAfter                 pgtype.Timestamptz
-	MaxArtifacts             int32
-	MaxBytes                 int64
-	MaxOperations            int64
-	ArtifactsSpent           int32
-	BytesSpent               int64
-	OperationsSpent          int64
-	IdempotencyKey           string
-	RequestDigest            []byte
-	RequestedAt              pgtype.Timestamptz
-	ReviewUntil              pgtype.Timestamptz
-	Decision                 pgtype.Text
-	ApproverIssuer           pgtype.Text
-	ApproverSubject          pgtype.Text
-	ApproverClient           pgtype.Text
-	DecisionReason           pgtype.Text
-	DecisionAcr              pgtype.Text
-	DecisionAuthTime         pgtype.Timestamptz
-	DecidedAt                pgtype.Timestamptz
-	DecisionKey              pgtype.Text
-	ExpiresAt                pgtype.Timestamptz
-	RevokedAt                pgtype.Timestamptz
-	RevokerIssuer            pgtype.Text
-	RevokerSubject           pgtype.Text
-	RevokerClient            pgtype.Text
-	RevokeKey                pgtype.Text
-	Revision                 int16
-	RequesterKind            string
-	RequestOperation         string
-	RequesterKey             []byte
-	PolicyUid                pgtype.Text
-	PolicyAcceptanceID       pgtype.UUID
-	PolicyScope              []byte
-	PolicyNotAfter           pgtype.Timestamptz
-	PolicyMaxExecutions      pgtype.Int8
-	PolicyMaxBytes           pgtype.Int8
-	PolicyMaxObservedBytes   pgtype.Int8
-	PolicyExecutionsSpent    int64
-	PolicyBytesSpent         int64
-	PolicyObservedBytesSpent int64
+	ID                        pgtype.UUID
+	RootID                    pgtype.UUID
+	Kind                      string
+	PreviewID                 pgtype.UUID
+	CaptureID                 pgtype.UUID
+	ClusterID                 pgtype.UUID
+	NamespaceUid              string
+	WorkloadUid               string
+	PodUid                    pgtype.Text
+	ExecutionDigest           []byte
+	ResultAccessDigest        []byte
+	ReviewDigest              []byte
+	DataClass                 string
+	Reasons                   []byte
+	Review                    []byte
+	Scope                     []byte
+	RequesterIssuer           string
+	RequesterSubject          string
+	RequesterClient           string
+	LifetimeSeconds           int32
+	ResultAccess              []byte
+	NotAfter                  pgtype.Timestamptz
+	MaxArtifacts              int32
+	MaxBytes                  int64
+	MaxOperations             int64
+	ArtifactsSpent            int32
+	BytesSpent                int64
+	OperationsSpent           int64
+	IdempotencyKey            string
+	RequestDigest             []byte
+	RequestedAt               pgtype.Timestamptz
+	ReviewUntil               pgtype.Timestamptz
+	Decision                  pgtype.Text
+	ApproverIssuer            pgtype.Text
+	ApproverSubject           pgtype.Text
+	ApproverClient            pgtype.Text
+	DecisionReason            pgtype.Text
+	DecisionAcr               pgtype.Text
+	DecisionAuthTime          pgtype.Timestamptz
+	DecidedAt                 pgtype.Timestamptz
+	DecisionKey               pgtype.Text
+	ExpiresAt                 pgtype.Timestamptz
+	RevokedAt                 pgtype.Timestamptz
+	RevokerIssuer             pgtype.Text
+	RevokerSubject            pgtype.Text
+	RevokerClient             pgtype.Text
+	RevokeKey                 pgtype.Text
+	Revision                  int16
+	RequesterKind             string
+	RequestOperation          string
+	RequesterKey              []byte
+	PolicyUid                 pgtype.Text
+	PolicyAcceptanceID        pgtype.UUID
+	PolicyScope               []byte
+	PolicyNotAfter            pgtype.Timestamptz
+	PolicyMaxExecutions       pgtype.Int8
+	PolicyMaxBytes            pgtype.Int8
+	PolicyMaxObservedBytes    pgtype.Int8
+	PolicyExecutionsSpent     int64
+	PolicyBytesSpent          int64
+	PolicyObservedBytesSpent  int64
+	PolicyObservedEventsSpent int64
 }
 
 type AccessGrantChild struct {
@@ -2086,6 +2087,7 @@ type PolicyAcceptance struct {
 	SharingStopKey      pgtype.Text
 	CollectedBytesSpent int64
 	ObservedBytesSpent  int64
+	ObservedEventsSpent int64
 }
 
 type PolicyGrantAttachment struct {
@@ -2121,36 +2123,43 @@ type PolicyGrantSetting struct {
 }
 
 type PolicyObservationSession struct {
-	ID                pgtype.UUID
-	RootID            pgtype.UUID
-	PolicyUid         pgtype.Text
-	AcceptanceID      pgtype.UUID
-	GrantID           pgtype.UUID
-	CaptureID         pgtype.UUID
-	AttemptID         pgtype.UUID
-	Fence             pgtype.UUID
-	ActionID          string
-	PodUid            string
-	NodeUid           string
-	BootID            string
-	CollectorPodUid   string
-	CollectorEpoch    string
-	ExpectationDigest []byte
-	ProgramDigest     []byte
-	BindingScope      []byte
-	AccountingRule    []byte
-	SourceObservedAt  pgtype.Timestamptz
-	SourceFreshUntil  pgtype.Timestamptz
-	StartedAt         pgtype.Timestamptz
-	SessionUntil      pgtype.Timestamptz
-	LeaseUntil        pgtype.Timestamptz
-	StartBy           pgtype.Timestamptz
-	DurationMillis    int64
-	Sequence          int64
-	Credit            int64
-	MaxBytesPerSecond int64
-	EndedAt           pgtype.Timestamptz
-	AdhocCaptureID    pgtype.UUID
+	ID                       pgtype.UUID
+	RootID                   pgtype.UUID
+	PolicyUid                pgtype.Text
+	AcceptanceID             pgtype.UUID
+	GrantID                  pgtype.UUID
+	CaptureID                pgtype.UUID
+	AttemptID                pgtype.UUID
+	Fence                    pgtype.UUID
+	ActionID                 string
+	PodUid                   string
+	NodeUid                  string
+	BootID                   string
+	CollectorPodUid          string
+	CollectorEpoch           string
+	ExpectationDigest        []byte
+	ProgramDigest            []byte
+	BindingScope             []byte
+	AccountingRule           []byte
+	SourceObservedAt         pgtype.Timestamptz
+	SourceFreshUntil         pgtype.Timestamptz
+	StartedAt                pgtype.Timestamptz
+	SessionUntil             pgtype.Timestamptz
+	LeaseUntil               pgtype.Timestamptz
+	StartBy                  pgtype.Timestamptz
+	DurationMillis           int64
+	Sequence                 int64
+	Credit                   int64
+	MaxBytesPerSecond        int64
+	EndedAt                  pgtype.Timestamptz
+	AdhocCaptureID           pgtype.UUID
+	ArgumentDefinitionDigest []byte
+	EventCredit              int64
+	MaxEventsPerSecond       int64
+	MaxProbeBytes            int64
+	MaxBytesPerEvent         int64
+	MaxTrackedThreads        int64
+	CaptureBuffers           bool
 }
 
 type PolicyOccurrence struct {

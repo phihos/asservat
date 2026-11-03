@@ -92,7 +92,8 @@ func attachPolicyAccountingGrantMode(t *testing.T, ctx context.Context, admin *p
 				t.Fatal(err)
 			}
 			g.Policy.Limits.MaxObservedBytes = a.Limits.MaxObservedBytes
-			g.Policy.Observation = &authorization.ObservationLimits{MaxSessionSeconds: int64(timeout / time.Second), MaxObservedBytes: a.Limits.MaxObservedBytes, MaxBytesPerSecond: planvalue.SensitiveMaxBytesPerSecond, MaxConcurrentSessions: 1}
+			g.Policy.Limits.MaxObservedEvents = min(a.Limits.MaxObservedEvents, 10)
+			g.Policy.Observation = &authorization.ObservationLimits{MaxSessionSeconds: int64(timeout / time.Second), MaxObservedBytes: a.Limits.MaxObservedBytes, MaxObservedEvents: g.Policy.Limits.MaxObservedEvents, MaxBytesPerSecond: planvalue.SensitiveMaxBytesPerSecond, MaxConcurrentSessions: 1}
 		}
 	}
 	if !observation && len(recorder) == 1 {

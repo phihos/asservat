@@ -45,12 +45,136 @@ func (q *Queries) CountActivePolicyObservations(ctx context.Context, arg CountAc
 	return count, err
 }
 
+const insertArgumentObservation = `-- name: InsertArgumentObservation :one
+INSERT INTO policy_observation_session(id,root_id,policy_uid,acceptance_id,grant_id,capture_id,attempt_id,fence,
+ action_id,pod_uid,node_uid,boot_id,collector_pod_uid,collector_epoch,expectation_digest,program_digest,binding_scope,accounting_rule,
+ source_observed_at,source_fresh_until,started_at,session_until,lease_until,start_by,duration_millis,sequence,credit,max_bytes_per_second,
+ argument_definition_digest,event_credit,max_events_per_second,max_probe_bytes,max_bytes_per_event,max_tracked_threads,capture_buffers)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$22,$23,$24,1,$25,$26,$27,$28,$29,$30,$31,$32,$33)
+RETURNING id, root_id, policy_uid, acceptance_id, grant_id, capture_id, attempt_id, fence, action_id, pod_uid, node_uid, boot_id, collector_pod_uid, collector_epoch, expectation_digest, program_digest, binding_scope, accounting_rule, source_observed_at, source_fresh_until, started_at, session_until, lease_until, start_by, duration_millis, sequence, credit, max_bytes_per_second, ended_at, adhoc_capture_id, argument_definition_digest, event_credit, max_events_per_second, max_probe_bytes, max_bytes_per_event, max_tracked_threads, capture_buffers
+`
+
+type InsertArgumentObservationParams struct {
+	ID                       pgtype.UUID
+	RootID                   pgtype.UUID
+	PolicyUid                pgtype.Text
+	AcceptanceID             pgtype.UUID
+	GrantID                  pgtype.UUID
+	CaptureID                pgtype.UUID
+	AttemptID                pgtype.UUID
+	Fence                    pgtype.UUID
+	ActionID                 string
+	PodUid                   string
+	NodeUid                  string
+	BootID                   string
+	CollectorPodUid          string
+	CollectorEpoch           string
+	ExpectationDigest        []byte
+	ProgramDigest            []byte
+	BindingScope             []byte
+	AccountingRule           []byte
+	SourceObservedAt         pgtype.Timestamptz
+	SourceFreshUntil         pgtype.Timestamptz
+	StartedAt                pgtype.Timestamptz
+	SessionUntil             pgtype.Timestamptz
+	StartBy                  pgtype.Timestamptz
+	DurationMillis           int64
+	Credit                   int64
+	MaxBytesPerSecond        int64
+	ArgumentDefinitionDigest []byte
+	EventCredit              int64
+	MaxEventsPerSecond       int64
+	MaxProbeBytes            int64
+	MaxBytesPerEvent         int64
+	MaxTrackedThreads        int64
+	CaptureBuffers           bool
+}
+
+func (q *Queries) InsertArgumentObservation(ctx context.Context, arg InsertArgumentObservationParams) (PolicyObservationSession, error) {
+	row := q.db.QueryRow(ctx, insertArgumentObservation,
+		arg.ID,
+		arg.RootID,
+		arg.PolicyUid,
+		arg.AcceptanceID,
+		arg.GrantID,
+		arg.CaptureID,
+		arg.AttemptID,
+		arg.Fence,
+		arg.ActionID,
+		arg.PodUid,
+		arg.NodeUid,
+		arg.BootID,
+		arg.CollectorPodUid,
+		arg.CollectorEpoch,
+		arg.ExpectationDigest,
+		arg.ProgramDigest,
+		arg.BindingScope,
+		arg.AccountingRule,
+		arg.SourceObservedAt,
+		arg.SourceFreshUntil,
+		arg.StartedAt,
+		arg.SessionUntil,
+		arg.StartBy,
+		arg.DurationMillis,
+		arg.Credit,
+		arg.MaxBytesPerSecond,
+		arg.ArgumentDefinitionDigest,
+		arg.EventCredit,
+		arg.MaxEventsPerSecond,
+		arg.MaxProbeBytes,
+		arg.MaxBytesPerEvent,
+		arg.MaxTrackedThreads,
+		arg.CaptureBuffers,
+	)
+	var i PolicyObservationSession
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.PolicyUid,
+		&i.AcceptanceID,
+		&i.GrantID,
+		&i.CaptureID,
+		&i.AttemptID,
+		&i.Fence,
+		&i.ActionID,
+		&i.PodUid,
+		&i.NodeUid,
+		&i.BootID,
+		&i.CollectorPodUid,
+		&i.CollectorEpoch,
+		&i.ExpectationDigest,
+		&i.ProgramDigest,
+		&i.BindingScope,
+		&i.AccountingRule,
+		&i.SourceObservedAt,
+		&i.SourceFreshUntil,
+		&i.StartedAt,
+		&i.SessionUntil,
+		&i.LeaseUntil,
+		&i.StartBy,
+		&i.DurationMillis,
+		&i.Sequence,
+		&i.Credit,
+		&i.MaxBytesPerSecond,
+		&i.EndedAt,
+		&i.AdhocCaptureID,
+		&i.ArgumentDefinitionDigest,
+		&i.EventCredit,
+		&i.MaxEventsPerSecond,
+		&i.MaxProbeBytes,
+		&i.MaxBytesPerEvent,
+		&i.MaxTrackedThreads,
+		&i.CaptureBuffers,
+	)
+	return i, err
+}
+
 const insertPolicyObservation = `-- name: InsertPolicyObservation :one
 INSERT INTO policy_observation_session(id,root_id,policy_uid,acceptance_id,grant_id,capture_id,attempt_id,fence,
  action_id,pod_uid,node_uid,boot_id,collector_pod_uid,collector_epoch,expectation_digest,program_digest,binding_scope,accounting_rule,
  source_observed_at,source_fresh_until,started_at,session_until,lease_until,start_by,duration_millis,sequence,credit,max_bytes_per_second)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$22,$23,$24,1,$25,$26)
-RETURNING id, root_id, policy_uid, acceptance_id, grant_id, capture_id, attempt_id, fence, action_id, pod_uid, node_uid, boot_id, collector_pod_uid, collector_epoch, expectation_digest, program_digest, binding_scope, accounting_rule, source_observed_at, source_fresh_until, started_at, session_until, lease_until, start_by, duration_millis, sequence, credit, max_bytes_per_second, ended_at, adhoc_capture_id
+RETURNING id, root_id, policy_uid, acceptance_id, grant_id, capture_id, attempt_id, fence, action_id, pod_uid, node_uid, boot_id, collector_pod_uid, collector_epoch, expectation_digest, program_digest, binding_scope, accounting_rule, source_observed_at, source_fresh_until, started_at, session_until, lease_until, start_by, duration_millis, sequence, credit, max_bytes_per_second, ended_at, adhoc_capture_id, argument_definition_digest, event_credit, max_events_per_second, max_probe_bytes, max_bytes_per_event, max_tracked_threads, capture_buffers
 `
 
 type InsertPolicyObservationParams struct {
@@ -143,12 +267,19 @@ func (q *Queries) InsertPolicyObservation(ctx context.Context, arg InsertPolicyO
 		&i.MaxBytesPerSecond,
 		&i.EndedAt,
 		&i.AdhocCaptureID,
+		&i.ArgumentDefinitionDigest,
+		&i.EventCredit,
+		&i.MaxEventsPerSecond,
+		&i.MaxProbeBytes,
+		&i.MaxBytesPerEvent,
+		&i.MaxTrackedThreads,
+		&i.CaptureBuffers,
 	)
 	return i, err
 }
 
 const readPolicyObservation = `-- name: ReadPolicyObservation :one
-SELECT id, root_id, policy_uid, acceptance_id, grant_id, capture_id, attempt_id, fence, action_id, pod_uid, node_uid, boot_id, collector_pod_uid, collector_epoch, expectation_digest, program_digest, binding_scope, accounting_rule, source_observed_at, source_fresh_until, started_at, session_until, lease_until, start_by, duration_millis, sequence, credit, max_bytes_per_second, ended_at, adhoc_capture_id FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2
+SELECT id, root_id, policy_uid, acceptance_id, grant_id, capture_id, attempt_id, fence, action_id, pod_uid, node_uid, boot_id, collector_pod_uid, collector_epoch, expectation_digest, program_digest, binding_scope, accounting_rule, source_observed_at, source_fresh_until, started_at, session_until, lease_until, start_by, duration_millis, sequence, credit, max_bytes_per_second, ended_at, adhoc_capture_id, argument_definition_digest, event_credit, max_events_per_second, max_probe_bytes, max_bytes_per_event, max_tracked_threads, capture_buffers FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2
 `
 
 type ReadPolicyObservationParams struct {
@@ -192,6 +323,13 @@ func (q *Queries) ReadPolicyObservation(ctx context.Context, arg ReadPolicyObser
 		&i.MaxBytesPerSecond,
 		&i.EndedAt,
 		&i.AdhocCaptureID,
+		&i.ArgumentDefinitionDigest,
+		&i.EventCredit,
+		&i.MaxEventsPerSecond,
+		&i.MaxProbeBytes,
+		&i.MaxBytesPerEvent,
+		&i.MaxTrackedThreads,
+		&i.CaptureBuffers,
 	)
 	return i, err
 }
@@ -213,6 +351,29 @@ func (q *Queries) RetirePolicyObservation(ctx context.Context, arg RetirePolicyO
 	return result.RowsAffected(), nil
 }
 
+const spendAdHocObservation = `-- name: SpendAdHocObservation :one
+SELECT spend_adhoc_observation($1::uuid,$2::uuid,$3::bigint,$4::bigint)::boolean
+`
+
+type SpendAdHocObservationParams struct {
+	RootID  pgtype.UUID
+	GrantID pgtype.UUID
+	Bytes   int64
+	Events  int64
+}
+
+func (q *Queries) SpendAdHocObservation(ctx context.Context, arg SpendAdHocObservationParams) (bool, error) {
+	row := q.db.QueryRow(ctx, spendAdHocObservation,
+		arg.RootID,
+		arg.GrantID,
+		arg.Bytes,
+		arg.Events,
+	)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const spendAdHocObservedBytes = `-- name: SpendAdHocObservedBytes :one
 SELECT spend_adhoc_observed_bytes($1::uuid,$2::uuid,$3::bigint)::boolean
 `
@@ -231,6 +392,35 @@ func (q *Queries) SpendAdHocObservedBytes(ctx context.Context, arg SpendAdHocObs
 	return column_1, err
 }
 
+const spendPolicyGrantObservation = `-- name: SpendPolicyGrantObservation :execrows
+UPDATE access_grant SET policy_observed_bytes_spent=policy_observed_bytes_spent+$1::bigint, policy_observed_events_spent=policy_observed_events_spent+$2::bigint
+WHERE root_id=$3::uuid AND id=$4::uuid AND kind='policy'
+ AND decision='approved' AND revoked_at IS NULL AND clock_timestamp()<policy_not_after
+ AND $1::bigint>0 AND $2::bigint>0
+ AND policy_observed_bytes_spent<=policy_max_observed_bytes-$1::bigint
+ AND policy_observed_events_spent<=COALESCE((policy_scope#>>'{Limits,MaxObservedEvents}')::bigint,0)-$2::bigint
+`
+
+type SpendPolicyGrantObservationParams struct {
+	Bytes  int64
+	Events int64
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+func (q *Queries) SpendPolicyGrantObservation(ctx context.Context, arg SpendPolicyGrantObservationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, spendPolicyGrantObservation,
+		arg.Bytes,
+		arg.Events,
+		arg.RootID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const spendPolicyGrantObservedBytes = `-- name: SpendPolicyGrantObservedBytes :execrows
 UPDATE access_grant SET policy_observed_bytes_spent=policy_observed_bytes_spent+$1::bigint
 WHERE root_id=$2::uuid AND id=$3::uuid AND kind='policy'
@@ -246,6 +436,34 @@ type SpendPolicyGrantObservedBytesParams struct {
 
 func (q *Queries) SpendPolicyGrantObservedBytes(ctx context.Context, arg SpendPolicyGrantObservedBytesParams) (int64, error) {
 	result, err := q.db.Exec(ctx, spendPolicyGrantObservedBytes, arg.Bytes, arg.RootID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const spendPolicyObservation = `-- name: SpendPolicyObservation :execrows
+UPDATE policy_acceptance SET observed_bytes_spent=observed_bytes_spent+$1::bigint, observed_events_spent=observed_events_spent+$2::bigint
+WHERE root_id=$3::uuid AND id=$4::uuid
+ AND executions_spent>0 AND $1::bigint>0 AND $2::bigint>0
+ AND observed_bytes_spent<=(record#>>'{Authority,Limits,MaxObservedBytes}')::bigint-$1::bigint
+ AND observed_events_spent<=COALESCE((record#>>'{Authority,Limits,MaxObservedEvents}')::bigint,0)-$2::bigint
+`
+
+type SpendPolicyObservationParams struct {
+	Bytes  int64
+	Events int64
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+func (q *Queries) SpendPolicyObservation(ctx context.Context, arg SpendPolicyObservationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, spendPolicyObservation,
+		arg.Bytes,
+		arg.Events,
+		arg.RootID,
+		arg.ID,
+	)
 	if err != nil {
 		return 0, err
 	}

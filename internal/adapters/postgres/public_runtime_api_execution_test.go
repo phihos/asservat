@@ -42,10 +42,13 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		{"table", "access_grant", "", "SELECT"},
 		{"table", "access_grant", "id", "UPDATE"},
 		{"table", "access_grant", "policy_observed_bytes_spent", "UPDATE"},
+		{"table", "access_grant", "policy_observed_events_spent", "UPDATE"},
 		{"table", "policy_acceptance", "observed_bytes_spent", "UPDATE"},
+		{"table", "policy_acceptance", "observed_events_spent", "UPDATE"},
 		{"table", "policy_observation_session", "", "SELECT"},
 		{"table", "policy_observation_session", "", "INSERT"},
 		{"function", "spend_adhoc_observed_bytes(uuid,uuid,bigint)", "", "EXECUTE"},
+		{"function", "spend_adhoc_observation(uuid,uuid,bigint,bigint)", "", "EXECUTE"},
 		{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"},
 		{"schema", "public", "", "USAGE"},
 		{"table", "authority_audit", "", "SELECT"},
@@ -110,7 +113,7 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		}
 	}
 	for _, grant := range got {
-		if grant.privilege == "DELETE" || grant.kind == "function" && grant.object != "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)" && grant.object != "spend_adhoc_observed_bytes(uuid,uuid,bigint)" || grant.object == "custody_copy" || grant.object == "context_catalog" || strings.HasPrefix(grant.object, "download_") {
+		if grant.privilege == "DELETE" || grant.kind == "function" && grant.object != "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)" && grant.object != "spend_adhoc_observed_bytes(uuid,uuid,bigint)" && grant.object != "spend_adhoc_observation(uuid,uuid,bigint,bigint)" || grant.object == "custody_copy" || grant.object == "context_catalog" || strings.HasPrefix(grant.object, "download_") {
 			t.Fatal("execution gained excluded deletion, publication, evidence-copy or download privilege", grant)
 		}
 	}

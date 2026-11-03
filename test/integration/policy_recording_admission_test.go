@@ -71,7 +71,7 @@ type policySourceAcceptedFixture struct {
 // debit. Protected source/target/identity, initial trust and independent review
 // remain explicit synthetic component facts. No collector or public enablement.
 func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario, protected ...policyRecorderProtectedCase) {
-	modes := []string{"packet-policy", "snapshot-policy-refuses-recorder", "packet-policy-observation-sql", "packet-policy-companion-sql"}
+	modes := []string{"packet-policy", "snapshot-policy-refuses-recorder", "packet-policy-observation-sql", "packet-policy-companion-sql", "argument-observation-sql"}
 	if len(protected) > 0 {
 		modes = []string{"packet-policy-companion-sql"}
 	}
@@ -86,7 +86,8 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			packetPolicy := mode != "snapshot-policy-refuses-recorder"
 			observationSQL := mode == "packet-policy-observation-sql"
 			companionSQL := mode == "packet-policy-companion-sql"
-			observed := observationSQL || companionSQL
+			argumentSQL := mode == "argument-observation-sql"
+			observed := observationSQL || companionSQL || argumentSQL
 			compilePolicy := publicPolicyCompile
 			var filters planning.FilterCompiler = publicPolicyFilters{}
 			if companionSQL {
@@ -117,6 +118,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			b.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{authorization.PolicyContextAction, "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: collectedBytes}
 			if observed {
 				b.Automation.MaxObservedBytes = 1 << 30
+				if argumentSQL {
+					b.Automation.MaxObservedEvents = 20
+				}
 			}
 			b.Resource.Generation++
 			b.Resource.SpecDigest[0]++
@@ -209,6 +213,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: custodyID(), Creator: creator, ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{sponsor}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: collectedBytes}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
 			if observed {
 				authority.Limits.MaxObservedBytes = 1 << 30
+				if argumentSQL {
+					authority.Limits.MaxObservedEvents = 20
+				}
 			}
 			if len(protected) > 0 && protected[0].PolicyExecutions > 0 {
 				authority.Limits.MaxExecutions = protected[0].PolicyExecutions
@@ -452,6 +459,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal("action mismatch/replay changed prospective pools", execs, bytes, grantExec, grantBytes, reservations)
 			}
 			t.Logf("actual Tick accepted executions=%d; native output=%d grant executions=%d output=%d reservations=%d", execs, bytes, grantExec, grantBytes, reservations)
+			if argumentSQL {
+				qualifyArgumentObservationSQL(t, ctx, admin, hub, root, record.Record.ID, grant, output)
+			}
 			if observationSQL {
 				qualifyFinitePolicyObservationSQL(t, ctx, admin, hub, poolFor, root, record.Record.ID, grant, output)
 			}

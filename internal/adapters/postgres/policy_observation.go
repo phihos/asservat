@@ -35,8 +35,10 @@ func (s *APIContextExecutions) PreparePolicyRecording(ctx context.Context, c app
 }
 
 type policyObservationPreparation struct {
-	source targets.PacketSourceObservation
-	permit collector.ObservationPermit
+	source         targets.PacketSourceObservation
+	permit         collector.ObservationPermit
+	arguments      bool
+	argumentPermit collector.ArgumentObservationPermit
 }
 
 func sensitivePolicyRecording(c app.APIExecutionCheck) bool {
@@ -145,22 +147,78 @@ func policyObservationScope(row custodydb.PolicyObservationSession) []byte {
 			field.Time = field.Time.UTC()
 		}
 	}
-	// adhoc_capture_id is generated from capture_id/acceptance_id, both bound
-	// here, and is absent on the inserted row the scope is first computed
-	// from. Shadowing it keeps the pre-117 v1 encoding of policy sessions.
+	// Explicit frozen v1 row: additive SQL fields must never change legacy
+	// packet JSON, including field order and zero encodings.
 	type v1Row struct {
-		custodydb.PolicyObservationSession
-		AdhocCaptureID *struct{} `json:",omitempty"`
+		ID                pgtype.UUID
+		RootID            pgtype.UUID
+		PolicyUid         pgtype.Text
+		AcceptanceID      pgtype.UUID
+		GrantID           pgtype.UUID
+		CaptureID         pgtype.UUID
+		AttemptID         pgtype.UUID
+		Fence             pgtype.UUID
+		ActionID          string
+		PodUid            string
+		NodeUid           string
+		BootID            string
+		CollectorPodUid   string
+		CollectorEpoch    string
+		ExpectationDigest []byte
+		ProgramDigest     []byte
+		BindingScope      []byte
+		AccountingRule    []byte
+		SourceObservedAt  pgtype.Timestamptz
+		SourceFreshUntil  pgtype.Timestamptz
+		StartedAt         pgtype.Timestamptz
+		SessionUntil      pgtype.Timestamptz
+		LeaseUntil        pgtype.Timestamptz
+		StartBy           pgtype.Timestamptz
+		DurationMillis    int64
+		Sequence          int64
+		Credit            int64
+		MaxBytesPerSecond int64
+		EndedAt           pgtype.Timestamptz
 	}
 	return digest(struct {
 		Format string
 		Row    v1Row
-	}{"finite-policy-observation/v1", v1Row{PolicyObservationSession: row}})
+	}{"finite-policy-observation/v1", v1Row{
+		ID:                row.ID,
+		RootID:            row.RootID,
+		PolicyUid:         row.PolicyUid,
+		AcceptanceID:      row.AcceptanceID,
+		GrantID:           row.GrantID,
+		CaptureID:         row.CaptureID,
+		AttemptID:         row.AttemptID,
+		Fence:             row.Fence,
+		ActionID:          row.ActionID,
+		PodUid:            row.PodUid,
+		NodeUid:           row.NodeUid,
+		BootID:            row.BootID,
+		CollectorPodUid:   row.CollectorPodUid,
+		CollectorEpoch:    row.CollectorEpoch,
+		ExpectationDigest: row.ExpectationDigest,
+		ProgramDigest:     row.ProgramDigest,
+		BindingScope:      row.BindingScope,
+		AccountingRule:    row.AccountingRule,
+		SourceObservedAt:  row.SourceObservedAt,
+		SourceFreshUntil:  row.SourceFreshUntil,
+		StartedAt:         row.StartedAt,
+		SessionUntil:      row.SessionUntil,
+		LeaseUntil:        row.LeaseUntil,
+		StartBy:           row.StartBy,
+		DurationMillis:    row.DurationMillis,
+		Sequence:          row.Sequence,
+		Credit:            row.Credit,
+		MaxBytesPerSecond: row.MaxBytesPerSecond,
+		EndedAt:           row.EndedAt,
+	}})
 }
 
 func policyObservationPermit(row custodydb.PolicyObservationSession) (collector.ObservationPermit, error) {
 	var zero collector.ObservationPermit
-	if len(row.BindingScope) != 32 || len(row.ProgramDigest) != 32 || len(row.ExpectationDigest) != 32 || !bytes.Equal(row.BindingScope, policyObservationScope(row)) || !bytes.Equal(row.AccountingRule, observationRuleBytes()) || row.Sequence != 1 || row.EndedAt.Valid {
+	if !legacyObservationTuple(row) || len(row.BindingScope) != 32 || len(row.ProgramDigest) != 32 || len(row.ExpectationDigest) != 32 || !bytes.Equal(row.BindingScope, policyObservationScope(row)) || !bytes.Equal(row.AccountingRule, observationRuleBytes()) || row.Sequence != 1 || row.EndedAt.Valid {
 		return zero, value.ErrDenied
 	}
 	b := collector.ObservationBinding{SessionID: uid(row.ID), Fence: uid(row.Fence), CaptureID: uid(row.CaptureID), ActionID: row.ActionID, PodUID: row.PodUid, NodeUID: row.NodeUid, BootID: row.BootID, CollectorPodUID: row.CollectorPodUid, CollectorEpoch: row.CollectorEpoch, AccountingRule: collector.ObservationAccountingRule()}
@@ -183,4 +241,9 @@ func policyObservationProgramDigest(program []artifact.FilterInstruction) []byte
 	}
 	sum := planning.FilterProgramDigest(native)
 	return sum[:]
+}
+
+// New argument columns must remain completely absent from a packet session.
+func legacyObservationTuple(r custodydb.PolicyObservationSession) bool {
+	return r.ArgumentDefinitionDigest == nil && r.EventCredit == 0 && r.MaxEventsPerSecond == 0 && r.MaxProbeBytes == 0 && r.MaxBytesPerEvent == 0 && r.MaxTrackedThreads == 0 && !r.CaptureBuffers
 }

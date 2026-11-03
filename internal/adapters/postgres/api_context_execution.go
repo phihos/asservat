@@ -305,7 +305,10 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.APIExecutionCheck, observation *policyObservationPreparation) (value.APIExecution, bool, error) {
 	var out value.APIExecution
 	var first bool
-	if (sensitivePolicyRecording(c) || sensitiveManualRecording(c)) && observation == nil {
+	if (sensitivePolicyRecording(c) || sensitiveManualRecording(c) || sensitiveArgumentRecording(c)) && observation == nil {
+		return out, false, value.ErrDenied
+	}
+	if observation != nil && observation.arguments != sensitiveArgumentRecording(c) {
 		return out, false, value.ErrDenied
 	}
 	if !authorization.UUID(c.Work.Accepted.CaptureID) || c.Work.Accepted.Expectation.ExecutionClass != artifact.ContextAPIExecution {
@@ -400,13 +403,22 @@ func (s *APIContextExecutions) prepareAPIExecution(ctx context.Context, c app.AP
 				if sensitiveManualRecording(c) {
 					prepare = func() error { return s.prepareAdHocObservation(ctx, q, c, accepted, now.Time, first, observation) }
 				}
+				if observation.arguments {
+					prepare = func() error {
+						return s.prepareArgumentObservation(ctx, q, c, accepted, policyGrant, now.Time, first, observation)
+					}
+				}
 				if err := prepare(); err != nil {
 					return sqlStep{"observation", err}
 				}
 				// New preparation must still have dispatch slack after all existing
 				// post-effect reads. Exact replay is passive even after its old startBy.
 				if first {
-					*sourceUntil = identity.Earlier(*sourceUntil, observation.permit.StartBy)
+					startBy := observation.permit.StartBy
+					if observation.arguments {
+						startBy = observation.argumentPermit.StartBy
+					}
+					*sourceUntil = identity.Earlier(*sourceUntil, startBy)
 				}
 			}
 			return nil

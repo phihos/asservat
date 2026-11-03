@@ -66,11 +66,11 @@ original start slack; the total at most 70 seconds intersects all reviewed grant
 policy, capture and retention bounds. There is no lease renewal or rearming.
 This does not implement ongoing argument observation.
 
-The next SQL128 extension reuses the existing observation session and API
+The implemented SQL128 extension reuses the existing observation session and API
 preparation transaction: additive argument fields, independent policy acceptance
 and grant event counters, atomic event/byte debit and immutable replay. An
-explicit legacy digest DTO must preserve every packet v1 field despite generated
-model growth. Downgrade must refuse retained nonlegacy sessions/counters.
+explicit legacy digest DTO preserves every packet v1 field despite generated
+model growth. Downgrade refuses retained nonlegacy sessions/counters.
 
 | Complexity question | Numeric or yes/no answer |
 | --- | --- |
@@ -85,3 +85,41 @@ model growth. Downgrade must refuse retained nonlegacy sessions/counters.
 | 9. Aggregate cost | One existing locked preparation transaction; seven session fields and two aggregate counters; zero new tables, jobs or watches. |
 | 10. Rollback | Must reject retained argument state; restore exact legacy definitions on empty history, with actual SQL proof still pending. |
 | 11. Smaller fix | Byte-only reservation cannot enforce the required pre-read event ceiling; reuse current sessions and grants. |
+
+
+### SQL128 argument authority checkpoint
+
+The finite argument preparation now uses the same original API execution
+transaction and source observation as packet preparation. Both independent
+policy acceptance and current grant pools reserve bytes and events before the
+immutable session is inserted. Manual arguments use the existing approved ad hoc
+pool. Zero event authority refuses arguments; an exhausted event allowance does
+not prevent a packet from using its remaining byte allowance. Exact passive
+replay returns the original session, fence, rates and credit without another
+debit. Ordinary preparation cannot bypass the distinct argument preparer.
+
+Publisher provenance is a separate `ArgumentSourceProvenance`, read with the
+existing context verifier credential from the immutable observation session.
+The read checks exact capture, attempt, expectation digest, original scope and
+mechanism tuple. An ended or expired acquisition session remains historical
+provenance; it never becomes a fresh permit. No node identity is invented in the
+public approved API expectation and no accepted digest changes. The existing
+single authenticated native read can run the source-aware argument checker.
+This adds one session SELECT per argument publication, zero additional native downloads,
+zero new credentials and two narrow aggregate-column UPDATE privileges.
+
+`argument-authority-sql128-1` passed in 19.968 seconds, with unchanged sources and
+no cleanup failures. The real PostgreSQL tests cover separately accepted 20-event
+and approved 10-event pools, 32 concurrent contenders yielding exactly ten
+atomic byte/event debits, rollback of both counters when insertion fails,
+immutable 60-second source sessions, and downgrade refusal with retained sessions
+or event spend. Existing ad hoc concurrency and expiry after a blocking pool lock
+also pass. The schema-owner upgrade from 127 to 128 passed in 3.30 seconds.
+
+Those are SQL/query component results with explicit synthetic mechanism facts.
+The new full `PrepareArgumentRecording` path still needs the independently
+implemented argument compiler and admitted API workflow integration; neither the
+SQL fixture nor structural unit tests qualify installed argument collection,
+raw publication/download, public activation or ongoing observation. Empty
+rollback function/schema parity still needs the general migration suite; it was
+not selected in this populated-state refusal run.
