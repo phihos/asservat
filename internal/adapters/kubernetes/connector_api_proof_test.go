@@ -319,3 +319,53 @@ func TestConnectorAPIProofNearExpiryIsProducedAgain(t *testing.T) {
 		}
 	}
 }
+
+// Final frame checks cannot gain headroom beyond their caller deadline.
+// Keep current native rechecks without reproducing a proof that already covers it.
+func TestConnectorAPIProofReusesWholeRemainingCallerInterval(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		extra       time.Duration
+		wantProduce bool
+	}{
+		{"earlier", -time.Second, false}, {"equal", 0, false}, {"later", time.Millisecond, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			start := time.Now().UTC()
+			proof := connectorCachedProof(t, start)
+			state := connectorAPIProofState{cached: &proof}
+			clock := start.Add(3 * time.Second)
+			ctx, cancel := context.WithDeadline(t.Context(), proof.validUntil.Add(tc.extra))
+			defer cancel()
+			produced, checked := false, false
+			got, err := state.read(ctx, func() time.Time { return clock }, func(context.Context) (connectorAPIProof, error) { produced = true; return proof, nil }, func(c context.Context, p connectorAPIProof) (connectorAPIProof, error) {
+				checked = true
+				if d, _ := c.Deadline(); d.After(proof.validUntil) {
+					t.Fatal("recheck extended original expiry")
+				}
+				return p, nil
+			})
+			if err != nil || produced != tc.wantProduce || checked == tc.wantProduce {
+				t.Fatalf("produced=%v checked=%v error=%v", produced, checked, err)
+			}
+			if got.observedAt != proof.observedAt || got.validUntil.After(proof.validUntil) {
+				t.Fatal("renewed proof")
+			}
+		})
+	}
+}
+
+func TestConnectorAPIProofBoundedReuseNeverFallsBackAfterFailedRecheck(t *testing.T) {
+	start := time.Now().UTC()
+	proof := connectorCachedProof(t, start)
+	state := connectorAPIProofState{cached: &proof}
+	ctx, cancel := context.WithDeadline(t.Context(), proof.validUntil)
+	defer cancel()
+	produced := false
+	_, err := state.read(ctx, func() time.Time { return start.Add(3 * time.Second) }, func(context.Context) (connectorAPIProof, error) { produced = true; return proof, nil }, func(context.Context, connectorAPIProof) (connectorAPIProof, error) {
+		return connectorAPIProof{}, cfg.ErrChanged
+	})
+	if err == nil || produced || state.cached != nil {
+		t.Fatalf("failed current check reused authority: err=%v produced=%v cached=%v", err, produced, state.cached != nil)
+	}
+}

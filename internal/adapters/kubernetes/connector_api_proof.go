@@ -101,8 +101,15 @@ func (s *connectorAPIProofState) read(ctx context.Context, now func() time.Time,
 	// one-second headroom (installed native 41197238161: process@<0.5s).
 	// Produce a fresh one instead; no interval is extended.
 	if old != nil && !old.valid(now().Add(proofReuseMargin)) {
-		s.cached = nil
-		old = nil
+		// A final result check is already capped by its original work lease.
+		// Reproducing a proof cannot improve headroom when the retained proof
+		// covers that entire interval. Still perform the current native recheck;
+		// expiry, invalidation and failures retain their ordinary behavior.
+		deadline, bounded := ctx.Deadline()
+		if !bounded || deadline.After(old.validUntil) || !old.valid(now()) {
+			s.cached = nil
+			old = nil
+		}
 	}
 	s.mu.Unlock()
 	var p connectorAPIProof

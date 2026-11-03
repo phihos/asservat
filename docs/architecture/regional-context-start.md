@@ -100,6 +100,14 @@ local read; it neither caches a whole connection setup nor removes its later
 owner, source or executor checks. Whole installed opening timing remains
 unqualified.
 
+New work retains the three-second proof-reuse margin for preparation headroom.
+When the caller's deadline is already at or before a still-valid cached proof's
+expiry, the proof covers the entire remaining operation: the reader performs
+the same current native recheck instead of repeating the full denial/TokenReview
+producer merely to obtain headroom the caller cannot use. This particularly
+applies to final result checks bounded by the original work lease. The original
+proof interval, current checks, invalidation and failure behavior are unchanged.
+
 After expiry, a new independent invocation may perform the full proof again under its own original caller bound. Existing preparation, binding and request deadlines remain fixed. [ADR-163](../decisions/163-original-work-transport-observation-lease.md) separately selects an exchange-owned transport observation lease, described below. Source-reader reuse remains unimplemented; neither mechanism qualifies the installed HTTP/2 path or removes current effect checks inside the production credential source.
 
 The accepted template is the API-returned defaulted Deployment template. Comparison retains every PodSpec/security/mount/token field and template label/annotation. It normalizes only the deprecated service-account alias and Pod-only zero priority/default preemption/default service-links scalars. It removes exactly the qualified ReplicaSet controller hash and actual node assignment for comparison. Both 300-second not-ready/unreachable tolerations are explicit. Automount is false; the projected service-account token is explicit and dynamic, with its entire specification pinned. Init/ephemeral/sidecar injection, different mounts, privilege, image or arguments fail closed.

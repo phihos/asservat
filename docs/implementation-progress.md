@@ -1,5 +1,50 @@
 # Sustained implementation progress
 
+## History timing recovery and bounded proof reuse (2026-11-03)
+
+Recovered Claude session 06c27237-b261-43c1-9d73-4b617059a89d's final timing
+pair, native runs 41541454985 and 41541459234 at
+`0f615b2f8a778a6ab1eb13a579f41c7c559ef507`: both failed. The first ended
+on repeat preview 503s; the second lost a later history write's reply before
+its original bound. The downloaded `context-storage.log` artifacts show all
+individual history object puts/gets and the combined regional storage effect
+below 100 ms; hub seal/open also stayed below 100 ms. The first run's slow
+write spent 500–1000 ms in signature/trust verification and 500–1000 ms in
+the final receiver's local proof; sending the reply (including that proof)
+took 1–2 s. These buckets overlap and must not be added. Its regional request
+counter reached 878 Kubernetes requests in ten seconds, with no limiter waits
+or individual requests of one second or longer. This points to cumulative
+proof cost, not slow object copies; it does not establish a single root cause
+for all preview failures.
+
+A failing regression reproduced one avoidable full-proof production: the
+three-second cache headroom rule also applied when the caller's original
+deadline was already covered by the cached proof. Reproduction cannot improve
+that deadline. The reader now retains the same current native recheck in this
+case, including exact process/source/guard checks and failure invalidation,
+without repeating the independent denial/TokenReview producer. Longer callers
+retain the original headroom rule. No request, proof or preview window grows.
+
+Complexity gate: (1) two measured failing installed runs; (2) no accepted risk
+is reopened; (3) ordinary final exchange checks benefit; (4) existing bounded
+cache reuse, no new mechanism; (5) zero privileges/credentials/exposure added;
+(6) zero failure/fallback states added; (7) zero configuration added;
+(8) no new external dependency; (9) fewer full proof API requests, unchanged
+memory/watch/background-task counts; (10) no migration or wire change, revert
+restores the prior selection rule; (11) one cache condition suffices, parallel
+object writes are unsupported by these measurements.
+
+Verification: the new earlier/equal-deadline regression failed before the fix
+and passes after it; all `TestConnectorAPIProof` tests pass. The affected
+`TestConnectorAPI(Proof|Setup)` selection passes with `-race -count=1`,
+Kubernetes package `go vet` and `make go-architecture-check` pass.
+`make spec-check architecture-check` passes using an isolated environment
+installed from `requirements-spec.txt`, including format extras (system Python
+initially lacked those dependencies). Both recovered native environment reports
+retain unchanged source hashes and empty cleanup-failure lists. Installed
+qualification of this change remains pending; neither recovered run is a success. Next: qualify the fixed candidate
+and inspect remaining repeat-preview timing if it still fails.
+
 ## Profile plans in manual preview (2026-11-03)
 
 Recovered Claude session `06c27237-b261-43c1-9d73-4b617059a89d`, S-05
