@@ -15,7 +15,14 @@ Verification: the six-second composition regression fails at elapsed five
 seconds with the old selector and passes with the new one. Targeted race tests
 for preview/request-window/current-identity boundaries pass across audit,
 identity, presentation, browser and MCP; affected vet and spec/architecture/Go
-architecture gates pass. Installed qualification remains pending.
+architecture gates pass. Review found an existing timing test still expected
+normal-lane event names; the fifteen-second operation uses the existing
+per-operation doubling sequence. The test and ADR now name
+`preview_capture[/service-failed]`, with unchanged bounded sampling and no
+additional I/O. Full affected audit/domain-identity/application-identity,
+presentation, browser and MCP race suites pass after that correction
+(presentation 168.571s, browser 47.492s, MCP 81.126s). Installed qualification
+remains pending.
 
 
 ## Finite Go profile acquisition and Stop components (2026-11-03)
