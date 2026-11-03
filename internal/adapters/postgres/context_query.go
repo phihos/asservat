@@ -77,7 +77,7 @@ func queryDecode(raw []byte, limit int, out any) error {
 }
 func queryFromRow(r custodydb.ContextQuery) (value.ContextQuery, error) {
 	var q value.ContextQuery
-	if queryDecode(r.Query, 65536, &q) != nil || !q.Valid() || q.ID != uid(r.ID) || q.Scope.RootID != uid(r.RootID) || q.OperationID != uid(r.OperationID) || q.WorkerID != uid(r.WorkerID) || q.Plan.AllocationID != uid(r.AllocationID) || q.Plan.AccountID != uid(r.AccountID) || q.RecoveryIssuerEpoch != uid(r.IssuerEpoch) || !q.CreatedAt.Equal(r.CreatedAt.Time) || !q.Deadline.Equal(r.Deadline.Time) || !q.CleanupUntil.Equal(r.CleanupUntil.Time) || !q.Plan.RetireBy.Equal(r.RetireBy.Time) || !bytes.Equal(principalKey(q.Scope.Principal), r.PrincipalKey) {
+	if queryDecode(r.Query, comparisonQueryBytes, &q) != nil || len(r.Query) > projectionQueryBytes(q) || !q.Valid() || q.ID != uid(r.ID) || q.Scope.RootID != uid(r.RootID) || q.OperationID != uid(r.OperationID) || q.WorkerID != uid(r.WorkerID) || q.Plan.AllocationID != uid(r.AllocationID) || q.Plan.AccountID != uid(r.AccountID) || q.BaselinePlan.AllocationID != uid(r.BaselineAllocationID) || q.RecoveryIssuerEpoch != uid(r.IssuerEpoch) || !q.CreatedAt.Equal(r.CreatedAt.Time) || !q.Deadline.Equal(r.Deadline.Time) || !q.CleanupUntil.Equal(r.CleanupUntil.Time) || !q.Plan.RetireBy.Equal(r.RetireBy.Time) || !bytes.Equal(principalKey(q.Scope.Principal), r.PrincipalKey) {
 		return value.ContextQuery{}, value.ErrUnavailable
 	}
 	var actor identity.Principal
@@ -102,8 +102,25 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 	if e != nil {
 		return queryRefusal("topology", nil)
 	}
+	var baselineTopology privacy.PolicyTopology
+	if query.Scope.Comparison != (value.ProfileComparisonWindow{}) {
+		baselineTopology = topology
+		if query.Scope.Comparison.Baseline.ClusterID != query.Scope.ClusterID {
+			baselineTopology, e = s.retention.observe(ctx, query.Scope.Comparison.Baseline.ClusterID)
+			if e != nil {
+				return queryRefusal("baseline-topology", e)
+			}
+		}
+	}
 	e = queryGuarded(ctx, func(bound context.Context, callback func(context.Context) error) error {
-		return s.backing.WithCurrentQueryBacking(bound, query.Plan, authority, callback)
+		incidentQuery, incidentAuthority := projectionQuerySource(query, authority, false)
+		return s.backing.WithCurrentQueryBacking(bound, incidentQuery.Plan, incidentAuthority, func(first context.Context) error {
+			if query.Scope.Comparison == (value.ProfileComparisonWindow{}) {
+				return callback(first)
+			}
+			baselineQuery, baselineAuthority := projectionQuerySource(query, authority, true)
+			return s.backing.WithCurrentQueryBacking(first, baselineQuery.Plan, baselineAuthority, callback)
+		})
 	}, func(callback context.Context) error {
 		return s.ledger.transaction(callback, func(tx *custodydb.Queries) error {
 			recovery, e := s.recovery.lock(callback, tx, s.root, authority.Environment.Recovery)
@@ -126,12 +143,19 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 			if e != nil {
 				return queryRefusal("backing-lock", e)
 			}
-			allocation, e := tx.LockContextQueryAllocation(callback, custodydb.LockContextQueryAllocationParams{ID: id(query.Plan.AllocationID), RootID: id(s.root)})
+			allocation, baselineAllocation, e := lockProjectionAllocations(callback, tx, query)
 			if e != nil {
 				return queryRefusal("allocation-lock", e)
 			}
 			fence := func() error {
-				return s.fence(callback, tx, query, request, authority, topology, recovery, permissions, backing, allocation)
+				if e := s.fence(callback, tx, query, request, authority, topology, recovery, permissions, backing, allocation); e != nil {
+					return e
+				}
+				if query.Scope.Comparison == (value.ProfileComparisonWindow{}) {
+					return nil
+				}
+				baselineQuery, baselineAuthority := projectionQuerySource(query, authority, true)
+				return s.fence(callback, tx, baselineQuery, request, baselineAuthority, baselineTopology, recovery, permissions, backing, baselineAllocation)
 			}
 			if e = fence(); e != nil {
 				return e
@@ -234,7 +258,7 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 
 func (s *ContextQueries) AdmitQuery(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) (app.ContextQueryAdmission, error) {
 	var out app.ContextQueryAdmission
-	if !q.Plan.Valid(q.Scope, time.Now()) || q.OperationID != r.Call.ID || r.Call.Tool != q.Scope.BeginTool() || q.CreatedAt.Before(r.Call.StartedAt) {
+	if !projectionAdmissionPlansCurrent(q, time.Now()) || q.OperationID != r.Call.ID || r.Call.Tool != q.Scope.BeginTool() || q.CreatedAt.Before(r.Call.StartedAt) {
 		return out, value.ErrUnavailable
 	}
 	e := s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, b custodydb.ContextQueryBacking, allocation custodydb.ContextQueryAllocation) error {
@@ -274,7 +298,7 @@ func (s *ContextQueries) AdmitQuery(ctx context.Context, q value.ContextQuery, r
 		if e != nil {
 			return e
 		}
-		row, e := tx.InsertContextQuery(ctx, custodydb.InsertContextQueryParams{ID: id(q.ID), RootID: id(s.root), AllocationID: id(q.Plan.AllocationID), AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: actor, Query: raw, InitialRequest: initialRequest, OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline), CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(q.RecoveryIssuerEpoch), PostmasterAt: incarnation.PostmasterAt, DatabaseOid: incarnation.DatabaseOid})
+		row, e := tx.InsertContextQuery(ctx, custodydb.InsertContextQueryParams{ID: id(q.ID), RootID: id(s.root), AllocationID: id(q.Plan.AllocationID), AccountID: id(q.Plan.AccountID), PrincipalKey: principalKey(q.Scope.Principal), Actor: actor, Query: raw, InitialRequest: initialRequest, OperationID: id(q.OperationID), WorkerID: id(q.WorkerID), CreatedAt: ts(q.CreatedAt), Deadline: ts(q.Deadline), CleanupUntil: ts(q.CleanupUntil), RetireBy: ts(q.Plan.RetireBy), IssuerEpoch: id(q.RecoveryIssuerEpoch), PostmasterAt: incarnation.PostmasterAt, DatabaseOid: incarnation.DatabaseOid, BaselineAllocationID: id(q.BaselinePlan.AllocationID)})
 		if e != nil {
 			return e
 		}

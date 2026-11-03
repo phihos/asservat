@@ -58,8 +58,8 @@ func (s *ProjectionWorkers) current(ctx context.Context, q query.ContextQuery, r
 }
 func projectionWorkerState(row custodydb.DownloadWorker, q query.ContextQuery) (evidence.ProjectionWorkerState, error) {
 	var out evidence.ProjectionWorkerState
-	if queryDecode(row.IntentJson, 65536, &out.Intent) != nil || !out.Intent.Valid() || !out.Intent.Query.Equal(q) ||
-		uid(row.QueryID) != q.ID || row.SessionID.Valid || row.AllocationID.Valid || uid(row.QueryAllocationID) != q.Plan.AllocationID ||
+	if queryDecode(row.IntentJson, comparisonQueryBytes, &out.Intent) != nil || !out.Intent.Valid() || len(row.IntentJson) > projectionQueryBytes(q) || !out.Intent.Query.Equal(q) ||
+		uid(row.QueryID) != q.ID || row.SessionID.Valid || row.AllocationID.Valid || uid(row.QueryAllocationID) != q.Plan.AllocationID || uid(row.BaselineQueryAllocationID) != q.BaselinePlan.AllocationID ||
 		uid(row.ID) != q.WorkerID || uid(row.RootID) != q.Scope.RootID || uid(row.InstallationID) != q.Plan.InstallationID || row.Generation != 1 ||
 		!row.RunUntil.Time.Equal(out.Intent.Worker.RunUntil) || !bytes.Equal(row.PrincipalKey, principalKey(q.Scope.Principal)) {
 		return out, query.ErrUnavailable
@@ -101,19 +101,18 @@ func (s *ProjectionWorkers) ReserveProjectionWorker(ctx context.Context, q query
 		if !errors.Is(e, pgx.ErrNoRows) {
 			return e
 		}
-		counts, e := tx.AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: id(q.Plan.InstallationID), ClusterID: id(q.Scope.ClusterID), NamespaceUid: q.Scope.NamespaceUID, WorkloadUid: q.Scope.WorkloadUID, PrincipalKey: principalKey(q.Scope.Principal)})
-		if e != nil || !projectionWorkerRoom(counts) {
-			return query.ErrUnavailable
+		if e = projectionPairWorkerRoom(ctx, tx, q); e != nil {
+			return e
 		}
 		i := query.ContextProjectionWorkerIntent{Query: q, Worker: value.AcquisitionWorkerIntent{ID: q.WorkerID, Parent: value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: q.ID}, Profile: s.profile, CreatedAt: q.CreatedAt, RunUntil: q.WorkerUntil}}
 		if !i.Valid() {
 			return query.ErrUnavailable
 		}
 		raw, e := json.Marshal(i)
-		if e != nil || len(raw) > 65536 {
+		if e != nil || len(raw) > projectionQueryBytes(q) {
 			return query.ErrUnavailable
 		}
-		if e = tx.InsertQueryAcquisitionWorker(ctx, custodydb.InsertQueryAcquisitionWorkerParams{ID: id(q.WorkerID), QueryID: id(q.ID), RootID: id(q.Scope.RootID), InstallationID: id(q.Plan.InstallationID), QueryAllocationID: id(q.Plan.AllocationID), PrincipalKey: principalKey(q.Scope.Principal), IntentJson: raw, RunUntil: ts(q.WorkerUntil)}); e != nil {
+		if e = tx.InsertQueryAcquisitionWorker(ctx, custodydb.InsertQueryAcquisitionWorkerParams{ID: id(q.WorkerID), QueryID: id(q.ID), RootID: id(q.Scope.RootID), InstallationID: id(q.Plan.InstallationID), QueryAllocationID: id(q.Plan.AllocationID), PrincipalKey: principalKey(q.Scope.Principal), IntentJson: raw, RunUntil: ts(q.WorkerUntil), BaselineQueryAllocationID: id(q.BaselinePlan.AllocationID)}); e != nil {
 			return e
 		}
 		out.Intent = i
@@ -135,14 +134,7 @@ func projectionWorkerRoom(c custodydb.AcquisitionWorkerCapacityRow) bool {
 // so a full cap refuses without charging the query. It is advisory: the
 // reservation rechecks the caps under its lock.
 func (s *ProjectionWorkers) ProjectionWorkerRoom(ctx context.Context, q query.ContextQuery) error {
-	counts, e := custodydb.New(s.queries.ledger.pool).AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: id(q.Plan.InstallationID), ClusterID: id(q.Scope.ClusterID), NamespaceUid: q.Scope.NamespaceUID, WorkloadUid: q.Scope.WorkloadUID, PrincipalKey: principalKey(q.Scope.Principal)})
-	if e != nil {
-		return query.ErrUnavailable
-	}
-	if !projectionWorkerRoom(counts) {
-		return query.ErrBusy
-	}
-	return nil
+	return projectionPairWorkerRoom(ctx, custodydb.New(s.queries.ledger.pool), q)
 }
 func (s *ProjectionWorkers) ReadProjectionWorker(ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, a query.ContextProjectionAuthority) (evidence.ProjectionWorkerState, error) {
 	var out evidence.ProjectionWorkerState
@@ -279,4 +271,23 @@ func AttachProjectionWorkers(q *ContextQueries, profile value.DownloadWorkerProf
 	}
 	q.workers = projectionIdentityGuard{workers: w}
 	return w, nil
+}
+
+// One physical worker counts once globally/per principal and against each
+// distinct covered workload. Both checks run again under the root lock.
+func projectionPairWorkerRoom(ctx context.Context, tx *custodydb.Queries, q query.ContextQuery) error {
+	plans := []query.ContextQueryPlan{q.Plan}
+	if q.BaselinePlan.AllocationID != "" && q.BaselinePlan.AllocationID != q.Plan.AllocationID {
+		plans = append(plans, q.BaselinePlan)
+	}
+	for _, p := range plans {
+		counts, e := tx.AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: id(p.InstallationID), ClusterID: id(p.ClusterID), NamespaceUid: p.NamespaceUID, WorkloadUid: p.WorkloadUID, PrincipalKey: principalKey(q.Scope.Principal)})
+		if e != nil {
+			return query.ErrUnavailable
+		}
+		if !projectionWorkerRoom(counts) {
+			return query.ErrBusy
+		}
+	}
+	return nil
 }

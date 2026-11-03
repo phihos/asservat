@@ -1,7 +1,7 @@
 # Profile comparison composition proposal
 
-Status: pending implementation and qualification. Scope: REQ-PRF-005 /
-SC-PRF-005, S-05 increment 8. This review changes no runtime behavior. The
+Status: integrated candidate; service and installed qualification pending. Scope: REQ-PRF-005 /
+SC-PRF-005, S-05 increment 8. ADR-295 governs the current implementation. The
 [component checkpoint](s05-profile-comparison-component.md) covers the prepared
 parser and authenticated two-reader adapter; it supplies no public authority.
 
@@ -113,22 +113,24 @@ native sample duration when calculating rates.
 | 6. Additional fallback states | 0. Existing unavailable and specified semantic-mismatch outcomes apply. |
 | 7. Machinery configuration | 0 new settings. |
 | 8. External dependence | 0 new dependencies; current PostgreSQL, Kubernetes, key service and object store remain required. |
-| 9. Aggregate work | 2 complete native inputs, at most 64 MiB each; 6 unwraps; 20 conservative units; 1 physical worker; 0 watches/background loops; comparison output at most 24 KiB. Combined peak memory/CPU and actual provider/SQL time are unqualified. |
+| 9. Aggregate work | 2 complete native inputs, at most 64 MiB each; 6 unwraps; 20 conservative units; 1 physical worker; 0 watches/background loops; comparison output at most 24 KiB. New shared workers declare 384 MiB physical/transient memory and 500m CPU (+128 MiB per active worker versus the previous installer profile; +256 MiB at the existing two-worker workload ceiling). Existing accepted profiles and legacy admission floors remain unchanged. Full-worker peak/CPU and provider/SQL time remain unqualified. |
 | 10. Rollback/disable | Planned: omit typed facet to disable new admission; legacy bytes stay unchanged; rollback refuses retained new pair state. Not yet tested. |
 | 11. Smaller alternative | Two independently admitted summaries fail full-function comparison, atomic charging and one-worker ownership. The prepared parser/reader alone does not satisfy the public feature. |
 
-Before choosing the whole-worker resource declaration, measure maximum-shape
-two-source framing, parsing and complete aggregation together; do not infer
-that the summary's 256 MiB worker automatically qualifies the pair. Then test
+The retained complete two-source process probe peaked at 252.363 MiB RSS in
+1.202s without real SQL/KMS or a cgroup. ADR-295 selects 384 MiB for the new
+shared installer profile, retaining the legacy summary floor. The versioned
+`shared-query/v3` qualification digest records the changed resource declaration.
+Still qualify actual framing, parsing, aggregation and providers together. Test
 atomic cross-workload refusal/unknown commit, same-artifact child separation,
 either source's deny/expiry/revocation, mismatch after both final hashes, closed
 delivery and positive worker retirement. Complete native comparison against
 both authenticated downloaded profiles and browser/MCP parity before claiming
 REQ-PRF-005 or SC-PRF-005 complete.
 
-## Paired SQL and encoding review, 2026-11-04
+## Paired SQL and encoding review, 2026-11-03
 
-Still pending implementation. The isolated C-03 preparation now uses one owned
+The implemented C-03 pair uses one owned
 `Baseline *ContextProjectionAuthority`, rejects a second nesting level and
 retains comparable value scopes. The proposed query adds
 `BaselinePlan ContextQueryPlan` **by value**, omitted when zero. Extend

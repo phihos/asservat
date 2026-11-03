@@ -563,7 +563,19 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					}
 					measurement = &nativePacingMeasurement{admin: admin, root: p.RootID, providers: providers, traffic: f.NativeTrafficHelper}
 				}
-				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID))
+				if installedJourneyFocus() == "profile-comparison" {
+					var sources []installedProfileComparisonSource
+					for index := 0; index < 2; index++ {
+						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {
+							sources = append(sources, source)
+							if len(sources) == 2 {
+								qualifyInstalledProfileComparison(t, ctx, identity, transport, publicRoot, publicAddress, origin, [2]installedProfileComparisonSource{sources[0], sources[1]}, installedProfileComparisonSQLCheck(t, ctx, admin, api, p.RootID))
+							}
+						}})
+					}
+				} else {
+					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID))
+				}
 			})
 			return
 		}
@@ -972,6 +984,9 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	records := int64(8)
 	if installedJourneyFocus() == "manual-profile" {
 		records = 10
+	}
+	if installedJourneyFocus() == "profile-comparison" {
+		records = installedProfileComparisonQueries * query.ProfileComparisonQueryUnits
 	}
 	// The saved-syscall journey performs five distinct paid queries, including
 	// the changed-filter cursor refusal. Retiring a worker never refunds a

@@ -341,7 +341,7 @@ func (s *ProjectionEnrollments) auditTransaction(ctx context.Context, w value.Ac
 			return e
 		}
 		var original query.ContextProjectionWorkerIntent
-		if queryDecode(row.IntentJson, 65536, &original) != nil || !original.Valid() {
+		if queryDecode(row.IntentJson, comparisonQueryBytes, &original) != nil || !original.Valid() {
 			return artifact.ErrIntegrity
 		}
 		stored, e := projectionWorkerState(row, original.Query)

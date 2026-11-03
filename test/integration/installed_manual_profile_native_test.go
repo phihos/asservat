@@ -268,7 +268,11 @@ func qualifyManualProfileNative(t *testing.T, ctx context.Context, native []byte
 	if err != nil || p.CheckValid() != nil || len(p.Sample) == 0 || p.DurationNanos < 9_000_000_000 {
 		t.Fatal("downloaded CPU profile has no valid ten-second sample interval", err)
 	}
-	path := "../results/manual-profile.pb.gz"
+	prefix := "../results/manual-profile"
+	if installedJourneyFocus() == "profile-comparison" {
+		prefix += "-" + captureID
+	}
+	path := prefix + ".pb.gz"
 	if err := os.WriteFile(path, native, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +281,7 @@ func qualifyManualProfileNative(t *testing.T, ctx context.Context, native []byte
 	if err != nil || !strings.Contains(string(out), "main.burnCPU") {
 		t.Fatalf("native pprof cannot open the synthetic CPU sample: %v\n%s", err, out)
 	}
-	if err := os.WriteFile("../results/manual-profile-pprof.txt", out, 0600); err != nil {
+	if err := os.WriteFile(prefix+"-pprof.txt", out, 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("manual profile %s: %d native bytes, %d samples, duration %dns; authenticated download hash matched; go tool pprof opened the original", captureID, len(native), len(p.Sample), p.DurationNanos)

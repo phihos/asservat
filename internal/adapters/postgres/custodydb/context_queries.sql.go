@@ -65,9 +65,27 @@ func (q *Queries) CloseProjectionNativeBatch(ctx context.Context, arg CloseProje
 	return result.RowsAffected(), nil
 }
 
+const consumeProjectionComparisonKeyRole = `-- name: ConsumeProjectionComparisonKeyRole :execrows
+UPDATE context_query_key_binding SET used_roles=used_roles|$1::smallint
+WHERE child_id=$2 AND source_ordinal IS NOT NULL AND (used_roles&$1::smallint)=0
+`
+
+type ConsumeProjectionComparisonKeyRoleParams struct {
+	Role    int16
+	ChildID pgtype.UUID
+}
+
+func (q *Queries) ConsumeProjectionComparisonKeyRole(ctx context.Context, arg ConsumeProjectionComparisonKeyRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, consumeProjectionComparisonKeyRole, arg.Role, arg.ChildID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const consumeProjectionKeyRole = `-- name: ConsumeProjectionKeyRole :execrows
 UPDATE context_query_key_binding SET used_roles=used_roles|$1::smallint
-WHERE batch_id=$2 AND (used_roles&$1::smallint)=0
+WHERE batch_id=$2 AND source_ordinal IS NULL AND (used_roles&$1::smallint)=0
 `
 
 type ConsumeProjectionKeyRoleParams struct {
@@ -107,28 +125,29 @@ func (q *Queries) ContextQueryCaseExists(ctx context.Context, arg ContextQueryCa
 }
 
 const insertContextQuery = `-- name: InsertContextQuery :one
-INSERT INTO context_query(id,root_id,allocation_id,account_id,principal_key,actor,query,initial_request,operation_id,worker_id,created_at,deadline,cleanup_until,retire_by,issuer_epoch,postmaster_at,database_oid)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain
+INSERT INTO context_query(id,root_id,allocation_id,account_id,principal_key,actor,query,initial_request,operation_id,worker_id,created_at,deadline,cleanup_until,retire_by,issuer_epoch,postmaster_at,database_oid,baseline_allocation_id)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id
 `
 
 type InsertContextQueryParams struct {
-	ID             pgtype.UUID
-	RootID         pgtype.UUID
-	AllocationID   pgtype.UUID
-	AccountID      pgtype.UUID
-	PrincipalKey   []byte
-	Actor          []byte
-	Query          []byte
-	InitialRequest []byte
-	OperationID    pgtype.UUID
-	WorkerID       pgtype.UUID
-	CreatedAt      pgtype.Timestamptz
-	Deadline       pgtype.Timestamptz
-	CleanupUntil   pgtype.Timestamptz
-	RetireBy       pgtype.Timestamptz
-	IssuerEpoch    pgtype.UUID
-	PostmasterAt   pgtype.Timestamptz
-	DatabaseOid    pgtype.Uint32
+	ID                   pgtype.UUID
+	RootID               pgtype.UUID
+	AllocationID         pgtype.UUID
+	AccountID            pgtype.UUID
+	PrincipalKey         []byte
+	Actor                []byte
+	Query                []byte
+	InitialRequest       []byte
+	OperationID          pgtype.UUID
+	WorkerID             pgtype.UUID
+	CreatedAt            pgtype.Timestamptz
+	Deadline             pgtype.Timestamptz
+	CleanupUntil         pgtype.Timestamptz
+	RetireBy             pgtype.Timestamptz
+	IssuerEpoch          pgtype.UUID
+	PostmasterAt         pgtype.Timestamptz
+	DatabaseOid          pgtype.Uint32
+	BaselineAllocationID pgtype.UUID
 }
 
 func (q *Queries) InsertContextQuery(ctx context.Context, arg InsertContextQueryParams) (ContextQuery, error) {
@@ -150,6 +169,7 @@ func (q *Queries) InsertContextQuery(ctx context.Context, arg InsertContextQuery
 		arg.IssuerEpoch,
 		arg.PostmasterAt,
 		arg.DatabaseOid,
+		arg.BaselineAllocationID,
 	)
 	var i ContextQuery
 	err := row.Scan(
@@ -175,6 +195,7 @@ func (q *Queries) InsertContextQuery(ctx context.Context, arg InsertContextQuery
 		&i.Polls,
 		&i.Controls,
 		&i.Uncertain,
+		&i.BaselineAllocationID,
 	)
 	return i, err
 }
@@ -258,8 +279,31 @@ func (q *Queries) InsertContextQueryPrincipal(ctx context.Context, arg InsertCon
 	return i, err
 }
 
+const insertProjectionComparisonKeyChild = `-- name: InsertProjectionComparisonKeyChild :exec
+INSERT INTO context_query_key_binding(child_id,batch_id,query_id,source_ordinal,binding) VALUES($1,$2,$3,$4,$5)
+`
+
+type InsertProjectionComparisonKeyChildParams struct {
+	ChildID       pgtype.UUID
+	BatchID       pgtype.UUID
+	QueryID       pgtype.UUID
+	SourceOrdinal pgtype.Int2
+	Binding       []byte
+}
+
+func (q *Queries) InsertProjectionComparisonKeyChild(ctx context.Context, arg InsertProjectionComparisonKeyChildParams) error {
+	_, err := q.db.Exec(ctx, insertProjectionComparisonKeyChild,
+		arg.ChildID,
+		arg.BatchID,
+		arg.QueryID,
+		arg.SourceOrdinal,
+		arg.Binding,
+	)
+	return err
+}
+
 const insertProjectionKeyBinding = `-- name: InsertProjectionKeyBinding :exec
-INSERT INTO context_query_key_binding(batch_id,query_id,binding) VALUES($1,$2,$3)
+INSERT INTO context_query_key_binding(batch_id,query_id,binding,child_id) VALUES($1,$2,$3,$1)
 `
 
 type InsertProjectionKeyBindingParams struct {
@@ -295,7 +339,7 @@ func (q *Queries) InsertProjectionQueryWorker(ctx context.Context, arg InsertPro
 }
 
 const lockContextQuery = `-- name: LockContextQuery :one
-SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain FROM context_query WHERE id=$1 AND root_id=$2 FOR UPDATE
+SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id FROM context_query WHERE id=$1 AND root_id=$2 FOR UPDATE
 `
 
 type LockContextQueryParams struct {
@@ -329,6 +373,7 @@ func (q *Queries) LockContextQuery(ctx context.Context, arg LockContextQueryPara
 		&i.Polls,
 		&i.Controls,
 		&i.Uncertain,
+		&i.BaselineAllocationID,
 	)
 	return i, err
 }
@@ -440,8 +485,26 @@ func (q *Queries) LockContextQueryPrincipal(ctx context.Context, arg LockContext
 	return i, err
 }
 
+const lockProjectionComparisonKeyChild = `-- name: LockProjectionComparisonKeyChild :one
+SELECT batch_id, query_id, binding, used_roles, child_id, source_ordinal FROM context_query_key_binding WHERE child_id=$1 AND source_ordinal IS NOT NULL FOR UPDATE
+`
+
+func (q *Queries) LockProjectionComparisonKeyChild(ctx context.Context, childID pgtype.UUID) (ContextQueryKeyBinding, error) {
+	row := q.db.QueryRow(ctx, lockProjectionComparisonKeyChild, childID)
+	var i ContextQueryKeyBinding
+	err := row.Scan(
+		&i.BatchID,
+		&i.QueryID,
+		&i.Binding,
+		&i.UsedRoles,
+		&i.ChildID,
+		&i.SourceOrdinal,
+	)
+	return i, err
+}
+
 const lockProjectionKeyBinding = `-- name: LockProjectionKeyBinding :one
-SELECT batch_id, query_id, binding, used_roles FROM context_query_key_binding WHERE batch_id=$1 FOR UPDATE
+SELECT batch_id, query_id, binding, used_roles, child_id, source_ordinal FROM context_query_key_binding WHERE batch_id=$1 AND source_ordinal IS NULL FOR UPDATE
 `
 
 func (q *Queries) LockProjectionKeyBinding(ctx context.Context, batchID pgtype.UUID) (ContextQueryKeyBinding, error) {
@@ -452,6 +515,8 @@ func (q *Queries) LockProjectionKeyBinding(ctx context.Context, batchID pgtype.U
 		&i.QueryID,
 		&i.Binding,
 		&i.UsedRoles,
+		&i.ChildID,
+		&i.SourceOrdinal,
 	)
 	return i, err
 }
@@ -481,8 +546,39 @@ func (q *Queries) OpenProjectionNativeBatch(ctx context.Context, arg OpenProject
 	return result.RowsAffected(), nil
 }
 
+const projectionComparisonKeyChildren = `-- name: ProjectionComparisonKeyChildren :many
+SELECT batch_id, query_id, binding, used_roles, child_id, source_ordinal FROM context_query_key_binding WHERE batch_id=$1 AND source_ordinal IS NOT NULL ORDER BY source_ordinal
+`
+
+func (q *Queries) ProjectionComparisonKeyChildren(ctx context.Context, batchID pgtype.UUID) ([]ContextQueryKeyBinding, error) {
+	rows, err := q.db.Query(ctx, projectionComparisonKeyChildren, batchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ContextQueryKeyBinding{}
+	for rows.Next() {
+		var i ContextQueryKeyBinding
+		if err := rows.Scan(
+			&i.BatchID,
+			&i.QueryID,
+			&i.Binding,
+			&i.UsedRoles,
+			&i.ChildID,
+			&i.SourceOrdinal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const readAcquisitionQuery = `-- name: ReadAcquisitionQuery :one
-SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain FROM context_query WHERE id=$1 AND root_id=$2
+SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id FROM context_query WHERE id=$1 AND root_id=$2
 `
 
 type ReadAcquisitionQueryParams struct {
@@ -516,12 +612,13 @@ func (q *Queries) ReadAcquisitionQuery(ctx context.Context, arg ReadAcquisitionQ
 		&i.Polls,
 		&i.Controls,
 		&i.Uncertain,
+		&i.BaselineAllocationID,
 	)
 	return i, err
 }
 
 const readContextQuery = `-- name: ReadContextQuery :one
-SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain FROM context_query WHERE id=$1 AND root_id=$2 AND actor=$3
+SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain, baseline_allocation_id FROM context_query WHERE id=$1 AND root_id=$2 AND actor=$3
 `
 
 type ReadContextQueryParams struct {
@@ -556,6 +653,7 @@ func (q *Queries) ReadContextQuery(ctx context.Context, arg ReadContextQueryPara
 		&i.Polls,
 		&i.Controls,
 		&i.Uncertain,
+		&i.BaselineAllocationID,
 	)
 	return i, err
 }
@@ -661,8 +759,26 @@ func (q *Queries) ReadContextQueryWorker(ctx context.Context, queryID pgtype.UUI
 	return i, err
 }
 
+const readProjectionComparisonKeyChild = `-- name: ReadProjectionComparisonKeyChild :one
+SELECT batch_id, query_id, binding, used_roles, child_id, source_ordinal FROM context_query_key_binding WHERE child_id=$1 AND source_ordinal IS NOT NULL
+`
+
+func (q *Queries) ReadProjectionComparisonKeyChild(ctx context.Context, childID pgtype.UUID) (ContextQueryKeyBinding, error) {
+	row := q.db.QueryRow(ctx, readProjectionComparisonKeyChild, childID)
+	var i ContextQueryKeyBinding
+	err := row.Scan(
+		&i.BatchID,
+		&i.QueryID,
+		&i.Binding,
+		&i.UsedRoles,
+		&i.ChildID,
+		&i.SourceOrdinal,
+	)
+	return i, err
+}
+
 const readProjectionKeyBinding = `-- name: ReadProjectionKeyBinding :one
-SELECT batch_id, query_id, binding, used_roles FROM context_query_key_binding WHERE batch_id=$1
+SELECT batch_id, query_id, binding, used_roles, child_id, source_ordinal FROM context_query_key_binding WHERE batch_id=$1 AND source_ordinal IS NULL
 `
 
 func (q *Queries) ReadProjectionKeyBinding(ctx context.Context, batchID pgtype.UUID) (ContextQueryKeyBinding, error) {
@@ -673,6 +789,8 @@ func (q *Queries) ReadProjectionKeyBinding(ctx context.Context, batchID pgtype.U
 		&i.QueryID,
 		&i.Binding,
 		&i.UsedRoles,
+		&i.ChildID,
+		&i.SourceOrdinal,
 	)
 	return i, err
 }

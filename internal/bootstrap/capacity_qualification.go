@@ -184,7 +184,7 @@ func buildConnectorBacking(c contracts.InstallerConnectorSettings, b contracts.I
 // global worker/hub/provider admission limits are not multiplied per query.
 // These are configured ceilings, not measured overhead or a new deployment.
 func installedQueryBudget(p contracts.InstallerCapacitySettings, newID func() string) (app.ContextQueryQualification, error) {
-	rev := identity.Revision{UID: newID(), Generation: 1, Digest: profileDigest("shared-query/v2", p)}
+	rev := identity.Revision{UID: newID(), Generation: 1, Digest: profileDigest("shared-query/v3", p)}
 	// Four paid status polls and 32 state transitions bound retained SQL work.
 	// One worker intent, one enrollment and two signing audits are independent.
 	const polls, controls, signs int64 = 4, 32, 2

@@ -125,6 +125,17 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("previous key-child bound", e)
 		}
 	}
+	const comparisonDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.context_query_scope_source_valid(jsonb)','public.context_query_begin_tool(jsonb)','public.context_query_units(jsonb)','public.operation_audit_lane(text)','public.operation_audit_human_input_valid(text,text)','public.guard_operation_audit()','public.context_query_intent_current(uuid,uuid,jsonb,uuid,jsonb)','public.context_query_outcome_closed(uuid,uuid,jsonb,uuid)','public.guard_context_query()','public.guard_context_query_child()','public.guard_context_query_account()','public.guard_download_worker()']) f`
+	const comparisonShape = `SELECT jsonb_build_object('columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name,c.ordinal_position) FROM (SELECT table_name,column_name,ordinal_position,is_nullable,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('context_query','context_query_batch','context_query_key_binding','download_worker')) c),'constraints',(SELECT jsonb_agg(x ORDER BY x) FROM (SELECT conrelid::regclass::text||':'||pg_get_constraintdef(oid) x FROM pg_constraint WHERE conrelid IN ('context_query'::regclass,'context_query_batch'::regclass,'context_query_key_binding'::regclass,'download_worker'::regclass)) c),'indexes',(SELECT jsonb_agg(indexdef ORDER BY indexdef) FROM pg_indexes WHERE schemaname='public' AND tablename IN ('context_query','context_query_batch','context_query_key_binding','download_worker')))::text`
+	var originalComparisonFunctions, originalComparisonShape string
+	if head == 133 {
+		if e = conn.QueryRow(ctx, comparisonDefinitions).Scan(&originalComparisonFunctions); e != nil {
+			t.Fatal(e)
+		}
+		if e = conn.QueryRow(ctx, comparisonShape).Scan(&originalComparisonShape); e != nil {
+			t.Fatal(e)
+		}
+	}
 	const profileDefinitions = `SELECT pg_get_functiondef('public.guard_custody_stream()'::regprocedure),pg_get_functiondef('public.project_context_processing()'::regprocedure),pg_get_functiondef('public.guard_context_execution()'::regprocedure)`
 	var originalStreamGuard, originalProcessingProjector, originalExecutionGuard string
 	if e = conn.QueryRow(ctx, profileDefinitions).Scan(&originalStreamGuard, &originalProcessingProjector, &originalExecutionGuard); e != nil {
@@ -262,6 +273,29 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("resource projection Up after Down", from, to, e)
 		}
 		t.Log("resource projection Down restored exact validators and unchanged trust; Up restored104; no old-decoder rollback qualification")
+	}
+	if head == 133 {
+		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
+		qualifySavedSyscallQueryFunctions(t, ctx, conn)
+		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
+		if _, e = p.DownTo(ctx, 132); e != nil {
+			t.Fatal("empty comparison Down", e)
+		}
+		var functions, shape, trust string
+		if e = conn.QueryRow(ctx, comparisonDefinitions).Scan(&functions); e != nil || functions != originalComparisonFunctions {
+			t.Fatal("comparison Down changed132 function definitions", e)
+		}
+		if e = conn.QueryRow(ctx, comparisonShape).Scan(&shape); e != nil || shape != originalComparisonShape {
+			t.Fatal("comparison Down changed132 columns/constraints/indexes", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT row_to_json(t)::text FROM fleet_trust t`).Scan(&trust); e != nil || trust != originalTrust {
+			t.Fatal("comparison Down changed trust/recovery", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != 132 || to != 133 {
+			t.Fatal("comparison Up after Down", from, to, e)
+		}
+		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
+		t.Log("comparison133→132→133: exact twelve existing function definitions, table/index/constraint shape and trust restored; closed pair/20 units/one batch")
 	}
 	if head == 132 {
 		qualifySavedSyscallQueryFunctions(t, ctx, conn)

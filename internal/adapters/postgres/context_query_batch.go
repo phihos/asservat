@@ -39,7 +39,7 @@ func queryWorker(ctx context.Context, tx *custodydb.Queries, q value.ContextQuer
 }
 func queryBatch(row custodydb.ContextQueryBatch, q value.ContextQuery) (value.ContextReadBatch, error) {
 	var b value.ContextReadBatch
-	if queryDecode(row.Batch, 16384, &b) != nil || !b.Matches(q) || b.ID != uid(row.ID) || b.QueryID != uid(row.QueryID) || b.OperationID != uid(row.OperationID) || b.Generation != int64(row.Generation) {
+	if queryDecode(row.Batch, 32<<10, &b) != nil || (q.Scope.Comparison == (value.ProfileComparisonWindow{}) && len(row.Batch) > 16384) || !b.Matches(q) || b.ID != uid(row.ID) || b.QueryID != uid(row.QueryID) || b.OperationID != uid(row.OperationID) || b.Generation != int64(row.Generation) {
 		return value.ContextReadBatch{}, value.ErrUnavailable
 	}
 	return b, nil

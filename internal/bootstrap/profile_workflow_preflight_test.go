@@ -63,6 +63,9 @@ func TestInstalledProfileComparisonCapacity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if qualification.Profile.Source.Digest == profileDigest("shared-query/v2", settings) {
+		t.Fatal("new shared resource declaration reused the previous identity")
+	}
 	worker := qualification.Profile.Worker
 	if worker.MemoryBytes != query.ProfileComparisonWorkerBytes || worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes || qualification.PrincipalQueries < query.ProfileComparisonQueryUnits || qualification.WorkloadQueries < query.ProfileComparisonQueryUnits {
 		t.Fatal("comparison producer/consumer capacity mismatch", qualification)

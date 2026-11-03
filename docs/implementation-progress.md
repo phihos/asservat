@@ -51,8 +51,13 @@ transient floor. The new installer uses 384 MiB for the shared worker profile
 and query transient budget (+128 MiB per active worker); legacy accepted profiles
 and the summary admission floor remain unchanged.
 SQL133 atomic two-workload accounting and independent key children, complete
-native worker/public composition and the React baseline selection are being
-integrated. The next gate is the composed real-service fixture with frozen
+native worker/public composition and the React baseline selection are locally
+implemented. The console can explicitly load an earlier evidence case through
+current `get_case` metadata and compare its selected profile; lookup never
+creates a native download. Nine focused console files passed 145 tests, with
+a subsequent 46-test cross-case/link check and type checking. Native TLS
+comparison/mismatch, full command bounds and six remote child-role requests
+pass focused races; these component providers do not establish SQL/key authority. The next gate is the composed real-service fixture with frozen
 sources, followed by native comparison against both downloaded originals.
 No comparison requirement or installed result is marked complete. The argument job's cold-start/teardown
 headroom also needs improvement before later installed campaigns. No timeout was
