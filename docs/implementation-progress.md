@@ -48,7 +48,19 @@ initiator's headroom exception. A failing concurrent regression reproduced it
 for later and unbounded callers; bounded-reuse flights now require each waiter
 to fit their result interval or re-enter ordinary selection. Completed-flight
 expiry, cancellation and invalidation checks still run before reselection.
-The retry is iterative, with no stack growth or detached work. Next: qualify the fixed candidate
+The retry is iterative, with no stack growth or detached work.
+
+The one follow-up diagnostic run, 41564008984 at `d84e0cf8` (before the
+waiter correction), also failed: the capture's history write succeeded, but
+three repeat previews returned 503. Sampled history reads 1/2/4 completed
+below 500 ms total, while another dispatch still spent 1–2 s exchanging
+history, followed by a 1.23 s target query and a recorder deadline. A later
+preview failed at the target deadline. These samples do not establish a
+uniform latency improvement. The native job took 16m35s; its environment
+report records unchanged source hashes, test exit 1 and no cleanup failures.
+No second diagnostic run was dispatched. Remaining work is the composed
+repeat-preview latency, beyond the cache-selection defect fixed here.
+ Next: qualify the fixed candidate
 and inspect remaining repeat-preview timing if it still fails.
 
 ## Profile plans in manual preview (2026-11-03)
