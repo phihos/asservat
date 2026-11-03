@@ -247,4 +247,6 @@ argument-preflight:
 # Owned SQL/S3 service composition, after local preflight and source freeze.
 .PHONY: profile-service-preflight
 profile-service-preflight:
-	$(PYTHON) scripts/test-custody.py --fleet --run '^(TestCustodyProfileWriteOnlyWithRealServices|TestProfileSummaryQueryLedgerWithRealPostgres|TestProfileComparisonQueryLedgerWithRealPostgres|TestCustodyUpgradeSchemaWithRealPostgres)$$' --result-name profile-service-preflight
+	# Each protected capacity-root fixture requires its own pristine database.
+	$(PYTHON) scripts/test-custody.py --fleet --run '^TestProfileComparisonQueryLedgerWithRealPostgres$$' --result-name profile-comparison-service-preflight
+	$(PYTHON) scripts/test-custody.py --fleet --run '^(TestCustodyProfileWriteOnlyWithRealServices|TestProfileSummaryQueryLedgerWithRealPostgres|TestCustodyUpgradeSchemaWithRealPostgres)$$' --result-name profile-service-preflight

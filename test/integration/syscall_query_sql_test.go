@@ -153,7 +153,7 @@ func qualifySavedSyscallQueryFunctions(t *testing.T, ctx context.Context, conn *
 		}
 		var valid bool
 		var bytes int
-		if err := conn.QueryRow(ctx, "SELECT "+keyConstraint+",octet_length(binding::text) FROM (SELECT $1::jsonb AS binding) synthetic", encoded).Scan(&valid, &bytes); err != nil || valid != (mode == "max-filter") {
+		if err := conn.QueryRow(ctx, "SELECT "+keyConstraint+",octet_length(binding::text) FROM (SELECT $1::jsonb AS binding,NULL::smallint AS source_ordinal) synthetic", encoded).Scan(&valid, &bytes); err != nil || valid != (mode == "max-filter") {
 			t.Fatal("narrow canonical key-child bound", mode, valid, bytes, err)
 		}
 		if mode == "max-filter" {

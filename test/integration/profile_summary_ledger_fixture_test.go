@@ -211,33 +211,67 @@ func refuseRetainedProfileSummaryDowngrade(t *testing.T, f *queryLedgerFixture) 
 	if err != nil || head < 127 {
 		t.Fatal("summary rollback requires schema127 or newer", head, err)
 	}
-	// Later migrations are restored even if their downgrade or this probe
-	// fails. The guard under test remains exactly127, as for capacity125.
+	// A retained verified byte count is a stronger rollback fence introduced
+	// after summary queries. Never erase it to reach the older127 guard.
+	stop, refusal := int64(127), "profile summary query history cannot be downgraded"
+	if head >= 130 {
+		var retainedLength bool
+		if err = f.base.admin.QueryRow(f.base.ctx, "SELECT EXISTS(SELECT 1 FROM context_verification WHERE native_bytes IS NOT NULL)").Scan(&retainedLength); err != nil {
+			t.Fatal("retained native-length observation", err)
+		}
+		if retainedLength {
+			stop, refusal = 130, "retained native-length verification prevents rollback"
+		}
+	}
+	// Exclude only133's nullable route column so the snapshot compares the
+	// same immutable queries and spend across the supported schema prefix.
+	snapshot := func(ctx context.Context) (string, error) {
+		var b []byte
+		err := f.base.admin.QueryRow(ctx, `SELECT jsonb_build_object('queries',(SELECT jsonb_agg(to_jsonb(q)-'baseline_allocation_id' ORDER BY q.id) FROM context_query q WHERE q.root_id=$1),'backing',(SELECT to_jsonb(b) FROM context_query_backing b WHERE b.root_id=$1),'allocations',(SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM context_query_allocation a WHERE a.root_id=$1))`, f.base.input.PermissionRootID).Scan(&b)
+		if err != nil {
+			return "", err
+		}
+		if stop == 130 {
+			var sizes []byte
+			if err = f.base.admin.QueryRow(ctx, `SELECT jsonb_agg(jsonb_build_object('capture',capture_id,'bytes',native_bytes,'copies',encode(copies_digest,'hex')) ORDER BY capture_id) FROM context_verification WHERE root_id=$1`, f.base.input.PermissionRootID).Scan(&sizes); err != nil {
+				return "", err
+			}
+			return string(b) + "\n" + string(sizes), nil
+		}
+		return string(b), nil
+	}
+	before, err := snapshot(f.base.ctx)
+	if err != nil {
+		t.Fatal("summary pre-rollback snapshot", err)
+	}
+	// Goose may have committed later Down migrations before the retained
+	// source refuses. Repair that prefix on every exit, including Fatal/cancel.
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(f.base.ctx), 30*time.Second)
 		defer cancel()
 		if _, err := provider.UpTo(cleanup, head); err != nil {
 			t.Error("restore schema after summary rollback", err)
+			return
+		}
+		restored, err := provider.GetDBVersion(cleanup)
+		if err != nil || restored != head {
+			t.Error("summary rollback did not restore original schema head", restored, head, err)
+		}
+		after, err := snapshot(cleanup)
+		if err != nil || after != before {
+			t.Error("summary rollback restoration changed retained query/spend state", err)
 		}
 	}()
-	if _, err = provider.DownTo(f.base.ctx, 127); err != nil {
-		t.Fatal("isolate summary rollback", err)
+	if _, err = provider.DownTo(f.base.ctx, stop-1); err == nil || !strings.Contains(err.Error(), refusal) {
+		t.Fatal("retained summary/source rollback", stop, err)
 	}
-	snapshot := func() string {
-		var b []byte
-		err := f.base.admin.QueryRow(f.base.ctx, `SELECT jsonb_build_object('queries',(SELECT jsonb_agg(to_jsonb(q) ORDER BY q.id) FROM context_query q WHERE q.root_id=$1),'backing',(SELECT to_jsonb(b) FROM context_query_backing b WHERE b.root_id=$1),'allocations',(SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM context_query_allocation a WHERE a.root_id=$1))`, f.base.input.PermissionRootID).Scan(&b)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return string(b)
+	afterHead, err := provider.GetDBVersion(f.base.ctx)
+	if err != nil || afterHead != stop {
+		t.Fatal("refused rollback left unexpected schema prefix", afterHead, stop, err)
 	}
-	before := snapshot()
-	if _, err = provider.DownTo(f.base.ctx, 126); err == nil || !strings.Contains(err.Error(), "profile summary query history cannot be downgraded") {
-		t.Fatal("retained summary rollback", err)
+	after, err := snapshot(f.base.ctx)
+	if err != nil || after != before {
+		t.Fatal("refused summary/source rollback changed query identity or spend", err)
 	}
-	after, err := provider.GetDBVersion(f.base.ctx)
-	if err != nil || after != 127 || snapshot() != before {
-		t.Fatal("refused summary rollback changed state", after, err)
-	}
-	t.Log("retained summary rollback127->126 refused; schema, query identity, original limits and spend unchanged")
+	t.Logf("retained summary/source rollback%d->%d refused by %s; query identity/limits/spend unchanged; original schema%d restoration readback follows", stop, stop-1, refusal, head)
 }
