@@ -51,6 +51,9 @@ type ProjectionSource struct {
 
 // LookupProjectionSource returns the source for a published native type.
 func LookupProjectionSource(nativeType string) (ProjectionSource, bool) {
+	if nativeType == artifact.SyscallRecordsArtifact || nativeType == artifact.SyscallArgumentsArtifact {
+		return LookupProjectionSourceFor(nativeType, SyscallSummaryDisplayVersion)
+	}
 	switch nativeType {
 	case artifact.PodStatusArtifact:
 		return ProjectionSource{NativeType: artifact.PodStatusArtifact, Format: artifact.ContextFormat, DataClass: "metadata", EvidenceType: "context",
@@ -62,6 +65,23 @@ func LookupProjectionSource(nativeType string) (ProjectionSource, bool) {
 			DisplayVersion: HTTPHeadersDisplayVersion, NativeLimit: artifact.RecordingNativeLimit}, true
 	}
 	return ProjectionSource{}, false
+}
+
+// LookupProjectionSourceFor binds a closed display purpose as well as its
+// native input. A syscall source supports two distinct approved views.
+func LookupProjectionSourceFor(nativeType, displayVersion string) (ProjectionSource, bool) {
+	if nativeType == artifact.SyscallRecordsArtifact || nativeType == artifact.SyscallArgumentsArtifact {
+		if displayVersion != SyscallSummaryDisplayVersion && displayVersion != SyscallEventsDisplayVersion {
+			return ProjectionSource{}, false
+		}
+		class, format := "metadata", artifact.SyscallRecordsFormat
+		if nativeType == artifact.SyscallArgumentsArtifact {
+			class, format = "raw", artifact.SyscallArgumentsFormat
+		}
+		return ProjectionSource{NativeType: nativeType, Format: format, DataClass: class, EvidenceType: "syscallTrace", DisplayVersion: displayVersion, NativeLimit: artifact.RecordingNativeLimit}, true
+	}
+	known, ok := LookupProjectionSource(nativeType)
+	return known, ok && known.DisplayVersion == displayVersion
 }
 
 // Matches reports whether published facts are exactly this source.
@@ -146,6 +166,7 @@ type ContextProjectionCandidate struct {
 	NativeType                                                                          string                  `json:",omitempty"`
 	Headers                                                                             HTTPHeaderWindow        `json:",omitzero"`
 	Profile                                                                             ProfileSummarySelection `json:",omitzero"`
+	Syscalls                                                                            SyscallWindow           `json:",omitzero"`
 }
 
 func (c ContextProjectionCandidate) Valid() bool {
@@ -160,12 +181,25 @@ func (c ContextProjectionCandidate) RouteValid() bool {
 		identity.Text(c.WorkloadUID, 64) && identity.Text(c.PodUID, 64) && c.Principal.Valid()
 }
 
+// Source derives the view identity from the closed typed selection.
+func (c ContextProjectionCandidate) Source() (ProjectionSource, bool) {
+	if c.NativeType == artifact.SyscallRecordsArtifact || c.NativeType == artifact.SyscallArgumentsArtifact {
+		return LookupProjectionSourceFor(c.NativeType, c.Syscalls.View.DisplayVersion())
+	}
+	return LookupProjectionSource(c.NativeType)
+}
+
 func (c ContextProjectionCandidate) selectionValid() bool {
+	if c.NativeType != artifact.SyscallRecordsArtifact && c.NativeType != artifact.SyscallArgumentsArtifact && c.Syscalls != (SyscallWindow{}) {
+		return false
+	}
 	switch c.NativeType {
 	case artifact.PodStatusArtifact:
 		return c.Selection.Valid() && c.Headers == HTTPHeaderWindow{} && c.Profile == (ProfileSummarySelection{})
 	case artifact.HTTPHeadersArtifact:
 		return c.Selection == LineSelection{} && c.Headers.Valid() && c.Profile == (ProfileSummarySelection{})
+	case artifact.SyscallRecordsArtifact, artifact.SyscallArgumentsArtifact:
+		return c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Profile == (ProfileSummarySelection{}) && c.Syscalls.Valid()
 	case artifact.PprofArtifact:
 		return c.Selection == LineSelection{} && c.Headers == (HTTPHeaderWindow{}) && c.Profile.Valid()
 	}
@@ -183,6 +217,7 @@ type ContextProjectionScope struct {
 	NativeType                                                                          string                  `json:",omitempty"`
 	Headers                                                                             HTTPHeaderWindow        `json:",omitzero"`
 	Profile                                                                             ProfileSummarySelection `json:",omitzero"`
+	Syscalls                                                                            SyscallWindow           `json:",omitzero"`
 }
 
 func (s ContextProjectionScope) Valid() bool {
@@ -193,13 +228,16 @@ func (s ContextProjectionScope) Valid() bool {
 
 // Source is the closed projection source this scope reads.
 func (s ContextProjectionScope) Source() (ProjectionSource, bool) {
-	return LookupProjectionSource(s.NativeType)
+	if (s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact) && s.Syscalls.View.DisplayVersion() != s.DisplayVersion {
+		return ProjectionSource{}, false
+	}
+	return LookupProjectionSourceFor(s.NativeType, s.DisplayVersion)
 }
 
 func (s ContextProjectionScope) Candidate() ContextProjectionCandidate {
 	return ContextProjectionCandidate{RootID: s.RootID, CaseID: s.CaseID, ArtifactID: s.ArtifactID, CaptureID: s.CaptureID,
 		ClusterID: s.ClusterID, NamespaceUID: s.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.PodUID,
-		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers, Profile: s.Profile}
+		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers, Profile: s.Profile, Syscalls: s.Syscalls}
 }
 
 // ContextProjectionPath is accepted placement for this query purpose. It is not

@@ -3,6 +3,19 @@
 
 ## Current delivery workflow (2026-11-03)
 
+[ADR-294](decisions/294-saved-syscall-projections.md) now records the saved-syscall
+source/authority contract. Exact source/view/filter scopes are comparable and
+retain legacy zero-field encoding. A regression reproduced accepting an events
+selection with the summary display identity; scope validation now rejects that
+mismatch. Raw syscall inputs use the distinct fixed-metadata read operation,
+which grants no raw download, profile-summary or other raw-source access.
+Composed authorization tests preserve original deadlines, current audiences and
+permissions, and prohibit metadata-share fallback for raw input. Domain analysis,
+domain authorization and application authorization races pass (1.026s / 1.552s /
+2.231s); Go architecture passes. Public query/funding/SQL/key/worker/result and
+raw-source extraction are still pending, so these prepared source types enable
+no public tool or key authority by themselves.
+
 Finite argument policies and independent existing-raw download approval are
 installed-qualified and merged in [PR149](https://github.com/phihos/asservat/pull/149),
 merge `62ede0db` from qualified head `af8d2b07`. CI41672851629 and

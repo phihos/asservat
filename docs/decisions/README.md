@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-294 — Fixed saved-syscall projections](294-saved-syscall-projections.md)
+selects two version/filter-bound extracts using the existing regional worker.
+Source/eligibility preparation is implemented; public composition and installed
+qualification remain pending.
+
 [ADR-268 — Grouped Save dispatch](268-grouped-save-dispatch-window.md) removes
 the all-sibling intent barrier and gives the composed request a prospective
 fifteen-second envelope while retaining every original child StartBy. Local

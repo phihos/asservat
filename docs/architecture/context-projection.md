@@ -8,6 +8,14 @@ the C-18 coordinator component are implemented. The
 [shared acquisition composition](../decisions/219-shared-approved-acquisition.md)
 is an implementation candidate; its installed qualification remains pending.
 
+## Saved syscall projection candidate
+
+[ADR-294](../decisions/294-saved-syscall-projections.md) extends the same coordinator
+with fixed summary and event views of saved metadata or argument sources. The
+source/view/filter identity is separate from raw disclosure authority. Prepared
+values and eligibility do not enable a public route; funded SQL, worker/key,
+raw-source extraction and UI/MCP/native qualification remain in progress.
+
 ## Profile summary candidate
 
 [ADR-291](../decisions/291-bounded-profile-summary.md) adds a closed raw-pprof

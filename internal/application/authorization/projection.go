@@ -117,7 +117,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	if s.Reviews != nil {
 		_ = s.Reviews.ReviewRecorded(call, i, target)
 	}
-	src, _ := analysis.LookupProjectionSource(candidate.NativeType)
+	src, _ := candidate.Source()
 	operation := src.ReadOperation()
 	p, err := s.Permissions.Permissions(call, target)
 	p = cloneProjectionPermissions(p)
@@ -151,8 +151,8 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	// The protected source lookup follows current ordinary target eligibility.
 	record, err := s.Catalog.ContextProjectionEvidence(call, candidate.ArtifactID)
 	record = cloneProjectionEvidence(record)
-	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, NativeType: candidate.NativeType, Headers: candidate.Headers, Profile: candidate.Profile, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat}
-	if src, ok := analysis.LookupProjectionSource(candidate.NativeType); ok {
+	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, NativeType: candidate.NativeType, Headers: candidate.Headers, Profile: candidate.Profile, Syscalls: candidate.Syscalls, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat}
+	if src, ok := candidate.Source(); ok {
 		scope.DisplayVersion = src.DisplayVersion
 	}
 	if err != nil || !scope.Valid() || expected != nil && scope != *expected || !projectionEvidenceMatches(record, scope, s.Now()) || call.Err() != nil {

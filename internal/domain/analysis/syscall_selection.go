@@ -48,7 +48,11 @@ type SyscallSelection struct {
 }
 
 func (s SyscallSelection) Valid() bool {
-	if !authorization.UUID(s.CaseID) || !authorization.UUID(s.ArtifactID) || s.Limit < 1 || s.Limit > SyscallPageRecords || s.Start < 0 || s.Start >= SyscallMaxRecords || len(s.Names) > 64 {
+	return authorization.UUID(s.CaseID) && authorization.UUID(s.ArtifactID) && s.selectionValid()
+}
+
+func (s SyscallSelection) selectionValid() bool {
+	if s.Limit < 1 || s.Limit > SyscallPageRecords || s.Start < 0 || s.Start >= SyscallMaxRecords || len(s.Names) > 64 {
 		return false
 	}
 	if s.Start == 0 && s.Binding != "" || s.Start > 0 && !lowerHex(s.Binding, 32) {
@@ -116,4 +120,40 @@ func (s SyscallSelection) cursorBinding(version artifact.Digest) string {
 		write(name)
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)[:16])
+}
+
+// SyscallWindow is the comparable, closed selection carried by an admitted
+// scope. Fixed storage preserves exact scope equality without borrowed slices.
+type SyscallWindow struct {
+	View         SyscallView
+	Start, Limit int
+	Binding      string
+	Names        [64]string
+	NameCount    int
+	ErrorsOnly   bool
+}
+
+func (s SyscallSelection) Window() SyscallWindow {
+	w := SyscallWindow{View: s.View, Start: s.Start, Limit: s.Limit, Binding: s.Binding, NameCount: len(s.Names), ErrorsOnly: s.ErrorsOnly}
+	copy(w.Names[:], s.Names)
+	return w
+}
+func (w SyscallWindow) Valid() bool { return w.Selection("", "").selectionValid() }
+func (w SyscallWindow) Selection(caseID, artifactID string) SyscallSelection {
+	if w.NameCount < 0 || w.NameCount > len(w.Names) {
+		return SyscallSelection{}
+	}
+	for _, name := range w.Names[w.NameCount:] {
+		if name != "" {
+			return SyscallSelection{}
+		}
+	}
+	s := SyscallSelection{CaseID: caseID, ArtifactID: artifactID, View: w.View, Start: w.Start, Limit: w.Limit, Binding: w.Binding, ErrorsOnly: w.ErrorsOnly}
+	if w.NameCount >= 0 && w.NameCount <= len(w.Names) {
+		s.Names = append([]string(nil), w.Names[:w.NameCount]...)
+	}
+	if !s.selectionValid() {
+		return SyscallSelection{}
+	}
+	return s
 }

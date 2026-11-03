@@ -20,12 +20,15 @@ func (r ProfileSummaryRequest) Valid() bool {
 // permission to disclose the original raw evidence. A caller cannot invent a
 // source definition: the entire value must equal the closed registry entry.
 func (s ProjectionSource) ReadOperation() authorization.Operation {
-	known, ok := LookupProjectionSource(s.NativeType)
+	known, ok := LookupProjectionSourceFor(s.NativeType, s.DisplayVersion)
 	if !ok || known != s {
 		return ""
 	}
 	if s.NativeType == artifact.PprofArtifact {
 		return authorization.ReadProfileSummary
+	}
+	if s.NativeType == artifact.SyscallArgumentsArtifact {
+		return authorization.ReadSyscallProjection
 	}
 	return authorization.ReadApproved
 }
@@ -35,7 +38,7 @@ func (s ProjectionSource) OutputClass() string {
 	if s.ReadOperation() == "" {
 		return ""
 	}
-	if s.NativeType == artifact.PprofArtifact {
+	if s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
 		return "extract"
 	}
 	return s.DataClass
