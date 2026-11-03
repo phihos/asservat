@@ -2132,6 +2132,23 @@ def main() -> None:
     rejects(examples["lifecycle-plan-post-trigger.json"], "action-lifecycle", lambda d: d["actions"][0].pop("after"))
     for name in ["mcp-backtrace-result.json", "mcp-discovery-flows-result.json", "mcp-discovery-processes-result.json", "mcp-http-headers-result.json", "mcp-profile-result.json", "mcp-syscall-events-result.json", "mcp-syscall-query-result.json", "mcp-syscall-summary-result.json"]:
         require(any(w.startswith("SensitiveDataHandling:") and "cannot be recalled" in w for w in examples[name]["warnings"]), "Direct evidence fixture lost handling reminder")
+    # Comparison preserves both roles/configurations and requires real window rates.
+    comparison = examples["mcp-profile-comparison-result.json"]
+    cd = comparison["data"]
+    require(cd["baseline"]["duration_seconds"] == 30 and cd["incident"]["duration_seconds"] == 10, "Comparison fixture lost unequal native durations")
+    require(cd["rows"][0]["baseline"] == cd["rows"][0]["incident"] and cd["rows"][0]["delta"] == 0, "Comparison rates were replaced by raw counts")
+    require({(p["artifactID"], p["digest"]) for p in comparison["provenance"]} == {(cd["baseline_artifact_id"], cd["baseline_source_version"]), (cd["artifact_id"], cd["source_version"])}, "Comparison fixture lost exact two-source provenance")
+    require(any(w.startswith("SensitiveDataHandling:") for w in comparison["warnings"]), "Comparison lost user-data handling reminder")
+    for key in ("baseline", "incident", "baseline_case_id", "baseline_artifact_id", "baseline_source_version", "source_version", "query_observed_at", "query_expires_at", "aggregation"):
+        rejects_guidance("compare_profiles", "mcp-profile-comparison-result.json", lambda d, key=key: d["data"].pop(key))
+    rejects_guidance("compare_profiles", "mcp-profile-comparison-result.json", lambda d: d.update({"data_class": "raw"}))
+    rejects_guidance("compare_profiles", "mcp-profile-comparison-result.json", lambda d: d["data"].update({"comparable": False}))
+    rejects_guidance("compare_profiles", "mcp-profile-comparison-result.json", lambda d: d["data"]["baseline"].update({"duration_seconds": None}))
+    rejects_guidance("compare_profiles", "mcp-profile-comparison-result.json", lambda d: d["data"]["incident"].update({"force_gc": True}))
+    rejects_guidance("compare_profiles", "mcp-profile-comparison-result.json", lambda d: d["data"]["baseline"].update({"profile_type": "runtimeTrace"}))
+    rejects_guidance("compare_profiles", "mcp-profile-comparison-result.json", lambda d: d["data"]["baseline"].update({"labels": {"synthetic": "excluded"}}))
+    rejects_guidance("compare_profiles", "mcp-profile-comparison-result.json", lambda d: d["data"].update({"baseline_source_version": "unbound"}))
+    rejects_guidance("compare_profiles", "mcp-profile-comparison-result.json", lambda d: d["data"]["rows"][0].update({"label": "excluded"}))
     # Signed Go heap deltas preserve counts and have no defined percentage.
     delta_profile = examples["mcp-profile-delta-result.json"]["data"]
     require(delta_profile["total"] == 0 and all(h["fraction"] is None for h in delta_profile["top"]), "Signed delta invented a fraction")

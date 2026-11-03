@@ -85,6 +85,30 @@ Given a trigger that starts a 10-second CPU recording, when the case timeline is
 
 Comparison MUST preserve baseline/incident identity, build changes, profiling configuration and normalization method. Do not claim statistical significance or a definitive regression from one short sample. A shared recipient cannot compare against an unshared baseline or learn its existence. Access to approved aggregates is extract access; arbitrary label/raw sample inspection needs the appropriate raw grant.
 
+[ADR-295](../docs/decisions/295-two-source-profile-comparison.md) fixes the
+bounded Go comparison: aggregate every selected cumulative function value before
+ranking absolute incident-minus-baseline deltas, then function name. Do not
+subtract truncated summaries or infer that an omitted function has zero value.
+`none` preserves raw signed values. `perSecond` requires positive native duration
+and interval/delta semantics on both inputs; its unit is the selected native unit
+per second. Calculate from native integer counts and nanosecond durations before
+rounding each displayed value. Independently rounded rates may subtract to a
+value different from the displayed delta; disclose this precision limit. Unknown
+build, sampling configuration and symbols remain explicit. Heap and allocation
+handlers may compare matching selected counters with compatible state/window
+semantics; their handler names alone do not establish incompatibility.
+
+Both readers MUST retain independently current rights, original audience,
+client, retention, recovery and permitted processing placement. Authenticate both
+complete native files before a comparison or semantic-mismatch result. Neither
+source's native size limit is enlarged by comparison. Bind both exact versions,
+role order and normalization to one query. A repeated source still has two
+independent key-use identities. The first implementation requires a common
+qualified regional reader/store; wider placements remain unavailable until
+qualified, without a plaintext hub proxy or invented credential union. Charge
+both reads atomically and preserve uncertain spend. These clauses describe the
+implementation contract, not completed public or installed qualification.
+
 ### SC-PRF-005
 
 Given a 10-second CPU profile and a 30-second baseline, when the user requests rate comparison, then the result identifies normalization and units. Comparing allocation bytes to CPU nanoseconds is rejected. A hidden baseline cannot be inspected through comparison errors or timing metadata.

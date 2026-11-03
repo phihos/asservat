@@ -16,6 +16,17 @@ func (r ProfileSummaryRequest) Valid() bool {
 	return authorization.UUID(r.CaseID) && authorization.UUID(r.ArtifactID) && r.Selection.Valid()
 }
 
+// ProfileComparisonRequest is normalized public selection of two ordered
+// artifacts. Private routes, versions, placement and authority are absent.
+type ProfileComparisonRequest struct {
+	CaseID, ArtifactID, BaselineCaseID, BaselineArtifactID string
+	Selection                                              ProfileComparisonSelection
+}
+
+func (r ProfileComparisonRequest) Valid() bool {
+	return authorization.UUID(r.CaseID) && authorization.UUID(r.ArtifactID) && authorization.UUID(r.BaselineCaseID) && authorization.UUID(r.BaselineArtifactID) && (r.ArtifactID != r.BaselineArtifactID || r.CaseID == r.BaselineCaseID) && r.Selection.Valid()
+}
+
 // ReadOperation separates permission to disclose a qualified aggregate from
 // permission to disclose the original raw evidence. A caller cannot invent a
 // source definition: the entire value must equal the closed registry entry.

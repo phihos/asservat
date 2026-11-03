@@ -79,3 +79,34 @@ A local 10,000-function-per-source parser benchmark after precise normalization
 used 41.18 ms/op and 39.96 MB total allocations. Total allocations are not peak
 RSS, worker residency or composed provider cost. No public activation or physical
 worker qualification is inferred.
+
+
+The fixed-pair scope/request/result and public contracts are now prepared under
+ADR-295. Legacy source/candidate JSON stays identical. One compound comparison
+has fixed role order, exact versions, one batch and twenty read-work units; typed
+incompatible-profile results carry no content. Affected domain races passed in
+1.025 s, plus the strict mismatch-union follow-up in 1.011 s. Canonical browser/MCP
+contracts preserve both case/artifact IDs, versions, acquisition/configuration
+facts and original query times. The new example normalizes a 30-second baseline
+and 10-second incident to equal rates. The old contract rejected its missing
+provenance/configuration fields; the amended spec/OpenAPI/schema gates passed
+13,530 assertions. None of this registers a runtime comparison tool.
+
+The opt-in encrypted process probe now measures both complete sources, including
+native framing, manifest checks and pinned TLS ranges. Each accepted source has
+100,000 functions/locations/samples and 1,048,576 frame visits. The heavy shape
+adds sixteen sample types/values and 32,768 numeric labels with units, exactly
+662,144 shared structural units, with protobuf 56 bytes below 16 MiB. It does not
+simultaneously maximize every independent string/inline dimension.
+
+With the final immutable binary, the original pair peaked at 191.266 MiB RSS and
+the heavy pair at 252.363 MiB; both took 1.202s wall and returned twenty valid rows,
+six synthetic unwraps and closed both sources. A single unchanged-heavy replay
+with standard GOMEMLIMIT=224MiB observed 246.152 MiB RSS and similar wall time.
+This small improvement does not establish deployed 256 MiB feasibility. No
+product memory setting changed. Source inventory scope is tracked/untracked Go,
+go.mod/go.sum and internal JSON (3,814 files), not the whole repository/module
+cache; each final phase matches its build inventory. Earlier cancellation data
+belongs to a separately identified binary and is retained as such. Exact hashes,
+CPU values, inputs and caveats are in test/results/profile-comparison-memory.
+Real cgroup/CPU-quota/SQL/KMS and public/native qualification remain pending.

@@ -7907,7 +7907,7 @@ components:
                   - none
                   - perSecond
                 comparable:
-                  type: boolean
+                  const: true
                 rows:
                   type: array
                   items:
@@ -7922,10 +7922,16 @@ components:
                         - type: 'null'
                       baseline:
                         type: number
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
                       incident:
                         type: number
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
                       delta:
                         type: number
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
                     required:
                     - function
                     - baseline
@@ -7939,6 +7945,274 @@ components:
                     minLength: 1
                     maxLength: 512
                   maxItems: 16
+                aggregation:
+                  const: cumulative
+                case_id:
+                  type: string
+                  format: uuid
+                artifact_id:
+                  type: string
+                  format: uuid
+                baseline_case_id:
+                  type: string
+                  format: uuid
+                baseline_artifact_id:
+                  type: string
+                  format: uuid
+                source_version:
+                  type: string
+                  pattern: ^[a-f0-9]{64}$
+                baseline_source_version:
+                  type: string
+                  pattern: ^[a-f0-9]{64}$
+                baseline:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    profile_type:
+                      enum:
+                      - cpu
+                      - heap
+                      - allocs
+                      - goroutine
+                      - block
+                      - mutex
+                      - threadcreate
+                    mode:
+                      enum:
+                      - snapshot
+                      - cumulative
+                      - delta
+                      - interval
+                    force_gc:
+                      type: boolean
+                    duration_seconds:
+                      anyOf:
+                      - type: number
+                        exclusiveMinimum: 0
+                        maximum: 86400
+                      - type: 'null'
+                    total:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                    period:
+                      anyOf:
+                      - type: object
+                        additionalProperties: false
+                        properties:
+                          type:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          unit:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          value:
+                            type: integer
+                            minimum: 1
+                            maximum: 9007199254740991
+                        required:
+                        - type
+                        - unit
+                        - value
+                      - type: 'null'
+                    symbol_status:
+                      enum:
+                      - complete
+                      - partial
+                      - missing
+                  required:
+                  - profile_type
+                  - mode
+                  - force_gc
+                  - duration_seconds
+                  - total
+                  - period
+                  - symbol_status
+                  allOf:
+                  - if:
+                      properties:
+                        profile_type:
+                          enum:
+                          - cpu
+                    then:
+                      properties:
+                        mode:
+                          enum:
+                          - interval
+                  - if:
+                      properties:
+                        profile_type:
+                          enum:
+                          - heap
+                          - goroutine
+                    then:
+                      properties:
+                        mode:
+                          enum:
+                          - snapshot
+                          - delta
+                  - if:
+                      properties:
+                        profile_type:
+                          enum:
+                          - allocs
+                          - block
+                          - mutex
+                          - threadcreate
+                    then:
+                      properties:
+                        mode:
+                          enum:
+                          - cumulative
+                          - delta
+                  - if:
+                      properties:
+                        force_gc:
+                          const: true
+                    then:
+                      properties:
+                        profile_type:
+                          const: heap
+                        mode:
+                          const: snapshot
+                incident:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    profile_type:
+                      enum:
+                      - cpu
+                      - heap
+                      - allocs
+                      - goroutine
+                      - block
+                      - mutex
+                      - threadcreate
+                    mode:
+                      enum:
+                      - snapshot
+                      - cumulative
+                      - delta
+                      - interval
+                    force_gc:
+                      type: boolean
+                    duration_seconds:
+                      anyOf:
+                      - type: number
+                        exclusiveMinimum: 0
+                        maximum: 86400
+                      - type: 'null'
+                    total:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                    period:
+                      anyOf:
+                      - type: object
+                        additionalProperties: false
+                        properties:
+                          type:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          unit:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          value:
+                            type: integer
+                            minimum: 1
+                            maximum: 9007199254740991
+                        required:
+                        - type
+                        - unit
+                        - value
+                      - type: 'null'
+                    symbol_status:
+                      enum:
+                      - complete
+                      - partial
+                      - missing
+                  required:
+                  - profile_type
+                  - mode
+                  - force_gc
+                  - duration_seconds
+                  - total
+                  - period
+                  - symbol_status
+                  allOf:
+                  - if:
+                      properties:
+                        profile_type:
+                          enum:
+                          - cpu
+                    then:
+                      properties:
+                        mode:
+                          enum:
+                          - interval
+                  - if:
+                      properties:
+                        profile_type:
+                          enum:
+                          - heap
+                          - goroutine
+                    then:
+                      properties:
+                        mode:
+                          enum:
+                          - snapshot
+                          - delta
+                  - if:
+                      properties:
+                        profile_type:
+                          enum:
+                          - allocs
+                          - block
+                          - mutex
+                          - threadcreate
+                    then:
+                      properties:
+                        mode:
+                          enum:
+                          - cumulative
+                          - delta
+                  - if:
+                      properties:
+                        force_gc:
+                          const: true
+                    then:
+                      properties:
+                        profile_type:
+                          const: heap
+                        mode:
+                          const: snapshot
+                build_status:
+                  enum:
+                  - same
+                  - different
+                  - unknown
+                sampling_status:
+                  enum:
+                  - same
+                  - different
+                  - unknown
+                acquisition_status:
+                  enum:
+                  - same
+                  - different
+                query_observed_at:
+                  type: string
+                  format: date-time
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                query_expires_at:
+                  type: string
+                  format: date-time
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - sample_type
               - unit
@@ -7946,6 +8220,53 @@ components:
               - comparable
               - rows
               - limitations
+              - aggregation
+              - case_id
+              - artifact_id
+              - baseline_case_id
+              - baseline_artifact_id
+              - source_version
+              - baseline_source_version
+              - baseline
+              - incident
+              - build_status
+              - sampling_status
+              - acquisition_status
+              - query_observed_at
+              - query_expires_at
+              allOf:
+              - if:
+                  properties:
+                    normalization:
+                      const: perSecond
+                then:
+                  properties:
+                    baseline:
+                      properties:
+                        mode:
+                          enum:
+                          - interval
+                          - delta
+                        duration_seconds:
+                          type: number
+                          exclusiveMinimum: 0
+                          maximum: 86400
+                    incident:
+                      properties:
+                        mode:
+                          enum:
+                          - interval
+                          - delta
+                        duration_seconds:
+                          type: number
+                          exclusiveMinimum: 0
+                          maximum: 86400
+            data_class:
+              const: extract
+            provenance:
+              type: array
+              minItems: 1
+              maxItems: 2
           required:
           - status
           - data
@@ -7965,9 +8286,21 @@ components:
                   type: integer
                   minimum: 1
                   maximum: 60
+                query_observed_at:
+                  type: string
+                  format: date-time
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                query_expires_at:
+                  type: string
+                  format: date-time
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - query_handle
               - retry_after_seconds
+              - query_observed_at
+              - query_expires_at
+            data_class:
+              const: metadata
           required:
           - status
           - data
@@ -8007,6 +8340,8 @@ components:
               - code
               - message
               - retryable
+            data_class:
+              const: metadata
           required:
           - status
           - data

@@ -21,6 +21,9 @@ const (
 	// ProfileSummaryQueryUnits conservatively funds the full 64 MiB native
 	// window (nine encrypted frames, two index pages) plus metadata.
 	ProfileSummaryQueryUnits = 10
+	// ProfileComparisonQueryUnits funds two complete maximum pprof reads.
+	// It is a conservative work declaration, not qualified worker memory.
+	ProfileComparisonQueryUnits = 2 * ProfileSummaryQueryUnits
 	// ProfileSummaryWorkerBytes is the whole physical worker memory bound,
 	// also declared as transient capacity before summary admission.
 	ProfileSummaryWorkerBytes = 256 << 20
@@ -35,12 +38,16 @@ const (
 // ProjectionResult is the approved result of one read batch. Exactly the
 // scope's branch is populated; InvalidCursor discloses no record.
 type ProjectionResult struct {
-	PodStatus      PodStatusProjection
-	Headers        HTTPHeaderPage
-	Summary        *ProfileSummary     `json:",omitempty"`
-	SyscallSummary *SyscallSummaryPage `json:",omitempty"`
-	SyscallEvents  *SyscallEventPage   `json:",omitempty"`
-	InvalidCursor  bool
+	PodStatus  PodStatusProjection
+	Headers    HTTPHeaderPage
+	Summary    *ProfileSummary    `json:",omitempty"`
+	Comparison *ProfileComparison `json:",omitempty"`
+	// IncompatibleProfiles is a content-free semantic result after both
+	// authenticated source reads, not an unknown read/transport failure.
+	IncompatibleProfiles bool                `json:",omitempty"`
+	SyscallSummary       *SyscallSummaryPage `json:",omitempty"`
+	SyscallEvents        *SyscallEventPage   `json:",omitempty"`
+	InvalidCursor        bool
 	// TooLarge refuses a page whose first selected record alone exceeds the
 	// wire bound; it discloses no record and paging cannot pass that record.
 	TooLarge bool
@@ -49,6 +56,18 @@ type ProjectionResult struct {
 // Valid reports whether the result is exactly the scope's source branch.
 func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 	if !s.Valid() {
+		return false
+	}
+	if s.Comparison != (ProfileComparisonWindow{}) {
+		if r.PodStatus != (PodStatusProjection{}) || !r.Headers.empty() || r.Summary != nil || r.SyscallSummary != nil || r.SyscallEvents != nil || r.InvalidCursor || r.TooLarge {
+			return false
+		}
+		if r.IncompatibleProfiles {
+			return r.Comparison == nil
+		}
+		return r.Comparison != nil && r.Comparison.Valid(s.Comparison.Selection(s.Profile))
+	}
+	if r.Comparison != nil || r.IncompatibleProfiles {
 		return false
 	}
 	if s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
@@ -86,6 +105,9 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 
 // Clear drops the transient record values.
 func (r *ProjectionResult) Clear() {
+	if r.Comparison != nil {
+		r.Comparison.Clear()
+	}
 	if r.SyscallSummary != nil {
 		clear(r.SyscallSummary.Rows)
 		*r.SyscallSummary = SyscallSummaryPage{}
@@ -122,6 +144,9 @@ func (s ContextProjectionScope) BeginTool() string {
 	}
 
 	if s.NativeType == artifact.PprofArtifact {
+		if s.Comparison != (ProfileComparisonWindow{}) {
+			return "compare_profiles"
+		}
 		return "get_profile_summary"
 	}
 	if s.NativeType == artifact.HTTPHeadersArtifact {
