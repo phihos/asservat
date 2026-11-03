@@ -34,8 +34,10 @@ type Binding struct {
 	OperationID, CaptureID, ActionID, AttemptID                         string
 	ClusterID, IssuerEpoch, PodUID, NodeUID, NodeBootID, CollectorEpoch string
 	ScopeDigest, AuthorityDigest, BudgetDigest, AuditDigest             artifact.Digest
-	NativeBytes                                                         int64
-	NotBefore, NotAfter                                                 time.Time
+	// NativeType is explicit for profile bindings; absent on existing recorder scopes.
+	NativeType          string `json:",omitempty"`
+	NativeBytes         int64
+	NotBefore, NotAfter time.Time
 }
 
 func (b Binding) Valid() bool {
@@ -46,14 +48,15 @@ func (b Binding) Valid() bool {
 	}
 	if b.ExecutionClass == artifact.ContextAPIExecution {
 		// Pod status has exact bytes. A recorder binding carries the admitted
-		// output ceiling: finite expectations still require their original 8 MiB
-		// registration; typed snapshots may admit a smaller bounded output.
-		podStatus := b.ActionID == "pod-status" && b.NativeBytes == artifact.MaxContextBytes
-		recording := recorderAction(b.ActionID) && b.NativeBytes > 0 && b.NativeBytes <= artifact.RecordingNativeLimit
-		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || !podStatus && !recording || b.NotAfter.After(b.NotBefore.Add(5*time.Second)) {
+		// output ceiling: finite recording expectations retain 8 MiB; Go
+		// profiles independently validate their selected registered type bound.
+		podStatus := b.NativeType == "" && b.ActionID == "pod-status" && b.NativeBytes == artifact.MaxContextBytes
+		recording := b.NativeType == "" && recorderAction(b.ActionID) && b.NativeBytes > 0 && b.NativeBytes <= artifact.RecordingNativeLimit
+		profile := recorderAction(b.ActionID) && b.NativeBytes > 0 && (b.NativeType == artifact.PprofArtifact && b.NativeBytes <= artifact.MaxPprofBytes || b.NativeType == artifact.GoTraceArtifact && b.NativeBytes <= artifact.MaxGoTraceBytes)
+		if b.NodeUID != "" || b.NodeBootID != "" || !authorization.UUID(b.ExecutorPodUID) || !authorization.UUID(b.ExecutorAccountUID) || !podStatus && !recording && !profile || b.NotAfter.After(b.NotBefore.Add(5*time.Second)) {
 			return false
 		}
-	} else if b.ExecutionClass != artifact.ContextNodeExecution || !authorization.UUID(b.NodeUID) || !authorization.UUID(b.NodeBootID) || b.ExecutorPodUID != "" || b.ExecutorAccountUID != "" {
+	} else if b.NativeType != "" || b.ExecutionClass != artifact.ContextNodeExecution || !authorization.UUID(b.NodeUID) || !authorization.UUID(b.NodeBootID) || b.ExecutorPodUID != "" || b.ExecutorAccountUID != "" {
 		return false
 	}
 	return identity.Text(b.ActionID, 63) && b.ScopeDigest != (artifact.Digest{}) && b.AuthorityDigest != (artifact.Digest{}) && b.BudgetDigest != (artifact.Digest{}) && b.AuditDigest != (artifact.Digest{}) && b.NativeBytes > 0 && b.NativeBytes <= 1<<40 && canonicalTime(b.NotBefore) && canonicalTime(b.NotAfter) && b.NotAfter.After(b.NotBefore) && !b.NotAfter.After(b.NotBefore.Add(time.Minute))

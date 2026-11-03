@@ -299,3 +299,41 @@ func TestRecordingSaveSixteenSourcePreviewFitsResponseBound(t *testing.T) {
 		t.Fatal("large preview escaped exact audit/count", auditErr, gate.outcomes)
 	}
 }
+
+func TestProfileCancellationAndBusyHaveCanonicalProgress(t *testing.T) {
+	for _, tc := range []struct {
+		reason, phase string
+		warning       bool
+	}{{"CancellationJoined", "Cancelled", false}, {"ProfileCancellationUncertain", "Cancelled", true}, {"ProfilerBusy", "Failed", false}} {
+		t.Run(tc.reason, func(t *testing.T) {
+			base, current := operationFixture(t, true)
+			p, err := current.Get(t.Context(), current, "00000000-0000-4000-8000-000000000030")
+			if err != nil {
+				t.Fatal(err)
+			}
+			p.ActionID = "a0123456789abcdef01234567"
+			p.Phase = tc.phase
+			p.ActionPhase = tc.phase
+			p.ReasonCode = tc.reason
+			p.CancellationRequested = tc.phase == "Cancelled"
+			ops, err := NewContextOperations(base.config, current, groupedRecordingProgressFixture{p})
+			if err != nil {
+				t.Fatal(err)
+			}
+			reply, err := ops.Call(t.Context(), current, "get_capture", json.RawMessage(`{"capture_id":"00000000-0000-4000-8000-000000000030"}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var envelope struct {
+				Data     ContextProgressData
+				Warnings []string
+			}
+			if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Data.Phase != tc.phase || len(envelope.Data.Actions) != 1 || (len(envelope.Warnings) > 0) != tc.warning {
+				t.Fatal(string(reply.Body))
+			}
+			if tc.warning && !strings.Contains(strings.Join(envelope.Warnings, " "), "Whether the application stopped profiling is unknown") {
+				t.Fatal("missing application uncertainty", string(reply.Body))
+			}
+		})
+	}
+}

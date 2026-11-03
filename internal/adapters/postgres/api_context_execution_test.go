@@ -96,7 +96,7 @@ func TestAPIVerificationAuditRequiresExactCompletedResult(t *testing.T) {
 }
 func TestAPIExecutionProgressUsesItsDurableOutcome(t *testing.T) {
 	f, r, _ := apiCompletedFixture(t)
-	for _, tc := range []struct{ state, phase, reason string }{{"prepared", "Pending", "DispatchUnconfirmed"}, {"started", "Running", "AcquisitionStarted"}, {"captureFailed", "Failed", "AcquisitionFailed"}, {"targetGone", "Failed", "PinnedPodGone"}, {"denied", "Failed", "PodStatusDenied"}, {"peerMembershipChanged", "Failed", "PeerMembershipChanged"}, {"peerMembershipStale", "Failed", "PeerMembershipStale"}, {"storeUnconfirmed", "Indeterminate", "StorageOutcomeUnconfirmed"}, {"stored", "Finalizing", "VerificationPending"}} {
+	for _, tc := range []struct{ state, phase, reason string }{{"prepared", "Pending", "DispatchUnconfirmed"}, {"started", "Running", "AcquisitionStarted"}, {"captureFailed", "Failed", "AcquisitionFailed"}, {"targetGone", "Failed", "PinnedPodGone"}, {"denied", "Failed", "PodStatusDenied"}, {"peerMembershipChanged", "Failed", "PeerMembershipChanged"}, {"peerMembershipStale", "Failed", "PeerMembershipStale"}, {"profilerBusy", "Failed", "ProfilerBusy"}, {"storeUnconfirmed", "Indeterminate", "StorageOutcomeUnconfirmed"}, {"stored", "Finalizing", "VerificationPending"}} {
 		t.Run(tc.state, func(t *testing.T) {
 			x := r
 			x.Phase = tc.state
@@ -111,7 +111,7 @@ func TestAPIExecutionProgressUsesItsDurableOutcome(t *testing.T) {
 				x.AcquiredAt = time.Time{}
 				x.CompletedAt = time.Time{}
 			}
-			if tc.state == "captureFailed" || tc.state == "targetGone" || tc.state == "denied" || tc.state == "peerMembershipChanged" || tc.state == "peerMembershipStale" {
+			if tc.state == "captureFailed" || tc.state == "targetGone" || tc.state == "denied" || tc.state == "peerMembershipChanged" || tc.state == "peerMembershipStale" || tc.state == "profilerBusy" {
 				x.AcquiredAt = time.Time{}
 			}
 			out, err := progressFacts(f, x)

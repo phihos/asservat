@@ -120,3 +120,23 @@ func (s ContextInvestigation) peersCurrent(ctx context.Context, plan planning.Co
 	}
 	return ctx.Err()
 }
+
+// profileEndpointCurrent checks the reviewed route again without replacing
+// the frozen observation in its digest or silently selecting another Pod.
+func (s ContextInvestigation) profileEndpointCurrent(ctx context.Context, p planning.ContextPlan) error {
+	if p.Input.Profile == nil {
+		return nil
+	}
+	if s.ProfileEndpoints == nil || len(p.Input.Profile.Endpoints) != 1 {
+		return value.ErrRecorderUnavailable
+	}
+	frozen := p.Input.Profile.Endpoints[0]
+	fresh, err := s.ProfileEndpoints.ResolveProfileEndpoint(ctx, frozen.Request)
+	if err != nil {
+		return err
+	}
+	if !fresh.Answers(frozen.Request) || fresh.EndpointDigest != frozen.EndpointDigest || fresh.DefinitionDigest != frozen.DefinitionDigest || fresh.SourceKind != frozen.SourceKind || fresh.SourceName != frozen.SourceName || fresh.AddressMode != frozen.AddressMode || fresh.Port != frozen.Port || fresh.DeclaredPortName != frozen.DeclaredPortName || fresh.PathPolicy != frozen.PathPolicy || fresh.TLS != frozen.TLS || fresh.Credential != frozen.Credential {
+		return s.requestChanged("profile-endpoint")
+	}
+	return ctx.Err()
+}

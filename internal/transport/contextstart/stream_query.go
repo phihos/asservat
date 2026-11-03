@@ -40,6 +40,7 @@ const (
 	queryPacketRecorder        = "packet-recorder"
 	queryResolvePacketRecorder = "resolve-packet-recorder"
 	// B3: the exact Pod with the syscall recorder's availability.
+	queryResolveProfileRecorder  = "resolve-profile-recorder"
 	queryResolveSyscallRecorder  = "resolve-syscall-recorder"
 	queryResolveOngoingRecorders = "resolve-ongoing-recorders"
 	// One signed source arm/renewal/stop. The only query that verifies and
@@ -82,6 +83,10 @@ type ProfileEndpointTargets interface {
 // PR 2). A region without it answers unsupported, which refuses the peers.
 type PeerTargets interface {
 	ResolvePacketPeers(context.Context, targets.PeerRequest) (targets.PeerResolution, error)
+}
+
+type ProfileTargetResolver interface {
+	ResolveProfileRecorder(context.Context, targets.Request) (targets.RecorderResolution, error)
 }
 
 // SyscallTargetResolver is PacketTargetResolver for the syscall recorder.
@@ -458,6 +463,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if resolver, ok := s.targets.(PacketTargetResolver); ok {
 			out, e = resolver.ResolvePacketRecorder(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryResolveProfileRecorder:
+		var r targets.Request
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(ProfileTargetResolver); ok {
+			out, e = resolver.ResolveProfileRecorder(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}

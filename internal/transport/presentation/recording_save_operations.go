@@ -205,6 +205,9 @@ func (s *RecordingSaveOperations) CallWithContext(ctx context.Context, current i
 		decision, operationErr = s.cancellations.Cancel(bounded, current, value.CancellationRequest{CaptureID: in.CaptureID, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey})
 		if decision.Valid(s.config.Now()) && decision.CaptureID == in.CaptureID {
 			until = identity.Earlier(until, decision.ValidUntil)
+			if decision.ApplicationStopUnknown {
+				out.Warnings = append(out.Warnings, "Stopping Asservat collection does not confirm that the application stopped profiling.")
+			}
 			out.Data = RecordingCancellationData{decision.CaptureID, decision.Phase, decision.Revision, decision.Requested, s.config.PublicOrigin + "/captures/" + decision.CaptureID}
 			if operationErr != nil && decision.Requested {
 				out.Warnings = append(out.Warnings, "Cancellation delivery is unconfirmed; the durable request remains pending.")

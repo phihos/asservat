@@ -177,15 +177,16 @@ type nodeEntry struct {
 }
 
 type NodeChannel struct {
-	attester NodeAttester
-	issuer   NodeIssuer
-	now      func() time.Time
-	mu       sync.Mutex
-	nodes    map[string]*nodeEntry
-	certs    map[[32]byte]string
-	onChange func(NodeView)
-	limit    *enrollLimiter
-	sink     PacketSink
+	attester    NodeAttester
+	issuer      NodeIssuer
+	now         func() time.Time
+	mu          sync.Mutex
+	nodes       map[string]*nodeEntry
+	certs       map[[32]byte]string
+	onChange    func(NodeView)
+	limit       *enrollLimiter
+	sink        PacketSink
+	profileSink ProfileSink
 }
 
 // NewNodeChannel composes the channel. onChange, when set, is called outside
@@ -452,7 +453,7 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 // Enqueue queues one work item without payload for the node's current
 // process and wakes its poll. Packet captures use EnqueuePacket.
 func (c *NodeChannel) Enqueue(nodeUID string, kind collector.WorkKind, notAfter time.Time) (collector.Work, error) {
-	if !kind.Valid() || kind == collector.WorkPacketCapture || kind == collector.WorkSyscallCapture || kind == collector.WorkPacketSource || kind == collector.WorkStopPacketSource || kind == collector.WorkCancelPacketCapture {
+	if !kind.Valid() || kind == collector.WorkProfileCapture || kind == collector.WorkCancelProfileCapture || kind == collector.WorkPacketCapture || kind == collector.WorkSyscallCapture || kind == collector.WorkPacketSource || kind == collector.WorkStopPacketSource || kind == collector.WorkCancelPacketCapture {
 		return collector.Work{}, ErrNodeInvalid
 	}
 	return c.enqueue(nodeUID, kind, notAfter, nil, nil, nil)

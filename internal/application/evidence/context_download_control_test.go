@@ -85,7 +85,7 @@ func (f *downloadControlFixture) ObserveDownload(_ context.Context, id string, a
 	}
 	return artifact.DownloadObservation{Session: session, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}, f.step("observe")
 }
-func (f *downloadControlFixture) ContextDownloadPlan(context.Context, artifact.DownloadScope) (ContextDownloadPlan, error) {
+func (f *downloadControlFixture) ContextDownloadPlan(context.Context, ContextDownloadSource) (ContextDownloadPlan, error) {
 	return f.plan, f.step("plan")
 }
 func (f *downloadControlFixture) CheckContextDownloadRuntime(context.Context, artifact.DownloadScope) (time.Time, error) {
@@ -348,7 +348,7 @@ func TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects(t *testing.T) {
 			if err == nil || out.Metadata != nil || slices.Contains(f.calls, "continue") {
 				t.Fatal(out, err, f.calls)
 			}
-			if which != "source-expired" && slices.Contains(f.calls, "reserve") {
+			if slices.Contains(f.calls, "reserve") {
 				t.Fatal("expired authority reserved", f.calls)
 			}
 		})
@@ -468,5 +468,20 @@ func TestContextDownloadTerminalViewRetainsCurrentShortenedEvidenceLimits(t *tes
 		if !out.AccessUntil.Before(out.Session.Deadline) {
 			t.Fatal("fixture did not shorten access below original transfer deadline")
 		}
+	}
+}
+
+func TestContextDownloadSourceReusedWithoutRenewalAcrossReservation(t *testing.T) {
+	f, s := newDownloadControlFixture(t)
+	f.after = func(step string) {
+		if step == "reserve" {
+			f.now = f.now.Add(6 * time.Second)
+		}
+	}
+	if _, err := s.PrepareContextDownload(context.Background(), f, f.a.Scope.ArtifactID, "key"); err == nil {
+		t.Fatal("expired source permitted preparation")
+	}
+	if countDownloadCalls(f, "source") != 1 || countDownloadCalls(f, "continue") != 0 {
+		t.Fatal("source re-read extended original deadline", f.calls)
 	}
 }

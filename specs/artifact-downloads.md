@@ -40,6 +40,14 @@ permission fences remain and MAY deny earlier; this is not a promised 30-second
 revocation delay. The native response MAY consume the coordinator's exact checked
 short authority through a private handoff instead of reconstructing it again.
 
+A native content conversation may span at most 60 seconds for one bounded 64 MiB
+response window ([ADR-288](../docs/decisions/288-profile-native-streaming.md)),
+intersected with every original caller, worker, credential and access deadline.
+This permits slower delivery while retaining at-most-five-second native/disclosure
+leases and current SQL permission, recovery and processing checks. It never
+renews an existing operation. Kubernetes-only Pod/Job/account changes can remain
+unobserved within that finite conversation; the next window attests again.
+
 A finite public worker-preparation operation may reuse its initial combined
 authorization until the earliest original request, identity, evidence and proof
 deadline, capped at five seconds. Each subsequent helper checks that retained

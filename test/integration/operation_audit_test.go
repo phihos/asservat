@@ -7,10 +7,14 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/migrations"
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 	"sync"
 	"testing"
 	"time"
@@ -53,12 +57,33 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		in := func(actor byte, name string) audit.OperationIntent {
 			now := time.Now().UTC().Truncate(time.Microsecond)
 			id := custodyID()
-			return audit.OperationIntent{ID: id, TraceID: id, RootID: s.a.RootID, Name: name, InputFormat: "context-input/v1", MACVersion: "audit-v1", AccountVersion: "accounts-v1", Actor: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic", ClientID: "console", Kind: identity.Human}, PrincipalDigest: artifact.Digest{actor}, InputDigest: artifact.Digest{1}, CreatedAt: now, RequestUntil: now.Add(5 * time.Second), WriteUntil: now.Add(30 * time.Second), RetainUntil: now.Add(time.Hour)}
+			return audit.OperationIntent{ID: id, TraceID: id, RootID: s.a.RootID, Name: name, InputFormat: "context-input/v1", MACVersion: "audit-v1", AccountVersion: "accounts-v1", Actor: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic", ClientID: "console", Kind: identity.Human}, PrincipalDigest: artifact.Digest{actor}, InputDigest: artifact.Digest{1}, CreatedAt: now, RequestUntil: now.Add(audit.OperationRequestWindow(name)), WriteUntil: now.Add(30 * time.Second), RetainUntil: now.Add(time.Hour)}
 		}
 		out := func(i audit.OperationIntent) audit.OperationOutcome {
 			return audit.OperationOutcome{Intent: i, Status: "success", Reason: "prepared", Effect: "none", ClientReceipt: "unknown", OutputDigest: artifact.Digest{9}, OutputBytes: 13, MetadataUntil: i.RequestUntil, RecordedAt: time.Now().UTC().Truncate(time.Microsecond)}
 		}
-		first := in(1, "get_capture")
+		// Exercise SQL's own prospective window guard, bypassing the Go
+		// intent validator only for these deliberately invalid insertions.
+		for _, tc := range []struct {
+			name   string
+			window time.Duration
+		}{{"preview_capture", 15*time.Second + time.Microsecond}, {"get_capture", 5*time.Second + time.Microsecond}} {
+			invalid := in(1, tc.name)
+			invalid.RequestUntil = invalid.CreatedAt.Add(tc.window)
+			body, err := json.Marshal(invalid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = journalPool.Exec(ctx, "INSERT INTO operation_audit(id,root_id,lane,principal_digest,intent,request_until,write_until,retain_until,issuer_epoch) VALUES($1,$2,'normal',$3,$4,$5,$6,$7,$8)", invalid.ID, invalid.RootID, invalid.PrincipalDigest[:], body, invalid.RequestUntil, invalid.WriteUntil, invalid.RetainUntil, s.a.Recovery.IssuerEpoch)
+			var denied *pgconn.PgError
+			if !errors.As(err, &denied) || denied.Code != "23514" || denied.Message != "operation audit unavailable" {
+				t.Fatal("SQL accepted an overlong operation window or failed for another reason", tc.name, err)
+			}
+		}
+		first := in(1, "preview_capture")
+		if first.RequestUntil.Sub(first.CreatedAt) != 15*time.Second || audit.OperationRequestWindow("get_capture") != 5*time.Second {
+			t.Fatal("preview/ordinary request window drift")
+		}
 		gate := gates["normal"]
 		if e = gate.Begin(ctx, first); e != nil {
 			t.Fatal("begin", e)
@@ -66,6 +91,38 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		result := out(first)
 		if e = gate.Finish(ctx, result); e != nil {
 			t.Fatal("finish", e)
+		}
+		// The real migration can roll back its admission rule and return without
+		// rewriting the fifteen-second record already committed above.
+		db := stdlib.OpenDB(*admin.Config().ConnConfig)
+		provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.Files(), goose.WithDisableGlobalRegistry(true))
+		if err != nil {
+			db.Close()
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			restore, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if _, err := provider.Up(restore); err != nil {
+				t.Error("restore current audit schema", err)
+			}
+			db.Close()
+		})
+		if _, err := provider.DownTo(ctx, 125); err != nil {
+			t.Fatal("preview window rollback", err)
+		}
+		rolledBack := in(1, "preview_capture")
+		body, err := json.Marshal(rolledBack)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = journalPool.Exec(ctx, "INSERT INTO operation_audit(id,root_id,lane,principal_digest,intent,request_until,write_until,retain_until,issuer_epoch) VALUES($1,$2,'normal',$3,$4,$5,$6,$7,$8)", rolledBack.ID, rolledBack.RootID, rolledBack.PrincipalDigest[:], body, rolledBack.RequestUntil, rolledBack.WriteUntil, rolledBack.RetainUntil, s.a.Recovery.IssuerEpoch)
+		var denied *pgconn.PgError
+		if !errors.As(err, &denied) || denied.Code != "23514" || denied.Message != "operation audit unavailable" {
+			t.Fatal("rollback did not restore original preview SQL window", err)
+		}
+		if _, err := provider.Up(ctx); err != nil {
+			t.Fatal("preview window upgrade", err)
 		}
 		// Exact audit replay never repeats the two object creations or charges.
 		if e = gate.Finish(ctx, result); e != nil {

@@ -138,7 +138,8 @@
                           "enum": [
                             "pod-status",
                             "packetCapture",
-                            "syscallTrace"
+                            "syscallTrace",
+                            "profile"
                           ]
                         },
                         "data_class": {
@@ -256,6 +257,12 @@
                               }
                             }
                           ]
+                        },
+                        "native_format": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64,
+                          "description": "Verified native format, when supplied; used to choose a compatible saved-evidence view. It grants no download or analysis authority."
                         }
                       },
                       "required": [

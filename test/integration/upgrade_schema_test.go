@@ -115,6 +115,20 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	if e = conn.QueryRow(ctx, queryDefinitions).Scan(&originalQueryFunctions); e != nil {
 		t.Fatal("previous query functions", e)
 	}
+	const profileDefinitions = `SELECT pg_get_functiondef('public.guard_custody_stream()'::regprocedure),pg_get_functiondef('public.project_context_processing()'::regprocedure),pg_get_functiondef('public.guard_context_execution()'::regprocedure)`
+	var originalStreamGuard, originalProcessingProjector, originalExecutionGuard string
+	if e = conn.QueryRow(ctx, profileDefinitions).Scan(&originalStreamGuard, &originalProcessingProjector, &originalExecutionGuard); e != nil {
+		t.Fatal("previous profile functions", e)
+	}
+	const profileCancelDefinition = `SELECT pg_get_functiondef('public.guard_snapshot_cancel()'::regprocedure)`
+	var originalCancellation string
+	if e = conn.QueryRow(ctx, profileCancelDefinition).Scan(&originalCancellation); e != nil {
+		t.Fatal(e)
+	}
+	var originalCapacityBacking string
+	if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.capacity_context_protocol_backing(jsonb,jsonb)'::regprocedure)`).Scan(&originalCapacityBacking); e != nil {
+		t.Fatal(e)
+	}
 	upgrade, e := postgres.NewUpgradeSchema(config)
 	if e != nil {
 		t.Fatal(e)
@@ -205,6 +219,25 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		t.Log("resource projection Down restored exact validators and unchanged trust; Up restored104; no old-decoder rollback qualification")
 	}
+	if head == 127 {
+		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("profile summary Down", e)
+		}
+		var restored string
+		if e = conn.QueryRow(ctx, queryDefinitions).Scan(&restored); e != nil || restored != originalQueryFunctions {
+			t.Fatal("summary Down changed prior query/audit functions", e)
+		}
+		var profileValid bool
+		if e = conn.QueryRow(ctx, `SELECT context_query_scope_source_valid('{"NativeType":"pprof"}'::jsonb)`).Scan(&profileValid); e != nil || profileValid {
+			t.Fatal("Down kept summary source", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("summary Up after Down", from, to, e)
+		}
+		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
+		t.Log("summary127→126→127: exact query/audit restoration; fixed ten units, one batch, closed source/selection")
+	}
 	if head == 122 {
 		// The extract scope reserves two units and one read batch, admits
 		// get_http_headers as its begin tool and needs its record window; a
@@ -237,6 +270,84 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("http header query Up after Down", from, to, e)
 		}
 		t.Log("http header query functions: units/batches/tool/source pinned; Down restored exact functions; Up restored 122")
+	}
+	if head == 125 {
+		qualifyProfileCapacityParity(t, ctx, conn)
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("profile capacity Down", e)
+		}
+		var restored string
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.capacity_context_protocol_backing(jsonb,jsonb)'::regprocedure)`).Scan(&restored); e != nil || restored != originalCapacityBacking {
+			t.Fatal("profile capacity Down changed legacy compiler", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("profile capacity Up", from, to, e)
+		}
+		qualifyProfileCapacityParity(t, ctx, conn)
+	}
+	if head == 124 {
+		var updated string
+		if e = conn.QueryRow(ctx, profileCancelDefinition).Scan(&updated); e != nil || !strings.Contains(updated, "'Profile'") {
+			t.Fatal("profile cancellation guard", e)
+		}
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("profile cancellation Down", e)
+		}
+		var restored string
+		if e = conn.QueryRow(ctx, profileCancelDefinition).Scan(&restored); e != nil || restored != originalCancellation {
+			t.Fatal("profile cancellation Down exact restoration", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != 123 || to != 124 {
+			t.Fatal("profile cancellation Up", from, to, e)
+		}
+	}
+	if head == 123 {
+		var writerNullable, planNullable bool
+		if e = conn.QueryRow(ctx, `SELECT NOT a.attnotnull,NOT b.attnotnull FROM pg_attribute a,pg_attribute b WHERE a.attrelid='public.custody_stream'::regclass AND b.attrelid=a.attrelid AND a.attname='writer_epoch' AND b.attname='plan_digest'`).Scan(&writerNullable, &planNullable); e != nil || !writerNullable || !planNullable {
+			t.Fatal("pending stream columns", e)
+		}
+		var guard, projector, executionGuard string
+		if e = conn.QueryRow(ctx, profileDefinitions).Scan(&guard, &projector, &executionGuard); e != nil || !strings.Contains(projector, "pprof") || !strings.Contains(projector, "goTrace") || !strings.Contains(executionGuard, "profilerBusy") {
+			t.Fatal("profile processing projector", e)
+		}
+		// Exercise the actual guard on a fixture table with the exact live column
+		// constraints. No fixture row is authority or an acquisition attempt.
+		if _, e = conn.Exec(ctx, `CREATE TEMP TABLE profile_stream_probe (LIKE public.custody_stream INCLUDING ALL); CREATE TRIGGER profile_stream_probe_guard BEFORE UPDATE OR DELETE ON profile_stream_probe FOR EACH ROW EXECUTE FUNCTION public.guard_custody_stream()`); e != nil {
+			t.Fatal(e)
+		}
+		attempt, epoch, replacement := custodyID(), custodyID(), custodyID()
+		if _, e = conn.Exec(ctx, `INSERT INTO profile_stream_probe(attempt_id,temporary_bytes,temporary_objects,state) VALUES($1,1,2,'{}')`, attempt); e != nil {
+			t.Fatal("reserve unbound", e)
+		}
+		if _, e = conn.Exec(ctx, `UPDATE profile_stream_probe SET state='{"CreateSpent":true}',revision=revision+1 WHERE attempt_id=$1`, attempt); e == nil {
+			t.Fatal("unbound journal spent create")
+		}
+		if _, e = conn.Exec(ctx, `UPDATE profile_stream_probe SET writer_epoch=$2,plan_digest=$3,revision=revision+1 WHERE attempt_id=$1`, attempt, epoch, make([]byte, 32)); e != nil {
+			t.Fatal("first exact writer binding", e)
+		}
+		if _, e = conn.Exec(ctx, `UPDATE profile_stream_probe SET writer_epoch=$2,revision=revision+1 WHERE attempt_id=$1`, attempt, replacement); e == nil {
+			t.Fatal("writer replacement accepted")
+		}
+		if _, e = conn.Exec(ctx, `UPDATE profile_stream_probe SET state='{"CreateSpent":true}',revision=revision+1 WHERE attempt_id=$1`, attempt); e != nil {
+			t.Fatal("generic bound journal regression", e)
+		}
+		if _, e = conn.Exec(ctx, `UPDATE profile_stream_probe SET state='{}',revision=revision+1 WHERE attempt_id=$1`, attempt); e == nil {
+			t.Fatal("spent journal reset")
+		}
+		if _, e = conn.Exec(ctx, `DROP TABLE profile_stream_probe`); e != nil {
+			t.Fatal(e)
+		}
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("profile Down", e)
+		}
+		var restoredGuard, restoredProjector, restoredExecutionGuard string
+		if e = conn.QueryRow(ctx, profileDefinitions).Scan(&restoredGuard, &restoredProjector, &restoredExecutionGuard); e != nil || restoredGuard != originalStreamGuard || restoredProjector != originalProcessingProjector || restoredExecutionGuard != originalExecutionGuard {
+			t.Fatal("profile Down did not restore exact functions", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("profile Up after Down", from, to, e)
+		}
+		t.Log("profile stream reserve/bind/no-reset guard, native projector and exact function rollback passed")
 	}
 	// A version this binary does not know is refused, not skipped.
 	if _, e = conn.Exec(ctx, "INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", head+1); e != nil {

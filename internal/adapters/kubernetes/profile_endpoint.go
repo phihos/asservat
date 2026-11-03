@@ -114,3 +114,16 @@ func (c *PodTargets) ResolveProfileEndpoint(ctx context.Context, r value.Profile
 	}
 	return planner.ResolveProfileEndpointRequest(c.endpoints, network, r, c.client.now())
 }
+
+// ResolveProfilePlan repeats the protected endpoint resolution before dispatch,
+// retaining the route only inside the connector/node control path.
+func (c *PodTargets) ResolveProfilePlan(ctx context.Context, r value.ProfileEndpointRequest) (plan.GoEndpointPlan, error) {
+	if c == nil || c.client == nil || ctx == nil || !r.Valid() || r.Target.ClusterID != c.client.clusterID {
+		return plan.GoEndpointPlan{}, value.ErrInvalid
+	}
+	network, err := c.ObserveProfileNetwork(ctx, r.Target)
+	if err != nil {
+		return plan.GoEndpointPlan{}, err
+	}
+	return planner.ResolveProfileEndpointPlan(c.endpoints, network, r, c.client.now())
+}

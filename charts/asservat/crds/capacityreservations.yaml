@@ -152,6 +152,13 @@
                     "type": "string",
                     "maxLength": 36,
                     "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                  },
+                  "nativeType": {
+                    "type": "string",
+                    "enum": [
+                      "pprof",
+                      "goTrace"
+                    ]
                   }
                 },
                 "required": [
@@ -178,7 +185,7 @@
                     "message": "A prepaid start binding is immutable."
                   },
                   {
-                    "rule": "self.profile == \"apiContextStart/v1\" ? (has(self.executorPodUID) && has(self.executorAccountUID) && !has(self.nodeUID) && !has(self.nodeBootID) && (self.actionID == \"pod-status\" && self.nativeBytes == 4096 || self.actionID.matches(\"^a[0-9a-f]{24}$\") && self.nativeBytes == 8388608) && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration(\"5s\")) : (has(self.nodeUID) && has(self.nodeBootID) && !has(self.executorPodUID) && !has(self.executorAccountUID))",
+                    "rule": "self.profile == \"apiContextStart/v1\" ? (has(self.executorPodUID) && has(self.executorAccountUID) && !has(self.nodeUID) && !has(self.nodeBootID) && (!has(self.nativeType) && (self.actionID == \"pod-status\" && self.nativeBytes == 4096 || self.actionID.matches(\"^a[0-9a-f]{24}$\") && self.nativeBytes == 8388608) || has(self.nativeType) && self.actionID.matches(\"^a[0-9a-f]{24}$\") && self.nativeBytes > 0 && (self.nativeType == \"pprof\" && self.nativeBytes <= 67108864 || self.nativeType == \"goTrace\" && self.nativeBytes <= 134217728)) && timestamp(self.notAfter) <= timestamp(self.notBefore) + duration(\"5s\")) : (has(self.nodeUID) && has(self.nodeBootID) && !has(self.executorPodUID) && !has(self.executorAccountUID) && !has(self.nativeType))",
                     "message": "Execution profile requires exactly its own identity and limits."
                   },
                   {

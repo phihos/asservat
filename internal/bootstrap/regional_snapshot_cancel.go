@@ -32,7 +32,7 @@ func (h *ConnectorRecordings) CancelSourceSnapshot(ctx context.Context, x collec
 		if held.outcome.State == evidence.RecordingStored || held.outcome.State == evidence.RecordingCancelled {
 			return nil
 		}
-	} else if len(h.held) >= maxHeldRecordings {
+	} else if len(h.held)+len(h.profiles) >= maxHeldRecordings {
 		return value.ErrUnavailable
 	}
 	until := h.now().Add(5 * time.Second)
@@ -56,6 +56,11 @@ func (h *ConnectorRecordings) CancelSourceSnapshot(ctx context.Context, x collec
 		h.held[x.CaptureID] = held
 	}
 	held.cancelID, held.cancelRequested = work.ID, true
+	// An unread HTTP/1 body may not observe client disconnection. Stop only the
+	// local admission wait; node and local joins still establish cancellation.
+	if held.stopStoreWait != nil {
+		held.stopStoreWait()
+	}
 	return nil
 }
 

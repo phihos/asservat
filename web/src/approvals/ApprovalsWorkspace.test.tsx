@@ -184,3 +184,22 @@ it('does not infer team revocation from requester provenance and rejects persona
     expect(validOutput_get_grant(result({ ...client.detail, ...patch }))).toBe(false);
   }
 });
+
+it('shows profile parameters and endpoint without a fabricated recording ring', async () => {
+  const client = new SyntheticApprovals();
+  client.detail = { ...grant, observation_limits: undefined, data_class: 'raw', reasons: [{ action_id: 'heap', code: 'liveProfile' }],
+    actions: [{ action_id: 'heap', kind: 'profile', execution_mode: 'onTrigger', max_bytes: 16 << 20, sensitive: ['liveProfile'], profile: { runtime: 'go', type: 'heap', mode: 'snapshot', source: 'httpEndpoint', timeout: '5s', force_gc: true, source_ref: 'go-endpoint', source_name: 'go-pprof-loopback', address_mode: 'targetLoopback', port: 6060, path_policy: 'go-pprof/v1', endpoint_digest: 'ab'.repeat(32) } }] };
+  expect(validOutput_get_grant(result(client.detail))).toBe(true);
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+  expect(await screen.findByText(/Go profile/)).toBeTruthy();
+  expect(screen.getByText(/heap · snapshot/)).toBeTruthy();
+  expect(screen.getByText(/forced GC enabled/)).toBeTruthy();
+  expect(screen.getByText(/target Pod loopback, TCP port 6060/)).toBeTruthy();
+  expect(screen.getByText('No pre-trigger history')).toBeTruthy();
+  expect(screen.queryByText('Syscalls')).toBeNull();
+  expect(screen.queryByText(/0 bytes/)).toBeNull();
+  const mixed = structuredClone(client.detail); Object.assign(mixed.actions[0], { ring_max_bytes: 16 << 20 });
+  expect(validOutput_get_grant(result(mixed))).toBe(false);
+  const missing = structuredClone(client.detail); delete missing.actions[0].profile;
+  expect(validOutput_get_grant(result(missing))).toBe(false);
+});

@@ -48,7 +48,7 @@ func (s ContextDownloadSource) Valid(now time.Time) bool {
 // This read port supplies accepted, independently backed configuration; the
 // coordinator cannot mint allocations or invent a default transfer budget.
 type ContextDownloadPlans interface {
-	ContextDownloadPlan(context.Context, artifact.DownloadScope) (ContextDownloadPlan, error)
+	ContextDownloadPlan(context.Context, ContextDownloadSource) (ContextDownloadPlan, error)
 }
 type ContextDownloadPlan struct {
 	Allocation                           artifact.DownloadAllocation
@@ -238,8 +238,16 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 	// Readiness is consumed here. Worker effects independently require current
 	// configuration and authority; an older readiness observation is not their
 	// lifetime. Keep the original request/identity/authority bounds in until.
+	var source ContextDownloadSource
 	if !lookup.Found {
-		plan, e := s.Plans.ContextDownloadPlan(ctx, scope)
+		// Reuse the exact published source for funding and preparation. Reading it
+		// here adds no I/O and prevents small artifacts reserving profile maxima.
+		source, err = s.Sources.ReadContextDownloadSource(ctx, a)
+		if err != nil || !source.Valid(s.Now()) || source.Scope != scope {
+			return zero, collapsed("source", artifact.ErrDownloadUnavailable, err)
+		}
+		until = identity.Earlier(until, source.ValidUntil)
+		plan, e := s.Plans.ContextDownloadPlan(ctx, source)
 		if e != nil || !plan.Valid(scope, s.Now()) {
 			return zero, collapsed("plan", artifact.ErrDownloadUnavailable, e)
 		}
@@ -281,7 +289,10 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 		workUntil := identity.Earlier(until, session.Deadline)
 		workCtx, stop := context.WithDeadline(ctx, workUntil)
 		defer stop()
-		source, e := s.Sources.ReadContextDownloadSource(workCtx, a)
+		var e error
+		if lookup.Found {
+			source, e = s.Sources.ReadContextDownloadSource(workCtx, a)
+		}
 		if e != nil || !source.Valid(s.Now()) || source.Scope != scope {
 			return zero, collapsed("source", artifact.ErrDownloadUnavailable, e)
 		}

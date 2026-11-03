@@ -21,8 +21,9 @@ import (
 // An httpHeaders page (ADR-282) additionally needs the installed pager; a
 // reader without one serves pod status only.
 type ContextProjectionReader struct {
-	store *CustodyStore
-	pages evidence.HTTPHeaderPager
+	store     *CustodyStore
+	pages     evidence.HTTPHeaderPager
+	summarize evidence.ProfileSummarizer
 }
 
 func NewContextProjectionReader(store *CustodyStore) (*ContextProjectionReader, error) {
@@ -35,6 +36,9 @@ func NewContextProjectionReader(store *CustodyStore) (*ContextProjectionReader, 
 // ReadProjectionNative returns the scope's one result: the pod-status DTO, or
 // one rechecked httpHeaders page.
 func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, source evidence.NativeContextSource, scope value.ContextProjectionScope, keys evidence.KeyOpener, until time.Time) (value.ProjectionResult, error) {
+	if r != nil && scope.NativeType == artifact.PprofArtifact {
+		return r.readProfileSummary(ctx, source, scope, keys, until)
+	}
 	if r != nil && scope.NativeType == artifact.HTTPHeadersArtifact {
 		return r.readHeaderPage(ctx, source, scope, keys, until)
 	}
@@ -169,4 +173,45 @@ func (e *readRefusal) FixedStep() string {
 		return inner.FixedStep()
 	}
 	return "verify"
+}
+
+// ServeProfileSummaries enables the closed analyzer in a regional reader only.
+func (r *ContextProjectionReader) ServeProfileSummaries(f evidence.ProfileSummarizer) {
+	if r != nil {
+		r.summarize = f
+	}
+}
+
+func (r *ContextProjectionReader) readProfileSummary(ctx context.Context, source evidence.NativeContextSource, scope value.ContextProjectionScope, keys evidence.KeyOpener, until time.Time) (value.ProjectionResult, error) {
+	var zero value.ProjectionResult
+	if r.store == nil || r.summarize == nil || ctx == nil || ctx.Err() != nil || keys == nil || !scope.Valid() || !source.Valid(scope.Version) {
+		return zero, value.ErrUnavailable
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok || deadline.After(until) || deadline.After(time.Now().Add(identity.EvidenceReadRequestWindow)) || !time.Now().Before(deadline) {
+		return zero, value.ErrUnavailable
+	}
+	source.Expectation.Audience = slices.Clone(source.Expectation.Audience)
+	source.Expectation.RetentionRules = slices.Clone(source.Expectation.RetentionRules)
+	source.Expectation.Profile = source.Expectation.Profile.Clone()
+	timed := &timedKeyOpener{inner: keys}
+	verifier, err := NewContextVerifier(r.store, timed)
+	if err != nil {
+		return zero, value.ErrUnavailable
+	}
+	started := time.Now()
+	opened, err := verifier.openNative(ctx, ctx, source.Expectation, source.Copies, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
+	if err != nil || ctx.Err() != nil {
+		if opened != nil {
+			opened.Close()
+		}
+		return zero, &readRefusal{value.ErrUnavailable, err}
+	}
+	summary, err := evidence.ReadProfileSummary(ctx, opened, source, scope, r.summarize)
+	app.MarkDuration(ctx, "object-decrypt", time.Since(started)-timed.total())
+	if err != nil || ctx.Err() != nil || !time.Now().Before(deadline) {
+		clear(summary.Top)
+		return zero, &readRefusal{value.ErrUnavailable, readStage(ctx, "parse", errors.Join(value.ErrUnavailable, err))}
+	}
+	return value.ProjectionResult{Summary: &summary}, nil
 }

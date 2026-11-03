@@ -1,0 +1,30 @@
+{
+  "command": [
+    "systemd-run",
+    "--user",
+    "--unit=asservat-profile-native-heap-rebuilt",
+    "--wait",
+    "--pipe",
+    "--collect",
+    "-p",
+    "MemoryMax=1G",
+    "-p",
+    "MemorySwapMax=0",
+    "-p",
+    "RuntimeMaxSec=45s",
+    "-p",
+    "LimitCORE=0",
+    "--setenv=GOMAXPROCS=2",
+    "/home/phil/.cache/asservat-build/pprof-runtime-heap",
+    "-output",
+    "/home/phil/.cache/asservat-build/runtime-heap-final-40000.pb.gz",
+    "-buckets",
+    "40000"
+  ],
+  "exitCode": 0,
+  "stdout": "{\"bytesLabels\":40007,\"decompressedBytes\":1401571,\"functions\":14,\"goVersion\":\"go1.27.3-X:nodwarf5\",\"labels\":40007,\"locationReferences\":760054,\"locations\":20,\"nativeBytes\":127059,\"requestedBuckets\":40000,\"sampleTypes\":[{\"Type\":\"alloc_objects\",\"Unit\":\"count\"},{\"Type\":\"alloc_space\",\"Unit\":\"bytes\"},{\"Type\":\"inuse_objects\",\"Unit\":\"count\"},{\"Type\":\"inuse_space\",\"Unit\":\"bytes\"}],\"samples\":40007,\"sha256\":\"a22222db05d3fafe982e4f42910027e6e30e2c154b529f865f925180eee468d8\"}\n",
+  "stderr": "Running as unit: asservat-profile-native-heap-rebuilt.service\n          Finished with result: success\nMain processes terminated with: code=exited, status=0/SUCCESS\n               Service runtime: 930ms\n             CPU time consumed: 940ms\n                   Memory peak: 72.8M (swap: 0B)\n",
+  "binarySHA256": "e51b9d932b1e98489ed949b69c8c0d332f0e0b6c99726d64289c98baeb7155a1",
+  "helperSHA256": "5ac98caad8c965e472ef133454778d7575877568932ddaf8118106b6d030ea3f",
+  "helperUnchanged": true
+}

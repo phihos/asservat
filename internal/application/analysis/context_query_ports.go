@@ -44,6 +44,7 @@ type ContextQueryInvocation interface {
 type ContextQueryInput struct {
 	Selection value.ContextExcerptSelection
 	Headers   value.HTTPHeaderSelection
+	Profile   value.ProfileSummaryRequest
 	QueryID   string
 }
 
@@ -105,7 +106,7 @@ type ContextProjectionRequestOwner interface {
 // alongside an error still transfers its cleanup obligation to C-18.
 type ContextProjectionRead interface {
 	// Projection is the scope's one result: the pod-status DTO or one
-	// httpHeaders page (or its invalid-cursor refusal), ADR-282.
+	// httpHeaders page (or its invalid-cursor refusal), or closed pprof summary.
 	Projection(context.Context) (value.ProjectionResult, error)
 	CheckCurrent(context.Context) error
 	Close(context.Context) error

@@ -189,18 +189,35 @@ type grantReason struct {
 }
 
 type grantAction struct {
-	ActionID           string   `json:"action_id"`
-	Kind               string   `json:"kind"`
-	ExecutionMode      string   `json:"execution_mode"`
-	Before             string   `json:"before"`
-	After              string   `json:"after"`
-	Filter             string   `json:"filter,omitempty"`
-	FilterDigest       string   `json:"filter_digest,omitempty"`
-	FilterInstructions int      `json:"filter_instructions,omitempty"`
-	MaxBytes           int64    `json:"max_bytes"`
-	RingMaxBytes       int64    `json:"ring_max_bytes"`
-	RingMaxAge         string   `json:"ring_max_age"`
-	Sensitive          []string `json:"sensitive"`
+	ActionID           string        `json:"action_id"`
+	Kind               string        `json:"kind"`
+	ExecutionMode      string        `json:"execution_mode"`
+	Before             string        `json:"before,omitempty"`
+	After              string        `json:"after,omitempty"`
+	Filter             string        `json:"filter,omitempty"`
+	FilterDigest       string        `json:"filter_digest,omitempty"`
+	FilterInstructions int           `json:"filter_instructions,omitempty"`
+	MaxBytes           int64         `json:"max_bytes"`
+	RingMaxBytes       int64         `json:"ring_max_bytes,omitempty"`
+	RingMaxAge         string        `json:"ring_max_age,omitempty"`
+	Sensitive          []string      `json:"sensitive"`
+	Profile            *grantProfile `json:"profile,omitempty"`
+}
+
+type grantProfile struct {
+	Runtime        string `json:"runtime"`
+	Type           string `json:"type"`
+	Mode           string `json:"mode"`
+	Source         string `json:"source"`
+	Duration       string `json:"duration,omitempty"`
+	Timeout        string `json:"timeout"`
+	ForceGC        bool   `json:"force_gc"`
+	SourceRef      string `json:"source_ref"`
+	SourceName     string `json:"source_name"`
+	AddressMode    string `json:"address_mode"`
+	Port           uint16 `json:"port"`
+	PathPolicy     string `json:"path_policy"`
+	EndpointDigest string `json:"endpoint_digest"`
 }
 
 type grantLimits struct {
@@ -341,6 +358,9 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 	d.CanResume, d.CanResolve, d.ResumeRequiresOriginalClient = &v.CanResume, &v.CanResolve, &v.ResumeRequiresOriginalClient
 	for _, a := range r.Actions {
 		x := grantAction{ActionID: a.ActionID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, Before: a.Before, After: a.After, Filter: a.Filter, FilterInstructions: a.FilterInstructions, MaxBytes: a.MaxBytes, RingMaxBytes: a.RingMaxBytes, RingMaxAge: a.RingMaxAge, Sensitive: slices.Clone(a.Sensitive)}
+		if p := a.Profile; p != nil {
+			x.Profile = &grantProfile{Runtime: p.Runtime, Type: p.Type, Mode: p.Mode, Source: p.Source, Duration: p.Duration, Timeout: p.Timeout, ForceGC: p.ForceGC, SourceRef: p.SourceRef, SourceName: p.SourceName, AddressMode: p.AddressMode, Port: p.Port, PathPolicy: p.PathPolicy, EndpointDigest: p.EndpointDigest}
+		}
 		if x.Sensitive == nil {
 			x.Sensitive = []string{}
 		}

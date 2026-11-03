@@ -47,6 +47,9 @@ func captureShareInstruction(ctx context.Context, q *custodydb.Queries, stream c
 	if s == nil {
 		return nil, nil
 	}
+	if a.Plan.Input.Profile != nil {
+		return nil, value.ErrInvalid
+	}
 	i := a.Eligibility.VerifiedIdentity
 	if a.RecordingSave != nil {
 		i = a.RecordingSave.Initiator.VerifiedIdentity

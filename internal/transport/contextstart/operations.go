@@ -40,6 +40,7 @@ const (
 	opFinish               = "finish"
 	// ADR-248: a recording is started within the committed start and
 	// collected by a later exchange for the same verified capture.
+	opStartProfile   = "start-profile"
 	opStartRecording = "start-recording"
 	opCollect        = "collect-recording"
 )
@@ -93,6 +94,12 @@ type policyRecordingRequest struct {
 	Started, Until time.Time
 	Source         targets.PacketSourceObservation
 	Permit         collector.ObservationPermit
+}
+
+type profileRequest struct {
+	Pin            artifact.PinnedPod
+	Started, Until time.Time
+	Endpoint       targets.ProfileEndpointRequest
 }
 
 type acquireReply struct {
@@ -243,6 +250,12 @@ var (
 	_ evidence.ContextRecorder     = (*remoteOutput)(nil)
 	_ evidence.RecordingCollector  = (*HubOperations)(nil)
 )
+
+func (o *remoteOutput) StartProfile(ctx context.Context, pin artifact.PinnedPod, started, until time.Time, endpoint targets.ProfileEndpointRequest) (time.Time, error) {
+	var out recordingReply
+	err := o.h.call(ctx, opStartProfile, profileRequest{pin, started, until, endpoint}, &out)
+	return out.Queued, err
+}
 
 // StartRecording asks the region to queue the recording on the pinned Pod's
 // node within the committed start (ADR-248).
@@ -551,6 +564,22 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 			return nil, value.ErrDenied
 		}
 		return closer.CompleteStored()
+	case opStartProfile:
+		var r profileRequest
+		if err := decodeOperationBody(q.Body, &r); err != nil {
+			return nil, err
+		}
+		d := s.consumed
+		recorder, ok := s.prepared.(evidence.ProfileRecorder)
+		if s.acquired || !ok || s.resolved == nil || s.expectation == nil || s.expectation.Profile == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || !r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !l.Now().Before(r.Until) {
+			return nil, value.ErrDenied
+		}
+		s.acquired = true
+		queued, err := recorder.StartProfile(ctx, r.Pin, r.Started, r.Until, r.Endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return recordingReply{Queued: queued}, nil
 	case opStartRecording:
 		var r acquireRequest
 		if err := decodeOperationBody(q.Body, &r); err != nil {

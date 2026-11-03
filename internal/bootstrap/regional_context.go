@@ -279,12 +279,14 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if err != nil {
 		return &fixedStepError{"start-client", err}
 	}
-	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
+	output := r.output
+	output.writerEpoch = process.ProcessEpoch()
+	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings}, Local: preparer, Starts: r.journal, Output: output, Collector: r.collector, Source: r.source, Now: time.Now}
 	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.TrustSettings.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}, Report: timedEventLog(os.Stderr, "regional history timing")}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
 		if queue, ok := r.output.recordings.nodes.(contextstart.SourceQueue); ok {
-			local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Queue: queue, Snapshots: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
+			local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Queue: queue, Snapshots: r.output.recordings, Profiles: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
 		}
 	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
@@ -301,13 +303,35 @@ type regionalArtifactOutput struct {
 	now      func() time.Time
 	// recordings holds started manual recordings (ADR-248); nil without the
 	// collector input, which refuses every recording.
-	recordings *ConnectorRecordings
+	recordings  *ConnectorRecordings
+	writerEpoch string
 }
 
 func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.ContextExpectation) (evidence.PreparedContext, error) {
 	seal, err := kms.NewRemoteSealer(o.endpoint, o.scope, e.Registration.Location.AttemptID, o.client)
 	if err != nil {
 		return nil, err
+	}
+	if e.Profile != nil {
+		if o.recordings == nil || o.writerEpoch == "" {
+			return nil, value.ErrUnavailable
+		}
+		if e.Registration.NativeLimit > artifact.FrameBytes {
+			prepared, err := objectstore.PrepareOneShotProfileArtifact(ctx, o.store, seal, e, o.writerEpoch, o.now)
+			if err != nil {
+				return nil, err
+			}
+			return o.recordings.PrepareProfile(prepared, e), nil
+		}
+		producer, err := objectstore.NewArtifactProducer(o.store, seal, noJournal{}, o.now)
+		if err != nil {
+			return nil, err
+		}
+		prepared, err := producer.Prepare(ctx, e, "")
+		if err != nil {
+			return nil, err
+		}
+		return o.recordings.PrepareProfile(prepared, e), nil
 	}
 	if e.Recording != nil || e.Snapshot != nil {
 		// ADR-248: one frame at most, so the artifact producer never needs
@@ -442,4 +466,14 @@ func (v reportedWorkVerifier) VerifyAPIContextWork(ctx context.Context, encoded 
 		v.report(step)
 	}
 	return out, err
+}
+
+// ResolveProfileRecorder observes the original API target and current profile
+// mechanism in the same bounded regional query, without probing the endpoint.
+func (t reportedTargets) ResolveProfileRecorder(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {
+	p, node, err := t.PodTargets.ResolvePacketPod(ctx, r)
+	if err != nil {
+		return targets.RecorderResolution{}, err
+	}
+	return t.packetTargetAvailability(ctx, p, node, false, collector.MechanismProfile), nil
 }

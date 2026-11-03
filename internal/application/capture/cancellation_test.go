@@ -17,10 +17,12 @@ type cancellationFixture struct {
 	persisted   bool
 	dispatches  int
 	deliveryErr error
+	check       value.CancellationCheck
 }
 
 func (f *cancellationFixture) RequestCaptureCancellation(_ context.Context, check value.CancellationCheck) (SnapshotCancellationWork, error) {
-	if !check.Valid(f.f.now) {
+	f.check = check
+	if !check.Valid(check.CheckedAt) || !check.Valid(f.f.now) {
 		return SnapshotCancellationWork{}, value.ErrDenied
 	}
 	f.persisted = true
@@ -55,5 +57,54 @@ func TestCaptureCancellationPersistsBeforeUnknownDeliveryAndNeverClaimsJoined(t 
 	out, err = service.Cancel(t.Context(), fixtureIdentityResolverHandle{f}, request)
 	if err != nil || out.Phase != "Cancelled" || port.dispatches != 1 {
 		t.Fatal("durable no-start cancellation unnecessarily dispatched", out, err)
+	}
+}
+
+func (f *cancellationFixture) CancelProfile(_ context.Context, cluster string, stop collector.ProfileStop) error {
+	if !f.persisted || f.work.Profile == nil || *f.work.Profile != stop || cluster != stop.ClusterID {
+		panic("profile stop preceded persistence or changed attempt")
+	}
+	f.dispatches++
+	return f.deliveryErr
+}
+func TestProfileCancellationKeepsDurableUnknownDelivery(t *testing.T) {
+	f := newInvestigationFixture()
+	stop := collector.ProfileStop{RootID: fixtureID(1), ClusterID: fixtureID(4), CaptureID: fixtureID(31), AttemptID: fixtureID(32), WriterPodUID: fixtureID(33), WriterEpoch: fixtureID(34), ExpectationDigest: artifact.Digest{1}, WriteUntil: f.now.Add(time.Minute)}
+	lost := errors.New("unconfirmed")
+	port := &cancellationFixture{f: f, deliveryErr: lost, work: SnapshotCancellationWork{ClusterID: stop.ClusterID, Profile: &stop, Decision: value.Cancellation{CaptureID: stop.CaptureID, Phase: "Running", Revision: 2, Requested: true, ApplicationStopUnknown: true, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}}}
+	service := CaptureCancellation{RootID: stop.RootID, InstallationID: fixtureID(2), Ledger: port, Dispatcher: port, Recovery: f, Now: func() time.Time { return f.now }}
+	out, err := service.Cancel(t.Context(), fixtureIdentityResolverHandle{f}, value.CancellationRequest{CaptureID: stop.CaptureID, ExpectedRevision: 1, IdempotencyKey: "profile-stop"})
+	if !errors.Is(err, lost) || !out.Requested || out.Phase != "Running" || !out.ApplicationStopUnknown || port.dispatches != 1 {
+		t.Fatal("uncertain stop lost", out, err)
+	}
+}
+
+type delayedCancellationRecovery struct {
+	f     *investigationFixture
+	delay time.Duration
+}
+
+func (r delayedCancellationRecovery) RecoveryState(ctx context.Context) (artifact.RecoveryProof, error) {
+	r.f.now = r.f.now.Add(r.delay)
+	return r.f.RecoveryState(ctx)
+}
+func TestCancellationObservationCompletionDoesNotRenewOriginalBudget(t *testing.T) {
+	for _, delay := range []time.Duration{2 * time.Second, 6 * time.Second} {
+		t.Run(delay.String(), func(t *testing.T) {
+			f := newInvestigationFixture()
+			started := f.now
+			port := &cancellationFixture{f: f, work: SnapshotCancellationWork{Decision: value.Cancellation{CaptureID: fixtureID(31), Phase: "Cancelled", Revision: 2, Requested: true, ObservedAt: started, ValidUntil: started.Add(5 * time.Second)}}}
+			service := CaptureCancellation{RootID: fixtureID(1), InstallationID: fixtureID(2), Ledger: port, Dispatcher: port, Recovery: delayedCancellationRecovery{f, delay}, Now: func() time.Time { return f.now }}
+			out, err := service.Cancel(t.Context(), fixtureIdentityResolverHandle{f}, value.CancellationRequest{CaptureID: fixtureID(31), ExpectedRevision: 1, IdempotencyKey: "cancel"})
+			if delay > 5*time.Second {
+				if err == nil || port.persisted {
+					t.Fatal("expired original operation reached ledger", err)
+				}
+				return
+			}
+			if err != nil || !port.persisted || !port.check.CheckedAt.Equal(f.now) || !port.check.ValidUntil.Equal(started.Add(5*time.Second)) || !out.ValidUntil.Equal(started.Add(5*time.Second)) {
+				t.Fatal("observation completion renewed or invalidated original operation", out, port.check, err)
+			}
+		})
 	}
 }

@@ -89,7 +89,7 @@ func newHubOperationChecked(gate *evidence.NativeFrameGate, checked *checkedNati
 	}
 	if o.Kind == value.NativeResponse {
 		limit := expected.Expectation.Type().DownloadLimit()
-		if !value.UUID(c.WindowID) || c.Offset < 0 || c.Length < 1 || c.Offset > limit || c.Length > limit-c.Offset {
+		if !value.UUID(c.WindowID) || c.Offset < 0 || c.Length < 1 || c.Length > artifact.DownloadWindowBytes || c.Offset > limit || c.Length > limit-c.Offset {
 			return nil, artifact.ErrInvalid
 		}
 	} else if c.WindowID != "" || c.Offset != 0 || c.Length != 0 {

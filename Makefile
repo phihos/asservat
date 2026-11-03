@@ -230,3 +230,14 @@ go-vet:
 .PHONY: history-storage-integration
 history-storage-integration:
 	$(PYTHON) scripts/test-history-storage.py $(or $(HISTORY_RESULT_NAME),history-storage-native-1)
+
+# Fast component preflight for the complete profile path. No external fixtures.
+.PHONY: profile-preflight
+profile-preflight:
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestInstalledProfile|TestDownloadWorkerProfileAndPathTemplate|TestPublicProfileSummary|TestPublicSnapshotCancellation|TestSourceWork|TestConnectorProfile|TestProfile|TestSharedManifest|TestNativeTypeRegistry|TestNodeProfile|TestOneShotProfile|TestCurrentDownloadEnvironment)' ./internal/bootstrap ./internal/domain/privacy ./internal/domain/artifact ./internal/domain/analysis ./internal/application/authorization ./internal/application/capture ./internal/application/analysis ./internal/adapters/objectstore ./internal/adapters/objectstore/manifest ./internal/adapters/jose ./internal/transport/contextstart
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledManualProfile' ./test/integration
+
+# Owned SQL/S3 service composition, after local preflight and source freeze.
+.PHONY: profile-service-preflight
+profile-service-preflight:
+	$(PYTHON) scripts/test-custody.py --fleet --run '^(TestCustodyProfileWriteOnlyWithRealServices|TestProfileSummaryQueryLedgerWithRealPostgres)$$' --result-name profile-service-preflight

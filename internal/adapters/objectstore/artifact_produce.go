@@ -43,6 +43,8 @@ func NewArtifactProducer(store *CustodyStore, keys evidence.KeySealer, journal p
 // PreparedArtifact holds the prepared keys of one attempt. It is single use:
 // a failed store leaves its journal and charges for cleanup, never a retry.
 type PreparedArtifact struct {
+	// Only PrepareOneShotProfileArtifact selects receipt-only completion.
+	storedOnly       bool
 	snapshotRetained *uint64
 	mu               sync.Mutex
 	producer         *ArtifactProducer
@@ -78,6 +80,7 @@ func (p *ArtifactProducer) Prepare(ctx context.Context, e artifact.ContextExpect
 	if ctx.Err() != nil || !p.now().Before(r.WriteUntil) {
 		return nil, privacy.ErrExpired
 	}
+	e.Profile = e.Profile.Clone()
 	e.Audience = slices.Clone(e.Audience)
 	e.RetentionRules = slices.Clone(e.RetentionRules)
 	e.Lifecycle = e.Lifecycle.Clone()
@@ -131,7 +134,24 @@ func (a *PreparedArtifact) Store(ctx context.Context, src io.Reader, started, co
 	return a.storeLocked(ctx, src, started, completed)
 }
 
-func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, started, completed time.Time) (artifact.Copies, error) {
+// artifactStoreError exposes only a producer-owned stage; its cause remains
+// available to errors.Is but is never interpolated into diagnostic text.
+type artifactStoreError struct {
+	stage string
+	cause error
+}
+
+func (e artifactStoreError) Error() string     { return "artifact store refused at " + e.stage }
+func (e artifactStoreError) Unwrap() error     { return e.cause }
+func (e artifactStoreError) FixedStep() string { return e.stage }
+
+func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, started, completed time.Time) (copies artifact.Copies, err error) {
+	stage := "prepare"
+	defer func() {
+		if err != nil {
+			err = artifactStoreError{stage, err}
+		}
+	}()
 	var out artifact.Copies
 	if a.used || a.encoder == nil || a.metadata == nil || src == nil {
 		return out, fmt.Errorf("%w: prepared artifact used", artifact.ErrInvalid)
@@ -145,6 +165,7 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 	}
 	ctx, cancel := context.WithDeadline(ctx, r.WriteUntil)
 	defer cancel()
+	stage = "native-check"
 	check, err := p.contracts.NativeCheck(e, manifest.ContextManifest{StartedAt: started, CompletedAt: completed})
 	if err != nil {
 		return out, fmt.Errorf("%w: native check", err)
@@ -153,15 +174,18 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 	var data io.Writer = &small
 	var stream *privacy.StreamingWriter
 	if r.NativeLimit > artifact.FrameBytes {
+		stage = "multipart-create"
 		if stream, err = privacy.NewStreamingWriter(ctx, a.plan, p.journal, StreamingObjects{Store: p.store.store}); err != nil {
 			return out, err
 		}
 		data = streamingSink{ctx, stream}
 	}
+	stage = "encode-and-parts"
 	layout, err := a.encoder.Encode(ctx, checkedReader{src, check}, data, &index, r.NativeLimit)
 	if err != nil {
 		return out, err
 	}
+	stage = "native-check"
 	if err = check.Close(); err != nil {
 		return out, err
 	}
@@ -172,6 +196,7 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 		}
 	}
 	put := func(i int, body []byte) error {
+		stage = "put-" + artifact.Role(i)
 		if ctx.Err() != nil || !p.now().Before(r.WriteUntil) {
 			return privacy.ErrExpired
 		}
@@ -186,24 +211,34 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 		return nil
 	}
 	if stream != nil {
-		// Finish completes create-only and rereads the whole ciphertext.
-		if out[0], err = stream.Finish(ctx); err != nil {
+		stage = "multipart-complete"
+		if a.storedOnly {
+			// This private profile path cannot read or release temporary charges.
+			// The publisher independently verifies the complete stored artifact.
+			out[0], err = stream.FinishStored(ctx)
+		} else {
+			out[0], err = stream.Finish(ctx)
+		}
+		if err != nil {
 			return artifact.Copies{}, err
 		}
 	} else if err = put(0, small.Bytes()); err != nil {
 		return artifact.Copies{}, err
 	}
+	stage = "data-receipt"
 	if layout.DataBytes != out[0].Bytes || layout.DataSHA256 != out[0].SHA256 {
 		return artifact.Copies{}, artifact.ErrIntegrity
 	}
 	if err = put(1, index.Bytes()); err != nil {
 		return artifact.Copies{}, err
 	}
+	stage = "manifest"
 	plain, err := p.contracts.MarshalContext(e, layout, out, started, completed)
 	if err != nil {
 		return artifact.Copies{}, err
 	}
 	defer clear(plain)
+	stage = "manifest-seal"
 	cipher, key, err := a.metadata.Seal(ctx, plain)
 	if err != nil {
 		return artifact.Copies{}, err
@@ -211,6 +246,7 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 	if err = put(2, cipher); err != nil {
 		return artifact.Copies{}, err
 	}
+	stage = "commit"
 	commit, err := p.contracts.MarshalCommit(r.Location, out[2], key)
 	if err != nil {
 		return artifact.Copies{}, err
@@ -218,6 +254,7 @@ func (a *PreparedArtifact) storeLocked(ctx context.Context, src io.Reader, start
 	if err = put(3, commit); err != nil {
 		return artifact.Copies{}, err
 	}
+	stage = "completion"
 	if out.Validate(r) != nil || ctx.Err() != nil || !p.now().Before(r.WriteUntil) {
 		return artifact.Copies{}, privacy.ErrExpired
 	}

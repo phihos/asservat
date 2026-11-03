@@ -354,3 +354,17 @@ func (m *queryMarks) String() string {
 	defer m.mu.Unlock()
 	return strings.Join(m.marks, " ")
 }
+
+func (t Targets) ResolveProfileRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
+	return t.resolveRecorder(ctx, r, queryResolveProfileRecorder)
+}
+func (t Targets) ProfileRecorder(ctx context.Context, p targets.PodResolution) error {
+	current, err := t.ResolveProfileRecorder(ctx, p.Request)
+	if err != nil {
+		return err
+	}
+	if current.Pin != p.Pin {
+		return targets.ErrChanged
+	}
+	return nil
+}

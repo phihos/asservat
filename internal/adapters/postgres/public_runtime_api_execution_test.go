@@ -15,6 +15,11 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		t.Fatal("missing consolidated execution credential")
 	}
 	want := []publicRuntimeGrant{
+		{"table", "custody_stream", "", "SELECT"},
+		{"table", "custody_stream", "attempt_id", "UPDATE"},
+		{"table", "custody_stream", "writer_epoch", "UPDATE"},
+		{"table", "custody_stream", "plan_digest", "UPDATE"},
+		{"table", "custody_stream", "revision", "UPDATE"},
 		// ADR-266: parent membership/status and immutable cancellation intent only.
 		{"table", "recording_save_group", "", "SELECT"},
 		{"table", "recording_save_group", "progress_revision", "UPDATE"},

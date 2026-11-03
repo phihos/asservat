@@ -1064,7 +1064,7 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 
 - [ADR-271: two context-start standbys per cluster](271-two-standbys-per-cluster.md): maintainer reopened ADR-209; join reserves two per cluster, the region keeps two staggered exchanges per owner and an exhausted standby retires only beside another; installed qualification pending.
 
-- [ADR-272: advisory history after the start](272-advisory-history-after-start.md): starts take priority; history follows with its own at-most-five-second budget inside the original request window; unit tests pass, installed qualification pending.
+- [ADR-272: advisory history after the start](272-advisory-history-after-start.md): starts take priority; history follows with its own at-most-ten-second budget inside the original request window; unit tests pass, installed qualification pending.
 - [ADR-274: time-sliced ring segments](274-time-sliced-ring-segments.md): segments also rotate after MaxAge/MaxSegments, so sparse recent records never age out with an old one; at least MaxAge minus one slice of history.
 - [ADR-275: multi-source policy recorders](275-multi-source-policy-recorders.md): one policy arms one source per composed recorder (at most one packet and one syscall); incident captures per recorder via policy_occurrence_capture (00114); accepted, native mixed run passed.
 - [ADR-276: manual composition groups](276-manual-composition-groups.md): a manual packet + syscall composition becomes a reviewed group of byte-identical single manual recordings under a recorder-group/v1 parent scope (migration 00116); proposed.
@@ -1079,4 +1079,13 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-273: syscall metadata recorder](273-syscall-metadata-recorder.md): pinned traceloop eBPF without its wasm layer, metadata-only records on the shared ongoing source/snapshot path, events metered at 256 credit units, drops as visible gaps; unit tests pass, native qualification pending.
 - [ADR-285: profile preview plans](285-profile-preview-plans.md): Go endpoint and eBPF CPU profile actions compile into manual preview with raw class and live-profile approval; bounded administrator endpoint configuration resolves in the target region without probing; acquisition and policy execution remain unavailable.
 
+- [ADR-287: admitted Go endpoint acquisition](287-go-profile-acquisition.md): separate profile context and one-use node HTTP work, exact network namespace, original deadline and conservative runtime slot, encrypted connector streaming under existing budgets; installed qualification pending.
+- [ADR-290: one-shot regional profile streaming](290-one-shot-profile-streaming.md): durable worst-case multipart reservation and immutable accepted connector binding, with private local one-use transitions and no early temporary refund; generic journaled streaming is unchanged.
+
+- [ADR-288: native profile streaming](288-profile-native-streaming.md): extend installed profile downloads through bounded accounting windows; implementation and native qualification pending.
+
+- [ADR-289: bounded capture-preview composition](289-preview-composition-window.md): fifteen-second outer request, unchanged original observation and five-second stage bounds; installed qualification pending.
 - [ADR-286: Bounded Go analyzer isolation](286-bounded-go-analyzer-isolation.md): maintainer-delegated M1 decision permits qualified data-only Go analyzers in the regional worker with bounded inputs, output and process resources, original authority and joined cancellation; native tools retain ADR-036. No analyzer is qualified by this contract amendment.
+
+- [ADR-292: independent submission start phase](292-independent-submission-start-phase.md): admission and start each retain at most five seconds inside the original request and authority bounds; installed profile rerun pending.
+- [ADR-291: bounded profile summary](291-bounded-profile-summary.md): internal typed pprof aggregate authority and selection/result composition; raw provenance and ordinary audience preserved, metadata-only shares unchanged; resource funding, SQL and public activation pending.

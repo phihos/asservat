@@ -253,7 +253,11 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 	if e != nil {
 		t.Fatal(e)
 	}
-	plan, e := plans.ContextDownloadPlan(ctx, session.Scope)
+	source, e = f.runtime.ReadContextDownloadSource(ctx, f.authority())
+	if e != nil {
+		t.Fatal(e)
+	}
+	plan, e := plans.ContextDownloadPlan(ctx, source)
 	if (f.content.retry == nil || !f.content.retry.second) && (e != nil || plan.HardUntil.IsZero() || plan.HardUntil.After(f.allocation.ValidUntil)) {
 		t.Fatal("accepted allocation plan", e)
 	}
@@ -298,7 +302,11 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 	if e = f.config.BindDownloadAllocation(ctx, ambiguous); e != nil {
 		t.Fatal("second independently configured allocation", e)
 	}
-	if _, e = plans.ContextDownloadPlan(ctx, session.Scope); e == nil {
+	source, e = f.runtime.ReadContextDownloadSource(ctx, f.authority())
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = plans.ContextDownloadPlan(ctx, source); e == nil {
 		t.Fatal("ambiguous allocation selected a preferred backed candidate")
 	}
 	t.Log("actual bounded runtime and GET completed; synthetic session, Job, Pod, issuer and accepted installation/backing inputs remain explicit")

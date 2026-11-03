@@ -236,11 +236,12 @@
             "enum": [
               "context",
               "packetCapture",
-              "syscallTrace"
+              "syscallTrace",
+              "profile"
             ]
           },
           "minItems": 0,
-          "maxItems": 3,
+          "maxItems": 4,
           "uniqueItems": true
         },
         "purposes": {

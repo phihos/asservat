@@ -44,7 +44,7 @@ func TestNativeTypeRegistry(t *testing.T) {
 	traceType, _ := LookupNativeType(GoTraceArtifact)
 	if pprofType.Kind != "profile" || traceType.Kind != "profile" || pprofType.MediaType != "application/octet-stream" || traceType.MediaType != pprofType.MediaType ||
 		pprofType.Extension != ".pb.gz" || traceType.Extension != ".trace" || !pprofType.AllowsClass("raw") || pprofType.AllowsClass("metadata") || !traceType.AllowsClass("raw") ||
-		pprofType.MaxBytes != 64<<20 || traceType.MaxBytes != 128<<20 || pprofType.DownloadLimit() != RemoteNativeLimit {
+		pprofType.MaxBytes != 64<<20 || traceType.MaxBytes != 128<<20 || pprofType.DownloadLimit() != MaxPprofBytes {
 		t.Fatal("profile types", pprofType, traceType)
 	}
 	if !GoTraceHeader([]byte("go 1.22 trace\x00\x00\x00")) || !GoTraceHeader([]byte("go 1.99 trace\x00\x00\x00")) || GoTraceHeader([]byte("go 1.21 trace\x00\x00\x00")) || GoTraceHeader([]byte("go 1.2a trace\x00\x00\x00")) || GoTraceHeader([]byte("go 1.26 trace\x00\x00")) {

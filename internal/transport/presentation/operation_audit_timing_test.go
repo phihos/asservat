@@ -78,7 +78,7 @@ func TestAuditedFailureTimingPrecedesBlockedFinish(t *testing.T) {
 			early := mode != "success"
 			select {
 			case got := <-samples:
-				if !early || got.event != "normal/service-failed" || !strings.Contains(got.line, " call@") || !strings.Contains(got.line, "p-target@") || strings.Contains(got.line, "finish") || strings.Contains(got.line, "private") || strings.Contains(got.line, "api") || len(got.line) > 2048 || strings.Count(got.line, "p-target@") != 64 {
+				if !early || got.event != "preview_capture/service-failed" || !strings.Contains(got.line, " call@") || !strings.Contains(got.line, "p-target@") || strings.Contains(got.line, "finish") || strings.Contains(got.line, "private") || strings.Contains(got.line, "api") || len(got.line) > 2048 || strings.Count(got.line, "p-target@") != 64 {
 					t.Fatal("unbounded, late or unexpected failure timing", got)
 				}
 			default:
@@ -98,7 +98,7 @@ func TestAuditedFailureTimingPrecedesBlockedFinish(t *testing.T) {
 				t.Fatal("call did not join Finish")
 			}
 			final := <-samples
-			wantEvent := "normal"
+			wantEvent := "preview_capture"
 			if mode == "success" {
 				wantEvent = "request_capture"
 			}

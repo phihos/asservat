@@ -56,11 +56,11 @@ type ContextExpectation struct {
 }
 
 // ServedClass reports a class the installed publication and download path
-// carries: metadata, raw only as a raw packet capture (ADR-279) and extract
-// only as an HTTP header projection (ADR-282). It is not access: a raw
+// carries: metadata, raw packet captures and Go profiles, and extract only
+// as an HTTP header projection. It is not access: a raw
 // disclosure still needs its approved grant child.
 func (e ContextExpectation) ServedClass() bool {
-	return e.DataClass == "metadata" || e.DataClass == "raw" && e.NativeType == RawPCAPNGArtifact || e.DataClass == "extract" && e.NativeType == HTTPHeadersArtifact
+	return e.DataClass == "metadata" || e.DataClass == "raw" && (e.NativeType == RawPCAPNGArtifact || e.NativeType == PprofArtifact || e.NativeType == GoTraceArtifact) || e.DataClass == "extract" && e.NativeType == HTTPHeadersArtifact
 }
 
 // Type returns the registered native type; Validate rejects unknown names.

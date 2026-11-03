@@ -35,3 +35,25 @@ func TestAPIRecorderBindingCarriesBoundedSnapshotOutputCeiling(t *testing.T) {
 		t.Fatal("original pod-status binding changed")
 	}
 }
+
+func TestProfileBindingRetainsNativeTypeSpecificCeiling(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	id := "00000000-0000-4000-8000-000000000001"
+	b := Binding{ExecutionClass: artifact.ContextAPIExecution, ExecutorPodUID: id, ExecutorAccountUID: id, OperationID: id, CaptureID: id, ActionID: "a000000000000000000000001", AttemptID: id, ClusterID: id, IssuerEpoch: id, PodUID: id, CollectorEpoch: id, ScopeDigest: artifact.Digest{1}, AuthorityDigest: artifact.Digest{2}, BudgetDigest: artifact.Digest{3}, AuditDigest: artifact.Digest{4}, NativeType: artifact.PprofArtifact, NativeBytes: artifact.MaxPprofBytes, NotBefore: now, NotAfter: now.Add(5 * time.Second)}
+	if !b.Valid() {
+		t.Fatal("bounded pprof binding refused")
+	}
+	b.NativeBytes++
+	if b.Valid() {
+		t.Fatal("pprof widened to trace ceiling")
+	}
+	b.NativeType = artifact.GoTraceArtifact
+	b.NativeBytes = artifact.MaxGoTraceBytes
+	if !b.Valid() {
+		t.Fatal("bounded trace binding refused")
+	}
+	b.NativeType = ""
+	if b.Valid() {
+		t.Fatal("untyped recorder ceiling widened")
+	}
+}

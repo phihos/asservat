@@ -130,11 +130,10 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 	if err != nil {
 		return authorization.Grant{}, value.ErrUnavailable
 	}
-	if slices.ContainsFunc(actions, func(a planning.RecorderAction) bool { return a.Kind == "profile" }) {
-		// ADR-285: profile plans are plan-only until a node acquires them
-		// (S-05 increments 3 and 5); no review opens for a plan that cannot run.
+	if slices.ContainsFunc(actions, func(a planning.RecorderAction) bool { return a.Kind == "profile" }) && (len(actions) != 1 || actions[0].ProfileSource != "httpEndpoint" || p.Storage == (value.ContextStorageSelection{})) {
 		return authorization.Grant{}, value.ErrRecorderUnavailable
 	}
+
 	required, err := s.requireRecordingApproval(ctx, source, p.Actor)
 	if err != nil {
 		return authorization.Grant{}, err
@@ -200,8 +199,21 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 	}
 	review := authapp.GrantReview{Namespace: p.Target.Namespace.Name, WorkloadKind: p.Target.Workload.Kind, WorkloadName: p.Target.Workload.Name, PodName: p.Target.PodName, Deadline: p.Deadline}
 	for _, a := range actions {
-		review.Actions = append(review.Actions, authapp.GrantReviewAction{ActionID: a.ID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, Before: a.Before, After: a.After, Filter: a.Filter, RingMaxAge: a.RingMaxAge,
-			FilterDigest: a.FilterDigest, FilterInstructions: a.FilterInstructions, MaxBytes: a.MaxBytes, RingMaxBytes: a.RingMaxBytes, Sensitive: a.Sensitive})
+		x := authapp.GrantReviewAction{ActionID: a.ID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, Before: a.Before, After: a.After, Filter: a.Filter, RingMaxAge: a.RingMaxAge,
+			FilterDigest: a.FilterDigest, FilterInstructions: a.FilterInstructions, MaxBytes: a.MaxBytes, RingMaxBytes: a.RingMaxBytes, Sensitive: a.Sensitive}
+		if a.Kind == "profile" {
+			if p.Intent.Composition == nil {
+				return authorization.Grant{}, value.ErrUnavailable
+			}
+			profile, err := compiler.ProfileContextFromScope(*p.Intent.Composition, p.Target, p.CanonicalScope)
+			if err != nil {
+				return authorization.Grant{}, value.ErrUnavailable
+			}
+			e := profile.Endpoints[0]
+			x.Profile = &authapp.GrantReviewProfile{Runtime: a.ProfileRuntime, Type: a.ProfileType, Mode: a.ProfileMode, Source: a.ProfileSource, Duration: a.Duration, Timeout: a.Timeout, ForceGC: a.ForceGC,
+				SourceRef: e.Request.SourceRef, SourceName: e.SourceName, AddressMode: e.AddressMode, Port: e.Port, PathPolicy: e.PathPolicy, EndpointDigest: a.EndpointDigest}
+		}
+		review.Actions = append(review.Actions, x)
 	}
 	if l := approval.ObservationLimits; l != nil {
 		review.ObservationLimits = &authapp.GrantObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}

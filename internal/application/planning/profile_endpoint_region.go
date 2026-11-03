@@ -29,7 +29,23 @@ type ProfileEndpointEntry struct {
 // through the pure endpoint planner. Nothing is dialed, probed or read from
 // a credential; the answer carries no address or secret material.
 func ResolveProfileEndpointRequest(entries []ProfileEndpointEntry, network targets.ProfileNetwork, r targets.ProfileEndpointRequest, now time.Time) (targets.ProfileEndpointResolution, error) {
+	plan, err := ResolveProfileEndpointPlan(entries, network, r, now)
+	if err != nil {
+		return targets.ProfileEndpointResolution{}, err
+	}
 	var out targets.ProfileEndpointResolution
+	out = targets.ProfileEndpointResolution{Request: r, SourceKind: plan.SourceKind, SourceName: plan.Definition.Source.Name, AddressMode: plan.AddressMode, Port: plan.Port, DeclaredPortName: plan.DeclaredPortName,
+		PathPolicy: plan.Definition.PathPolicy, TLS: plan.Definition.TLS != nil, Credential: plan.Definition.Credential != nil, DefinitionDigest: plan.DefinitionDigest, EndpointDigest: plan.EndpointDigest}
+	out.Request.Bindings = slices.Clone(r.Bindings)
+	if !out.Answers(r) {
+		return targets.ProfileEndpointResolution{}, targets.ErrInvalid
+	}
+	return out, nil
+}
+
+// ResolveProfileEndpointPlan retains the private numeric route for an exact admitted acquisition.
+func ResolveProfileEndpointPlan(entries []ProfileEndpointEntry, network targets.ProfileNetwork, r targets.ProfileEndpointRequest, now time.Time) (value.GoEndpointPlan, error) {
+	var out value.GoEndpointPlan
 	if !r.Valid() || !network.Valid(now) || network.Target.Request != r.Target {
 		return out, targets.ErrInvalid
 	}
@@ -71,11 +87,5 @@ func ResolveProfileEndpointRequest(entries []ProfileEndpointEntry, network targe
 	case err != nil:
 		return out, targets.ErrInvalid
 	}
-	out = targets.ProfileEndpointResolution{Request: r, SourceKind: plan.SourceKind, SourceName: plan.Definition.Source.Name, AddressMode: plan.AddressMode, Port: plan.Port, DeclaredPortName: plan.DeclaredPortName,
-		PathPolicy: plan.Definition.PathPolicy, TLS: plan.Definition.TLS != nil, Credential: plan.Definition.Credential != nil, DefinitionDigest: plan.DefinitionDigest, EndpointDigest: plan.EndpointDigest}
-	out.Request.Bindings = slices.Clone(r.Bindings)
-	if !out.Answers(r) {
-		return targets.ProfileEndpointResolution{}, targets.ErrInvalid
-	}
-	return out, nil
+	return plan, nil
 }

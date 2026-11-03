@@ -1,0 +1,23 @@
++ env ASSERVAT_JOURNEY_FOCUS=manual-profile python3 scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation
+mkdir -p "/tmp/asservat-provider-pair-build-0hoyo_3k"
+LIBPCAP_VERSION=1.11.0 LIBPCAP_SHA256=9237f5bae9dcf3a91823d9963ec43b7c0e2e3374ef2ad57d92c8cd39530f4723 LIBPCAP_PREFIX="/home/runner/.cache/asservat-build/libpcap-1.11.0" TMPDIR="/tmp/asservat-provider-pair-build-0hoyo_3k" scripts/build-libpcap.sh
+libpcap 1.11.0 already built in /home/runner/.cache/asservat-build/libpcap-1.11.0
+CGO_ENABLED=1 CGO_CFLAGS="-I/home/runner/.cache/asservat-build/libpcap-1.11.0/include" CGO_LDFLAGS="-L/home/runner/.cache/asservat-build/libpcap-1.11.0/lib" TMPDIR="/tmp/asservat-provider-pair-build-0hoyo_3k" go build -tags libpcap,netgo,osusergo -trimpath -buildvcs=false -ldflags '-extldflags "-static"' -o "/home/runner/.cache/asservat-build/context-r3ej9zov/worker-image/asservat" ./cmd/asservat
+# asservat.local/asservat/cmd/asservat
+/usr/bin/ld: /home/runner/.cache/asservat-build/libpcap-1.11.0/lib/libpcap.a(gencode.o): in function `nametoport':
+/home/runner/.cache/asservat-build/tmp/libpcap.0oUcvW/libpcap-1.11.0/./gencode.c:6947:(.text+0x170f): warning: Using 'getaddrinfo' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+/usr/bin/ld: /home/runner/.cache/asservat-build/libpcap-1.11.0/lib/libpcap.a(nametoaddr.o): in function `pcap_nametoaddr':
+/home/runner/.cache/asservat-build/tmp/libpcap.0oUcvW/libpcap-1.11.0/nametoaddr.c:161:(.text+0x19): warning: Using 'gethostbyname' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+/usr/bin/ld: /home/runner/.cache/asservat-build/libpcap-1.11.0/lib/libpcap.a(nametoaddr.o): in function `pcap_nametonetaddr':
+/home/runner/.cache/asservat-build/tmp/libpcap.0oUcvW/libpcap-1.11.0/nametoaddr.c:250:(.text+0x101): warning: Using 'getnetbyname_r' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+/usr/bin/ld: /home/runner/.cache/asservat-build/libpcap-1.11.0/lib/libpcap.a(nametoaddr.o): in function `pcap_nametoproto':
+/home/runner/.cache/asservat-build/tmp/libpcap.0oUcvW/libpcap-1.11.0/nametoaddr.c:486:(.text+0x463): warning: Using 'getprotobyname_r' in statically linked applications requires at runtime the shared libraries from the glibc version used for linking
+file "/home/runner/.cache/asservat-build/context-r3ej9zov/worker-image/asservat" | grep -q 'statically linked'
+[33m[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+Creating owned synthetic cluster 1
+Creating owned synthetic cluster 2
+Component test exit: 1

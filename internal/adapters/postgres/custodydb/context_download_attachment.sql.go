@@ -194,7 +194,7 @@ func (q *Queries) ReadFirstContextDownloadBatches(ctx context.Context, sessionID
 }
 
 const readFirstContextResponseWindows = `-- name: ReadFirstContextResponseWindows :many
-SELECT id, response_id, session_id, ordinal, intent_json, intent_receipt, intent_completion, outcome_json, outcome_receipt, outcome_completion FROM download_window WHERE response_id=$1 AND session_id=$2 ORDER BY ordinal LIMIT 2
+SELECT id, response_id, session_id, ordinal, intent_json, intent_receipt, intent_completion, outcome_json, outcome_receipt, outcome_completion FROM download_window WHERE response_id=$1 AND session_id=$2 ORDER BY ordinal LIMIT 3
 `
 
 type ReadFirstContextResponseWindowsParams struct {
@@ -202,8 +202,8 @@ type ReadFirstContextResponseWindowsParams struct {
 	SessionID  pgtype.UUID
 }
 
-// The first context response has exactly one <=4096-byte window. A second row
-// detects incompatible data; a closed owner is never substituted for outcome.
+// The installed native response has at most two 64 MiB windows (128 MiB trace).
+// A third row detects incompatible data; a closed owner is never substituted for outcome.
 // Caller holds the original session lock, shared with outcome/ack writers.
 func (q *Queries) ReadFirstContextResponseWindows(ctx context.Context, arg ReadFirstContextResponseWindowsParams) ([]DownloadWindow, error) {
 	rows, err := q.db.Query(ctx, readFirstContextResponseWindows, arg.ResponseID, arg.SessionID)

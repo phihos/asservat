@@ -70,6 +70,21 @@ func (c *sourceSnapshotCanceller) CancelSourceSnapshot(ctx context.Context, x co
 	return nil
 }
 
+type sourceProfileCanceller struct {
+	calls int
+	last  collector.ProfileStop
+	fail  bool
+}
+
+func (c *sourceProfileCanceller) CancelProfile(ctx context.Context, x collector.ProfileStop) error {
+	c.calls++
+	c.last = x
+	if ctx.Err() != nil || c.fail {
+		return fleet.ErrUnavailable
+	}
+	return nil
+}
+
 type freshConnectorSource struct{ countingLocal }
 
 func (freshConnectorSource) ReadConnectorIdentitySource(context.Context) (fleet.ConnectorIdentitySource, error) {
@@ -81,12 +96,16 @@ func (freshConnectorSource) ReadConnectorIdentitySource(context.Context) (fleet.
 // the real router. Real signature purpose/key checks have their JOSE test.
 // Every source delivery is one query: the standby stays idle for a Save.
 func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
-	for _, mode := range []string{"arm", "stop", "queue-refusal", "cancel", "cancel-refused", "sign-failure"} {
+	for _, mode := range []string{"arm", "stop", "queue-refusal", "cancel", "cancel-refused", "profile-cancel", "profile-cancel-refused", "sign-failure"} {
 		t.Run(mode, func(t *testing.T) {
 			w, r := sourceStreamWorkFixture()
 			switch mode {
 			case "stop":
 				w = app.SourceWork{Channel: w.Channel, Source: collector.PacketSource{Permit: collector.SourcePermit{Binding: w.Source.Permit.Binding}}, Stop: true, StopIssuedAt: w.Source.Permit.IssuedAt, NotAfter: w.NotAfter}
+			case "profile-cancel", "profile-cancel-refused":
+				now := w.IssuedAt()
+				x := collector.ProfileStop{RootID: w.Channel.RootID, ClusterID: w.Channel.Connector.Binding.ClusterID, CaptureID: "44444444-4444-4444-8444-444444444444", AttemptID: "55555555-5555-4555-8555-555555555555", WriterPodUID: w.Channel.Executor.PodUID, WriterEpoch: w.Channel.Executor.ProcessEpoch, ExpectationDigest: artifact.Digest{5}, WriteUntil: now.Add(time.Minute)}
+				w = app.SourceWork{Channel: w.Channel, StopProfile: &x, StopIssuedAt: now, NotAfter: w.NotAfter}
 			case "cancel", "cancel-refused":
 				now := w.IssuedAt()
 				b := w.Binding()
@@ -107,7 +126,8 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 			region.targets = &countingLocal{}
 			queue := &sourceQueue{fail: mode == "queue-refusal"}
 			snapshots := &sourceSnapshotCanceller{fail: mode == "cancel-refused"}
-			region.sourceWork = &SourceLocal{Queue: queue, Snapshots: snapshots, Verifier: sourceWorkVerifierFunc(func(_ context.Context, b []byte, current fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
+			profiles := &sourceProfileCanceller{fail: mode == "profile-cancel-refused"}
+			region.sourceWork = &SourceLocal{Queue: queue, Snapshots: snapshots, Profiles: profiles, Verifier: sourceWorkVerifierFunc(func(_ context.Context, b []byte, current fleet.APIContextReceiver) (app.AuthenticatedSourceWork, error) {
 				if current.Channel != w.Channel || string(b) != "synthetic-source-signature" {
 					return app.AuthenticatedSourceWork{}, fleet.ErrDenied
 				}
@@ -142,7 +162,7 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 				return w, []byte("synthetic-source-signature"), nil
 			})
 			switch mode {
-			case "queue-refusal", "cancel-refused":
+			case "queue-refusal", "cancel-refused", "profile-cancel-refused":
 				if !errors.Is(err, fleet.ErrUnavailable) {
 					t.Fatal("effect refusal lost", err)
 				}
@@ -158,8 +178,12 @@ func TestSourceWorkIsAQueryThatKeepsTheStandby(t *testing.T) {
 			cancelling := mode == "cancel" || mode == "cancel-refused"
 			switch {
 			case mode == "sign-failure":
-				if queue.calls != 0 || snapshots.calls != 0 {
+				if queue.calls != 0 || snapshots.calls != 0 || profiles.calls != 0 {
 					t.Fatal("unsigned work reached the region")
+				}
+			case mode == "profile-cancel" || mode == "profile-cancel-refused":
+				if profiles.calls != 1 || !profiles.last.Equal(*w.StopProfile) || queue.calls != 0 || snapshots.calls != 0 {
+					t.Fatal("profile cancellation changed attempt or replayed", profiles.calls, queue.calls, snapshots.calls)
 				}
 			case cancelling:
 				if snapshots.calls != 1 || !snapshots.last.Equal(*w.StopSnapshot) || queue.calls != 0 {

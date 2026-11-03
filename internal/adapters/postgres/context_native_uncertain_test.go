@@ -12,14 +12,14 @@ import (
 // or turn the retained uncertainty into metadata-observation admission.
 func TestFirstContextClosedLocalOwnersDoNotClearUncertainResponse(t *testing.T) {
 	c := contextNativeControl{remaining: 32, uncertain: true}
-	if c.canObserve() {
+	if c.canObserve(artifact.MaxGoTraceBytes) {
 		t.Fatal("closed local owners admitted another native observation despite retained failed/unknown output")
 	}
-	if c.canRespond() {
+	if c.canRespond(artifact.DownloadResponsePlan{Version: 1, Selection: artifact.DownloadSelection{Length: artifact.MaxGoTraceBytes}, WindowReadLimit: 80 << 20}) {
 		t.Fatal("failed response permitted another content admission")
 	}
 	c.uncertain = false
-	if !c.canObserve() {
+	if !c.canObserve(artifact.MaxGoTraceBytes) {
 		t.Fatal("known eligible bounded retry denied")
 	}
 }
@@ -69,5 +69,37 @@ func TestFirstContextRetryRequiresExactIndependentSuccessfulOutcome(t *testing.T
 	r.CompletedWindows = 0
 	if firstContextResponseOutcome(r, []artifact.DownloadWindow{w}) {
 		t.Fatal("uncommitted response outcome permitted retry")
+	}
+}
+
+func TestNativeProfileResponseRequiresAllWindowOutcomes(t *testing.T) {
+	n := time.Now().UTC()
+	id := "10000000-0000-4000-8000-000000000001"
+	a := artifact.DownloadAuthority{Scope: artifact.DownloadScope{RootID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: "ns", WorkloadUID: "workload", PodUID: "pod", Version: artifact.Digest{1}, Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "dev", ClientID: "console", Kind: identity.Human}}, PermissionEpoch: id, PermissionSequence: 1, ProjectionDigest: artifact.Digest{2}, DecisionDigest: artifact.Digest{3}, IdentityRevision: identity.Revision{UID: "policy", Generation: 1, Digest: artifact.Digest{4}}, CheckedAt: n, ValidUntil: n.Add(5 * time.Second), AccessUntil: n.Add(time.Hour)}
+	r := artifact.DownloadResponse{ID: id, SessionID: id, OwnerID: id, Generation: 2, Plan: artifact.DownloadResponsePlan{Version: 1, Selection: artifact.DownloadSelection{Offset: 1, Length: 16, Partial: true}, WindowReadLimit: 4 << 20}, StartedAt: n, Until: n.Add(time.Minute), WindowCount: 1, CompletedWindows: 1, EmittedBytes: 16, Closed: true}
+	w := artifact.DownloadWindow{ID: id, ResponseID: id, SessionID: id, OwnerID: id, AuditStoreID: id, Generation: 2, Ordinal: 1, Offset: 1, Length: 16, ReadLimit: 4 << 20, StartedAt: n, WriteUntil: n.Add(time.Minute), Authority: a, IntentAcknowledged: true, OutcomeAcknowledged: true, Outcome: &artifact.DownloadWindowOutcome{EmittedBytes: 16, Success: true, VerifiedFinal: true, RecordedAt: n}}
+	r.Plan.Selection.Offset = 0
+	r.Plan.Selection.Length = 2 * artifact.DownloadWindowBytes
+	r.Plan.Selection.Partial = false
+	r.Plan.WholeFile = true
+	r.Plan.WindowReadLimit = 80 << 20
+	r.WindowCount, r.CompletedWindows, r.EmittedBytes = 2, 2, r.Plan.Selection.Length
+	w.Offset, w.Length, w.ReadLimit = 0, artifact.DownloadWindowBytes, r.Plan.WindowReadLimit
+	w.Outcome.EmittedBytes, w.Outcome.VerifiedFinal = w.Length, false
+	last := w
+	last.ID = "10000000-0000-4000-8000-000000000002"
+	last.Ordinal, last.Offset = 2, w.Length
+	last.Outcome = &artifact.DownloadWindowOutcome{EmittedBytes: last.Length, Success: true, VerifiedFinal: true, RecordedAt: n}
+	if !firstContextResponseOutcome(r, []artifact.DownloadWindow{w, last}) {
+		t.Fatal("complete two-window native profile refused")
+	}
+	for _, windows := range [][]artifact.DownloadWindow{{w}, {last, w}, {w, w}, {w, last, last}} {
+		if firstContextResponseOutcome(r, windows) {
+			t.Fatal("incomplete/duplicate/reordered windows certified")
+		}
+	}
+	last.Outcome.VerifiedFinal = false
+	if firstContextResponseOutcome(r, []artifact.DownloadWindow{w, last}) {
+		t.Fatal("unverified final window certified")
 	}
 }

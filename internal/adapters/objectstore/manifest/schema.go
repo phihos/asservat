@@ -10,6 +10,7 @@ import (
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 	"io"
 	"strconv"
+	"sync"
 )
 
 // Copies of the canonical schemas are generated and checked byte-for-byte.
@@ -23,7 +24,14 @@ func (denyLoader) Load(string) (any, error) { return nil, artifact.ErrInvalid }
 
 type Validator struct{ manifest, commit, pod, syscallEvent *jsonschema.Schema }
 
-func New() (*Validator, error) {
+// The embedded contracts are immutable for this process. Each validation
+// creates its own request state; sharing compiled schemas avoids one complete
+// schema graph per prepared artifact. No caller data or authority is cached.
+var embeddedValidator = sync.OnceValues(compileValidator)
+
+func New() (*Validator, error) { return embeddedValidator() }
+
+func compileValidator() (*Validator, error) {
 	c := jsonschema.NewCompiler()
 	c.UseLoader(denyLoader{})
 	c.AssertFormat()

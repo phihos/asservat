@@ -1,0 +1,27 @@
+{
+  "scope": "Native download implementation at66584c18; not the later combined profile/SQL126 candidate",
+  "sourceCommit": "66584c18d414101fbe32100ccad4bed75fd57863",
+  "command": "TMPDIR=/home/phil/.cache/asservat-build/tmp make go-check go-architecture-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+  "exitCode": 0,
+  "log": "/home/phil/.cache/asservat-build/profile-native-go-gates-final.log",
+  "fullPackages": 68,
+  "kubernetesSelected": 676,
+  "kubernetesGroups": 17,
+  "explicitSkips": [
+    {
+      "test": "TestInitialRuntimeObjectRoundTripWithRealKubernetes",
+      "reason": "requires the owned runtime-object-roundtrip native harness"
+    }
+  ],
+  "goArchitecture": {
+    "packages": 69,
+    "internalImportEdges": 423
+  },
+  "otherVerifiedGates": [
+    "spec-check (13435 assertions)",
+    "architecture-check",
+    "sql-check (68 generated files)"
+  ],
+  "realServices": "profile-native-plan-sql-1-environment.json",
+  "remaining": "Integrate paced transfer3e3dd7b7, profile collection/cancellation, SQL123-126, runtime schemas and resource fixture; native installed workflow qualification remains pending."
+}

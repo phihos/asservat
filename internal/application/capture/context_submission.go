@@ -219,7 +219,12 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 		fresh, readErr := s.refreshGroupMetadata(i, a, preview, key, func() (context.Context, time.Time, error) { e := check(); return call, until, e })
 		return fresh, errors.Join(err, readErr)
 	}
-	if err = narrow(started.Add(5 * time.Second)); err != nil {
+	// Admission has completed under its own five-second observation bound.
+	// Start obtains fresh authority and gets at most five seconds from this
+	// phase handoff, still clipped by every original request/accepted bound.
+	// Counting admission against this phase starved installed profile starts
+	// after a normal storage wait (ADR-292).
+	if err = narrow(s.Now().Add(5 * time.Second)); err != nil {
 		return a, err
 	}
 	if e := a.Expectation; e.Snapshot != nil && e.Lifecycle != nil && e.Lifecycle.TriggerKind == "recordingSave" && !s.RecordingSaveEnabled {

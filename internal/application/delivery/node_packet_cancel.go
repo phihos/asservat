@@ -34,7 +34,7 @@ func (c *NodeChannel) EnqueuePacketCancel(ctx context.Context, nodeUID, captureI
 		return collector.Work{}, ErrNodeUnavailable
 	}
 	pending, ok := e.captures[workID]
-	if !ok || pending.cancelOnly || pending.snapshot != nil || pending.captureID != captureID || !now.Before(pending.until) {
+	if !ok || pending.cancelOnly || pending.snapshot != nil || pending.profile != nil || pending.captureID != captureID || !now.Before(pending.until) {
 		return collector.Work{}, ErrNodeUnavailable
 	}
 	if len(e.work) >= collector.MaxQueuedWork || e.nextSeq == ^uint64(0) {

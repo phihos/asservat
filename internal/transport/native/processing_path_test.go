@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"time"
 )
 
 // Synthetic policy/processing authority only. These tests qualify the actual
@@ -13,5 +14,8 @@ func syntheticProcessingPath(o value.NativeOperation) value.NativeOperation {
 	rev := identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{7}}
 	o.Path = artifact.DownloadPath{ID: id, TargetClusterID: id, StoreID: id, StorageRegion: "fixture", AcquisitionClusterID: id, AcquisitionRegion: "fixture", ConnectorClusterID: id, ConnectorRegion: "fixture", HubClusterID: id, HubRegion: "fixture", WorkerConfiguration: rev, HubConfiguration: rev}
 	o.Processing = artifact.DownloadProcessingProof{RootID: id, Epoch: id, CaptureID: id, Location: artifact.Location{ClusterID: id, ArtifactID: id, AttemptID: id}, Sequence: 1, StateDigest: artifact.Digest{8}, ObservedAt: o.StartedAt, ValidUntil: o.Until}
+	if o.Kind == value.NativeResponse {
+		o.Processing.ValidUntil = identity.Earlier(o.Until, o.StartedAt.Add(5*time.Second))
+	}
 	return o
 }

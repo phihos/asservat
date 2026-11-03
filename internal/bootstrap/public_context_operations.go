@@ -145,6 +145,11 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 			return nil, err
 		}
 	}
+	if summaries, ok := q.ProfileSummaries(); ok {
+		if projection, err = projection.WithProfileSummaries(summaries); err != nil {
+			return nil, err
+		}
+	}
 	return presentation.NewInvestigationProjectionOperations(operations, projection)
 }
 

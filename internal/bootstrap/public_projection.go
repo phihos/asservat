@@ -54,7 +54,8 @@ func (s publicProjectionAdmission) AdmitProjectionWorker(ctx context.Context, q 
 
 // The existing installed worker source, physical Job capacity, provider audit
 // store and native listener serve a second closed purpose. All selection and SQL
-// effects use ReadApproved; no native download session or authority is invented.
+// effects use each closed source's read operation; no native download session
+// or authority is invented.
 func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp.DownloadPolicyReader, processing *postgres.ProcessingReads, profile authorization.DownloadWorkerProfile, jobs *kube.DownloadWorkerJobs, dispatch *evidence.DownloadDispatcher, pool *pgxpool.Pool, scope authorization.KeyScope, audit publicAuditStore) (*analysisapp.ContextProjectionService, error) {
 	if d == nil || d.publicContext == nil || d.Runtime == nil || d.Runtime.native == nil || d.Runtime.started.Load() || policy == nil || processing == nil || jobs == nil || dispatch == nil || pool == nil {
 		return nil, mounts.ErrUnavailable
@@ -120,6 +121,12 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 		Authority: authority, Ledger: ledger, Reader: reader, Now: time.Now, NewID: ownerRandomID,
 		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "query refused"), time.Now)}, Recovery: recovery, Routes: routes, HeaderRoutes: routes, Plans: plans,
 		Workers: publicProjectionAdmission{&evidence.ProjectionWorkerAdmission{Cleanup: cleanup, Ledger: workers, Jobs: jobs, Audit: audit.projectionWorkerObjects(), Now: time.Now}}}
+	// Existing accepted worker and per-query backing gates remain mandatory.
+	// Old smaller transient profiles still serve older tools; summary admission
+	// independently refuses them without rewriting their accepted budget.
+	if profile.MemoryBytes >= query.ProfileSummaryWorkerBytes {
+		service.ProfileRoutes = routes
+	}
 	// The peer adapter is retained by both native admissions. Configure it only
 	// during startup, before any listener/goroutine can observe the pointer.
 	peers, ok := d.Runtime.native.peers.(*mtls.NativePeerChecks)

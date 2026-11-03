@@ -41,6 +41,8 @@ type ContextInput struct {
 	// pod status: the authored composition with its filters frozen at
 	// preview, so the plan never depends on a compiler being present later.
 	Recorder *RecorderContext `json:",omitempty"`
+	// Profile selects one finite Go endpoint acquisition with frozen resolution.
+	Profile *ProfileContext `json:",omitempty"`
 	// Snapshot selects one existing-source window, independently of finite recording.
 	Snapshot *SourceSnapshotContext `json:",omitempty"`
 	// SnapshotSource is a current exact-source observation, never persisted in passive preview.
@@ -135,4 +137,25 @@ type ContextPlan struct {
 	ScopeDigest, RecipeDigest artifact.Digest
 	ValidUntil                time.Time
 	CompiledAt                time.Time
+}
+
+// ProfileContext retains the reviewed endpoint and expanded binding inputs.
+// It carries observations only; the region resolves them again before starting.
+type ProfileContext struct {
+	Composition     ProfileComposition
+	Endpoints       []targets.ProfileEndpointResolution
+	RequireApproval bool `json:",omitempty"`
+}
+
+func (p *ProfileContext) Clone() *ProfileContext {
+	if p == nil {
+		return nil
+	}
+	out := *p
+	out.Composition = *p.Composition.Clone()
+	out.Endpoints = make([]targets.ProfileEndpointResolution, len(p.Endpoints))
+	for i, e := range p.Endpoints {
+		out.Endpoints[i] = e.Clone()
+	}
+	return &out
 }

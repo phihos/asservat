@@ -90,7 +90,7 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 	var err error
 	switch i.call.Tool {
 	case "get_file_excerpt":
-		if !in.Selection.Valid() || in.QueryID != "" || in.Headers != (value.HTTPHeaderSelection{}) {
+		if !in.Selection.Valid() || in.QueryID != "" || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(struct {
@@ -100,12 +100,17 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 			MaxLines   int    `json:"max_lines"`
 		}{in.Selection.CaseID, in.Selection.ArtifactID, in.Selection.Selection.LineStart, in.Selection.Selection.MaxLines})
 	case "get_http_headers":
-		if !in.Headers.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) {
+		if !in.Headers.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(HTTPHeaderOperationInput{CaseID: in.Headers.CaseID, ArtifactID: in.Headers.ArtifactID, Cursor: httpHeaderCursorText(in.Headers), Limit: in.Headers.Limit})
+	case "get_profile_summary":
+		if !in.Profile.Valid() || in.QueryID != "" || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) {
+			return ErrOperationDelivery
+		}
+		raw, err = json.Marshal(ProfileSummaryOperationInput{CaseID: in.Profile.CaseID, ArtifactID: in.Profile.ArtifactID, SampleType: in.Profile.Selection.SampleType, TopN: in.Profile.Selection.TopN})
 	case "get_query_result":
-		if !authorization.UUID(in.QueryID) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) {
+		if !authorization.UUID(in.QueryID) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) {
 			return ErrOperationDelivery
 		}
 		raw, err = json.Marshal(struct {
@@ -136,7 +141,7 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		return ErrOperationDelivery
 	}
 	a := d.Association()
-	selected := a.Selection.Valid() && a.Headers == (value.HTTPHeaderWindow{}) || a.Selection == (value.LineSelection{}) && a.Headers.Valid()
+	selected := a.Selection.Valid() && a.Headers == (value.HTTPHeaderWindow{}) && a.Profile == (value.ProfileSummarySelection{}) || a.Selection == (value.LineSelection{}) && a.Headers.Valid() && a.Profile == (value.ProfileSummarySelection{}) || a.Selection == (value.LineSelection{}) && a.Headers == (value.HTTPHeaderWindow{}) && a.Profile.Valid()
 	if !authorization.UUID(a.ID) || !authorization.UUID(a.QueryID) || !selected {
 		return ErrOperationDelivery
 	}
@@ -148,8 +153,9 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		!i.now().Before(until) || until.After(i.call.Until) || bytes <= 0 || bytes > audit.OperationOutputLimit {
 		return ErrOperationDelivery
 	}
-	if i.call.Tool == "get_file_excerpt" && (a.Selection != i.input.Selection.Selection || a.Headers != (value.HTTPHeaderWindow{})) ||
-		i.call.Tool == "get_http_headers" && (a.Headers != i.input.Headers.Window() || a.Selection != (value.LineSelection{})) ||
+	if i.call.Tool == "get_file_excerpt" && (a.Selection != i.input.Selection.Selection || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{})) ||
+		i.call.Tool == "get_http_headers" && (a.Headers != i.input.Headers.Window() || a.Selection != (value.LineSelection{}) || a.Profile != (value.ProfileSummarySelection{})) ||
+		i.call.Tool == "get_profile_summary" && (a.Profile != i.input.Profile.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{})) ||
 		i.call.Tool == "get_query_result" && a.QueryID != i.input.QueryID {
 		return ErrOperationDelivery
 	}

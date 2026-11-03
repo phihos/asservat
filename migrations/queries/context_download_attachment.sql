@@ -21,7 +21,7 @@ WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3 AND workload_uid=$4
 ORDER BY id LIMIT 2;
 
 -- name: ReadFirstContextResponseWindows :many
--- The first context response has exactly one <=4096-byte window. A second row
--- detects incompatible data; a closed owner is never substituted for outcome.
+-- The installed native response has at most two 64 MiB windows (128 MiB trace).
+-- A third row detects incompatible data; a closed owner is never substituted for outcome.
 -- Caller holds the original session lock, shared with outcome/ack writers.
-SELECT * FROM download_window WHERE response_id=$1 AND session_id=$2 ORDER BY ordinal LIMIT 2;
+SELECT * FROM download_window WHERE response_id=$1 AND session_id=$2 ORDER BY ordinal LIMIT 3;

@@ -2,6 +2,7 @@
 """Self-test: --cleanup-kept removes only one kept run's own resources."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import subprocess
@@ -16,7 +17,7 @@ RUN = "ab12cd34"
 
 
 class KeptCleanup(unittest.TestCase):
-    def cleanup(self, kept, labels):
+    def cleanup(self, kept, labels, cache=None):
         removed = []
 
         def fake_run(args, *, data=None):
@@ -31,13 +32,17 @@ class KeptCleanup(unittest.TestCase):
 
         harness.run = fake_run
         with tempfile.TemporaryDirectory() as directory:
-            manifest = Path(directory, RUN + ".json")
+            run_id = kept["runId"]
+            parent = Path(cache)/"asservat-build/kept" if cache else Path(directory)
+            parent.mkdir(parents=True, exist_ok=True)
+            manifest = parent/(run_id + ".json")
             manifest.write_text(json.dumps(kept))
             results = harness.ROOT / "test/results"
             results.mkdir(parents=True, exist_ok=True)
-            code = harness.cleanup_kept(manifest)
-            report = json.loads((results / ("kept-cleanup-" + RUN + ".json")).read_text())
-            (results / ("kept-cleanup-" + RUN + ".json")).unlink()
+            with patch.dict(os.environ, {"XDG_CACHE_HOME": str(cache)} if cache else {}):
+                code = harness.cleanup_kept(manifest)
+            report = json.loads((results / ("kept-cleanup-" + run_id + ".json")).read_text())
+            (results / ("kept-cleanup-" + run_id + ".json")).unlink()
             return code, removed, report, manifest.exists()
 
     def test_removes_own_resources_and_manifest(self):
@@ -55,6 +60,63 @@ class KeptCleanup(unittest.TestCase):
         self.assertEqual(sorted(report["cleanupFailures"]), ["haptic-cluster", "other"])
         self.assertEqual(removed, [])
         self.assertTrue(left)
+
+
+    def test_removes_owned_private_fixture_directory(self):
+        with tempfile.TemporaryDirectory() as cache:
+            run_id = "context-" + RUN
+            work = Path(cache)/"asservat-build"/run_id
+            work.mkdir(parents=True, mode=0o700)
+            (work/"fixtures.json").write_text("synthetic private inputs")
+            kept = {"runId": run_id, "clusters": [], "containers": [], "volumes": [], "image": None, "networks": [], "workDirectory": str(work)}
+            code, _, report, left = self.cleanup(kept, {}, cache)
+            self.assertEqual(code, 0)
+            self.assertEqual(report["cleanupFailures"], [])
+            self.assertFalse(work.exists())
+            self.assertFalse(left)
+
+    def test_refuses_foreign_or_symlinked_fixture_directory(self):
+        for mode in ("outside-cache", "other-run", "symlink", "foreign-manifest"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as cache:
+                run_id = "context-" + RUN
+                owned = Path(cache)/"asservat-build"/run_id
+                owned.parent.mkdir()
+                foreign = Path(cache)/"unrelated"
+                foreign.mkdir()
+                sentinel = foreign/"keep"
+                sentinel.write_text("unrelated")
+                if mode == "outside-cache":
+                    target = foreign
+                elif mode == "other-run":
+                    target = owned.with_name("context-another-run")
+                    target.mkdir()
+                elif mode == "symlink":
+                    owned.symlink_to(foreign, target_is_directory=True)
+                    target = owned
+                else:
+                    owned.mkdir(mode=0o700)
+                    target = owned
+                kept = {"runId": run_id, "clusters": [], "containers": [], "volumes": [], "image": None, "networks": [], "workDirectory": str(target)}
+                with patch.dict(os.environ, {"XDG_CACHE_HOME": cache}):
+                    code, removed, report, left = self.cleanup(kept, {}, None if mode == "foreign-manifest" else cache)
+                self.assertEqual(code, 1)
+                self.assertEqual(report["cleanupFailures"], [str(target)])
+                self.assertEqual(removed, [])
+                self.assertTrue(left)
+                self.assertTrue(target.exists())
+                self.assertEqual(sentinel.read_text(), "unrelated")
+
+    def test_keeps_private_inputs_when_resource_cleanup_fails(self):
+        with tempfile.TemporaryDirectory() as cache:
+            run_id = "context-" + RUN
+            work = Path(cache)/"asservat-build"/run_id
+            work.mkdir(parents=True, mode=0o700)
+            kept = {"runId": run_id, "clusters": [], "containers": ["foreign"], "volumes": [], "image": None, "networks": [], "workDirectory": str(work)}
+            code, _, report, left = self.cleanup(kept, {"foreign": "someone-else"}, cache)
+            self.assertEqual(code, 1)
+            self.assertEqual(report["cleanupFailures"], ["foreign"])
+            self.assertTrue(work.exists())
+            self.assertTrue(left)
 
 
 class CollectorPacketCleanup(unittest.TestCase):

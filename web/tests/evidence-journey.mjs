@@ -177,6 +177,49 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     assert.deepEqual(browserDownloads, []);
     await page.setViewportSize({ width: 1440, height: 1080 });
     checks.push('revoked session removes the evidence workspace; sign-in returns to exact case; no browser persistence or synthetic native transfer');
+    // UI-only summary qualification uses explicitly synthetic responses here.
+    // The separate installed profile focus owns SQL/key/worker/MCP authority.
+    const profileCase = structuredClone(wire);
+    const artifact = profileCase.data.artifacts[0];
+    artifact.kind = 'profile'; artifact.data_class = 'raw'; artifact.native_format = 'pprof';
+    let summaryCalls = 0;
+    const caseRoute = origin + '/api/v1/operations/get_case';
+    const summaryRoute = origin + '/api/v1/operations/get_profile_summary';
+    await page.route(caseRoute, route => route.fulfill({ json: profileCase }));
+    await page.route(summaryRoute, route => {
+      summaryCalls++;
+      assert.deepEqual(route.request().postDataJSON(), { case_id: caseID, artifact_id: artifact.artifact_id, sample_type: 'cpu', top_n: 20 });
+      assert(route.request().headers()['x-csrf-token']);
+      const now = Date.now();
+      return route.fulfill({ json: { schema_version: 'mcp-result/v1', request_id: '00000000-0000-4000-8000-000000000091', status: 'ok', data_class: 'extract', truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [{ artifactID: artifact.artifact_id, digest: artifact.digest }], data: { sample_type: 'cpu', unit: 'nanoseconds', duration_seconds: 10, total: 100, symbol_status: 'partial', top: [{ function: '<img src="https://outside.invalid" onerror="alert(1)">' + 'x'.repeat(256), flat: 20, cumulative: 50, fraction: null }], query_observed_at: new Date(now).toISOString(), query_expires_at: new Date(now + 10000).toISOString() } } });
+    });
+    try {
+      await page.reload();
+      await expect(page.getByRole('button', { name: 'Inspect saved profile', exact: true })).toBeVisible();
+      assert.equal(summaryCalls, 0);
+      await page.getByRole('button', { name: 'Inspect saved profile', exact: true }).click();
+      await expect(page.getByRole('table', { name: 'Profile function costs' })).toBeVisible();
+      await expect(page.locator('table img')).toHaveCount(0);
+      await expect(page.getByRole('cell', { name: 'Unavailable', exact: true })).toBeVisible();
+      await page.setViewportSize({ width: 320, height: 740 });
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await scan('profile-summary-mobile');
+      await page.screenshot({ path: output + '/profile-summary-mobile.png', fullPage: true });
+      await page.getByRole('button', { name: 'Close view', exact: true }).click();
+      await expect(page.getByRole('table')).toHaveCount(0);
+      assert.equal(summaryCalls, 1);
+      artifact.native_format = 'go-trace';
+      await page.reload();
+      await expect(page.getByRole('heading', { name: 'profile', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Inspect saved profile', exact: true })).toHaveCount(0);
+      assert.equal(summaryCalls, 1);
+      checks.push('synthetic summary wire in actual built UI: explicit typed selection, no eager query, untrusted symbols rendered as text, nullable fraction, mobile reflow and close; Go trace has no pprof action');
+    } finally {
+      await page.unroute(caseRoute); await page.unroute(summaryRoute);
+      await page.setViewportSize({ width: 1440, height: 1080 }); await page.reload();
+      await expect(page.getByRole('heading', { name: 'Pod status', exact: true })).toBeVisible();
+    }
+
   } finally {
     page.off('request', requestListener);
     page.off('download', downloadListener);

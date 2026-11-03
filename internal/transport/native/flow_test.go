@@ -173,7 +173,10 @@ func flowOperationWithConnector(t *testing.T, ctx context.Context, source eviden
 		until = delivery.Until
 		o.Until = until
 		if len(observations) > 0 {
-			o.Until = now.Add(identity.EvidenceReadRequestWindow)
+			o.Until = now.Add(value.NativeConversationWindow(kind))
+			if end, ok := ctx.Deadline(); ok && end.Before(o.Until) {
+				o.Until = end
+			}
 		}
 	}
 	o = syntheticProcessingPath(o)

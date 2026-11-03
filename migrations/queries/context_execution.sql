@@ -21,5 +21,5 @@ UPDATE context_execution SET phase=$3,acquired_at=$4,completed_at=$5,copies_json
 -- ADR-248/273/279/282: started recordings (pcapng, rawPcapng, httpHeaders or syscallRecords expectations) whose start is at
 -- or before the given instant, oldest first, for the hub's collect loop.
 SELECT e.capture_id FROM context_execution e JOIN context_capture c ON c.id=e.capture_id AND c.root_id=e.root_id
-WHERE e.root_id=$1 AND e.phase='started' AND e.started_at<=$2 AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType' IN ('pcapng','rawPcapng','httpHeaders','syscallRecords')
+WHERE e.root_id=$1 AND e.phase='started' AND e.started_at<=$2 AND convert_from(c.expectation_json,'UTF8')::jsonb->>'NativeType' IN ('pcapng','rawPcapng','httpHeaders','syscallRecords','pprof','goTrace')
 ORDER BY e.started_at LIMIT $3;

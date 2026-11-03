@@ -23,21 +23,30 @@ func TestPublicSnapshotCancellationReachesPurposeValidatorWithoutAcquisitionTarg
 		t.Fatal(err)
 	}
 	signers := publicSigners{runtimeID: signer}
-	work := fleetapp.SourceWork{StopSnapshot: &collector.SourceSnapshot{}, NotAfter: time.Now().Add(time.Second)}
-	work.Channel.Connector.Binding.ClusterID = runtimeID
-	// The routing layer must delegate to the existing purpose validator, which
-	// refuses this deliberately invalid descriptor. It must not demand the empty
-	// acquisition Target from a restrictive snapshot-only operation.
-	if _, err = signers.SignSourceWork(t.Context(), work); !errors.Is(err, fleet.ErrDenied) {
-		t.Fatal("snapshot cancel did not reach purpose validation", err)
+	for _, kind := range []string{"snapshot", "profile"} {
+		t.Run(kind, func(t *testing.T) {
+			work := fleetapp.SourceWork{NotAfter: time.Now().Add(time.Second)}
+			work.Channel.Connector.Binding.ClusterID = runtimeID
+			if kind == "snapshot" {
+				work.StopSnapshot = &collector.SourceSnapshot{}
+			} else {
+				work.StopProfile = &collector.ProfileStop{}
+			}
+			// Reach the actual purpose validator, which refuses this deliberately
+			// invalid descriptor. Restrictive work has no acquisition Target;
+			// routing must not reject it before its own authority is checked.
+			if _, err := signers.SignSourceWork(t.Context(), work); !errors.Is(err, fleet.ErrDenied) {
+				t.Fatal("cancel did not reach purpose validation", err)
+			}
+			work.Channel.Connector.Binding.ClusterID = "uninstalled"
+			if _, err := signers.SignSourceWork(t.Context(), work); !errors.Is(err, fleet.ErrUnavailable) {
+				t.Fatal("cancellation routed to an uninstalled signer", err)
+			}
+		})
 	}
-	work.StopSnapshot = nil
+	work := fleetapp.SourceWork{NotAfter: time.Now().Add(time.Second)}
+	work.Channel.Connector.Binding.ClusterID = runtimeID
 	if _, err = signers.SignSourceWork(t.Context(), work); !errors.Is(err, fleet.ErrUnavailable) {
 		t.Fatal("ordinary arm accepted missing cluster target", err)
-	}
-	work.StopSnapshot = &collector.SourceSnapshot{}
-	work.Channel.Connector.Binding.ClusterID = "uninstalled"
-	if _, err = signers.SignSourceWork(t.Context(), work); !errors.Is(err, fleet.ErrUnavailable) {
-		t.Fatal("cancellation routed to an uninstalled signer", err)
 	}
 }

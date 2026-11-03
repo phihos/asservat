@@ -34,12 +34,13 @@ import (
 )
 
 type installedApprovedRecordingPreview struct {
-	ID       string    `json:"preview_id"`
-	Expires  time.Time `json:"expires_at"`
-	Approval bool      `json:"approval_required"`
-	Enabled  bool      `json:"capture_enabled"`
-	Digest   string    `json:"execution_digest"`
-	Blockers []struct {
+	ID          string          `json:"preview_id"`
+	Expires     time.Time       `json:"expires_at"`
+	Approval    bool            `json:"approval_required"`
+	Enabled     bool            `json:"capture_enabled"`
+	Digest      string          `json:"execution_digest"`
+	Composition json.RawMessage `json:"profile_composition"`
+	Blockers    []struct {
 		Code string `json:"code"`
 	} `json:"blockers"`
 	Pods      []struct{ UID, Name string } `json:"selected_pods"`
@@ -68,6 +69,9 @@ func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code str
 // approvedRecordingArguments is the actual public request, validated offline
 // before the expensive installed qualification. It is never authority.
 func approvedRecordingArguments(cluster, namespace, workload string) map[string]any {
+	if installedJourneyFocus() == "manual-profile" {
+		return manualProfileArguments(cluster, namespace, workload)
+	}
 	if installedJourneyFocus() == "manual-raw" {
 		// ADR-279: one finite raw packet recording from a namespace profile.
 		return manualRawArguments(cluster, namespace, workload)
@@ -267,7 +271,7 @@ func (b *installedBrowser) approvedRecordingStepUp(t *testing.T, ctx context.Con
 	b.csrf = view.CSRF
 }
 
-func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string)) {
+func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string), summaryCheck installedProjectionCheck) {
 	t.Helper()
 	// Initial MCP transport/read failures can diagnose and terminate inside
 	// helpers before recovery returns. Sample this one preview first, once.
@@ -390,7 +394,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Fatal("approved recording preview lacks its original window or has a non-approval blocker", preview.Blockers)
 	}
 	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "approved-preview-" + preview.ID}
-	if installedJourneyFocus() == "manual-raw" {
+	if installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-profile" {
 		// ADR-279: raw output downloads only through result-access children of
 		// the requesting human's own client.
 		if len(preview.Lifecycle.Actions) != 1 {
@@ -486,6 +490,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if grant.Phase != "Approved" || grant.Digest != preview.Digest || grant.Decision.By.Subject != reviewer.ReviewerSubject {
 		t.Fatal("independent decision or exact plan changed", grant)
 	}
+	if installedJourneyFocus() == "manual-profile" && grant.DataClass != "raw" {
+		t.Fatal("live profile approval did not retain raw classification", grant.DataClass)
+	}
 	if installedJourneyFocus() == "manual-raw" {
 		// ADR-279: payload approval names the raw class and observation limits.
 		if grant.DataClass != "raw" || grant.Observation == nil || grant.Observation.MaxObservedBytes < 1 || grant.Observation.MaxSessionSeconds < 1 {
@@ -528,7 +535,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	joined := make(chan struct{})
 	go func() {
 		defer close(joined)
-		if measurement != nil {
+		if measurement != nil || installedJourneyFocus() == "manual-profile" {
 			return
 		}
 		for traffic.Err() == nil {
@@ -710,9 +717,12 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	var evidence struct {
 		Artifacts []struct {
-			ID        string    `json:"artifact_id"`
-			DataClass string    `json:"data_class"`
-			Expires   time.Time `json:"expires_at"`
+			ID           string    `json:"artifact_id"`
+			DataClass    string    `json:"data_class"`
+			Kind         string    `json:"kind"`
+			Digest       string    `json:"digest"`
+			NativeFormat string    `json:"native_format"`
+			Expires      time.Time `json:"expires_at"`
 		} `json:"artifacts"`
 	}
 	read("get_case", map[string]string{"case_id": progress.CaseID}, &evidence)
@@ -754,11 +764,14 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Fatal("manual recording retention did not start at submission", evidence)
 	}
 	wantClass := "metadata"
-	if installedJourneyFocus() == "manual-raw" {
+	if installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-profile" {
 		wantClass = "raw"
 	}
 	if installedJourneyFocus() == "manual-http" {
 		wantClass = "extract"
+	}
+	if installedJourneyFocus() == "manual-profile" && (evidence.Artifacts[0].Kind != "profile" || evidence.Artifacts[0].NativeFormat != "pprof") {
+		t.Fatal("published profile is mislabeled", evidence.Artifacts[0].Kind)
 	}
 	if evidence.Artifacts[0].DataClass != wantClass {
 		t.Fatal("case lists the recording with another data class", evidence.Artifacts[0].DataClass, wantClass)
@@ -806,7 +819,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal("native download identity/deadline changed")
 		}
 	}
-	if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil || *download.SizeBytes < 1 || *download.SizeBytes > artifact.RecordingNativeLimit {
+	nativeLimit := int64(artifact.RecordingNativeLimit)
+	if installedJourneyFocus() == "manual-profile" {
+		nativeLimit = artifact.MaxPprofBytes
+	}
+	if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil || *download.SizeBytes < 1 || *download.SizeBytes > nativeLimit {
 		diagnose()
 		t.Fatal("approved recording native download not ready", download.State)
 	}
@@ -824,6 +841,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	response := installedJourneyContent(t, ctx, &http.Client{Transport: transport, Timeout: time.Minute}, strings.TrimSuffix(origin, "/")+download.ContentPath, identity.downloadToken(), nil)
 	_, disposition, dispositionErr := mime.ParseMediaType(response.Header.Get("Content-Disposition"))
 	extension := ".pcapng"
+	if installedJourneyFocus() == "manual-profile" {
+		extension = ".pb.gz"
+	}
 	if installedJourneyFocus() == "manual-syscall" {
 		extension = ".jsonl"
 	}
@@ -832,13 +852,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	if dispositionErr != nil || disposition["filename"] != "artifact-"+evidence.Artifacts[0].ID+extension {
 		response.Body.Close()
-		t.Fatal("native download lacks its PCAPNG filename", response.StatusCode, dispositionErr)
+		t.Fatal("native download lacks its expected filename", response.StatusCode, dispositionErr)
 	}
-	native, err := io.ReadAll(io.LimitReader(response.Body, artifact.RecordingNativeLimit+1))
+	native, err := io.ReadAll(io.LimitReader(response.Body, nativeLimit+1))
 	response.Body.Close()
 	digest := sha256.Sum256(native)
 	if err != nil || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
-		t.Fatal("native PCAPNG does not match authenticated metadata", err)
+		t.Fatal("native artifact does not match authenticated metadata", err)
 	}
 	if measurement != nil {
 		if response.ProtoMajor != 2 || response.ContentLength != int64(len(native)) || response.Header.Get("ETag") != download.ETag {
@@ -848,6 +868,18 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if err := finishUnpaced(); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if installedJourneyFocus() == "manual-profile" {
+		qualifyManualProfileNative(t, ctx, native, receipt.CaptureID)
+		qualifyManualProfileRepeatPreview(t, receipt.CaptureID, preview, invoke)
+		qualifyInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, native, evidence.Artifacts[0].Expires, summaryCheck)
+		qualifyManualProfileStop(t, ctx, manualProfileStopArguments(cluster, namespace, workload), read, invoke, func(grantID string) {
+			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
+			if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent installed profile Stop review", "idempotency_key": "approve-stop-" + grantID}, nil); code != "" {
+				t.Fatal("Stop profile independent approval", code)
+			}
+		})
+		return
 	}
 	if installedJourneyFocus() == "manual-syscall" {
 		// B3: metadata-only JSON Lines of the one recorded Pod.

@@ -3,6 +3,7 @@ import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import { Evidence } from './evidence';
 import type { Artifact, Download } from './http';
+import { ProfileSummaryView } from '../projection/ProfileSummaryView';
 import { ContextProjectionView } from '../projection/ContextProjectionView';
 import { ContextProjection } from '../projection/projection';
 import { SharePanel } from '../sharing/SharePanel';
@@ -20,6 +21,10 @@ function SavedPodStatus({ session, scope, caseID, artifactID }: { session: Sessi
   // view aborts its request and clears its result on unmount or session loss.
   const [controller] = useState(() => new ContextProjection());
   return <ContextProjectionView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifactID}/>;
+}
+function SavedProfileSummary({ session, scope, caseID, artifact }: { session: Session; scope: AbortSignal; caseID: string; artifact: Artifact }) {
+  const [controller] = useState(() => ContextProjection.profile());
+  return <ProfileSummaryView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest}/>;
 }
 function Handling({ artifact }: { artifact: Artifact }) {
   const notice = artifact.handling_notice;
@@ -52,6 +57,7 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
         <Handling artifact={artifact}/>
         {Date.parse(artifact.expires_at) <= Date.now() ? <p>Evidence access has expired.</p> : <>
           {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <SavedPodStatus session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id}/>}
+          {artifact.kind === 'profile' && artifact.native_format === 'pprof' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared' && <SavedProfileSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/>}
           <Button className="button" isDisabled={state.busy || pending} onPress={() => void controller.prepare(artifact)}>Download</Button>
           {state.details?.case.access !== 'shared' && <>
             <SharePanel session={session} scope={scope} caseID={caseID} artifact={artifact} preview={<>

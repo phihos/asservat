@@ -2,7 +2,7 @@ package mtls
 
 import (
 	"asservat.local/asservat/internal/contracts"
-	"asservat.local/asservat/internal/domain/identity"
+	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"crypto/tls"
 	"io"
@@ -225,9 +225,10 @@ func (s *NativeClientStream) begin(ctx context.Context, read bool) (func(), erro
 		return nil, contracts.ErrNativeProtocol
 	}
 	d, ok := ctx.Deadline()
-	// Frame calls carry the operation's current bound: at most the
-	// evidence-read window for an approved projection read.
-	if !ok || !time.Now().Before(d) || d.After(time.Now().Add(identity.EvidenceReadRequestWindow)) {
+	// Frame waits fit the longest supported operation (a response window).
+	// The owning context and purpose-specific gate retain their earlier bounds;
+	// this transport ceiling never supplies disclosure authority.
+	if !ok || !time.Now().Before(d) || d.After(time.Now().Add(value.NativeConversationWindow(value.NativeResponse))) {
 		return nil, contracts.ErrNativeProtocol
 	}
 	s.mu.Lock()

@@ -128,3 +128,23 @@ func TestGrantOperationsWire(t *testing.T) {
 		t.Fatal("unknown decision accepted")
 	}
 }
+
+func TestProfileGrantReviewWire(t *testing.T) {
+	base, f := operationFixture(t, true)
+	uc := &grantUseCase{view: grantView(f.i.VerifiedAt), until: f.metadataUntil}
+	uc.view.Review.Actions = []authapp.GrantReviewAction{{ActionID: "cpu", Kind: "profile", ExecutionMode: "onTrigger", MaxBytes: 16 << 20, Sensitive: []string{"liveProfile"}, Profile: &authapp.GrantReviewProfile{Runtime: "go", Type: "heap", Mode: "snapshot", Source: "httpEndpoint", Timeout: "5s", ForceGC: true, SourceRef: "go-endpoint", SourceName: "go-pprof-loopback", AddressMode: "targetLoopback", Port: 6060, PathPolicy: "go-pprof/v1", EndpointDigest: strings.Repeat("ab", 32)}}}
+	s, err := NewGrantOperations("https://console.invalid", base.config.Now, func() string { return "00000000-0000-4000-8000-000000000099" }, uc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply, err := s.Call(t.Context(), f, "get_grant", []byte(`{"grant_id":"00000000-0000-4000-8000-0000000009a1"}`))
+	if err != nil || !strings.Contains(string(reply.Body), `"status":"ok"`) {
+		t.Fatalf("profile review: %v %s", err, reply.Body)
+	}
+	var out struct {
+		Data grantData `json:"data"`
+	}
+	if json.Unmarshal(reply.Body, &out) != nil || len(out.Data.Actions) != 1 || out.Data.Actions[0].Profile == nil || out.Data.Actions[0].Profile.Type != "heap" || !out.Data.Actions[0].Profile.ForceGC || out.Data.Actions[0].Profile.Port != 6060 || strings.Contains(string(reply.Body), `"ring_max_bytes"`) {
+		t.Fatalf("profile review changed facts or invented ring: %s", reply.Body)
+	}
+}

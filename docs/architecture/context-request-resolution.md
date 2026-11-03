@@ -13,7 +13,11 @@ then the immutable preview ID, then bounded legacy matches. A private decoder
 validates the existing canonical compiler scope, digest, actor, capture ID,
 execution class, target and deadline before current ordinary read authorization.
 The old key with another request still conflicts after current authorization.
-Accepted lookup does not require a live Pod or an available collector.
+For approved recordings, snapshots and profiles, the compiler's explicit
+approved-acceptance timing marker replaces the absolute review deadline. The
+accepted write deadline remains immutable; decoding never renews it or supplies
+current authority. Accepted lookup does not require a live Pod or an available
+collector.
 
 Owned passive previews can be closed with current identity, read OAuth scope
 and recovery after target permission is removed: this discloses no target data

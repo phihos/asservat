@@ -1,0 +1,10 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/108 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 108/108 completed, now fuzzing with 2 workers
+fuzz: elapsed: 3s, execs: 36107 (12034/sec), new interesting: 16 (total: 124)
+fuzz: elapsed: 6s, execs: 66961 (10284/sec), new interesting: 27 (total: 135)
+fuzz: elapsed: 9s, execs: 83242 (5427/sec), new interesting: 30 (total: 138)
+fuzz: elapsed: 12s, execs: 160480 (25747/sec), new interesting: 36 (total: 144)
+fuzz: elapsed: 15s, execs: 236182 (25237/sec), new interesting: 44 (total: 152)
+fuzz: elapsed: 16s, execs: 236182 (0/sec), new interesting: 44 (total: 152)
+PASS
+ok  	asservat.local/asservat/internal/adapters/diagnostics	16.016s

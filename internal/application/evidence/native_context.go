@@ -76,12 +76,18 @@ func sameNativeMetadata(a, b artifact.NativeDownloadMetadata) bool {
 
 // NativeWindowReadWork bounds the ciphertext one remote response window of
 // the source reads. Pod status keeps its historical fixed charge. Any other
-// type is at most one frame (ADR-248), read as that frame and one index page,
-// each with its fixed cipher overhead; the window's read limit and the session
+// recorder type is at most one frame (ADR-248); profiles use up to nine frames
+// per window. Include index pages and fixed cipher overhead; the window's
+// read limit and the session
 // read budget are charged with this bound, not with measured reads.
 func NativeWindowReadWork(t artifact.NativeType) int64 {
 	if t.Name == artifact.PodStatusArtifact {
 		return ContextDownloadReadWork
+	}
+	if t.DownloadLimit() > artifact.FrameBytes {
+		// A 64 MiB response window can straddle nine encrypted storage frames
+		// and two index pages. Charge this worst case even for a shorter range.
+		return artifact.ProfileDownloadWindowReadWork
 	}
 	return artifact.FrameBytes + artifact.CipherOverhead + artifact.PageBytes + artifact.CipherOverhead
 }
@@ -322,7 +328,7 @@ func (r *RegionalContextResult) Read(ctx context.Context, o value.NativeOperatio
 // check; any failure stops the window and is not retried in this process.
 func (r *RegionalContextResult) ReadWindow(ctx context.Context, o value.NativeOperation, source NativeContextSource, window string, offset, length int64, deliver func(context.Context, []byte) error) error {
 	limit := source.Expectation.Type().DownloadLimit()
-	if o.Kind != value.NativeResponse || deliver == nil || !value.UUID(window) || !source.Valid(o.SourceVersion) || o.Processing.Location != source.Expectation.Registration.Location || o.Path.StoreID != source.Expectation.Registration.StoreID || offset < 0 || length < 1 || offset > limit || length > limit-offset {
+	if o.Kind != value.NativeResponse || deliver == nil || !value.UUID(window) || !source.Valid(o.SourceVersion) || o.Processing.Location != source.Expectation.Registration.Location || o.Path.StoreID != source.Expectation.Registration.StoreID || offset < 0 || length < 1 || length > artifact.DownloadWindowBytes || offset > limit || length > limit-offset {
 		return artifact.ErrInvalid
 	}
 	call, leave, e := r.enter(ctx, o)

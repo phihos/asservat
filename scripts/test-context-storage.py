@@ -9,6 +9,7 @@ No host kernel configuration or privileged collector is installed.
 """
 import argparse
 import concurrent.futures
+from contextlib import ExitStack
 import json
 import hashlib
 import os
@@ -365,7 +366,7 @@ def qualify_direct_helper_issuer(env, report):
 
 def qualification_cluster_count(default_count, installer_continuation=False):
     """Owned topology: one hub plus one workload cluster for these focuses."""
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording", "manual-syscall", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording", "manual-syscall", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
         return 2
     return default_count
 
@@ -373,7 +374,7 @@ def qualification_cluster_count(default_count, installer_continuation=False):
 def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False, native_traffic_probe=False):
     if native_traffic_probe:
         return "2m"
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "manual-syscall", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "manual-syscall", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
         return "18m"
     if installer_continuation:
         # The installed journey waits for its capture's ten-minute expiry; the
@@ -386,7 +387,7 @@ def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False,
 
 def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False):
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
-    collector_qualification = installer_continuation and focus in ("approved-recording", "manual-syscall", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed")
+    collector_qualification = installer_continuation and focus in ("approved-recording", "manual-syscall", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed")
     native_paced = installer_continuation and focus == "native-paced"
     native_traffic_probe = test_pattern == NATIVE_TRAFFIC_PROBE
     guard = Path("/etc/asservat-disposable-host")
@@ -412,8 +413,11 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     test_package = "./internal/adapters/kms" if owner_provider_auth else "./internal/adapters/kubernetes" if runtime_object_roundtrip else "./test/integration"
     cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home()/".cache"))/"asservat-build"
     cache.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="context-", dir=cache) as directory:
-        work = Path(directory)
+    with ExitStack() as cleanup:
+        work = Path(tempfile.mkdtemp(prefix="context-", dir=cache)).absolute()
+        work.chmod(0o700)
+        keep_work = False
+        cleanup.callback(lambda: None if keep_work else shutil.rmtree(work))
         run_id = work.name.replace("_", "-")
         network = "asservat-"+run_id
         containers, clusters, ephemeral_volumes = [], [], []
@@ -466,6 +470,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             subprocess.run(["make", "--no-print-directory", "hub-binary", "HUB_BINARY="+str(image_dir/"asservat"), "ASSERVAT_BUILD_TMP="+build_env["TMPDIR"]], cwd=ROOT, env=build_env, check=True)
             subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"provider-proxy"), "./test/fixtures/provider-proxy/main.go"], cwd=ROOT, env=build_env, check=True)
             helper_copy = ""
+            if focus == "manual-profile":
+                subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"profile-native"), "./test/fixtures/profile-native/main.go"], cwd=ROOT, env=build_env, check=True)
+                helper_copy += "COPY profile-native /profile-native\n"
+                report["profileWorkloadSHA256"] = hashlib.sha256((image_dir/"profile-native").read_bytes()).hexdigest()
             if direct_observation:
                 qualify_direct_helper_issuer(build_env, report)
                 subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"observation-native"), *[str(ROOT/"test/fixtures/observation-native"/name) for name in DIRECT_OBSERVATION_HELPER_SOURCES]], cwd=ROOT, env=build_env, check=True)
@@ -900,13 +908,16 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             # --cleanup-kept removes exactly these later with its own evidence.
             keep = keep_on_failure and exit_code != 0 and bool(clusters)
             if keep:
-                kept = {"runId": run_id, "clusters": clusters, "containers": containers, "volumes": ephemeral_volumes, "image": worker_tag, "upgradeImage": upgrade_tag, "collectorImage": collector_tag,
+                kept = {"runId": run_id, "clusters": clusters, "containers": containers, "volumes": ephemeral_volumes, "image": worker_tag, "upgradeImage": upgrade_tag, "collectorImage": collector_tag, "workDirectory": str(work),
                         "networks": [n for n, made in ((network, created_network), (kind_network, created_kind_network)) if made]}
                 (cache/"kept").mkdir(exist_ok=True)
                 manifest = cache/"kept"/(run_id+".json")
                 manifest.write_text(json.dumps(kept, indent=2)+"\n")
+                keep_work = True
                 report["keptResources"] = str(manifest)
+                report["keptWorkDirectory"] = str(work)
                 print("Kept failed fixture for inspection:", manifest, flush=True)
+                print("  private fixture directory:", work, flush=True)
                 for name in clusters:
                     print("  kubeconfig: kind get kubeconfig --name", name, flush=True)
                 print("  remove with: python3 scripts/test-context-storage.py --cleanup-kept", manifest, flush=True)
@@ -971,6 +982,22 @@ def cleanup_kept(path):
     if not re.fullmatch(r"[a-z0-9-]{4,64}", run_id):
         raise ValueError("invalid kept run id")
     failures = []
+    work = None
+    if "workDirectory" in kept:
+        # A manifest cannot turn cleanup into an arbitrary recursive removal.
+        # Keep the original path so fixtures.json and kubeconfig references work.
+        cache = (Path(os.environ.get("XDG_CACHE_HOME", Path.home()/".cache"))/"asservat-build").resolve()
+        candidate = Path(kept["workDirectory"])
+        manifest = Path(path)
+        if (not candidate.is_absolute() or candidate.is_symlink()
+                or candidate.parent.resolve() != cache
+                or not candidate.name.startswith("context-")
+                or candidate.name.replace("_", "-") != run_id
+                or manifest.is_symlink() or manifest.name != run_id+".json"
+                or manifest.parent.resolve() != cache/"kept"):
+            failures.append(str(candidate))
+        else:
+            work = candidate
     for name in reversed(kept["clusters"]):
         try:
             info = json.loads(run(["docker", "inspect", name+"-control-plane"]))[0]
@@ -985,6 +1012,11 @@ def cleanup_kept(path):
                 assert labels["asservat.test"] == run_id
                 run(["docker", kind, "rm", "-f", "-v", name] if kind == "container" else ["docker", kind, "rm", name])
             except Exception: failures.append(name)
+    if work is not None and not failures:
+        try:
+            shutil.rmtree(work)
+        except OSError:
+            failures.append(str(work))
     report = {"runId": run_id, "manifest": str(path), "cleanupFailures": failures}
     (ROOT/"test/results"/("kept-cleanup-"+run_id+".json")).write_text(json.dumps(report, indent=2)+"\n")
     if failures:

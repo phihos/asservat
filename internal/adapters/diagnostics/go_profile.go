@@ -44,10 +44,33 @@ func (c *GoProfileCollector) CollectGoProfile(parent context.Context, r value.Go
 	if sink == nil {
 		return out, value.ErrInvalid
 	}
+	return c.collectGoProfile(parent, r, sink.ConsumeGoProfile, sink.Close, true)
+}
+
+// CollectGoProfileNative runs the same one-attempt HTTP mechanism for the
+// key-free node collector. The destination consumes native bytes synchronously;
+// this result establishes no encrypted layout, custody or publication. The
+// authenticated connector must encrypt and verify the delivered bytes.
+func (c *GoProfileCollector) CollectGoProfileNative(parent context.Context, r value.GoProfileRequest, destination io.Writer) (value.GoProfileOutcome, error) {
+	if destination == nil {
+		return value.GoProfileOutcome{}, value.ErrInvalid
+	}
+	consume := func(ctx context.Context, _ value.GoProfileRequest, source io.Reader) (artifact.Layout, error) {
+		_, err := io.Copy(destination, source)
+		if ctx.Err() != nil {
+			err = ctx.Err()
+		}
+		return artifact.Layout{}, err
+	}
+	result, err := c.collectGoProfile(parent, r, consume, func() {}, false)
+	return result.Outcome, err
+}
+
+func (c *GoProfileCollector) collectGoProfile(parent context.Context, r value.GoProfileRequest, consume func(context.Context, value.GoProfileRequest, io.Reader) (artifact.Layout, error), closeSink func(), encrypted bool) (out port.GoProfileCollection, err error) {
 	var watch *profileWatch
 	var channelDeadline time.Time
 	defer func() {
-		sink.Close()
+		closeSink()
 		// Output disposal also joins the original attempt. Check immutable/current
 		// cutoffs after it; the collector owns even an unopened prepared sink.
 		if err == nil && (parent.Err() != nil || r.Validate(c.now()) != nil || watch == nil || !watch.valid(c.now()) || !c.now().Before(channelDeadline)) {
@@ -174,7 +197,7 @@ func (c *GoProfileCollector) CollectGoProfile(parent context.Context, r value.Go
 		return out, value.ErrProfileLimit
 	}
 	body := &profileBody{ctx: channelCtx, source: response.Body, remaining: r.NativeLimit}
-	layout, sinkErr := sink.ConsumeGoProfile(channelCtx, r, body)
+	layout, sinkErr := consume(channelCtx, r, body)
 	out.Outcome.NativeBytes = r.NativeLimit - body.remaining
 	if body.failure != nil {
 		return out, profileOperationError(channelCtx, body.failure)
@@ -182,7 +205,7 @@ func (c *GoProfileCollector) CollectGoProfile(parent context.Context, r value.Go
 	if sinkErr != nil {
 		return out, profileOperationError(channelCtx, value.ErrProfileOutput)
 	}
-	if !body.eof || out.Outcome.NativeBytes == 0 || layout.Validate() != nil || layout.Binding != r.Binding || layout.NativeBytes != out.Outcome.NativeBytes {
+	if !body.eof || out.Outcome.NativeBytes == 0 || encrypted && (layout.Validate() != nil || layout.Binding != r.Binding || layout.NativeBytes != out.Outcome.NativeBytes) {
 		return out, value.ErrProfileOutput
 	}
 	if channelCtx.Err() != nil || !watch.valid(c.now()) {

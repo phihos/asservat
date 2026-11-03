@@ -62,3 +62,7 @@ summary { cursor: pointer; min-height: 44px; padding: 8px 0; color: #126b54; }
 .plan-diff th, .plan-diff td { text-align: left; vertical-align: top; padding: 6px 8px 6px 0; border-top: 1px solid #e3e6e9; overflow-wrap: anywhere; }
 .plan-diff-actions { list-style: none; padding: 0; margin: 8px 0; }
 .manifest { max-height: 24rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.profile-summary { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
+.profile-summary th, .profile-summary td { text-align: left; vertical-align: top; padding: 6px 4px; border-top: 1px solid #e3e6e9; overflow-wrap: anywhere; }
+.profile-summary th:first-child { width: 40%; }

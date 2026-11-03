@@ -116,6 +116,22 @@ func (w *StreamingWriter) flush(ctx context.Context) error {
 // Finish uploads the last part, completes create-only, records the receipt and
 // verifies the complete ciphertext before returning it for StoreCopies.
 func (w *StreamingWriter) Finish(ctx context.Context) (artifact.CopyReceipt, error) {
+	receipt, err := w.FinishStored(ctx)
+	if err != nil {
+		return artifact.CopyReceipt{}, err
+	}
+	if err = w.objects.VerifyStreaming(ctx, w.plan.Registration.Location, receipt, w.plan.Registration.Limits()[0]); err != nil {
+		return artifact.CopyReceipt{}, err
+	}
+	return receipt, nil
+}
+
+// FinishStored completes the one-use upload and records its acknowledged
+// receipt without reading ciphertext. The digest describes the bytes sent;
+// it is not a verification verdict. Only the protected non-resumable profile
+// producer uses this path, with its private no-release journal. Independent
+// full verification is required before publication. Generic custody uses Finish.
+func (w *StreamingWriter) FinishStored(ctx context.Context) (artifact.CopyReceipt, error) {
 	var zero artifact.CopyReceipt
 	if w == nil || w.failed {
 		return zero, ErrUnavailable
@@ -142,9 +158,6 @@ func (w *StreamingWriter) Finish(ctx context.Context) (artifact.CopyReceipt, err
 		return zero, ErrUnavailable // uncertain completion: reconcile, never repeat
 	}
 	if _, _, err = w.journal.AdvanceStreaming(ctx, w.plan, artifact.StreamingStep{Kind: artifact.StreamAckComplete, Receipt: receipt}); err != nil {
-		return zero, err
-	}
-	if err = w.objects.VerifyStreaming(ctx, loc, receipt, w.plan.Registration.Limits()[0]); err != nil {
 		return zero, err
 	}
 	return receipt, nil

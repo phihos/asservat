@@ -13,9 +13,11 @@ import (
 type Operation string
 
 const (
-	CollectContext   Operation = "collectContext"
-	ReadApproved     Operation = "readApproved"
-	DownloadApproved Operation = "downloadApproved"
+	CollectContext Operation = "collectContext"
+	ReadApproved   Operation = "readApproved"
+	// ReadProfileSummary authorizes only a closed pprof aggregate, never raw bytes.
+	ReadProfileSummary Operation = "readProfileSummary"
+	DownloadApproved   Operation = "downloadApproved"
 	// ApproveAction is reviewing another person's sensitive acquisition
 	// request (ADR-249): the action-approver role in scope. It is never an
 	// evidence read and never collection.
@@ -60,6 +62,8 @@ type Retained struct {
 	ArtifactID string
 	Target     Target
 	DataClass  string
+	// NativeType is required only by the closed profile-summary facet.
+	NativeType string
 	ExpiresAt  time.Time
 	Audience   []artifact.AudienceAssignment
 }
@@ -91,7 +95,7 @@ func (t Target) Valid() bool {
 	return UUID(t.ClusterID) && identity.Text(t.NamespaceUID, 64) && identity.Text(t.WorkloadUID, 64) && identity.Text(t.PodUID, 64)
 }
 func (op Operation) Valid() bool {
-	return op == CollectContext || op == ReadApproved || op == DownloadApproved || op == ApproveAction
+	return op == CollectContext || op == ReadApproved || op == ReadProfileSummary || op == DownloadApproved || op == ApproveAction
 }
 func validAudience(a artifact.AudienceAssignment) bool {
 	return (a.Kind == "User" || a.Kind == "Group" || a.Kind == "Workload") && identity.Text(a.Issuer, 2048) && identity.Text(a.SubjectID, 256) && validRole(a.Role) && (a.BasisKind == "AccessBinding" || a.BasisKind == "PermissionSource") && identity.Text(a.BasisUID, 64) && UUID(a.AssignmentID) && a.BasisDigest != (artifact.Digest{})
@@ -103,7 +107,7 @@ func permits(role string, op Operation) bool {
 	switch op {
 	case CollectContext:
 		return role == "workload-maintainer"
-	case ReadApproved, DownloadApproved:
+	case ReadApproved, ReadProfileSummary, DownloadApproved:
 		return role == "evidence-reader" || role == "workload-maintainer" || role == "evidence-owner"
 	case ApproveAction:
 		return role == "action-approver"
@@ -203,7 +207,10 @@ func evaluateDetailScope(i identity.Identity, p Projection, op Operation, t Targ
 	if requireRetained && op != CollectContext && op != ApproveAction && (e == nil || !e.valid() || e.Target != t || !now.Before(e.ExpiresAt)) {
 		return deny("EvidenceUnavailable")
 	}
-	if e != nil && e.DataClass != "metadata" && e.DataClass != "extract" {
+	if e != nil && op == ReadProfileSummary && (e.DataClass != "raw" || e.NativeType != artifact.PprofArtifact) {
+		return deny("ProjectionSourceUnsupported")
+	}
+	if e != nil && op != ReadProfileSummary && e.DataClass != "metadata" && e.DataClass != "extract" {
 		return deny("RawAccessUnsupported")
 	}
 	until := identity.Earlier(i.ValidUntil, p.FreshUntil)

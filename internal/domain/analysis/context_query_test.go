@@ -198,3 +198,25 @@ func TestQueryFlooredDeadlineMustStillFollowActualNow(t *testing.T) {
 		t.Fatal("remaining representable interval changed", err)
 	}
 }
+
+func TestProfileSummaryRequiresDeclaredWorkerMemoryWithoutChangingOldQueries(t *testing.T) {
+	a := testAuthority()
+	p := queryPlan(a)
+	if !p.Matches(a.Scope) {
+		t.Fatal("legacy context backing refused")
+	}
+	s := a.Scope
+	s.NativeType, s.SourceFormat, s.DisplayVersion = artifact.PprofArtifact, artifact.PprofFormat, ProfileSummaryDisplayVersion
+	s.SourceProjectionDigest, s.Selection, s.Profile = artifact.Digest{}, LineSelection{}, ProfileSummarySelection{SampleType: "cpu", TopN: 20}
+	if p.Matches(s) {
+		t.Fatal("old small worker declaration authorized analyzer")
+	}
+	p.Profile.Worker.MemoryBytes = ProfileSummaryWorkerBytes
+	if p.Matches(s) {
+		t.Fatal("physical memory substituted for declared transient budget")
+	}
+	p.Profile.Worker.WorkerTransientBytes = ProfileSummaryWorkerBytes
+	if !p.Matches(s) || !p.Matches(a.Scope) {
+		t.Fatal("shared bounded worker refused")
+	}
+}

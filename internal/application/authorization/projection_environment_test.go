@@ -31,7 +31,7 @@ func (f *queryEnvironmentFixture) step(ctx context.Context, name string) error {
 	}
 	return ctx.Err()
 }
-func (f *queryEnvironmentFixture) ContextProjectionPolicy(ctx context.Context, target, store string) (value.ContextProjectionPolicy, error) {
+func (f *queryEnvironmentFixture) ContextProjectionPolicy(ctx context.Context, target, store, nativeType string) (value.ContextProjectionPolicy, error) {
 	if target != f.policy.Path.TargetClusterID || store != f.policy.Path.StoreID {
 		return value.ContextProjectionPolicy{}, value.ErrUnavailable
 	}

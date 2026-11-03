@@ -1,9 +1,16 @@
 package integration
 
 import (
+	"asservat.local/asservat/internal/adapters/diagnostics"
+	executionapp "asservat.local/asservat/internal/application/execution"
+	privacyapp "asservat.local/asservat/internal/application/privacy"
+	"asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/execution"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	pprof "github.com/google/pprof/profile"
 	"testing"
 	"time"
 
@@ -28,6 +35,14 @@ import (
 // ownership remain explicit synthetic inputs; this is SQL/S3 qualification.
 func TestContextQueryLedgerWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, qualifyProtectedContextQueryLedger)
+}
+
+func TestProfileSummaryQueryLedgerWithRealPostgres(t *testing.T) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+		t.Run("profile-summary-source-and-ledger", func(t *testing.T) {
+			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyContextQueries, true)
+		})
+	})
 }
 
 func TestContextQueryLedgerOriginalQualification(t *testing.T) {
@@ -109,8 +124,21 @@ func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin
 	withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyContextQueries)
 }
 
-func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects, qualify func(*testing.T, *queryLedgerFixture)) {
-	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) { queryLedgerQualification(t, f) })
+func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects, qualify func(*testing.T, *queryLedgerFixture), profileSource ...bool) {
+	isProfile := len(profileSource) > 0 && profileSource[0]
+	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
+		queryLedgerQualification(t, f)
+		if isProfile {
+			q := f.qualification.ContextQuery
+			q.Profile.Worker.MemoryBytes, q.Profile.Worker.WorkerTransientBytes = value.ProfileSummaryWorkerBytes, value.ProfileSummaryWorkerBytes
+			q.RootQueries, q.PrincipalQueries, q.WorkloadQueries = 20, 20, 20
+			var err error
+			q.Envelope, err = q.Required()
+			if err != nil || !f.qualification.Valid() {
+				t.Fatal("original summary backing", err)
+			}
+		}
+	})
 	// Pools opened by this owned extension close on function return. The base
 	// fixture's pools and source loop close with this sole top-level fixture.
 	originalPool := f.fixturePool
@@ -155,8 +183,11 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	for _, p := range pools[processingPools:] {
 		p.Close()
 	}
-	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled)
+	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile)
 	profile := syntheticWorkerProfile(f.input.InstallationID)
+	if isProfile {
+		profile.MemoryBytes = value.ProfileSummaryWorkerBytes
+	}
 	profile.ClusterID = scope.ClusterID
 	profile.Configuration = f.qualification.ContextQuery.Profile.Source
 	profile.StoreCredentialSecret, profile.StoreCredentialSecretUID = "query-fixture-store", custodyID()
@@ -175,7 +206,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path}
+	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path, profile: isProfile}
 	query.policies, err = authapp.NewContextProjectionPolicies(raw, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -187,36 +218,86 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 
 // Produce and independently publish an actual managed context. No download
 // session, download policy or download authority supplies query admission.
-func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.RootConfiguration, enrollment app.Enrollment) (captureAdmissionScenario, artifact.PublishedContext) {
+func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.RootConfiguration, enrollment app.Enrollment, profileSource bool) (captureAdmissionScenario, artifact.PublishedContext) {
 	t.Helper()
-	s, accepted := f.admitManagedContextRetention(t, root, enrollment, 60)
+	var s captureAdmissionScenario
+	var accepted capture.Accepted
+	var profileSQL *postgres.APIContextExecutions
+	var started execution.APIExecution
+	var refresh func() executionapp.APIExecutionCheck
+	if profileSource {
+		s, accepted, profileSQL = admitQueryLedgerProfile(t, f, root, enrollment)
+		started, refresh = startQueryLedgerProfile(t, f, s, accepted, profileSQL)
+	} else {
+		s, accepted = f.admitManagedContextRetention(t, root, enrollment, 60)
+	}
 	e := accepted.Expectation
 	bound, err := f.store.ForCustody(e.Registration.StoreID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	producer, err := objectstore.NewContextProducer(bound, f.keys, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	prepared, err := producer.PrepareContext(f.ctx, e)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer prepared.Close()
-	at := time.Now().UTC()
-	payload, err := json.Marshal(map[string]any{"format": artifact.ContextFormat, "namespaceUID": e.NamespaceUID, "podUID": e.PodUID, "resourceVersion": "synthetic-1", "observedAt": at, "phase": "Running", "ready": "True", "initialized": "True", "scheduled": "True", "runtimeInstances": 1, "running": 1, "waiting": 0, "terminated": 0, "restarts": 0})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clear(payload)
-	copies, err := prepared.StoreContext(f.ctx, payload, at, at)
-	if err != nil {
-		t.Fatal("managed encrypted query source", err)
+	var copies artifact.Copies
+	if profileSource {
+		producer, err := objectstore.NewArtifactProducer(bound, f.keys, unusedStreamingJournal{}, time.Now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		prepared, err := producer.Prepare(f.ctx, e, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body bytes.Buffer
+		function := &pprof.Function{ID: 1, Name: "synthetic.work"}
+		location := &pprof.Location{ID: 1, Line: []pprof.Line{{Function: function}}}
+		native := &pprof.Profile{PeriodType: &pprof.ValueType{Type: "cpu", Unit: "nanoseconds"}, SampleType: []*pprof.ValueType{{Type: "cpu", Unit: "nanoseconds"}}, Function: []*pprof.Function{function}, Location: []*pprof.Location{location}, Sample: []*pprof.Sample{{Location: []*pprof.Location{location}, Value: []int64{7}}}}
+		if err = native.Write(&body); err != nil {
+			t.Fatal(err)
+		}
+		if err = diagnostics.CheckPprof(bytes.NewReader(body.Bytes())); err != nil {
+			t.Fatal("synthetic profile shape", err)
+		}
+		at := time.Now().UTC()
+		copies, err = prepared.Store(f.ctx, bytes.NewReader(body.Bytes()), started.StartedAt, at)
+		clear(body.Bytes())
+		if err != nil {
+			t.Fatal("managed encrypted profile source", err)
+		}
+		stored := time.Now().UTC().Truncate(time.Microsecond)
+		started.Copies, started.Phase, started.AcquiredAt, started.CompletedAt = copies, "stored", at.Truncate(time.Microsecond), stored
+		c := refresh()
+		completion := artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: evidence.ContextExpectationDigest(e), Copies: copies, StoredAt: stored, ClosedAt: stored}
+		if _, err = profileSQL.RecordAPIStoredCompletion(f.ctx, started, completion, c.Process, c.Recovery); err != nil {
+			t.Fatal("managed profile stored completion", err)
+		}
+
+	} else {
+		producer, err := objectstore.NewContextProducer(bound, f.keys, time.Now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		prepared, err := producer.PrepareContext(f.ctx, e)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer prepared.Close()
+		at := time.Now().UTC()
+		payload, err := json.Marshal(map[string]any{"format": artifact.ContextFormat, "namespaceUID": e.NamespaceUID, "podUID": e.PodUID, "resourceVersion": "synthetic-1", "observedAt": at, "phase": "Running", "ready": "True", "initialized": "True", "scheduled": "True", "runtimeInstances": 1, "running": 1, "waiting": 0, "terminated": 0, "restarts": 0})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer clear(payload)
+		copies, err = prepared.StoreContext(f.ctx, payload, at, at)
+		if err != nil {
+			t.Fatal("managed encrypted query source", err)
+		}
+
 	}
 	verifier, err := objectstore.NewContextVerifier(bound, f.keys)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if profileSource {
+		verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })
 	}
 	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
 	var publicationPools []*pgxpool.Pool
@@ -241,6 +322,15 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: check, ContextVerificationRecorder: check, ContextVerificationAuditor: ack, ContextCatalogPublisher: publish}, Authority: contextPublicationTestGate{check: func(ctx context.Context, v artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
 		return f.currentManagedPublication(ctx, s, v)
 	}}, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Now: time.Now}
+	if profileSource {
+		gatePool := f.fixturePool("api_publication_gate_runtime", "synthetic-api-publication-gate")
+		defer gatePool.Close()
+		gate, err := postgres.NewAPIContextPublicationGate(f.ctx, gatePool, s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		publisher.Authority = gate
+	}
 	published, err := publisher.Publish(f.ctx, e.CaptureUID, copies)
 	if err != nil {
 		t.Fatal("managed independent query source publication", err)
@@ -253,6 +343,7 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 type querySQLPolicy struct {
 	root, installation, epoch string
 	path                      value.ContextProjectionPath
+	profile                   bool
 }
 
 func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPolicy, error) {
@@ -262,9 +353,13 @@ func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPol
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	x := p.path
 	path := artifact.DownloadPath{ID: x.ID, TargetClusterID: x.TargetClusterID, StoreID: x.StoreID, StorageRegion: x.StorageRegion, AcquisitionClusterID: x.AcquisitionClusterID, AcquisitionRegion: x.AcquisitionRegion, ConnectorClusterID: x.ConnectorClusterID, ConnectorRegion: x.ConnectorRegion, HubClusterID: x.HubClusterID, HubRegion: x.HubRegion, WorkerConfiguration: x.WorkerConfiguration, HubConfiguration: x.HubConfiguration}
+	classes, evidenceTypes := []string{"metadata"}, []string{"context"}
+	if p.profile {
+		classes, evidenceTypes = []string{"extract"}, []string{"profile"}
+	}
 	clients := []privacy.DownloadClient{}
 	for _, name := range []string{"console", "fixture-other-client"} {
-		clients = append(clients, privacy.DownloadClient{Issuer: "https://id.example.test", ID: name, Kind: identity.Human, DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}})
+		clients = append(clients, privacy.DownloadClient{Issuer: "https://id.example.test", ID: name, Kind: identity.Human, DataClasses: classes, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: evidenceTypes, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}})
 	}
 	return privacy.DownloadPolicy{RootID: p.root, InstallationID: p.installation, RecoveryEpoch: p.epoch, Revision: x.WorkerConfiguration, ProtectionDigest: artifact.Digest{41}, PermittedRegions: []string{"local"}, Paths: []artifact.DownloadPath{path}, Clients: clients, Operators: []privacy.ProcessingOperator{{Issuer: "https://id.example.test", ClientID: "console", Kind: "User", ID: "fixture"}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, nil
 }

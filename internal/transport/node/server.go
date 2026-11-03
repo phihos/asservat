@@ -71,6 +71,10 @@ func (h *Handler) peer(r *http.Request) (delivery.NodePeer, error) {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost && r.TLS != nil && r.URL.RawQuery == "" && r.URL.Path == contracts.NodeProfileCapturePath && r.Header.Get("Content-Type") == contracts.NodeProfileCaptureContentType {
+		h.profile(w, r)
+		return
+	}
 	if r.Method == http.MethodPost && r.TLS != nil && r.URL.RawQuery == "" && r.URL.Path == contracts.NodeCapturePath && r.Header.Get("Content-Type") == contracts.NodeCaptureContentType {
 		h.capture(w, r)
 		return

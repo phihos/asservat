@@ -171,3 +171,44 @@ func TestInstalledSharedQueryCapacityUsesOriginalEnvelopeAndExactWorkloadBudgets
 		}
 	}
 }
+
+// Match the installed journey's explicit 16-account/eight-record profile. The
+// fixture has no implicit production default; prove a finite exact envelope can
+// fund the complete graph and that a one-byte WAL shortfall is refused.
+func TestProfileCapacityQualificationFundsRenewalsWithinFiniteEnvelope(t *testing.T) {
+	p := capacityProfileFixture()
+	p.Records = 8
+	p.AdmissionSeconds = 86400
+	p.Lanes.Normal.Records = 128
+	p.Lanes.Resolution.Records = 8
+	p.Processing.MaxRootTransitions = 512
+	p.Metadata.ConfigurationTransitions = 4096
+	d := capacityDerivedFixture()
+	q, err := buildCapacityQualification(p, d, sequentialIDs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := app.ProtectedPoolPlan{Format: app.ProtectedPoolPlanFormat, UID: d.SystemPoolUID, System: q.RootBacking.Envelope.SystemObjects}
+	plan, err := app.CompileRootBacking(q.RootBacking, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	totals := plan.Totals()
+	u := (artifact.Registration{NativeLimit: artifact.MaxContextBytes}).ReservedBytes()
+	work, err := app.CompileContextProtocolBacking(app.BudgetAmount{Bytes: p.Records * u, Objects: p.Records * 4}, q.RootBacking.ContextHistory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if work.NativeWALBytes != 909<<20 || work.NativeBackupBytes != 10<<20 || work.NativeTransitionsPerRow != 267 {
+		t.Fatalf("unexpected installed native budget: %+v", work)
+	}
+	p.Envelope = contracts.InstallerCapacityEnvelope{SystemObjects: contracts.InstallerCapacityAmount{Bytes: totals.SystemObjects.Bytes, Objects: totals.SystemObjects.Objects}, SQLBytes: totals.SQLBytes, BackupBytes: totals.BackupBytes, WALBytes: totals.WALBytes, KeyAttempts: totals.KeyAttempts}
+	if _, err := buildCapacityQualification(p, d, sequentialIDs()); err != nil {
+		t.Fatal("exact finite envelope refused", err)
+	}
+	p.Envelope.WALBytes--
+	if _, err := buildCapacityQualification(p, d, sequentialIDs()); err == nil {
+		t.Fatal("underfunded renewal graph accepted")
+	}
+	t.Logf("installed complete root: accounts=%d records/account=%d SQL=%d backup=%d WAL=%d nativeWAL/workload=%d nativeBackup/workload=%d", p.Accounts, p.Records, totals.SQLBytes, totals.BackupBytes, totals.WALBytes, work.NativeWALBytes, work.NativeBackupBytes)
+}

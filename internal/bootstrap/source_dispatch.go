@@ -117,3 +117,16 @@ func (d RegionalSourceDispatch) CancelSourceSnapshot(ctx context.Context, cluste
 		return fleetapp.SourceWork{Channel: r.Channel, StopSnapshot: &snapshot, StopIssuedAt: issued, NotAfter: identity.Earlier(issued.Add(5*time.Second), r.ValidUntil)}
 	})
 }
+
+func (d RegionalSourceDispatch) CancelProfile(ctx context.Context, cluster string, stop collector.ProfileStop) error {
+	if ctx == nil || ctx.Err() != nil || d.Router == nil || d.Signer == nil || d.Now == nil || !stop.Valid() || stop.ClusterID != cluster {
+		return fleet.ErrUnavailable
+	}
+	issued := d.Now().UTC()
+	call, cancel := context.WithDeadline(ctx, issued.Add(5*time.Second))
+	defer cancel()
+	var step string
+	return d.deliver(call, cluster, &step, func(r fleet.APIContextReceiver) fleetapp.SourceWork {
+		return fleetapp.SourceWork{Channel: r.Channel, StopProfile: &stop, StopIssuedAt: issued, NotAfter: identity.Earlier(issued.Add(5*time.Second), r.ValidUntil)}
+	})
+}

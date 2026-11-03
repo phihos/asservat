@@ -115,16 +115,18 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 		return "", err
 	}
 	a := w.Accepted
-	if a.CaptureID != captureID || a.State != capturevalue.IntentAudited || a.Expectation.Recording == nil && a.Expectation.Snapshot == nil {
+	if a.CaptureID != captureID || a.State != capturevalue.IntentAudited || a.Expectation.Recording == nil && a.Expectation.Snapshot == nil && a.Expectation.Profile == nil {
 		return "", execution.ErrDenied
 	}
 	readyAt := time.Time{}
 	if a.Expectation.Snapshot != nil {
 		readyAt = a.Expectation.Snapshot.T0.Add(a.Expectation.Snapshot.After)
+	} else if a.Expectation.Profile != nil {
+		readyAt = exec.StartedAt.Add(time.Duration(a.Expectation.Profile.TimeoutMillis) * time.Millisecond)
 	} else {
 		readyAt = exec.StartedAt.Add(time.Duration(a.Expectation.Recording.DurationMillis) * time.Millisecond)
 	}
-	if s.Now().Before(readyAt) {
+	if !w.CancellationRequested && s.Now().Before(readyAt) {
 		return "Recording", nil
 	}
 	until := identity.Earlier(started.Add(5*time.Second), recovery.FreshUntil)
@@ -167,7 +169,7 @@ func (s RegionalRecordingCollect) Collect(ctx context.Context, captureID string)
 		r.Process = ops
 		result, err := r.CollectRecording(ctx, w, exec, ops)
 		switch {
-		case err == nil && (result.State == "Recording" || result.State == "StoredPendingVerification" || result.State == "Failed"):
+		case err == nil && (result.State == "Recording" || result.State == "StoredPendingVerification" || result.State == "Failed" || result.State == "Cancelled"):
 			return result.State, nil
 		}
 		return "Unavailable", err

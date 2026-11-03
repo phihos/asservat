@@ -26,6 +26,7 @@ type PacketSink interface {
 }
 
 type pendingCapture struct {
+	profile        *collector.ProfileCapture
 	cancelOnly     bool
 	cancelID       string
 	cancelSeq      uint64
@@ -128,7 +129,7 @@ func (c *NodeChannel) DeliverPacket(ctx context.Context, p NodePeer, epoch strin
 		return err
 	}
 	pending, ok := e.captures[r.WorkID]
-	if !ok || pending.cancelOnly || pending.captureID != r.CaptureID || !c.now().Before(pending.until) || c.sink == nil {
+	if !ok || pending.profile != nil || pending.cancelOnly || pending.captureID != r.CaptureID || !c.now().Before(pending.until) || c.sink == nil {
 		c.mu.Unlock()
 		return ErrNodeConflict
 	}

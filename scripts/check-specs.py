@@ -2132,6 +2132,13 @@ def main() -> None:
     rejects(examples["lifecycle-plan-post-trigger.json"], "action-lifecycle", lambda d: d["actions"][0].pop("after"))
     for name in ["mcp-backtrace-result.json", "mcp-discovery-flows-result.json", "mcp-discovery-processes-result.json", "mcp-http-headers-result.json", "mcp-profile-result.json", "mcp-syscall-events-result.json", "mcp-syscall-query-result.json", "mcp-syscall-summary-result.json"]:
         require(any(w.startswith("SensitiveDataHandling:") and "cannot be recalled" in w for w in examples[name]["warnings"]), "Direct evidence fixture lost handling reminder")
+    # Signed Go heap deltas preserve counts and have no defined percentage.
+    delta_profile = examples["mcp-profile-delta-result.json"]["data"]
+    require(delta_profile["total"] == 0 and all(h["fraction"] is None for h in delta_profile["top"]), "Signed delta invented a fraction")
+    positive_profile = examples["mcp-profile-result.json"]["data"]
+    require(positive_profile["top"][0]["fraction"] == positive_profile["top"][0]["flat"] / positive_profile["total"], "Positive profile fraction semantics changed")
+    for invalid_fraction in [-0.1, 1.1, "unavailable", True]:
+        rejects_guidance("get_profile_summary", "mcp-profile-delta-result.json", lambda d, value=invalid_fraction: d["data"]["top"][0].update({"fraction": value}))
     # Final review: bind concrete ad hoc pods, complete windows and acquisition identity.
     scope = examples["resolved-capture-scope.json"]
     context_scope = examples["resolved-context-scope.json"]

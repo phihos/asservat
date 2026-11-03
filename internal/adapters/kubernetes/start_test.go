@@ -192,3 +192,22 @@ func TestLocalStartSubstitution(t *testing.T) {
 		})
 	}
 }
+
+func TestProfileLocalStartSpecRetainsExactNativeType(t *testing.T) {
+	r := startRequest(time.Now().UTC().Truncate(time.Microsecond))
+	b := r.Binding
+	b.ExecutionClass = artifact.ContextAPIExecution
+	b.ExecutorPodUID, b.ExecutorAccountUID = b.PodUID, b.PodUID
+	b.NodeUID, b.NodeBootID = "", ""
+	b.ActionID = "a000000000000000000000001"
+	b.NativeType, b.NativeBytes = artifact.PprofArtifact, 16<<20
+	b.NotAfter = b.NotBefore.Add(5 * time.Second)
+	s, err := LocalStartSpec(b)
+	if err != nil || s.NativeType != artifact.PprofArtifact || s.NativeBytes != 16<<20 {
+		t.Fatal("profile local permit lost native type", err)
+	}
+	b.NativeType = ""
+	if _, err = LocalStartSpec(b); err == nil {
+		t.Fatal("large untyped recorder accepted")
+	}
+}

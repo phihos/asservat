@@ -126,3 +126,49 @@ func TestStreamingWriterStopsAtPlanBound(t *testing.T) {
 		t.Fatal("parts beyond plan")
 	}
 }
+
+// A completion receipt is distinct from a verified ciphertext. In particular,
+// the generic custody path must still propagate read-back failures.
+type writeOnlyObjects struct {
+	memoryObjects
+	reads int
+}
+
+func (o *writeOnlyObjects) VerifyStreaming(context.Context, artifact.Location, artifact.CopyReceipt, int64) error {
+	o.reads++
+	return errors.New("read forbidden")
+}
+func TestStreamingCompletionSeparatesStoredAndVerified(t *testing.T) {
+	for _, storedOnly := range []bool{false, true} {
+		plan := streamingUnitPlan(16 << 20)
+		journal, objects := &memoryJournal{}, &writeOnlyObjects{}
+		writer, err := NewStreamingWriter(t.Context(), plan, journal, objects)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = writer.Write(t.Context(), []byte("synthetic ciphertext")); err != nil {
+			t.Fatal(err)
+		}
+		var receipt artifact.CopyReceipt
+		if storedOnly {
+			receipt, err = writer.FinishStored(t.Context())
+		} else {
+			receipt, err = writer.Finish(t.Context())
+		}
+		if storedOnly && (err != nil || receipt.Bytes == 0 || objects.reads != 0) {
+			t.Fatal("receipt-only result", receipt, err, objects.reads)
+		}
+		if !storedOnly && (err == nil || receipt != (artifact.CopyReceipt{}) || objects.reads != 1) {
+			t.Fatal("generic verification skipped", receipt, err, objects.reads)
+		}
+		if journal.state.Receipt == nil || !journal.state.CompleteSpent || !journal.state.ReleasedAt.IsZero() {
+			t.Fatal("completion or charge changed")
+		}
+		if _, err = writer.FinishStored(t.Context()); err == nil {
+			t.Fatal("completion repeated")
+		}
+		if err = writer.Write(t.Context(), []byte{1}); err == nil {
+			t.Fatal("finished writer reused")
+		}
+	}
+}

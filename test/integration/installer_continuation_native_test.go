@@ -556,7 +556,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					}
 					measurement = &nativePacingMeasurement{admin: admin, root: p.RootID, providers: providers, traffic: f.NativeTrafficHelper}
 				}
-				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) })
+				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))
 			})
 			return
 		}
@@ -959,7 +959,14 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
-	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 8, AdmissionSeconds: 86400,
+	// One pprof summary costs ten conservative read-work units. The previous
+	// eight-unit fixture cannot fund it; this explicit operator fixture funds
+	// exactly one such query without reducing its admission charge.
+	records := int64(8)
+	if installedJourneyFocus() == "manual-profile" {
+		records = 10
+	}
+	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 128), Resolution: lane(4, 8), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},

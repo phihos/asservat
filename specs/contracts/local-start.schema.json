@@ -121,6 +121,13 @@
           "type": "string",
           "maxLength": 36,
           "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "nativeType": {
+          "type": "string",
+          "enum": [
+            "pprof",
+            "goTrace"
+          ]
         }
       },
       "required": [
@@ -164,6 +171,11 @@
                   "nativeBytes": {
                     "const": 4096
                   }
+                },
+                "not": {
+                  "required": [
+                    "nativeType"
+                  ]
                 }
               },
               {
@@ -173,6 +185,45 @@
                   },
                   "nativeBytes": {
                     "const": 8388608
+                  }
+                },
+                "not": {
+                  "required": [
+                    "nativeType"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "nativeType"
+                ],
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  },
+                  "nativeType": {
+                    "const": "pprof"
+                  },
+                  "nativeBytes": {
+                    "minimum": 1,
+                    "maximum": 67108864
+                  }
+                }
+              },
+              {
+                "required": [
+                  "nativeType"
+                ],
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  },
+                  "nativeType": {
+                    "const": "goTrace"
+                  },
+                  "nativeBytes": {
+                    "minimum": 1,
+                    "maximum": 134217728
                   }
                 }
               }
@@ -207,6 +258,11 @@
                 {
                   "required": [
                     "executorAccountUID"
+                  ]
+                },
+                {
+                  "required": [
+                    "nativeType"
                   ]
                 }
               ]

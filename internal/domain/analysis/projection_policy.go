@@ -10,7 +10,7 @@ import (
 )
 
 // ContextProjectionPolicy is independent of download policy. It selects only
-// the approved context source; it supplies neither ordinary read permission nor
+// the closed source and its approved output; it supplies neither read permission nor
 // processing release authority. Empty clients/purposes are explicit denial.
 type ContextProjectionClient struct {
 	Issuer, ID string
@@ -19,6 +19,8 @@ type ContextProjectionClient struct {
 }
 
 type ContextProjectionPolicy struct {
+	// NativeType fixes the source/output classification used to select clients.
+	NativeType                            string `json:",omitempty"`
 	RootID, InstallationID, RecoveryEpoch string
 	Revision                              identity.Revision
 	ProtectionDigest                      artifact.Digest
@@ -30,6 +32,9 @@ type ContextProjectionPolicy struct {
 }
 
 func (p ContextProjectionPolicy) WellFormed() bool {
+	if _, ok := LookupProjectionSource(p.NativeType); !ok {
+		return false
+	}
 	if !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.RecoveryEpoch) || !p.Revision.Valid() || !p.Path.Valid() || p.PermittedRegions == nil || !identity.Strings(p.PermittedRegions, 64, 63) || p.Clients == nil || len(p.Clients) > 64 {
 		return false
 	}

@@ -1,0 +1,16 @@
+=== RUN   TestProfileCapacityBackingWithRealPostgres
+--- PASS: TestProfileCapacityBackingWithRealPostgres (0.03s)
+=== RUN   TestProfileCapacityProducerWithRealPostgres
+=== RUN   TestProfileCapacityProducerWithRealPostgres/actual-postgres-function-type-alias
+    capacity_sql_fixture_test.go:137: same_function_oid=true display_uses_timestamp_with_time_zone=true
+=== NAME  TestProfileCapacityProducerWithRealPostgres
+    profile_capacity_producer_test.go:59: fixed_role_production_ms=2801
+    profile_capacity_producer_test.go:167: retained profile graph unchanged: schema 126 -> 125 -> refused 124 -> 126
+    capacity_producer_test.go:164: actual initial activation and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer
+--- PASS: TestProfileCapacityProducerWithRealPostgres (4.35s)
+    --- PASS: TestProfileCapacityProducerWithRealPostgres/actual-postgres-function-type-alias (0.00s)
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres
+    upgrade_schema_test.go:340: upgrade schema: 125 to 126 by the schema owner, idempotent, floor "asservat:oldest-binary-schema=102", unknown history refused
+--- PASS: TestCustodyUpgradeSchemaWithRealPostgres (2.54s)
+PASS
+ok  	asservat.local/asservat/test/integration	7.989s

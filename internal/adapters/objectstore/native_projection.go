@@ -32,6 +32,7 @@ func (r *NativeContextReader) ReadApprovedContext(ctx context.Context, source ev
 		return zero, &readRefusal{e, &contextReadStage{"store", e}}
 	}
 	reader.pages = r.pages
+	reader.summarize = r.summarize
 	return reader.ReadProjectionNative(ctx, source, scope, opener, end)
 }
 
@@ -44,3 +45,10 @@ func (r *NativeContextReader) ServeHTTPHeaderPages(p evidence.HTTPHeaderPager) {
 }
 
 var _ evidence.NativeApprovedContextRead = (*NativeContextReader)(nil)
+
+// ServeProfileSummaries installs the bounded pprof interpreter for approved reads.
+func (r *NativeContextReader) ServeProfileSummaries(f evidence.ProfileSummarizer) {
+	if r != nil {
+		r.summarize = f
+	}
+}

@@ -124,22 +124,49 @@ export interface components {
                 can_revoke: boolean;
                 /** Format: uri */
                 approval_navigation_uri: string;
-                actions: {
+                actions: ({
                     action_id: string;
                     /** @enum {unknown} */
-                    kind: "packetCapture" | "syscallTrace";
+                    kind: "packetCapture" | "syscallTrace" | "profile";
                     /** @enum {unknown} */
                     execution_mode: "ongoing" | "onTrigger";
-                    before: string;
-                    after: string;
+                    before?: string;
+                    after?: string;
                     filter?: string;
                     filter_digest?: string;
                     filter_instructions?: number;
                     max_bytes: number;
-                    ring_max_bytes: number;
-                    ring_max_age: string;
+                    ring_max_bytes?: number;
+                    ring_max_age?: string;
                     sensitive: ("rawBytePredicate" | "rawPackets" | "httpHeaders" | "liveProfile" | "recordingApprovalRequired")[];
-                }[];
+                    profile?: {
+                        /** @constant */
+                        runtime: "go";
+                        /** @enum {unknown} */
+                        type: "cpu" | "heap" | "allocs" | "goroutine" | "block" | "mutex" | "threadcreate" | "runtimeTrace";
+                        /** @enum {unknown} */
+                        mode: "snapshot" | "interval" | "cumulative" | "delta";
+                        /** @constant */
+                        source: "httpEndpoint";
+                        duration?: string;
+                        timeout: string;
+                        force_gc: boolean;
+                        source_ref: string;
+                        source_name: string;
+                        /** @enum {unknown} */
+                        address_mode: "targetLoopback" | "podIP";
+                        port: number;
+                        /** @constant */
+                        path_policy: "go-pprof/v1";
+                        endpoint_digest: string;
+                    };
+                } & ({
+                    /** @constant */
+                    kind?: "profile";
+                } | {
+                    /** @enum {unknown} */
+                    kind?: "packetCapture" | "syscallTrace";
+                }))[];
                 result_access?: {
                     action_ids: string[];
                     operations: "download_artifact"[];
@@ -302,22 +329,49 @@ export interface components {
                 can_revoke: boolean;
                 /** Format: uri */
                 approval_navigation_uri: string;
-                actions: {
+                actions: ({
                     action_id: string;
                     /** @enum {unknown} */
-                    kind: "packetCapture" | "syscallTrace";
+                    kind: "packetCapture" | "syscallTrace" | "profile";
                     /** @enum {unknown} */
                     execution_mode: "ongoing" | "onTrigger";
-                    before: string;
-                    after: string;
+                    before?: string;
+                    after?: string;
                     filter?: string;
                     filter_digest?: string;
                     filter_instructions?: number;
                     max_bytes: number;
-                    ring_max_bytes: number;
-                    ring_max_age: string;
+                    ring_max_bytes?: number;
+                    ring_max_age?: string;
                     sensitive: ("rawBytePredicate" | "rawPackets" | "httpHeaders" | "liveProfile" | "recordingApprovalRequired")[];
-                }[];
+                    profile?: {
+                        /** @constant */
+                        runtime: "go";
+                        /** @enum {unknown} */
+                        type: "cpu" | "heap" | "allocs" | "goroutine" | "block" | "mutex" | "threadcreate" | "runtimeTrace";
+                        /** @enum {unknown} */
+                        mode: "snapshot" | "interval" | "cumulative" | "delta";
+                        /** @constant */
+                        source: "httpEndpoint";
+                        duration?: string;
+                        timeout: string;
+                        force_gc: boolean;
+                        source_ref: string;
+                        source_name: string;
+                        /** @enum {unknown} */
+                        address_mode: "targetLoopback" | "podIP";
+                        port: number;
+                        /** @constant */
+                        path_policy: "go-pprof/v1";
+                        endpoint_digest: string;
+                    };
+                } & ({
+                    /** @constant */
+                    kind?: "profile";
+                } | {
+                    /** @enum {unknown} */
+                    kind?: "packetCapture" | "syscallTrace";
+                }))[];
                 result_access?: {
                     action_ids: string[];
                     operations: "download_artifact"[];

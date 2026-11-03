@@ -94,7 +94,7 @@ func (r *pcapngReader) ReadNativeContext(context.Context, evidence.NativeContext
 	return nil, artifact.ErrInvalid
 }
 func (r *pcapngReader) OpenNativeArtifact(ctx context.Context, s evidence.NativeContextSource, o value.NativeOperation, window string, until time.Time) (evidence.NativeArtifactSource, error) {
-	if ctx.Err() != nil || s.Expectation.NativeType != artifact.PCAPNGArtifact || o.Kind == value.NativeResponse && !value.UUID(window) {
+	if ctx.Err() != nil || s.Expectation.NativeType != r.source.Expectation.NativeType || o.Kind == value.NativeResponse && !value.UUID(window) {
 		return nil, artifact.ErrInvalid
 	}
 	r.opens.Add(1)
@@ -130,13 +130,61 @@ func TestNativeTwoHopSlowPCAPNGWindowChunksAndResume(t *testing.T) {
 	nativePCAPNGWindowChunksAndResume(t, true)
 }
 func nativePCAPNGWindowChunksAndResume(t *testing.T, slow bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	defer cancel()
 	source := pcapngSourceValue(t)
-	body := syntheticPCAPNG(t, 2*int(artifact.DeliveryBytes)+300_000) // three chunks
+	body := syntheticPCAPNG(t, 2*int(artifact.DeliveryBytes)+300_000)
 	if slow {
 		body = syntheticPCAPNG(t, int(artifact.RemoteNativeLimit)-(256<<10))
 	}
+	nativeWindowChunksAndResume(t, slow, source, body)
+}
+
+// Synthetic stored profile bytes exercise the production two-hop TLS transport
+// at its 64 MiB window ceiling. This is not profile parsing or storage evidence.
+func TestNativeTwoHopProfileMaximumWindowAndResume(t *testing.T) {
+	source := flowSourceValue(t)
+	e := &source.Expectation
+	e.NativeType, e.DataClass, e.ActionID = artifact.PprofArtifact, "raw", "a0123456789abcdef01234567"
+	e.Profile = &artifact.GoProfileAcquisition{SourceRef: "go", EndpointDigest: artifact.Digest{1}, Type: "heap", Mode: "snapshot"}
+	e.Registration.NativeLimit = artifact.MaxPprofBytes
+	if !source.Valid(evidence.ContextCopiesDigest(source.Copies)) {
+		t.Fatal("invalid profile fixture")
+	}
+	body := bytes.Repeat([]byte{0x5a}, int(artifact.DownloadWindowBytes))
+	nativeWindowChunksAndResume(t, false, source, body)
+}
+
+func nativeWindowChunksAndResume(t *testing.T, slow bool, source evidence.NativeContextSource, body []byte) {
+	var pace time.Duration
+	if slow {
+		pace = 750 * time.Millisecond
+	}
+	nativeWindowWithPacing(t, pace, false, source, body)
+}
+
+// A 64 MiB window at an ordinary slower final sink must retain its cursor
+// beyond the earlier 20-second operation ceiling, under fresh short leases.
+func TestNativeTwoHopPacedProfileMaximumWindow(t *testing.T) {
+	source := flowSourceValue(t)
+	e := &source.Expectation
+	e.NativeType, e.DataClass, e.ActionID = artifact.PprofArtifact, "raw", "a0123456789abcdef01234567"
+	e.Profile = &artifact.GoProfileAcquisition{SourceRef: "go", EndpointDigest: artifact.Digest{1}, Type: "heap", Mode: "snapshot"}
+	e.Registration.NativeLimit = artifact.MaxPprofBytes
+	if !source.Valid(evidence.ContextCopiesDigest(source.Copies)) {
+		t.Fatal("invalid profile fixture")
+	}
+	body := bytes.Repeat([]byte{0x5a}, int(artifact.DownloadWindowBytes))
+	started := time.Now()
+	nativeWindowWithPacing(t, 350*time.Millisecond, true, source, body)
+	if time.Since(started) <= 20*time.Second {
+		t.Fatal("test did not cross old conversation ceiling")
+	}
+}
+
+func nativeWindowWithPacing(t *testing.T, pace time.Duration, wholeOnly bool, source evidence.NativeContextSource, body []byte) {
+	slow := pace > 0
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
 	sum := sha256.Sum256(body)
 	now := time.Now()
 	target := value.WorkerCredentialTarget{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, PodUID: nativeID, CreatedAt: now, RunUntil: now.Add(time.Minute)}
@@ -153,7 +201,7 @@ func nativePCAPNGWindowChunksAndResume(t *testing.T, slow bool) {
 	if e != nil {
 		t.Fatal("prepare", e)
 	}
-	if m != pcapngMetadata(source, body) || m.Filename != "artifact-"+nativeID+".pcapng" || m.Format != "pcapng" || m.SHA256 != sum {
+	if m != pcapngMetadata(source, body) || m.Filename != source.Expectation.Type().Filename(nativeID) || m.Format != source.Expectation.Type().Format || m.SHA256 != sum {
 		t.Fatalf("pcapng metadata %+v", m)
 	}
 	if e = preparation.Commit(ctx); e != nil {
@@ -181,17 +229,17 @@ func nativePCAPNGWindowChunksAndResume(t *testing.T, slow bool) {
 		var sequence atomic.Int64
 		sequence.Store(1)
 		var checks atomic.Int32
-		var observe []func(value.NativeLease) value.NativeLease
-		if slow {
-			observe = append(observe, func(l value.NativeLease) value.NativeLease {
-				checks.Add(1)
-				l.Sequence = sequence.Load()
-				l.ObservedAt = time.Now()
-				l.Until = identity.Earlier(l.ObservedAt.Add(4*time.Second), l.Operation.Until)
-				return l
-			})
+		// Even an unpaced 64 MiB response can outlive its first short lease
+		// on a constrained runner. Model the normal renewal path independently
+		// of deliberate sink pacing; never lengthen the lease to fit a test.
+		observe := func(l value.NativeLease) value.NativeLease {
+			checks.Add(1)
+			l.Sequence = sequence.Load()
+			l.ObservedAt = time.Now()
+			l.Until = identity.Earlier(l.ObservedAt.Add(4*time.Second), l.Operation.Until)
+			return l
 		}
-		response, client, _ := flowOperationWithConnector(t, ctx, source, value.NativeResponse, fence, lease, nil, observe...)
+		response, client, _ := flowOperationWithConnector(t, ctx, source, value.NativeResponse, fence, lease, nil, observe)
 		defer response.Close()
 		worker := flowRunWorker(t, ctx, client, target, result)
 		readWork := evidence.NativeWindowReadWork(source.Expectation.Type())
@@ -200,13 +248,14 @@ func nativePCAPNGWindowChunksAndResume(t *testing.T, slow bool) {
 			outcome <- func() error {
 				var writer http.ResponseWriter = w
 				if slow {
-					writer = &pacedNativeSink{ResponseWriter: w, ctx: r.Context(), delay: 750 * time.Millisecond}
+					writer = &pacedNativeSink{ResponseWriter: w, ctx: r.Context(), delay: pace}
 				}
 				factory := browser.HTTPDownloadResponseFactory{Writer: writer, Request: r}
 				if got, e := factory.SelectDownloadResponse(m); e != nil || got != selection {
 					return artifact.ErrIntegrity
 				}
-				work, stop := context.WithDeadline(r.Context(), now.Add(identity.EvidenceReadRequestWindow))
+				originalEnd, _ := ctx.Deadline()
+				work, stop := context.WithDeadline(r.Context(), originalEnd)
 				defer stop()
 				plan := artifact.DownloadResponse{ID: nativeID, SessionID: nativeID, OwnerID: nativeID, Generation: 1, Plan: artifact.DownloadResponsePlan{Version: 1, Selection: selection, WholeFile: selection.Offset == 0 && selection.Length == m.Size, WindowReadLimit: readWork}, StartedAt: now, Until: target.RunUntil}
 				sink, e := factory.OpenDownloadResponse(work, m, plan)
@@ -220,7 +269,7 @@ func nativePCAPNGWindowChunksAndResume(t *testing.T, slow bool) {
 				}
 				for offset, end := lease.Offset, lease.Offset+lease.Length; offset < end; {
 					n := min(artifact.DeliveryBytes, end-offset)
-					if slow && time.Now().Add(2*time.Second).After(lease.Until) {
+					if time.Now().Add(2 * time.Second).After(lease.Until) {
 						observed := time.Now()
 						a.CheckedAt = observed
 						a.ValidUntil = observed.Add(4 * time.Second)
@@ -275,10 +324,11 @@ func nativePCAPNGWindowChunksAndResume(t *testing.T, slow bool) {
 		}
 		got, e := io.ReadAll(reply.Body)
 		reply.Body.Close()
+		outcomeErr := <-outcome
 		if e != nil {
-			t.Fatal(e)
+			t.Fatalf("response body after %d bytes: %v; remote window: %v", len(got), e, outcomeErr)
 		}
-		outcomeErr, workerErr := <-outcome, <-worker
+		workerErr := <-worker
 		if outcomeErr != nil || workerErr != nil {
 			t.Fatal("remote window", outcomeErr, "worker", workerErr)
 		}
@@ -302,11 +352,17 @@ func nativePCAPNGWindowChunksAndResume(t *testing.T, slow bool) {
 	if ct := whole.Header.Get("Content-Type"); ct != "application/octet-stream" {
 		t.Fatal("content type", ct)
 	}
-	if _, params, e := mime.ParseMediaType(whole.Header.Get("Content-Disposition")); e != nil || params["filename"] != "artifact-"+nativeID+".pcapng" {
+	if _, params, e := mime.ParseMediaType(whole.Header.Get("Content-Disposition")); e != nil || params["filename"] != source.Expectation.Type().Filename(nativeID) {
 		t.Fatal("content disposition", whole.Header.Get("Content-Disposition"), e)
 	}
 	if whole.Header.Get("ETag") != m.ETag {
 		t.Fatal("etag", whole.Header.Get("ETag"))
+	}
+	if wholeOnly {
+		if reader.opens.Load() != 2 {
+			t.Fatal("paced window reopened keys", reader.opens.Load())
+		}
+		return
 	}
 	// Resume after an interruption past the first chunk with If-Range.
 	from := int64(artifact.DeliveryBytes + 4321)
@@ -348,4 +404,70 @@ func (w *pacedNativeSink) Write(p []byte) (int, error) {
 		w.afterWrite()
 	}
 	return n, err
+}
+
+// A maximum trace spans two independently owned 64 MiB conversations. Synthetic
+// bytes isolate transport/window continuity from semantic trace verification.
+func TestNativeTwoHopTraceAcrossTwoWindows(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	source := flowSourceValue(t)
+	e := &source.Expectation
+	e.NativeType, e.DataClass, e.ActionID = artifact.GoTraceArtifact, "raw", "a0123456789abcdef01234567"
+	e.Profile = &artifact.GoProfileAcquisition{SourceRef: "go", EndpointDigest: artifact.Digest{1}, Type: "runtimeTrace", Mode: "interval", DurationMillis: 1000}
+	e.Registration.NativeLimit = artifact.MaxGoTraceBytes
+	if !source.Valid(evidence.ContextCopiesDigest(source.Copies)) {
+		t.Fatal("trace source")
+	}
+	body := bytes.Repeat([]byte{0x43}, int(artifact.MaxGoTraceBytes))
+	reader := &pcapngReader{source: source, body: body}
+	now := time.Now()
+	target := value.WorkerCredentialTarget{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, PodUID: nativeID, CreatedAt: now, RunUntil: now.Add(time.Minute)}
+	result, err := evidence.NewRegionalContextResult(ctx, target, reader, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { result.Close(); result.Wait(context.Background()) }()
+	prepare, client, _ := flowOperation(t, ctx, source, value.NativePrepare, 1, artifact.DownloadDeliveryLease{})
+	done := flowRunWorker(t, ctx, client, target, result)
+	metadata, err := prepare.Prepared(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = prepare.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err = <-done; err != nil {
+		t.Fatal(err)
+	}
+	prepare.Close()
+	hash := sha256.New()
+	for ordinal := int64(1); ordinal <= 2; ordinal++ {
+		now := time.Now()
+		a := artifact.DownloadAuthority{Scope: artifact.DownloadScope{RootID: nativeID, ArtifactID: nativeID, CaptureID: nativeID, ClusterID: nativeID, NamespaceUID: nativeID, WorkloadUID: nativeID, PodUID: nativeID, Version: evidence.ContextCopiesDigest(source.Copies), Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "dev", ClientID: "browser", Kind: identity.Human}}, PermissionEpoch: nativeID, PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, DecisionDigest: artifact.Digest{2}, IdentityRevision: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{3}}, CheckedAt: now, ValidUntil: now.Add(4 * time.Second), AccessUntil: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
+		lease := artifact.DownloadDeliveryLease{ResponseID: nativeID, WindowID: fmt.Sprintf("10000000-0000-4000-8000-%012d", ordinal), OwnerID: nativeID, Generation: 1, Sequence: 1, Offset: (ordinal - 1) * artifact.DownloadWindowBytes, Length: artifact.DownloadWindowBytes, StartedAt: now, Until: a.ValidUntil, Authority: a}
+		op, client, _ := flowOperation(t, ctx, source, value.NativeResponse, ordinal+1, lease)
+		worker := flowRunWorker(t, ctx, client, target, result)
+		for offset := lease.Offset; offset < lease.Offset+lease.Length; offset += artifact.DeliveryBytes {
+			chunk, err := op.ReadChunk(ctx, lease, offset, artifact.DeliveryBytes)
+			if err != nil {
+				t.Fatalf("window%d offset%d: %v", ordinal, offset, err)
+			}
+			if len(chunk.Bytes) != int(artifact.DeliveryBytes) || !bytes.Equal(chunk.Bytes, body[offset:offset+artifact.DeliveryBytes]) {
+				t.Fatal("changed bytes")
+			}
+			hash.Write(chunk.Bytes)
+			clear(chunk.Bytes)
+			if err = op.AcknowledgeNativeChunk(ctx, lease, offset, artifact.DeliveryBytes); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err = <-worker; err != nil {
+			t.Fatal(err)
+		}
+		op.Close()
+	}
+	if !bytes.Equal(hash.Sum(nil), metadata.SHA256[:]) || reader.opens.Load() != 3 {
+		t.Fatalf("hash/key-opening mismatch: opens%d", reader.opens.Load())
+	}
 }

@@ -152,8 +152,8 @@ def cilium(work, name, kubeconfig, report):
 RING_DISK_BYTES = 16 << 20
 
 
-def packet(work, report, cni="", ring_disk=False):
-    suite = "collector-" + (cni or ("ringdisk" if ring_disk else "packet"))
+def packet(work, report, cni="", ring_disk=False, profile=False):
+    suite = "collector-" + (cni or ("profile" if profile else "ringdisk" if ring_disk else "packet"))
     run_id = secrets.token_hex(4)
     name = "asservat-collector-" + run_id
     env = dict(os.environ, TMPDIR=str(work), CGO_ENABLED="0")
@@ -173,6 +173,13 @@ def packet(work, report, cni="", ring_disk=False):
     tag = "asservat-collector:" + run_id
     run(["docker", "build", "--network=none", "--label", "asservat.test=" + run_id, "-t", tag, str(image_dir)])
     report["build"] = {"seconds": round(time.monotonic() - started, 1), "binaryBytes": (image_dir / "asservat").stat().st_size, "tags": "gadget,netgo,osusergo"}
+    profile_tag = "asservat-profile-native:" + run_id
+    if profile:
+        profile_dir = work / "profile-image"
+        profile_dir.mkdir()
+        subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(profile_dir / "profile-native"), "./test/fixtures/profile-native/main.go"], cwd=ROOT, env=env, check=True)
+        (profile_dir / "Dockerfile").write_text("FROM scratch\nCOPY profile-native /profile-native\nENTRYPOINT [\"/profile-native\"]\n")
+        run(["docker", "build", "--network=none", "--label", "asservat.test=" + run_id, "-t", profile_tag, str(profile_dir)])
     config = work / "kind.json"
     cluster = {"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4",
                "nodes": [{"role": "control-plane", "extraMounts": [{"hostPath": str(GUARD), "containerPath": str(GUARD), "readOnly": True}]}]}
@@ -189,6 +196,8 @@ def packet(work, report, cni="", ring_disk=False):
         if cni == "cilium":
             cilium(work, name, kubeconfig, report)
         run(["kind", "load", "docker-image", tag, "--name", name])
+        if profile:
+            run(["kind", "load", "docker-image", profile_tag, "--name", name])
         # The fixture images come from the host's digest-pinned pulls, so the
         # node never reaches a registry (an in-node Docker Hub pull on the
         # dual-stack node failed intermittently). kind cannot load a digest
@@ -219,7 +228,7 @@ def packet(work, report, cni="", ring_disk=False):
         run(["kubectl", "--kubeconfig", str(kubeconfig), "apply", "-f", str(manifests)])
         fixture = {"kubeconfig": str(kubeconfig), "collectorNamespace": "asservat-collector", "daemonSet": "asservat-node", "serviceAccount": "asservat-node",
                    "installationID": INSTALLATION, "clusterID": CLUSTER, "listen": f"{gateway}:{PORT}", "serverCertificate": str(cert), "serverKey": str(key),
-                   "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "ringDiskBytes": RING_DISK_BYTES if ring_disk else 0, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
+                   "profileImage": loaded_digest(node, profile_tag) if profile else "", "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "ringDiskBytes": RING_DISK_BYTES if ring_disk else 0, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
         (work / "fixture.json").write_text(json.dumps(fixture))
         started = time.monotonic()
         test = subprocess.run(["go", "test", "-tags", "libpcap", "-count=1", "-v", "-timeout", "12m", "-run", "^TestNodeCollectorWithRealKubernetes$", "./test/integration"],
@@ -227,6 +236,9 @@ def packet(work, report, cni="", ring_disk=False):
         for artifact_name in ("filtered", "unfiltered", "encrypted", "cni-backend", "cni-client"):
             if (work / (artifact_name + ".pcapng")).exists():
                 shutil.copy(work / (artifact_name + ".pcapng"), ROOT / "test/results" / (suite + "-" + artifact_name + ".pcapng"))
+        if profile:
+            for output in work.glob("profile-*.pb.gz"):
+                shutil.copy(output, ROOT / "test/results" / (suite + "-" + output.name))
         report["testSeconds"] = round(time.monotonic() - started, 1)
         if (work / "native-results.json").exists():
             report["native"] = json.loads((work / "native-results.json").read_text())
@@ -243,14 +255,18 @@ def packet(work, report, cni="", ring_disk=False):
         if s3name:
             subprocess.run(["docker", "rm", "-f", "-v", s3name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(["docker", "image", "rm", "-f", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if profile:
+            subprocess.run(["docker", "image", "rm", "-f", profile_tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for ref in (PAUSE, BUSYBOX):
             subprocess.run(["docker", "image", "rm", "asservat-fixture/" + ref.split("@")[0].rsplit("/", 1)[-1] + ":" + ref.rsplit(":", 1)[-1][:16]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if profile:
+            report["profileImageCleaned"] = subprocess.run(["docker", "image", "inspect", profile_tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
         report["cleanup"] = {"cluster": name not in run(["kind", "get", "clusters"]).split(), "image": subprocess.run(["docker", "image", "inspect", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0}
 
 
 def main():
-    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium", "ringdisk"):
-        raise SystemExit("usage: test-collector.py packet|cilium|ringdisk")
+    if len(sys.argv) != 2 or sys.argv[1] not in ("packet", "cilium", "ringdisk", "profile"):
+        raise SystemExit("usage: test-collector.py packet|cilium|ringdisk|profile")
     if not GUARD.is_file():
         raise SystemExit(f"refused: {GUARD} is absent. Collector suites load BPF programs and run only on disposable CI runners or VMs.")
     results = ROOT / "test/results"
@@ -261,7 +277,7 @@ def main():
     base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="collector-", dir=base))
     try:
-        packet(work, report, "cilium" if sys.argv[1] == "cilium" else "", ring_disk=sys.argv[1] == "ringdisk")
+        packet(work, report, "cilium" if sys.argv[1] == "cilium" else "", ring_disk=sys.argv[1] == "ringdisk", profile=sys.argv[1] == "profile")
         report["result"] = "passed"
     except BaseException:
         report["result"] = "failed"

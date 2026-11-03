@@ -1,0 +1,16 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding
+=== RUN   TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding/before-endpoint
+    profile_admission_test.go:249: typed profile cancellation {<nil> <nil> {  0 false false 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC}  <nil>} context admission no longer authorized
+=== RUN   TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding/after-endpoint
+    profile_admission_test.go:249: typed profile cancellation {<nil> <nil> {  0 false false 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC}  <nil>} context admission no longer authorized
+--- FAIL: TestContextAdmissionWithRealServices (5.32s)
+    --- FAIL: TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding (4.93s)
+        --- FAIL: TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding/before-endpoint (2.78s)
+        --- FAIL: TestContextAdmissionWithRealServices/profile-approved-admission-stream-binding/after-endpoint (2.15s)
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres
+    upgrade_schema_test.go:322: upgrade schema: 123 to 124 by the schema owner, idempotent, floor "asservat:oldest-binary-schema=102", unknown history refused
+--- PASS: TestCustodyUpgradeSchemaWithRealPostgres (3.13s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	8.553s
+FAIL

@@ -19,6 +19,7 @@ type SourceQueue interface {
 	EnqueueSourceStop(context.Context, collector.SourceBinding, time.Time) (collector.Work, error)
 }
 type SourceLocal struct {
+	Profiles  evidence.ProfileCanceller
 	Snapshots evidence.SourceSnapshotCanceller
 	Verifier  app.SourceWorkVerifier
 	Queue     SourceQueue
@@ -32,9 +33,19 @@ func sourceReply(w app.SourceWork, state string) contracts.SourceReply {
 		reply.CaptureID = w.StopSnapshot.CaptureID
 		reply.SnapshotID = w.StopSnapshot.Request.SnapshotID
 	}
+	if w.StopProfile != nil {
+		reply.CaptureID = w.StopProfile.CaptureID
+		reply.ProfileAttemptID = w.StopProfile.AttemptID
+	}
 	return reply
 }
 func matchingSourceReply(w app.SourceWork, r contracts.SourceReply) bool {
+	if w.StopProfile != nil {
+		return r.SourceID == "" && r.Fence == "" && r.SnapshotID == "" && r.CaptureID == w.StopProfile.CaptureID && r.ProfileAttemptID == w.StopProfile.AttemptID
+	}
+	if r.ProfileAttemptID != "" {
+		return false
+	}
 	return r.SourceID == w.Binding().SourceID && r.Fence == w.Binding().Fence && (w.StopSnapshot == nil && r.CaptureID == "" && r.SnapshotID == "" || w.StopSnapshot != nil && r.CaptureID == w.StopSnapshot.CaptureID && r.SnapshotID == w.StopSnapshot.Request.SnapshotID)
 }
 
@@ -70,7 +81,13 @@ func applySourceWork(ctx context.Context, r fleet.APIContextReceiver, signed []b
 		return contracts.SourceReply{}, targets.ErrUnavailable
 	}
 	var effectErr error
-	if w.StopSnapshot != nil {
+	if w.StopProfile != nil {
+		if local.Profiles == nil {
+			effectErr = fleet.ErrUnavailable
+		} else {
+			effectErr = local.Profiles.CancelProfile(call, *w.StopProfile)
+		}
+	} else if w.StopSnapshot != nil {
 		if local.Snapshots == nil {
 			effectErr = fleet.ErrUnavailable
 		} else {

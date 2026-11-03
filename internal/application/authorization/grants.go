@@ -36,6 +36,16 @@ type GrantReviewAction struct {
 	FilterInstructions                                               int
 	MaxBytes, RingMaxBytes                                           int64
 	Sensitive                                                        []string
+	Profile                                                          *GrantReviewProfile `json:",omitempty"`
+}
+
+// GrantReviewProfile retains the reviewed parameters and endpoint description;
+// it contains no credential, destination override, or execution authority.
+type GrantReviewProfile struct {
+	Runtime, Type, Mode, Source, Duration, Timeout                 string
+	ForceGC                                                        bool
+	SourceRef, SourceName, AddressMode, PathPolicy, EndpointDigest string
+	Port                                                           uint16
 }
 
 // GrantObservationLimits are the plan's REQ-AUT-006 limits.

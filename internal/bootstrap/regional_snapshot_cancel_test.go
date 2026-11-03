@@ -8,6 +8,7 @@ import (
 	"asservat.local/asservat/internal/domain/fleet"
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"sync/atomic"
 	"testing"
@@ -174,5 +175,28 @@ func TestRegionalSnapshotCancellationWaitsForRealWriterAndStoredWins(t *testing.
 			n.snapshotWG.Wait()
 			assertSourceBudget(t, n, 0, 1)
 		})
+	}
+}
+
+func TestRegionalSnapshotsRespectSharedProfileHolderLimit(t *testing.T) {
+	_, _, clock, x := sourceSnapshotPipelineFixture(t, nil)
+	x = distinctCancellationSnapshot(x)
+	e := snapshotExpected(t, x)
+	x.ExpectationDigest = [32]byte(evidence.ContextExpectationDigest(e))
+	nodes := &snapshotCancelQueue{}
+	h := NewConnectorRecordings(nodes, nil, clock.now, func(string) {})
+	h.profiles = make(map[string]*heldProfile)
+	for i := 0; i < maxHeldRecordings; i++ {
+		h.profiles[fmt.Sprint(i)] = &heldProfile{expires: clock.now().Add(time.Hour)}
+	}
+	output := h.Prepare(&objectstore.PreparedArtifact{}, e)
+	defer output.Close()
+	ctx, cancel := context.WithDeadline(t.Context(), x.Request.StartBy)
+	defer cancel()
+	if _, err := output.StartSourceSnapshot(ctx, x); err == nil || output.prepared == nil || len(nodes.got) != 0 {
+		t.Fatal("snapshot exceeded combined holder budget", err)
+	}
+	if err := h.CancelSourceSnapshot(ctx, x); err == nil || nodes.cancelled != nil {
+		t.Fatal("snapshot tombstone exceeded combined holder budget", err)
 	}
 }

@@ -51,7 +51,7 @@ func LocalStartSpec(b value.Binding) (api.LocalStartSpec, error) {
 	if b.ExecutionClass == artifact.ContextAPIExecution {
 		profile = apiContextStartProfile
 	}
-	return api.LocalStartSpec{Profile: profile, ExecutorPodUID: b.ExecutorPodUID, ExecutorAccountUID: b.ExecutorAccountUID, OperationID: b.OperationID, CaptureID: b.CaptureID, ActionID: b.ActionID, AttemptID: b.AttemptID, ClusterID: b.ClusterID, IssuerEpoch: b.IssuerEpoch, PodUID: b.PodUID, NodeUID: b.NodeUID, NodeBootID: b.NodeBootID, CollectorEpoch: b.CollectorEpoch, ScopeDigest: hex.EncodeToString(b.ScopeDigest[:]), AuthorityDigest: hex.EncodeToString(b.AuthorityDigest[:]), BudgetDigest: hex.EncodeToString(b.BudgetDigest[:]), AuditDigest: hex.EncodeToString(b.AuditDigest[:]), NativeBytes: b.NativeBytes, NotBefore: b.NotBefore.Format(time.RFC3339Nano), NotAfter: b.NotAfter.Format(time.RFC3339Nano)}, nil
+	return api.LocalStartSpec{Profile: profile, ExecutorPodUID: b.ExecutorPodUID, ExecutorAccountUID: b.ExecutorAccountUID, OperationID: b.OperationID, CaptureID: b.CaptureID, ActionID: b.ActionID, AttemptID: b.AttemptID, ClusterID: b.ClusterID, IssuerEpoch: b.IssuerEpoch, PodUID: b.PodUID, NodeUID: b.NodeUID, NodeBootID: b.NodeBootID, CollectorEpoch: b.CollectorEpoch, ScopeDigest: hex.EncodeToString(b.ScopeDigest[:]), AuthorityDigest: hex.EncodeToString(b.AuthorityDigest[:]), BudgetDigest: hex.EncodeToString(b.BudgetDigest[:]), AuditDigest: hex.EncodeToString(b.AuditDigest[:]), NativeBytes: b.NativeBytes, NativeType: b.NativeType, NotBefore: b.NotBefore.Format(time.RFC3339Nano), NotAfter: b.NotAfter.Format(time.RFC3339Nano)}, nil
 }
 
 func startError(ctx context.Context, err error) error {

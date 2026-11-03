@@ -14,3 +14,10 @@ SELECT * FROM custody_stream WHERE attempt_id = $1 FOR UPDATE;
 
 -- name: UpdateStream :execrows
 UPDATE custody_stream SET state = $2, revision = revision + 1, released_at = $4 WHERE attempt_id = $1 AND revision = $3;
+
+-- name: InsertPendingStream :exec
+INSERT INTO custody_stream(attempt_id,temporary_bytes,temporary_objects,state) VALUES($1,$2,$3,$4);
+
+-- name: BindPendingStream :execrows
+UPDATE custody_stream SET writer_epoch=$2,plan_digest=$3,revision=revision+1
+WHERE attempt_id=$1 AND writer_epoch IS NULL AND plan_digest IS NULL AND released_at IS NULL;

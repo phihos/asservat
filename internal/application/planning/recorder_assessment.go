@@ -76,6 +76,9 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 	if plan.Input.NodeRecorder {
 		out.Combined.Explanation = "Recorder overhead depends on traffic and placement and is not measured by this preview. This manual capture runs on the target node's collector and saves at most 8 MiB. Limits are not predictions."
 	}
+	if plan.Actions[0].Kind == "profile" {
+		out.Combined.Explanation = "Live profiling uses application and collector resources. Overhead and interaction with other profilers are not measured by this preview. The selected native byte and duration limits are ceilings, not predictions."
+	}
 	var ringArmed, ringIncident, frozen, output int64
 	effects := map[string]bool{}
 	for _, a := range plan.Actions {

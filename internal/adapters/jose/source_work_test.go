@@ -219,3 +219,36 @@ func TestSourceWorkSnapshotCancellationUsesCurrentControlAndOriginalWriter(t *te
 		})
 	}
 }
+
+func TestProfileStopSignatureBindsOriginalWriterWithoutSourceFields(t *testing.T) {
+	base, receiver, trust, key, now := apiWorkFixture(t)
+	stop := collector.ProfileStop{RootID: base.Channel.RootID, ClusterID: base.Channel.Connector.Binding.ClusterID, CaptureID: base.CaptureID, AttemptID: base.AttemptID, WriterPodUID: base.Channel.Executor.PodUID, WriterEpoch: base.Channel.Executor.ProcessEpoch, ExpectationDigest: artifact.Digest{1}, WriteUntil: now.Add(time.Minute)}
+	w := app.SourceWork{Channel: base.Channel, StopProfile: &stop, StopIssuedAt: *now, NotAfter: now.Add(3 * time.Second)}
+	signatures := apiSignatures(t, func(context.Context) (value.APIContextWorkTrust, error) { return trust, nil }, key, now)
+	signed, err := signatures.SignSourceWork(t.Context(), w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := signatures.VerifySourceWork(t.Context(), signed, receiver)
+	if err != nil || decoded.Work.StopProfile == nil || *decoded.Work.StopProfile != stop || decoded.Work.Binding() != (collector.SourceBinding{}) || decoded.Work.RouteID() != stop.CaptureID {
+		t.Fatal("typed profile stop", decoded, err)
+	}
+	for _, change := range []string{"writer", "cluster", "mixed", "deadline"} {
+		copy := w
+		changed := stop
+		copy.StopProfile = &changed
+		switch change {
+		case "writer":
+			changed.WriterEpoch = base.AttemptID
+		case "cluster":
+			changed.ClusterID = base.AttemptID
+		case "mixed":
+			copy.Stop = true
+		case "deadline":
+			copy.NotAfter = copy.StopIssuedAt.Add(6 * time.Second)
+		}
+		if _, err := signatures.SignSourceWork(t.Context(), copy); err == nil {
+			t.Fatal("unbound profile stop signed", change)
+		}
+	}
+}

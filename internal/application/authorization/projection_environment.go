@@ -12,7 +12,7 @@ import (
 )
 
 type ContextProjectionPolicyReader interface {
-	ContextProjectionPolicy(context.Context, string, string) (value.ContextProjectionPolicy, error)
+	ContextProjectionPolicy(context.Context, string, string, string) (value.ContextProjectionPolicy, error)
 }
 type ContextProjectionProcessingReader interface {
 	ContextProjectionProcessing(context.Context, ContextProjectionEvidence, artifact.RecoveryProof) (artifact.DownloadProcessingProof, error)
@@ -50,8 +50,8 @@ func (s CurrentProjectionEnvironment) ProjectionEnvironment(ctx context.Context,
 	// Every subsequent context derives from the preceding one. In particular a
 	// late second observation cannot grant a fresh five-second interval.
 	narrow := func(d time.Time) { until = identity.Earlier(until, d) }
-	p, e := s.Policies.ContextProjectionPolicy(call, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID)
-	if e != nil || !p.Valid(s.Now()) || p.RootID != s.RootID || p.InstallationID != s.InstallationID || !p.Permits(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, s.Now()) {
+	p, e := s.Policies.ContextProjectionPolicy(call, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.NativeType)
+	if e != nil || !p.Valid(s.Now()) || p.RootID != s.RootID || p.NativeType != r.NativeType || p.InstallationID != s.InstallationID || !p.Permits(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, s.Now()) {
 		return zero, projectionRefused(policyStep("policy", e, p.Valid(s.Now())), value.ErrUnavailable, e)
 	}
 	// Own the original accepted body before any further port can reuse its
@@ -79,8 +79,8 @@ func (s CurrentProjectionEnvironment) ProjectionEnvironment(ctx context.Context,
 	narrow(processing.ValidUntil)
 	call, c3 := context.WithDeadline(call, until)
 	defer c3()
-	last, e := s.Policies.ContextProjectionPolicy(call, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID)
-	if e != nil || !last.Valid(s.Now()) || last.RootID != p.RootID || last.InstallationID != p.InstallationID || last.RecoveryEpoch != p.RecoveryEpoch || last.Revision != p.Revision || last.ProtectionDigest != p.ProtectionDigest || last.Path != p.Path || !last.Permits(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, s.Now()) {
+	last, e := s.Policies.ContextProjectionPolicy(call, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.NativeType)
+	if e != nil || !last.Valid(s.Now()) || last.RootID != p.RootID || last.NativeType != p.NativeType || last.InstallationID != p.InstallationID || last.RecoveryEpoch != p.RecoveryEpoch || last.Revision != p.Revision || last.ProtectionDigest != p.ProtectionDigest || last.Path != p.Path || !last.Permits(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, s.Now()) {
 		return zero, projectionRefused(policyStep("policy-again", e, last.Valid(s.Now())), value.ErrUnavailable, e)
 	}
 	// Exact policy body identity is checked, not only its claimed revision.

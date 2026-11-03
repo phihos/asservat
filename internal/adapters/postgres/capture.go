@@ -142,7 +142,16 @@ func validAdmission(a value.Admission) bool {
 	p := a.Plan.Input
 	t := p.Target.Target()
 	e := a.Eligibility
-	return manualAdmissionShape(a) && authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && (p.Recorder == nil && p.Snapshot == nil && r.NativeLimit == artifact.MaxContextBytes || p.Recorder != nil && p.Snapshot == nil && r.NativeLimit == artifact.RecordingNativeLimit || p.Recorder == nil && p.Snapshot != nil && r.NativeLimit == p.Snapshot.Request.MaxBytes) && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
+	return manualAdmissionShape(a) && authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && admissionNativeLimit(a) && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
+}
+
+func admissionNativeLimit(a value.Admission) bool {
+	p, r := a.Plan.Input, a.Registration
+	if p.Profile != nil {
+		profile, _, err := planning.ProfileForContext(a.Plan)
+		return err == nil && p.Recorder == nil && p.Snapshot == nil && r.NativeLimit == profile.MaxBytes
+	}
+	return p.Recorder == nil && p.Snapshot == nil && r.NativeLimit == artifact.MaxContextBytes || p.Recorder != nil && p.Snapshot == nil && r.NativeLimit == artifact.RecordingNativeLimit || p.Recorder == nil && p.Snapshot != nil && r.NativeLimit == p.Snapshot.Request.MaxBytes
 }
 
 func requestKey(a value.Admission) []byte {
@@ -635,6 +644,11 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 		if _, err = registerLocked(ctx, q, p, allocation, r); err != nil {
 			return err
 		}
+		if a.Plan.Input.Profile != nil {
+			if err = reserveProfileStreamLocked(ctx, q, r); err != nil {
+				return err
+			}
+		}
 		in := a.Plan.Input
 		target := in.Target
 		retention := in.Retention
@@ -659,6 +673,13 @@ func (s *ContextAdmissions) admitContextInTransaction(ctx context.Context, q *cu
 			if recording.Profile == "httpHeaders" {
 				expected.NativeType, expected.DataClass = artifact.HTTPHeadersArtifact, "extract" // ADR-282
 			}
+		}
+		if in.Profile != nil {
+			profile, actionID, err := planning.ProfileForContext(a.Plan)
+			if err != nil {
+				return value.ErrInvalid
+			}
+			expected.NativeType, expected.ActionID, expected.Profile, expected.DataClass = profile.NativeType(), actionID, &profile, "raw"
 		}
 		if in.Snapshot != nil {
 			lifecycle, err := planning.SourceSnapshotLifecycle(in.Snapshot)

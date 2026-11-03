@@ -137,7 +137,7 @@ func (s *APIContextExecutions) requestSnapshotCancellationInTransaction(ctx cont
 		if err != nil {
 			return err
 		}
-		if accepted.Expectation.Snapshot == nil {
+		if accepted.Expectation.Snapshot == nil && accepted.Expectation.Profile == nil {
 			return value.ErrUnavailable
 		}
 		intent, err := captureIntent(row)
@@ -172,7 +172,7 @@ func (s *APIContextExecutions) requestSnapshotCancellationInTransaction(ctx cont
 			phase = "Running"
 		case "stored":
 			phase = "Finalizing"
-		case "captureFailed", "targetGone", "denied", "peerMembershipChanged", "peerMembershipStale":
+		case "captureFailed", "targetGone", "denied", "peerMembershipChanged", "peerMembershipStale", "profilerBusy":
 			phase = "Failed"
 		case "storeUnconfirmed":
 			phase = "Indeterminate"
@@ -209,15 +209,20 @@ func (s *APIContextExecutions) requestSnapshotCancellationInTransaction(ctx cont
 			phase = "Cancelled"
 		}
 		if row.SnapshotCancelRequestedAt.Valid && !row.SnapshotCancelJoinedAt.Valid && old.Phase == "started" {
-			w := executionapp.APIContextWork{Accepted: accepted, Actor: intent.Actor, Initiator: intent.Initiator}
-			if err = sourceSnapshotWork(ctx, q, s.root, &w); err != nil {
-				return err
+			if accepted.Expectation.Profile != nil {
+				out.ClusterID = accepted.Expectation.Registration.Location.ClusterID
+				out.Profile = &collector.ProfileStop{RootID: s.root, ClusterID: out.ClusterID, CaptureID: accepted.CaptureID, AttemptID: accepted.Expectation.Registration.Location.AttemptID, WriterPodUID: old.Process.PodUID, WriterEpoch: old.Process.ProcessEpoch, ExpectationDigest: evidence.ContextExpectationDigest(accepted.Expectation), WriteUntil: accepted.Expectation.Registration.WriteUntil}
+			} else {
+				w := executionapp.APIContextWork{Accepted: accepted, Actor: intent.Actor, Initiator: intent.Initiator}
+				if err = sourceSnapshotWork(ctx, q, s.root, &w); err != nil {
+					return err
+				}
+				if w.SourceBinding == nil {
+					return value.ErrUnavailable
+				}
+				out.ClusterID = accepted.Expectation.Registration.Location.ClusterID
+				out.Snapshot = &collector.SourceSnapshot{Binding: *w.SourceBinding, CaptureID: accepted.CaptureID, AttemptID: accepted.Expectation.Registration.Location.AttemptID, WriterPodUID: old.Process.PodUID, WriterEpoch: old.Process.ProcessEpoch, ExpectationDigest: [32]byte(evidence.ContextExpectationDigest(accepted.Expectation)), Request: *accepted.Expectation.Snapshot}
 			}
-			if w.SourceBinding == nil {
-				return value.ErrUnavailable
-			}
-			out.ClusterID = accepted.Expectation.Registration.Location.ClusterID
-			out.Snapshot = &collector.SourceSnapshot{Binding: *w.SourceBinding, CaptureID: accepted.CaptureID, AttemptID: accepted.Expectation.Registration.Location.AttemptID, WriterPodUID: old.Process.PodUID, WriterEpoch: old.Process.ProcessEpoch, ExpectationDigest: [32]byte(evidence.ContextExpectationDigest(accepted.Expectation)), Request: *accepted.Expectation.Snapshot}
 		}
 		if err = s.guards.Recovery.check(ctx, q, trust, s.root, in.Recovery); err != nil {
 			return err
@@ -229,7 +234,15 @@ func (s *APIContextExecutions) requestSnapshotCancellationInTransaction(ctx cont
 		if !in.Valid(now.Time) || !now.Time.Before(rights.ValidUntil) {
 			return value.ErrDenied
 		}
-		out.Decision = value.Cancellation{CaptureID: accepted.CaptureID, Phase: phase, Revision: row.ProgressRevision, Requested: row.SnapshotCancelRequestedAt.Valid, ObservedAt: now.Time.UTC(), ValidUntil: identity.Earlier(in.ValidUntil, identity.Earlier(rights.ValidUntil, now.Time.Add(5*time.Second)))}
+		applicationStopUnknown := accepted.Expectation.Profile != nil && row.SnapshotCancelRequestedAt.Valid && !old.StartedAt.IsZero()
+		if applicationStopUnknown && row.SnapshotCancelJoinedAt.Valid {
+			var proof artifact.ProfileCancellation
+			if json.Unmarshal(row.SnapshotCancelProof, &proof) != nil || !proof.Valid() || proof.CaptureID != accepted.CaptureID || proof.AttemptID != accepted.Expectation.Registration.Location.AttemptID || proof.ExpectationDigest != evidence.ContextExpectationDigest(accepted.Expectation) {
+				return value.ErrInvalid
+			}
+			applicationStopUnknown = proof.MayHaveStarted
+		}
+		out.Decision = value.Cancellation{CaptureID: accepted.CaptureID, Phase: phase, Revision: row.ProgressRevision, Requested: row.SnapshotCancelRequestedAt.Valid, ApplicationStopUnknown: applicationStopUnknown, ObservedAt: now.Time.UTC(), ValidUntil: identity.Earlier(in.ValidUntil, identity.Earlier(rights.ValidUntil, now.Time.Add(5*time.Second)))}
 		return ctx.Err()
 	}()
 	return out, err

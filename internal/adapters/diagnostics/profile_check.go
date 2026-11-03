@@ -44,46 +44,56 @@ func CheckPprof(r io.Reader) error {
 
 func checkPprof(r io.Reader, limit int64) (err error) {
 	defer recoverParser(&err)
+	_, err = parsePprof(r, limit)
+	return err
+}
+
+// parsePprof shares publication semantics with the bounded summary analyzer.
+// Callers contain parser panics and retain their own cancellation/authority.
+func parsePprof(r io.Reader, limit int64) (*profile.Profile, error) {
 	br := bufio.NewReader(r)
 	gz, err := gzip.NewReader(br)
 	if err != nil {
-		return ErrNotProfile
+		return nil, ErrNotProfile
 	}
 	gz.Multistream(false)
 	var plain bytes.Buffer
 	defer func() { clear(plain.Bytes()) }()
 	n, err := plain.ReadFrom(io.LimitReader(gz, limit+1))
 	if err != nil {
-		return ErrNotProfile
+		return nil, ErrNotProfile
 	}
 	if n > limit {
-		return artifact.ErrLimit
+		return nil, artifact.ErrLimit
 	}
 	if _, err = br.ReadByte(); err != io.EOF { // nothing after the member
-		return ErrNotProfile
+		return nil, ErrNotProfile
+	}
+	if err := preflightPprof(plain.Bytes()); err != nil {
+		return nil, err
 	}
 	p, err := profile.ParseUncompressed(plain.Bytes())
 	if err != nil || p.CheckValid() != nil {
-		return ErrNotProfile
+		return nil, ErrNotProfile
 	}
 	if len(p.SampleType) < 1 || len(p.SampleType) > maxPprofSampleTypes || len(p.Mapping) > MaxPprofMappings {
-		return ErrNotProfile
+		return nil, ErrNotProfile
 	}
 	for _, t := range p.SampleType {
 		if !pprofName(t.Type) || !pprofName(t.Unit) {
-			return ErrNotProfile
+			return nil, ErrNotProfile
 		}
 	}
 	if p.DurationNanos < 0 || p.DurationNanos > maxPprofDuration || p.TimeNanos < 0 || p.Period < 0 ||
 		p.PeriodType != nil && (!pprofName(p.PeriodType.Type) || !pprofName(p.PeriodType.Unit)) {
-		return ErrNotProfile
+		return nil, ErrNotProfile
 	}
 	for _, m := range p.Mapping {
 		if m.Limit < m.Start {
-			return ErrNotProfile
+			return nil, ErrNotProfile
 		}
 	}
-	return nil
+	return p, nil
 }
 
 func pprofName(s string) bool { return len(s) >= 1 && len(s) <= maxPprofName }

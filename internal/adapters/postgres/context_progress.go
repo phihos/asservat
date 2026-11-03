@@ -3,6 +3,7 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"time"
@@ -82,9 +83,18 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 	out.CancellationRequested = c.SnapshotCancelRequestedAt.Valid
 	if c.SnapshotCancelJoinedAt.Valid {
 		out.Phase, out.ActionPhase, out.ReasonCode = "Cancelled", "Cancelled", "CancellationJoined"
+		if accepted.Expectation.Profile != nil && len(c.SnapshotCancelProof) > 0 {
+			var proof artifact.ProfileCancellation
+			if json.Unmarshal(c.SnapshotCancelProof, &proof) != nil || !proof.Valid() {
+				return out, value.ErrUnavailable
+			}
+			if proof.MayHaveStarted {
+				out.ReasonCode = "ProfileCancellationUncertain"
+			}
+		}
 		return out, nil
 	}
-	out.CanCancel = accepted.Expectation.Snapshot != nil && !out.CancellationRequested && !f.CatalogArtifactID.Valid && (len(executions) == 0 || executions[0].Phase == "prepared" || executions[0].Phase == "started")
+	out.CanCancel = (accepted.Expectation.Snapshot != nil || accepted.Expectation.Profile != nil) && !out.CancellationRequested && !f.CatalogArtifactID.Valid && (len(executions) == 0 || executions[0].Phase == "prepared" || executions[0].Phase == "started")
 	verified := f.VerifiedCaptureID.Valid
 	if verified {
 		v := custodydb.ContextVerification{CaptureID: f.VerifiedCaptureID, RootID: f.VerifiedRootID, VerifiedAt: f.VerifiedAt, ExpectationDigest: f.ExpectationDigest, CopiesDigest: f.VerifiedCopiesDigest, IntentDigest: f.VerifiedIntentDigest, AuthorityDigest: f.AuthorityDigest, PermissionEpoch: f.PermissionEpoch, PermissionSequence: f.PermissionSequence.Int64}
@@ -134,6 +144,9 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 			out.Phase = "Failed"
 			out.ActionPhase = "Denied"
 			out.ReasonCode = "PodStatusDenied"
+			return out, nil
+		case "profilerBusy":
+			out.Phase, out.ActionPhase, out.ReasonCode = "Failed", "Failed", "ProfilerBusy"
 			return out, nil
 		case "peerMembershipChanged":
 			// ADR-283 part 3: the connector stopped (or never started) the

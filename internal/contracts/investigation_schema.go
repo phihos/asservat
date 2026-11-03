@@ -64,7 +64,7 @@ func (investigationOfflineLoader) Load(string) (any, error) { return nil, ErrInv
 
 // InvestigationToolNames lists every embedded operation contract.
 func InvestigationToolNames() []string {
-	return []string{"cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers"}
+	return []string{"cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary"}
 }
 
 func NewInvestigationContracts() (*InvestigationContracts, error) {
@@ -177,7 +177,7 @@ func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 	if err := v.validate(name, b, true); err != nil {
 		return err
 	}
-	if name != "get_file_excerpt" && name != "get_query_result" {
+	if name != "get_file_excerpt" && name != "get_query_result" && name != "get_profile_summary" {
 		return nil
 	}
 	var out struct {
@@ -204,7 +204,7 @@ func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 	}
 	// The server-selected original tool is closed at this implementation
 	// boundary. A future catalog entry cannot choose a weaker nested schema.
-	if out.Data.Tool != "get_file_excerpt" && out.Data.Tool != "get_http_headers" || v.ValidateOutput(out.Data.Tool, out.Data.Result) != nil {
+	if out.Data.Tool != "get_file_excerpt" && out.Data.Tool != "get_http_headers" && out.Data.Tool != "get_profile_summary" || v.ValidateOutput(out.Data.Tool, out.Data.Result) != nil {
 		return ErrInvestigationWire
 	}
 	if out.Data.Tool == "get_http_headers" {

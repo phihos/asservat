@@ -9,6 +9,7 @@ import (
 
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/catalog"
 	"asservat.local/asservat/internal/domain/identity"
@@ -74,6 +75,7 @@ type ArtifactHandlingNotice struct {
 	AsOf                     time.Time `json:"asOf"`
 }
 type ContextCaseArtifactData struct {
+	NativeFormat   string                 `json:"native_format,omitempty"`
 	ArtifactID     string                 `json:"artifact_id"`
 	Digest         string                 `json:"digest"`
 	Kind           string                 `json:"kind"`
@@ -132,14 +134,20 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 		data := ContextCaseData{Case: ContextCaseSummary{CaseID: view.CaseID, Status: "Ready", Access: "ordinary"}, Artifacts: make([]ContextCaseArtifactData, 0, len(view.Artifacts)), Timeline: []any{}}
 		for _, a := range view.Artifacts {
 			kind := "pod-status"
-			if a.EvidenceType == "packetCapture" || a.EvidenceType == "syscallTrace" {
+			if a.EvidenceType == "packetCapture" || a.EvidenceType == "syscallTrace" || a.EvidenceType == "profile" {
 				kind = a.EvidenceType
 			}
 			if a.Shared {
 				// ADR-232: the view contains an artifact admitted by a share.
 				data.Case.Access = "shared"
 			}
-			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
+			nativeFormat := ""
+			if kind == "profile" {
+				if typ, known := artifact.LookupNativeType(a.NativeType); known && typ.EvidenceType == "profile" {
+					nativeFormat = typ.Format
+				}
+			}
+			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{NativeFormat: nativeFormat, ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
 		}
 		out.Data = data
 	}

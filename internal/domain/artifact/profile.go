@@ -12,6 +12,10 @@ type GoProfileAcquisition struct {
 	Type, Mode     string
 	DurationMillis int64 // zero for a snapshot or cumulative read
 	ForceGC        bool
+	// Admission inputs are absent on historical component-only artifacts.
+	TimeoutMillis int64  `json:",omitempty"`
+	MaxBytes      int64  `json:",omitempty"`
+	Composition   []byte `json:",omitempty"`
 }
 
 // Valid checks the request against the Go pprof HTTP subset.
@@ -31,8 +35,9 @@ func (p *GoProfileAcquisition) NativeType() string {
 // MaxPprofDecompressedBytes bounds a pprof artifact's gunzipped protobuf
 // (ADR-284): the producer refuses a gzip trailer declaring more, and the
 // publisher stops decompressing beyond it. Larger profiles are refused,
-// never truncated. Parsing a 16 MiB table-heavy profile peaked at about
-// 200 MiB of live heap, within the publisher's 512 MiB limit (ADR-284).
+// never truncated. This byte limit is separate from the parser's preallocation
+// shape limits and process memory containment; valid protobuf labels can amplify
+// allocations far beyond the byte size (ADR-284 follow-up).
 const MaxPprofDecompressedBytes = 16 << 20
 
 // GoTraceHeaderBytes is the length of an execution trace header.
@@ -70,4 +75,14 @@ func ValidGoProfile(typ, mode string, d time.Duration, forceGC bool) bool {
 		return mode == "cumulative" && d == 0 || delta
 	}
 	return false
+}
+
+// Clone isolates persisted acquisition input from mutable callers.
+func (p *GoProfileAcquisition) Clone() *GoProfileAcquisition {
+	if p == nil {
+		return nil
+	}
+	out := *p
+	out.Composition = append([]byte(nil), p.Composition...)
+	return &out
 }
