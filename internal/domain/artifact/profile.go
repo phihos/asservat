@@ -35,8 +35,9 @@ func (p *GoProfileAcquisition) NativeType() string {
 // MaxPprofDecompressedBytes bounds a pprof artifact's gunzipped protobuf
 // (ADR-284): the producer refuses a gzip trailer declaring more, and the
 // publisher stops decompressing beyond it. Larger profiles are refused,
-// never truncated. Parsing a 16 MiB table-heavy profile peaked at about
-// 200 MiB of live heap, within the publisher's 512 MiB limit (ADR-284).
+// never truncated. This byte limit is separate from the parser's preallocation
+// shape limits and process memory containment; valid protobuf labels can amplify
+// allocations far beyond the byte size (ADR-284 follow-up).
 const MaxPprofDecompressedBytes = 16 << 20
 
 // GoTraceHeaderBytes is the length of an execution trace header.
