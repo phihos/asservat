@@ -172,6 +172,28 @@ func (t Targets) ResolvePacketPeers(ctx context.Context, r targets.PeerRequest) 
 	return out, nil
 }
 
+// ResolveProfileEndpoint asks the target's region to resolve one Go profile
+// action's endpoint (ADR-285). A mismatched answer is unavailable; the caller
+// records its own receipt time.
+func (t Targets) ResolveProfileEndpoint(ctx context.Context, r targets.ProfileEndpointRequest) (targets.ProfileEndpointResolution, error) {
+	var out targets.ProfileEndpointResolution
+	if !r.Valid() || t.Router == nil || ctx == nil || ctx.Err() != nil {
+		return out, targets.ErrInvalid
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	call, diagnostics := NewStreamDiagnosticContext(call)
+	if _, err := t.Router.Query(call, r.Target.ClusterID, queryResolveProfileEndpoint, r, &out); err != nil {
+		t.report("endpoint/"+queryStep(err, diagnostics), "")
+		return targets.ProfileEndpointResolution{}, err
+	}
+	if !out.ResolvedAt.IsZero() || !out.Answers(r) {
+		t.report("endpoint/result", "")
+		return targets.ProfileEndpointResolution{}, targets.ErrUnavailable
+	}
+	return out, nil
+}
+
 // ListCaptureProfiles asks the target's region for its namespace catalog
 // (one bounded LIST). A mismatched answer is unavailable.
 func (t Targets) ListCaptureProfiles(ctx context.Context, r targets.ProfileListRequest) (targets.ProfileCatalogAnswer, error) {

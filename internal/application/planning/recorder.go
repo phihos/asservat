@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -70,6 +71,33 @@ type syscallParameters struct {
 	Arguments              json.RawMessage  `json:"arguments,omitempty"`
 }
 
+// profileSource is a profile action's named acquisition source.
+type profileSource struct {
+	Kind       string `json:"kind"`
+	ProfileRef string `json:"profileRef,omitempty"`
+}
+
+// profileParameters is action.schema.json's profile parameters (ADR-285).
+type profileParameters struct {
+	Runtime     string        `json:"runtime"`
+	Type        string        `json:"type"`
+	Source      profileSource `json:"source"`
+	Duration    string        `json:"duration,omitempty"`
+	FrequencyHz int           `json:"frequencyHz,omitempty"`
+	ForceGC     bool          `json:"forceGC"`
+	Mode        string        `json:"mode"`
+}
+
+// endpointBinding is recipe.schema.json endpointBindings: a maintainer's
+// binding of an administrator template to a declared Pod port. It has no
+// URL, host, numeric port, path, header or credential (REQ-PRF-001).
+type endpointBinding struct {
+	Name        string `json:"name"`
+	TemplateRef string `json:"templateRef"`
+	AddressMode string `json:"addressMode"`
+	PortName    string `json:"portName"`
+}
+
 type actionLimits struct {
 	MaxBytes int64  `json:"maxBytes"`
 	Timeout  string `json:"timeout"`
@@ -91,6 +119,9 @@ type recipeSpec struct {
 	Actions       []recipeAction `json:"actions"`
 	MaxTotalBytes int64          `json:"maxTotalBytes"`
 	MaxDuration   string         `json:"maxDuration"`
+	// EndpointBindings are the recipe's Go profile endpoint bindings
+	// (ADR-285); absent for recorder recipes, so their digests are unchanged.
+	EndpointBindings []endpointBinding `json:"endpointBindings,omitempty"`
 }
 
 type editableField struct {
@@ -128,9 +159,9 @@ func (p resolvedProfile) wire(componentID string) wireResolved {
 }
 
 // Builtin evidence kinds available as composition components in this release.
-// process-context, http-headers and go-cpu stay unavailable until their
-// recorders or action kinds exist (plan §2.2).
-var builtinNames = []string{"network-connections", "syscall-activity"}
+// process-context and http-headers stay unavailable until their recorders or
+// action kinds exist (plan §2.2); go-cpu plans in preview (ADR-285).
+var builtinNames = []string{"network-connections", "syscall-activity", "go-cpu"}
 
 func strict(b []byte, out any) error {
 	d := json.NewDecoder(bytes.NewReader(b))
@@ -234,7 +265,7 @@ func resolveProfile(i int, ref value.ProfileRef, resolved []value.CatalogProfile
 func resolveBuiltin(i int, ref value.ProfileRef) (resolvedProfile, error) {
 	path := pathf("profile_composition.components[%d].profileRef", i)
 	if !slices.Contains(builtinNames, ref.Name) {
-		return resolvedProfile{}, refuse(value.CompositionProfileMissing, path, "builtin profile "+strconv.Quote(ref.Name)+" is not available in this release; available: network-connections/v1, syscall-activity/v1")
+		return resolvedProfile{}, refuse(value.CompositionProfileMissing, path, "builtin profile "+strconv.Quote(ref.Name)+" is not available in this release; available: network-connections/v1, syscall-activity/v1, go-cpu/v1")
 	}
 	if ref.Version != "v1" {
 		return resolvedProfile{}, refuse(value.CompositionProfileMissing, path, "version "+strconv.Quote(ref.Version)+" of builtin "+ref.Name+" does not exist; available: v1")
@@ -252,6 +283,8 @@ func evidenceType(kind string) string {
 		return "packetCapture"
 	case "syscallTrace":
 		return "syscallTrace"
+	case "profile":
+		return "profile"
 	}
 	return ""
 }
@@ -339,7 +372,12 @@ type expandedAction struct {
 	action  recipeAction
 	packet  *packetParameters
 	syscall *syscallParameters
-	filter  *value.CompiledFilter
+	// profile is a profile action (ADR-285); bindings are its component's
+	// expanded endpoint bindings and endpoint the region's frozen answer.
+	profile  *profileParameters
+	bindings []endpointBinding
+	endpoint *targets.ProfileEndpointResolution
+	filter   *value.CompiledFilter
 	// peers is the canonical CIDR selection (ADR-283); nil selects all pod
 	// traffic. expression is the compiled effective filter: the peer
 	// expression intersected with the authored filter.
@@ -420,6 +458,8 @@ func applyEdit(path string, e value.ProfileEdit, a *expandedAction) error {
 		a.syscall.Ring, err = ringValue()
 	case "syscallMode":
 		a.syscall.Mode, err = text()
+	case "profileDuration":
+		a.profile.Duration, err = text()
 	case "syscallFilter":
 		if e.Syscalls == nil {
 			return refuse(value.CompositionInvalid, path, "syscallFilter takes {mode: all} or {mode: include, names: [...]}")
@@ -602,6 +642,9 @@ func validRing(path string, r ring, before time.Duration) error {
 // normalize resolves the execution mode and validates one expanded action
 // against the action-lifecycle and mechanism rules as a whole.
 func normalize(path string, a *expandedAction, compiler FilterCompiler, pc *peerContext) error {
+	if a.profile != nil {
+		return normalizeProfile(path, a)
+	}
 	if a.action.ExecutionMode == "" {
 		a.action.ExecutionMode = "ongoing" // action.schema.json x-execution-modes default
 	}
@@ -835,6 +878,20 @@ func expand(c value.ProfileComposition, compiler FilterCompiler, pc *peerContext
 		profiles = append(profiles, p)
 		first := len(actions)
 		index := map[string]int{}
+		bindings, bindingNames := []endpointBinding(nil), map[string]string{}
+		for _, b := range p.Definition.Recipe.EndpointBindings {
+			id := generatedID("e", component.ID, b.Name)
+			if _, dup := bindingNames[b.Name]; dup || !(targets.ProfileEndpointBinding{Name: b.Name, TemplateRef: b.TemplateRef, AddressMode: b.AddressMode, PortName: b.PortName}).Valid() {
+				return nil, nil, refuse(value.CompositionInvalid, base+".profileRef", p.Name+"/"+p.Version+" has an invalid endpoint binding "+strconv.Quote(b.Name))
+			}
+			if other, taken := ids[id]; taken {
+				return nil, nil, refuse(value.CompositionInvalid, base+".id", "the generated endpoint binding ID of "+component.ID+"/"+b.Name+" collides with "+other+"; rename the component")
+			}
+			ids[id] = component.ID + "/" + b.Name
+			bindingNames[b.Name] = id
+			b.Name = id
+			bindings = append(bindings, b)
+		}
 		for _, a := range p.Definition.Recipe.Actions {
 			x := expandedAction{action: a, localID: a.ID, componentID: component.ID}
 			switch a.Kind {
@@ -844,6 +901,17 @@ func expand(c value.ProfileComposition, compiler FilterCompiler, pc *peerContext
 			case "syscallTrace":
 				x.syscall = &syscallParameters{}
 				err = strict(a.Parameters, x.syscall)
+			case "profile":
+				x.profile = &profileParameters{}
+				err = strict(a.Parameters, x.profile)
+				// ADR-285: a Go endpoint source names one of this component's
+				// bindings (renamed like action IDs) or an administrator profile.
+				if err == nil {
+					x.bindings = bindings
+					if b, ok := bindingNames[x.profile.Source.ProfileRef]; ok && x.profile.Source.Kind == "httpEndpoint" {
+						x.profile.Source.ProfileRef = b
+					}
+				}
 			default:
 				err = value.ErrInvalid
 			}
@@ -1090,6 +1158,9 @@ type recorderScope struct {
 	Timing     string                 `json:"timing,omitempty"`
 	Interim    string                 `json:"acceptance"`
 	Approval   *approvalRecord        `json:"approval,omitempty"`
+	// ProfileEndpoints are the reviewed Go profile endpoints (ADR-285);
+	// absent without profile actions, so recorder scopes are unchanged.
+	ProfileEndpoints []profileEndpointRecord `json:"profileEndpoints,omitempty"`
 }
 
 // normalizedRecorderAction is shared by manual and policy compilation. It
@@ -1117,6 +1188,12 @@ func normalizedRecorderAction(x expandedAction, componentID string) (recipeActio
 			}
 		}
 		rr = x.packet.Ring
+	} else if x.profile != nil {
+		params = x.profile
+		profileSummary(&summary, x.profile)
+		if x.endpoint != nil {
+			summary.EndpointDigest = hexDigest(x.endpoint.EndpointDigest)
+		}
 	} else {
 		s := x.syscall
 		params = s
@@ -1167,6 +1244,13 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 		// Every supplied resolution answers one action's exact query.
 		return bad()
 	}
+	if err := resolveEndpoints(actions, in.Composition, in.Target.Request, in.Endpoints); err != nil {
+		var needed EndpointResolutionNeeded
+		if errors.As(err, &needed) {
+			return value.RecorderPlan{}, err
+		}
+		return bad()
+	}
 	r := in.Retention
 	if r.Target != in.Target.Target() || !r.PolicyRevision.Valid() || !now.Before(r.ValidUntil) || r.ValidUntil.After(now.Add(60*time.Second)) || r.PrivacyClass != "potentialPersonalData" || !r.Deadlines.Valid() || r.AnchorAt.After(now) || !identity.Text(r.PurposeRef, 128) || len(r.Policies) < 1 || len(r.Policies) > 64 {
 		return bad()
@@ -1213,6 +1297,13 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 		if filter != nil {
 			scope.Filters = append(scope.Filters, *filter)
 		}
+		if x.endpoint != nil {
+			scope.ProfileEndpoints = append(scope.ProfileEndpoints, endpointRecord(id, *x.endpoint))
+		}
+		if x.profile != nil {
+			// ADR-284/285: pprof and execution traces are class raw.
+			approval.DataClass = "raw"
+		}
 		if summary.EvidenceType != r.EvidenceType {
 			return bad()
 		}
@@ -1249,6 +1340,9 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 		scope.Retention = append(scope.Retention, effectiveRetention{id, r.PurposeRef, r.PrivacyClass, r.EvidenceType, r.RequestedSeconds, r.MaximumSeconds, r.DeletionBudgetSeconds, refs})
 		expanded.Actions = append(expanded.Actions, a)
 		out.Actions = append(out.Actions, summary)
+		if x.profile != nil {
+			expanded.EndpointBindings = append(expanded.EndpointBindings, x.bindings...)
+		}
 	}
 	if len(approval.Reasons) > 0 {
 		scope.Approval = approval
@@ -1293,6 +1387,12 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 	}
 	out.Input.Retention.Policies = slices.Clone(in.Retention.Policies)
 	out.Input.Peers = clonePeerResolutions(in.Peers)
+	if in.Endpoints != nil {
+		out.Input.Endpoints = make([]targets.ProfileEndpointResolution, len(in.Endpoints))
+		for i, e := range in.Endpoints {
+			out.Input.Endpoints[i] = e.Clone()
+		}
+	}
 	out.Input.Composition = *in.Composition.Clone()
 	out.RecipeDigest, out.CanonicalScope, out.ScopeDigest = recipeDigest, b, d
 	out.ValidUntil = identity.Earlier(identity.Earlier(in.Target.FreshUntil, r.ValidUntil), in.Deadline)
@@ -1339,6 +1439,17 @@ func RecorderScopeSummary(scope []byte) ([]value.RecorderAction, *value.Recorder
 				return nil, nil, value.ErrInvalid
 			}
 			s.Before, s.After, s.SyscallMode, r = p.Before, p.After, p.Mode, p.Ring
+		case "profile":
+			var p profileParameters
+			if strict(a.Parameters, &p) != nil {
+				return nil, nil, value.ErrInvalid
+			}
+			profileSummary(&s, &p)
+			for _, e := range doc.ProfileEndpoints {
+				if e.ActionID == a.ID {
+					s.EndpointDigest = e.EndpointDigest
+				}
+			}
 		default:
 			return nil, nil, value.ErrInvalid
 		}

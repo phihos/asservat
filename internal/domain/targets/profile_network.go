@@ -4,7 +4,6 @@ import (
 	"net/netip"
 	"time"
 
-	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -46,7 +45,7 @@ type ProfileNetwork struct {
 }
 
 func (p ProfileNetwork) Valid(now time.Time) bool {
-	if !p.Target.Valid(now) || p.Target.ExecutionClass != artifact.ContextNodeExecution || len(p.Ports) > MaxProfilePodPorts || len(p.PodIPs) > 2 {
+	if !p.Target.Valid(now) || !p.Target.ExecutionClass.Valid() || len(p.Ports) > MaxProfilePodPorts || len(p.PodIPs) > 2 {
 		return false
 	}
 	// Public bindings intentionally retain their existing narrower name grammar.

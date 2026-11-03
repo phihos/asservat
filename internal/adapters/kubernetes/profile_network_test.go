@@ -299,3 +299,31 @@ func TestProfileNetworkNormalizesEquivalentIPAddresses(t *testing.T) {
 		t.Fatal("unexpected replacement or fallback read")
 	}
 }
+
+// API-execution resolution previews endpoint routing without inventing node
+// execution authority or adding node-read privileges.
+func TestProfileNetworkAPIExecutionPreview(t *testing.T) {
+	var nodeReads atomic.Int64
+	f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.HasPrefix(r.URL.Path, "/api/v1/nodes/") {
+			nodeReads.Add(1)
+		}
+		p := profileNetworkAPIObject(r.URL.Path)
+		if r.URL.Path == "/api/v1/namespaces/payments/pods/app" {
+			p = profileNetworkPod()
+		}
+		if p == nil {
+			return false
+		}
+		permissionReply(w, p)
+		return true
+	})
+	reader, err := NewAPIContextTargets(f.client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := reader.ObserveProfileNetwork(context.Background(), profileNetworkRequest())
+	if err != nil || !got.Valid(time.Unix(0, f.clock.Load()).UTC()) || got.Target.ExecutionClass != artifact.ContextAPIExecution || got.Target.Pin.NodeName != "" || nodeReads.Load() != 0 {
+		t.Fatalf("API preview %+v err=%v nodes=%d", got, err, nodeReads.Load())
+	}
+}

@@ -36,6 +36,7 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 	historyFile := flags.String("history-credential", "", "the separate history-prefix storage capability (required with the regional executor; never the evidence writer)")
 	alertmanager := flags.String("alertmanager", "", "optional in-cluster Alertmanager base URL for alert policies (ADR-231; regional executor only)")
 	mappingsJSON := flags.String("identity-mappings", "", "optional JSON array of identity mapping records for decision-time PermissionSources (ADR-245; regional executor only)")
+	endpointsJSON := flags.String("profile-endpoints", "", "optional JSON array of administrator Go profile endpoint templates and profiles (ADR-285; regional executor only)")
 	collectorNamespace := flags.String("collector-namespace", "", "optional existing collector namespace whose DaemonSet this connector attests (ADR-246)")
 	collectorName := flags.String("collector-name", "", "the collector DaemonSet and service account name (with --collector-namespace)")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || *offerFile == "" || *bootstrapFile == "" || (*collectorNamespace == "") != (*collectorName == "") {
@@ -84,6 +85,14 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 			return mounts.ErrUnavailable
 		}
 	}
+	var endpoints []contracts.RegionalProfileEndpoint
+	if *endpointsJSON != "" {
+		d := json.NewDecoder(strings.NewReader(*endpointsJSON))
+		d.DisallowUnknownFields()
+		if len(*endpointsJSON) > 64<<10 || d.Decode(&endpoints) != nil || d.More() || !kube.ProfileEndpointsValid(endpoints) {
+			return mounts.ErrUnavailable
+		}
+	}
 	var evidence []byte
 	if *evidenceFile != "" {
 		if evidence, err = os.ReadFile(*evidenceFile); err != nil || len(evidence) > 32<<10 {
@@ -100,7 +109,7 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 	}
 	// The output includes the public join record of an installed executor
 	// (ADR-196 decision 2); it holds no credential.
-	installed, err := kube.InstallRegionalConnector(ctx, config, kube.RegionalInstallPlan{Offer: offer, Bootstrap: envelope, Namespace: *namespace, AccountAdministrator: *inCluster, Evidence: evidence, History: history, Alertmanager: *alertmanager, IdentityMappings: mappings, Collector: collector})
+	installed, err := kube.InstallRegionalConnector(ctx, config, kube.RegionalInstallPlan{Offer: offer, Bootstrap: envelope, Namespace: *namespace, AccountAdministrator: *inCluster, Evidence: evidence, History: history, Alertmanager: *alertmanager, IdentityMappings: mappings, ProfileEndpoints: endpoints, Collector: collector})
 	if err != nil {
 		return err
 	}

@@ -351,3 +351,10 @@ func TestHTTPHeadersPreviewWire(t *testing.T) {
 		t.Fatalf("http preview: %s", reply.Body)
 	}
 }
+
+func TestProfileWarningsDescribeProfileTiming(t *testing.T) {
+	warnings := recorderWarnings(planning.RecorderPlan{Actions: []planning.RecorderAction{{Kind: "profile", ProfileRuntime: "go", ProfileType: "cpu", ProfileMode: "interval", Duration: "10s"}}})
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "go cpu profile (interval for 10s)") || strings.Contains(warnings[0], "Packet") {
+		t.Fatal(warnings)
+	}
+}

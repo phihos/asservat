@@ -114,3 +114,13 @@ resolved public configuration and mechanism parameters, while current
 observations retain their original earliest cutoffs. A pure catalog value or
 matching digest is not proof of protected source acceptance or permission to
 use credentials. See the [runtime-profile boundary](../docs/architecture/runtime-profiles.md).
+
+### Manual profile preview
+
+[ADR-285](../docs/decisions/285-profile-preview-plans.md) connects the passive
+endpoint planner to manual preview through regional installation configuration.
+The review freezes the public definition and endpoint digests without dialing
+or reading credentials. `builtin/go-cpu/v1` selects a ten-second CPU interval;
+custom profiles may use the supported Go modes or the eBPF CPU sampler. Plans
+state raw native output and the required `liveProfile` approval reason. They
+remain unavailable for submission until acquisition is implemented and qualified.

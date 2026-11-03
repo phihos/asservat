@@ -403,8 +403,10 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		// ADR-243: libpcap only in a hub build with the libpcap tag; otherwise a stub.
 		Filters: pcap.NewCompiler(),
 		// ADR-283 PR 2: the target's region resolves Kubernetes peers.
-		Peers:    queries,
-		Lifetime: time.Duration(p.PreviewSeconds) * time.Second}
+		Peers: queries,
+		// ADR-285: the target's region resolves Go profile endpoints.
+		ProfileEndpoints: queries,
+		Lifetime:         time.Duration(p.PreviewSeconds) * time.Second}
 	// REQ-CPR-001: organization capture profiles are published in the
 	// protected hub namespace; the hub reads them with its observer client.
 	// Namespace profiles are read by the target's region.

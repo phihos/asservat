@@ -7,6 +7,7 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 
+	planner "asservat.local/asservat/internal/application/planning"
 	port "asservat.local/asservat/internal/application/targets"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -27,6 +28,8 @@ type PodTargets struct {
 	alerts *Alertmanager
 	// mappings are the cluster's identity mapping records (ADR-245).
 	mappings []contracts.RegionalIdentityMapping
+	// endpoints are the cluster's profile endpoint entries (ADR-285).
+	endpoints []planner.ProfileEndpointEntry
 }
 
 var _ port.PodResolver = (*PodTargets)(nil)
