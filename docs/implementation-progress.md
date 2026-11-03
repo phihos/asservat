@@ -3,6 +3,24 @@
 
 ## Current delivery workflow (2026-11-03)
 
+The second native batch on `07dbce30` reached all five requests for both source
+formats. Four views passed independent native-content, SQL/key/batch and Pod
+checks. The changed-filter request returned the expected error, but its SQL
+batch never completed. Arguments Go exited 1 in 825.728s; metadata Go exited 1
+in 860.611s (its workflow subsequently hit the job cap). Both source inventories
+were unchanged, cleanup failures were empty, and build scratch was removed.
+Reports are retained in `test/results/syscall-native-41700386272/` and
+`test/results/syscall-native-41700390343/`. CI41700317751 passed and Gitar reports
+no open findings. PR150 remains unmerged; no complete native qualification is claimed.
+
+The coordinator closes invalid-cursor/oversize reads before C-20 can acknowledge
+its audited refusal. SQL correctly requires that acknowledged outcome before
+batch completion. The early close discards the only handle, leaving conservative
+active state. A composed failing regression and retained-refusal delivery fix
+are in progress; the SQL fence, worker cap and charges remain mandatory. The
+native inspector now reports the exact last worker/key/batch state on failure.
+No further hosted run has been scheduled.
+
 The first installed syscall qualification batch reached four successful views for
 both source formats: exact native summary, filtered first page, continuation and
 empty error-filter page. Each used the real 256 MiB Pod, two units and three

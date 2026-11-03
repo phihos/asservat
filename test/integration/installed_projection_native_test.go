@@ -74,6 +74,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 			} // acknowledged scoped denial, before query admission
 			limit, stop := context.WithTimeout(ctx, 10*time.Second)
 			defer stop()
+			lastState := "no observation"
 			for limit.Err() == nil {
 				var id, worker string
 				var polls, batches, workers, keys, closed int
@@ -83,6 +84,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
      (SELECT count(*) FROM context_query_key_binding k WHERE k.query_id=q.id AND k.used_roles=7),
      (SELECT count(*) FROM context_query_batch b WHERE b.query_id=q.id AND b.closed AND b.native_closed)
      FROM context_query q WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`, root, operation, artifact).Scan(&id, &worker, &polls, &batches, &active, &uncertain, &workers, &keys, &closed)
+				lastState = fmt.Sprintf("query=%s handle=%s workers=%d polls=%d batches=%d keys=%d closed=%d active=%t uncertain=%t err=%v", id, handle, workers, polls, batches, keys, closed, active, uncertain, err)
 				if err == nil && (handle == "" || id == handle) && worker != "" && workers == 1 && polls <= 4 && batches >= 1 && batches <= 2 && keys == batches && closed == batches && !active && !uncertain {
 					t.Logf("installed approved query: one exact shared worker, %d paid poll(s), %d joined batch(es), three consumed key roles per batch; no native session", polls, batches)
 					var intent query.ContextProjectionWorkerIntent
@@ -148,7 +150,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 					break
 				}
 			}
-			t.Fatal("approved response lacked exact joined SQL worker/key/batch readback")
+			t.Fatal("approved response lacked exact joined SQL worker/key/batch readback:", lastState)
 			return nil
 		}
 	}
