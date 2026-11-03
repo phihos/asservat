@@ -60,6 +60,10 @@ func TestProfileAdmissionRequiresRawReviewAndFrozenEndpoint(t *testing.T) {
 	if grants.requests[0].DataClass != "raw" || grants.requests[0].Review.ObservationLimits != nil || len(f.seen) != 0 {
 		t.Fatal("profile invented packet observation budget")
 	}
+	review := grants.requests[0].Review.Actions[0].Profile
+	if review == nil || review.Runtime != "go" || review.Type != "cpu" || review.Mode != "interval" || review.Duration != preview.Plan.Actions[0].Duration || review.Timeout != preview.Plan.Actions[0].Timeout || review.SourceRef != preview.Plan.Input.Endpoints[0].Request.SourceRef || review.EndpointDigest != preview.Plan.Actions[0].EndpointDigest || review.Port != preview.Plan.Input.Endpoints[0].Port {
+		t.Fatalf("profile approval lost reviewed parameters: %+v", review)
+	}
 	grants.covering = nil
 	grants.grant.ExpiresAt = f.now.Add(time.Minute)
 	if _, err = f.request(t, p, "start"); !errors.Is(err, reachedRecordingAdmission) || len(f.seen) != 1 {

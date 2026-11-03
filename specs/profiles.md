@@ -136,6 +136,13 @@ optional all-recordings approval setting. Existing same-human result-access
 children govern raw inspection/download; capture-time raw sharing stays refused
 until its separate approval contract is implemented.
 
+The persisted approval review and shared browser/MCP response carry the profile
+runtime, type, mode, optional duration, timeout, forced-GC choice, native limit
+and reviewed endpoint name, address mode, port, path policy and digest. The
+console presents these parameters and the absence of pre-trigger history;
+profile actions carry no fabricated packet window, filter or recording ring.
+This summary does not replace the canonical execution scope or probe endpoints.
+
 For native limits above 8 MiB, [ADR-290](../docs/decisions/290-one-shot-profile-streaming.md)
 requires atomic final and temporary multipart reservations and a single durable
 binding to the accepted connector process before storage. Its non-resumable

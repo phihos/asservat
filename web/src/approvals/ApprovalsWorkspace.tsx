@@ -9,6 +9,7 @@ import { operations as defaultOperations, type Grant, type Operations, type Revi
 const date = (value: string) => new Date(value).toLocaleString();
 const reasons: Record<string, string> = {
   rawBytePredicate: 'a raw byte comparison in the packet filter can test payload bytes',
+  liveProfile: 'live profiling can affect the application and records raw user data',
   rawPackets: 'the recording keeps payload prefixes up to the approved per-transport caps',
   httpHeaders: 'the recording reads payload to project HTTP/1 method, status, Content-Type and Content-Length; bodies, URLs and credentials are discarded',
   recordingApprovalRequired: 'this installation requires approval for every recording',
@@ -39,14 +40,15 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
       <table>
         <thead><tr><th scope="col">Action</th><th scope="col">Mode</th><th scope="col">Window</th><th scope="col">Filter</th><th scope="col">Ring</th><th scope="col">Output limit</th></tr></thead>
         <tbody>{grant.actions.map(a => <tr key={a.action_id}>
-          <td>{a.kind === 'packetCapture' ? 'Packets' : 'Syscalls'} <span className="identifier">{a.action_id}</span></td>
+          <td>{a.kind === 'profile' ? 'Go profile' : a.kind === 'packetCapture' ? 'Packets' : 'Syscalls'} <span className="identifier">{a.action_id}</span></td>
           <td>{a.execution_mode === 'ongoing' ? 'Records while armed' : 'On trigger'}</td>
-          <td>{a.before} before, {a.after} after</td>
-          <td>{a.filter ? <><code>{a.filter}</code>{a.filter_digest && <> ({a.filter_instructions} instructions, program <span className="identifier">{a.filter_digest.slice(0, 16)}</span>)</>}</> : 'none'}</td>
-          <td>{bytes(a.ring_max_bytes)}, {a.ring_max_age}</td>
+          <td>{a.profile ? <>{a.profile.type} · {a.profile.mode}{a.profile.duration && <> for {a.profile.duration}</>}<br/>Timeout {a.profile.timeout}; forced GC {a.profile.force_gc ? 'enabled' : 'disabled'}</> : <>{a.before} before, {a.after} after</>}</td>
+          <td>{a.filter ? <><code>{a.filter}</code>{a.filter_digest && <> ({a.filter_instructions} instructions, program <span className="identifier">{a.filter_digest.slice(0, 16)}</span>)</>}</> : a.profile ? 'Not applicable' : 'none'}</td>
+          <td>{a.profile ? 'No pre-trigger history' : <>{bytes(a.ring_max_bytes ?? 0)}, {a.ring_max_age}</>}</td>
           <td>{bytes(a.max_bytes)}</td>
         </tr>)}</tbody>
       </table>
+      {grant.actions.filter(a => a.profile).map(a => <p key={'endpoint-' + a.action_id}>Profile endpoint {a.profile!.source_name} ({a.profile!.source_ref}): {a.profile!.address_mode === 'targetLoopback' ? 'target Pod loopback' : 'target Pod IP'}, TCP port {a.profile!.port}, {a.profile!.path_policy}. The reviewed endpoint must match at execution.</p>)}
       {grant.observation_limits && <p>Observation limits bound by this approval: {grant.observation_limits.max_session_seconds} s per session, {bytes(grant.observation_limits.max_observed_bytes)} in total, {bytes(grant.observation_limits.max_bytes_per_second)} per second, {grant.observation_limits.max_concurrent_sessions} concurrent session.</p>}
       {grant.result_access && <p>Follow-up access for the requester only: {grant.result_access.operations.join(', ')} by clients {grant.result_access.client_ids.join(', ')}, at most {grant.result_access.max_artifacts} artifacts and {bytes(grant.result_access.max_bytes)} in total until {date(grant.result_access.not_after)} (used: {grant.result_access.artifacts_used} artifacts, {bytes(grant.result_access.bytes_used)}).</p>}
       {policy ? <>

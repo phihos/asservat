@@ -3646,7 +3646,8 @@
                             "kind": {
                               "enum": [
                                 "packetCapture",
-                                "syscallTrace"
+                                "syscallTrace",
+                                "profile"
                               ]
                             },
                             "execution_mode": {
@@ -3706,18 +3707,173 @@
                                   "recordingApprovalRequired"
                                 ]
                               }
+                            },
+                            "profile": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "runtime": {
+                                  "const": "go"
+                                },
+                                "type": {
+                                  "enum": [
+                                    "cpu",
+                                    "heap",
+                                    "allocs",
+                                    "goroutine",
+                                    "block",
+                                    "mutex",
+                                    "threadcreate",
+                                    "runtimeTrace"
+                                  ]
+                                },
+                                "mode": {
+                                  "enum": [
+                                    "snapshot",
+                                    "interval",
+                                    "cumulative",
+                                    "delta"
+                                  ]
+                                },
+                                "source": {
+                                  "const": "httpEndpoint"
+                                },
+                                "duration": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 16
+                                },
+                                "timeout": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 16
+                                },
+                                "force_gc": {
+                                  "type": "boolean"
+                                },
+                                "source_ref": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "source_name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "address_mode": {
+                                  "enum": [
+                                    "targetLoopback",
+                                    "podIP"
+                                  ]
+                                },
+                                "port": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 65535
+                                },
+                                "path_policy": {
+                                  "const": "go-pprof/v1"
+                                },
+                                "endpoint_digest": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                }
+                              },
+                              "required": [
+                                "runtime",
+                                "type",
+                                "mode",
+                                "source",
+                                "timeout",
+                                "force_gc",
+                                "source_ref",
+                                "source_name",
+                                "address_mode",
+                                "port",
+                                "path_policy",
+                                "endpoint_digest"
+                              ]
                             }
                           },
                           "required": [
                             "action_id",
                             "kind",
                             "execution_mode",
-                            "before",
-                            "after",
                             "max_bytes",
-                            "ring_max_bytes",
-                            "ring_max_age",
                             "sensitive"
+                          ],
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "kind": {
+                                  "const": "profile"
+                                }
+                              },
+                              "required": [
+                                "profile"
+                              ],
+                              "not": {
+                                "anyOf": [
+                                  {
+                                    "required": [
+                                      "before"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "after"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "ring_max_bytes"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "ring_max_age"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter_digest"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter_instructions"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "packetCapture",
+                                    "syscallTrace"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "before",
+                                "after",
+                                "ring_max_bytes",
+                                "ring_max_age"
+                              ],
+                              "not": {
+                                "required": [
+                                  "profile"
+                                ]
+                              }
+                            }
                           ]
                         }
                       },
@@ -15431,7 +15587,8 @@
                             "kind": {
                               "enum": [
                                 "packetCapture",
-                                "syscallTrace"
+                                "syscallTrace",
+                                "profile"
                               ]
                             },
                             "execution_mode": {
@@ -15491,18 +15648,173 @@
                                   "recordingApprovalRequired"
                                 ]
                               }
+                            },
+                            "profile": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "runtime": {
+                                  "const": "go"
+                                },
+                                "type": {
+                                  "enum": [
+                                    "cpu",
+                                    "heap",
+                                    "allocs",
+                                    "goroutine",
+                                    "block",
+                                    "mutex",
+                                    "threadcreate",
+                                    "runtimeTrace"
+                                  ]
+                                },
+                                "mode": {
+                                  "enum": [
+                                    "snapshot",
+                                    "interval",
+                                    "cumulative",
+                                    "delta"
+                                  ]
+                                },
+                                "source": {
+                                  "const": "httpEndpoint"
+                                },
+                                "duration": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 16
+                                },
+                                "timeout": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 16
+                                },
+                                "force_gc": {
+                                  "type": "boolean"
+                                },
+                                "source_ref": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "source_name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "address_mode": {
+                                  "enum": [
+                                    "targetLoopback",
+                                    "podIP"
+                                  ]
+                                },
+                                "port": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 65535
+                                },
+                                "path_policy": {
+                                  "const": "go-pprof/v1"
+                                },
+                                "endpoint_digest": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                }
+                              },
+                              "required": [
+                                "runtime",
+                                "type",
+                                "mode",
+                                "source",
+                                "timeout",
+                                "force_gc",
+                                "source_ref",
+                                "source_name",
+                                "address_mode",
+                                "port",
+                                "path_policy",
+                                "endpoint_digest"
+                              ]
                             }
                           },
                           "required": [
                             "action_id",
                             "kind",
                             "execution_mode",
-                            "before",
-                            "after",
                             "max_bytes",
-                            "ring_max_bytes",
-                            "ring_max_age",
                             "sensitive"
+                          ],
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "kind": {
+                                  "const": "profile"
+                                }
+                              },
+                              "required": [
+                                "profile"
+                              ],
+                              "not": {
+                                "anyOf": [
+                                  {
+                                    "required": [
+                                      "before"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "after"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "ring_max_bytes"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "ring_max_age"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter_digest"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter_instructions"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "properties": {
+                                "kind": {
+                                  "enum": [
+                                    "packetCapture",
+                                    "syscallTrace"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "before",
+                                "after",
+                                "ring_max_bytes",
+                                "ring_max_age"
+                              ],
+                              "not": {
+                                "required": [
+                                  "profile"
+                                ]
+                              }
+                            }
                           ]
                         }
                       },
