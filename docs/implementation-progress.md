@@ -58,14 +58,23 @@ creates a native download. Nine focused console files passed 145 tests, with
 a subsequent 46-test cross-case/link check and type checking. Native TLS
 comparison/mismatch, full command bounds and six remote child-role requests
 pass focused races; these component providers do not establish SQL/key authority. The repository pre-push gate passed, including 416 console tests and 69-package /
-433-edge architecture checks. The first service run stopped during SQL133
-migration before any Go test; all 4,008 recorded sources stayed unchanged and
-cleanup was complete. Original failure reports remain archived. A focused
-PostgreSQL 18.6 reproduction then fixed CASE parsing, JSON extraction/deletion
-precedence and rollback constraint ordering. Up133→Down132→Up133 passed with
-exact schema/function restoration and owned-container/volume cleanup. This
-compile/empty-history probe is not paired query qualification. The full service
-gate is being rerun on frozen sources; native comparison remains pending.
+433-edge architecture checks. The final sequential real-service gate on
+`4bf33ee0` passed: comparison suite 12.864s; legacy summary/producer and SQL133
+upgrade/rollback suite 16.619s. Both 4,009-file source inventories independently
+match the current files, with no changes during either run and cleanup failures
+`[]`. Reports are retained in `test/results/profile-comparison-service/`.
+The pair fixture uses the compiled hub-runtime grants. It proves real C3/C7,
+20-unit same-artifact admission/replay, two key children/six SQL role spends,
+second-source fences and a worker reservation. Cross-workload 10+10 atomicity,
+second-budget refusal and both-workload capacity use a real second enrollment
+with an explicitly synthetic unpublished route. C14 ownership is synthetic;
+these SQL masks are not mTLS unwrap or installed-worker evidence.
+
+The original failed reports remain archived. Fixes covered SQL expression and
+rollback ordering, fresh databases for protected root fixtures, real process
+grant coverage (one new baseline-allocation INSERT column), and joined SQL role
+cleanup. The next gate is schema133 installation handover, then reviewed exact
+CI and the prepared native two-capture browser/MCP comparison journey.
 No comparison requirement or installed result is marked complete. The argument job's cold-start/teardown
 headroom also needs improvement before later installed campaigns. No timeout was
 raised. These saved-view fixtures do not complete arbitrary `syscall_query`,
