@@ -43,9 +43,21 @@ type NativeOperation struct {
 	ParentID                       string
 	Generation                     int64
 	StartedAt, Until               time.Time
+	Baseline                       NativeProjectionSource `json:",omitzero"`
+}
+
+// NativeProjectionSource is the fixed baseline half of a paired approved read.
+// The parent keeps the incident half; a zero value preserves legacy bytes.
+type NativeProjectionSource struct {
+	Path          artifact.DownloadPath
+	Processing    artifact.DownloadProcessingProof
+	SourceVersion artifact.Digest
 }
 
 func (o NativeOperation) Valid() bool {
+	if o.Baseline != (NativeProjectionSource{}) && (o.Kind != NativeProjection || o.Baseline.SourceVersion == (artifact.Digest{})) {
+		return false
+	}
 	if !o.Reference.Valid() || !UUID(o.HubPodUID) || !UUID(o.HubProcessEpoch) || !UUID(o.WorkerPodUID) || o.WorkerPublicKey == (artifact.Digest{}) || o.SourceVersion == (artifact.Digest{}) || !UUID(o.ParentID) || o.Generation < 1 || o.StartedAt.IsZero() || !o.Until.After(o.StartedAt) {
 		return false
 	}
@@ -145,6 +157,9 @@ func nativeMultiply(a, b int64) (int64, bool) {
 
 func (o NativeOperation) Equal(other NativeOperation) bool {
 	dates := o.StartedAt.Equal(other.StartedAt) && o.Until.Equal(other.Until) && o.Processing.ObservedAt.Equal(other.Processing.ObservedAt) && o.Processing.ValidUntil.Equal(other.Processing.ValidUntil)
+	dates = dates && o.Baseline.Processing.ObservedAt.Equal(other.Baseline.Processing.ObservedAt) && o.Baseline.Processing.ValidUntil.Equal(other.Baseline.Processing.ValidUntil)
+	o.Baseline.Processing.ObservedAt, other.Baseline.Processing.ObservedAt = time.Time{}, time.Time{}
+	o.Baseline.Processing.ValidUntil, other.Baseline.Processing.ValidUntil = time.Time{}, time.Time{}
 	o.Processing.ObservedAt, other.Processing.ObservedAt = time.Time{}, time.Time{}
 	o.Processing.ValidUntil, other.Processing.ValidUntil = time.Time{}, time.Time{}
 	o.StartedAt, other.StartedAt = time.Time{}, time.Time{}
@@ -157,6 +172,18 @@ func (o NativeOperation) Equal(other NativeOperation) bool {
 func (o NativeOperation) CurrentValid(now time.Time) bool {
 	if !o.Valid() || !o.Path.Valid() || o.Path.TargetClusterID != o.Processing.Location.ClusterID {
 		return false
+	}
+	if o.Baseline != (NativeProjectionSource{}) {
+		b := o.Baseline
+		if !b.Path.Valid() || b.Path.TargetClusterID != b.Processing.Location.ClusterID || !b.Processing.Valid(now) || o.Until.After(b.Processing.ValidUntil) {
+			return false
+		}
+		first, second := b.Path, o.Path
+		first.ID, second.ID = "", ""
+		first.TargetClusterID, second.TargetClusterID = "", ""
+		if first != second || b.Processing.RootID != o.Processing.RootID {
+			return false
+		}
 	}
 	if o.Kind == NativeResponse {
 		// This immutable operation identity is not a disclosure observation. Every

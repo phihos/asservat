@@ -47,7 +47,9 @@ qualification. Reports are in `test/results/profile-comparison-service/`.
 The measured heavy two-source encrypted parser peaked at 252.363 MiB RSS in
 1.202s, with synthetic key providers and no cgroup/whole-worker qualification.
 ADR-295 therefore selects a provisional comparison-only 384 MiB physical and
-transient floor (+128 MiB per active worker); summary limits remain unchanged.
+transient floor. The new installer uses 384 MiB for the shared worker profile
+and query transient budget (+128 MiB per active worker); legacy accepted profiles
+and the summary admission floor remain unchanged.
 SQL133 atomic two-workload accounting and independent key children, complete
 native worker/public composition and the React baseline selection are being
 integrated. The next gate is the composed real-service fixture with frozen

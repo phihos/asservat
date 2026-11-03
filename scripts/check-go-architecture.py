@@ -65,7 +65,9 @@ for package in packages:
                 # display selection. SHA-256 is a deterministic value identity;
                 # no key handling, network, storage or JSON I/O is allowed here.
                 if package["ImportPath"] == module+"/internal/domain/analysis":
-                    allowed.add("crypto/sha256")
+                    # SHA-1 is only the RFC 4122 UUIDv5 row locator in profile_comparison_keys.go.
+                    # Key use and authorization still require independently checked parents.
+                    allowed |= {"crypto/sha256", "crypto/sha1"}
                 if imported not in allowed:
                     raise ValueError(f"Domain import is not a pure value utility: {imported}")
             if source != "bootstrap" and components[source]["layer"] in {"domain", "application"} and "." in imported.split("/")[0]:

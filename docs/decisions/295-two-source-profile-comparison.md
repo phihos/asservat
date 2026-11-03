@@ -65,8 +65,13 @@ maximum-shape encrypted two-source probe reached 252.363 MiB RSS in 1.202 s,
 leaving only 3.637 MiB below the old floor before SQL, real provider and worker
 runtime composition. One unchanged-input 224 MiB Go soft-limit probe reached
 246.152 MiB; that small reduction does not justify adding a product tuning knob.
-The chosen floor costs 128 MiB more per active comparison-capable worker, using
-existing resource configuration. See the retained reports in
+The installer uses one shared worker profile rather than a per-operation
+resource selector. New installations therefore declare 384 MiB for every active
+shared worker and its query transient budget: +128 MiB per active worker, with
+no standing idle worker cost. Existing accepted 256 MiB profiles remain usable
+for legacy operations and refuse comparison. A second worker profile or tuning
+setting would add routing and acceptance machinery solely to avoid this bounded
+increment. The summary admission floor remains 256 MiB. See the retained reports in
 `test/results/profile-comparison-memory`. These synthetic-process measurements
 are neither cgroup qualification nor a complete simultaneous parser maximum.
 Qualify framing, crypto, parser object graphs, both complete maps, actual provider

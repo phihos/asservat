@@ -137,20 +137,21 @@ type NativeHello struct {
 // caller object keys or authentication claims. The accepted source reader and
 // operation gate supply it; decoding JSON does not confer read or key rights.
 type NativeCommand struct {
-	Format        string          `json:"format"`
-	Reference     NativeReference `json:"reference"`
-	Nonce         string          `json:"nonce"`
-	Kind          string          `json:"kind"`
-	Source        json.RawMessage `json:"source"`
-	Operation     json.RawMessage `json:"operation"`
-	Projection    json.RawMessage `json:"projection,omitempty"`
-	ParentID      string          `json:"parentID"`
-	Generation    int64           `json:"generation"`
-	WindowID      string          `json:"windowID"`
-	LeaseSequence int64           `json:"leaseSequence"`
-	Offset        int64           `json:"offset"`
-	Length        int64           `json:"length"`
-	Until         string          `json:"until"`
+	Format         string          `json:"format"`
+	Reference      NativeReference `json:"reference"`
+	Nonce          string          `json:"nonce"`
+	Kind           string          `json:"kind"`
+	Source         json.RawMessage `json:"source"`
+	BaselineSource json.RawMessage `json:"baselineSource,omitempty"`
+	Operation      json.RawMessage `json:"operation"`
+	Projection     json.RawMessage `json:"projection,omitempty"`
+	ParentID       string          `json:"parentID"`
+	Generation     int64           `json:"generation"`
+	WindowID       string          `json:"windowID"`
+	LeaseSequence  int64           `json:"leaseSequence"`
+	Offset         int64           `json:"offset"`
+	Length         int64           `json:"length"`
+	Until          string          `json:"until"`
 }
 type NativeMetadata struct {
 	Format    string          `json:"format"`

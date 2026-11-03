@@ -239,6 +239,7 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 		// ADR-282: the approved read also pages httpHeaders extracts.
 		reader.ServeHTTPHeaderPages(httpheaders.RecordingPage{})
 		reader.ServeProfileSummaries(diagnostics.SummarizePprof)
+		reader.ServeProfileComparisons(diagnostics.ComparePprof)
 		reader.ServeSyscallProjections(syscalls.ProjectSyscalls)
 		result, err = evidence.NewRegionalApprovedResult(ctx, input.Target, reader, time.Now)
 	default:

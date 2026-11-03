@@ -29,6 +29,9 @@ type ProjectionNativeControl interface {
 type ProjectionSources interface {
 	ReadProjectionSource(context.Context, query.ContextQuery, query.ContextProjectionAuthority, query.ContextQueryRequest) (NativeContextSource, error)
 }
+type ProjectionComparisonSources interface {
+	ReadProjectionComparisonSources(context.Context, query.ContextQuery, query.ContextProjectionAuthority, query.ContextQueryRequest) ([2]NativeContextSource, error)
+}
 type ProjectionRuntime struct {
 	Workers                    ProjectionWorkerLedger
 	Identities                 ProjectionIdentityLedger
@@ -55,6 +58,7 @@ func (s *ProjectionRuntime) ObserveProjectionWorker(ctx context.Context, q query
 		s.Cleanup.CleanupProjectionWorkers(ctx)
 	}
 	a, e := owner.CheckCurrent(ctx)
+	a = ownedProjectionAuthority(a)
 	if e != nil || !q.Current(a, s.Now()) {
 		return zero, query.ErrUnavailable
 	}
@@ -135,6 +139,7 @@ func (s *ProjectionRuntime) ReadProjection(ctx context.Context, q query.ContextQ
 		return nil, query.ErrUnavailable
 	}
 	a, e := owner.CheckCurrent(ctx)
+	a = ownedProjectionAuthority(a)
 	if e != nil || !start.Batch.Current(q, a, s.Now()) {
 		return nil, query.ErrUnavailable
 	}
@@ -150,9 +155,25 @@ func (s *ProjectionRuntime) ReadProjection(ctx context.Context, q query.ContextQ
 	if e != nil || !c.Ready || !c.Enrollment.Valid() || c.Enrollment.Worker.Intent.ID != q.WorkerID || c.Peer.Certificate != start.Batch.Worker.Certificate || c.Peer.PeerID != start.Batch.Worker.PeerID {
 		return nil, query.ErrUnavailable
 	}
-	source, e := s.Sources.ReadProjectionSource(call, q, a, owner.Request())
-	if e != nil || !ProjectionSourceMatches(source, q, a) {
-		return nil, query.ErrUnavailable
+	var source NativeContextSource
+	var baselineSource *NativeContextSource
+	if q.Scope.Comparison != (query.ProfileComparisonWindow{}) {
+		paired, ok := s.Sources.(ProjectionComparisonSources)
+		if !ok {
+			return nil, query.ErrUnavailable
+		}
+		sources, err := paired.ReadProjectionComparisonSources(call, q, a, owner.Request())
+		if err != nil || !ProjectionComparisonSourcesMatch(sources, q.Scope, a) {
+			return nil, query.ErrUnavailable
+		}
+		baseline := cloneNativeSource(sources[0])
+		baselineSource, source = &baseline, cloneNativeSource(sources[1])
+	} else {
+		source, e = s.Sources.ReadProjectionSource(call, q, a, owner.Request())
+		if e != nil || !ProjectionSourceMatches(source, q, a) {
+			return nil, query.ErrUnavailable
+		}
+		source = cloneNativeSource(source)
 	}
 	now := s.Now().UTC().Truncate(time.Microsecond)
 	until = identity.Earlier(until, identity.Earlier(c.Peer.NotAfter, now.Add(identity.EvidenceReadRequestWindow))).UTC().Truncate(time.Microsecond)
@@ -160,6 +181,9 @@ func (s *ProjectionRuntime) ReadProjection(ctx context.Context, q query.ContextQ
 		Reference: value.NativeReference{InstallationID: q.Plan.InstallationID, QueryID: q.ID, WorkerID: q.WorkerID, OperationID: start.Batch.ID, Fence: start.Batch.Generation},
 		HubPodUID: s.HubPodUID, HubProcessEpoch: s.HubProcessEpoch, WorkerPodUID: c.Enrollment.Worker.Binding.PodUID, WorkerPublicKey: c.Enrollment.PublicKeyDigest,
 		SourceVersion: q.Scope.Version, ParentID: start.Batch.ID, Generation: start.Batch.Generation, StartedAt: now, Until: until}
+	if baselineSource != nil {
+		operation.Baseline = value.NativeProjectionSource{SourceVersion: q.Scope.Comparison.Baseline.Version, Path: a.Baseline.Environment.Path.AcquisitionPath(), Processing: a.Baseline.Environment.Processing}
+	}
 	if !operation.CurrentValid(s.Now()) || !start.Batch.Current(q, a, s.Now()) || call.Err() != nil {
 		return nil, query.ErrUnavailable
 	}
@@ -167,6 +191,7 @@ func (s *ProjectionRuntime) ReadProjection(ctx context.Context, q query.ContextQ
 	current := func(bound context.Context, origin NativeOrigin) (value.NativeLease, error) {
 		var zero value.NativeLease
 		fresh, e := owner.CheckCurrent(bound)
+		fresh = ownedProjectionAuthority(fresh)
 		if e != nil || call.Err() != nil {
 			return zero, collapsed("request", query.ErrUnavailable, errors.Join(e, call.Err()))
 		}
@@ -175,6 +200,9 @@ func (s *ProjectionRuntime) ReadProjection(ctx context.Context, q query.ContextQ
 		}
 		if fresh.Scope != a.Scope || fresh.Environment.Path != a.Environment.Path || !fresh.Environment.Processing.Equal(a.Environment.Processing) || origin.Proof.Binding != c.Enrollment.Worker.Binding || origin.Proof.Peer.Certificate != start.Batch.Worker.Certificate {
 			return zero, stepped("binding", query.ErrUnavailable)
+		}
+		if baselineSource != nil && (fresh.Baseline == nil || fresh.Baseline.Scope != a.Baseline.Scope || fresh.Baseline.Environment.Path != a.Baseline.Environment.Path || !fresh.Baseline.Environment.Processing.Equal(a.Baseline.Environment.Processing)) {
+			return zero, stepped("baseline-binding", query.ErrUnavailable)
 		}
 		lease, e := s.Origins.Recheck(bound, origin)
 		if e != nil {
@@ -204,7 +232,7 @@ func (s *ProjectionRuntime) ReadProjection(ctx context.Context, q query.ContextQ
 		}
 		return s.Operations.CompleteProjectionNative(bound, lease)
 	}
-	pending, e := s.Registrar.RegisterNativeExchange(call, NativeExchangeRegistration{Operation: operation, Projection: &q.Scope, Source: source, Complete: complete}, before, current)
+	pending, e := s.Registrar.RegisterNativeExchange(call, NativeExchangeRegistration{Operation: operation, Projection: &q.Scope, Source: source, BaselineSource: baselineSource, Complete: complete}, before, current)
 	if e != nil {
 		return nil, e
 	}

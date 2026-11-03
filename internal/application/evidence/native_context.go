@@ -36,6 +36,7 @@ func cloneNativeSource(s NativeContextSource) NativeContextSource {
 	s.Expectation.Audience = slices.Clone(s.Expectation.Audience)
 	s.Expectation.SourceSnapshotManifest = s.Expectation.SourceSnapshotManifest.Clone()
 	s.Expectation.RetentionRules = slices.Clone(s.Expectation.RetentionRules)
+	s.Expectation.Profile = s.Expectation.Profile.Clone()
 	if s.Expectation.Snapshot != nil {
 		s.Expectation.Snapshot = s.Expectation.Snapshot.Clone()
 	}

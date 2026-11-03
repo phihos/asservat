@@ -64,13 +64,21 @@ func commandValues(c contracts.NativeCommand, h contracts.NativeHello, target va
 	if e != nil || nativeDecode(c.Operation, &o) != nil || !o.Valid() || c.Format != contracts.NativeExchangeFormat || c.Nonce != h.Nonce || c.Reference != nativeReference(o) || o.Reference.InstallationID != target.InstallationID || o.Reference.Parent() != target.Parent() || o.Reference.WorkerID != target.WorkerID || o.WorkerPodUID != target.PodUID || o.WorkerPublicKey != key || o.Until.After(target.RunUntil) || c.Kind != string(o.Kind) || c.ParentID != o.ParentID || c.Generation != o.Generation || !now.Before(until) || until.After(now.Add(value.NativeConversationWindow(o.Kind))) || until.After(o.Until) {
 		return o, source, until, contracts.ErrNativeProtocol
 	}
-	if o.Kind != value.NativeProjection && len(c.Projection) != 0 {
+	if o.Kind != value.NativeProjection && (len(c.Projection) != 0 || len(c.BaselineSource) != 0) {
 		return o, source, until, contracts.ErrNativeProtocol
 	}
 	switch o.Kind {
 	case value.NativeProjection:
 		var scope query.ContextProjectionScope
 		if c.WindowID != "" || c.LeaseSequence != 1 || c.Offset != 0 || c.Length != 0 || nativeDecode(c.Projection, &scope) != nil || !scope.Valid() || scope.Version != o.SourceVersion || nativeDecodeBounded(c.Source, &source, contracts.NativeCommandBytes) != nil || !source.Valid(o.SourceVersion) {
+			return o, source, until, contracts.ErrNativeProtocol
+		}
+		if scope.Comparison != (query.ProfileComparisonWindow{}) {
+			var baseline evidence.NativeContextSource
+			if nativeDecodeBounded(c.BaselineSource, &baseline, contracts.NativeCommandBytes) != nil || !evidence.NativeComparisonSourcesMatch([2]evidence.NativeContextSource{baseline, source}, scope, o) {
+				return o, source, until, contracts.ErrNativeProtocol
+			}
+		} else if len(c.BaselineSource) != 0 || o.Baseline != (value.NativeProjectionSource{}) {
 			return o, source, until, contracts.ErrNativeProtocol
 		}
 	case value.NativePrepare:
@@ -147,12 +155,18 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 	disposition.Reference = c.Reference
 	o, source, until, e := commandValues(c, h, target, key, time.Now())
 	var approvedScope query.ContextProjectionScope
+	var baselineSource evidence.NativeContextSource
 	if e == nil && o.Kind == value.NativeProjection {
 		e = nativeDecode(c.Projection, &approvedScope)
+		if e == nil && approvedScope.Comparison != (query.ProfileComparisonWindow{}) {
+			e = nativeDecodeBounded(c.BaselineSource, &baselineSource, contracts.NativeCommandBytes)
+		}
 	}
 	clear(c.Projection)
 	c.Projection = nil
 	clear(c.Source)
+	clear(c.BaselineSource)
+	c.BaselineSource = nil
 	clear(c.Operation)
 	c.Source, c.Operation = nil, nil
 	if e != nil {
@@ -199,7 +213,13 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 	stage = "read"
 	switch o.Kind {
 	case value.NativeProjection:
-		projection, e := result.ReadApproved(work, o, source, approvedScope)
+		var projection query.ProjectionResult
+		var e error
+		if approvedScope.Comparison != (query.ProfileComparisonWindow{}) {
+			projection, e = result.ReadApprovedComparison(work, o, [2]evidence.NativeContextSource{baselineSource, source}, approvedScope)
+		} else {
+			projection, e = result.ReadApproved(work, o, source, approvedScope)
+		}
 		if e != nil {
 			return e
 		}
