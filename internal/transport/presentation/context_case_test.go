@@ -44,19 +44,47 @@ func TestCaseProjectionProfileKeepsNativeKindAndRawClass(t *testing.T) {
 	}
 }
 
-func TestCaseProjectionDiscriminatesVerifiedProfileFormat(t *testing.T) {
-	for _, tc := range []struct{ native, want string }{{artifact.PprofArtifact, artifact.PprofFormat}, {artifact.GoTraceArtifact, artifact.GoTraceFormat}, {"unknown", ""}, {artifact.PodStatusArtifact, ""}} {
-		t.Run(tc.native, func(t *testing.T) {
+func TestCaseProjectionDiscriminatesVerifiedNativeFormat(t *testing.T) {
+	for _, tc := range []struct{ name, evidence, native, class, want string }{
+		{"arguments", "syscallTrace", artifact.SyscallArgumentsArtifact, "raw", artifact.SyscallArgumentsFormat},
+		{"syscall-metadata", "syscallTrace", artifact.SyscallRecordsArtifact, "metadata", artifact.SyscallRecordsFormat},
+		{"packet-raw", "packetCapture", artifact.RawPCAPNGArtifact, "raw", artifact.RawPCAPNGFormat},
+		{"packet-headers", "packetCapture", artifact.PCAPNGArtifact, "metadata", artifact.PCAPNGFormat},
+		{"http-extract", "packetCapture", artifact.HTTPHeadersArtifact, "extract", artifact.HTTPHeadersFormat},
+		{"pprof", "profile", artifact.PprofArtifact, "raw", artifact.PprofFormat},
+		{"go-trace", "profile", artifact.GoTraceArtifact, "raw", artifact.GoTraceFormat},
+		{"context", "context", artifact.PodStatusArtifact, "metadata", artifact.ContextFormat},
+		{"context-raw", "context", artifact.PodStatusArtifact, "raw", artifact.ContextFormat},
+		{"unknown-native", "profile", "unknown", "raw", ""},
+		{"wrong-evidence", "profile", artifact.SyscallArgumentsArtifact, "raw", ""},
+		{"wrong-class", "syscallTrace", artifact.SyscallArgumentsArtifact, "metadata", ""},
+		{"profile-wrong-class", "profile", artifact.PprofArtifact, "metadata", ""},
+		{"packet-wrong-class", "packetCapture", artifact.PCAPNGArtifact, "raw", ""},
+		{"http-wrong-class", "packetCapture", artifact.HTTPHeadersArtifact, "metadata", ""},
+		{"unknown-evidence", "unknown", artifact.PodStatusArtifact, "metadata", ""},
+		{"legacy-untyped", "", artifact.PodStatusArtifact, "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			s, f, current := caseOperationsFixture(t)
 			current.i.Scopes = []string{"evidence:read"}
-			f.view.Artifacts[0].EvidenceType, f.view.Artifacts[0].DataClass, f.view.Artifacts[0].NativeType = "profile", "raw", tc.native
+			f.view.Artifacts[0].EvidenceType, f.view.Artifacts[0].DataClass, f.view.Artifacts[0].NativeType = tc.evidence, tc.class, tc.native
 			reply, err := s.Call(t.Context(), current, "get_case", []byte(caseInput))
 			if err != nil {
 				t.Fatal(err)
 			}
+			if err = s.contracts.ValidateOutput("get_case", reply.Body); err != nil {
+				t.Fatal("public case schema", err)
+			}
 			var envelope struct{ Data ContextCaseData }
-			if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Data.Artifacts[0].NativeFormat != tc.want {
+			if json.Unmarshal(reply.Body, &envelope) != nil || len(envelope.Data.Artifacts) != 1 {
+				t.Fatal("incorrect public case", string(reply.Body))
+			}
+			a := envelope.Data.Artifacts[0]
+			if a.NativeFormat != tc.want || strings.Contains(string(reply.Body), `"native_format"`) != (tc.want != "") {
 				t.Fatal("incorrect verified format", string(reply.Body))
+			}
+			if a.DataClass != listedDataClass(tc.class) || !slices.Equal(a.HandlingNotice.MayContain, listedMayContain(tc.class)) || !a.HandlingNotice.ManagedCopiesOnly || a.HandlingNotice.ExternalCopiesRecallable {
+				t.Fatal("native format changed data handling", a)
 			}
 		})
 	}

@@ -3,6 +3,24 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Installed run [41648031437](https://github.com/phihos/asservat/actions/runs/41648031437)
+on50077ab1 passed approved submission, actual acquisition/publication and the
+authenticated native download's filename, size and SHA-256 checks. It then failed
+the case-format assertion: `get_case` projected `native_format` only for runtime
+profiles, leaving it empty for the published syscall argument artifact. The
+failure occurs before the native fixture's semantic marker, repeat and Stop
+checks; those remain unqualified. Go632.347s exited1, sources unchanged and
+cleanupFailures empty. CI41647587881 passed; original reports are retained in
+`test/results/argument-native-41648031437`.
+
+The actual public case-operation regression reproduced this omission for syscall,
+packet, HTTP extract and context formats. Case projection now uses the existing
+verified native registry when evidence type and data class match; unknown or
+mismatched tuples remain omitted. No schema expansion, new lookup or configuration
+is needed. `argument-preflight` now includes the case-projection boundary.
+Full presentation race tests passed (215.710s), browser/MCP case races passed
+(3.023s / 8.765s), and expanded `make argument-preflight pre-push` exited0.
+
 Installed run [41642778383](https://github.com/phihos/asservat/actions/runs/41642778383)
 on9db49637 passed public preview, independent review and approved submission,
 then failed at node acquisition (`CaptureFailed` / `AcquisitionFailed`). It exited1
