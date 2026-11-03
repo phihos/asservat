@@ -1,5 +1,30 @@
 # Sustained implementation progress
 
+
+## Fourth installed profile run and download correction (2026-11-03)
+
+[Installed run 41606809149](https://github.com/phihos/asservat/actions/runs/41606809149)
+on `7c869f8d` reached approved profile capture, encrypted storage, independent
+publication and raw/pprof case metadata. Native download preparation then returned
+`NotAvailable`, with fixed diagnostic `prepare/authority/environment/path`.
+Go exited 1 after 610.888 seconds; source inventories matched and cleanup reported
+no failures. Original environment and timed logs are retained under
+`test/results/profile-native-41606809149/`. Summary and Stop were not reached.
+Exact-head CI 41606812874 passed; this does not qualify the installed workflow.
+
+Two local regressions reproduced the missing profile download path: the installer
+listed only context/packet/syscall evidence for human clients, and the shared
+policy validator limited the list to three types. The installer now includes
+`profile`, and the closed schema/domain validator allow the four implemented
+types. Existing client lists are not expanded at read time; a client without
+explicit profile permission or a selected path still fails. Raw approval,
+processing/retention/recovery and worker authentication remain mandatory.
+No service, credential, background task or configuration switch is added.
+
+Affected installer/privacy/authorization races passed (1.149/1.015/1.277 seconds),
+as did specification (13493 assertions), architecture and Go architecture gates.
+Installed download, saved summary and Stop still require the corrected run.
+
 ## Public saved-profile summary candidate (2026-11-03)
 
 ADR-291 now includes the protected optional runtime, browser view and a combined
@@ -38,9 +63,8 @@ summary; other focuses retain eight and production accounting is unchanged.
 It waits that original worker's
 finite lifetime; it creates no extra capture or approval. The integrated candidate passes `make pre-push` (299 console tests) and
 diagnostics/objectstore/analysis/evidence/domain races (20.443/11.485/1.420/
-7.784/1.023 seconds respectively). No native run was
-started for this candidate. Acquisition publication must pass before running the
-combined summary focus; S-05 remains incomplete.
+7.784/1.023 seconds respectively). The fourth installed run above supersedes this earlier local-only boundary;
+S-05 remains incomplete.
 
 ## Third installed profile run (2026-11-03)
 

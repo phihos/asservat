@@ -124,3 +124,24 @@ func TestDownloadPolicyObservationIsDownloadOnlyAndNeverSliding(t *testing.T) {
 		t.Fatal("observation exceeds fixed interval")
 	}
 }
+
+func TestProfileDownloadRequiresExplicitClientTypeAndPath(t *testing.T) {
+	p, actor, now := downloadPolicyFixture()
+	path := p.Paths[0]
+	p.Clients[0].DataClasses = []string{"metadata", "extract", "raw"}
+	selectProfile := func() bool {
+		_, ok := p.SelectDownload(actor, path.TargetClusterID, path.StoreID, "diagnostics", "raw", "potentialPersonalData", "profile", now)
+		return ok
+	}
+	if selectProfile() {
+		t.Fatal("legacy client gained profile access")
+	}
+	p.Clients[0].EvidenceTypes = []string{"context", "packetCapture", "syscallTrace", "profile"}
+	if !p.WellFormed() || !selectProfile() {
+		t.Fatal("explicit profile client refused")
+	}
+	p.Clients[0].PathIDs = []string{}
+	if selectProfile() {
+		t.Fatal("profile bypassed selected path")
+	}
+}

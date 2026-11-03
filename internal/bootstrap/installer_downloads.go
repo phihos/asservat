@@ -143,7 +143,7 @@ func downloadClients(p contracts.InstallerPublicSettings) []contracts.DownloadEn
 			continue
 		}
 		out = append(out, contracts.DownloadEnvironmentClient{Issuer: p.Issuer, ID: c.ID, Kind: c.Kind, DataClasses: []string{"metadata", "extract", "raw"}, PrivacyClasses: []string{"potentialPersonalData"},
-			EvidenceTypes: []string{"context", "packetCapture", "syscallTrace"}, Purposes: []string{p.RetentionBaseline.PurposeRef}, PathIDs: []string{}})
+			EvidenceTypes: []string{"context", "packetCapture", "syscallTrace", "profile"}, Purposes: []string{p.RetentionBaseline.PurposeRef}, PathIDs: []string{}})
 	}
 	return out
 }
