@@ -1,26 +1,38 @@
 --- a/program.bpf.c
 +++ b/program.bpf.c
-@@ -5,6 +5,7 @@
- #include <bpf/bpf_tracing.h>
- #include <gadget/mntns.h>
- #include <gadget/mntns_filter.h>
+@@ -7,0 +8 @@
 +#include "budget.h"
- 
- #ifndef TASK_COMM_LEN
- #define TASK_COMM_LEN 16
-@@ -218,6 +219,35 @@
- 	__type(key, __u32); // index: zero
- 	__type(value, bool);
- } syscall_enable_filters SEC(".maps");
+@@ -63 +64,6 @@
+-	__u8 padding[60];
++	__u8 align_identity[7];
++	__u32 tid;
++	__u32 identity_version;
++	__u64 task_start_ns;
++	__u64 process_start_ns;
++	__u8 padding[32];
+@@ -77,0 +84,3 @@
++	__u8 phase;
++	__u8 reserved;
++	__u32 tid;
+@@ -88,0 +98 @@
++	__u64 task_start_ns;
+@@ -220,0 +231,36 @@
 +
 +/* One shared session budget, never a per-CPU or per-container allowance.
-+ * Future loader: freeze this map and syscalls before exposing perf namespaces. */
++ * The loader freezes this map and syscalls before exposing perf namespaces. */
 +struct {
 +	__uint(type, BPF_MAP_TYPE_ARRAY);
 +	__uint(max_entries, 1);
 +	__type(key, __u32);
 +	__type(value, struct asservat_argument_budget);
 +} asservat_budget SEC(".maps");
++
++struct {
++	__uint(type, BPF_MAP_TYPE_HASH);
++	__uint(max_entries, 128);
++	__type(key, __u64);
++	__type(value, __u8);
++} asservat_cgroups SEC(".maps");
 +
 +static __always_inline bool asservat_probe_allowed(struct syscall_def_t *def,
 +						 bool exiting)
@@ -33,38 +45,118 @@
 +		bool at_exit = !!(len & PARAM_PROBE_AT_EXIT_MASK);
 +		if (len && at_exit == exiting &&
 +		    (exiting || len != USE_RET_AS_PARAM_LENGTH))
-+			/* Upstream can fall through a successful small/string read
-+			 * into a second 128-byte read. Reserve BOTH possible reads.
-+			 * Keep upstream helper semantics unchanged in this prototype. */
++			/* Reserve256 per eligible argument conservatively even
++			 * though the fixed branch below invokes one128-byte helper.
++			 * Observation credit is separate from actual read length. */
 +			bytes += 2 * PARAM_LEN;
 +	}
 +	return asservat_reserve_probe(bpf_map_lookup_elem(&asservat_budget, &zero),
 +				     bytes, bpf_ktime_get_boot_ns());
 +}
- 
- void *fake_stack_alloc(const void *event)
- {
-@@ -339,6 +369,11 @@
- 	if (syscall_def == NULL)
- 		syscall_def = &default_definition;
- 
+@@ -271,0 +318,17 @@
++/* Argument object v1 only. CO-RE resolution must find these fields; no
++ * zero identity fallback. Native x86-64 only (IA32 CS differs, x32 numbers
++ * are outside the fixed syscall filter). Kernel reads are not user reads. */
++static __always_inline bool asservat_identity(struct syscall_event_t *sc,
++                                             struct bpf_raw_tracepoint_args *ctx)
++{
++	struct task_struct *task = (void *)bpf_get_current_task();
++	struct task_struct *leader = BPF_CORE_READ(task, group_leader);
++	if (BPF_CORE_READ((struct pt_regs *)ctx->args[0], cs) != 0x33)
++		return false;
++	sc->tid = (__u32)bpf_get_current_pid_tgid();
++	sc->identity_version = 1;
++	sc->task_start_ns = BPF_CORE_READ(task, start_boottime);
++	sc->process_start_ns = BPF_CORE_READ(leader, start_boottime);
++	return sc->tid && sc->task_start_ns && sc->process_start_ns;
++}
++
+@@ -281,0 +345,3 @@
++	u64 current_cgroup = bpf_get_current_cgroup_id();
++	if (!bpf_map_lookup_elem(&asservat_cgroups, &current_cgroup))
++		return 0;
+@@ -326,0 +393,2 @@
++	if (!asservat_identity(sc, ctx))
++		goto end;
+@@ -329,0 +398 @@
++	remembered.task_start_ns = sc->task_start_ns;
+@@ -341,0 +411,5 @@
 +	if (!asservat_probe_allowed(syscall_def, false)) {
 +		bpf_map_delete_elem(&probe_at_sys_exit, &pid);
 +		goto end;
 +	}
 +
- 	bpf_get_current_comm(sc->comm, sizeof(sc->comm));
- 
- 	ret = bpf_map_update_elem(&regs_map, &pid, &empty, BPF_NOEXIST);
-@@ -570,6 +605,11 @@
- 	 */
- 	sc->monotonic_timestamp = remembered->monotonic_timestamp;
- 
+@@ -368 +442,2 @@
+-		if (syscall_def->args_len[i])
++		if (syscall_def->args_len[i] && !(syscall_def->args_len[i] & PARAM_PROBE_AT_EXIT_MASK) &&
++		    syscall_def->args_len[i] != USE_RET_AS_PARAM_LENGTH)
+@@ -407,0 +483,2 @@
++		sc_cont->tid = (__u32)pid;
++		sc_cont->phase = 0;
+@@ -448,15 +525,7 @@
+-		if (!arg_len &&
+-		    null_terminated /* NULL terminated argument like string */
+-		    && bpf_probe_read_user_str(sc_cont->param, PARAM_LEN,
+-					       (void *)(arg)) < 0)
+-			sc_cont->failed = true;
+-		else if (sizeof(u8) <= arg_len &&
+-			 arg_len <=
+-				 sizeof(u64) /* Conventional arguments like type (char, int, etc.) */
+-			 && bpf_probe_read_user(sc_cont->param, arg_len,
+-						(void *)(arg)))
+-			sc_cont->failed = true;
+-		else if (bpf_probe_read_user(
+-				 sc_cont->param, PARAM_LEN,
+-				 (void *)(arg))) /* TODO Struct arguments? */
+-			sc_cont->failed = true;
++		if (null_terminated) {
++			if (bpf_probe_read_user_str(sc_cont->param, PARAM_LEN, (void *)arg) < 0)
++				sc_cont->failed = true;
++		} else if (arg_len > 0 && arg_len <= PARAM_LEN) {
++			if (bpf_probe_read_user(sc_cont->param, arg_len, (void *)arg))
++				sc_cont->failed = true;
++		}
+@@ -510,0 +580,3 @@
++	u64 current_cgroup = bpf_get_current_cgroup_id();
++	if (!bpf_map_lookup_elem(&asservat_cgroups, &current_cgroup))
++		return 0;
+@@ -556,0 +629,2 @@
++	if (!asservat_identity(sc, ctx))
++		goto end;
+@@ -565,0 +640,4 @@
++	if (remembered->nr != nr || remembered->task_start_ns != sc->task_start_ns) {
++		bpf_map_delete_elem(&probe_at_sys_exit, &pid);
++		goto end;
++	}
+@@ -572,0 +651,8 @@
 +	if (!asservat_probe_allowed(syscall_def, true)) {
 +		bpf_map_delete_elem(&probe_at_sys_exit, &pid);
 +		goto end;
 +	}
 +
- 	bpf_get_current_comm(sc->comm, sizeof(sc->comm));
- 
- 	bpf_debug_printk(
++	for (i = 0; i < SYSCALL_ARGS; i++)
++		if (syscall_def->args_len[i] & PARAM_PROBE_AT_EXIT_MASK)
++			sc->cont_nr++;
+@@ -597,0 +684,2 @@
++		sc_cont->tid = (__u32)pid;
++		sc_cont->phase = 1;
+@@ -627,4 +715,3 @@
+-		if (arg_len == 0 && null_terminated) {
+-			if (bpf_probe_read_user_str(
+-				    sc_cont->param, PARAM_LEN,
+-				    (void *)(remembered->args[i])) < 0)
++		if (null_terminated) {
++			if (bpf_probe_read_user_str(sc_cont->param, PARAM_LEN,
++						(void *)remembered->args[i]) < 0)
+@@ -632,7 +719,4 @@
+-		} else if (sizeof(u8) <= arg_len && arg_len <= sizeof(u64) &&
+-			   bpf_probe_read_user(sc_cont->param, arg_len,
+-					       (void *)(remembered->args[i]))) {
+-			sc_cont->failed = true;
+-		} else if (bpf_probe_read_user(sc_cont->param, PARAM_LEN,
+-					       (void *)(remembered->args[i]))) {
+-			sc_cont->failed = true;
++		} else if (arg_len > 0 && arg_len <= PARAM_LEN) {
++			if (bpf_probe_read_user(sc_cont->param, arg_len,
++						(void *)remembered->args[i]))
++				sc_cont->failed = true;

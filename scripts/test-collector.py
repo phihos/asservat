@@ -269,7 +269,9 @@ def argument_engine(work, report):
     experiment = ROOT / "experiments/syscall-argument-budget"
     fixture = ROOT / "test/fixtures/syscall-argument-engine"
     inputs = [ROOT / "go.mod", ROOT / "go.sum", Path(__file__), ROOT / "scripts/ci-native.sh",
-              *sorted(experiment.glob("*")), *sorted(fixture.glob("*.go"))]
+              *sorted(experiment.glob("*")), *sorted(fixture.glob("*.go")),
+              *sorted((ROOT / "internal/adapters/syscalls").glob("*.go")),
+              *sorted((ROOT / "internal/adapters/gadget").glob("arguments*.go"))]
     def hashes():
         return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                 for p in inputs if p.is_file()}
@@ -313,7 +315,7 @@ def argument_engine(work, report):
         report["sourceUnchanged"] = report["sourceHashes"] == hashes()
         if (output / "native-results.json").exists():
             report["native"] = json.loads((output / "native-results.json").read_text())
-        for p in output.glob("*.txt"):
+        for p in [*output.glob("*.txt"), *output.glob("*.maps.json")]:
             shutil.copy(p, results / ("collector-argument-engine-" + p.name))
         if cleanup or not report["sourceUnchanged"]:
             raise RuntimeError("argument engine cleanup/source freeze failed")
