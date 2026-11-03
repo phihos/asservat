@@ -1,5 +1,36 @@
 # Sustained implementation progress
 
+## Combined manual-profile candidate and review fixes (2026-11-03)
+
+[PR 147](https://github.com/phihos/asservat/pull/147) combines acquisition,
+Stop, native transfer and migrations 123–126 with current main. PR 146 is
+superseded so the preview audit migration cannot precede the profile chain.
+The installed fixture now also performs one history-based preview and checks
+that its original composition, versions and retained source remain unchanged.
+It makes no additional capture. Maximum-input resource assertions require exact
+accepted Stop receipts and released reservations observed before the original
+upload deadline; expiry cleanup cannot count as a successful Stop.
+
+Review reproduced two additional defects. Raw-profile downloads were rejected
+by the packet-only class selector; profiles now use the same exact, current
+result-access child, with raw cores and profile extracts still refused. Full
+application/domain authorization race suites pass (1.368/1.449 seconds).
+An unrelated packet/profile store could also discard a completed profile.
+Delivery now waits with its body unread for the existing shared working budget,
+within its original context and WriteUntil. One release notification replaces
+immediate failure; no polling, new acquisition, budget increase or refund is
+added. Real encrypted-writer regressions cover both competing writer kinds,
+Stop, caller cancellation and expiry. Focused races pass in 2.014 seconds and
+the full bootstrap race suite passes in 78.969 seconds.
+
+The integrated pre-push gates, 278 console tests, built console and browser
+journeys pass. The first complete Go run found a discovery descriptor at
+36,968 bytes, exceeding its existing 36 KiB ceiling. Shorter tool descriptions
+restore that bound without changing schemas or the 60 KiB discovery-page limit;
+the complete contract race suite passes. The broader Go rerun and CI are still
+in progress at this checkpoint. Native collector and installed profile runs
+remain pending; these component results do not complete S-05.
+
 ## Profile upload Stop and maximum-input fixture (2026-11-03)
 
 Blocked-upload regressions reproduced two Stop gaps: node cancellation reached
@@ -108,8 +139,7 @@ for bootstrap (77.492 seconds), capture, execution, contextstart, presentation
 and JOSE. The initial broad bootstrap run exposed a test-only heap profile size
 dependency; the blocked-writer fixture now uses a deterministic valid pprof.
 
-Remaining: integrate the final native owner-renewal capacity correction and
-preview audit timing migration, then qualify actual collector CPU/heap/redirect/Stop and the installed
+Remaining: qualify actual collector CPU/heap/redirect/Stop and the installed
 approval→publication→native download→local pprof workflow, including resources
 at supported limits. No installed profile result or completed S-05 is claimed.
 
