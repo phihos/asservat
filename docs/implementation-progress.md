@@ -42,7 +42,13 @@ Kubernetes package `go vet` and `make go-architecture-check` pass.
 installed from `requirements-spec.txt`, including format extras (system Python
 initially lacked those dependencies). Both recovered native environment reports
 retain unchanged source hashes and empty cleanup-failure lists. Installed
-qualification of this change remains pending; neither recovered run is a success. Next: qualify the fixed candidate
+qualification of this change remains pending; neither recovered run is a success.
+PR #143 review found that a longer coalesced waiter could inherit the shorter
+initiator's headroom exception. A failing concurrent regression reproduced it
+for later and unbounded callers; bounded-reuse flights now require each waiter
+to fit their result interval or re-enter ordinary selection. Completed-flight
+expiry, cancellation and invalidation checks still run before reselection.
+The retry is iterative, with no stack growth or detached work. Next: qualify the fixed candidate
 and inspect remaining repeat-preview timing if it still fails.
 
 ## Profile plans in manual preview (2026-11-03)

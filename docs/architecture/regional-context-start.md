@@ -107,6 +107,9 @@ the same current native recheck instead of repeating the full denial/TokenReview
 producer merely to obtain headroom the caller cannot use. This particularly
 applies to final result checks bounded by the original work lease. The original
 proof interval, current checks, invalidation and failure behavior are unchanged.
+A coalesced waiter applies its own deadline: a later or unbounded caller cannot
+inherit this short-caller exception. After validating the completed flight, it
+re-enters proof selection iteratively and obtains the ordinary headroom.
 
 After expiry, a new independent invocation may perform the full proof again under its own original caller bound. Existing preparation, binding and request deadlines remain fixed. [ADR-163](../decisions/163-original-work-transport-observation-lease.md) separately selects an exchange-owned transport observation lease, described below. Source-reader reuse remains unimplemented; neither mechanism qualifies the installed HTTP/2 path or removes current effect checks inside the production credential source.
 
