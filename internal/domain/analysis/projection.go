@@ -317,9 +317,33 @@ type ContextProjectionAuthority struct {
 	// Bound names the component whose interval set ValidUntil, for the
 	// operator report only. It is never persisted, digested or authority.
 	Bound string `json:"-"`
+	// Baseline is present only on a compound comparison. It owns exactly one
+	// independently authorized legacy summary child; nested pairs are invalid.
+	Baseline *ContextProjectionAuthority `json:",omitempty"`
 }
 
 func (a ContextProjectionAuthority) Valid(now time.Time) bool {
+	if a.Scope.Comparison == (ProfileComparisonWindow{}) {
+		return a.Baseline == nil && a.validSingle(now)
+	}
+	// Check depth before invoking any child validation, including self-cycles.
+	b := a.Baseline
+	if b == nil || b.Baseline != nil || b.Scope.Comparison != (ProfileComparisonWindow{}) {
+		return false
+	}
+	baseline, ok := a.Scope.BaselineScope()
+	return ok && b.Scope == baseline && b.Valid(now) && a.validSingle(now) &&
+		CommonProfileComparisonReader(b.Environment, a.Environment) &&
+		// Permission revisions identify the single root-wide accepted stream,
+		// not a target's selected assignments (postgres permissionProjection).
+		a.PermissionRevision == b.PermissionRevision && a.IdentityRevision == b.IdentityRevision &&
+		a.Environment.Recovery.IssuerEpoch == b.Environment.Recovery.IssuerEpoch &&
+		a.Environment.Recovery.Revision == b.Environment.Recovery.Revision &&
+		!a.CheckedAt.After(b.CheckedAt) && !a.ValidUntil.After(b.ValidUntil) &&
+		!a.AccessUntil.After(b.AccessUntil) && !a.DeleteBy.After(b.DeleteBy)
+}
+
+func (a ContextProjectionAuthority) validSingle(now time.Time) bool {
 	return a.Scope.Valid() && a.Environment.Valid(now) && a.Environment.RootID == a.Scope.RootID &&
 		a.Environment.Principal == a.Scope.Principal && a.Environment.Location.ClusterID == a.Scope.ClusterID &&
 		a.Environment.Location.ArtifactID == a.Scope.ArtifactID && a.Environment.Processing.CaptureID == a.Scope.CaptureID &&

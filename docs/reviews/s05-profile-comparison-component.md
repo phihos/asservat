@@ -110,3 +110,20 @@ cache; each final phase matches its build inventory. Earlier cancellation data
 belongs to a separately identified binary and is retained as such. Exact hashes,
 CPU values, inputs and caveats are in test/results/profile-comparison-memory.
 Real cgroup/CPU-quota/SQL/KMS and public/native qualification remain pending.
+
+
+Paired C-03 authorization is implemented as an internal component: independent
+ordinary source checks, then an exact-version baseline recheck under the first
+source's original deadline. The shared request adapter still calls current
+identity on every read; original groups/scopes and earliest expiry remain pinned.
+The owned baseline proof is one level only; nested/cyclic authorities fail before
+recursion. The combined decision binds both source decisions and the full fixed
+scope, with minimum original access/deletion/validity dates. Global permission
+and recovery revisions must agree with the same root stream used by SQL effects.
+A successful pair performs nine identity, six permission, three catalog, six
+retention and six environment port reads; no additional watches/credentials.
+Affected C-03/domain races passed in 2.076s / 1.123s and independent review found
+no blocking issue. A regional comparison regression reproduced pointer-based
+baseline inequality after decoding; value comparison now passes (1.207s), keeps
+mandatory decisions and ignores only existing observation/diagnostic fields.
+Paired SQL/plan/native/public composition is still not enabled.

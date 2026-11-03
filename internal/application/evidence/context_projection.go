@@ -312,7 +312,19 @@ func sameProjectionAuthority(a, b value.ContextProjectionAuthority) bool {
 		v.Environment.Processing.ObservedAt, v.Environment.Processing.ValidUntil = time.Time{}, time.Time{}
 		v.Retention.ObservedAt, v.Retention.ValidUntil = time.Time{}, time.Time{}
 		v.AccessUntil, v.DeleteBy = v.AccessUntil.UTC(), v.DeleteBy.UTC()
+		v.Bound = "" // operator diagnostics are neither serialized nor authority
 		return v
+	}
+	if (a.Baseline == nil) != (b.Baseline == nil) {
+		return false
+	}
+	if a.Baseline != nil {
+		if a.Baseline.Baseline != nil || b.Baseline.Baseline != nil {
+			return false
+		}
+		baselineA, baselineB := *a.Baseline, *b.Baseline
+		a.Baseline, b.Baseline = nil, nil
+		return strip(a) == strip(b) && strip(baselineA) == strip(baselineB)
 	}
 	return strip(a) == strip(b)
 }

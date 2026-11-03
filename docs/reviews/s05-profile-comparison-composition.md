@@ -64,6 +64,16 @@ authority for the other source or the eventual comparison.
   authorized opens and six slots. Their identical AAD is why one six-bit mask
   selected only by AAD would be ambiguous.
 
+Comparison children should store compact references, not duplicate the complete
+pair authority and query in each row: child/query/batch/claim IDs, source ordinal
+and version, artifact-binding/AAD identity, key scope, exact worker/process and
+certificate references/digests, immutable parent query/authority digests and
+original creation/expiry bounds. The resolver already reads the immutable
+parent query, batch/native authority, admitted worker and published source;
+derive the full current check from those records before consuming a role bit.
+The compact child is never authority on its own. Keep the legacy key binding's
+bytes and validation branch unchanged.
+
 Preserve comparable immutable scopes: use closed value fields/fixed pairs,
 without borrowed slices, maps or pointer-identity equality. Omit the entire
 comparison branch for legacy queries and scopes. Ordinal order is semantic;
@@ -115,3 +125,116 @@ either source's deny/expiry/revocation, mismatch after both final hashes, closed
 delivery and positive worker retirement. Complete native comparison against
 both authenticated downloaded profiles and browser/MCP parity before claiming
 REQ-PRF-005 or SC-PRF-005 complete.
+
+## Paired SQL and encoding review, 2026-11-04
+
+Still pending implementation. The isolated C-03 preparation now uses one owned
+`Baseline *ContextProjectionAuthority`, rejects a second nesting level and
+retains comparable value scopes. The proposed query adds
+`BaselinePlan ContextQueryPlan` **by value**, omitted when zero. Extend
+`ContextQuery.Equal` to normalize all six baseline-plan observation/horizon
+times, as it already does for the incident plan. A pointer is appropriate for
+the exactly one optional authority, but existing `sameProjectionAuthority`
+helpers must compare/clone that child's values rather than pointer addresses.
+
+The plan reader must choose one proposed principal-account UUID for both
+source-plan reads. `SharedContextQueryPlans.ContextQueryPlan` currently creates
+a new UUID per call, and `read_shared_context_query_plan` returns that proposal
+when the principal has no account yet. Calling it twice unchanged can produce
+two account IDs for one new principal. Reuse the existing SQL function twice
+with one proposal in one plan-read transaction; do not rewrite a resolved plan
+afterward. Both accepted plans keep their own workload allocation/path facts.
+
+Observed pure encoding results, not SQL admission or installed qualification:
+
+| Structurally valid maximum-shape preparation | Go JSON bytes | Conservative JSONB spacing ceiling |
+| --- | ---: | ---: |
+| Pair scope | 19,265 | 19,422 |
+| Pair authority | 91,034 | 92,851 |
+| Existing full key-binding-shaped envelope with pair authority | 116,329 | 118,709 |
+| One independent plan | 22,575 | 22,943 |
+| Proposed query with value `BaselinePlan` | 65,548 | 66,522 |
+
+The authority/plan validity checks passed; the compound query/key envelopes are
+not activated. The spacing calculation retains Go escaping and is an upper
+bound, not observed PostgreSQL JSONB output. The focused maximum-shape test
+passed with race detection in 1.024 s. Its log is
+`/home/phil/.cache/asservat-build/profile-comparison-authority-maxencoding.log`.
+The selected design permits **comparison-only** 96 KiB query envelopes and
+128 KiB pair-authority envelopes; legacy 64 KiB limits remain unchanged.
+Actual PostgreSQL JSONB round-trip/constraint proof remains required.
+
+`download_worker.intent_json` is bytea capped at 64 KiB, and the worker intent
+contains the whole query plus the physical worker profile. Its comparison
+branch must use the corresponding measured, bounded envelope too; updating
+only `context_query.query` would leave dispatch/enrollment/cleanup unreadable.
+Audit `context_projection_worker.go` (`projectionWorkerState`,
+`ReserveProjectionWorker`), `context_projection_cleanup.go` (`cleanupState`) and
+`context_projection_enrollment.go` (`auditTransaction`) together. The certificate
+attempt's separate 64 KiB limit does not contain the full query and needs no
+automatic expansion. Keep batch/request, native-operation and result limits
+unless their own measured fixed shapes require a separate change.
+
+### Full source transfer fits the existing command path
+
+The private **command** ceiling is already 640 KiB (655,360 bytes), not the
+64 KiB limit used for other control/result frames. The unchanged pure
+`TestNativeCommandAcceptsMaximumExistingSource` passed in 0.078 s and reported
+569,446 source bytes, 3,898 operation bytes and 573,983 command bytes. That test
+constructs a conservative domain superset, not a source accepted by current SQL
+capture admission. Concatenating two such supersets would exceed the command
+ceiling and is not the proposed transfer contract.
+
+The actual `capture.go` admission producer marshals the complete expectation
+and rejects more than 65,536 bytes; migration 00004 independently preserves
+that immutable bytea bound. `ReadProjectionSource` reads precisely that
+published capture record. Re-establish the **same canonical re-encode bound**
+when assembling each full source; retain all audience, retention, composition
+and acquisition provenance. A raw SQL JSON byte count alone would not prove
+the size after Go escaping. `GoProfileAcquisition.Valid` alone also does not
+bound its optional `Composition`; `ProfileContextFor`'s separate 64 KiB input
+ceiling does not replace the smaller whole-expectation admission contract.
+
+Four copy receipts each have two strings of at most 1,024 bytes, a bounded
+integer and a fixed digest. Six-byte escaping plus fixed fields gives a
+conservative receipt-array allowance below 50,100 bytes. Complete sources are
+therefore below 115,700 bytes each under the existing producer contract. Two
+full sources, the measured pair scope, a native operation within its existing
+16 KiB bound and a 2 KiB command envelope remain below 270 KiB. This is derived
+bound arithmetic; the new two-source maximum-shape command regression is still
+required. Reuse the existing command/read ports, without new chunking states,
+endpoints or discarded provenance. Result/native-control frames stay 64 KiB;
+the comparison remains bounded to 24 KiB.
+
+### Additive migration contract
+
+1. Add nullable `baseline_allocation_id` with a same-root allocation foreign
+   key to `context_query`; retain primary incident allocation identity. An
+   absent comparison requires SQL NULL and an omitted zero baseline plan.
+2. Replace the closed comparison scope/tool/unit/audit predicates **in the same
+   migration as** both-source current fences and atomic accounting. Validate
+   both full plans, common physical placement and the one principal account;
+   lock distinct allocation IDs in stable order, then charge 20 once for the
+   same allocation or 10 to each, with principal/root total 20. Do not enable
+   comparison scope acceptance in a preliminary SQL helper-only change.
+3. Extend shared acquisition capacity matching to both distinct workload
+   allocations, counting one worker globally/per principal. Update source,
+   retention, processing, publication and recovery fences around every effect;
+   preserve originals across waits and unknown commit.
+4. Add immutable key-child UUID and ordinal columns to the existing key table,
+   retaining the batch/query foreign key and three role bits per child. Backfill
+   legacy child UUIDs from their batch IDs; enforce one child per source ordinal
+   and atomically insert the comparison's two compact children. Preserve the
+   original batch claim ID instead of treating the new child UUID as a claim.
+5. Add only the typed envelope branches described above, update matching Go
+   producers/decoders and account for the extra row/WAL/backup work in existing
+   conservative units. Refuse downgrade with retained pair state. Prove the
+   final migration/role/JSONB behavior before public composition.
+
+No resolver privilege addition is needed for the compact children:
+`public_runtime_projection_grants.go` already grants `key-acquisition` SELECT
+on the query, call, worker, batch and key-binding tables plus the existing
+fence-lock and `used_roles` updates. `ProjectionKeys.Resolve` already calls
+`withBatch` and reads the native parent, admitted worker and published source.
+Extend those existing sqlc reads/lookups by child ID and ordinal; do not give
+the worker SQL credentials or the key consumer child-insertion permission.
