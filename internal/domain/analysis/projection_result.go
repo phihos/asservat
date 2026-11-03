@@ -29,10 +29,12 @@ const (
 // ProjectionResult is the approved result of one read batch. Exactly the
 // scope's branch is populated; InvalidCursor discloses no record.
 type ProjectionResult struct {
-	PodStatus     PodStatusProjection
-	Headers       HTTPHeaderPage
-	Summary       *ProfileSummary `json:",omitempty"`
-	InvalidCursor bool
+	PodStatus      PodStatusProjection
+	Headers        HTTPHeaderPage
+	Summary        *ProfileSummary     `json:",omitempty"`
+	SyscallSummary *SyscallSummaryPage `json:",omitempty"`
+	SyscallEvents  *SyscallEventPage   `json:",omitempty"`
+	InvalidCursor  bool
 	// TooLarge refuses a page whose first selected record alone exceeds the
 	// wire bound; it discloses no record and paging cannot pass that record.
 	TooLarge bool
@@ -41,6 +43,22 @@ type ProjectionResult struct {
 // Valid reports whether the result is exactly the scope's source branch.
 func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 	if !s.Valid() {
+		return false
+	}
+	if s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
+		if r.PodStatus != (PodStatusProjection{}) || !r.Headers.empty() || r.Summary != nil {
+			return false
+		}
+		if r.InvalidCursor || r.TooLarge {
+			return r.InvalidCursor != r.TooLarge && r.SyscallSummary == nil && r.SyscallEvents == nil
+		}
+		selection := s.Syscalls.Selection(s.CaseID, s.ArtifactID)
+		if s.Syscalls.View == SyscallSummaryView {
+			return r.SyscallEvents == nil && r.SyscallSummary != nil && r.SyscallSummary.Valid(selection, s.Version)
+		}
+		return r.SyscallSummary == nil && r.SyscallEvents != nil && r.SyscallEvents.ValidShape(selection, s.Version, s.PodUID)
+	}
+	if r.SyscallSummary != nil || r.SyscallEvents != nil {
 		return false
 	}
 	switch s.NativeType {
@@ -62,6 +80,15 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 
 // Clear drops the transient record values.
 func (r *ProjectionResult) Clear() {
+	if r.SyscallSummary != nil {
+		clear(r.SyscallSummary.Rows)
+		*r.SyscallSummary = SyscallSummaryPage{}
+	}
+	if r.SyscallEvents != nil {
+		clear(r.SyscallEvents.Events)
+		*r.SyscallEvents = SyscallEventPage{}
+	}
+
 	if r.Summary != nil {
 		clear(r.Summary.Top)
 		*r.Summary = ProfileSummary{}
@@ -78,6 +105,16 @@ func (p HTTPHeaderPage) empty() bool {
 
 // BeginTool is the public tool that admits a query of this scope.
 func (s ContextProjectionScope) BeginTool() string {
+	if s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
+		switch s.Syscalls.View {
+		case SyscallSummaryView:
+			return "get_syscall_summary"
+		case SyscallEventsView:
+			return "get_syscall_events"
+		}
+		return ""
+	}
+
 	if s.NativeType == artifact.PprofArtifact {
 		return "get_profile_summary"
 	}
@@ -90,7 +127,7 @@ func (s ContextProjectionScope) BeginTool() string {
 // ReadBatches is the number of read batches a query of this scope may
 // start: one page read for an extract, the historical two for pod status.
 func (s ContextProjectionScope) ReadBatches() int64 {
-	if s.NativeType == artifact.HTTPHeadersArtifact || s.NativeType == artifact.PprofArtifact {
+	if s.NativeType == artifact.HTTPHeadersArtifact || s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
 		return 1
 	}
 	return ContextMaxReadBatches

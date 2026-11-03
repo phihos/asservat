@@ -157,3 +157,14 @@ func (w SyscallWindow) Selection(caseID, artifactID string) SyscallSelection {
 	}
 	return s
 }
+
+// SyscallQueryRequest is the immutable invocation input. It contains no source
+// type, placement, authority, key or caller-controlled execution budget.
+type SyscallQueryRequest struct {
+	CaseID, ArtifactID string
+	Selection          SyscallWindow
+}
+
+func (r SyscallQueryRequest) Valid() bool {
+	return authorization.UUID(r.CaseID) && authorization.UUID(r.ArtifactID) && r.Selection.Valid()
+}

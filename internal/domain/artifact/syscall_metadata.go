@@ -29,17 +29,23 @@ type SyscallMetadataEvent struct {
 // Valid checks native event values against independently supplied source facts.
 // It establishes neither artifact authenticity nor read permission.
 func (e SyscallMetadataEvent) Valid(pod string, from, until time.Time) bool {
-	if from.IsZero() || until.Before(from) {
+	if !e.WellFormed() || e.Identity.PodUID != pod || from.IsZero() || until.Before(from) {
 		return false
 	}
+	at, _ := time.Parse(time.RFC3339Nano, e.Timestamp)
+	return !at.Before(from) && !at.After(until)
+}
+
+// WellFormed checks value shape only; the source reader separately binds Pod/time.
+func (e SyscallMetadataEvent) WellFormed() bool {
 	bounded := func(s string, n int) bool {
 		return utf8.ValidString(s) && utf8.RuneCountInString(s) > 0 && utf8.RuneCountInString(s) <= n
 	}
-	if e.Identity.PodUID != pod || !bounded(e.Identity.PodUID, 64) || !bounded(e.Identity.ProcessRef, 128) || !bounded(e.Identity.ThreadRef, 128) || !bounded(e.Syscall, 64) || !bounded(e.ABI, 32) {
+	if !bounded(e.Identity.PodUID, 64) || !bounded(e.Identity.ProcessRef, 128) || !bounded(e.Identity.ThreadRef, 128) || !bounded(e.Syscall, 64) || !bounded(e.ABI, 32) {
 		return false
 	}
-	at, err := time.Parse(time.RFC3339Nano, e.Timestamp)
-	if err != nil || at.Before(from) || at.After(until) || e.DurationNS != nil && *e.DurationNS > MaxSyscallDurationNS {
+	_, err := time.Parse(time.RFC3339Nano, e.Timestamp)
+	if err != nil || e.DurationNS != nil && *e.DurationNS > MaxSyscallDurationNS {
 		return false
 	}
 	switch e.Outcome {

@@ -45,6 +45,7 @@ type ContextQueryInput struct {
 	Selection value.ContextExcerptSelection
 	Headers   value.HTTPHeaderSelection
 	Profile   value.ProfileSummaryRequest
+	Syscalls  value.SyscallQueryRequest
 	QueryID   string
 }
 

@@ -3,6 +3,17 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Saved-syscall results now use closed summary/event branches in the existing query
+coordinator. The invocation, route, view/filter, worker response and result
+association remain exact; oversized encoded results and mixed branches fail
+closed. Returned pages own their slices and nested durations, and joined close
+drops retained values. The initial admission regression found the domain call's
+closed tool list missing both new names; extending that list makes all four
+source/view paths pass pending/ready/refusal tests. Application/domain analysis
+races pass (1.457s / 1.019s). These are component results: parser/raw extraction,
+source authentication, SQL/funding/key/transport and public composition are still
+being integrated; no new public tool is enabled or installed-qualified.
+
 [ADR-294](decisions/294-saved-syscall-projections.md) now records the saved-syscall
 source/authority contract. Exact source/view/filter scopes are comparable and
 retain legacy zero-field encoding. A regression reproduced accepting an events

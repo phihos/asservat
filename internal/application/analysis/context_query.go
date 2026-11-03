@@ -39,6 +39,7 @@ type ContextProjectionService struct {
 	HeaderRoutes ContextProjectionRouteReader
 	// ProfileRoutes is opt-in; production composition remains disabled.
 	ProfileRoutes ContextProjectionRouteReader
+	SyscallRoutes SyscallProjectionRouteReader
 }
 
 // HTTPHeaders is the get_http_headers admission over this same service, when
@@ -71,6 +72,7 @@ type ContextProjectionAssociation struct {
 	Selection                         value.LineSelection
 	Headers                           value.HTTPHeaderWindow
 	Profile                           value.ProfileSummarySelection
+	Syscalls                          value.SyscallWindow
 }
 
 // ContextProjectionDelivery owns both the prepared result and its live request.
@@ -84,6 +86,8 @@ type ContextProjectionDelivery struct {
 	excerpt                                 value.ContextExcerpt
 	page                                    value.HTTPHeaderPage
 	summary                                 *value.ProfileSummary
+	syscallSummary                          *value.SyscallSummaryPage
+	syscallEvents                           *value.SyscallEventPage
 	pending                                 bool
 	batch                                   *value.ContextReadBatch
 	read                                    ContextProjectionRead
@@ -215,6 +219,16 @@ func (d *ContextProjectionDelivery) Close(ctx context.Context) error {
 		clear(d.page.Records)
 		clear(d.page.CoverageGaps)
 		d.page = value.HTTPHeaderPage{}
+		if d.syscallSummary != nil {
+			clear(d.syscallSummary.Rows)
+			*d.syscallSummary = value.SyscallSummaryPage{}
+			d.syscallSummary = nil
+		}
+		if d.syscallEvents != nil {
+			clear(d.syscallEvents.Events)
+			*d.syscallEvents = value.SyscallEventPage{}
+			d.syscallEvents = nil
+		}
 		if d.summary != nil {
 			clear(d.summary.Top)
 			*d.summary = value.ProfileSummary{}
@@ -639,7 +653,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
-		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile}}
+		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile, Syscalls: o.query.Scope.Syscalls}}
 	if !authorization.UUID(d.association.ID) {
 		return nil, queryStepped("association", value.ErrUnavailable)
 	}
@@ -720,6 +734,17 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	switch {
 	case err != nil || !projection.Valid(scope):
 		err = value.ErrUnavailable
+	case (scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) && projection.InvalidCursor:
+		invalidCursor = true
+	case (scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) && projection.TooLarge:
+		tooLarge = true
+	case scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact:
+		if !boundedSyscallResult(projection) {
+			err = value.ErrUnavailable
+		} else {
+			d.syscallSummary, projection.SyscallSummary = projection.SyscallSummary, nil
+			d.syscallEvents, projection.SyscallEvents = projection.SyscallEvents, nil
+		}
 	case scope.NativeType == artifact.PprofArtifact:
 		if !boundedProfileSummary(projection.Summary, scope.Profile) {
 			err = value.ErrUnavailable

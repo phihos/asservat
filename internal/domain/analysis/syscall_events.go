@@ -21,6 +21,19 @@ func (c SyscallRecordCounts) Valid() bool {
 }
 
 func (p SyscallEventPage) Valid(s SyscallSelection, version artifact.Digest, pod string, from, until time.Time) bool {
+	if !p.ValidShape(s, version, pod) {
+		return false
+	}
+	for _, e := range p.Events {
+		if !e.Valid(pod, from, until) {
+			return false
+		}
+	}
+	return true
+}
+
+// ValidShape is the coordinator's structural check after authenticated worker delivery.
+func (p SyscallEventPage) ValidShape(s SyscallSelection, version artifact.Digest, pod string) bool {
 	if p.Version != version || !s.Matches(version) || s.View != SyscallEventsView || !p.SyscallRecordCounts.Valid() || p.Start != s.Start || p.TotalMatching < 0 || uint64(p.TotalMatching) > p.RecordCount || p.Start > p.TotalMatching || len(p.Events) > s.Limit || len(p.Events) > p.TotalMatching-p.Start {
 		return false
 	}
@@ -28,7 +41,7 @@ func (p SyscallEventPage) Valid(s SyscallSelection, version artifact.Digest, pod
 		return false
 	}
 	for _, e := range p.Events {
-		if !e.Valid(pod, from, until) || !s.Includes(e.Syscall, e.Outcome) {
+		if !e.WellFormed() || e.Identity.PodUID != pod || !s.Includes(e.Syscall, e.Outcome) {
 			return false
 		}
 	}
