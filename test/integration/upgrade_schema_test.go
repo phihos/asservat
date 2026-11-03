@@ -120,6 +120,11 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	if e = conn.QueryRow(ctx, profileDefinitions).Scan(&originalStreamGuard, &originalProcessingProjector, &originalExecutionGuard); e != nil {
 		t.Fatal("previous profile functions", e)
 	}
+	const profileCancelDefinition = `SELECT pg_get_functiondef('public.guard_snapshot_cancel()'::regprocedure)`
+	var originalCancellation string
+	if e = conn.QueryRow(ctx, profileCancelDefinition).Scan(&originalCancellation); e != nil {
+		t.Fatal(e)
+	}
 	upgrade, e := postgres.NewUpgradeSchema(config)
 	if e != nil {
 		t.Fatal(e)
@@ -242,6 +247,22 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("http header query Up after Down", from, to, e)
 		}
 		t.Log("http header query functions: units/batches/tool/source pinned; Down restored exact functions; Up restored 122")
+	}
+	if head == 124 {
+		var updated string
+		if e = conn.QueryRow(ctx, profileCancelDefinition).Scan(&updated); e != nil || !strings.Contains(updated, "'Profile'") {
+			t.Fatal("profile cancellation guard", e)
+		}
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("profile cancellation Down", e)
+		}
+		var restored string
+		if e = conn.QueryRow(ctx, profileCancelDefinition).Scan(&restored); e != nil || restored != originalCancellation {
+			t.Fatal("profile cancellation Down exact restoration", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != 123 || to != 124 {
+			t.Fatal("profile cancellation Up", from, to, e)
+		}
 	}
 	if head == 123 {
 		var writerNullable, planNullable bool
