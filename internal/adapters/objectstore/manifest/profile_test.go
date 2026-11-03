@@ -95,8 +95,8 @@ func TestGoProfileExpectation(t *testing.T) {
 			t.Fatal("expectation accepted", name)
 		}
 	}
-	if e.ServedClass() {
-		t.Fatal("profiles are not yet served for publication or download (ADR-284)")
+	if !e.ServedClass() {
+		t.Fatal("valid raw profiles must remain eligible for verified publication and download")
 	}
 }
 
