@@ -8,6 +8,8 @@ import (
 	"syscall"
 	"time"
 
+	"asservat.local/asservat/internal/domain/artifact"
+
 	igsyscalls "github.com/inspektor-gadget/inspektor-gadget/pkg/utils/syscalls"
 	"golang.org/x/sys/unix"
 )
@@ -57,24 +59,10 @@ type Meta struct {
 
 var ErrMeta = errors.New("syscalls: invalid encoding metadata")
 
-const maxDuration = 1<<53 - 1 // schema maximum (JSON safe integer)
+const maxDuration = artifact.MaxSyscallDurationNS // schema maximum (JSON safe integer)
 
-type identity struct {
-	ProcessRef string `json:"process_ref"`
-	ThreadRef  string `json:"thread_ref"`
-	PodUID     string `json:"pod_uid"`
-}
-
-// event is syscall-results.schema.json#/$defs/event; field set is closed.
-type event struct {
-	Identity   identity `json:"identity"`
-	Syscall    string   `json:"syscall"`
-	ABI        string   `json:"abi"`
-	Timestamp  string   `json:"timestamp"`
-	DurationNS *uint64  `json:"duration_ns,omitempty"`
-	Outcome    string   `json:"outcome"`
-	Errno      string   `json:"errno,omitempty"`
-}
+type identity = artifact.SyscallMetadataIdentity
+type event = artifact.SyscallMetadataEvent
 
 // EncodeJSONLines writes one schema event per call, each ending in '\n',
 // stamped at m.BootWall plus the call's boot-clock time.

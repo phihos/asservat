@@ -61,6 +61,11 @@ for package in packages:
                 # storage I/O. Keep this exception confined to the value owner.
                 if package["ImportPath"] == module+"/internal/domain/capture":
                     allowed |= {"crypto/sha256", "encoding/json", "encoding/json/jsontext", "io"}
+                # Analysis cursors bind an immutable source version and closed
+                # display selection. SHA-256 is a deterministic value identity;
+                # no key handling, network, storage or JSON I/O is allowed here.
+                if package["ImportPath"] == module+"/internal/domain/analysis":
+                    allowed.add("crypto/sha256")
                 if imported not in allowed:
                     raise ValueError(f"Domain import is not a pure value utility: {imported}")
             if source != "bootstrap" and components[source]["layer"] in {"domain", "application"} and "." in imported.split("/")[0]:
