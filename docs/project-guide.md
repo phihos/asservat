@@ -1,5 +1,8 @@
 # Project guide
 
+Use the [development workflow](development-workflow.md) for implementation,
+integration review, staged checks and retained debugging fixtures.
+
 The detailed project orientation that previously opened the repository README:
 component status notes, the full reading map, confirmed product decisions and the
 validation commands. The [README](../README.md) is the short introduction.

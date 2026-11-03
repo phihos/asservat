@@ -9,6 +9,17 @@ benefit. Update the affected contracts and tests with those changes. Continue
 through complete user workflows; a status question or component checkpoint does
 not revoke the instruction to continue and does not require renewed permission.
 
+## Delivery workflow
+
+Maintainer-approved (2026-11-03): follow [the development workflow](docs/development-workflow.md).
+Finish one end-to-end user workflow on one integration candidate. Delegate
+bounded implementation/review/reproduction tasks against that candidate; park
+unrelated feature work. Run focused reproductions during editing, broad gates
+once on the integrated candidate, then fresh installed qualification. Reuse
+unchanged-source evidence, preserve required final checks, and inspect producer
+and consumer boundaries before expensive dispatches. Keep one concise current
+feature ledger; prefer measured simplifications over added infrastructure.
+
 ## Security proportionality and delivery
 
 Maintainer clarification (2026-10-20): the maintainer did not require permission

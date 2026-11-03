@@ -1,6 +1,27 @@
 # Sustained implementation progress
 
 
+## Current delivery workflow (2026-11-03)
+
+Active outcome: approved profile capture → independent publication → native
+download → saved summary → joined Stop (S-05, PR #147). Argument work is parked
+at its signed checkpoints until this workflow passes. One integration candidate
+contains the download-client correction and immutable validator reuse; no new
+scheduler or shared codec arena is enabled.
+
+Use `make profile-preflight`, then `make profile-service-preflight` for the
+actual write-only SQL/S3 producer/publication and funded summary ledger. These
+are component checks, not the installed outcome. The integrator owns broad
+`make pre-push`, exact-commit CI and one frozen installed qualification. Earlier
+local full Go checking was interrupted at the maintainer's pause (exit 143);
+exact `7c869f8d` CI passed, but changed-source qualification remains required.
+
+[Development workflow](development-workflow.md) records the agreed work limits,
+agent responsibilities and retained debug procedure. The last installed failure
+and focused correction are immediately below. Next: resolve preflight/review
+findings, then run the corrected installed focus once.
+
+
 ## Fourth installed profile run and download correction (2026-11-03)
 
 [Installed run 41606809149](https://github.com/phihos/asservat/actions/runs/41606809149)

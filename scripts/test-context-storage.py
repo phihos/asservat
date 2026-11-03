@@ -9,6 +9,7 @@ No host kernel configuration or privileged collector is installed.
 """
 import argparse
 import concurrent.futures
+from contextlib import ExitStack
 import json
 import hashlib
 import os
@@ -412,8 +413,11 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     test_package = "./internal/adapters/kms" if owner_provider_auth else "./internal/adapters/kubernetes" if runtime_object_roundtrip else "./test/integration"
     cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home()/".cache"))/"asservat-build"
     cache.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="context-", dir=cache) as directory:
-        work = Path(directory)
+    with ExitStack() as cleanup:
+        work = Path(tempfile.mkdtemp(prefix="context-", dir=cache)).absolute()
+        work.chmod(0o700)
+        keep_work = False
+        cleanup.callback(lambda: None if keep_work else shutil.rmtree(work))
         run_id = work.name.replace("_", "-")
         network = "asservat-"+run_id
         containers, clusters, ephemeral_volumes = [], [], []
@@ -904,13 +908,16 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             # --cleanup-kept removes exactly these later with its own evidence.
             keep = keep_on_failure and exit_code != 0 and bool(clusters)
             if keep:
-                kept = {"runId": run_id, "clusters": clusters, "containers": containers, "volumes": ephemeral_volumes, "image": worker_tag, "upgradeImage": upgrade_tag, "collectorImage": collector_tag,
+                kept = {"runId": run_id, "clusters": clusters, "containers": containers, "volumes": ephemeral_volumes, "image": worker_tag, "upgradeImage": upgrade_tag, "collectorImage": collector_tag, "workDirectory": str(work),
                         "networks": [n for n, made in ((network, created_network), (kind_network, created_kind_network)) if made]}
                 (cache/"kept").mkdir(exist_ok=True)
                 manifest = cache/"kept"/(run_id+".json")
                 manifest.write_text(json.dumps(kept, indent=2)+"\n")
+                keep_work = True
                 report["keptResources"] = str(manifest)
+                report["keptWorkDirectory"] = str(work)
                 print("Kept failed fixture for inspection:", manifest, flush=True)
+                print("  private fixture directory:", work, flush=True)
                 for name in clusters:
                     print("  kubeconfig: kind get kubeconfig --name", name, flush=True)
                 print("  remove with: python3 scripts/test-context-storage.py --cleanup-kept", manifest, flush=True)
@@ -975,6 +982,22 @@ def cleanup_kept(path):
     if not re.fullmatch(r"[a-z0-9-]{4,64}", run_id):
         raise ValueError("invalid kept run id")
     failures = []
+    work = None
+    if "workDirectory" in kept:
+        # A manifest cannot turn cleanup into an arbitrary recursive removal.
+        # Keep the original path so fixtures.json and kubeconfig references work.
+        cache = (Path(os.environ.get("XDG_CACHE_HOME", Path.home()/".cache"))/"asservat-build").resolve()
+        candidate = Path(kept["workDirectory"])
+        manifest = Path(path)
+        if (not candidate.is_absolute() or candidate.is_symlink()
+                or candidate.parent.resolve() != cache
+                or not candidate.name.startswith("context-")
+                or candidate.name.replace("_", "-") != run_id
+                or manifest.is_symlink() or manifest.name != run_id+".json"
+                or manifest.parent.resolve() != cache/"kept"):
+            failures.append(str(candidate))
+        else:
+            work = candidate
     for name in reversed(kept["clusters"]):
         try:
             info = json.loads(run(["docker", "inspect", name+"-control-plane"]))[0]
@@ -989,6 +1012,11 @@ def cleanup_kept(path):
                 assert labels["asservat.test"] == run_id
                 run(["docker", kind, "rm", "-f", "-v", name] if kind == "container" else ["docker", kind, "rm", name])
             except Exception: failures.append(name)
+    if work is not None and not failures:
+        try:
+            shutil.rmtree(work)
+        except OSError:
+            failures.append(str(work))
     report = {"runId": run_id, "manifest": str(path), "cleanupFailures": failures}
     (ROOT/"test/results"/("kept-cleanup-"+run_id+".json")).write_text(json.dumps(report, indent=2)+"\n")
     if failures:
