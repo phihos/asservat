@@ -115,6 +115,16 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	if e = conn.QueryRow(ctx, queryDefinitions).Scan(&originalQueryFunctions); e != nil {
 		t.Fatal("previous query functions", e)
 	}
+	const syscallQueryDefinitions = `SELECT string_agg(pg_get_functiondef(f::regprocedure),E'\n' ORDER BY f) FROM unnest(ARRAY['public.context_query_scope_source_valid(jsonb)','public.context_query_begin_tool(jsonb)','public.context_query_read_batches(jsonb)','public.context_query_units(jsonb)','public.operation_audit_lane(text)','public.operation_audit_human_input_valid(text,text)','public.guard_operation_audit()','public.context_query_intent_current(uuid,uuid,jsonb,uuid,jsonb)','public.context_query_outcome_closed(uuid,uuid,jsonb,uuid)','public.guard_context_query()']) f`
+	var originalSyscallQueryFunctions, originalKeyBindingConstraint string
+	if head == 132 {
+		if e = conn.QueryRow(ctx, syscallQueryDefinitions).Scan(&originalSyscallQueryFunctions); e != nil {
+			t.Fatal("previous saved-query functions", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='public.context_query_key_binding'::regclass AND conname='context_query_key_binding_binding_check'`).Scan(&originalKeyBindingConstraint); e != nil {
+			t.Fatal("previous key-child bound", e)
+		}
+	}
 	const profileDefinitions = `SELECT pg_get_functiondef('public.guard_custody_stream()'::regprocedure),pg_get_functiondef('public.project_context_processing()'::regprocedure),pg_get_functiondef('public.guard_context_execution()'::regprocedure)`
 	var originalStreamGuard, originalProcessingProjector, originalExecutionGuard string
 	if e = conn.QueryRow(ctx, profileDefinitions).Scan(&originalStreamGuard, &originalProcessingProjector, &originalExecutionGuard); e != nil {
@@ -252,6 +262,27 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("resource projection Up after Down", from, to, e)
 		}
 		t.Log("resource projection Down restored exact validators and unchanged trust; Up restored104; no old-decoder rollback qualification")
+	}
+	if head == 132 {
+		qualifySavedSyscallQueryFunctions(t, ctx, conn)
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("saved syscall Down", e)
+		}
+		var restored, constraint, trust string
+		if e = conn.QueryRow(ctx, syscallQueryDefinitions).Scan(&restored); e != nil || restored != originalSyscallQueryFunctions {
+			t.Fatal("saved syscall Down changed prior query/audit functions", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='public.context_query_key_binding'::regclass AND conname='context_query_key_binding_binding_check'`).Scan(&constraint); e != nil || constraint != originalKeyBindingConstraint {
+			t.Fatal("saved syscall Down changed prior key-child bound", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT row_to_json(t)::text FROM fleet_trust t`).Scan(&trust); e != nil || trust != originalTrust {
+			t.Fatal("saved syscall Down changed fixture trust/recovery", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != head-1 || to != head {
+			t.Fatal("saved syscall Up after Down", from, to, e)
+		}
+		qualifySavedSyscallQueryFunctions(t, ctx, conn)
+		t.Log("saved-syscall132→131→132: exact ten query/audit functions, key-child constraint and trust restored; two units, one read batch, closed metadata/argument source, view, filter and cursor")
 	}
 	if head == 127 {
 		qualifyProfileSummaryQueryFunctions(t, ctx, conn)

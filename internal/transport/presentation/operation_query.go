@@ -2,15 +2,35 @@ package presentation
 
 import (
 	"encoding/json"
+	"slices"
 
 	"asservat.local/asservat/internal/domain/analysis"
 )
 
 func queryOperation(name string) bool {
-	return name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || name == "get_query_result"
+	return name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || syscallQueryOperation(name) || name == "get_query_result"
 }
 
 func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
+	if syscallQueryOperation(name) {
+		var in SyscallOperationInput
+		if err := json.Unmarshal(raw, &in); err != nil {
+			return nil, err
+		}
+		if in.Limit == 0 {
+			in.Limit = analysis.SyscallPageRecords
+		}
+		in.Names = slices.Clone(in.Names)
+		slices.Sort(in.Names)
+		view := syscallView(name)
+		return json.Marshal(struct {
+			Tool, DisplayVersion, CaseID, ArtifactID, Cursor string
+			Limit                                            int
+			Names                                            []string
+			ErrorsOnly                                       bool
+		}{name, view.DisplayVersion(), in.CaseID, in.ArtifactID, in.Cursor, in.Limit, in.Names, in.ErrorsOnly})
+	}
+
 	if name == "get_profile_summary" {
 		var in ProfileSummaryOperationInput
 		if err := json.Unmarshal(raw, &in); err != nil {

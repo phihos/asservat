@@ -39,6 +39,7 @@ type ContextProjectionService struct {
 	HeaderRoutes ContextProjectionRouteReader
 	// ProfileRoutes is opt-in; production composition remains disabled.
 	ProfileRoutes ContextProjectionRouteReader
+	SyscallRoutes SyscallProjectionRouteReader
 }
 
 // HTTPHeaders is the get_http_headers admission over this same service, when
@@ -71,6 +72,7 @@ type ContextProjectionAssociation struct {
 	Selection                         value.LineSelection
 	Headers                           value.HTTPHeaderWindow
 	Profile                           value.ProfileSummarySelection
+	Syscalls                          value.SyscallWindow
 }
 
 // ContextProjectionDelivery owns both the prepared result and its live request.
@@ -84,7 +86,10 @@ type ContextProjectionDelivery struct {
 	excerpt                                 value.ContextExcerpt
 	page                                    value.HTTPHeaderPage
 	summary                                 *value.ProfileSummary
+	syscallSummary                          *value.SyscallSummaryPage
+	syscallEvents                           *value.SyscallEventPage
 	pending                                 bool
+	refusal                                 ContextProjectionRefusal
 	batch                                   *value.ContextReadBatch
 	read                                    ContextProjectionRead
 	observedAt, queryDeadline, cleanupUntil time.Time
@@ -129,7 +134,7 @@ func (d *ContextProjectionDelivery) HeaderPage() (value.HTTPHeaderPage, bool) {
 	}
 	d.owner.mu.Lock()
 	defer d.owner.mu.Unlock()
-	if d.owner.closed {
+	if d.owner.closed || d.refusal != ContextProjectionNoRefusal {
 		return value.HTTPHeaderPage{}, false
 	}
 	p := d.page
@@ -143,7 +148,7 @@ func (d *ContextProjectionDelivery) Excerpt() (value.ContextExcerpt, bool) {
 	}
 	d.owner.mu.Lock()
 	defer d.owner.mu.Unlock()
-	if d.owner.closed {
+	if d.owner.closed || d.refusal != ContextProjectionNoRefusal {
 		return value.ContextExcerpt{}, false
 	}
 	x := d.excerpt
@@ -210,16 +215,7 @@ func (d *ContextProjectionDelivery) Close(ctx context.Context) error {
 		o.cancel()
 		o.mu.Lock()
 		o.closed = true
-		clear(d.excerpt.Lines)
-		d.excerpt = value.ContextExcerpt{}
-		clear(d.page.Records)
-		clear(d.page.CoverageGaps)
-		d.page = value.HTTPHeaderPage{}
-		if d.summary != nil {
-			clear(d.summary.Top)
-			*d.summary = value.ProfileSummary{}
-			d.summary = nil
-		}
+		d.clearProjectionLocked()
 		o.mu.Unlock()
 		if d.read == nil {
 			return
@@ -639,7 +635,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
-		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile}}
+		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection, Headers: o.query.Scope.Headers, Profile: o.query.Scope.Profile, Syscalls: o.query.Scope.Syscalls}}
 	if !authorization.UUID(d.association.ID) {
 		return nil, queryStepped("association", value.ErrUnavailable)
 	}
@@ -720,6 +716,17 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	switch {
 	case err != nil || !projection.Valid(scope):
 		err = value.ErrUnavailable
+	case (scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) && projection.InvalidCursor:
+		invalidCursor = true
+	case (scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) && projection.TooLarge:
+		tooLarge = true
+	case scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact:
+		if !boundedSyscallResult(projection) {
+			err = value.ErrUnavailable
+		} else {
+			d.syscallSummary, projection.SyscallSummary = projection.SyscallSummary, nil
+			d.syscallEvents, projection.SyscallEvents = projection.SyscallEvents, nil
+		}
 	case scope.NativeType == artifact.PprofArtifact:
 		if !boundedProfileSummary(projection.Summary, scope.Profile) {
 			err = value.ErrUnavailable
@@ -752,13 +759,12 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	}
 	if invalidCursor {
 		// Judged by the worker against the rechecked document after current
-		// read rights; it discloses no record. The read stays charged.
-		_ = d.Close(context.WithoutCancel(o.ctx))
-		return nil, queryStepped("cursor", value.ErrInvalidCursor)
+		// read rights; it discloses no record. Keep the charged read alive until
+		// C-20 acknowledges this refusal's outcome, then joins final cleanup.
+		d.refusal = ContextProjectionInvalidCursor
 	}
 	if tooLarge {
-		_ = d.Close(context.WithoutCancel(o.ctx))
-		return nil, queryStepped("record-size", value.ErrRecordTooLarge)
+		d.refusal = ContextProjectionRecordTooLarge
 	}
 	return d, nil
 }

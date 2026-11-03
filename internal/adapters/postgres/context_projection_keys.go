@@ -30,6 +30,18 @@ func projectionActualProof(q query.ContextQuery, b query.ContextReadBatch, en va
 		Protection: w.Intent.Profile.Configuration, ObservedAt: o.Proof.ObservedAt, ValidUntil: o.Proof.FreshUntil,
 	}
 }
+
+const syscallProjectionKeyBindingBytes = 48 << 10
+
+// A maximal fixed syscall filter can add 25 KiB of JSON to the existing
+// 16 KiB key child. Only this typed source gets the additional bounded space;
+// it changes neither key use slots nor any other source's accepted encoding.
+func projectionKeyBindingBytes(b query.ContextProjectionKeyBinding) int {
+	if (b.Authority.Scope.NativeType == artifact.SyscallRecordsArtifact || b.Authority.Scope.NativeType == artifact.SyscallArgumentsArtifact) && b.Authority.Scope.Valid() {
+		return syscallProjectionKeyBindingBytes
+	}
+	return 16 << 10
+}
 func (s *ProjectionNativeOperations) BindProjectionNativeKeys(ctx context.Context, start query.ContextReadStart, a query.ContextProjectionAuthority, o value.NativeOperation, scope value.KeyScope, origin evidence.NativeOrigin) error {
 	b := start.Batch
 	if s == nil || ctx == nil || !start.Fresh || start.ClaimID != b.ID || !scope.Valid() || scope.Purpose != "artifact" || !origin.Proof.Valid(time.Now()) || !origin.Lease.Operation.Equal(o) || origin.Lease.Certificate != origin.Proof.Peer.Certificate || o.Reference.OperationID != b.ID {
@@ -61,7 +73,7 @@ func (s *ProjectionNativeOperations) BindProjectionNativeKeys(ctx context.Contex
 			return auth.ErrKeyDenied
 		}
 		raw, e := queryJSON(binding)
-		if e != nil || len(raw) > 16384 {
+		if e != nil || len(raw) > projectionKeyBindingBytes(binding) {
 			return auth.ErrKeyDenied
 		}
 		return tx.InsertProjectionKeyBinding(ctx, custodydb.InsertProjectionKeyBindingParams{BatchID: id(b.ID), QueryID: id(q.ID), Binding: raw})
@@ -91,7 +103,7 @@ func (s *ProjectionKeys) Resolve(ctx context.Context, peer value.KeyPeer, r valu
 		return out, auth.ErrKeyDenied
 	}
 	var binding query.ContextProjectionKeyBinding
-	if queryDecode(row.Binding, 16384, &binding) != nil || binding.Scope != s.scope || binding.ClaimID != r.AuthorityID || binding.Authority.Scope.RootID != s.queries.root || binding.Worker.Peer != peer {
+	if queryDecode(row.Binding, syscallProjectionKeyBindingBytes, &binding) != nil || len(row.Binding) > projectionKeyBindingBytes(binding) || binding.Scope != s.scope || binding.ClaimID != r.AuthorityID || binding.Authority.Scope.RootID != s.queries.root || binding.Worker.Peer != peer {
 		return out, auth.ErrKeyDenied
 	}
 	e = s.queries.withBatch(call, binding.Batch, binding.Authority, func(ctx context.Context, tx *custodydb.Queries, q query.ContextQuery, batch custodydb.ContextQueryBatch) error {

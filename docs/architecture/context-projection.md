@@ -8,6 +8,26 @@ the C-18 coordinator component are implemented. The
 [shared acquisition composition](../decisions/219-shared-approved-acquisition.md)
 is an implementation candidate; its installed qualification remains pending.
 
+## Charged refusal delivery
+
+A worker's invalid-cursor or record-size refusal is a ready, content-free
+delivery of the original charged read. Keep its exact invocation and cleanup
+owner until C-20 acknowledges the invalid/denied outcome and joins transport
+closure. Only then can the retained handle complete the SQL batch. Closing and
+discarding it before outcome acknowledgement leaves the batch active because
+the SQL outcome fence correctly refuses that premature completion. A complete
+public envelope that exceeds its bound discards its prepared content and uses
+the same owned refusal path. No refusal refunds read/key spend or proves remote
+retirement. An unknown close or audit acknowledgement remains conservative.
+
+## Saved syscall projection candidate
+
+[ADR-294](../decisions/294-saved-syscall-projections.md) extends the same coordinator
+with fixed summary and event views of saved metadata or argument sources. The
+source/view/filter identity is separate from raw disclosure authority. Prepared
+values and eligibility do not enable a public route; funded SQL, worker/key,
+raw-source extraction and UI/MCP/native qualification remain in progress.
+
 ## Profile summary candidate
 
 [ADR-291](../decisions/291-bounded-profile-summary.md) adds a closed raw-pprof

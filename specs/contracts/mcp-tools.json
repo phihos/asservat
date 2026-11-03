@@ -11901,6 +11901,16 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 60
+                      },
+                      "query_observed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                      },
+                      "query_expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
@@ -12068,6 +12078,16 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 60
+                      },
+                      "query_observed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                      },
+                      "query_expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [

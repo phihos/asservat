@@ -150,6 +150,11 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 			return nil, err
 		}
 	}
+	if syscalls, ok := q.SyscallQueries(); ok {
+		if projection, err = projection.WithSyscalls(syscalls); err != nil {
+			return nil, err
+		}
+	}
 	return presentation.NewInvestigationProjectionOperations(operations, projection)
 }
 

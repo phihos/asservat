@@ -9,7 +9,7 @@ import (
 )
 
 func TestContextQueryAuditNamesFormatsAndEffects(t *testing.T) {
-	for _, name := range []string{"get_file_excerpt", "get_http_headers", "get_profile_summary", "get_query_result"} {
+	for _, name := range []string{"get_file_excerpt", "get_http_headers", "get_profile_summary", "get_syscall_summary", "get_syscall_events", "get_query_result"} {
 		in := connectorAuditIntent()
 		in.Name, in.InputFormat, in.Peer = name, "context-query-input/v1", nil
 		in.Actor = identity.Principal{Issuer: "https://identity.invalid", Subject: "reader", ClientID: "console", Kind: identity.Human}

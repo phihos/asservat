@@ -15,6 +15,7 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
+	artifactvalue "asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -47,16 +48,33 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 			return n
 		}
 		before := countDownloads()
+		grantState := func() string {
+			t.Helper()
+			var state string
+			if err := admin.QueryRow(ctx, `SELECT jsonb_build_array(
+ (SELECT count(*) FROM access_grant WHERE root_id=$1),
+ (SELECT count(*) FROM access_grant_use WHERE root_id=$1),
+ (SELECT coalesce(sum(bytes),0) FROM access_grant_use WHERE root_id=$1),
+ (SELECT coalesce(sum(operations),0) FROM access_grant_use WHERE root_id=$1))::text`, root).Scan(&state); err != nil {
+				t.Fatal("approved-only grant readback", err)
+			}
+			return state
+		}
+		beforeGrants := grantState()
 		return func(handle, operation string) func() {
 			t.Helper()
 			if countDownloads() != before {
 				t.Fatal("read-only approved workflow created a native download session")
+			}
+			if grantState() != beforeGrants {
+				t.Fatal("read-only approved workflow created an approval or spent raw disclosure pool")
 			}
 			if operation == "" {
 				return nil
 			} // acknowledged scoped denial, before query admission
 			limit, stop := context.WithTimeout(ctx, 10*time.Second)
 			defer stop()
+			lastState := "no observation"
 			for limit.Err() == nil {
 				var id, worker string
 				var polls, batches, workers, keys, closed int
@@ -66,6 +84,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
      (SELECT count(*) FROM context_query_key_binding k WHERE k.query_id=q.id AND k.used_roles=7),
      (SELECT count(*) FROM context_query_batch b WHERE b.query_id=q.id AND b.closed AND b.native_closed)
      FROM context_query q WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`, root, operation, artifact).Scan(&id, &worker, &polls, &batches, &active, &uncertain, &workers, &keys, &closed)
+				lastState = fmt.Sprintf("query=%s handle=%s workers=%d polls=%d batches=%d keys=%d closed=%d active=%t uncertain=%t err=%v", id, handle, workers, polls, batches, keys, closed, active, uncertain, err)
 				if err == nil && (handle == "" || id == handle) && worker != "" && workers == 1 && polls <= 4 && batches >= 1 && batches <= 2 && keys == batches && closed == batches && !active && !uncertain {
 					t.Logf("installed approved query: one exact shared worker, %d paid poll(s), %d joined batch(es), three consumed key roles per batch; no native session", polls, batches)
 					var intent query.ContextProjectionWorkerIntent
@@ -89,6 +108,20 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 							t.Fatal("profile summary actual worker memory limit", err)
 						}
 						t.Log("installed profile summary: exact 256 MiB Pod limit and transient declaration, ten query units, one consumed three-key batch")
+					}
+					if intent.Query.Scope.NativeType == artifactvalue.SyscallRecordsArtifact || intent.Query.Scope.NativeType == artifactvalue.SyscallArgumentsArtifact {
+						if batches != 1 || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.SyscallProjectionWorkerBytes || intent.Query.Plan.Profile.Worker.MemoryBytes != query.SyscallProjectionWorkerBytes {
+							t.Fatal("syscall view did not retain its one-batch 256 MiB reservation")
+						}
+						var units int
+						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != query.SyscallProjectionQueryUnits {
+							t.Fatal("syscall projection source charge", units, err)
+						}
+						pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(limit, observed.Binding.Pod, meta.GetOptions{})
+						if err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != query.SyscallProjectionWorkerBytes {
+							t.Fatal("syscall projection actual worker memory limit", err)
+						}
+						t.Log("installed syscall view: exact 256 MiB Pod limit and transient declaration, two query units, one consumed three-key batch")
 					}
 					observed.Intent = intent.Worker
 					if !observed.Valid() {
@@ -117,7 +150,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 					break
 				}
 			}
-			t.Fatal("approved response lacked exact joined SQL worker/key/batch readback")
+			t.Fatal("approved response lacked exact joined SQL worker/key/batch readback:", lastState)
 			return nil
 		}
 	}

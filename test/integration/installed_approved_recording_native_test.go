@@ -275,7 +275,7 @@ func (b *installedBrowser) approvedRecordingStepUp(t *testing.T, ctx context.Con
 	b.csrf = view.CSRF
 }
 
-func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string), summaryCheck installedProjectionCheck, argumentSource installedArgumentsSourceReader) {
+func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string), summaryCheck installedProjectionCheck, argumentSource installedArgumentsSourceReader, stoppedDownload installedStoppedDownloadCheck) {
 	t.Helper()
 	// Initial MCP transport/read failures can diagnose and terminate inside
 	// helpers before recovery returns. Sample this one preview first, once.
@@ -892,6 +892,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if evidence.Artifacts[0].Kind != "syscallTrace" || evidence.Artifacts[0].NativeFormat != "asservat-syscall-arguments/v1" {
 			t.Fatal("argument artifact native classification", evidence.Artifacts[0])
 		}
+		retirement, err := finishInstalledSyscallNativeDownload(downloadID, invoke, stoppedDownload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		qualifyInstalledSyscallProjections(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, artifact.SyscallArgumentsArtifact, preview.Pods[0].UID, native, evidence.Artifacts[0].Expires, manualArgumentsMarker, summaryCheck, retirement)
 		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
 		qualifyManualRecorderStop(t, ctx, "arguments", manualArgumentsCaptureInput(cluster, namespace, workload, true), read, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
@@ -925,6 +930,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		events := ongoingSyscallEvents(t, native, first.Identity.PodUID, time.Now())
 		t.Logf("manual syscall recording %s: %d metadata events, %d bytes", receipt.CaptureID, events, len(native))
+		retirement, err := finishInstalledSyscallNativeDownload(downloadID, invoke, stoppedDownload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		qualifyInstalledSyscallProjections(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, artifact.SyscallRecordsArtifact, first.Identity.PodUID, native, evidence.Artifacts[0].Expires, "", summaryCheck, retirement)
 		return
 	}
 	if installedJourneyFocus() == "manual-http" {

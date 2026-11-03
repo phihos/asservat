@@ -289,7 +289,15 @@
           "maximum": 9007199254740991
         },
         "truncated": {
-          "type": "boolean"
+          "description": "Whether acquisition output was truncated, when independently known; null means the retained source does not establish it. Pagination does not imply acquisition truncation.",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "gaps": {
           "type": "array",
@@ -300,6 +308,21 @@
           },
           "minItems": 0,
           "maxItems": 16
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "unfinished_events": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "unknown_events": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
         }
       },
       "required": [
@@ -361,6 +384,16 @@
         },
         "coverage": {
           "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/coverage"
+        },
+        "query_observed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+        },
+        "query_expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
         }
       },
       "required": [
@@ -386,6 +419,16 @@
         },
         "coverage": {
           "$ref": "https://asservat.io/spec/v1/syscall-results.schema.json#/$defs/coverage"
+        },
+        "query_observed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+        },
+        "query_expires_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
         }
       },
       "required": [

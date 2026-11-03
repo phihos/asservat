@@ -21,6 +21,7 @@ type NativeContextReader struct {
 	client    *http.Client
 	pages     evidence.HTTPHeaderPager
 	summarize evidence.ProfileSummarizer
+	syscalls  evidence.SyscallProjector
 }
 
 var _ evidence.NativeContextRead = (*NativeContextReader)(nil)

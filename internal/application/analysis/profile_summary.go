@@ -46,7 +46,7 @@ func (d *ContextProjectionDelivery) ProfileSummary() (value.ProfileSummary, bool
 	}
 	d.owner.mu.Lock()
 	defer d.owner.mu.Unlock()
-	if d.owner.closed || d.summary == nil {
+	if d.owner.closed || d.refusal != ContextProjectionNoRefusal || d.summary == nil {
 		return value.ProfileSummary{}, false
 	}
 	return value.CloneProfileSummary(*d.summary), true

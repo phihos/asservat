@@ -3,6 +3,126 @@
 
 ## Current delivery workflow (2026-11-03)
 
+The second native batch on `07dbce30` reached all five requests for both source
+formats. Four views passed independent native-content, SQL/key/batch and Pod
+checks. The changed-filter request returned the expected error, but its SQL
+batch never completed. Arguments Go exited 1 in 825.728s; metadata Go exited 1
+in 860.611s (its workflow subsequently hit the job cap). Both source inventories
+were unchanged, cleanup failures were empty, and build scratch was removed.
+Reports are retained in `test/results/syscall-native-41700386272/` and
+`test/results/syscall-native-41700390343/`. CI41700317751 passed and Gitar reports
+no open findings. PR150 remains unmerged; no complete native qualification is claimed.
+
+The coordinator closes invalid-cursor/oversize reads before C-20 can acknowledge
+its audited refusal. SQL correctly requires that acknowledged outcome before
+batch completion. The early close discards the only handle, leaving conservative
+active state. A composed regression reproduced all fourteen direct/poll cases for HTTP and
+both syscall sources (invalid cursor and record size), plus an oversized public
+profile envelope. The retained-refusal delivery fix passes that focused race
+regression in 24.230s. Final focused races passed (application 1.036s,
+presentation 55.359s), extending coverage to sixteen direct/poll refusals and
+four audit/cancellation/identity-loss/uncertain-close cases. Exact Finish and
+local acknowledgement precede batch completion; failed acknowledgement or
+private closure stays conservative. Final `make pre-push` returned 0, including
+369 console tests. Native qualification remains pending. SQL fences, worker caps
+and charges remain mandatory. The
+native inspector now reports the exact last worker/key/batch state on failure.
+No further hosted run has been scheduled.
+
+The existing background image prefetch for these two suites now includes the
+already pinned traceloop builder. Both latest jobs pulled it serially during the test step; arguments
+spent about 21 seconds pulling layers. Prefetch overlaps that same download with
+existing setup, adding no image, dependency, permission or job. The expected
+critical-path saving is not yet measured. The 20-minute job and 18-minute Go
+limits remain unchanged; successful last-worker proof and argument Stop checks
+must still run. Existing argument qualification measured about 20 seconds for
+the repeat/approval/Stop branch, so this overlap provides useful headroom.
+
+The first installed syscall qualification batch reached four successful views for
+both source formats: exact native summary, filtered first page, continuation and
+empty error-filter page. Each used the real 256 MiB Pod, two units and three
+one-use keys; read-only download denial, native-content comparison and recorded
+worker retirement also passed. The fifth changed-filter request failed because
+the fixture allocated eight units but five charged queries require ten. Go exited
+1 (arguments 871.253s, metadata 869.306s); both source inventories were unchanged and
+cleanup failures were empty. Workflow cancellation at the 20-minute cap followed.
+Original reports are retained in `test/results/syscall-native-41691601751/` and
+`test/results/syscall-native-41691604591/`; no complete qualification is claimed.
+
+The fixture now funds exactly ten units for these two workflows and overlaps
+terminal inspection in two-worker cohorts, preserving all five joined workers
+and the first four positive later-demand retirements. The preceding completed
+native download is closed and its exact original Job/Pod termination is observed
+before using both existing worker slots. No product default, cap, charge, source
+or deadline changes. Focused fixture races pass in 1.878s. CI also reproduced an old
+source-pin fixture omitting the now-required display identity; updating it and
+adding unknown/cross-display denials makes the entire PostgreSQL adapter race
+suite pass in 4.240s. Final `make pre-push` returned 0, including all 369 console tests. These
+corrections are ready for one explained qualification rerun.
+
+Saved syscall summaries/events are integrated through the regional reader,
+SQL132, audit, private result codec, browser/MCP and console. Both metadata and
+raw-argument sources return fixed extracts under ordinary current read rights;
+raw arguments remain regional. Full authenticated scans precede results, every
+page pays two existing query units/three keys, and both physical and declared
+worker memory require 256 MiB. Filters/cursors retain exact source/view binding;
+unknown loss/truncation and recorded unmatched/unfinished/unknown counts stay
+explicit. See [ADR-294](decisions/294-saved-syscall-projections.md).
+
+Real SQL132 upgrade/rollback and source/tool/funding/audit/key-bound parity passed
+(Go 4.598s; 201 passed entries), followed by initial-schema handover (Go 146.989s).
+Both harnesses returned 0 with unchanged sources and empty cleanup failures.
+Original compressed reports are in `test/results/syscall-projections-local/`.
+The first pre-push found an embedded canonical-schema copy and a formatting-only
+blank line; both were repaired. Affected manifest/read races then passed
+1.121s/1.611s/1.153s. Final `make pre-push` returned 0; [PR150](https://github.com/phihos/asservat/pull/150)
+is open. CI and review run before installed qualification.
+
+All 367 console tests and the production build passed. The first browser run
+passed native restart (2.47s) then failed the new scenario's exact label locator:
+Chromium exposes the wrapped select's correct accessible combobox name, while
+Playwright label-text matching includes option text. The exact role/name locator
+passes the real browser: 27 journeys/26 accessibility scans, 28.144s, no external,
+CSP/runtime or accessibility errors. Failure and passing reports are retained
+separately in `test/results/syscall-browser-first/` and
+`test/results/syscall-browser-focused/`. No product assertion was relaxed.
+Review identified trailing commas/duplicate names producing a misleading access
+error. The two failing UI regressions now pass after trimming empty entries and
+deduplicating the comma-separated list; the controller/API retain strict typed
+selection checks. All 38 affected tests and the updated complete browser gate
+passed (27 journeys/26 scans; Go 39.110s including native restart). Reports are
+retained in `test/results/syscall-filter-normalization/`. No Go/SQL source changed.
+
+Six earlier isolated maximum-input encrypted consumers used 65,952–74,608 KiB peak
+RSS and 0.489–0.621s with three synthetic unwraps. Those exact-binary measurements
+include framing/canonical validation/TLS ranges/parser; they are not real SQL/KMS
+or installed qualification. Native fixtures now independently compare both public
+views with downloaded JSONL, verify a read-only session cannot download, forbid
+actual captured sensitive buffer encodings, and inspect SQL/key/Pod accounting.
+They are compiled/prepared; actual installed manual-arguments and manual-syscall
+qualification remains pending after review/CI on the final frozen candidate.
+
+Finite argument policies and independent existing-raw download approval are
+installed-qualified and merged in [PR149](https://github.com/phihos/asservat/pull/149),
+merge `62ede0db` from qualified head `af8d2b07`. CI41672851629 and
+[Native41673309250](https://github.com/phihos/asservat/actions/runs/41673309250) passed.
+The actual policy restart produced 48 writes. Collection-only download was refused;
+independent exact-artifact personal approval admitted the original prepare retry.
+All 33,491 native bytes matched size/SHA and the expected marker, original SQL source
+and mechanism. Exactly one operation and 33,491 bytes were charged; original policy
+reservations remained intact. Footer accounting: 96 probes / 36,864 charged bytes
+within 6,000 events / 96 MiB, coverage explicitly unknown. Go exited 0 in 542.990s;
+sources unchanged, cleanup failures empty and scratch removed. Original reports
+and synthetic native bytes are retained in `test/results/policy-native-41673309250`.
+This supersedes the earlier pending qualification below; grouped/ongoing arguments
+and historical unknown-size recovery remain open.
+
+The active slice is saved syscall summaries and filtered metadata events
+(REQ-SYS-003/SC-SYS-003), under [ADR-294](decisions/294-saved-syscall-projections.md).
+Next: finish console and installed comparisons, run the real SQL upgrade/ledger
+and final repository gates, then review and qualify one frozen candidate. No
+second integration PR is open.
+
 Native41668728510 on `ecc0ef43` passed policy capture/publication, personal raw
 approval and authenticated download size/SHA checks. It failed the shared raw
 pool assertion: one operation was charged but zero bytes. Go533.422s exited1;

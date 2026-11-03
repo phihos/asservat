@@ -36,6 +36,17 @@ Use `syscallTrace` as the manifest kind and privacy evidence type. New types def
 
 `get_syscall_summary` returns bounded per-syscall counts, errors and duration aggregates over an approved projection; missing/partial pairs and gaps are explicit. `get_syscall_events` returns a paginated metadata timeline with no argument option. `syscall_query` is a bounded typed raw operation for already collected artifacts, requiring evidence:raw, current artifact rights and a matching raw-query grant. It can select syscall names/errors and return bounded recorded arguments; no arbitrary code, address dereference, live tracing or new acquisition. Add this operation consistently to raw grant/share contracts and delivery checks. Sharing a metadata projection does not grant raw argument queries or live tracing.
 
+Saved summary/event pages scan the complete authenticated bounded source before
+returning a result. Display filters never reduce the charged source work or
+change acquisition. Continuation binds case, artifact version, view and filter;
+page size may change. Counts describe the recorded file, independently of the
+current display page. Preserve unmatched, unfinished and unknown records
+separately. If the retained format does not establish acquisition loss or
+truncation, report null and an explicit coverage gap; never infer zero loss or
+complete observation from a quiet, empty or filtered page. A fixed approved view
+of an argument source omits its arguments, paths, pointers and buffers and
+conveys no raw query or native download authority.
+
 The guidance engine can recommend a narrow syscall include list based on the diagnostic goal (for example file errors or network calls), while explaining ABI/overhead limits. All names and recorded strings remain untrusted data. UI and external agents use the same projections and capture-profile compiler. Unsupported syscall decoders produce partial evidence; they cannot silently broaden collection into a custom command.
 
 ### SC-SYS-003
@@ -60,8 +71,9 @@ program to enforce the existing pre-read observation budget. It changes the
 engine sourcing rule only; REQ-SYS-002 accounting, approval, isolation and native
 qualification remain mandatory. The finite manual workflow passed its installed
 acceptance on `9a8e392e`; exact scope and evidence are recorded in
-[implementation progress](../docs/implementation-progress.md). Recurring and
-ongoing argument workflows require their own composed qualification.
+[implementation progress](../docs/implementation-progress.md). The finite recurring policy workflow also passed on `af8d2b07`, including
+independent personal raw-download approval. Ongoing argument workflows remain
+unavailable pending their own implementation and qualification.
 
 ### Finite argument implementation boundary (ADR-281)
 

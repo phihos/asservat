@@ -79,6 +79,32 @@ func prepareProfileEncryptedFixture(t *testing.T, dir string, native io.Reader, 
 	if err := e.Validate(); err != nil {
 		t.Fatal(err)
 	}
+	copies := prepareEncryptedProjectionSource(t, dir, native, e, wrongWholeHash)
+	f := profileEncryptedFixture{Source: evidence.NativeContextSource{Expectation: e, Copies: copies}, Scope: testProjectionScope()}
+	s := &f.Scope
+	s.CaseID, s.CaptureID = e.CaseID, e.CaptureUID
+	s.ArtifactID, s.ClusterID = e.Registration.Location.ArtifactID, e.Registration.Location.ClusterID
+	s.NamespaceUID, s.WorkloadUID, s.PodUID = e.NamespaceUID, e.WorkloadUID, e.PodUID
+	s.Version = evidence.ContextCopiesDigest(copies)
+	s.NativeType, s.SourceFormat, s.DisplayVersion = artifact.PprofArtifact, artifact.PprofFormat, query.ProfileSummaryDisplayVersion
+	s.Selection, s.SourceProjectionDigest, s.Profile = query.LineSelection{}, artifact.Digest{}, query.ProfileSummarySelection{SampleType: "cpu", TopN: 20}
+	if !s.Valid() || !f.Source.Valid(s.Version) {
+		t.Fatal("invalid synthetic scope/source")
+	}
+	encoded, err := json.Marshal(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(dir, "fixture.json"), encoded, 0600); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+// prepareEncryptedProjectionSource shares only synthetic frame/manifest setup;
+// each caller supplies its own exact source expectation and projection scope.
+func prepareEncryptedProjectionSource(t *testing.T, dir string, native io.Reader, e artifact.ContextExpectation, wrongWholeHash bool) artifact.Copies {
+	t.Helper()
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -142,25 +168,7 @@ func prepareProfileEncryptedFixture(t *testing.T, dir string, native io.Reader, 
 		t.Fatal(err)
 	}
 	put(3, commit)
-	f := profileEncryptedFixture{Source: evidence.NativeContextSource{Expectation: e, Copies: copies}, Scope: testProjectionScope()}
-	s := &f.Scope
-	s.CaseID, s.CaptureID = e.CaseID, e.CaptureUID
-	s.ArtifactID, s.ClusterID = e.Registration.Location.ArtifactID, e.Registration.Location.ClusterID
-	s.NamespaceUID, s.WorkloadUID, s.PodUID = e.NamespaceUID, e.WorkloadUID, e.PodUID
-	s.Version = evidence.ContextCopiesDigest(copies)
-	s.NativeType, s.SourceFormat, s.DisplayVersion = artifact.PprofArtifact, artifact.PprofFormat, query.ProfileSummaryDisplayVersion
-	s.Selection, s.SourceProjectionDigest, s.Profile = query.LineSelection{}, artifact.Digest{}, query.ProfileSummarySelection{SampleType: "cpu", TopN: 20}
-	if !s.Valid() || !f.Source.Valid(s.Version) {
-		t.Fatal("invalid synthetic scope/source")
-	}
-	encoded, err := json.Marshal(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = os.WriteFile(filepath.Join(dir, "fixture.json"), encoded, 0600); err != nil {
-		t.Fatal(err)
-	}
-	return f
+	return copies
 }
 
 // openProfileEncryptedFixture reads only the exact four fixture objects, with
