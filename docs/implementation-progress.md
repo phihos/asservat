@@ -18,7 +18,8 @@ Both harnesses returned 0 with unchanged sources and empty cleanup failures.
 Original compressed reports are in `test/results/syscall-projections-local/`.
 The first pre-push found an embedded canonical-schema copy and a formatting-only
 blank line; both were repaired. Affected manifest/read races then passed
-1.121s/1.611s/1.153s. Final `make pre-push` returned 0; no push or PR yet.
+1.121s/1.611s/1.153s. Final `make pre-push` returned 0; [PR150](https://github.com/phihos/asservat/pull/150)
+is open. CI and review run before installed qualification.
 
 All 367 console tests and the production build passed. The first browser run
 passed native restart (2.47s) then failed the new scenario's exact label locator:
@@ -28,6 +29,12 @@ passes the real browser: 27 journeys/26 accessibility scans, 28.144s, no externa
 CSP/runtime or accessibility errors. Failure and passing reports are retained
 separately in `test/results/syscall-browser-first/` and
 `test/results/syscall-browser-focused/`. No product assertion was relaxed.
+Review identified trailing commas/duplicate names producing a misleading access
+error. The two failing UI regressions now pass after trimming empty entries and
+deduplicating the comma-separated list; the controller/API retain strict typed
+selection checks. All38 affected tests and the updated complete browser gate
+passed (27 journeys/26 scans; Go39.110s including native restart). Reports are
+retained in `test/results/syscall-filter-normalization/`. No Go/SQL source changed.
 
 Six earlier isolated maximum-input encrypted consumers used 65,952–74,608 KiB peak
 RSS and 0.489–0.621s with three synthetic unwraps. Those exact-binary measurements

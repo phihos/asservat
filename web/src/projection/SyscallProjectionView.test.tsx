@@ -69,3 +69,18 @@ it('hides old syscall results before passive attachment effects when the immutab
   const rendered = render(view(profileVersion)); fireEvent.click(screen.getByRole('button', { name: 'Inspect saved syscalls' })); await screen.findByRole('table');
   rendered.rerender(view('8'.repeat(64))); expect(observations).toEqual([false]); expect(client.calls).toHaveLength(1);
 });
+
+it.each([
+  ['write,', ['write']],
+  [' write, read, write, , ', ['read', 'write']],
+])('normalizes comma-separated names before querying: %s', async (names, expected) => {
+  const client = new SyntheticProjection(); client.responder = () => syscallEvents();
+  mount(client);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Syscall view' }), { target: { value: 'events' } });
+  fireEvent.change(screen.getByLabelText('Syscall names, separated by commas'), { target: { value: names } });
+  fireEvent.click(screen.getByRole('button', { name: 'Inspect saved syscalls' }));
+  await screen.findByRole('table', { name: 'Recorded syscall events' });
+  expect(client.calls).toHaveLength(1);
+  expect(client.calls[0]).toMatchObject({ name: 'get_syscall_events', input: { syscall_names: expected } });
+  expect(screen.queryByRole('alert')).toBeNull();
+});

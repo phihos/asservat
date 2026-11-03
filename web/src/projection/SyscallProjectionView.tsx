@@ -14,7 +14,7 @@ export function SyscallProjectionView({ controller, session, scope, caseID, arti
   useEffect(() => controller.attach(session, scope, caseID, artifactID, version), [controller, session, scope, caseID, artifactID, version]);
   const busy = !attached || state.phase === 'loading' || state.phase === 'pending';
   const coverage = state.syscallSummary?.coverage ?? state.syscallEvents?.coverage;
-  const inspect = () => controller.inspectSyscalls({ view, limit: Number(limit), names: view === 'events' && names.trim() ? names.split(',').map(name => name.trim()) : [], errorsOnly: view === 'events' && errorsOnly });
+  const inspect = () => controller.inspectSyscalls({ view, limit: Number(limit), names: view === 'events' ? [...new Set(names.split(',').map(name => name.trim()).filter(Boolean))] : [], errorsOnly: view === 'events' && errorsOnly });
   return <section className="syscall-projection" aria-label="Saved syscall views" aria-busy={state.phase === 'loading'}>
     <h3>Saved syscall views</h3>
     <p>Inspect recorded syscall names, outcomes, timing and source identities. Arguments, paths, buffers and pointers are omitted.</p>

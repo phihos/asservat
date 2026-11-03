@@ -76,7 +76,7 @@ export async function syscallJourney({ page, origin, output, scan, checks, wire 
     await view.getByRole('combobox', { name: 'Syscall view', exact: true }).selectOption('events');
     await expect(view.getByRole('table')).toHaveCount(0);
     await view.getByLabel('Rows per page', { exact: true }).fill('2');
-    await view.getByLabel('Syscall names, separated by commas', { exact: true }).fill('write');
+    await view.getByLabel('Syscall names, separated by commas', { exact: true }).fill(' write, write, , ');
     await view.getByLabel('Errors only', { exact: true }).check();
     assert.equal(calls.length, 3, 'filter edits must not create queries');
     await view.getByRole('button', { name: 'Inspect saved syscalls', exact: true }).click();
