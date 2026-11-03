@@ -51,3 +51,12 @@ For an ongoing source, maxEvents limits resident ring entries and each saved sna
 ## Approved live syscall views
 
 [Live watch](live-watch.md) adds a bounded metadata view of an already running syscall source, separate from saved-artifact get_syscall_events/syscall_query. It uses fixed syscall/PID/error/paired-duration fields and typed display filters; no user-memory reads, argument bytes, paths, argv or speculative dereference. Unpaired events and lost/filtered/sampled rows are distinct. A viewer cannot change which processes are observed, prolong a manual session or obtain raw argument access through a live subscription. Closing/pausing the viewer leaves the source under its original acquisition authority and budgets.
+
+### Qualified argument-engine exception
+
+The maintainer-approved [ADR-281 exception](../docs/decisions/281-syscall-arguments-engine-limit.md)
+allows a narrowly patched, reproducibly built, digest-pinned upstream traceloop
+program to enforce the existing pre-read observation budget. It changes the
+engine sourcing rule only; REQ-SYS-002 accounting, approval, isolation and native
+qualification remain mandatory. Arguments mode stays unavailable until that
+implementation passes its installed native acceptance tests.
