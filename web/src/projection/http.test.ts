@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { operations } from './http';
-import { excerpt, id, syscallSummary, syscallEvents } from './test-fixtures';
+import { excerpt, id, syscallSummary, syscallEvents, profileComparison } from './test-fixtures';
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 const json = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
 it('uses fixed same-origin CSRF routes without an idempotency key or replay', async () => {
@@ -36,4 +36,12 @@ it('refuses raw arguments and excessive syscall display filters before issuing H
     await expect(operations.call('get_syscall_events', { case_id: id(2), artifact_id: id(3), ...extra }, 'csrf', new AbortController().signal)).rejects.toThrow('Query unavailable');
   }
   expect(fetcher).not.toHaveBeenCalled();
+});
+
+it('uses the existing bounded CSRF transport for a fixed two-source comparison', async () => {
+  const fetcher = vi.fn().mockResolvedValue(json(profileComparison())); vi.stubGlobal('fetch', fetcher);
+  const input = { case_id: id(2), artifact_id: id(3), baseline_case_id: id(2), baseline_artifact_id: id(4), sample_type: 'cpu', normalization: 'perSecond' as const, top_n: 20 };
+  await operations.call('compare_profiles', input, 'csrf', new AbortController().signal);
+  expect(fetcher).toHaveBeenCalledOnce(); expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/compare_profiles');
+  expect(fetcher.mock.calls[0][1]).toMatchObject({ credentials: 'same-origin', redirect: 'error', cache: 'no-store', headers: { 'X-CSRF-Token': 'csrf' }, body: JSON.stringify(input) });
 });

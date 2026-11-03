@@ -1,0 +1,11 @@
+npm notice run @asservat/console@0.0.0 npx
+npm notice run 'vitest' run src/evidence/EvidenceWorkspace.comparison.test.tsx src/projection/ProfileComparisonView.test.tsx src/projection/comparison.test.ts
+
+ RUN  v5.0.3 /home/phil/Projekte/asservat-profile-comparison/web
+
+
+ Test Files  3 passed (3)
+      Tests  46 passed (46)
+   Start at  23:08:58
+   Duration  1.99s (environment 31%, transform 25%, import 25%, tests 18%)
+
