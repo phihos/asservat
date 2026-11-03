@@ -249,6 +249,16 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			if _, err = f.publish.PublishContext(ctx, f.e, f.copies, a); err != nil {
 				t.Fatal(err)
 			}
+			progressPool := poolFor("context_progress_read_runtime", "synthetic-context-progress-read")
+			defer progressPool.Close()
+			progressReader, err := postgres.NewContextProgressReads(ctx, progressPool, f.scenario.a.RootID, f.scenario.recovery.guard)
+			if err != nil {
+				t.Fatal(err)
+			}
+			progress, err := progressReader.ReadContextProgress(ctx, progressQuery(t, ctx, f.scenario))
+			if err != nil || progress.Phase != "Succeeded" || progress.ReasonCode != "Published" {
+				t.Fatal("published progress lost verified-size audit", legacy, progress, err)
+			}
 			got, err := f.reader.ContextDownloadEvidence(ctx, f.e.Registration.Location.ArtifactID)
 			if err != nil {
 				t.Fatal(err)

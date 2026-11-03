@@ -96,9 +96,14 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 		diagnose()
 		t.Fatal("installed policy arguments timed out", what)
 	}
+	readFailures := map[string]int{}
 	read := func(call context.Context, s *sdk.ClientSession, name string, args, out any) bool {
 		reply, code, err := invoke(call, s, name, args)
 		if err != nil || reply.Status != "ok" || code != "" {
+			readFailures[name]++
+			if n := readFailures[name]; n&(n-1) == 0 {
+				t.Logf("policy public read %s refused: status=%s code=%s transport_error=%t count=%d", name, reply.Status, code, err != nil, n)
+			}
 			return false
 		}
 		if out != nil && json.Unmarshal(reply.Data, out) != nil {

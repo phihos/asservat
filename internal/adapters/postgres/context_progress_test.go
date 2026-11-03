@@ -152,3 +152,23 @@ func TestContextMetadataDeadlineIsOriginalAndNotSerialized(t *testing.T) {
 		t.Fatal("response-only lease serialized", err)
 	}
 }
+
+func TestProgressPreservesVerifiedNativeSizeAudit(t *testing.T) {
+	for _, size := range []int64{0, 1234} {
+		f := progressFactsFixture(t, "published")
+		f.NativeBytes = pgtype.Int8{Int64: size, Valid: true}
+		record, err := verificationRecord(f.ContextCapture, custodydb.ContextVerification{CaptureID: f.VerifiedCaptureID, RootID: f.VerifiedRootID, VerifiedAt: f.VerifiedAt, ExpectationDigest: f.ExpectationDigest, CopiesDigest: f.VerifiedCopiesDigest, IntentDigest: f.VerifiedIntentDigest, AuthorityDigest: f.AuthorityDigest, PermissionEpoch: f.PermissionEpoch, PermissionSequence: f.PermissionSequence.Int64, NativeBytes: f.NativeBytes})
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.AuditDigest = digest(record)
+		got, err := progressFacts(f)
+		if err != nil || got.Phase != "Succeeded" {
+			t.Fatal("verified size missing from progress audit reconstruction", size, got, err)
+		}
+		f.NativeBytes.Int64++
+		if _, err := progressFacts(f); err == nil {
+			t.Fatal("changed native size accepted")
+		}
+	}
+}

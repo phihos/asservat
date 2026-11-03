@@ -116,3 +116,27 @@ it.each(['transport', 'http-refusal', 'invalid-envelope', 'retryable', 'pending'
   expect(fetch.mock.calls[1][1].headers['Idempotency-Key']).toBe('original-key');
   expect(newID).toHaveBeenCalledOnce();
 });
+
+it('lets a refused selection discard an artifact that expired during the request', async () => {
+  const now = Date.now();
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+  try {
+    const expired = { ...artifact(3, 512), expires_at: new Date(now + 1000).toISOString() };
+    const current = { ...artifact(4, 1024), expires_at: new Date(now + 3600000).toISOString() };
+    const call = vi.fn().mockImplementationOnce(async () => { clock.mockReturnValue(now + 2000); return refusal(false); }).mockResolvedValueOnce(result({ grant_id: id(41), phase: 'Pending' }));
+    let key = 0;
+    render(<RawAccessPanel session={session} scope={new AbortController().signal} caseID={id(2)} artifacts={[expired, current]} newID={() => `request-${++key}`} client={{ call } as Operations}/>);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.change(screen.getByLabelText('Reason for raw download'), { target: { value: 'Inspect incident' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
+    await screen.findByRole('alert');
+    expect(screen.getAllByRole('checkbox')[0]).toHaveProperty('disabled', false);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    expect(screen.getAllByRole('checkbox')[0]).toHaveProperty('checked', false);
+    expect(screen.getAllByRole('checkbox')[0]).toHaveProperty('disabled', true);
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    fireEvent.click(screen.getByRole('button', { name: 'Request download approval' }));
+    await screen.findByRole('link', { name: 'Review download approval' });
+    expect(call.mock.calls[1][1]).toMatchObject({ artifact_digests: [current.digest], max_bytes: 1024, idempotency_key: 'request-2' });
+  } finally { clock.mockRestore(); }
+});

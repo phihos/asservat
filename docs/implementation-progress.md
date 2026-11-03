@@ -3,6 +3,24 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Native41659215769 on `a62854d5` failed while polling published argument progress
+(Go623.440s, source unchanged, cleanup complete). The publisher reported a
+publication, but progress reconstruction omitted SQL130's verified native size
+from its audit digest. The local regression reproduced this rejection. Progress
+and history SQL projections now read the field and retain it in audit validation;
+NULL legacy records keep their original digest. PostgreSQL race checks passed
+(1.189s), including zero/positive sizes and size-tampering rejection. The actual
+scoped SQL/S3 progress reads passed current and legacy publication cases in
+`verified-native-progress-2` (Go3.332s, exit0, unchanged sources, cleanup complete).
+The preceding `-1` run selected an unrelated skipped test and was rejected by the
+harness; it supplies no service evidence. Original reports are retained.
+
+A separate red/green form regression now permits deselecting an artifact that
+expired during a definitively refused request; it cannot be selected again.
+The exact new selection gets a new key. All ten focused raw-form tests and full
+pre-push gates passed, including322console tests. Installed raw approval/download
+still awaits qualification of this corrected candidate.
+
 PR149 review reproduced a raw-access form that stayed locked after a definitive
 refusal. It now releases the retained request only for a validated non-retryable
 error, preserves entered values, and assigns a new key on explicit resubmission.
