@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
@@ -27,8 +28,9 @@ var recordingScenarioSlots int64 = 1
 
 // Uses real SQL with explicit synthetic bootstrap and a synthetic approved
 // reviewer; independent reviewer/step-up qualification belongs to ADR-249.
-func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, create func(*testing.T) captureAdmissionScenario) {
+func qualifyApprovedRecording(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario) {
 	t.Helper()
+	t.Run("manual-argument-prepare", func(t *testing.T) { qualifyManualArgumentPreparation(t, ctx, admin, poolFor, store, keys, create(t)) })
 	t.Run("adhoc-observation-pool", func(t *testing.T) {
 		qualifyAdHocObservationPool(t, ctx, admin, poolFor, create(t), "bytes")
 	})

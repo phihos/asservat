@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/manual-argument-prepare
+    manual_argument_prepare_test.go:56: missing compiled duty api-execution
+--- FAIL: TestContextAdmissionWithRealServices (2.82s)
+    --- FAIL: TestContextAdmissionWithRealServices/manual-argument-prepare (2.44s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.878s
+FAIL

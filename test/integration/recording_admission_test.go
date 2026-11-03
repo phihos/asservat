@@ -142,7 +142,7 @@ func syntheticFilteredRecording(t *testing.T, started time.Time, program []planv
 // read of the exact bytes.
 func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario) {
 	t.Helper()
-	qualifyApprovedRecording(t, ctx, admin, poolFor, create)
+	qualifyApprovedRecording(t, ctx, admin, poolFor, store, keys, create)
 	qualifyProfileAdmission(t, ctx, admin, poolFor, store, keys, create)
 	t.Run("recording-admission-collect-publish-native-read", func(t *testing.T) {
 		s := create(t)

@@ -25,7 +25,7 @@ func manualProfileEndpoints() []contracts.RegionalProfileEndpoint {
 // Exercise the installed history-read + target + recorder composition without
 // starting another capture. Each operation gets one attempt, so retries cannot
 // conceal the preview deadline failure this qualification is intended to detect.
-func qualifyManualProfileRepeatPreview(t *testing.T, captureID string, original installedApprovedRecordingPreview, invoke func(string, any) (installedJourneyEnvelope, string)) {
+func qualifyManualRecorderRepeatPreview(t *testing.T, captureID string, original installedApprovedRecordingPreview, invoke func(string, any) (installedJourneyEnvelope, string)) {
 	t.Helper()
 	type settings struct {
 		CaptureID       string         `json:"capture_id"`
@@ -40,18 +40,18 @@ func qualifyManualProfileRepeatPreview(t *testing.T, captureID string, original 
 		var reply installedJourneyEnvelope
 		var code string
 		defer func() {
-			t.Logf("manual profile history %s: single attempt elapsed=%s status=%s code=%s", name, time.Since(started), reply.Status, code)
+			t.Logf("manual recorder history %s: single attempt elapsed=%s status=%s code=%s", name, time.Since(started), reply.Status, code)
 		}()
 		reply, code = invoke(name, args)
 		if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, out) != nil {
-			t.Fatal("manual profile history operation failed", name, reply.Status, code)
+			t.Fatal("manual recorder history operation failed", name, reply.Status, code)
 		}
 	}
 	var source settings
 	read("get_capture_settings", map[string]string{"capture_id": captureID}, &source)
 	var originalComposition map[string]any
 	if json.Unmarshal(original.Composition, &originalComposition) != nil || len(originalComposition) != 3 || source.CaptureID != captureID || source.Digest == "" || source.ExecutionDigest != original.Digest || !time.Now().Before(source.ExpiresAt) || !reflect.DeepEqual(source.Settings["profile_composition"], originalComposition) {
-		t.Fatal("stored profile settings differ from the original reviewed composition")
+		t.Fatal("stored recorder settings differ from the original reviewed composition")
 	}
 	var repeated struct {
 		installedApprovedRecordingPreview
@@ -67,7 +67,7 @@ func qualifyManualProfileRepeatPreview(t *testing.T, captureID string, original 
 	if !reflect.DeepEqual(source, after) || !time.Now().Before(after.ExpiresAt) {
 		t.Fatal("repeat preview changed original settings, digest or expiry")
 	}
-	t.Logf("manual profile %s: fresh repeat preview %s preserved original composition and source expiry %s; no repeat capture requested", captureID, repeated.ID, source.ExpiresAt.Format(time.RFC3339Nano))
+	t.Logf("manual recorder %s: fresh repeat preview %s preserved original composition and source expiry %s; no repeat capture requested", captureID, repeated.ID, source.ExpiresAt.Format(time.RFC3339Nano))
 }
 
 func manualProfileStopArguments(cluster, namespace, workload string) map[string]any {
@@ -83,7 +83,11 @@ func manualProfileStopArguments(cluster, namespace, workload string) map[string]
 }
 
 func manualProfileStopRequests(preview installedApprovedRecordingPreview, now time.Time) (map[string]any, map[string]any) {
-	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "profile-stop-" + preview.ID}
+	return manualRecorderStopRequests(preview, now, "profile")
+}
+
+func manualRecorderStopRequests(preview installedApprovedRecordingPreview, now time.Time, kind string) (map[string]any, map[string]any) {
+	original := map[string]any{"preview_id": preview.ID, "idempotency_key": kind + "-stop-" + preview.ID}
 	resolution := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"]}
 	// Raw collection currently requires a selected result-access instruction,
 	// even when this separate capture is intended to be stopped before output.
@@ -97,20 +101,20 @@ func manualProfileStopRequests(preview installedApprovedRecordingPreview, now ti
 // This is a second, independently reviewed capture. Stop never mutates or
 // deletes the successfully downloaded first profile, and no endpoint probe
 // starts an unapproved sampler to discover whether the target is busy.
-func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[string]any, read func(string, any, any), invoke func(string, any) (installedJourneyEnvelope, string), approve func(string)) {
+func qualifyManualRecorderStop(t *testing.T, ctx context.Context, kind string, arguments map[string]any, read func(string, any, any), invoke func(string, any) (installedJourneyEnvelope, string), approve func(string)) {
 	t.Helper()
 	var preview installedApprovedRecordingPreview
 	read("preview_capture", arguments, &preview)
 	if !preview.readyForApproval(time.Now()) || len(preview.Lifecycle.Actions) != 1 {
-		t.Fatal("Stop profile lacks an approvable preview", preview.Blockers)
+		t.Fatal("Stop recorder lacks an approvable preview", preview.Blockers)
 	}
-	original, resolution := manualProfileStopRequests(preview, time.Now())
+	original, resolution := manualRecorderStopRequests(preview, time.Now(), kind)
 	pending, code := invoke("request_capture", original)
 	var review struct {
 		URI string `json:"navigation_uri"`
 	}
 	if code != "ApprovalRequired" || json.Unmarshal(pending.Data, &review) != nil {
-		t.Fatal("Stop profile did not require separate approval", code)
+		t.Fatal("Stop recorder did not require separate approval", code)
 	}
 	u, err := url.Parse(review.URI)
 	if err != nil {
@@ -118,7 +122,7 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 	}
 	grant := strings.TrimPrefix(u.Path, "/approvals/")
 	if len(grant) != 36 || grant == u.Path {
-		t.Fatal("Stop profile review identity")
+		t.Fatal("Stop recorder review identity")
 	}
 	approve(grant)
 	var receipt struct {
@@ -127,7 +131,7 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 	submit := func(input map[string]any) string {
 		reply, code := invoke("request_capture", input)
 		if code == "" && json.Unmarshal(reply.Data, &receipt) != nil {
-			t.Fatal("Stop profile receipt")
+			t.Fatal("Stop recorder receipt")
 		}
 		return code
 	}
@@ -150,7 +154,7 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 	closed, err := installedJourneyRecoverCapture(ctx, initial, resolve, func() (string, string) { code := submit(continuation); return code, receipt.CaptureID }, func() error {
 		d, err := resolve()
 		if err != nil || d.State != "accepted" || d.CaptureID != receipt.CaptureID {
-			return errors.New("Stop profile original request not accepted")
+			return errors.New("Stop recorder original request not accepted")
 		}
 		return nil
 	}, installedJourneyPause, func(id string) (installedJourneyCaptureProgress, error) {
@@ -159,10 +163,10 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 		return p, nil
 	})
 	if err != nil || closed || receipt.CaptureID == "" {
-		t.Fatal("Stop profile was not admitted", err, closed)
+		t.Fatal("Stop recorder was not admitted", err, closed)
 	}
 	admittedAt := time.Now()
-	t.Logf("manual profile Stop %s: admitted at %s", receipt.CaptureID, admittedAt.UTC().Format(time.RFC3339Nano))
+	t.Logf("manual recorder Stop %s: admitted at %s", receipt.CaptureID, admittedAt.UTC().Format(time.RFC3339Nano))
 	var current struct {
 		CaptureID string `json:"capture_id"`
 		Phase     string `json:"phase"`
@@ -173,27 +177,27 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 	for time.Now().Before(end) {
 		read("get_capture", map[string]string{"capture_id": receipt.CaptureID}, &current)
 		if current.CaptureID != receipt.CaptureID || current.Revision < 1 {
-			t.Fatal("Stop profile progress identity", current)
+			t.Fatal("Stop recorder progress identity", current)
 		}
 		if current.Phase == "Running" {
 			break
 		}
 		if current.Phase == "Succeeded" || current.Phase == "Failed" || current.Phase == "Partial" || current.Phase == "Cancelled" || current.Phase == "Indeterminate" {
-			t.Fatal("Stop profile ended before live Stop", current)
+			t.Fatal("Stop recorder ended before live Stop", current)
 		}
 		if err := installedJourneyPause(ctx, time.Second); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if current.Phase != "Running" {
-		t.Fatal("Stop profile never entered Running", current)
+		t.Fatal("Stop recorder never entered Running", current)
 	}
 	if err := installedJourneyPause(ctx, 2*time.Second); err != nil {
 		t.Fatal(err)
 	}
 	read("get_capture", map[string]string{"capture_id": receipt.CaptureID}, &current)
 	if current.Phase != "Running" {
-		t.Fatal("Stop profile completed before cancellation", current)
+		t.Fatal("Stop recorder completed before cancellation", current)
 	}
 	var stopped struct {
 		CaptureID string `json:"capture_id"`
@@ -201,11 +205,14 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 	}
 	stopAt := time.Now()
 	reply, code := invoke("cancel_capture", map[string]any{"capture_id": receipt.CaptureID, "expected_revision": current.Revision, "idempotency_key": "stop-" + receipt.CaptureID})
-	t.Logf("manual profile Stop %s: single attempt at %s, since admission=%s, elapsed=%s, last phase=%s revision=%d, status=%s code=%s warnings=%v", receipt.CaptureID, stopAt.UTC().Format(time.RFC3339Nano), stopAt.Sub(admittedAt), time.Since(stopAt), current.Phase, current.Revision, reply.Status, code, reply.Warnings)
+	t.Logf("manual recorder Stop %s: single attempt at %s, since admission=%s, elapsed=%s, last phase=%s revision=%d, status=%s code=%s warnings=%v", receipt.CaptureID, stopAt.UTC().Format(time.RFC3339Nano), stopAt.Sub(admittedAt), time.Since(stopAt), current.Phase, current.Revision, reply.Status, code, reply.Warnings)
 	if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &stopped) != nil {
 		t.Fatal("live Stop request failed", reply.Status, code)
 	}
 	for _, warning := range reply.Warnings {
+		if kind == "arguments" && strings.Contains(warning, "application stopped profiling") {
+			t.Fatal("collector argument Stop inherited a remote-profile uncertainty warning", warning)
+		}
 		if strings.HasPrefix(warning, "Cancellation delivery is unconfirmed;") {
 			t.Fatal("live Stop was persisted but not confirmed delivered", warning)
 		}
@@ -219,14 +226,14 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 			break
 		}
 		if current.Phase == "Succeeded" || current.Phase == "Failed" || current.Phase == "Partial" || current.Phase == "Indeterminate" {
-			t.Fatalf("profile ended without joined Stop after %s: %+v", time.Since(stopAt), current)
+			t.Fatalf("recorder ended without joined Stop after %s: %+v", time.Since(stopAt), current)
 		}
 		if err := installedJourneyPause(ctx, time.Second); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if current.CaptureID != receipt.CaptureID || current.Phase != "Cancelled" {
-		t.Fatal("Stop profile did not reach terminal cancellation", current)
+		t.Fatal("Stop recorder did not reach terminal cancellation", current)
 	}
 	if current.CaseID != "" {
 		var evidence struct {
@@ -234,10 +241,14 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 		}
 		read("get_case", map[string]string{"case_id": current.CaseID}, &evidence)
 		if len(evidence.Artifacts) != 0 {
-			t.Fatal("stopped profile published an artifact")
+			t.Fatal("stopped recorder published an artifact")
 		}
 	}
-	t.Logf("manual profile %s: public Stop accepted while Running and terminal Cancelled observed; application profiler stop is not claimed", receipt.CaptureID)
+	if kind == "profile" {
+		t.Logf("manual profile %s: public Stop accepted while Running and terminal Cancelled observed; application profiler stop is not claimed", receipt.CaptureID)
+	} else {
+		t.Logf("manual arguments %s: public Stop accepted while Running, joined collector cancellation and terminal Cancelled observed; no artifact published", receipt.CaptureID)
+	}
 }
 
 func manualProfileArguments(cluster, namespace, workload string) map[string]any {

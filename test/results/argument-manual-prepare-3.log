@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/manual-argument-prepare
+    approved_recording_test.go:33: frozen argument execution scope invalid or stale context plan
+--- FAIL: TestContextAdmissionWithRealServices (2.76s)
+    --- FAIL: TestContextAdmissionWithRealServices/manual-argument-prepare (2.40s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	2.825s
+FAIL

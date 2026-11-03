@@ -94,7 +94,7 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		}
 		return out, nil
 	}
-	out.CanCancel = (accepted.Expectation.Snapshot != nil || accepted.Expectation.Profile != nil) && !out.CancellationRequested && !f.CatalogArtifactID.Valid && (len(executions) == 0 || executions[0].Phase == "prepared" || executions[0].Phase == "started")
+	out.CanCancel = (accepted.Expectation.Snapshot != nil || accepted.Expectation.Profile != nil || argumentCancellationExpected(accepted.Expectation)) && !out.CancellationRequested && !f.CatalogArtifactID.Valid && (len(executions) == 0 || executions[0].Phase == "prepared" || executions[0].Phase == "started")
 	verified := f.VerifiedCaptureID.Valid
 	if verified {
 		v := custodydb.ContextVerification{CaptureID: f.VerifiedCaptureID, RootID: f.VerifiedRootID, VerifiedAt: f.VerifiedAt, ExpectationDigest: f.ExpectationDigest, CopiesDigest: f.VerifiedCopiesDigest, IntentDigest: f.VerifiedIntentDigest, AuthorityDigest: f.AuthorityDigest, PermissionEpoch: f.PermissionEpoch, PermissionSequence: f.PermissionSequence.Int64}

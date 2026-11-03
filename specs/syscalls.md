@@ -73,3 +73,18 @@ later excluded by result filters consume credit; replay never refills it.
 The initial adapter supports only its closed qualified ABI table and refuses
 unknown names. Planning/component tests do not enable the installed capability;
 raw publication, authenticated download and stop still need composed qualification.
+
+Publication verifies argument JSONL against the immutable prepaid observation
+session as well as the accepted engine/definition/accounting pins. Native header
+values cannot supply their own trusted source identity. This historical lookup
+does not renew collection authority or require the original observation lease
+to remain active.
+
+For a finite argument capture, Stop is restricted to its original attempt and
+regional writer. A node acknowledgement means only that cancellation was
+requested. `Cancelled` requires the original acquisition result after reader
+and attachment shutdown, together with regional writer completion. An uncertain
+start, missing holder or Stop delivery failure cannot establish completion or
+refund observation spend. If storage already completed, the stored result wins;
+Stop does not delete it. This introduces no application-profiler uncertainty
+flag because the argument source is owned by Asservat.

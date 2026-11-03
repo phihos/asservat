@@ -7,11 +7,39 @@ Active outcome: independently approved manual syscall arguments → prepaid boun
 node acquisition → independent publication → native JSONL download → joined Stop.
 The existing argument branch is rebased on the verified profile base; node,
 compiler, review and SQL128 foundations are integrated. Execution/transport,
-processing/publication and finite-recording cancellation composition remain in
-progress. Native engine and SQL component evidence do not qualify this workflow.
+processing/publication and finite-recording cancellation are composed. The local
+race preflight passed across 15 packages; installed request/Stop fixture preflight
+and gadget-tag namespace tests passed. The actual packaging command reproduced
+the pinned argument ELF without loading BPF. Native engine and SQL component
+evidence do not qualify the installed workflow.
 One integrator owns external fixtures and final installed qualification; agents
 have bounded file ownership. Policy argument compilation remains at its separate
 checkpoint until the manual workflow is composed.
+
+The owned SQL/S3 run `argument-processing129-1` passed the SQL128 dual-pool and
+SQL129 processing/Stop/rollback branch (4.82s), but its manual preparation branch
+failed on colliding fixture role names. The manual-only rerun
+`argument-manual-prepare-2` then exposed a retired standalone role name;
+`argument-manual-prepare-3` exposed missing current namespace-profile facts in
+fixture plan reconstruction. All three runs exited 1, retained unchanged source
+inventories and completed cleanup. These failures are not passing preparation
+evidence. The fixture now uses the actual installed hub-runtime credential and
+reconstructs current catalog inputs as the production runner does. Offline
+regressions reproduce the setup failures and preserve original scope/deadlines.
+The corrected `argument-manual-prepare-4` passed (Go4.041s, selected test2.60s):
+real manual approval/admission, encrypted intent, one immutable execution/session,
+100663296 prepaid bytes and6000 events, unchanged passive replay and target/epoch
+substitution refusal. Direct authority mutation through the actual hub-runtime
+credential was denied. Source inventories matched, testExit0 and cleanupFailures
+empty. Reports remain under `test/results/`.
+
+Repository pre-push gates passed except for the cleanup self-test's outdated
+mock of the newly added packaging command. The exact command mock was corrected
+without weakening cleanup assertions; the full self-test target then passed.
+Final spec/architecture/Go-architecture/format checks passed. Runtime boundary
+review also corrected native timestamp rounding and immutable Stop-proof replay,
+and added cgroup namespace handling with existing capabilities. Installed
+qualification must exercise actual namespace entry and the complete raw workflow.
 
 ## Approved profiles and saved summaries merged (2026-11-03)
 

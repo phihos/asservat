@@ -66,6 +66,26 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 		}
 		return ContextResult{State: "Cancelled"}, nil
 	}
+	if c.State == evidence.RecordingCancelled && e.Recording != nil {
+		joined := c.RecordingCancellation
+		if e.NativeType != artifact.SyscallArgumentsArtifact || e.DataClass != "raw" || e.Recording.Kind != "syscallTrace" || e.Recording.Profile != "arguments" || e.Recording.Arguments == nil || e.Snapshot != nil || joined == nil || joined.CaptureID != e.CaptureUID || joined.AttemptID != e.Registration.Location.AttemptID || joined.ExpectationDigest != r.ExpectationDigest || joined.WriterPodUID != r.Process.PodUID || joined.WriterEpoch != r.Process.ProcessEpoch || joined.JoinedAt.Before(r.StartedAt) || joined.JoinedAt.After(s.Now()) {
+			return ContextResult{State: "Indeterminate"}, executeStep{"RecordingCancellation", value.ErrInvalid}
+		}
+		recorder, ok := s.Record.(APIRecordingCancellationRecorder)
+		if !ok {
+			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIRecordingCancellation", value.ErrUnavailable}
+		}
+		recovery, err := s.Recovery.RecoveryState(ctx)
+		if err != nil {
+			return ContextResult{State: "Indeterminate"}, executeStep{"RecoveryState", err}
+		}
+		result.Phase, result.CompletedAt = "cancelled", joined.JoinedAt.UTC()
+		result.AcquiredAt, result.Copies = time.Time{}, artifact.Copies{}
+		if _, err = recorder.RecordAPIRecordingCancellation(ctx, result, *joined, process, recovery); err != nil {
+			return ContextResult{State: "Indeterminate"}, executeStep{"RecordAPIRecordingCancellation", err}
+		}
+		return ContextResult{State: "Cancelled"}, nil
+	}
 	if c.State == evidence.RecordingCancelled {
 		joined := c.SnapshotCancellation
 		if e.Snapshot == nil || joined == nil || joined.CaptureID != e.CaptureUID || joined.AttemptID != e.Registration.Location.AttemptID || !joined.Request.Equal(*e.Snapshot) || joined.AcceptedExpectationDigest != evidence.ContextExpectationDigest(e) || joined.JoinedAt.Before(r.StartedAt) || joined.JoinedAt.After(s.Now()) {
@@ -126,4 +146,10 @@ func (s APIContextRunner) CollectRecording(ctx context.Context, w APIContextWork
 
 type APIProfileCancellationRecorder interface {
 	RecordAPIProfileCancellation(context.Context, value.APIExecution, artifact.ProfileCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
+}
+
+// APIRecordingCancellationRecorder persists one original writer's joined Stop.
+// The durable request alone never supplies this proof.
+type APIRecordingCancellationRecorder interface {
+	RecordAPIRecordingCancellation(context.Context, value.APIExecution, artifact.RecordingCancellation, value.APIProcessObservation, artifact.RecoveryProof) (value.APIExecution, error)
 }

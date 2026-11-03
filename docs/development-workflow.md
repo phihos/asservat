@@ -23,7 +23,8 @@ build another test framework or duplicate the production workflow with mocks.
 ## Verification tiers
 
 1. While editing: run the failing regression and affected tests. Use
-   `make profile-preflight` for the current profile workflow. It runs local
+   `make profile-preflight` for profiles or `make argument-preflight` for the
+   finite syscall argument workflow. These run local
    race/component tests without Docker, collection, privileged access or a
    deployment; it does not establish installed qualification.
 2. Once integrated: run `make pre-push` and the affected service fixtures.

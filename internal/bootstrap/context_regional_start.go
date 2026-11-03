@@ -280,6 +280,18 @@ func (p gatedPreparer) PreparePolicyRecording(ctx context.Context, c executionap
 	return r, first, permit, err
 }
 
+func (p gatedPreparer) PrepareArgumentRecording(ctx context.Context, c executionapp.APIExecutionCheck, source targets.PacketSourceObservation) (execution.APIExecution, bool, collector.ArgumentObservationPermit, error) {
+	preparer, ok := p.APIExecutionPreparer.(executionapp.ArgumentRecordingPreparer)
+	if !ok || !p.gate.enter() {
+		return execution.APIExecution{}, false, collector.ArgumentObservationPermit{}, errors.Join(execution.ErrUnavailable, execution.ErrNotStarted)
+	}
+	r, first, permit, err := preparer.PrepareArgumentRecording(ctx, c, source)
+	if err != nil && errors.Is(err, execution.ErrNotStarted) {
+		p.gate.rolledBack()
+	}
+	return r, first, permit, err
+}
+
 // Diagnostic only: a retained caller deadline is not a fresh start interval.
 func regionalStartInitialBound(ctx context.Context, started time.Time) string {
 	if deadline, ok := ctx.Deadline(); ok && deadline.Before(started.Add(5*time.Second)) {

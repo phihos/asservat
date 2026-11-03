@@ -79,6 +79,50 @@ func TestProfileCancellationKeepsDurableUnknownDelivery(t *testing.T) {
 	}
 }
 
+func (f *cancellationFixture) CancelRecording(_ context.Context, cluster string, stop collector.RecordingStop) error {
+	if !f.persisted || f.work.Recording == nil || !f.work.Recording.Equal(stop) || cluster != stop.ClusterID {
+		panic("argument stop preceded persistence or changed attempt")
+	}
+	f.dispatches++
+	return f.deliveryErr
+}
+
+func TestArgumentCancellationPersistsBeforeDeliveryWithoutProfileUncertainty(t *testing.T) {
+	f := newInvestigationFixture()
+	stop := collector.RecordingStop{RootID: fixtureID(1), ClusterID: fixtureID(4), CaptureID: fixtureID(31), AttemptID: fixtureID(32), WriterPodUID: fixtureID(33), WriterEpoch: fixtureID(34), ExpectationDigest: artifact.Digest{1}, WriteUntil: f.now.Add(time.Minute)}
+	lost := errors.New("unknown argument Stop delivery")
+	port := &cancellationFixture{f: f, deliveryErr: lost, work: SnapshotCancellationWork{ClusterID: stop.ClusterID, Recording: &stop, Decision: value.Cancellation{CaptureID: stop.CaptureID, Phase: "Running", Revision: 2, Requested: true, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}}}
+	service := CaptureCancellation{RootID: stop.RootID, InstallationID: fixtureID(2), Ledger: port, Dispatcher: port, Recovery: f, Now: func() time.Time { return f.now }}
+	request := value.CancellationRequest{CaptureID: stop.CaptureID, ExpectedRevision: 1, IdempotencyKey: "argument-stop"}
+	out, err := service.Cancel(t.Context(), fixtureIdentityResolverHandle{f}, request)
+	if !errors.Is(err, lost) || !out.Requested || out.Phase != "Running" || out.ApplicationStopUnknown || port.dispatches != 1 {
+		t.Fatal(out, err, port.dispatches)
+	}
+	for _, mode := range []string{"mixed-profile", "wrong-root", "wrong-cluster", "wrong-capture", "profile-uncertainty"} {
+		t.Run(mode, func(t *testing.T) {
+			original := port.work
+			changed := stop
+			port.work.Recording = &changed
+			switch mode {
+			case "mixed-profile":
+				port.work.Profile = &collector.ProfileStop{}
+			case "wrong-root":
+				changed.RootID = fixtureID(99)
+			case "wrong-cluster":
+				changed.ClusterID = fixtureID(98)
+			case "wrong-capture":
+				changed.CaptureID = fixtureID(97)
+			case "profile-uncertainty":
+				port.work.Decision.ApplicationStopUnknown = true
+			}
+			if _, err := service.Cancel(t.Context(), fixtureIdentityResolverHandle{f}, request); err == nil || port.dispatches != 1 {
+				t.Fatal("invalid Stop dispatched", err, port.dispatches)
+			}
+			port.work = original
+		})
+	}
+}
+
 type delayedCancellationRecovery struct {
 	f     *investigationFixture
 	delay time.Duration

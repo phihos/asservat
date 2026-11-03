@@ -1,0 +1,7 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/manual-argument-prepare
+    approved_recording_test.go:33: manual raw grant -> admission -> encrypted intent -> PrepareArgumentRecording: one exact execution/session, 100663296 prepaid bytes/6000 events, unchanged passive replay and source mismatch refusal
+--- PASS: TestContextAdmissionWithRealServices (2.98s)
+    --- PASS: TestContextAdmissionWithRealServices/manual-argument-prepare (2.60s)
+PASS
+ok  	asservat.local/asservat/test/integration	4.041s

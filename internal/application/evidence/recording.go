@@ -30,10 +30,20 @@ type PolicyContextRecorder interface {
 	StartPolicyRecording(context.Context, artifact.PinnedPod, time.Time, time.Time, targets.PacketSourceObservation, collector.ObservationPermit) (time.Time, error)
 }
 
+// ArgumentContextRecorder consumes the original argument observation receipt
+// and exact source observed in this exchange, without packet permit semantics.
+type ArgumentContextRecorder interface {
+	StartArgumentRecording(context.Context, artifact.PinnedPod, time.Time, time.Time, targets.PacketSourceObservation, collector.ArgumentObservationPermit) (time.Time, error)
+}
+
 // SourceSnapshotRecorder starts only an independently admitted window of an
 // existing source; it cannot arm or renew that source.
 type SourceSnapshotRecorder interface {
 	StartSourceSnapshot(context.Context, collector.SourceSnapshot) (time.Time, error)
+}
+
+type RecordingCanceller interface {
+	CancelRecording(context.Context, collector.RecordingStop) error
 }
 
 type SourceSnapshotCanceller interface {
@@ -64,26 +74,43 @@ const (
 // peerMembershipStale, ADR-283 part 3). Acquired is the queue instant
 // returned at start.
 type RecordingCollection struct {
-	ProfileCancellation  *artifact.ProfileCancellation        `json:",omitempty"`
-	SnapshotCancellation *artifact.SourceSnapshotCancellation `json:",omitempty"`
-	SnapshotCoverage     *artifact.SourceSnapshotCoverage     `json:",omitempty"`
-	State                string
-	Acquired             time.Time
-	Completion           artifact.ContextWriterCompletion
-	Failure              string
+	RecordingCancellation *artifact.RecordingCancellation      `json:",omitempty"`
+	ProfileCancellation   *artifact.ProfileCancellation        `json:",omitempty"`
+	SnapshotCancellation  *artifact.SourceSnapshotCancellation `json:",omitempty"`
+	SnapshotCoverage      *artifact.SourceSnapshotCoverage     `json:",omitempty"`
+	State                 string
+	Acquired              time.Time
+	Completion            artifact.ContextWriterCompletion
+	Failure               string
 }
 
 // Valid checks the collection against the recording's registration.
 func (c RecordingCollection) Valid(r artifact.Registration) bool {
 	switch c.State {
 	case RecordingPending:
-		return c.ProfileCancellation == nil && c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && c.Failure == ""
+		return c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && c.Failure == ""
 	case RecordingStored:
-		return c.ProfileCancellation == nil && c.SnapshotCancellation == nil && !c.Acquired.IsZero() && c.Completion.Valid(r) && !c.Completion.StoredAt.Before(c.Acquired) && c.Failure == ""
+		return c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && !c.Acquired.IsZero() && c.Completion.Valid(r) && !c.Completion.StoredAt.Before(c.Acquired) && c.Failure == ""
 	case RecordingCancelled:
-		return (c.ProfileCancellation != nil && c.ProfileCancellation.Valid() && c.SnapshotCancellation == nil || c.ProfileCancellation == nil && c.SnapshotCancellation != nil && c.SnapshotCancellation.Valid()) && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && c.Failure == ""
+		variants := 0
+		if c.ProfileCancellation != nil && c.ProfileCancellation.Valid() {
+			variants++
+		} else if c.ProfileCancellation != nil {
+			return false
+		}
+		if c.SnapshotCancellation != nil && c.SnapshotCancellation.Valid() {
+			variants++
+		} else if c.SnapshotCancellation != nil {
+			return false
+		}
+		if c.RecordingCancellation != nil && c.RecordingCancellation.Valid() {
+			variants++
+		} else if c.RecordingCancellation != nil {
+			return false
+		}
+		return variants == 1 && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && c.Failure == ""
 	case RecordingFailed:
-		return c.ProfileCancellation == nil && c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && (c.Failure == "captureFailed" || c.Failure == "storeUnconfirmed" || c.Failure == RecordingProfilerBusy || c.Failure == RecordingPeersChanged || c.Failure == RecordingPeersStale)
+		return c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && (c.Failure == "captureFailed" || c.Failure == "storeUnconfirmed" || c.Failure == RecordingProfilerBusy || c.Failure == RecordingPeersChanged || c.Failure == RecordingPeersStale)
 	}
 	return false
 }

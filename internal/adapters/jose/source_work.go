@@ -29,7 +29,7 @@ var _ app.SourceWorkSigner = (*APIContextWorkSignatures)(nil)
 var _ app.SourceWorkVerifier = (*APIContextWorkSignatures)(nil)
 
 func sourceWorkBytes(w app.SourceWork) ([]byte, error) {
-	if !w.Stop && w.StopSnapshot == nil && w.StopProfile == nil && deliveryapp.SourceResourcesDigest(w.Source.Resources) != w.Source.Permit.Binding.ResourceDigest {
+	if !w.Stop && w.StopSnapshot == nil && w.StopProfile == nil && w.StopRecording == nil && deliveryapp.SourceResourcesDigest(w.Source.Resources) != w.Source.Permit.Binding.ResourceDigest {
 		return nil, value.ErrInvalid
 	}
 	program := make([]byte, 8*len(w.Source.Program))
@@ -56,7 +56,12 @@ func sourceWorkBytes(w app.SourceWork) ([]byte, error) {
 		profile, _ = json.Marshal(w.StopProfile)
 		target, node, source = nil, nil, nil
 	}
-	return wire.EncodeSourceWork(wire.SourceWork{Format: wire.SourceWorkFormat, Channel: historyChannelWire(w.Channel), Target: target, Node: node, Source: source, ProgramLE: program, NotAfter: w.NotAfter, Stop: w.Stop, StopIssuedAt: w.StopIssuedAt, StopSnapshot: cancelled, StopProfile: profile})
+	var recording json.RawMessage
+	if w.StopRecording != nil {
+		recording, _ = json.Marshal(w.StopRecording)
+		target, node, source = nil, nil, nil
+	}
+	return wire.EncodeSourceWork(wire.SourceWork{Format: wire.SourceWorkFormat, Channel: historyChannelWire(w.Channel), Target: target, Node: node, Source: source, ProgramLE: program, NotAfter: w.NotAfter, Stop: w.Stop, StopIssuedAt: w.StopIssuedAt, StopSnapshot: cancelled, StopProfile: profile, StopRecording: recording})
 }
 func sourceWorkValue(b []byte) (app.SourceWork, error) {
 	d, e := wire.DecodeSourceWork(b)
@@ -70,7 +75,7 @@ func sourceWorkValue(b []byte) (app.SourceWork, error) {
 		raw   []byte
 		value any
 	}{{d.Target, &target}, {d.Node, &node}, {d.Source, &source}} {
-		if len(entry.raw) == 0 && len(d.StopProfile) > 0 {
+		if len(entry.raw) == 0 && (len(d.StopProfile) > 0 || len(d.StopRecording) > 0) {
 			continue
 		}
 		dec := json.NewDecoder(bytes.NewReader(entry.raw))
@@ -108,6 +113,15 @@ func sourceWorkValue(b []byte) (app.SourceWork, error) {
 			return app.SourceWork{}, value.ErrInvalid
 		}
 		w.StopProfile = &x
+	}
+	if len(d.StopRecording) > 0 {
+		var x collector.RecordingStop
+		decoder := json.NewDecoder(bytes.NewReader(d.StopRecording))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&x) != nil {
+			return app.SourceWork{}, value.ErrInvalid
+		}
+		w.StopRecording = &x
 	}
 	canonical, e := sourceWorkBytes(w)
 	if e != nil || !bytes.Equal(canonical, b) {

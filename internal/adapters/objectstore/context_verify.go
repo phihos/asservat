@@ -19,7 +19,7 @@ type ContextVerifier struct {
 	contracts *manifest.Validator
 	// extra are additional streaming checks per native type, run on the
 	// same authenticated read (ADR-248: the networkHeaders recheck).
-	extra map[string]func(artifact.ContextExpectation) StreamCheck
+	extra map[string]func(context.Context, artifact.ContextExpectation) (StreamCheck, error)
 }
 
 // StreamCheck sees every authenticated native byte of one verification and
@@ -32,8 +32,14 @@ type StreamCheck interface {
 // WithStreamCheck adds a verification check for one native type. It runs in
 // the same read as the type's own check: no second unwrap or download.
 func (v *ContextVerifier) WithStreamCheck(nativeType string, check func(artifact.ContextExpectation) StreamCheck) *ContextVerifier {
+	return v.WithContextStreamCheck(nativeType, func(_ context.Context, e artifact.ContextExpectation) (StreamCheck, error) { return check(e), nil })
+}
+
+// WithContextStreamCheck resolves independent verifier inputs within the same
+// original verification deadline. Register checks before sharing a verifier.
+func (v *ContextVerifier) WithContextStreamCheck(nativeType string, check func(context.Context, artifact.ContextExpectation) (StreamCheck, error)) *ContextVerifier {
 	if v.extra == nil {
-		v.extra = map[string]func(artifact.ContextExpectation) StreamCheck{}
+		v.extra = map[string]func(context.Context, artifact.ContextExpectation) (StreamCheck, error){}
 	}
 	v.extra[nativeType] = check
 	return v
@@ -116,7 +122,19 @@ func (v *ContextVerifier) verifyStream(ctx context.Context, e artifact.ContextEx
 	}
 	var extra StreamCheck
 	if factory := v.extra[e.NativeType]; factory != nil {
-		extra = factory(e)
+		extra, err = factory(ctx, e)
+		if err != nil || extra == nil {
+			if extra != nil {
+				_ = extra.Close()
+			}
+			if err == nil {
+				err = artifact.ErrInvalid
+			}
+			return readStage(ctx, "validate", err)
+		}
+	} else if e.NativeType == artifact.SyscallArgumentsArtifact {
+		// Structural native validation cannot prove the historical source.
+		return readStage(ctx, "validate", artifact.ErrInvalid)
 	}
 	if err = reader.Read(ctx, 0, m.Layout.NativeBytes, checkSink{check, extra}); err != nil {
 		if extra != nil {

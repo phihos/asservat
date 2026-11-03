@@ -131,12 +131,16 @@ class CollectorPacketCleanup(unittest.TestCase):
                 (root / "test/results").mkdir(parents=True)
                 work.mkdir()
                 clusters, deleted, commands = {"encrypted", "unrelated"}, [], []
+                package_command = [collector.sys.executable, str(root / "scripts/package-argument-gadget.py"),
+                                   str(work / "image/gadgets/traceloop-arguments"), "--tmpdir", str(work)]
 
                 def fake_subprocess(args, **kwargs):
                     commands.append(list(args))
                     output, code = "", 0
                     if args[:2] == ["go", "build"]:
                         Path(args[args.index("-o") + 1]).write_bytes(b"synthetic non-executable fixture")
+                    elif args == package_command:
+                        self.assertEqual(kwargs, {"check": True})
                     elif args[:2] == ["go", "test"]:
                         if artifacts:
                             for artifact in ("filtered", "unfiltered", "encrypted"):
@@ -174,6 +178,9 @@ class CollectorPacketCleanup(unittest.TestCase):
                      patch.object(collector.urllib.request, "urlopen", side_effect=AssertionError("unmocked network")):
                     report = {"runner": {"synthetic": True}}
                     collector.packet(work, report)
+                self.assertEqual(commands.count(package_command), 1)
+                image_build = next(i for i, command in enumerate(commands) if command[:2] == ["docker", "build"])
+                self.assertLess(commands.index(package_command), image_build)
                 self.assertEqual(report["cleanup"]["cluster"], owned not in clusters,
                                  {"deleted": deleted, "remaining": sorted(clusters), "cleanup": report["cleanup"]})
                 self.assertEqual(deleted, [owned], commands)

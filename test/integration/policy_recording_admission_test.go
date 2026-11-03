@@ -461,6 +461,8 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			t.Logf("actual Tick accepted executions=%d; native output=%d grant executions=%d output=%d reservations=%d", execs, bytes, grantExec, grantBytes, reservations)
 			if argumentSQL {
 				qualifyArgumentObservationSQL(t, ctx, admin, hub, root, record.Record.ID, grant, output)
+				initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, output.Expectation)
+				qualifyArgumentProcessingSQL(t, ctx, admin, poolFor, root, output)
 			}
 			if observationSQL {
 				qualifyFinitePolicyObservationSQL(t, ctx, admin, hub, poolFor, root, record.Record.ID, grant, output)

@@ -27,6 +27,7 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	planvalue "asservat.local/asservat/internal/domain/planning"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -69,6 +70,9 @@ func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code str
 // approvedRecordingArguments is the actual public request, validated offline
 // before the expensive installed qualification. It is never authority.
 func approvedRecordingArguments(cluster, namespace, workload string) map[string]any {
+	if installedJourneyFocus() == "manual-arguments" {
+		return manualArgumentsCaptureInput(cluster, namespace, workload, false)
+	}
 	if installedJourneyFocus() == "manual-profile" {
 		return manualProfileArguments(cluster, namespace, workload)
 	}
@@ -271,7 +275,7 @@ func (b *installedBrowser) approvedRecordingStepUp(t *testing.T, ctx context.Con
 	b.csrf = view.CSRF
 }
 
-func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string), summaryCheck installedProjectionCheck) {
+func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement, historyPhase func(string), initialStorageFailure func(string), summaryCheck installedProjectionCheck, argumentSource installedArgumentsSourceReader) {
 	t.Helper()
 	// Initial MCP transport/read failures can diagnose and terminate inside
 	// helpers before recovery returns. Sample this one preview first, once.
@@ -362,6 +366,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if measurement != nil {
 		arguments = nativePacingArguments(cluster, namespace, workload)
 	}
+	if installedJourneyFocus() == "manual-arguments" {
+		definition, err := manualArgumentsProfileDefinition()
+		if err != nil {
+			t.Fatal(err)
+		}
+		publishNamespaceCaptureProfile(t, ctx, regionalConfig, namespace, manualArgumentsProfile, "v1", definition)
+	}
 	if installedJourneyFocus() == "manual-raw" {
 		publishManualRawProfile(t, ctx, regionalConfig, namespace)
 	}
@@ -394,7 +405,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Fatal("approved recording preview lacks its original window or has a non-approval blocker", preview.Blockers)
 	}
 	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "approved-preview-" + preview.ID}
-	if installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-profile" {
+	if installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-profile" || installedJourneyFocus() == "manual-arguments" {
 		// ADR-279: raw output downloads only through result-access children of
 		// the requesting human's own client.
 		if len(preview.Lifecycle.Actions) != 1 {
@@ -479,6 +490,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		Observation *struct {
 			MaxSessionSeconds int64 `json:"max_session_seconds"`
 			MaxObservedBytes  int64 `json:"max_observed_bytes"`
+			MaxObservedEvents int64 `json:"max_observed_events"`
 		} `json:"observation_limits"`
 		Decision struct {
 			By struct {
@@ -492,6 +504,12 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	if installedJourneyFocus() == "manual-profile" && grant.DataClass != "raw" {
 		t.Fatal("live profile approval did not retain raw classification", grant.DataClass)
+	}
+	if installedJourneyFocus() == "manual-arguments" {
+		if grant.DataClass != "raw" || grant.Observation == nil || grant.Observation.MaxObservedEvents != manualArgumentsRate*6 || grant.Observation.MaxObservedBytes != planvalue.SensitiveMaxObservedBytes {
+			t.Fatal("argument review lost raw event/byte ceilings", grant)
+		}
+		t.Logf("raw argument review: %d observed probes, %d maximum observed bytes, %d maximum session seconds", grant.Observation.MaxObservedEvents, grant.Observation.MaxObservedBytes, grant.Observation.MaxSessionSeconds)
 	}
 	if installedJourneyFocus() == "manual-raw" {
 		// ADR-279: payload approval names the raw class and observation limits.
@@ -764,7 +782,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Fatal("manual recording retention did not start at submission", evidence)
 	}
 	wantClass := "metadata"
-	if installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-profile" {
+	if installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-profile" || installedJourneyFocus() == "manual-arguments" {
 		wantClass = "raw"
 	}
 	if installedJourneyFocus() == "manual-http" {
@@ -844,7 +862,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-profile" {
 		extension = ".pb.gz"
 	}
-	if installedJourneyFocus() == "manual-syscall" {
+	if installedJourneyFocus() == "manual-syscall" || installedJourneyFocus() == "manual-arguments" {
 		extension = ".jsonl"
 	}
 	if installedJourneyFocus() == "manual-http" {
@@ -869,11 +887,25 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal(err)
 		}
 	}
+	if installedJourneyFocus() == "manual-arguments" {
+		if evidence.Artifacts[0].Kind != "syscallTrace" || evidence.Artifacts[0].NativeFormat != "asservat-syscall-arguments/v1" {
+			t.Fatal("argument artifact native classification", evidence.Artifacts[0])
+		}
+		qualifyManualArgumentsNative(t, native, receipt.CaptureID, preview.Pods[0].UID, argumentSource)
+		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
+		qualifyManualRecorderStop(t, ctx, "arguments", manualArgumentsCaptureInput(cluster, namespace, workload, true), read, invoke, func(grantID string) {
+			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
+			if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent installed argument Stop review", "idempotency_key": "approve-stop-" + grantID}, nil); code != "" {
+				t.Fatal("Stop argument independent approval", code)
+			}
+		})
+		return
+	}
 	if installedJourneyFocus() == "manual-profile" {
 		qualifyManualProfileNative(t, ctx, native, receipt.CaptureID)
-		qualifyManualProfileRepeatPreview(t, receipt.CaptureID, preview, invoke)
+		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
 		qualifyInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, native, evidence.Artifacts[0].Expires, summaryCheck)
-		qualifyManualProfileStop(t, ctx, manualProfileStopArguments(cluster, namespace, workload), read, invoke, func(grantID string) {
+		qualifyManualRecorderStop(t, ctx, "profile", manualProfileStopArguments(cluster, namespace, workload), read, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
 			if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent installed profile Stop review", "idempotency_key": "approve-stop-" + grantID}, nil); code != "" {
 				t.Fatal("Stop profile independent approval", code)

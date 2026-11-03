@@ -286,7 +286,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
 		if queue, ok := r.output.recordings.nodes.(contextstart.SourceQueue); ok {
-			local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Queue: queue, Snapshots: r.output.recordings, Profiles: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
+			local.Sources = &contextstart.SourceLocal{Verifier: r.verifier, Queue: queue, Snapshots: r.output.recordings, Profiles: r.output.recordings, Recordings: r.output.recordings, Report: eventLog(os.Stderr, "regional source work refused")}
 		}
 	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
@@ -392,6 +392,16 @@ func (t reportedTargets) ResolveSyscallRecorder(ctx context.Context, r targets.R
 // sensitive dispatch. Existing metadata wire answers never include these facts.
 func (t reportedTargets) ResolvePacketSource(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {
 	return t.resolvePacketRecorder(ctx, r, true)
+}
+
+// ResolveArgumentSource requires syscall availability and the same exact Pod
+// and node incarnation used by the finite argument observation issuer.
+func (t reportedTargets) ResolveArgumentSource(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {
+	p, node, err := t.PodTargets.ResolvePacketPod(ctx, r)
+	if err != nil {
+		return targets.RecorderResolution{}, err
+	}
+	return t.packetTargetAvailability(ctx, p, node, true, collector.MechanismSyscall), nil
 }
 
 func (t reportedTargets) resolvePacketRecorder(ctx context.Context, r targets.Request, includeSource bool) (targets.RecorderResolution, error) {

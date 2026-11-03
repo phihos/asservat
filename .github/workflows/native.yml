@@ -92,7 +92,7 @@ jobs:
         run: sudo touch /etc/asservat-disposable-host
       # ADR-248: the collector suites open the downloaded PCAPNG with tshark
       # (offline file read only; nothing captures on the runner itself).
-      - if: matrix.suite != 'continuation-manual-profile' && (startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || startsWith(matrix.suite, 'continuation-manual-') || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || startsWith(matrix.suite, 'continuation-ongoing-'))
+      - if: matrix.suite != 'continuation-manual-profile' && matrix.suite != 'continuation-manual-arguments' && (startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || startsWith(matrix.suite, 'continuation-manual-') || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || startsWith(matrix.suite, 'continuation-ongoing-'))
         name: tshark
         timeout-minutes: 3
         run: |

@@ -27,17 +27,19 @@ import (
 // data keys never cross the exchange: acquisition captures, encrypts and
 // uploads in the region and returns copy receipts only.
 const (
-	opResolvePod           = "resolve-pod"
-	opResolvePacketSource  = "resolve-packet-source"
-	opStartPolicyRecording = "start-policy-recording"
-	opReadProcess          = "read-process"
-	opPrepareStart         = "prepare-start"
-	opReadyStart           = "ready-start"
-	opConsumeStart         = "consume-start"
-	opPrepareOutput        = "prepare-output"
-	opAcquire              = "acquire-context"
-	opComplete             = "complete-stored"
-	opFinish               = "finish"
+	opResolvePod             = "resolve-pod"
+	opResolvePacketSource    = "resolve-packet-source"
+	opResolveArgumentSource  = "resolve-argument-source"
+	opStartArgumentRecording = "start-argument-recording"
+	opStartPolicyRecording   = "start-policy-recording"
+	opReadProcess            = "read-process"
+	opPrepareStart           = "prepare-start"
+	opReadyStart             = "ready-start"
+	opConsumeStart           = "consume-start"
+	opPrepareOutput          = "prepare-output"
+	opAcquire                = "acquire-context"
+	opComplete               = "complete-stored"
+	opFinish                 = "finish"
 	// ADR-248: a recording is started within the committed start and
 	// collected by a later exchange for the same verified capture.
 	opStartProfile   = "start-profile"
@@ -94,6 +96,13 @@ type policyRecordingRequest struct {
 	Started, Until time.Time
 	Source         targets.PacketSourceObservation
 	Permit         collector.ObservationPermit
+}
+
+type argumentRecordingRequest struct {
+	Pin            artifact.PinnedPod
+	Started, Until time.Time
+	Source         targets.PacketSourceObservation
+	Permit         collector.ArgumentObservationPermit
 }
 
 type profileRequest struct {
@@ -203,6 +212,12 @@ func (h *HubOperations) ResolvePacketSource(ctx context.Context, r targets.Reque
 	return out, err
 }
 
+func (h *HubOperations) ResolveArgumentSource(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {
+	var out targets.RecorderResolution
+	err := h.call(ctx, opResolveArgumentSource, r, &out)
+	return out, err
+}
+
 func (h *HubOperations) ReadAPIProcess(ctx context.Context) (value.APIProcessObservation, error) {
 	var out value.APIProcessObservation
 	err := h.call(ctx, opReadProcess, struct{}{}, &out)
@@ -245,10 +260,11 @@ func (h *HubOperations) PrepareContext(ctx context.Context, e artifact.ContextEx
 type remoteOutput struct{ h *HubOperations }
 
 var (
-	_ evidence.StoredContextCloser = (*remoteOutput)(nil)
-	_ evidence.ContextAcquirer     = (*remoteOutput)(nil)
-	_ evidence.ContextRecorder     = (*remoteOutput)(nil)
-	_ evidence.RecordingCollector  = (*HubOperations)(nil)
+	_ evidence.StoredContextCloser     = (*remoteOutput)(nil)
+	_ evidence.ContextAcquirer         = (*remoteOutput)(nil)
+	_ evidence.ContextRecorder         = (*remoteOutput)(nil)
+	_ evidence.ArgumentContextRecorder = (*remoteOutput)(nil)
+	_ evidence.RecordingCollector      = (*HubOperations)(nil)
 )
 
 func (o *remoteOutput) StartProfile(ctx context.Context, pin artifact.PinnedPod, started, until time.Time, endpoint targets.ProfileEndpointRequest) (time.Time, error) {
@@ -268,6 +284,12 @@ func (o *remoteOutput) StartRecording(ctx context.Context, pin artifact.PinnedPo
 func (o *remoteOutput) StartPolicyRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time, source targets.PacketSourceObservation, permit collector.ObservationPermit) (time.Time, error) {
 	var out recordingReply
 	err := o.h.call(ctx, opStartPolicyRecording, policyRecordingRequest{pin, started, until, source, permit}, &out)
+	return out.Queued, err
+}
+
+func (o *remoteOutput) StartArgumentRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time, source targets.PacketSourceObservation, permit collector.ArgumentObservationPermit) (time.Time, error) {
+	var out recordingReply
+	err := o.h.call(ctx, opStartArgumentRecording, argumentRecordingRequest{pin, started, until, source, permit}, &out)
 	return out.Queued, err
 }
 
@@ -397,13 +419,14 @@ type regionalSession struct {
 	work           fleet.APIContextWork
 	// process is this work's one complete process observation (ADR-173). Later
 	// operations reuse it until its original deadline; it is never renewed.
-	process      *value.APIProcessObservation
-	resolved     *targets.PodResolution
-	packetSource *targets.PacketSourceObservation
-	expectation  *artifact.ContextExpectation
-	prepared     evidence.PreparedContext
-	consumed     *value.Disposition
-	acquired     bool
+	process        *value.APIProcessObservation
+	resolved       *targets.PodResolution
+	packetSource   *targets.PacketSourceObservation
+	argumentSource *targets.PacketSourceObservation
+	expectation    *artifact.ContextExpectation
+	prepared       evidence.PreparedContext
+	consumed       *value.Disposition
+	acquired       bool
 }
 
 func (s *regionalSession) close() {
@@ -455,7 +478,7 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 	case opResolveSourceSnapshot:
 		return s.resolveSourceSnapshot(ctx, q.Body)
 	case opResolvePod:
-		if s.packetSource != nil || s.snapshotTarget != nil {
+		if s.packetSource != nil || s.argumentSource != nil || s.snapshotTarget != nil {
 			return nil, value.ErrDenied
 		}
 		var r targets.Request
@@ -495,6 +518,27 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		}
 		target, source := out.Target, *out.Recorder.Source
 		s.resolved, s.packetSource = &target, &source
+		return out, nil
+	case opResolveArgumentSource:
+		var r targets.Request
+		if err := decodeOperationBody(q.Body, &r); err != nil {
+			return nil, err
+		}
+		resolver, ok := l.Targets.(interface {
+			ResolveArgumentSource(context.Context, targets.Request) (targets.RecorderResolution, error)
+		})
+		if !ok || s.resolved != nil {
+			return nil, value.ErrDenied
+		}
+		out, err := resolver.ResolveArgumentSource(ctx, r)
+		if err != nil {
+			return nil, err
+		}
+		if !out.ValidSource(l.Now()) || out.Target.Target() != s.work.Target {
+			return nil, value.ErrDenied
+		}
+		target, source := out.Target, *out.Recorder.Source
+		s.resolved, s.argumentSource = &target, &source
 		return out, nil
 	case opReadProcess:
 		return s.readProcess(ctx)
@@ -581,6 +625,9 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		}
 		return recordingReply{Queued: queued}, nil
 	case opStartRecording:
+		if s.expectation != nil && s.expectation.Recording != nil && s.expectation.Recording.Arguments != nil {
+			return nil, value.ErrDenied
+		}
 		var r acquireRequest
 		if err := decodeOperationBody(q.Body, &r); err != nil {
 			return nil, err
@@ -615,6 +662,25 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 		}
 		s.acquired = true
 		queued, err := recorder.StartPolicyRecording(ctx, r.Pin, r.Started, r.Until, r.Source, r.Permit)
+		if err != nil {
+			return nil, err
+		}
+		return recordingReply{Queued: queued}, nil
+	case opStartArgumentRecording:
+		var r argumentRecordingRequest
+		if err := decodeOperationBody(q.Body, &r); err != nil {
+			return nil, err
+		}
+		d := s.consumed
+		recorder, ok := s.prepared.(evidence.ArgumentContextRecorder)
+		now := l.Now()
+		if s.acquired || !ok || s.resolved == nil || s.argumentSource == nil || s.expectation == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted ||
+			!r.Started.Equal(d.CommittedAt) || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin || !samePacketSource(r.Source, *s.argumentSource) || !r.Source.Valid(now) || !r.Permit.ValidFinite(now) ||
+			r.Permit.Binding.ExpectationDigest != [32]byte(s.work.ExpectationDigest) || r.Permit.Binding.CaptureID != s.work.CaptureID || r.Permit.Binding.ActionID != s.expectation.ActionID || !argumentRecordingMatches(*s.expectation, r.Source, r.Permit) || !now.Before(r.Until) {
+			return nil, value.ErrDenied
+		}
+		s.acquired = true // an uncertain reply cannot repeat the start effect
+		queued, err := recorder.StartArgumentRecording(ctx, r.Pin, r.Started, r.Until, r.Source, r.Permit)
 		if err != nil {
 			return nil, err
 		}
@@ -783,7 +849,7 @@ func samePacketSource(a, b targets.PacketSourceObservation) bool {
 // recovered from the permit's caller-supplied copies.
 func policyRecordingMatches(e artifact.ContextExpectation, source targets.PacketSourceObservation, permit collector.ObservationPermit) bool {
 	r, b := e.Recording, permit.Binding
-	if !r.Valid() || !compiler.MeteredRecording(r) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || b.PodUID != e.PodUID || source.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch {
+	if !r.Valid() || r.Arguments != nil || !compiler.MeteredRecording(r) || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || b.PodUID != e.PodUID || source.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch {
 		return false
 	}
 	program := make([]planning.BPFInstruction, len(r.Filter.Program))
@@ -791,4 +857,17 @@ func policyRecordingMatches(e artifact.ContextExpectation, source targets.Packet
 		program[i] = planning.BPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
 	}
 	return b.ProgramDigest == [32]byte(compiler.FilterProgramDigest(program))
+}
+
+// The local source and signed expectation are independent of the permit fields.
+func argumentRecordingMatches(e artifact.ContextExpectation, source targets.PacketSourceObservation, permit collector.ArgumentObservationPermit) bool {
+	r, b := e.Recording, permit.Binding
+	if !r.Valid() || r.Arguments == nil || e.NativeType != artifact.SyscallArgumentsArtifact || e.DataClass != "raw" || permit.Duration != time.Duration(r.DurationMillis)*time.Millisecond || permit.SessionUntil.After(e.Registration.WriteUntil) ||
+		b.PodUID != e.PodUID || source.PodUID != e.PodUID || b.NodeUID != source.NodeUID || b.BootID != source.BootID || b.CollectorPodUID != source.CollectorPodUID || b.CollectorEpoch != source.CollectorEpoch ||
+		(e.NodeUID != "" && e.NodeUID != source.NodeUID) || (e.NodeBootID != "" && e.NodeBootID != source.BootID) {
+		return false
+	}
+	a, s := r.Arguments, r.Syscalls
+	return b.ProgramDigest == [32]byte(a.ProgramDigest) && b.DefinitionDigest == [32]byte(a.DefinitionDigest) && b.AccountingRule == [32]byte(a.AccountingRule) &&
+		permit.MaxProbeBytes == a.MaxProbeBytes && permit.MaxBytesPerEvent == a.MaxBytesPerEvent && permit.BytesPerSecond == a.MaxBytesPerSecond && permit.CaptureBuffers == a.CaptureBuffers && permit.EventsPerSecond == s.MaxEventsPerSecond && permit.MaxTrackedThreads == s.MaxTrackedThreads
 }

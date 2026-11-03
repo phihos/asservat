@@ -11,6 +11,7 @@ import copy
 import io
 import json
 import tempfile
+import hashlib
 
 spec = importlib.util.spec_from_file_location("context_fixture", Path(__file__).with_name("test-context-storage.py"))
 fixture = importlib.util.module_from_spec(spec)
@@ -161,10 +162,43 @@ class RegionalContextSelection(unittest.TestCase):
         self.assertEqual(measured.count("max_connections=48"), 1)
 
     def test_approved_recording_refuses_missing_disposable_guard_before_setup(self):
-        for focus in ("approved-recording", "manual-syscall", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "ongoing-mixed"):
+        for focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "ongoing-mixed"):
             with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}), patch.object(fixture.Path, "is_file", return_value=False):
                 with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):
                     fixture.main(installer_continuation=True)
+
+    def test_argument_engine_build_inputs_are_frozen(self):
+        hashes = fixture.source_hashes()
+        for name in ("scripts/package-argument-gadget.py", "experiments/syscall-argument-budget/prepare.py",
+                     "experiments/syscall-argument-budget/pins.json", "experiments/syscall-argument-budget/program.patch",
+                     "experiments/syscall-argument-budget/budget.h"):
+            self.assertIn(name, hashes)
+            self.assertEqual(len(hashes[name]), 64)
+
+    def test_argument_inventory_refuses_object_or_source_pin_substitution(self):
+        # Synthetic bytes exercise reporting/refusal only; this never builds or loads BPF.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "experiments/syscall-argument-budget"
+            source.mkdir(parents=True)
+            package = root / "package"
+            package.mkdir()
+            pins = {"compiled_object_sha256": hashlib.sha256(b"synthetic ELF").hexdigest(), "upstream_commit": "synthetic"}
+            (source / "pins.json").write_text(json.dumps(pins))
+            (package / "source-pins.json").write_text(json.dumps(pins))
+            (package / "program.bpf.o").write_bytes(b"synthetic ELF")
+            with patch.object(fixture, "ROOT", root):
+                report = fixture.argument_engine_build_inventory(package)
+                self.assertEqual(report["objectSHA256"], pins["compiled_object_sha256"])
+                self.assertEqual(report["sourcePins"], pins)
+                self.assertEqual(report["objectBytes"], 13)
+                (package / "program.bpf.o").write_bytes(b"replacement")
+                with self.assertRaisesRegex(RuntimeError, "pins"):
+                    fixture.argument_engine_build_inventory(package)
+                (package / "program.bpf.o").write_bytes(b"synthetic ELF")
+                (package / "source-pins.json").write_text(json.dumps(dict(pins, upstream_commit="replacement")))
+                with self.assertRaisesRegex(RuntimeError, "pins"):
+                    fixture.argument_engine_build_inventory(package)
 
     def test_history_driver_and_locked_browser_dependencies_are_source_pinned(self):
         hashes = fixture.source_hashes()
@@ -173,12 +207,12 @@ class RegionalContextSelection(unittest.TestCase):
             self.assertEqual(len(hashes[name]), 64)
 
     def test_approved_recording_has_finite_go_envelope(self):
-        for focus in ("approved-recording", "manual-syscall", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "ongoing-mixed"):
+        for focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed", "ongoing-mixed"):
             with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}):
                 self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
 
     def test_installed_focus_topology_and_flags_reach_the_go_consumer(self):
-        for focus, expected in (("approved-recording", 2), ("manual-syscall", 2), ("manual-mixed", 2), ("manual-raw", 2), ("manual-http", 2), ("manual-peers", 2), ("manual-profile", 2), ("policy-recording", 2), ("ongoing-save", 2), ("ongoing-save-disk", 2), ("ongoing-incident", 2), ("ongoing-syscall", 2), ("ongoing-mixed", 2), ("native-paced", 2), ("journey", 2), ("browser", 2),
+        for focus, expected in (("approved-recording", 2), ("manual-syscall", 2), ("manual-arguments", 2), ("manual-mixed", 2), ("manual-raw", 2), ("manual-http", 2), ("manual-peers", 2), ("manual-profile", 2), ("policy-recording", 2), ("ongoing-save", 2), ("ongoing-save-disk", 2), ("ongoing-incident", 2), ("ongoing-syscall", 2), ("ongoing-mixed", 2), ("native-paced", 2), ("journey", 2), ("browser", 2),
                                 ("policy", 2), ("alert", 2), ("logresource", 2),
                                 ("restart", 2), ("upgrade", 2), ("share", 2),
                                 ("chain", 2), ("clusters", 3), ("", 3), ("unknown", 3)):

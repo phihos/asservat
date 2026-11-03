@@ -19,21 +19,25 @@ type SourceWorkVerifier interface {
 // SourceWork is a committed ordinary ongoing source purpose over one retained
 // connector conversation. It has no capture, occurrence, evidence or raw grant.
 type SourceWork struct {
-	Channel      value.APIContextChannel
-	Target       targets.PodResolution
-	Node         targets.PacketSourceObservation
-	Source       collector.PacketSource
-	NotAfter     time.Time
-	Stop         bool
-	StopIssuedAt time.Time
-	StopSnapshot *collector.SourceSnapshot `json:",omitempty"`
-	StopProfile  *collector.ProfileStop    `json:",omitempty"`
+	Channel       value.APIContextChannel
+	Target        targets.PodResolution
+	Node          targets.PacketSourceObservation
+	Source        collector.PacketSource
+	NotAfter      time.Time
+	Stop          bool
+	StopIssuedAt  time.Time
+	StopSnapshot  *collector.SourceSnapshot `json:",omitempty"`
+	StopRecording *collector.RecordingStop  `json:",omitempty"`
+	StopProfile   *collector.ProfileStop    `json:",omitempty"`
 }
 
 func (w SourceWork) Valid(now time.Time) bool {
 	p, b := w.Source.Permit, w.Source.Permit.Binding
+	if x := w.StopRecording; x != nil {
+		return x.Valid() && w.Source.Syscalls == nil && !w.Stop && w.StopSnapshot == nil && w.StopProfile == nil && w.Channel.Valid() && x.RootID == w.Channel.RootID && x.ClusterID == w.Channel.Connector.Binding.ClusterID && x.WriterPodUID == w.Channel.Executor.PodUID && x.WriterEpoch == w.Channel.Executor.ProcessEpoch && p == (collector.SourcePermit{}) && len(w.Source.Program) == 0 && w.Source.Ring == (collector.SourceRingLimits{}) && w.Source.Resources == (collector.SourceResources{}) && w.Target == (targets.PodResolution{}) && w.Node == (targets.PacketSourceObservation{}) && !w.StopIssuedAt.IsZero() && !now.Before(w.StopIssuedAt) && now.Before(w.NotAfter) && !w.NotAfter.After(w.StopIssuedAt.Add(5*time.Second))
+	}
 	if x := w.StopProfile; x != nil {
-		return x.Valid() && w.Source.Syscalls == nil && !w.Stop && w.StopSnapshot == nil && w.Channel.Valid() && x.RootID == w.Channel.RootID && x.ClusterID == w.Channel.Connector.Binding.ClusterID && x.WriterPodUID == w.Channel.Executor.PodUID && x.WriterEpoch == w.Channel.Executor.ProcessEpoch && p == (collector.SourcePermit{}) && len(w.Source.Program) == 0 && w.Source.Ring == (collector.SourceRingLimits{}) && w.Source.Resources == (collector.SourceResources{}) && w.Target == (targets.PodResolution{}) && w.Node == (targets.PacketSourceObservation{}) && !w.StopIssuedAt.IsZero() && !now.Before(w.StopIssuedAt) && now.Before(w.NotAfter) && !w.NotAfter.After(w.StopIssuedAt.Add(5*time.Second))
+		return w.StopRecording == nil && x.Valid() && w.Source.Syscalls == nil && !w.Stop && w.StopSnapshot == nil && w.Channel.Valid() && x.RootID == w.Channel.RootID && x.ClusterID == w.Channel.Connector.Binding.ClusterID && x.WriterPodUID == w.Channel.Executor.PodUID && x.WriterEpoch == w.Channel.Executor.ProcessEpoch && p == (collector.SourcePermit{}) && len(w.Source.Program) == 0 && w.Source.Ring == (collector.SourceRingLimits{}) && w.Source.Resources == (collector.SourceResources{}) && w.Target == (targets.PodResolution{}) && w.Node == (targets.PacketSourceObservation{}) && !w.StopIssuedAt.IsZero() && !now.Before(w.StopIssuedAt) && now.Before(w.NotAfter) && !w.NotAfter.After(w.StopIssuedAt.Add(5*time.Second))
 	}
 	if w.StopSnapshot != nil {
 		x := w.StopSnapshot
@@ -56,7 +60,7 @@ func (w SourceWork) Valid(now time.Time) bool {
 		now.Before(w.NotAfter) && !w.NotAfter.After(p.DispatchUntil) && !w.NotAfter.After(w.Target.FreshUntil) && !w.NotAfter.After(w.Node.FreshUntil)
 }
 func (w SourceWork) IssuedAt() time.Time {
-	if w.Stop || w.StopSnapshot != nil || w.StopProfile != nil {
+	if w.Stop || w.StopSnapshot != nil || w.StopProfile != nil || w.StopRecording != nil {
 		return w.StopIssuedAt
 	}
 	return w.Source.Permit.IssuedAt
@@ -83,6 +87,9 @@ func (w SourceWork) Binding() collector.SourceBinding {
 	return w.Source.Permit.Binding
 }
 func (w SourceWork) RouteID() string {
+	if w.StopRecording != nil {
+		return w.StopRecording.CaptureID
+	}
 	if w.StopProfile != nil {
 		return w.StopProfile.CaptureID
 	}

@@ -91,9 +91,6 @@ func argumentCgroupID(f *os.File) (uint64, error) {
 	}
 	return binary.LittleEndian.Uint64(h.Bytes()), nil
 }
-func argumentMembers(ctx context.Context, proc, cgroups, pod string) (map[argumentMembership]argumentPins, error) {
-	return scanArgumentMembers(ctx, proc, cgroups, pod, argumentCgroupID)
-}
 func scanArgumentMembers(ctx context.Context, proc, cgroups, pod string, cgroupID func(*os.File) (uint64, error)) (out map[argumentMembership]argumentPins, err error) {
 	out = map[argumentMembership]argumentPins{}
 	if ctx.Err() != nil {
@@ -223,7 +220,7 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 		}
 		spec.Maps[name].MaxEntries = uint32(r.MaxTrackedThreads)
 	}
-	members, err := argumentMembers(ctx, "/proc", "/sys/fs/cgroup", r.PodUID)
+	members, err := argumentMembers(ctx, r.PodUID)
 	if err != nil || len(members) == 0 {
 		return stats, ErrTargetNotFound
 	}
@@ -379,7 +376,7 @@ func traceArguments(parent context.Context, r ArgumentRequest, deliver func([]by
 				break
 			}
 			var next map[argumentMembership]argumentPins
-			next, err = argumentMembers(ctx, "/proc", "/sys/fs/cgroup", r.PodUID)
+			next, err = argumentMembers(ctx, r.PodUID)
 			if err == nil {
 				err = reconcile(next)
 			}
