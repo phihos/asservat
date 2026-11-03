@@ -216,7 +216,7 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		review.Actions = append(review.Actions, x)
 	}
 	if l := approval.ObservationLimits; l != nil {
-		review.ObservationLimits = &authapp.GrantObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
+		review.ObservationLimits = &authapp.GrantObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions, MaxObservedEvents: l.MaxObservedEvents}
 	}
 	created, _, err := s.Grants.Request(ctx, source, authapp.GrantRequestInput{PreviewID: p.ID, CaptureID: p.CaptureID, Actor: p.Actor, Target: t, Scope: p.CanonicalScope, ExecutionDigest: p.ScopeDigest,
 		DataClass: approval.DataClass, Reasons: approval.Reasons, Review: review, Lifetime: authorization.GrantDefaultLifetime, ResultAccess: access, IdempotencyKey: key})
