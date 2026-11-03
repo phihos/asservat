@@ -497,3 +497,69 @@ func testNativeResponseRenewal(t *testing.T, composed, checked bool, mode string
 		t.Fatal("renewal reopened/refilled conversation", ports.registrations, ports.renewals, ports.releases)
 	}
 }
+
+// The coordinator emits fixed 1 MiB chunks and never retries a failed read.
+// Open binds the first chunk's lease; each later chunk can require one durable
+// owner renewal. Exercise those real attachment/source transitions, rather than
+// only checking the arithmetic against a second copy of the same formula.
+func TestProfileNativeOwnerBackingCoversRenewalBeforeEverySubsequentChunk(t *testing.T) {
+	body := make([]byte, artifact.DownloadWindowBytes)
+	var registrations, releases, renewals int64
+	for window := int64(0); window < artifact.ProfileDownloadContentWindows; window++ {
+		f := newActiveEnrollmentFixture(t)
+		ports := &windowNativePorts{exchange: &windowExchange{body: body}}
+		en := *f.lookup.value.Enrollment
+		peer := value.KeyPeer{InstallationID: en.Worker.Binding.InstallationID, PeerID: en.Worker.Binding.PodUID, Role: "acquisition", Certificate: artifact.Digest{31}, NotBefore: f.f.now.Add(-time.Second), NotAfter: en.Worker.Intent.RunUntil}
+		ports.onRegister = func(r NativeExchangeRegistration, check func(context.Context, NativeOrigin) (value.NativeLease, error)) {
+			ports.observation = value.NativeLease{Operation: r.Operation, Certificate: peer.Certificate, Sequence: r.Delivery.Sequence, ObservedAt: f.f.now, Until: r.Delivery.Until}
+			origin := NativeOrigin{Lease: ports.observation, Proof: value.AcquisitionPeerProof{Binding: en.Worker.Binding.Acquisition(), Peer: peer, TokenDigest: artifact.Digest{1}, ObservedAt: f.f.now, FreshUntil: r.Delivery.Until}}
+			keyProof, _ := origin.Proof.DownloadProof()
+			origin.response = &nativeResponseAdmission{proof: NativeResponsePeerProof{Proof: keyProof, TokenNotAfter: en.Worker.Intent.RunUntil}, at: f.f.now}
+			if _, err := check(t.Context(), origin); err != nil {
+				t.Fatal("synthetic initial current check", err)
+			}
+		}
+		f.r.config.Native = NativeAttachmentConfig{HubPodUID: en.Worker.Binding.PodUID, HubProcessEpoch: en.Worker.Intent.ID, KeyScope: value.KeyScope{InstallationID: en.Worker.Binding.InstallationID, Purpose: "artifact", KeyID: "synthetic"}, Owners: ports, Fences: ports, Origins: NativeOrigins{Operations: ports, Now: f.r.config.Now, Recent: NewNativeRecentObservations()}, Registrar: ports, PreparationKeys: ports, WindowKeys: ports}
+
+		attachment, err := f.r.native(en)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request := ContextDownloadRequest{SessionID: f.f.s.ID, Scope: f.f.s.Scope, Expectation: f.source.Expectation, Copies: f.source.Copies}
+		source, err := NewRemoteContextSource(t.Context(), attachment, request, artifact.DownloadPreparation{SessionID: f.f.s.ID, BatchID: "30000000-0000-4000-8000-000000000001", Generation: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		id := f.f.s.ID
+		lease := artifact.DownloadDeliveryLease{ResponseID: id, WindowID: id, OwnerID: id, Generation: 1, Sequence: 1, Length: int64(len(body)), StartedAt: f.f.now, Until: f.f.a.ValidUntil, Authority: f.f.a}
+		for offset := int64(0); offset < int64(len(body)); offset += artifact.DeliveryBytes {
+			if offset > 0 {
+				lease.Sequence++
+			}
+			ports.nextLease = lease
+			chunk, err := source.ReadChunkCurrent(t.Context(), f.f, lease, offset, artifact.DeliveryBytes)
+			if err != nil {
+				source.Close()
+				t.Fatalf("window %d offset %d: %v", window, offset, err)
+			}
+			clear(chunk.Bytes)
+			if err := source.AcknowledgeNativeChunk(t.Context(), lease, offset, artifact.DeliveryBytes); err != nil {
+				source.Close()
+				t.Fatal(err)
+			}
+		}
+		source.Close()
+		registrations += int64(ports.registrations)
+		releases += int64(ports.releases)
+		renewals += int64(ports.renewals)
+	}
+	if registrations != 4 || releases != 4 || renewals != 252 {
+		t.Fatalf("claims=%d closes=%d renewals=%d", registrations, releases, renewals)
+	}
+	// Preparation claim/close, two observations, actual content effects and final
+	// retirement must all fit one immutable owner allowance.
+	needed := int64(2) + 2*artifact.ProfileDownloadResponses + registrations + releases + renewals + 1
+	if artifact.ProfileDownloadNativeTransitions != needed {
+		t.Fatalf("profile owner allowance %d cannot cover %d transitions", artifact.ProfileDownloadNativeTransitions, needed)
+	}
+}

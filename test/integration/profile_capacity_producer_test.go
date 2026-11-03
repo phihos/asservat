@@ -85,7 +85,7 @@ func TestProfileCapacityProducerWithRealPostgres(t *testing.T) {
 		if err = admin.QueryRow(ctx, `SELECT a.byte_limit,a.object_limit,d.output_limit,d.read_limit,c.window_limit,n.keys_limit,n.transitions_per_row FROM custody_allocation a JOIN download_allocation d ON d.id=$2 JOIN download_control_allocation c ON c.id=d.id JOIN download_native_backing n ON n.allocation_id=d.id WHERE a.id=$1`, enrollment.AllocationID, enrollment.DownloadAllocationID).Scan(&evidenceBytes, &evidenceObjects, &output, &read, &windows, &keys, &transitions); err != nil {
 			t.Fatal(err)
 		}
-		if evidenceBytes != expected.Evidence.Bytes || evidenceObjects != expected.Evidence.Objects || output != expected.OutputBytes || read != expected.ReadBytes || windows != expected.Windows || keys != expected.NativeKeys || transitions != 15 {
+		if evidenceBytes != expected.Evidence.Bytes || evidenceObjects != expected.Evidence.Objects || output != expected.OutputBytes || read != expected.ReadBytes || windows != expected.Windows || keys != expected.NativeKeys || transitions != artifact.ProfileDownloadNativeTransitions {
 			t.Fatalf("persisted graph underfunded: %d/%d output%d read%d windows%d keys%d transitions%d expected%+v", evidenceBytes, evidenceObjects, output, read, windows, keys, transitions, expected)
 		}
 		// Reserve an ordinary custody obligation without writing an object. Its

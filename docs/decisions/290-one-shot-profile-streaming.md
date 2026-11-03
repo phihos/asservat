@@ -118,10 +118,12 @@ administrator's existing root envelope; no new operator tuning is added.
 
 Each qualified record funds two native responses and four content windows:
 one full 128 MiB trace and one separately admitted full response. This means
-four key rows, twelve content unwraps, eight window audit objects and fifteen
-owner transitions (preparation claim/close, two observation claim/close pairs,
-four content claim/close pairs, and retirement). Backup and WAL accounting use
-those same row/transition counts. Read funding is 311,164,928 bytes: four
+four key rows, twelve content unwraps, eight window audit objects and 267
+owner transitions: fifteen preparation/observation/content claim and close plus
+retirement transitions, and at most 252 lease renewals. A 64 MiB window has 64
+fixed 1 MiB chunks; its first lease is bound by the original claim and each
+subsequent chunk can consume one renewal. Failed reads terminate without replay.
+Backup and WAL accounting use those same row/transition counts. Read funding is 311,164,928 bytes: four
 73.1875 MiB conservative window bounds plus 4 MiB metadata preparation. Output
 funding is 256 MiB. These are prepaid ceilings, not retries after uncertain work
 or promises to refill spent resources. Typed per-session admission may reserve
@@ -140,3 +142,22 @@ Required evidence includes exact Go/SQL parity for both versions, maximum and
 undersized workload slices, unchanged legacy function restoration on rollback,
 and a refusal to roll back a retained marked graph. These arithmetic and
 migration checks do not qualify installed profile acquisition or native delivery.
+
+The installed qualification fixture uses a 128 KiB native transition WAL bound,
+three WAL copies, a 64 KiB row bound, two backup copies, eight records per workload
+and sixteen workload accounts. Its native reservation is therefore 113.625 MiB
+WAL and 1.25 MiB backup per record: 909 MiB WAL / 10 MiB backup per workload,
+14.203125 GiB WAL / 160 MiB backup for the full root. Relative to the incomplete
+fifteen-transition calculation, renewal funding adds 94.5 MiB per record,
+756 MiB per workload and 11.8125 GiB per root; backup is unchanged. These are
+qualified conservative accounting ceilings, not measured WAL generation. The
+fixture's 1 PiB envelope is synthetic and does not qualify small-install sizing.
+There is no implicit production capacity default: the installer consumes the
+operator's explicit qualification and finite envelope, and refuses an envelope
+that cannot fund the complete graph. The complete installed fixture graph needs
+184,074,240 SQL bytes, 736,296,960 backup bytes and 77,612,187,648 WAL bytes;
+a regression accepts this exact finite envelope and refuses one WAL byte less.
+A smaller record/account count reduces
+this cost linearly. No additional poll, renewal, rate limiter, credential or
+network call is introduced: the change funds existing successful-transfer
+updates rather than failing a slow download after its fifteenth owner update.

@@ -81,9 +81,9 @@ BEGIN
   'WindowObjects',jsonb_build_object('Bytes',n*1048576,'Objects',n*8),
   'ProtocolSystemObjects',jsonb_build_object('Bytes',n*1769472,'Objects',n*15),
   'OutputBytes',n*268435456,'ReadBytes',n*311164928,
-  'Windows',n*4,'NativeKeys',n*4,'NativeTransitionsPerRow',15,'ContentUnwraps',n*12,
+  'Windows',n*4,'NativeKeys',n*4,'NativeTransitionsPerRow',267,'ContentUnwraps',n*12,
   'NativeBackupBytes',n*2*(nq->>'RowBytes')::numeric*(nq->>'BackupCopies')::numeric*5,
-  'NativeWALBytes',n*(nq->>'TransitionWALBytes')::numeric*(nq->>'WALCopies')::numeric*(15+4+8*4));
+  'NativeWALBytes',n*(nq->>'TransitionWALBytes')::numeric*(nq->>'WALCopies')::numeric*(267+4+8*4));
 EXCEPTION WHEN data_exception THEN RETURN NULL;
 END $$;
 -- +goose StatementEnd

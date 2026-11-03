@@ -170,7 +170,7 @@ func TestProfileCapacityFundsCompleteNativeWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Format != ProfileContextBackingFormat || p.Evidence != slice || p.NativeTransitionsPerRow != 15 || p.Windows != p.Sessions*4 || p.NativeKeys != p.Windows || p.ContentUnwraps != p.Windows*3 || p.WindowObjects.Objects != p.Windows*2 || p.WindowObjects.Bytes != p.Windows*2*artifact.DownloadWindowAuditBytes || p.ReadBytes != p.Sessions*artifact.ProfileDownloadReadBytes || p.OutputBytes != p.Sessions*artifact.ProfileDownloadOutputBytes {
+	if p.Format != ProfileContextBackingFormat || p.Evidence != slice || p.NativeTransitionsPerRow != 267 || p.Windows != p.Sessions*4 || p.NativeKeys != p.Windows || p.ContentUnwraps != p.Windows*3 || p.WindowObjects.Objects != p.Windows*2 || p.WindowObjects.Bytes != p.Windows*2*artifact.DownloadWindowAuditBytes || p.ReadBytes != p.Sessions*artifact.ProfileDownloadReadBytes || p.OutputBytes != p.Sessions*artifact.ProfileDownloadOutputBytes {
 		t.Fatalf("incomplete native profile backing: %+v", p)
 	}
 	h.ProfileProtocol = "future/unqualified"

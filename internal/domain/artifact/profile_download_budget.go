@@ -12,7 +12,11 @@ const (
 	ProfileDownloadMetadataReadWork int64 = 4 << 20
 	ProfileDownloadReadBytes              = ProfileDownloadContentWindows*ProfileDownloadWindowReadWork + ProfileDownloadMetadataReadWork
 	ProfileDownloadOutputBytes            = ProfileDownloadResponses * MaxGoTraceBytes
+	// The first chunk's lease is bound by claim. Each subsequent fixed-size
+	// chunk can require one owner renewal; failed reads terminate, without
+	// replay. This includes all renewals even under adversarial backpressure.
+	ProfileDownloadRenewalsPerWindow = (DownloadWindowBytes - 1) / DeliveryBytes
 	// Claim/close pairs for preparation, one observation per response and
-	// each content window, followed by one retained-owner retirement.
-	ProfileDownloadNativeTransitions = 2 + 2*ProfileDownloadResponses + 2*ProfileDownloadContentWindows + 1
+	// each content window, all possible renewals, then owner retirement.
+	ProfileDownloadNativeTransitions = 2 + 2*ProfileDownloadResponses + (2+ProfileDownloadRenewalsPerWindow)*ProfileDownloadContentWindows + 1
 )
