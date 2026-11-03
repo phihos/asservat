@@ -95,6 +95,13 @@ fixed (red reproduced; focused race3.595s passed). The same already-required
 pinned builder is prefetched for this suite, overlapping its observed20s serial
 pull without adding an image or changing20m/18m limits. Original reports remain
 in `test/results/profile-comparison-native-41737480379/`.
+CI41740242503 caught one stale parser-test assertion after the reviewed output-size
+refusal change: oversized valid output now returns `ErrRecordTooLarge`, while
+unsafe arithmetic retains `artifact.ErrLimit`. The old assertion failed locally;
+its corrected exclusive error check and the full diagnostics race package pass
+(14.419s). This changes only a test assertion; the frozen native candidate
+`ddddfd90` and production sources remain unchanged. Original red/green and CI
+logs are retained in `test/results/profile-comparison-service/`.
 No comparison requirement or installed result is marked complete. The argument job's cold-start/teardown
 headroom also needs improvement before later installed campaigns. No timeout was
 raised. These saved-view fixtures do not complete arbitrary `syscall_query`,

@@ -268,7 +268,7 @@ func TestPprofComparisonRefusesUnsafeDeltasAndOversizedResults(t *testing.T) {
 	b = comparisonFixture(names, values, 10)
 	i = comparisonFixture(names, values, 10)
 	out, err = runComparison(t, b, i, comparisonSelection(t, analysis.ProfileComparisonRaw, 100))
-	if !errors.Is(err, artifact.ErrLimit) || !reflect.DeepEqual(out, analysis.ProfileComparison{}) {
+	if !errors.Is(err, analysis.ErrRecordTooLarge) || errors.Is(err, artifact.ErrLimit) || !reflect.DeepEqual(out, analysis.ProfileComparison{}) {
 		t.Fatal("oversized selected comparison was trimmed or emitted", err)
 	}
 }
