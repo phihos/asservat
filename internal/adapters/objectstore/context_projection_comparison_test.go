@@ -7,9 +7,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -22,13 +24,14 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"github.com/google/pprof/profile"
 )
 
 func TestProjectionComparisonReaderAuthenticatesBeforeTypedMismatch(t *testing.T) {
-	for _, mode := range []string{"complete", "mismatch", "early-mismatch", "bad-hash-mismatch", "uninstalled"} {
+	for _, mode := range []string{"complete", "mismatch", "early-mismatch", "bad-hash-mismatch", "oversize", "early-oversize", "bad-hash-oversize", "input-limit", "uninstalled"} {
 		t.Run(mode, func(t *testing.T) {
 			dir := t.TempDir()
-			f := prepareProfileEncryptedFixture(t, dir, bytes.NewReader(comparisonEncryptedNative(t, 7)), mode == "bad-hash-mismatch")
+			f := prepareProfileEncryptedFixture(t, dir, bytes.NewReader(comparisonEncryptedNative(t, 7)), mode == "bad-hash-mismatch" || mode == "bad-hash-oversize")
 			verifier, _, _, unblock := profileEncryptedVerifier(t, dir, f, false)
 			defer unblock()
 			scope := f.Scope
@@ -39,11 +42,17 @@ func TestProjectionComparisonReaderAuthenticatesBeforeTypedMismatch(t *testing.T
 			if mode != "uninstalled" {
 				reader.ServeProfileComparisons(diagnostics.ComparePprof)
 			}
-			if mode == "mismatch" || mode == "early-mismatch" || mode == "bad-hash-mismatch" {
+			if mode != "complete" && mode != "uninstalled" {
 				reader.ServeProfileComparisons(func(ctx context.Context, b io.Reader, _ query.ProfileComparisonAcquisition, i io.Reader, _ query.ProfileComparisonAcquisition, _ query.ProfileComparisonSelection) (query.ProfileComparison, error) {
-					if mode != "early-mismatch" {
+					if mode != "early-mismatch" && mode != "early-oversize" {
 						_, _ = io.Copy(io.Discard, b)
 						_, _ = io.Copy(io.Discard, i)
+					}
+					if mode == "oversize" || mode == "early-oversize" || mode == "bad-hash-oversize" {
+						return query.ProfileComparison{}, query.ErrRecordTooLarge
+					}
+					if mode == "input-limit" {
+						return query.ProfileComparison{}, artifact.ErrLimit
 					}
 					return query.ProfileComparison{}, query.ErrProfileIncompatible
 				})
@@ -62,8 +71,12 @@ func TestProjectionComparisonReaderAuthenticatesBeforeTypedMismatch(t *testing.T
 				if err != nil || !result.Valid(scope) || !result.IncompatibleProfiles {
 					t.Fatal("authenticated mismatch not retained", result, err)
 				}
+			case "oversize":
+				if err != nil || !result.Valid(scope) || !result.TooLarge || result.IncompatibleProfiles || result.Comparison != nil {
+					t.Fatal("authenticated size refusal not retained", result, err)
+				}
 			default:
-				if err == nil || result.Valid(scope) || result.IncompatibleProfiles || result.Comparison != nil {
+				if err == nil || result.Valid(scope) || result.IncompatibleProfiles || result.TooLarge || result.Comparison != nil {
 					t.Fatal("incomplete input disclosed semantic mismatch", result, err)
 				}
 			}
@@ -75,6 +88,44 @@ func TestProjectionComparisonReaderAuthenticatesBeforeTypedMismatch(t *testing.T
 				t.Fatal("independent three-role opens", keys[0].calls, keys[1].calls)
 			}
 		})
+	}
+}
+
+func TestComparisonRawOutputLimitBecomesAuthenticatedRefusal(t *testing.T) {
+	p, err := profile.ParseData(comparisonEncryptedNative(t, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Function, p.Location, p.Sample = nil, nil, nil
+	for n := range 100 {
+		function := &profile.Function{ID: uint64(n + 1), Name: fmt.Sprintf("%03d.%s", n, strings.Repeat("<", 508))}
+		location := &profile.Location{ID: uint64(n + 1), Line: []profile.Line{{Function: function}}}
+		p.Function = append(p.Function, function)
+		p.Location = append(p.Location, location)
+		p.Sample = append(p.Sample, &profile.Sample{Location: []*profile.Location{location}, Value: []int64{1}})
+	}
+	var native bytes.Buffer
+	if err := p.Write(&native); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	f := prepareProfileEncryptedFixture(t, dir, bytes.NewReader(native.Bytes()), false)
+	f.Scope.Profile.TopN = 100
+	scope := f.Scope
+	scope.DisplayVersion = query.ProfileComparisonDisplayVersion
+	s := f.Scope
+	scope.Comparison = query.ProfileComparisonWindow{Normalization: query.ProfileComparisonRaw, Baseline: query.ProfileComparisonBaseline{CaseID: s.CaseID, ArtifactID: s.ArtifactID, CaptureID: s.CaptureID, ClusterID: s.ClusterID, NamespaceUID: s.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.PodUID, Version: s.Version}}
+	verifier, _, _, unblock := profileEncryptedVerifier(t, dir, f, false)
+	defer unblock()
+	reader, _ := NewContextProjectionReader(verifier.store)
+	reader.ServeProfileComparisons(diagnostics.ComparePprof)
+	keys := [2]*projectionTestOpener{{}, {}}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	until, _ := ctx.Deadline()
+	result, err := reader.ReadProjectionComparisonNative(ctx, [2]evidence.NativeContextSource{f.Source, f.Source}, scope, [2]evidence.KeyOpener{keys[0], keys[1]}, until)
+	if err != nil || !result.Valid(scope) || !result.TooLarge || result.IncompatibleProfiles || result.Comparison != nil || keys[0].calls != 3 || keys[1].calls != 3 {
+		t.Fatal("real parser output lost authenticated refusal", result, err, keys[0].calls, keys[1].calls)
 	}
 }
 
