@@ -17,7 +17,6 @@ import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/adapters/pcap"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
@@ -401,7 +400,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		ReportPreviewFailure: eventLog(os.Stderr, "public preview refused"),
 		Targets:              queries, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Recovery: out.recovery, Reviews: out.reviews,
 		// ADR-243: libpcap only in a hub build with the libpcap tag; otherwise a stub.
-		Filters: pcap.NewCompiler(),
+		Filters: newPublicRecorderCompiler(),
 		// ADR-283 PR 2: the target's region resolves Kubernetes peers.
 		Peers: queries,
 		// ADR-285: the target's region resolves Go profile endpoints.
