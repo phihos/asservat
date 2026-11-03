@@ -1080,3 +1080,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-285: profile preview plans](285-profile-preview-plans.md): Go endpoint and eBPF CPU profile actions compile into manual preview with raw class and live-profile approval; bounded administrator endpoint configuration resolves in the target region without probing; acquisition and policy execution remain unavailable.
 
 - [ADR-286: Bounded Go analyzer isolation](286-bounded-go-analyzer-isolation.md): maintainer-delegated M1 decision permits qualified data-only Go analyzers in the regional worker with bounded inputs, output and process resources, original authority and joined cancellation; native tools retain ADR-036. No analyzer is qualified by this contract amendment.
+
+- [ADR-289: bounded capture-preview composition](289-preview-composition-window.md): fifteen-second outer request, unchanged original observation and five-second stage bounds; installed qualification pending.
