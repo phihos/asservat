@@ -240,4 +240,4 @@ profile-preflight:
 # Owned SQL/S3 service composition, after local preflight and source freeze.
 .PHONY: profile-service-preflight
 profile-service-preflight:
-	$(PYTHON) scripts/test-custody.py --run '^(TestCustodyProfileWriteOnlyWithRealServices|TestProfileSummaryQueryLedgerWithRealPostgres)$$' --result-name profile-service-preflight
+	$(PYTHON) scripts/test-custody.py --fleet --run '^(TestCustodyProfileWriteOnlyWithRealServices|TestProfileSummaryQueryLedgerWithRealPostgres)$$' --result-name profile-service-preflight
