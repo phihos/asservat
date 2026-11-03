@@ -232,7 +232,9 @@ func (n *nodePackets) runArguments(parent context.Context, epoch, workID string,
 		footer.ObservedEvents = &events
 		footer.ObservedBytes = &credit
 	}
-	completed := !joinedAt.Before(until) && parent.Err() == nil && (err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled))
+	// A setup timeout can occur before attachment. Only the final budget
+	// read after detach establishes an observed window, including an empty one.
+	completed := stats.AccountingKnown && !joinedAt.Before(until) && parent.Err() == nil && (err == nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled))
 	switch {
 	case outputFull > 0:
 		footer.Outcome = "outputLimit"

@@ -21,6 +21,12 @@ outcome. Failure logs now report a fixed stage only, without underlying errors,
 target identity or observed bytes, so later boundary failures are diagnosable.
 Focused constructor/node races passed (1.022s / 2.336s), tagged Gadget argument
 checks passed (1.526s), and full `make argument-preflight pre-push` exited0.
+A further composed regression reproduced a setup timeout being reported as an
+empty completed capture before any attachment. Normal completion now also
+requires the engine's existing final-accounting fact; a known empty observation
+still succeeds. Node argument race tests passed (4.196s), including unchanged
+Stop, delayed cleanup and partial-output behavior. No new lifecycle state or
+deadline is introduced. CI41646362415 was cancelled for this superseding fix.
 
 Manual compositions containing syscall arguments are explicitly refused during
 preview, before review persistence or recordable output. At this head, a packet

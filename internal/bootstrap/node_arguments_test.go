@@ -227,3 +227,55 @@ func TestNodeArgumentObservationEndsBeforeDelayedJoin(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestNodeArgumentQuietCompletionRequiresFinalAccounting(t *testing.T) {
+	for _, known := range []bool{false, true} {
+		name := "setup-timeout"
+		if known {
+			name = "observed-empty-window"
+		}
+		t.Run(name, func(t *testing.T) {
+			n, w, results, bodies := nodeArgumentFixture(t)
+			n.argumentTrace = func(ctx context.Context, r gadget.ArgumentRequest, _ func([]byte), _ func(gadget.InputNotice)) (gadget.ArgumentStats, error) {
+				if !r.StartBy.Equal(w.NotAfter) || !r.Deadline.Before(r.StartBy) {
+					t.Error("original independent deadlines changed")
+				}
+				// Setup can exhaust the observation window before attachment. A real
+				// empty observation differs by its final detached-budget accounting.
+				<-ctx.Done()
+				return gadget.ArgumentStats{AccountingKnown: known, CoverageUnknown: true}, ctx.Err()
+			}
+			if receipt := n.startSyscall(t.Context(), n.identity().Epoch, w); receipt.Outcome != collector.OutcomeAccepted {
+				t.Fatal(receipt)
+			}
+			n.wg.Wait()
+			result, native := <-results, <-bodies
+			lines := strings.Split(strings.TrimSpace(string(native)), "\n")
+			if len(lines) != 2 {
+				t.Fatalf("quiet capture fabricated events: %s", native)
+			}
+			var footer syscalls.ArgumentFooter
+			if err := json.Unmarshal([]byte(lines[1]), &footer); err != nil {
+				t.Fatal(err)
+			}
+			if !result.Valid() || result.Retained != 0 || !footer.CoverageUnknown {
+				t.Fatal("invalid quiet result", result, footer)
+			}
+			if known {
+				if result.Failure != "" || footer.Outcome != "completed" || footer.ObservedEvents == nil || *footer.ObservedEvents != 0 || footer.ObservedBytes == nil || *footer.ObservedBytes != 0 {
+					t.Fatal("known empty observation refused", result, footer)
+				}
+			} else {
+				if result.Failure != collector.ReasonCaptureFailed || footer.Outcome != "failed" || footer.ObservedEvents != nil || footer.ObservedBytes != nil {
+					t.Fatal("setup timeout reported a completed observation", result, footer)
+				}
+			}
+			n.budgetMu.Lock()
+			active, _, _ := n.budget().SourceUsage()
+			n.budgetMu.Unlock()
+			if active != 0 {
+				t.Fatal("source retained after joined outcome")
+			}
+		})
+	}
+}
