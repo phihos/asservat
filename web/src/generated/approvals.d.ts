@@ -11,6 +11,8 @@ export interface components {
                 max_executions: number;
                 max_collected_bytes: number;
                 max_observed_bytes: number;
+                /** @description Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation. */
+                max_observed_events?: number;
             };
             observation_limits?: {
                 max_session_seconds: number;
@@ -222,8 +224,54 @@ export interface components {
                     max_observed_bytes: number;
                     collected_bytes_used: number;
                     observed_bytes_used: number;
+                    /** @description Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation. */
+                    max_observed_events?: number;
+                    /** @description Conservative charged event units, including uncertain observations. */
+                    observed_events_used?: number;
                 };
             } & (unknown & unknown & unknown);
+        } | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                retry_after_seconds: number;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
+        McpInput_request_raw_access: {
+            /** Format: uuid */
+            case_id: string;
+            artifact_digests: string[];
+            operations: ("read_memory" | "backtrace" | "threads" | "registers" | "frame_variables" | "managed_stack" | "heap_statistics" | "pcap_query" | "syscall_query" | "download_artifact")[];
+            reason: string;
+            max_bytes: number;
+            expires_in_seconds: number;
+            idempotency_key: string;
+        } & unknown;
+        McpOutput_request_raw_access: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: {
+                /** Format: uuid */
+                grant_id: string;
+                /** @enum {string} */
+                phase: "Pending" | "Approved" | "Denied" | "Expired" | "Revoked";
+                /** Format: uri */
+                approval_uri?: string;
+            };
         } | {
             /** @constant */
             status: "pending";
@@ -252,7 +300,7 @@ export interface components {
         McpOutput_get_grant: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */
             status: "ok";
-            data: {
+            data: ({
                 /** Format: uuid */
                 grant_id: string;
                 /** @enum {unknown} */
@@ -428,8 +476,110 @@ export interface components {
                     max_observed_bytes: number;
                     collected_bytes_used: number;
                     observed_bytes_used: number;
+                    /** @description Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation. */
+                    max_observed_events?: number;
+                    /** @description Conservative charged event units, including uncertain observations. */
+                    observed_events_used?: number;
                 };
-            } & (unknown & unknown & unknown);
+            } & (unknown & unknown & unknown)) | {
+                /** Format: uuid */
+                grant_id: string;
+                /** @enum {unknown} */
+                phase: "Pending" | "Approved" | "Denied" | "Revoked" | "Expired" | "Exhausted";
+                revision: number;
+                /** @constant */
+                kind: "rawQuery";
+                execution_digest: string;
+                review_digest: string;
+                /** @constant */
+                data_class: "raw";
+                reasons: unknown[];
+                requested_by: {
+                    issuer: string;
+                    subject: string;
+                    client_id: string;
+                };
+                /** Format: date-time */
+                requested_at: string;
+                /** Format: date-time */
+                review_until: string;
+                lifetime_seconds: number;
+                decision?: {
+                    /** @enum {unknown} */
+                    decision: "approved" | "denied";
+                    decided_by: {
+                        issuer: string;
+                        subject: string;
+                        client_id: string;
+                    };
+                    /** Format: date-time */
+                    decided_at: string;
+                    reason: string;
+                    authentication_context?: {
+                        acr: string;
+                        /** Format: date-time */
+                        authenticated_at: string;
+                    };
+                };
+                /** Format: date-time */
+                not_after?: string;
+                /** Format: date-time */
+                revoked_at?: string;
+                revoked_by?: {
+                    issuer: string;
+                    subject: string;
+                    client_id: string;
+                };
+                can_decide: boolean;
+                can_revoke: boolean;
+                /** Format: uri */
+                approval_navigation_uri: string;
+                /** @constant */
+                can_resume?: false;
+                /** @constant */
+                can_resolve?: false;
+                /** @constant */
+                resume_requires_original_client?: false;
+                raw_access: {
+                    /** Format: uuid */
+                    case_id: string;
+                    reason: string;
+                    operations: "download_artifact"[];
+                    max_bytes: number;
+                    /** @constant */
+                    max_operations: 10000;
+                    /** Format: date-time */
+                    not_after: string;
+                    artifact_count: number;
+                    bytes_used: number;
+                    operations_used: number;
+                    artifacts: {
+                        /** Format: uuid */
+                        artifact_id: string;
+                        /** Format: uuid */
+                        capture_id: string;
+                        action_id: string;
+                        digest: string;
+                        execution_digest: string;
+                        native_type: string;
+                        native_bytes: number;
+                        /** Format: date-time */
+                        expires_at: string;
+                        target: {
+                            /** Format: uuid */
+                            cluster_id: string;
+                            namespace_uid: string;
+                            workload_uid: string;
+                            pod_uid: string;
+                            namespace?: string;
+                            /** @enum {unknown} */
+                            workload_kind?: "Deployment" | "StatefulSet";
+                            workload_name?: string;
+                            pod_name?: string;
+                        };
+                    }[];
+                };
+            };
         } | {
             /** @constant */
             status: "pending";
@@ -460,7 +610,7 @@ export interface components {
             /** @constant */
             status: "ok";
             data: {
-                approvals: ({
+                approvals: (({
                     /** Format: uuid */
                     grant_id: string;
                     /** @enum {unknown} */
@@ -571,8 +721,79 @@ export interface components {
                         max_observed_bytes: number;
                         collected_bytes_used: number;
                         observed_bytes_used: number;
+                        /** @description Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation. */
+                        max_observed_events?: number;
+                        /** @description Conservative charged event units, including uncertain observations. */
+                        observed_events_used?: number;
                     };
-                } & (unknown & unknown & unknown))[];
+                } & (unknown & unknown & unknown)) | {
+                    /** Format: uuid */
+                    grant_id: string;
+                    /** @enum {unknown} */
+                    phase: "Pending" | "Approved" | "Denied" | "Revoked" | "Expired" | "Exhausted";
+                    revision: number;
+                    /** @constant */
+                    kind: "rawQuery";
+                    execution_digest: string;
+                    review_digest: string;
+                    /** @constant */
+                    data_class: "raw";
+                    reasons: unknown[];
+                    requested_by: {
+                        issuer: string;
+                        subject: string;
+                        client_id: string;
+                    };
+                    /** Format: date-time */
+                    requested_at: string;
+                    /** Format: date-time */
+                    review_until: string;
+                    lifetime_seconds: number;
+                    decision?: {
+                        /** @enum {unknown} */
+                        decision: "approved" | "denied";
+                        decided_by: {
+                            issuer: string;
+                            subject: string;
+                            client_id: string;
+                        };
+                        /** Format: date-time */
+                        decided_at: string;
+                        reason: string;
+                        authentication_context?: {
+                            acr: string;
+                            /** Format: date-time */
+                            authenticated_at: string;
+                        };
+                    };
+                    /** Format: date-time */
+                    not_after?: string;
+                    /** Format: date-time */
+                    revoked_at?: string;
+                    revoked_by?: {
+                        issuer: string;
+                        subject: string;
+                        client_id: string;
+                    };
+                    can_decide: boolean;
+                    can_revoke: boolean;
+                    /** Format: uri */
+                    approval_navigation_uri: string;
+                    raw_access: {
+                        /** Format: uuid */
+                        case_id: string;
+                        reason: string;
+                        operations: "download_artifact"[];
+                        max_bytes: number;
+                        /** @constant */
+                        max_operations: 10000;
+                        /** Format: date-time */
+                        not_after: string;
+                        artifact_count: number;
+                        bytes_used: number;
+                        operations_used: number;
+                    };
+                })[];
             };
         } | {
             /** @constant */

@@ -6,6 +6,7 @@ import type { Artifact, Download } from './http';
 import { ProfileSummaryView } from '../projection/ProfileSummaryView';
 import { ContextProjectionView } from '../projection/ContextProjectionView';
 import { ContextProjection } from '../projection/projection';
+import { RawAccessPanel } from './RawAccessPanel';
 import { SharePanel } from '../sharing/SharePanel';
 
 export const evidenceController = new Evidence();
@@ -69,11 +70,12 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
         </>}
         {pending && state.preparingArtifact !== artifact.artifact_id && <p className="field-help">Finish the current download request before preparing another file.</p>}
       </section>)}
+      {state.details.case.access !== 'shared' && <RawAccessPanel key={caseID + session.principal.issuer + session.principal.subject_id} session={session} scope={scope} caseID={caseID} artifacts={state.details.artifacts} prefilledArtifactID={state.rawApprovalArtifact}/>}
       <p className="notice">Downloaded copies are outside Asservat's automatic deletion. Follow your organization's handling and deletion policy.</p>
     </>}
       {pending && <section className="review-section" aria-label="Native download" aria-busy={state.busy}>
         {state.uncertain && <>
-          <h2>Confirming the download request</h2><p>The request may have been accepted. Keep this tab open; retry uses the same request and reservation.</p>
+          <h2>{state.rawApprovalArtifact ? 'Download approval needed' : 'Confirming the download request'}</h2><p>{state.rawApprovalArtifact ? 'Review the selected existing artifact above. Keep this tab open; after approval, retry this same download request.' : 'The request may have been accepted. Keep this tab open; retry uses the same request and reservation.'}</p>
           <Button className="button" isDisabled={state.busy} onPress={() => void controller.retryPreparation()}>Retry same download request</Button>
         </>}
         {state.cancellation && <>

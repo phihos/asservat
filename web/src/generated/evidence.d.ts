@@ -82,6 +82,19 @@ export interface components {
                     handling_notice: components["schemas"]["Contract_capture_assessment_896e91b8fce79799"];
                     /** @description Verified native format, when supplied; used to choose a compatible saved-evidence view. It grants no download or analysis authority. */
                     native_format?: string;
+                    verified_native_bytes?: number;
+                    target?: {
+                        /** Format: uuid */
+                        cluster_id: string;
+                        namespace_uid: string;
+                        workload_uid: string;
+                        pod_uid: string;
+                        namespace?: string;
+                        /** @enum {unknown} */
+                        workload_kind?: "Deployment" | "StatefulSet";
+                        workload_name?: string;
+                        pod_name?: string;
+                    };
                 }[];
                 timeline: {
                     /** Format: date-time */
@@ -168,6 +181,7 @@ export interface components {
             /** @constant */
             status: "error";
             data: {
+                /** @description RawApprovalRequired is returned only for a fresh preparation whose ordinary access checks passed but no current whole-file grant covers it. Other failures must not open approval. */
                 code: string;
                 message: string;
                 retryable: boolean;

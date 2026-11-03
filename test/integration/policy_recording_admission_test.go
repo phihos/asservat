@@ -71,7 +71,7 @@ type policySourceAcceptedFixture struct {
 // debit. Protected source/target/identity, initial trust and independent review
 // remain explicit synthetic component facts. No collector or public enablement.
 func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario, protected ...policyRecorderProtectedCase) {
-	modes := []string{"packet-policy", "snapshot-policy-refuses-recorder", "packet-policy-observation-sql", "packet-policy-companion-sql", "argument-observation-sql"}
+	modes := []string{"packet-policy", "snapshot-policy-refuses-recorder", "packet-policy-observation-sql", "packet-policy-companion-sql", "argument-observation-sql", "argument-observation-companion"}
 	if len(protected) > 0 {
 		modes = []string{"packet-policy-companion-sql"}
 	}
@@ -87,7 +87,8 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			observationSQL := mode == "packet-policy-observation-sql"
 			companionSQL := mode == "packet-policy-companion-sql"
 			argumentSQL := mode == "argument-observation-sql"
-			observed := observationSQL || companionSQL || argumentSQL
+			argumentCompanion := mode == "argument-observation-companion"
+			observed := observationSQL || companionSQL || argumentSQL || argumentCompanion
 			compilePolicy := publicPolicyCompile
 			var filters planning.FilterCompiler = publicPolicyFilters{}
 			if companionSQL {
@@ -118,9 +119,12 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			b.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{authorization.PolicyContextAction, "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: collectedBytes}
 			if observed {
 				b.Automation.MaxObservedBytes = 1 << 30
-				if argumentSQL {
+				if argumentSQL || argumentCompanion {
 					b.Automation.MaxObservedEvents = 20
 				}
+			}
+			if argumentCompanion {
+				b.Automation.AllowedActions = append(b.Automation.AllowedActions, "syscallTrace")
 			}
 			b.Resource.Generation++
 			b.Resource.SpecDigest[0]++
@@ -194,7 +198,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if len(protected) > 0 {
 				admissions = protected[0].Admissions
 			} else {
-				admitRole := narrowRole(t, ctx, admin, "policy_recorder_admit_"+strings.Split(mode, "-")[0]+"_", "synthetic-policy-recorder-admit", func(role string) []string {
+				admitRole := narrowRole(t, ctx, admin, "policy_admit_"+strings.ReplaceAll(mode, "-", "_")+"_", "synthetic-policy-recorder-admit", func(role string) []string {
 					sql, ok := postgres.PublicRuntimeRoleGrantSQL("capture-admit", role)
 					if !ok {
 						t.Fatal("capture-admit purpose")
@@ -213,12 +217,15 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			authority := authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: custodyID(), Creator: creator, ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{sponsor}, Actions: []string{"packetCapture"}, Limits: authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: collectedBytes}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
 			if observed {
 				authority.Limits.MaxObservedBytes = 1 << 30
-				if argumentSQL {
+				if argumentSQL || argumentCompanion {
 					authority.Limits.MaxObservedEvents = 20
 				}
 			}
 			if len(protected) > 0 && protected[0].PolicyExecutions > 0 {
 				authority.Limits.MaxExecutions = protected[0].PolicyExecutions
+			}
+			if argumentCompanion {
+				authority.Actions = []string{"syscallTrace"}
 			}
 			authority.Executor = authorization.PolicyPrincipal(installation, authority.PolicyUID)
 			spec := publicPolicySpec(t, authority)
@@ -276,11 +283,16 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if len(protected) > 0 {
 				policyRecorderFinalizeTimeout(authored, protected[0].PolicyFinalizeTimeout)
 			}
+			if argumentCompanion {
+				authored["profileComposition"] = argumentPolicyCompositionWire()
+				compilePolicy = argumentPolicyCompiler(t, authority.ClusterID, authority.NamespaceUID)
+				filters = installedArgumentsCompiler{}
+			}
 			spec, err = json.Marshal(authored)
 			if err != nil {
 				t.Fatal(err)
 			}
-			compiled, err := captureapp.CompilePolicyWithRecorders(spec, planning.ContextRecipeName, planning.RecipeDigest(), compilePolicy)
+			compiled, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, spec, planning.ContextRecipeName, planning.RecipeDigest(), compilePolicy)
 			if err != nil || compiled.Recorder == nil {
 				t.Fatal("policy recorder compiler", err)
 			}
@@ -396,7 +408,11 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			// blocking read. Validate after it returns; retain every original
 			// identity, plan, storage, grant and policy deadline above.
 			now = clock()
-			in.Retention, err = privacy.Resolve(retained, privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "packetCapture", AnchorAt: a.Registration.AnchorAt}, now)
+			evidenceType := "packetCapture"
+			if argumentCompanion {
+				evidenceType = "syscallTrace"
+			}
+			in.Retention, err = privacy.Resolve(retained, privacy.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: evidenceType, AnchorAt: a.Registration.AnchorAt}, now)
 			if err != nil {
 				t.Fatal("recording retention after current source read", err)
 			}
@@ -407,7 +423,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if err != nil {
 				t.Fatal(err)
 			}
-			a, preview := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, !companionSQL, clock())
+			a, preview := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, !companionSQL && !argumentCompanion, clock())
 			requirePolicyRecorderAdmissionFixture(t, a, preview, clock())
 			previews, err := postgres.NewContextPreviews(ctx, hub, root)
 			if err != nil {
@@ -459,6 +475,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				t.Fatal("action mismatch/replay changed prospective pools", execs, bytes, grantExec, grantBytes, reservations)
 			}
 			t.Logf("actual Tick accepted executions=%d; native output=%d grant executions=%d output=%d reservations=%d", execs, bytes, grantExec, grantBytes, reservations)
+			if argumentCompanion {
+				qualifyArgumentObservationCompanion(t, ctx, admin, hub, poolFor, store, keys, s, admissions, current, authority, a, output, record.Record.ID, grant)
+			}
 			if argumentSQL {
 				qualifyArgumentObservationSQL(t, ctx, admin, hub, root, record.Record.ID, grant, output)
 				initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, output.Expectation)
@@ -492,7 +511,7 @@ func buildPolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, comp
 		t.Fatal(err)
 	}
 	a.Registration.WriteUntil, a.Registration.ExpiresAt, a.Registration.DeleteBy = in.Deadline, in.Retention.ExpiresAt, in.Retention.DeleteBy
-	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: a.RootID, InstallationID: a.Recovery.InstallationID, IssuerEpoch: a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, ArtifactID: a.Registration.Location.ArtifactID, AttemptID: a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: in.Target.ExecutionClass,
+	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesFor(reviewed.Actions), RootID: a.RootID, InstallationID: a.Recovery.InstallationID, IssuerEpoch: a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, ArtifactID: a.Registration.Location.ArtifactID, AttemptID: a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: in.Target.ExecutionClass,
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: "Pod", Name: in.Target.Request.PodName}, Composition: composition.Clone(), RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage:   capture.ContextStorageSelection{StoreID: a.Registration.StoreID, AllocationID: a.Registration.AllocationID, PoolRevision: a.Registration.PoolRevision, AllocationRevision: a.Registration.AllocationRevision, BindingRevision: a.Storage.Revision},
 		Retention: capture.ContextRetentionReview{PurposeRef: in.Retention.PurposeRef, RequestedSeconds: in.Retention.RequestedSeconds, MaximumSeconds: in.Retention.MaximumSeconds, DeletionBudgetSeconds: in.Retention.DeletionBudgetSeconds, Policies: in.Retention.Policies}, Audience: append([]artifact.AudienceAssignment(nil), a.Eligibility.DefaultAudience...), CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: in.Deadline}
@@ -560,7 +579,7 @@ func TestPolicyRecorderAdmissionFixtureOfflineBindings(t *testing.T) {
 				compilePolicy = policyRawCompile
 				filters = policyRawFilters{}
 			}
-			compiled, err := captureapp.CompilePolicyWithRecorders(spec, planning.ContextRecipeName, planning.RecipeDigest(), compilePolicy)
+			compiled, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, spec, planning.ContextRecipeName, planning.RecipeDigest(), compilePolicy)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -680,7 +699,7 @@ func TestManualSaveFixtureReviewedOptInAndSharingCompile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	compiled, err := captureapp.CompilePolicyWithRecorders(raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
+	compiled, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
 	if err != nil || !compiled.RecordingSaves || compiled.Recorder == nil || compiled.Recorder.Action.ExecutionMode != "ongoing" || compiled.Sharing == nil || compiled.Sharing.MaxCaptures != sharing.MaxCaptures || len(compiled.Sharing.Recipients) != 1 {
 		t.Fatal("reviewed manual opt-in and recurring sharing not supported by actual compiler", err)
 	}
@@ -689,7 +708,7 @@ func TestManualSaveFixtureReviewedOptInAndSharingCompile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	old, err := captureapp.CompilePolicyWithRecorders(raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
+	old, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
 	if err != nil || old.RecordingSaves {
 		t.Fatal("legacy policy silently gained manual save capability", err)
 	}
@@ -759,7 +778,7 @@ func TestManualSaveProspectiveThirtySecondProfileCompiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	compiled, err := captureapp.CompilePolicyWithRecorders(raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
+	compiled, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(publicPolicyFilters{}))
 	if err != nil || compiled.Recorder == nil || compiled.Recorder.Action.Timeout != "30s" || compiled.Recorder.Composition.MaxDuration != "30s" {
 		t.Fatal("prospective authored policy profile refused", err)
 	}

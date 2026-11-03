@@ -2,6 +2,7 @@ package capture
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -22,12 +23,14 @@ import (
 )
 
 // PolicyRecorderCompiler converts/compiles a source composition at the
-// composition root. Shared DTO decoding stays outside application/domain layers.
-type PolicyRecorderCompiler func(json.RawMessage) ([]planvalue.PolicyRecorderConfiguration, error)
+// composition root. catalogTarget is the operation's observed/accepted workload
+// scope, with no selected Pod. Shared DTO decoding stays outside these layers.
+type PolicyRecorderCompiler func(context.Context, targets.Request, json.RawMessage) ([]planvalue.PolicyRecorderConfiguration, error)
 
-// SingleRecorder adapts a one-recorder compiler.
+// SingleRecorder adapts an inert one-recorder compiler with no catalog I/O.
+// Runtime catalog compilation uses the explicit context and workload scope.
 func SingleRecorder(f func(json.RawMessage) (planvalue.PolicyRecorderConfiguration, error)) PolicyRecorderCompiler {
-	return func(raw json.RawMessage) ([]planvalue.PolicyRecorderConfiguration, error) {
+	return func(_ context.Context, _ targets.Request, raw json.RawMessage) ([]planvalue.PolicyRecorderConfiguration, error) {
 		cfg, err := f(raw)
 		if err != nil {
 			return nil, err
@@ -39,41 +42,30 @@ func SingleRecorder(f func(json.RawMessage) (planvalue.PolicyRecorderConfigurati
 // CompileRestartPolicy compiles a schema-valid DebugPolicy spec. The recipe
 // is the installation's exact context recipe, supplied by the caller.
 func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.Digest) (value.RestartPolicy, error) {
-	return compilePolicy(spec, recipeName, recipeDigest, nil, false)
+	return compilePolicy(nil, targets.Request{}, spec, recipeName, recipeDigest, nil, false)
 }
 
 // CompilePolicyWithRecorders compiles finite recorders and ordinary ongoing
 // source intent. Compilation grants no source or incident authority.
-func CompilePolicyWithRecorders(spec []byte, recipeName string, recipeDigest artifact.Digest, compileRecorder PolicyRecorderCompiler) (value.RestartPolicy, error) {
-	return compilePolicy(spec, recipeName, recipeDigest, compileRecorder, true)
+func CompilePolicyWithRecorders(ctx context.Context, catalogTarget targets.Request, spec []byte, recipeName string, recipeDigest artifact.Digest, compileRecorder PolicyRecorderCompiler) (value.RestartPolicy, error) {
+	return compilePolicy(ctx, catalogTarget, spec, recipeName, recipeDigest, compileRecorder, true)
 }
 
-func compilePolicy(spec []byte, recipeName string, recipeDigest artifact.Digest, compileRecorder PolicyRecorderCompiler, recorders bool) (value.RestartPolicy, error) {
+// policyObservationPlan parses the same target/detector prefix as compilation.
+// It carries authored names only, never catalog authority or a selected Pod.
+func policyObservationPlan(spec []byte) (value.RestartPolicy, bool, error) {
+	var s map[string]json.RawMessage
+	if strict(spec, &s) != nil {
+		return value.RestartPolicy{}, false, value.ErrInvalid
+	}
+	out, err := compilePolicyObservation(s)
+	return out, s["profileComposition"] != nil, err
+}
+
+func compilePolicyObservation(s map[string]json.RawMessage) (value.RestartPolicy, error) {
 	var out value.RestartPolicy
 	reject := func(path, reason string) (value.RestartPolicy, error) {
 		return value.RestartPolicy{}, value.PolicyFieldError{Path: "spec" + path, Reason: reason}
-	}
-	var s map[string]json.RawMessage
-	if strict(spec, &s) != nil {
-		return reject("", "not an object")
-	}
-	for key := range s {
-		switch key {
-		case "target", "detectors", "when", "recipeRef", "budgets", "retention", "suspended", "observation", "evaluation", "recordingSaves", "sharing":
-		case "profileComposition":
-			if !recorders {
-				return reject(policyComposition(s[key]))
-			}
-		case "grantRef":
-			if !recorders {
-				return reject(".grantRef", "policy grants are unavailable on this path")
-			}
-			if strict(s[key], &out.GrantRef) != nil || !authorization.UUID(out.GrantRef) {
-				return reject(".grantRef", "must name an exact grant UUID")
-			}
-		default:
-			return reject("."+key, "unsupported in this release (ADR-228)")
-		}
 	}
 	// Target: one named workload in one cluster; the triggering Pod only.
 	var target struct {
@@ -158,6 +150,42 @@ func compilePolicy(spec []byte, recipeName string, recipeDigest artifact.Digest,
 	if when.Detector != detector.ID {
 		return reject(".when.detector", "names no detector")
 	}
+	return out, nil
+}
+
+func compilePolicy(ctx context.Context, catalogTarget targets.Request, spec []byte, recipeName string, recipeDigest artifact.Digest, compileRecorder PolicyRecorderCompiler, recorders bool) (value.RestartPolicy, error) {
+	var out value.RestartPolicy
+	reject := func(path, reason string) (value.RestartPolicy, error) {
+		return value.RestartPolicy{}, value.PolicyFieldError{Path: "spec" + path, Reason: reason}
+	}
+	var s map[string]json.RawMessage
+	if strict(spec, &s) != nil {
+		return reject("", "not an object")
+	}
+	for key := range s {
+		switch key {
+		case "target", "detectors", "when", "recipeRef", "budgets", "retention", "suspended", "observation", "evaluation", "recordingSaves", "sharing":
+		case "profileComposition":
+			if !recorders {
+				return reject(policyComposition(s[key]))
+			}
+		case "grantRef":
+			if !recorders {
+				return reject(".grantRef", "policy grants are unavailable on this path")
+			}
+			if strict(s[key], &out.GrantRef) != nil || !authorization.UUID(out.GrantRef) {
+				return reject(".grantRef", "must name an exact grant UUID")
+			}
+		default:
+			return reject("."+key, "unsupported in this release (ADR-228)")
+		}
+	}
+	observed, err := compilePolicyObservation(s)
+	if err != nil {
+		return value.RestartPolicy{}, err
+	}
+	observed.GrantRef = out.GrantRef
+	out = observed
 	if raw := s["profileComposition"]; raw != nil {
 		if s["recipeRef"] != nil {
 			return reject(".recipeRef", "select exactly one recipe or profile composition")
@@ -165,7 +193,10 @@ func compilePolicy(spec []byte, recipeName string, recipeDigest artifact.Digest,
 		if compileRecorder == nil {
 			return reject(".profileComposition", "recorder compiler unavailable")
 		}
-		compiled, err := compileRecorder(raw)
+		if catalogTarget.ClusterID != "" && (catalogTarget.ClusterID != out.ClusterID || catalogTarget.Namespace.Name != out.Namespace || catalogTarget.Workload.Kind != out.WorkloadKind || catalogTarget.Workload.Name != out.WorkloadName) {
+			return reject(".target", "catalog scope differs from the protected workload")
+		}
+		compiled, err := compileRecorder(ctx, catalogTarget, raw)
 		if err != nil {
 			return value.RestartPolicy{}, err
 		}

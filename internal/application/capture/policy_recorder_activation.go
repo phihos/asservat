@@ -19,21 +19,29 @@ type policyWorkloadDelegation interface {
 	WorkloadDelegation(context.Context, authorization.WorkloadTarget) (identity.Revision, error)
 }
 
-func (s PolicyActivation) activateRecorderPolicy(ctx context.Context, author identity.Identity, recovery artifact.RecoveryProof, source value.PolicySource, compiled value.RestartPolicy, observed targets.RestartObservation, status value.PolicyStatus, nonce string, sharingReviewed bool) (PolicyActivationResult, error) {
-	var zero PolicyActivationResult
+type recorderPolicyBasis struct {
+	target     authorization.WorkloadTarget
+	delegation identity.Revision
+	envelope   authorization.WorkloadAutomationProjection
+	owners     []artifact.AudienceAssignment
+	until      time.Time
+}
+
+// Resolve once before catalog reads, then reuse for immutable acceptance.
+func (s PolicyActivation) recorderPolicyBasis(ctx context.Context, author identity.Identity, source value.PolicySource, compiled value.RestartPolicy, observed targets.RestartObservation) (recorderPolicyBasis, error) {
 	ledger, ok := s.Ledger.(policyWorkloadDelegation)
 	now := s.Now()
-	if !ok || s.WorkloadAutomation == nil || !source.Valid(now) || !observed.Valid(now) || !observed.Answers(compiled.Request()) || observed.ClusterID != compiled.ClusterID || observed.Namespace.Name != compiled.Namespace || observed.Workload.Kind != compiled.WorkloadKind || observed.Workload.Name != compiled.WorkloadName || status.PolicyUID != source.Revision.UID || status.IntentVersion < 1 {
-		return zero, s.refused("recorder/workload", value.ErrUnavailable)
+	if !ok || s.WorkloadAutomation == nil || !source.Valid(now) || !observed.Valid(now) || !observed.Answers(compiled.Request()) || observed.ClusterID != compiled.ClusterID || observed.Namespace.Name != compiled.Namespace || observed.Workload.Kind != compiled.WorkloadKind || observed.Workload.Name != compiled.WorkloadName {
+		return recorderPolicyBasis{}, s.refused("recorder/workload", value.ErrUnavailable)
 	}
 	target := authorization.WorkloadTarget{ClusterID: observed.ClusterID, NamespaceUID: observed.Namespace.UID, WorkloadUID: observed.Workload.UID}
 	delegation, err := ledger.WorkloadDelegation(ctx, target)
 	if err != nil {
-		return zero, s.delegationRefused("basis")
+		return recorderPolicyBasis{}, s.delegationRefused("basis")
 	}
 	envelope, err := s.WorkloadAutomation.PolicyWorkloadAutomation(ctx, target, delegation)
 	if err != nil {
-		return zero, s.delegationRefused("envelope")
+		return recorderPolicyBasis{}, s.delegationRefused("envelope")
 	}
 	// One existing current envelope read also carries the complete accepted
 	// workload permissions. There is no second read or invented draft authority.
@@ -45,15 +53,29 @@ func (s PolicyActivation) activateRecorderPolicy(ctx context.Context, author ide
 		}
 	}
 	if len(owners) == 0 || len(owners) > 8 {
-		return zero, s.delegationRefused("sponsors")
+		return recorderPolicyBasis{}, s.delegationRefused("sponsors")
+	}
+	rights := authorization.WorkloadScopeEligibility(author, envelope.Permissions, authorization.CollectContext, target, s.Now())
+	if !rights.Eligible || ctx.Err() != nil {
+		return recorderPolicyBasis{}, s.delegationRefused("permissions")
 	}
 	slices.SortFunc(owners, func(a, b artifact.AudienceAssignment) int { return strings.Compare(a.AssignmentID, b.AssignmentID) })
+	return recorderPolicyBasis{target: target, delegation: delegation, envelope: envelope, owners: owners, until: identity.Earlier(rights.ValidUntil, envelope.FreshUntil)}, nil
+}
+
+func (s PolicyActivation) activateRecorderPolicy(ctx context.Context, author identity.Identity, recovery artifact.RecoveryProof, source value.PolicySource, compiled value.RestartPolicy, observed targets.RestartObservation, status value.PolicyStatus, nonce string, sharingReviewed bool, basis recorderPolicyBasis) (PolicyActivationResult, error) {
+	var zero PolicyActivationResult
+	now := s.Now()
+	if !source.Valid(now) || !observed.Valid(now) || status.PolicyUID != source.Revision.UID || status.IntentVersion < 1 || !now.Before(basis.until) {
+		return zero, s.refused("recorder/workload", value.ErrUnavailable)
+	}
+	target, delegation, envelope, owners := basis.target, basis.delegation, basis.envelope, basis.owners
 	creator := author.Principal
 	if status.Creator != nil {
 		creator = *status.Creator
 	}
 	issued := s.Now().UTC().Truncate(time.Second)
-	authority := authorization.AcceptedPolicyAuthority{InstallationID: s.InstallationID, PolicyUID: source.Revision.UID, Creator: creator, Executor: authorization.PolicyPrincipal(s.InstallationID, source.Revision.UID), ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: delegation, Owners: owners, Actions: recorderKinds(compiled), Limits: authorization.AutomationLimits{MaxExecutions: envelope.Envelope.MaxExecutions, MaxBytes: envelope.Envelope.MaxBytes, MaxObservedBytes: envelope.Envelope.MaxObservedBytes}, IssuedAt: issued, NotAfter: issued.Add(time.Duration(envelope.Envelope.MaxLifetimeSeconds) * time.Second)}
+	authority := authorization.AcceptedPolicyAuthority{InstallationID: s.InstallationID, PolicyUID: source.Revision.UID, Creator: creator, Executor: authorization.PolicyPrincipal(s.InstallationID, source.Revision.UID), ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID, Delegation: delegation, Owners: owners, Actions: recorderKinds(compiled), Limits: authorization.AutomationLimits{MaxExecutions: envelope.Envelope.MaxExecutions, MaxBytes: envelope.Envelope.MaxBytes, MaxObservedBytes: envelope.Envelope.MaxObservedBytes, MaxObservedEvents: envelope.Envelope.MaxObservedEvents}, IssuedAt: issued, NotAfter: issued.Add(time.Duration(envelope.Envelope.MaxLifetimeSeconds) * time.Second)}
 	if !envelope.NotAfter.IsZero() {
 		authority.NotAfter = identity.Earlier(authority.NotAfter, envelope.NotAfter.UTC().Truncate(time.Second))
 	}

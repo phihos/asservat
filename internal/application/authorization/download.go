@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"slices"
 	"time"
 
@@ -17,8 +18,13 @@ import (
 // ContextDownloadEvidence is a verified catalog/retention projection, not an
 // upload manifest. No native evidence or checksum is needed for authorization.
 type ContextDownloadEvidence struct {
-	PurposeRef string
-	CaptureID  string
+	// NativeBytes is verified publication metadata; nil means legacy unknown.
+	// It never substitutes the registration limit or ciphertext object length.
+	NativeBytes                                    *int64
+	ExecutionDigest                                artifact.Digest
+	Namespace, WorkloadKind, WorkloadName, PodName string
+	PurposeRef                                     string
+	CaptureID                                      string
 	// CaseID binds a recipient's share to the artifact's case (ADR-233).
 	CaseID string
 	// DataClass is the accepted expectation's class: metadata, raw for an
@@ -92,13 +98,19 @@ func (s ContextDownloadAuthority) CheckDownload(ctx context.Context, token strin
 }
 
 func (s ContextDownloadAuthority) CheckDownloadCurrent(ctx context.Context, source identities.CurrentIdentity, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
-	return s.checkDownloadCurrent(ctx, source, scope, nil)
+	return s.checkDownloadCurrent(ctx, source, scope, nil, false)
+}
+
+// CheckDownloadPreparation is only for a fresh session, before reservation.
+// It reuses the catalog's verified size; no payload or additional read is needed.
+func (s ContextDownloadAuthority) CheckDownloadPreparation(ctx context.Context, source identities.CurrentIdentity, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	return s.checkDownloadCurrent(ctx, source, scope, nil, true)
 }
 
 // A non-nil ordinary slot belongs to one original response. Only the
 // entitlement (ordinary or shared) may survive a short identity batch; every other fact below is
 // reobserved and the resulting effect authority still lasts at most five seconds.
-func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, source identities.CurrentIdentity, scope artifact.DownloadScope, ordinary **downloadEntitlement) (artifact.DownloadAuthority, error) {
+func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, source identities.CurrentIdentity, scope artifact.DownloadScope, ordinary **downloadEntitlement, preparing bool) (artifact.DownloadAuthority, error) {
 	var out artifact.DownloadAuthority
 	if !value.UUID(s.RootID) || source == nil || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Environment == nil || s.Now == nil || ctx.Err() != nil {
 		return out, downloadRefused("configuration", ctx.Err())
@@ -235,7 +247,30 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	// Last, so a revocation or expiry during the I/O above refuses.
 	var resultUntil time.Time
 	if raw {
-		if resultUntil, err = s.RawResults.CurrentResultAccess(ctx, source, scope, record.ActionID); err != nil {
+		if preparing {
+			preparation, ok := s.RawResults.(interface {
+				CurrentResultAccessForPreparation(context.Context, identities.CurrentIdentity, artifact.DownloadScope, string, *int64) (time.Time, error)
+			})
+			if !ok {
+				return out, downloadRefused("result-preparation", nil)
+			}
+			resultUntil, err = preparation.CurrentResultAccessForPreparation(ctx, source, scope, record.ActionID, record.NativeBytes)
+		} else {
+			resultUntil, err = s.RawResults.CurrentResultAccess(ctx, source, scope, record.ActionID)
+		}
+		if err != nil {
+			if preparing && errors.Is(err, value.ErrApprovalRequired) {
+				// A missing grant is actionable only while the preceding ordinary
+				// checks retain their original intervals after the blocking lookup.
+				now := s.Now()
+				fresh := ctx.Err() == nil && current.Valid(now) && now.Before(started.Add(5*time.Second))
+				for _, end := range []time.Time{initial.ValidUntil, final.ValidUntil, record.ValidUntil, resolved.ValidUntil, environment.ValidUntil, resolved.ExpiresAt} {
+					fresh = fresh && now.Before(end)
+				}
+				if fresh {
+					return out, downloadRefusedAs("result-access", value.ErrApprovalRequired)
+				}
+			}
 			return out, downloadRefused("result-access", err)
 		}
 	}

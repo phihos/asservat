@@ -116,3 +116,28 @@ func TestPublicPolicyGrantRequestUsesExistingViewAndIndependentAuditBoundary(t *
 		})
 	}
 }
+
+func TestPublicPolicyArgumentGrantPreservesEventPool(t *testing.T) {
+	base, current := operationFixture(t, true)
+	use := &policyRequestWire{grantUseCase: &grantUseCase{view: policyRequestWireView(current.i.VerifiedAt, current.i.Principal), until: current.metadataUntil}}
+	use.view.Grant.Policy.Limits.MaxObservedEvents = 6000
+	use.view.Grant.PolicySpend.ObservedEvents = 2000
+	operations, err := NewGrantOperations("https://console.invalid", base.config.Now, func() string { return "00000000-0000-4000-8000-000000000099" }, use)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte(`{"policy_uid":"team-policy","policy_name":"restarts","idempotency_key":"argument-key","limits":{"max_executions":10,"max_collected_bytes":67108864,"max_observed_bytes":100663296,"max_observed_events":6000},"observation_limits":{"max_session_seconds":10,"max_observed_bytes":100663296,"max_bytes_per_second":16777216,"max_concurrent_sessions":1,"max_observed_events":6000}}`)
+	reply, err := operations.Call(t.Context(), current, "request_policy_grant", raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if use.calls != 1 || use.input.Limits.MaxObservedEvents != 6000 || use.input.Observation == nil || use.input.Observation.MaxObservedEvents != 6000 {
+		t.Fatalf("event pool lost: %+v", use.input)
+	}
+	var out struct {
+		Data struct{ Policy map[string]any }
+	}
+	if json.Unmarshal(reply.Body, &out) != nil || out.Data.Policy["max_observed_events"] != float64(6000) || out.Data.Policy["observed_events_used"] != float64(2000) {
+		t.Fatalf("event charges missing: %s", reply.Body)
+	}
+}

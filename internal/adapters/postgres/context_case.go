@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"asservat.local/asservat/internal/domain/artifact"
 	"context"
 	"slices"
 	"time"
@@ -72,7 +73,12 @@ func (s *ContextCaseReads) ResolveContextCase(ctx context.Context, request value
 			if uid(row.RootID) != s.root || uid(row.CaseID) != request.CaseID {
 				return value.ErrUnavailable
 			}
-			out.Routes = append(out.Routes, value.ContextCaseRoute{CaptureID: uid(row.CaptureID), ArtifactID: uid(row.ArtifactID), Target: authorization.Target{ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, PodUID: row.PodUid}})
+			if len(row.Version) != 32 {
+				return value.ErrUnavailable
+			}
+			var version artifact.Digest
+			copy(version[:], row.Version)
+			out.Routes = append(out.Routes, value.ContextCaseRoute{Version: version, CaptureID: uid(row.CaptureID), ArtifactID: uid(row.ArtifactID), Target: authorization.Target{ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, PodUID: row.PodUid}})
 		}
 		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
 			return err

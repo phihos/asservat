@@ -134,6 +134,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "context_verification", "copies_digest", "INSERT"},
 		{"table", "context_verification", "expectation_digest", "INSERT"},
 		{"table", "context_verification", "intent_digest", "INSERT"},
+		{"table", "context_verification", "native_bytes", "INSERT"},
 		{"table", "context_verification", "permission_epoch", "INSERT"},
 		{"table", "context_verification", "permission_sequence", "INSERT"},
 		{"table", "context_verification", "root_id", "INSERT"},

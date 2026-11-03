@@ -83,6 +83,10 @@ func attachPolicyAccountingGrantMode(t *testing.T, ctx context.Context, admin *p
 	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantPolicy, Requester: a.Creator, ExecutionDigest: a.ScopeDigest, DataClass: "extract", Reasons: []authorization.SensitiveReason{{ActionID: "pod-status", Code: "synthetic-component-review"}}, Scope: scope, Review: []byte(`{}`), Lifetime: time.Hour, Revision: 1, Policy: &authorization.PolicyGrantScope{Authority: a, RecipeDigest: planning.RecipeDigest(), Limits: limits, ApprovalPolicyRef: settings.Revision, ApprovalMaxAge: time.Hour}}
 	if len(recorder) == 1 {
 		g.Policy.RecipeDigest = recorder[0].RecipeDigest
+		if recorder[0].Arguments != nil {
+			g.DataClass = "raw"
+			g.Reasons = []authorization.SensitiveReason{{ActionID: recorder[0].Action.ID, Code: "syscallArguments"}}
+		}
 		g.Policy.Limits.MaxBytes = 4 * artifact.RecordingNativeLimit
 		// Only the explicit SQL observation component case provisions this
 		// synthetic reviewed pool; ordinary recorder fixtures remain unchanged.

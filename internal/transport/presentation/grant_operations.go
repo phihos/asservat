@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/url"
@@ -125,7 +126,7 @@ func (s *GrantOperations) PublicOrigin() string {
 }
 
 func (s *GrantOperations) ToolNames() []string {
-	return []string{"request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant"}
+	return []string{"request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant"}
 }
 
 func (s *GrantOperations) Tool(name string) (contracts.InvestigationTool, bool) {
@@ -137,6 +138,7 @@ func (s *GrantOperations) Tool(name string) (contracts.InvestigationTool, bool) 
 
 // GrantOperationInput is the closed union of the four inputs.
 type policyGrantRequestLimits struct {
+	MaxObservedEvents int64 `json:"max_observed_events,omitempty"`
 	MaxExecutions     int64 `json:"max_executions"`
 	MaxCollectedBytes int64 `json:"max_collected_bytes"`
 	MaxObservedBytes  int64 `json:"max_observed_bytes"`
@@ -149,6 +151,11 @@ type policyGrantObservationInput struct {
 	MaxObservedEvents     int64 `json:"max_observed_events,omitempty"`
 }
 type GrantOperationInput struct {
+	CaseID           string                       `json:"case_id,omitempty"`
+	ArtifactDigests  []string                     `json:"artifact_digests,omitempty"`
+	Operations       []string                     `json:"operations,omitempty"`
+	MaxBytes         int64                        `json:"max_bytes,omitempty"`
+	ExpiresInSeconds int64                        `json:"expires_in_seconds,omitempty"`
 	PolicyName       string                       `json:"policy_name,omitempty"`
 	PolicyUID        string                       `json:"policy_uid,omitempty"`
 	LifetimeSeconds  int64                        `json:"lifetime_seconds,omitempty"`
@@ -255,6 +262,8 @@ type grantResultAccess struct {
 }
 
 type grantPolicyData struct {
+	MaxObservedEvents  int64           `json:"max_observed_events,omitempty"`
+	ObservedEventsUsed int64           `json:"observed_events_used,omitempty"`
 	UID                string          `json:"uid"`
 	Executor           *grantPrincipal `json:"executor"`
 	AuthorityIssuedAt  time.Time       `json:"authority_issued_at"`
@@ -269,39 +278,40 @@ type grantPolicyData struct {
 
 // grantData is get_grant's reply; list rows omit actions and result access.
 type grantData struct {
-	GrantID                      string             `json:"grant_id"`
-	Phase                        string             `json:"phase"`
-	Revision                     int64              `json:"revision"`
-	Kind                         string             `json:"kind"`
-	Policy                       *grantPolicyData   `json:"policy,omitempty"`
-	CaptureID                    string             `json:"capture_id,omitempty"`
-	PreviewID                    string             `json:"preview_id,omitempty"`
-	ExecutionDigest              string             `json:"execution_digest"`
-	ReviewDigest                 string             `json:"review_digest"`
-	Target                       grantTarget        `json:"target"`
-	DataClass                    string             `json:"data_class"`
-	Reasons                      []grantReason      `json:"reasons"`
-	Actions                      []grantAction      `json:"actions,omitempty"`
-	ObservationLimits            *grantLimits       `json:"observation_limits,omitempty"`
-	RequestedBy                  *grantPrincipal    `json:"requested_by"`
-	RequestedAt                  time.Time          `json:"requested_at"`
-	ReviewUntil                  time.Time          `json:"review_until"`
-	PreviewDeadline              *time.Time         `json:"preview_deadline,omitempty"`
-	CaptureDeadlineRule          string             `json:"capture_deadline_rule"`
-	CaptureWindowSeconds         int64              `json:"capture_window_seconds,omitempty"`
-	LifetimeSeconds              int64              `json:"lifetime_seconds"`
-	Decision                     *grantDecision     `json:"decision,omitempty"`
-	NotAfter                     *time.Time         `json:"not_after,omitempty"`
-	RevokedAt                    *time.Time         `json:"revoked_at,omitempty"`
-	RevokedBy                    *grantPrincipal    `json:"revoked_by,omitempty"`
-	ResultAccess                 *grantResultAccess `json:"result_access,omitempty"`
-	RemainingBytes               *int64             `json:"remaining_bytes,omitempty"`
-	CanResume                    *bool              `json:"can_resume,omitempty"`
-	CanResolve                   *bool              `json:"can_resolve,omitempty"`
-	ResumeRequiresOriginalClient *bool              `json:"resume_requires_original_client,omitempty"`
-	CanDecide                    bool               `json:"can_decide"`
-	CanRevoke                    bool               `json:"can_revoke"`
-	NavigationURI                string             `json:"approval_navigation_uri"`
+	GrantID                      string              `json:"grant_id"`
+	Phase                        string              `json:"phase"`
+	Revision                     int64               `json:"revision"`
+	Kind                         string              `json:"kind"`
+	RawAccess                    *grantRawAccessData `json:"raw_access,omitempty"`
+	Policy                       *grantPolicyData    `json:"policy,omitempty"`
+	CaptureID                    string              `json:"capture_id,omitempty"`
+	PreviewID                    string              `json:"preview_id,omitempty"`
+	ExecutionDigest              string              `json:"execution_digest"`
+	ReviewDigest                 string              `json:"review_digest"`
+	Target                       *grantTarget        `json:"target,omitempty"`
+	DataClass                    string              `json:"data_class"`
+	Reasons                      []grantReason       `json:"reasons"`
+	Actions                      []grantAction       `json:"actions,omitempty"`
+	ObservationLimits            *grantLimits        `json:"observation_limits,omitempty"`
+	RequestedBy                  *grantPrincipal     `json:"requested_by"`
+	RequestedAt                  time.Time           `json:"requested_at"`
+	ReviewUntil                  time.Time           `json:"review_until"`
+	PreviewDeadline              *time.Time          `json:"preview_deadline,omitempty"`
+	CaptureDeadlineRule          string              `json:"capture_deadline_rule,omitempty"`
+	CaptureWindowSeconds         int64               `json:"capture_window_seconds,omitempty"`
+	LifetimeSeconds              int64               `json:"lifetime_seconds"`
+	Decision                     *grantDecision      `json:"decision,omitempty"`
+	NotAfter                     *time.Time          `json:"not_after,omitempty"`
+	RevokedAt                    *time.Time          `json:"revoked_at,omitempty"`
+	RevokedBy                    *grantPrincipal     `json:"revoked_by,omitempty"`
+	ResultAccess                 *grantResultAccess  `json:"result_access,omitempty"`
+	RemainingBytes               *int64              `json:"remaining_bytes,omitempty"`
+	CanResume                    *bool               `json:"can_resume,omitempty"`
+	CanResolve                   *bool               `json:"can_resolve,omitempty"`
+	ResumeRequiresOriginalClient *bool               `json:"resume_requires_original_client,omitempty"`
+	CanDecide                    bool                `json:"can_decide"`
+	CanRevoke                    bool                `json:"can_revoke"`
+	NavigationURI                string              `json:"approval_navigation_uri"`
 }
 
 func digestText(d artifact.Digest) string { return hash(d) }
@@ -310,17 +320,29 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 	g, r := v.Grant, v.Review
 	requester := g.Requester.Issuer == caller.Issuer && g.Requester.Subject == caller.Subject
 	d := grantData{GrantID: g.ID, Phase: string(v.Phase), Revision: g.Revision, Kind: g.Kind, CaptureID: g.CaptureID, PreviewID: g.PreviewID, ExecutionDigest: digestText(g.ExecutionDigest), ReviewDigest: digestText(g.ReviewDigest),
-		Target: grantTarget{ClusterID: g.Target.ClusterID, Namespace: r.Namespace, WorkloadKind: r.WorkloadKind, WorkloadName: r.WorkloadName, PodName: r.PodName}, DataClass: g.DataClass, Reasons: []grantReason{}, RequestedBy: principalView(g.Requester),
+		Target: &grantTarget{ClusterID: g.Target.ClusterID, Namespace: r.Namespace, WorkloadKind: r.WorkloadKind, WorkloadName: r.WorkloadName, PodName: r.PodName}, DataClass: g.DataClass, Reasons: []grantReason{}, RequestedBy: principalView(g.Requester),
 		RequestedAt: g.RequestedAt.UTC(), ReviewUntil: g.ReviewUntil.UTC(), CaptureDeadlineRule: "previewDeadline", LifetimeSeconds: int64(g.Lifetime / time.Second),
 		CanDecide: v.Approver && v.Phase == authorization.GrantPending, CanRevoke: g.RevokedAt.IsZero() && (requester || v.Approver), NavigationURI: s.origin + "/approvals/" + g.ID}
 	if g.Kind == authorization.GrantPolicy && g.Policy != nil {
 		p := g.Policy
 		d.Target.ClusterID, d.Target.NamespaceUID, d.Target.WorkloadUID, d.Target.PodName = p.Authority.ClusterID, p.Authority.NamespaceUID, p.Authority.WorkloadUID, ""
-		d.Policy = &grantPolicyData{UID: p.Authority.PolicyUID, Executor: principalView(p.Authority.Executor), AuthorityIssuedAt: p.Authority.IssuedAt.UTC(), AuthorityNotAfter: p.Authority.NotAfter.UTC(), MaxExecutions: p.Limits.MaxExecutions, MaxCollectedBytes: p.Limits.MaxBytes, MaxObservedBytes: p.Limits.MaxObservedBytes, ExecutionsUsed: g.PolicySpend.Executions, CollectedBytesUsed: g.PolicySpend.CollectedBytes, ObservedBytesUsed: g.PolicySpend.ObservedBytes}
+		d.Policy = &grantPolicyData{UID: p.Authority.PolicyUID, Executor: principalView(p.Authority.Executor), AuthorityIssuedAt: p.Authority.IssuedAt.UTC(), AuthorityNotAfter: p.Authority.NotAfter.UTC(), MaxExecutions: p.Limits.MaxExecutions, MaxCollectedBytes: p.Limits.MaxBytes, MaxObservedBytes: p.Limits.MaxObservedBytes, MaxObservedEvents: p.Limits.MaxObservedEvents, ObservedEventsUsed: g.PolicySpend.ObservedEvents, ExecutionsUsed: g.PolicySpend.Executions, CollectedBytesUsed: g.PolicySpend.CollectedBytes, ObservedBytesUsed: g.PolicySpend.ObservedBytes}
 		end := g.PolicyNotAfter.UTC()
 		d.NotAfter = &end
 		d.CaptureDeadlineRule = "policyAuthority"
 		d.CanRevoke = v.CanRevoke
+	} else if g.Kind == authorization.GrantRawQuery {
+		d.Target, d.CaptureDeadlineRule = nil, ""
+		d.CaptureID, d.PreviewID = "", ""
+		if q := r.RawQuery; q != nil {
+			d.RawAccess = &grantRawAccessData{CaseID: q.CaseID, Reason: q.Reason, Operations: slices.Clone(q.Operations), MaxBytes: q.MaxBytes, MaxOperations: q.MaxOperations, NotAfter: q.NotAfter.UTC(), ArtifactCount: len(q.Artifacts), BytesUsed: g.Spent.Bytes, OperationsUsed: g.Spent.Operations}
+			if full {
+				for _, a := range q.Artifacts {
+					o := a.Output
+					d.RawAccess.Artifacts = append(d.RawAccess.Artifacts, grantRawArtifact{ArtifactID: o.ArtifactID, CaptureID: o.CaptureID, ActionID: o.ActionID, Digest: hash(o.ArtifactDigest), ExecutionDigest: hash(o.ExecutionDigest), NativeType: a.NativeType, NativeBytes: a.NativeBytes, ExpiresAt: a.ExpiresAt.UTC(), Target: grantRawTarget{ClusterID: o.Target.ClusterID, NamespaceUID: o.Target.NamespaceUID, WorkloadUID: o.Target.WorkloadUID, PodUID: o.Target.PodUID, Namespace: a.Namespace, WorkloadKind: a.WorkloadKind, WorkloadName: a.WorkloadName, PodName: a.PodName}})
+				}
+			}
+		}
 	} else {
 		deadline := r.Deadline.UTC()
 		d.PreviewDeadline = &deadline
@@ -331,8 +353,10 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 	if g.Kind == authorization.GrantAdHocCapture && json.Unmarshal(g.Scope, &timing) == nil && timing.Timing == "approvedAcceptance/v1" {
 		d.CaptureDeadlineRule, d.CaptureWindowSeconds = "acceptanceWithinGrant", 300
 	}
-	for _, x := range g.Reasons {
-		d.Reasons = append(d.Reasons, grantReason{x.ActionID, x.Code})
+	if g.Kind != authorization.GrantRawQuery {
+		for _, x := range g.Reasons {
+			d.Reasons = append(d.Reasons, grantReason{x.ActionID, x.Code})
+		}
 	}
 	if l := r.ObservationLimits; l != nil {
 		d.ObservationLimits = &grantLimits{MaxObservedEvents: l.MaxObservedEvents, MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
@@ -353,7 +377,7 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 		at := g.RevokedAt.UTC()
 		d.RevokedAt, d.RevokedBy = &at, principalView(g.Revoker)
 	}
-	if !full {
+	if !full || g.Kind == authorization.GrantRawQuery {
 		return d
 	}
 	d.CanResume, d.CanResolve, d.ResumeRequiresOriginalClient = &v.CanResume, &v.CanResolve, &v.ResumeRequiresOriginalClient
@@ -391,8 +415,10 @@ type grantDecisionData struct {
 
 func publicGrantFailure(err error) OperationFailure {
 	switch {
+	case errors.Is(err, authapp.ErrRawQueryOperationUnsupported):
+		return OperationFailure{"UnsupportedOperation", "Only whole-file download_artifact approval is currently available for existing raw evidence. No collection or disclosure was started.", false}
 	case errors.Is(err, authorization.ErrGrantInvalid), errors.Is(err, authorization.ErrGrantScope):
-		return OperationFailure{"InvalidApprovalRequest", "The selected approval period or limits do not fit this policy. Check its current limits and try again.", false}
+		return OperationFailure{"InvalidApprovalRequest", "The selected approval scope, period or limits are invalid. Check the selected evidence or policy and its current limits.", false}
 	case errors.Is(err, authorization.ErrSelfApproval):
 		return OperationFailure{"SelfApprovalRefused", "You requested this plan, so you cannot decide it, from any client. Another approver of this workload must review it.", false}
 	case errors.Is(err, authorization.ErrStepUpRequired):
@@ -444,6 +470,36 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 	until := i.ValidUntil
 	var operationErr error
 	switch name {
+	case "request_raw_access":
+		requester, ok := s.grants.(interface {
+			RequestRaw(context.Context, identities.CurrentIdentity, authapp.RawQueryRequestInput) (authorization.Grant, bool, error)
+		})
+		if !ok {
+			operationErr = authapp.ErrGrantUnavailable
+			break
+		}
+		request := authapp.RawQueryRequestInput{CaseID: in.CaseID, Operations: slices.Clone(in.Operations), Reason: in.Reason, MaxBytes: in.MaxBytes, Lifetime: time.Duration(in.ExpiresInSeconds) * time.Second, IdempotencyKey: in.IdempotencyKey}
+		for _, d := range in.ArtifactDigests {
+			b, err := hex.DecodeString(d)
+			if err != nil || len(b) != len(artifact.Digest{}) {
+				operationErr = authorization.ErrGrantInvalid
+				break
+			}
+			var digest artifact.Digest
+			copy(digest[:], b)
+			request.ArtifactDigests = append(request.ArtifactDigests, digest)
+		}
+		if operationErr != nil {
+			break
+		}
+		var g authorization.Grant
+		if g, _, operationErr = requester.RequestRaw(ctx, current, request); operationErr == nil {
+			out.Data = struct {
+				GrantID     string `json:"grant_id"`
+				Phase       string `json:"phase"`
+				ApprovalURI string `json:"approval_uri"`
+			}{g.ID, string(g.Phase(s.now())), s.origin + "/approvals/" + g.ID}
+		}
 	case "request_policy_grant":
 		requester, ok := s.grants.(interface {
 			RequestPolicy(context.Context, identities.CurrentIdentity, authapp.PolicyGrantRequestInput) (authorization.Grant, bool, error)
@@ -452,7 +508,7 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 			operationErr = authapp.ErrGrantUnavailable
 			break
 		}
-		request := authapp.PolicyGrantRequestInput{PolicyUID: in.PolicyUID, PolicyName: in.PolicyName, IdempotencyKey: in.IdempotencyKey, Lifetime: time.Duration(in.LifetimeSeconds) * time.Second, Limits: authorization.AutomationLimits{MaxExecutions: in.Limits.MaxExecutions, MaxBytes: in.Limits.MaxCollectedBytes, MaxObservedBytes: in.Limits.MaxObservedBytes}}
+		request := authapp.PolicyGrantRequestInput{PolicyUID: in.PolicyUID, PolicyName: in.PolicyName, IdempotencyKey: in.IdempotencyKey, Lifetime: time.Duration(in.LifetimeSeconds) * time.Second, Limits: authorization.AutomationLimits{MaxExecutions: in.Limits.MaxExecutions, MaxBytes: in.Limits.MaxCollectedBytes, MaxObservedBytes: in.Limits.MaxObservedBytes, MaxObservedEvents: in.Limits.MaxObservedEvents}}
 		if in.Observation != nil {
 			o := in.Observation
 			request.Observation = &authorization.ObservationLimits{MaxSessionSeconds: o.MaxSessionSeconds, MaxObservedBytes: o.MaxObservedBytes, MaxBytesPerSecond: o.MaxBytesPerSecond, MaxConcurrentSessions: o.MaxConcurrentSessions, MaxObservedEvents: o.MaxObservedEvents}
@@ -527,7 +583,7 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 	// refusal differs from an unavailable/withdrawn-rights retry whose earlier
 	// logical mutation may already have committed.
 	noDispatch := name == "decide_review" && errors.Is(operationErr, authorization.ErrSelfApproval)
-	return OperationReply{Body: b, ValidUntil: until, auditDecision: grantAuditDecision(operationErr), auditNoDispatch: noDispatch}, nil
+	return OperationReply{Body: b, ValidUntil: until, auditDecision: grantAuditDecision(operationErr), auditNoDispatch: noDispatch, grantReview: name == "get_grant"}, nil
 }
 
 func grantAuditDecision(err error) operationAuditDecision {

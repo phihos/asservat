@@ -237,7 +237,7 @@ func qualifyAPIContextAcquisition(t *testing.T, ctx context.Context, f fixture, 
 	wrong := e
 	wrong.ExecutionClass = artifact.ContextNodeExecution
 	wrong.NodeUID, wrong.NodeBootID = cluster.NodeUID, cluster.NodeBootID
-	if err := verifier.VerifyContext(ctx, wrong, copies); err == nil {
+	if _, err := verifier.VerifyContext(ctx, wrong, copies); err == nil {
 		t.Fatal("API artifact promoted to node execution identity")
 	}
 	t.Logf("actual unscheduled Pod resolved and captured with Node/exec denied; %d native bytes; encrypted full verification and exact native read; stored_unpublished, synthetic authority remains fixture-only", len(native))

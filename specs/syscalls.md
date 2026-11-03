@@ -58,8 +58,10 @@ The maintainer-approved [ADR-281 exception](../docs/decisions/281-syscall-argume
 allows a narrowly patched, reproducibly built, digest-pinned upstream traceloop
 program to enforce the existing pre-read observation budget. It changes the
 engine sourcing rule only; REQ-SYS-002 accounting, approval, isolation and native
-qualification remain mandatory. Arguments mode stays unavailable until that
-implementation passes its installed native acceptance tests.
+qualification remain mandatory. The finite manual workflow passed its installed
+acceptance on `9a8e392e`; exact scope and evidence are recorded in
+[implementation progress](../docs/implementation-progress.md). Recurring and
+ongoing argument workflows require their own composed qualification.
 
 ### Finite argument implementation boundary (ADR-281)
 
@@ -71,8 +73,9 @@ still require reviewed user-memory access. Raw approval includes independent
 cumulative byte and eligible entry/exit event limits. Failed reads and observations
 later excluded by result filters consume credit; replay never refills it.
 The initial adapter supports only its closed qualified ABI table and refuses
-unknown names. Planning/component tests do not enable the installed capability;
-raw publication, authenticated download and stop still need composed qualification.
+unknown names. Planning/component tests alone do not enable the installed
+capability. The qualified finite manual workflow includes raw publication,
+authenticated download and joined Stop; it does not qualify other lifecycle modes.
 
 Publication verifies argument JSONL against the immutable prepaid observation
 session as well as the accepted engine/definition/accounting pins. Native header

@@ -1089,3 +1089,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 
 - [ADR-292: independent submission start phase](292-independent-submission-start-phase.md): admission and start each retain at most five seconds inside the original request and authority bounds; installed profile rerun pending.
 - [ADR-291: bounded profile summary](291-bounded-profile-summary.md): internal typed pprof aggregate authority and selection/result composition; raw provenance and ordinary audience preserved, metadata-only shares unchanged; resource funding, SQL and public activation pending.
+
+- [ADR-293: existing-artifact raw approval](293-existing-artifact-raw-approval.md): reuse independent review and disclosure accounting for exact published artifacts; verified native length comes from the existing publication pass. Implementation and installed qualification pending.

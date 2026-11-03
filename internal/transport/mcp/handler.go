@@ -32,6 +32,7 @@ const (
 	MaxResponseBytes = 64 << 10
 	// Only the16-source preview has a larger SDK text+structured result frame.
 	MaxRecordingSavePreviewResponseBytes = presentation.OperationRecordingSavePreviewFrameLimit
+	MaxGrantReviewResponseBytes          = presentation.OperationGrantReviewFrameLimit
 	maxNesting                           = 32
 	// toolsListBudget bounds the encoded tools of one tools/list page. The
 	// rest of MaxResponseBytes covers the JSON-RPC envelope, cursor and cache
@@ -696,6 +697,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if route.Method == "tools/call" && route.Name == "preview_recording_save" && h.operations != nil {
 		if _, ok := h.operations.Tool(route.Name); ok {
 			response.limit = MaxRecordingSavePreviewResponseBytes
+		}
+	}
+	if route.Method == "tools/call" && route.Name == "get_grant" && h.operations != nil {
+		if _, ok := h.operations.Tool(route.Name); ok {
+			response.limit = MaxGrantReviewResponseBytes
 		}
 	}
 	defer func() { clear(response.body) }()

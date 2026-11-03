@@ -29,6 +29,8 @@ func (q CaseRouteQuery) Valid(now time.Time) bool {
 // ContextCaseRoute contains published-only lookup keys. It is not a public DTO
 // and never substitutes for ordinary scope eligibility or retained audiences.
 type ContextCaseRoute struct {
+	// Version is internal published-copy routing, never disclosure authority.
+	Version               artifact.Digest
 	CaptureID, ArtifactID string
 	Target                authorization.Target
 }
@@ -66,6 +68,9 @@ type ContextCase struct {
 }
 
 type ContextCaseArtifact struct {
+	Namespace, WorkloadKind, WorkloadName, PodName string
+	// NativeBytes is the verified native length, nil for legacy unknown.
+	NativeBytes           *int64
 	ArtifactID, CaptureID string
 	NativeType            string               // verified format discriminator for supported views
 	Target                authorization.Target // internal navigation match; omit from public DTO
@@ -90,7 +95,7 @@ func (c ContextCase) Valid(now time.Time) bool {
 	}
 	seen := map[string]bool{}
 	for _, a := range c.Artifacts {
-		if !authorization.UUID(a.ArtifactID) || !authorization.UUID(a.CaptureID) || !a.Target.Valid() || a.Version == (artifact.Digest{}) || !now.Before(a.ExpiresAt) || !a.ExpiresAt.Before(a.DeleteBy) || c.ValidUntil.After(a.ExpiresAt) || seen[a.ArtifactID] {
+		if a.NativeBytes != nil && (*a.NativeBytes < 0 || *a.NativeBytes > artifact.MaxNativeBytes) || !authorization.UUID(a.ArtifactID) || !authorization.UUID(a.CaptureID) || !a.Target.Valid() || a.Version == (artifact.Digest{}) || !now.Before(a.ExpiresAt) || !a.ExpiresAt.Before(a.DeleteBy) || c.ValidUntil.After(a.ExpiresAt) || seen[a.ArtifactID] {
 			return false
 		}
 		seen[a.ArtifactID] = true

@@ -145,6 +145,7 @@ type Grant struct {
 	RequestedAt, ReviewUntil                          time.Time
 	Lifetime                                          time.Duration
 	ResultAccess                                      *ResultAccess
+	RawQuery                                          *RawQueryScope `json:",omitempty"`
 	Policy                                            *PolicyGrantScope
 	// PolicyNotAfter is the monotonic accepted-settings overlay, also for pending requests.
 	PolicyNotAfter time.Time
@@ -162,7 +163,7 @@ func validDataClass(c string) bool { return c == "metadata" || c == "extract" ||
 func (g Grant) Valid() bool {
 	if !UUID(g.ID) || !UUID(g.RootID) || !g.validKindScope() ||
 		g.ExecutionDigest == (artifact.Digest{}) || g.ReviewDigest == (artifact.Digest{}) || !validDataClass(g.DataClass) ||
-		len(g.Reasons) < 1 || len(g.Reasons) > GrantMaxReasons || len(g.Scope) < 2 || len(g.Scope) > GrantMaxScopeBytes || len(g.Review) < 2 || len(g.Review) > GrantMaxReviewBytes ||
+		len(g.Reasons) < 1 || len(g.Reasons) > GrantMaxReasons || len(g.Scope) < 2 || len(g.Scope) > GrantMaxScopeBytes || len(g.Review) < 2 || len(g.Review) > GrantReviewBytesLimit(g.Kind) ||
 		!g.Requester.Valid() ||
 		g.RequestedAt.IsZero() || !g.ReviewUntil.After(g.RequestedAt) || g.ReviewUntil.Sub(g.RequestedAt) > GrantReviewWindow ||
 		g.Revision < 1 || g.Revision > GrantMaxRevision {
@@ -209,18 +210,21 @@ func (g Grant) expiryAt(decided time.Time) time.Time {
 	if g.ResultAccess != nil {
 		end = identity.Earlier(end, g.ResultAccess.NotAfter)
 	}
+	if g.RawQuery != nil {
+		end = identity.Earlier(end, g.RawQuery.NotAfter)
+	}
 	return end
 }
 
 func sameHuman(a, b identity.Principal) bool { return a.Issuer == b.Issuer && a.Subject == b.Subject }
 
 // Phase is the grant's current phase. Revocation wins over every other
-// state; a pending request lapses at ReviewUntil.
+// state; a pending request lapses at ReviewUntil or its earlier absolute bound.
 func (g Grant) Phase(now time.Time) GrantPhase {
 	switch {
 	case !g.RevokedAt.IsZero():
 		return GrantRevoked
-	case g.Decision == nil && (!now.Before(g.ReviewUntil) || g.Kind == GrantPolicy && !now.Before(g.PolicyNotAfter)):
+	case g.Decision == nil && (!now.Before(g.ReviewUntil) || g.Kind == GrantPolicy && !now.Before(g.PolicyNotAfter) || g.Kind == GrantRawQuery && g.RawQuery != nil && !now.Before(g.RawQuery.NotAfter)):
 		return GrantExpired
 	case g.Decision == nil:
 		return GrantPending
@@ -337,6 +341,15 @@ func CheckMaterialize(g Grant, output VerifiedOutput, clientID string, registere
 	if err := phaseError(g.Phase(now)); err != nil {
 		return err
 	}
+	if g.Kind == GrantRawQuery {
+		if clientID != g.Requester.ClientID || !g.RawQuery.covers(output, now) {
+			return ErrGrantScope
+		}
+		if !registered && g.Spent.Artifacts >= len(g.RawQuery.Artifacts) {
+			return ErrGrantPoolExhausted
+		}
+		return nil
+	}
 	r := g.ResultAccess
 	if r == nil || output.CaptureID != g.CaptureID || output.ExecutionDigest != g.ExecutionDigest || output.Target != g.Target || !slices.Contains(r.ActionIDs, output.ActionID) || !slices.Contains(r.ClientIDs, clientID) {
 		return ErrGrantScope
@@ -368,6 +381,12 @@ func CheckResultUse(g Grant, c GrantChild, caller identity.Identity, operation s
 	if !caller.Valid(now) || !sameHuman(caller.Principal, g.Requester) || caller.Principal.Kind != identity.Human || caller.Principal.ClientID != c.ClientID {
 		return ErrGrantPrincipal
 	}
+	if g.Kind == GrantRawQuery {
+		if caller.Principal != g.Requester || !slices.Contains(g.RawQuery.Operations, operation) || !g.RawQuery.covers(c.Output, now) {
+			return ErrGrantScope
+		}
+		return nil
+	}
 	r := g.ResultAccess
 	if r == nil || !slices.Contains(r.Operations, operation) || !slices.Contains(r.ClientIDs, c.ClientID) || c.Output.CaptureID != g.CaptureID || c.Output.ExecutionDigest != g.ExecutionDigest {
 		return ErrGrantScope
@@ -377,8 +396,18 @@ func CheckResultUse(g Grant, c GrantChild, caller identity.Identity, operation s
 
 // PoolCovers reports whether the shared pool can still reserve use.
 func PoolCovers(g Grant, use GrantUse) bool {
-	r := g.ResultAccess
-	return r != nil && use.Bytes >= 0 && use.Operations >= 0 && use.Bytes+use.Operations > 0 && g.Spent.Bytes+use.Bytes <= r.MaxBytes && g.Spent.Operations+use.Operations <= r.MaxOperations
+	var bytes, operations int64
+	switch {
+	case g.Kind == GrantRawQuery && g.RawQuery != nil:
+		bytes, operations = g.RawQuery.MaxBytes, g.RawQuery.MaxOperations
+	case g.ResultAccess != nil:
+		bytes, operations = g.ResultAccess.MaxBytes, g.ResultAccess.MaxOperations
+	default:
+		return false
+	}
+	return use.Bytes >= 0 && use.Operations >= 0 && (use.Bytes > 0 || use.Operations > 0) &&
+		g.Spent.Bytes >= 0 && g.Spent.Bytes <= bytes && g.Spent.Operations >= 0 && g.Spent.Operations <= operations &&
+		use.Bytes <= bytes-g.Spent.Bytes && use.Operations <= operations-g.Spent.Operations
 }
 
 // CanRevoke reports whether actor may revoke: the requesting human (any
@@ -388,18 +417,20 @@ func CanRevoke(g Grant, actor identity.Identity, approver Result, now time.Time)
 	if !actor.Valid(now) || actor.Principal.Kind != identity.Human || !g.RevokedAt.IsZero() {
 		return false
 	}
-	return g.Kind == GrantAdHocCapture && sameHuman(actor.Principal, g.Requester) || approver.Eligible && approver.Principal == actor.Principal && now.Before(approver.ValidUntil)
+	return (g.Kind == GrantAdHocCapture || g.Kind == GrantRawQuery) && sameHuman(actor.Principal, g.Requester) || approver.Eligible && approver.Principal == actor.Principal && now.Before(approver.ValidUntil)
 }
 
 // validKindScope keeps policy team authority disjoint from personal capture
 // authority. Policy fields may never be smuggled into an old ad hoc scope.
 func (g Grant) validKindScope() bool {
 	switch g.Kind {
+	case GrantRawQuery:
+		return g.validRawQuery()
 	case GrantAdHocCapture:
-		return g.Policy == nil && g.PolicyNotAfter.IsZero() && g.Requester.Kind == identity.Human && UUID(g.PreviewID) && UUID(g.CaptureID) && g.Target.Valid() && g.Lifetime >= time.Minute && g.Lifetime <= GrantMaxLifetime
+		return g.RawQuery == nil && g.Policy == nil && g.PolicyNotAfter.IsZero() && g.Requester.Kind == identity.Human && UUID(g.PreviewID) && UUID(g.CaptureID) && g.Target.Valid() && g.Lifetime >= time.Minute && g.Lifetime <= GrantMaxLifetime
 	case GrantPolicy:
 		_, _, executorRequester := PolicyExecutor(g.Requester)
-		return !executorRequester && g.Policy != nil && g.policyStartWitnessValid() && g.Policy.valid(g.RequestedAt) && g.PolicyNotAfter.After(g.RequestedAt) && !g.PolicyNotAfter.After(identity.Earlier(g.RequestedAt.Add(g.Lifetime), g.Policy.Authority.NotAfter)) && g.ExecutionDigest == g.Policy.Authority.ScopeDigest && g.PreviewID == "" && g.CaptureID == "" && g.Target == (Target{}) && g.ResultAccess == nil && g.ResultAccessDigest == (artifact.Digest{}) && g.Lifetime >= time.Second && g.Lifetime <= g.Policy.ApprovalMaxAge
+		return g.RawQuery == nil && !executorRequester && g.Policy != nil && g.policyStartWitnessValid() && g.Policy.valid(g.RequestedAt) && g.PolicyNotAfter.After(g.RequestedAt) && !g.PolicyNotAfter.After(identity.Earlier(g.RequestedAt.Add(g.Lifetime), g.Policy.Authority.NotAfter)) && g.ExecutionDigest == g.Policy.Authority.ScopeDigest && g.PreviewID == "" && g.CaptureID == "" && g.Target == (Target{}) && g.ResultAccess == nil && g.ResultAccessDigest == (artifact.Digest{}) && g.Lifetime >= time.Second && g.Lifetime <= g.Policy.ApprovalMaxAge
 	default:
 		return false
 	}
@@ -414,4 +445,13 @@ func (g Grant) validApprovedExpiry(decided time.Time) bool {
 		return g.ExpiresAt.Equal(end)
 	}
 	return g.ExpiresAt.Equal(end)
+}
+
+// GrantReviewBytesLimit accommodates the existing-artifact review's up to64
+// exact target/file rows while retaining the original collection review limit.
+func GrantReviewBytesLimit(kind string) int {
+	if kind == GrantRawQuery {
+		return 128 << 10
+	}
+	return GrantMaxReviewBytes
 }

@@ -1,6 +1,6 @@
 {
   "name": "list_reviews",
-  "description": "List approval requests (ADR-249): view pending is the approver inbox, the reviewable requests of other people for workloads where you hold the action-approver role now; view requested lists your own requests in every phase. Newest first, at most limit (default 20, maximum 100). Approvals are decided in the console.",
+  "description": "List approval requests (ADR-249): view pending is the approver inbox, the reviewable requests of other people for workloads where you hold the action-approver role now; view requested lists your own requests in every phase. Newest first, at most limit (default 20, maximum 100). Approvals are decided in the console. Existing-artifact rawQuery approvals show exact selected files, verified sizes, targets, requesting client and finite download budgets; they authorize no collection.",
   "transports": [
     "browser"
   ],
@@ -109,223 +109,176 @@
                     "type": "array",
                     "maxItems": 100,
                     "items": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "properties": {
-                        "grant_id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "phase": {
-                          "enum": [
-                            "Pending",
-                            "Approved",
-                            "Denied",
-                            "Revoked",
-                            "Expired",
-                            "Exhausted"
-                          ]
-                        },
-                        "revision": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 3
-                        },
-                        "kind": {
-                          "enum": [
-                            "adHocCapture",
-                            "policy"
-                          ]
-                        },
-                        "capture_id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "preview_id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "execution_digest": {
-                          "type": "string",
-                          "pattern": "^[a-f0-9]{64}$"
-                        },
-                        "review_digest": {
-                          "type": "string",
-                          "pattern": "^[a-f0-9]{64}$"
-                        },
-                        "target": {
+                      "oneOf": [
+                        {
                           "type": "object",
                           "additionalProperties": false,
                           "properties": {
-                            "cluster_id": {
+                            "grant_id": {
                               "type": "string",
                               "format": "uuid"
                             },
-                            "namespace": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 63
-                            },
-                            "workload_kind": {
+                            "phase": {
                               "enum": [
-                                "Deployment",
-                                "StatefulSet",
-                                "Pod"
+                                "Pending",
+                                "Approved",
+                                "Denied",
+                                "Revoked",
+                                "Expired",
+                                "Exhausted"
                               ]
                             },
-                            "workload_name": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 253
+                            "revision": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 3
                             },
-                            "pod_name": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 253
+                            "kind": {
+                              "enum": [
+                                "adHocCapture",
+                                "policy"
+                              ]
                             },
-                            "namespace_uid": {
+                            "capture_id": {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 64
+                              "format": "uuid"
                             },
-                            "workload_uid": {
+                            "preview_id": {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 64
-                            }
-                          },
-                          "required": [
-                            "cluster_id",
-                            "namespace",
-                            "workload_kind",
-                            "workload_name"
-                          ]
-                        },
-                        "data_class": {
-                          "enum": [
-                            "metadata",
-                            "extract",
-                            "raw"
-                          ]
-                        },
-                        "reasons": {
-                          "type": "array",
-                          "minItems": 1,
-                          "maxItems": 16,
-                          "items": {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "properties": {
-                              "action_id": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 64
+                              "format": "uuid"
+                            },
+                            "execution_digest": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "review_digest": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "target": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "cluster_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "namespace": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "workload_kind": {
+                                  "enum": [
+                                    "Deployment",
+                                    "StatefulSet",
+                                    "Pod"
+                                  ]
+                                },
+                                "workload_name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 253
+                                },
+                                "pod_name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 253
+                                },
+                                "namespace_uid": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "workload_uid": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                }
                               },
-                              "code": {
-                                "enum": [
-                                  "rawBytePredicate",
-                                  "rawPackets",
-                                  "httpHeaders",
-                                  "syscallArguments",
-                                  "liveProfile",
-                                  "recordingApprovalRequired",
-                                  "policyCollection"
+                              "required": [
+                                "cluster_id",
+                                "namespace",
+                                "workload_kind",
+                                "workload_name"
+                              ]
+                            },
+                            "data_class": {
+                              "enum": [
+                                "metadata",
+                                "extract",
+                                "raw"
+                              ]
+                            },
+                            "reasons": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 16,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "action_id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "code": {
+                                    "enum": [
+                                      "rawBytePredicate",
+                                      "rawPackets",
+                                      "httpHeaders",
+                                      "syscallArguments",
+                                      "liveProfile",
+                                      "recordingApprovalRequired",
+                                      "policyCollection"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "action_id",
+                                  "code"
                                 ]
                               }
                             },
-                            "required": [
-                              "action_id",
-                              "code"
-                            ]
-                          }
-                        },
-                        "observation_limits": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "max_session_seconds": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "maximum": 3600
-                            },
-                            "max_observed_bytes": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "maximum": 1099511627776
-                            },
-                            "max_bytes_per_second": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "maximum": 1073741824
-                            },
-                            "max_concurrent_sessions": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "maximum": 1000
-                            },
-                            "max_observed_events": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 1000000000
-                            }
-                          },
-                          "required": [
-                            "max_session_seconds",
-                            "max_observed_bytes",
-                            "max_bytes_per_second",
-                            "max_concurrent_sessions"
-                          ]
-                        },
-                        "requested_by": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "issuer": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 2048
-                            },
-                            "subject": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 256
-                            },
-                            "client_id": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 256
-                            }
-                          },
-                          "required": [
-                            "issuer",
-                            "subject",
-                            "client_id"
-                          ]
-                        },
-                        "requested_at": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "review_until": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "lifetime_seconds": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 31536000
-                        },
-                        "decision": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "decision": {
-                              "enum": [
-                                "approved",
-                                "denied"
+                            "observation_limits": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "max_session_seconds": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 3600
+                                },
+                                "max_observed_bytes": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 1099511627776
+                                },
+                                "max_bytes_per_second": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 1073741824
+                                },
+                                "max_concurrent_sessions": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 1000
+                                },
+                                "max_observed_events": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000000000
+                                }
+                              },
+                              "required": [
+                                "max_session_seconds",
+                                "max_observed_bytes",
+                                "max_bytes_per_second",
+                                "max_concurrent_sessions"
                               ]
                             },
-                            "decided_by": {
+                            "requested_by": {
                               "type": "object",
                               "additionalProperties": false,
                               "properties": {
@@ -351,115 +304,100 @@
                                 "client_id"
                               ]
                             },
-                            "decided_at": {
+                            "requested_at": {
                               "type": "string",
                               "format": "date-time"
                             },
-                            "reason": {
+                            "review_until": {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 512
+                              "format": "date-time"
                             },
-                            "authentication_context": {
+                            "lifetime_seconds": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 31536000
+                            },
+                            "decision": {
                               "type": "object",
                               "additionalProperties": false,
                               "properties": {
-                                "acr": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 128
+                                "decision": {
+                                  "enum": [
+                                    "approved",
+                                    "denied"
+                                  ]
                                 },
-                                "authenticated_at": {
+                                "decided_by": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "issuer": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 2048
+                                    },
+                                    "subject": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "client_id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    }
+                                  },
+                                  "required": [
+                                    "issuer",
+                                    "subject",
+                                    "client_id"
+                                  ]
+                                },
+                                "decided_at": {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "authentication_context": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "acr": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 128
+                                    },
+                                    "authenticated_at": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    }
+                                  },
+                                  "required": [
+                                    "acr",
+                                    "authenticated_at"
+                                  ]
                                 }
                               },
                               "required": [
-                                "acr",
-                                "authenticated_at"
+                                "decision",
+                                "decided_by",
+                                "decided_at",
+                                "reason"
                               ]
-                            }
-                          },
-                          "required": [
-                            "decision",
-                            "decided_by",
-                            "decided_at",
-                            "reason"
-                          ]
-                        },
-                        "not_after": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "revoked_at": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "revoked_by": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "issuer": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 2048
                             },
-                            "subject": {
+                            "not_after": {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 256
+                              "format": "date-time"
                             },
-                            "client_id": {
+                            "revoked_at": {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 256
-                            }
-                          },
-                          "required": [
-                            "issuer",
-                            "subject",
-                            "client_id"
-                          ]
-                        },
-                        "can_decide": {
-                          "type": "boolean"
-                        },
-                        "can_revoke": {
-                          "type": "boolean"
-                        },
-                        "approval_navigation_uri": {
-                          "type": "string",
-                          "format": "uri",
-                          "maxLength": 2048
-                        },
-                        "preview_deadline": {
-                          "type": "string",
-                          "format": "date-time",
-                          "description": "Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans."
-                        },
-                        "capture_deadline_rule": {
-                          "enum": [
-                            "previewDeadline",
-                            "acceptanceWithinGrant",
-                            "policyAuthority"
-                          ],
-                          "description": "Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry."
-                        },
-                        "capture_window_seconds": {
-                          "type": "integer",
-                          "const": 300,
-                          "description": "Maximum window fixed once at acceptance, never beyond original approval expiry."
-                        },
-                        "policy": {
-                          "type": "object",
-                          "additionalProperties": false,
-                          "properties": {
-                            "uid": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 64
+                              "format": "date-time"
                             },
-                            "executor": {
+                            "revoked_by": {
                               "type": "object",
                               "additionalProperties": false,
                               "properties": {
@@ -485,228 +423,584 @@
                                 "client_id"
                               ]
                             },
-                            "authority_issued_at": {
+                            "can_decide": {
+                              "type": "boolean"
+                            },
+                            "can_revoke": {
+                              "type": "boolean"
+                            },
+                            "approval_navigation_uri": {
                               "type": "string",
-                              "format": "date-time"
+                              "format": "uri",
+                              "maxLength": 2048
                             },
-                            "authority_not_after": {
+                            "preview_deadline": {
                               "type": "string",
-                              "format": "date-time"
+                              "format": "date-time",
+                              "description": "Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans."
                             },
-                            "max_executions": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "maximum": 10000
+                            "capture_deadline_rule": {
+                              "enum": [
+                                "previewDeadline",
+                                "acceptanceWithinGrant",
+                                "policyAuthority"
+                              ],
+                              "description": "Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry."
                             },
-                            "executions_used": {
+                            "capture_window_seconds": {
                               "type": "integer",
-                              "minimum": 0,
-                              "maximum": 10000
+                              "const": 300,
+                              "description": "Maximum window fixed once at acceptance, never beyond original approval expiry."
                             },
-                            "max_collected_bytes": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "maximum": 1099511627776
-                            },
-                            "max_observed_bytes": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 1099511627776
-                            },
-                            "collected_bytes_used": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 1099511627776
-                            },
-                            "observed_bytes_used": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 1099511627776
+                            "policy": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "uid": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "executor": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "issuer": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 2048
+                                    },
+                                    "subject": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "client_id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    }
+                                  },
+                                  "required": [
+                                    "issuer",
+                                    "subject",
+                                    "client_id"
+                                  ]
+                                },
+                                "authority_issued_at": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "authority_not_after": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "max_executions": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 10000
+                                },
+                                "executions_used": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "max_collected_bytes": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 1099511627776
+                                },
+                                "max_observed_bytes": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1099511627776
+                                },
+                                "collected_bytes_used": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1099511627776
+                                },
+                                "observed_bytes_used": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1099511627776
+                                },
+                                "max_observed_events": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000000000,
+                                  "description": "Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation."
+                                },
+                                "observed_events_used": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000000000,
+                                  "description": "Conservative charged event units, including uncertain observations."
+                                }
+                              },
+                              "required": [
+                                "uid",
+                                "executor",
+                                "authority_issued_at",
+                                "authority_not_after",
+                                "max_executions",
+                                "executions_used",
+                                "max_collected_bytes",
+                                "max_observed_bytes",
+                                "collected_bytes_used",
+                                "observed_bytes_used"
+                              ]
                             }
                           },
                           "required": [
-                            "uid",
-                            "executor",
-                            "authority_issued_at",
-                            "authority_not_after",
-                            "max_executions",
-                            "executions_used",
-                            "max_collected_bytes",
-                            "max_observed_bytes",
-                            "collected_bytes_used",
-                            "observed_bytes_used"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "grant_id",
-                        "phase",
-                        "revision",
-                        "kind",
-                        "execution_digest",
-                        "review_digest",
-                        "target",
-                        "data_class",
-                        "reasons",
-                        "requested_by",
-                        "requested_at",
-                        "review_until",
-                        "lifetime_seconds",
-                        "can_decide",
-                        "can_revoke",
-                        "approval_navigation_uri",
-                        "capture_deadline_rule"
-                      ],
-                      "allOf": [
-                        {
-                          "if": {
-                            "properties": {
-                              "capture_deadline_rule": {
-                                "const": "acceptanceWithinGrant"
-                              }
-                            }
-                          },
-                          "then": {
-                            "required": [
-                              "capture_window_seconds"
-                            ]
-                          },
-                          "else": {
-                            "not": {
-                              "required": [
-                                "capture_window_seconds"
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "if": {
-                            "properties": {
-                              "kind": {
-                                "const": "adHocCapture"
-                              }
-                            }
-                          },
-                          "then": {
-                            "required": [
-                              "capture_id",
-                              "preview_id",
-                              "preview_deadline"
-                            ],
-                            "properties": {
-                              "lifetime_seconds": {
-                                "minimum": 60,
-                                "maximum": 28800
+                            "grant_id",
+                            "phase",
+                            "revision",
+                            "kind",
+                            "execution_digest",
+                            "review_digest",
+                            "target",
+                            "data_class",
+                            "reasons",
+                            "requested_by",
+                            "requested_at",
+                            "review_until",
+                            "lifetime_seconds",
+                            "can_decide",
+                            "can_revoke",
+                            "approval_navigation_uri",
+                            "capture_deadline_rule"
+                          ],
+                          "allOf": [
+                            {
+                              "if": {
+                                "properties": {
+                                  "capture_deadline_rule": {
+                                    "const": "acceptanceWithinGrant"
+                                  }
+                                }
                               },
-                              "target": {
+                              "then": {
                                 "required": [
-                                  "pod_name"
+                                  "capture_window_seconds"
+                                ]
+                              },
+                              "else": {
+                                "not": {
+                                  "required": [
+                                    "capture_window_seconds"
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "if": {
+                                "properties": {
+                                  "kind": {
+                                    "const": "adHocCapture"
+                                  }
+                                }
+                              },
+                              "then": {
+                                "required": [
+                                  "capture_id",
+                                  "preview_id",
+                                  "preview_deadline"
                                 ],
+                                "properties": {
+                                  "lifetime_seconds": {
+                                    "minimum": 60,
+                                    "maximum": 28800
+                                  },
+                                  "target": {
+                                    "required": [
+                                      "pod_name"
+                                    ],
+                                    "not": {
+                                      "anyOf": [
+                                        {
+                                          "required": [
+                                            "namespace_uid"
+                                          ]
+                                        },
+                                        {
+                                          "required": [
+                                            "workload_uid"
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "capture_deadline_rule": {
+                                    "enum": [
+                                      "previewDeadline",
+                                      "acceptanceWithinGrant"
+                                    ]
+                                  }
+                                },
                                 "not": {
                                   "anyOf": [
                                     {
                                       "required": [
-                                        "namespace_uid"
+                                        "policy"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            {
+                              "if": {
+                                "properties": {
+                                  "kind": {
+                                    "const": "policy"
+                                  }
+                                }
+                              },
+                              "then": {
+                                "required": [
+                                  "policy",
+                                  "not_after"
+                                ],
+                                "properties": {
+                                  "target": {
+                                    "required": [
+                                      "namespace_uid",
+                                      "workload_uid"
+                                    ],
+                                    "not": {
+                                      "anyOf": [
+                                        {
+                                          "required": [
+                                            "pod_name"
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "capture_deadline_rule": {
+                                    "const": "policyAuthority"
+                                  },
+                                  "can_resume": {
+                                    "const": false
+                                  },
+                                  "can_resolve": {
+                                    "const": false
+                                  },
+                                  "resume_requires_original_client": {
+                                    "const": false
+                                  }
+                                },
+                                "not": {
+                                  "anyOf": [
+                                    {
+                                      "required": [
+                                        "capture_id"
                                       ]
                                     },
                                     {
                                       "required": [
-                                        "workload_uid"
+                                        "preview_id"
                                       ]
-                                    }
-                                  ]
-                                }
-                              },
-                              "capture_deadline_rule": {
-                                "enum": [
-                                  "previewDeadline",
-                                  "acceptanceWithinGrant"
-                                ]
-                              }
-                            },
-                            "not": {
-                              "anyOf": [
-                                {
-                                  "required": [
-                                    "policy"
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          "if": {
-                            "properties": {
-                              "kind": {
-                                "const": "policy"
-                              }
-                            }
-                          },
-                          "then": {
-                            "required": [
-                              "policy",
-                              "not_after"
-                            ],
-                            "properties": {
-                              "target": {
-                                "required": [
-                                  "namespace_uid",
-                                  "workload_uid"
-                                ],
-                                "not": {
-                                  "anyOf": [
+                                    },
                                     {
                                       "required": [
-                                        "pod_name"
+                                        "preview_deadline"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "result_access"
+                                      ]
+                                    },
+                                    {
+                                      "required": [
+                                        "remaining_bytes"
                                       ]
                                     }
                                   ]
                                 }
-                              },
-                              "capture_deadline_rule": {
-                                "const": "policyAuthority"
-                              },
-                              "can_resume": {
-                                "const": false
-                              },
-                              "can_resolve": {
-                                "const": false
-                              },
-                              "resume_requires_original_client": {
-                                "const": false
                               }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "grant_id": {
+                              "type": "string",
+                              "format": "uuid"
                             },
-                            "not": {
-                              "anyOf": [
-                                {
-                                  "required": [
-                                    "capture_id"
+                            "phase": {
+                              "enum": [
+                                "Pending",
+                                "Approved",
+                                "Denied",
+                                "Revoked",
+                                "Expired",
+                                "Exhausted"
+                              ]
+                            },
+                            "revision": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 3
+                            },
+                            "kind": {
+                              "const": "rawQuery"
+                            },
+                            "execution_digest": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "review_digest": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "data_class": {
+                              "const": "raw"
+                            },
+                            "reasons": {
+                              "type": "array",
+                              "maxItems": 0
+                            },
+                            "requested_by": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "issuer": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2048
+                                },
+                                "subject": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "client_id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                }
+                              },
+                              "required": [
+                                "issuer",
+                                "subject",
+                                "client_id"
+                              ]
+                            },
+                            "requested_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "review_until": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "lifetime_seconds": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 31536000
+                            },
+                            "decision": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "decision": {
+                                  "enum": [
+                                    "approved",
+                                    "denied"
                                   ]
                                 },
-                                {
+                                "decided_by": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "issuer": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 2048
+                                    },
+                                    "subject": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    },
+                                    "client_id": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 256
+                                    }
+                                  },
                                   "required": [
-                                    "preview_id"
+                                    "issuer",
+                                    "subject",
+                                    "client_id"
                                   ]
                                 },
-                                {
-                                  "required": [
-                                    "preview_deadline"
-                                  ]
+                                "decided_at": {
+                                  "type": "string",
+                                  "format": "date-time"
                                 },
-                                {
-                                  "required": [
-                                    "result_access"
-                                  ]
+                                "reason": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
                                 },
-                                {
+                                "authentication_context": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "acr": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 128
+                                    },
+                                    "authenticated_at": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    }
+                                  },
                                   "required": [
-                                    "remaining_bytes"
+                                    "acr",
+                                    "authenticated_at"
                                   ]
                                 }
+                              },
+                              "required": [
+                                "decision",
+                                "decided_by",
+                                "decided_at",
+                                "reason"
+                              ]
+                            },
+                            "not_after": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "revoked_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "revoked_by": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "issuer": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2048
+                                },
+                                "subject": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                },
+                                "client_id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 256
+                                }
+                              },
+                              "required": [
+                                "issuer",
+                                "subject",
+                                "client_id"
+                              ]
+                            },
+                            "can_decide": {
+                              "type": "boolean"
+                            },
+                            "can_revoke": {
+                              "type": "boolean"
+                            },
+                            "approval_navigation_uri": {
+                              "type": "string",
+                              "format": "uri",
+                              "maxLength": 2048
+                            },
+                            "raw_access": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "properties": {
+                                "case_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                },
+                                "operations": {
+                                  "type": "array",
+                                  "items": {
+                                    "const": "download_artifact"
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 1
+                                },
+                                "max_bytes": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 1099511627776
+                                },
+                                "max_operations": {
+                                  "const": 10000
+                                },
+                                "not_after": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "artifact_count": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 64
+                                },
+                                "bytes_used": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1099511627776
+                                },
+                                "operations_used": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                }
+                              },
+                              "required": [
+                                "case_id",
+                                "reason",
+                                "operations",
+                                "max_bytes",
+                                "max_operations",
+                                "not_after",
+                                "artifact_count",
+                                "bytes_used",
+                                "operations_used"
                               ]
                             }
-                          }
+                          },
+                          "required": [
+                            "grant_id",
+                            "phase",
+                            "revision",
+                            "kind",
+                            "execution_digest",
+                            "review_digest",
+                            "data_class",
+                            "reasons",
+                            "requested_by",
+                            "requested_at",
+                            "review_until",
+                            "lifetime_seconds",
+                            "can_decide",
+                            "can_revoke",
+                            "approval_navigation_uri",
+                            "raw_access"
+                          ]
                         }
                       ]
                     }

@@ -27,6 +27,9 @@ func (a APIOutcome) Valid() bool {
 }
 
 type ContextVerification struct {
+	// NativeBytes is independently verified native length. Nil is historical
+	// unknown and stays omitted so existing encrypted audit bytes do not change.
+	NativeBytes                                                                 *int64      `json:",omitempty"`
 	APIOutcome                                                                  *APIOutcome `json:",omitempty"`
 	RootID, CaptureID, ArtifactID, AttemptID, PermissionEpoch                   string
 	PermissionSequence                                                          int64
@@ -45,7 +48,7 @@ func (r ContextVerification) Valid() bool {
 			return false
 		}
 	}
-	return (r.APIOutcome == nil || r.APIOutcome.Valid() && r.APIOutcome.ExecutionDigest == r.AuthorityDigest && !r.APIOutcome.CompletedAt.After(r.VerifiedAt)) && r.PermissionSequence > 0 && !r.VerifiedAt.IsZero() && r.VerifiedAt.Before(r.WriteUntil) && !r.WriteUntil.After(r.ExpiresAt) && r.ExpiresAt.Before(r.DeleteBy)
+	return (r.NativeBytes == nil || *r.NativeBytes >= 0 && *r.NativeBytes <= artifact.MaxNativeBytes) && (r.APIOutcome == nil || r.APIOutcome.Valid() && r.APIOutcome.ExecutionDigest == r.AuthorityDigest && !r.APIOutcome.CompletedAt.After(r.VerifiedAt)) && r.PermissionSequence > 0 && !r.VerifiedAt.IsZero() && r.VerifiedAt.Before(r.WriteUntil) && !r.WriteUntil.After(r.ExpiresAt) && r.ExpiresAt.Before(r.DeleteBy)
 }
 func ContextVerificationKey(root, capture string) string {
 	return "context-verification/v1/" + root + "/" + capture + "/record"

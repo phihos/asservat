@@ -6,8 +6,10 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/conversion"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,7 +35,7 @@ func TestPolicyCompilesFiniteRecorderConfigurationWithoutPodOrCapture(t *testing
 	s := recorderPolicySpec()
 	s["grantRef"] = "00000000-0000-4000-8000-000000000001"
 	b, _ := json.Marshal(s)
-	p, err := CompilePolicyWithRecorders(b, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
+	p, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, b, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
 	if err != nil || !p.Valid() || p.Recorder == nil || p.GrantRef != s["grantRef"] {
 		t.Fatal(p, err)
 	}
@@ -59,7 +61,7 @@ func TestPolicyRecorderRejectsUnsupportedLifecycleAndAmbiguousSelection(t *testi
 	component := composition["components"].([]any)[0].(map[string]any)
 	component["overrides"] = []any{}
 	b, _ := json.Marshal(s)
-	_, err := CompilePolicyWithRecorders(b, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
+	_, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, b, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
 	var c planningvalue.CompositionError
 	if !errors.As(err, &c) || c.Code != planningvalue.CompositionRecorderUnavailable {
 		t.Fatal("ongoing source accepted", err)
@@ -67,7 +69,7 @@ func TestPolicyRecorderRejectsUnsupportedLifecycleAndAmbiguousSelection(t *testi
 	s = recorderPolicySpec()
 	s["recipeRef"] = restartSpec()["recipeRef"]
 	b, _ = json.Marshal(s)
-	_, err = CompilePolicyWithRecorders(b, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
+	_, err = CompilePolicyWithRecorders(context.Background(), targets.Request{}, b, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
 	var field value.PolicyFieldError
 	if !errors.As(err, &field) || field.Path != "spec.recipeRef" {
 		t.Fatal("ambiguous recipe selection", err)
@@ -91,7 +93,7 @@ func testPolicyRecorderCompilerOne(raw json.RawMessage) (planningvalue.PolicyRec
 func TestRecorderPolicyScopeControlEditsDoNotReissueAuthority(t *testing.T) {
 	s := recorderPolicySpec()
 	raw, _ := json.Marshal(s)
-	p, err := CompilePolicyWithRecorders(raw, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
+	p, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, raw, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +124,7 @@ func TestRecorderPolicyScopeControlEditsDoNotReissueAuthority(t *testing.T) {
 
 func TestRecorderPolicyScopeRefusesUnreviewableConfigurationExpansion(t *testing.T) {
 	raw, _ := json.Marshal(recorderPolicySpec())
-	p, err := CompilePolicyWithRecorders(raw, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
+	p, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, raw, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +152,7 @@ func TestRecorderPolicyScopeRefusesUnreviewableConfigurationExpansion(t *testing
 
 func TestRecorderPolicyUnsharedScopeDigestBaseline(t *testing.T) {
 	raw, _ := json.Marshal(recorderPolicySpec())
-	p, err := CompilePolicyWithRecorders(raw, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
+	p, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, raw, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
 	if err != nil {
 		t.Fatal(err)
 	}

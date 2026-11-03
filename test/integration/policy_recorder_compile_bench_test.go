@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	planvalue "asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/conversion"
 )
 
@@ -39,7 +40,7 @@ func BenchmarkPolicyRecorderPollCompilation(b *testing.B) {
 			spec := bytes.ReplaceAll(original, []byte("tcp dst port 80"), []byte(item.filter))
 			b.ReportAllocs()
 			for b.Loop() {
-				p, err := captureapp.CompilePolicyWithRecorders(spec, planningapp.ContextRecipeName, planningapp.RecipeDigest(), captureapp.SingleRecorder(compile))
+				p, err := captureapp.CompilePolicyWithRecorders(b.Context(), targets.Request{}, spec, planningapp.ContextRecipeName, planningapp.RecipeDigest(), captureapp.SingleRecorder(compile))
 				if err != nil || p.Recorder == nil {
 					b.Fatal("real policy compilation", err)
 				}

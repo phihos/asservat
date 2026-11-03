@@ -75,7 +75,7 @@ func grantFromRow(r custodydb.AccessGrant) (authorization.Grant, error) {
 		return authorization.Grant{}, authapp.ErrGrantUnavailable
 	}
 	g := authorization.Grant{ID: uid(r.ID), RootID: uid(r.RootID), Kind: r.Kind, PreviewID: uid(r.PreviewID), CaptureID: uid(r.CaptureID),
-		Target:    authorization.Target{ClusterID: uid(r.ClusterID), NamespaceUID: r.NamespaceUid, WorkloadUID: r.WorkloadUid, PodUID: r.PodUid.String},
+		Target:    authorization.Target{ClusterID: uid(r.ClusterID), NamespaceUID: r.NamespaceUid.String, WorkloadUID: r.WorkloadUid.String, PodUID: r.PodUid.String},
 		DataClass: r.DataClass, Scope: bytes.Clone(r.Scope), Review: bytes.Clone(r.Review),
 		Requester:   identity.Principal{Issuer: r.RequesterIssuer, Subject: r.RequesterSubject, ClientID: r.RequesterClient, Kind: identity.Human},
 		RequestedAt: r.RequestedAt.Time, ReviewUntil: r.ReviewUntil.Time, Lifetime: time.Duration(r.LifetimeSeconds) * time.Second,
@@ -99,6 +99,16 @@ func grantFromRow(r custodydb.AccessGrant) (authorization.Grant, error) {
 			return authorization.Grant{}, authapp.ErrGrantUnavailable
 		}
 		g.PolicySpend = authorization.PolicyGrantSpend{Executions: r.PolicyExecutionsSpent, CollectedBytes: r.PolicyBytesSpent, ObservedBytes: r.PolicyObservedBytesSpent, ObservedEvents: r.PolicyObservedEventsSpent}
+	} else if r.Kind == authorization.GrantRawQuery {
+		var raw authorization.RawQueryScope
+		if strictJSON(string(r.RawQuery), &raw) != nil || r.PreviewID.Valid || r.CaptureID.Valid || r.ClusterID.Valid || r.NamespaceUid.Valid || r.WorkloadUid.Valid || r.PodUid.Valid || r.RequesterKind != string(identity.Human) || r.RequestOperation != "requestRawAccess" || !bytes.Equal(r.RequesterKey, policyGrantActorKey(g.Requester)) || len(r.ResultAccess) != 0 || len(r.ResultAccessDigest) != 0 || !r.NotAfter.Valid || !r.NotAfter.Time.Equal(raw.NotAfter) || int(r.MaxArtifacts) != len(raw.Artifacts) || r.MaxBytes != raw.MaxBytes || r.MaxOperations != raw.MaxOperations {
+			return authorization.Grant{}, authapp.ErrGrantUnavailable
+		}
+		g.Target = authorization.Target{}
+		g.RawQuery = &raw
+		if !authapp.RawQueryScopeMatches(g) {
+			return authorization.Grant{}, authapp.ErrGrantUnavailable
+		}
 	} else if r.Kind != authorization.GrantAdHocCapture || r.RequesterKind != string(identity.Human) || r.RequestOperation != "requestGrant" || len(r.RequesterKey) != 0 {
 		return authorization.Grant{}, authapp.ErrGrantUnavailable
 	}
@@ -161,6 +171,9 @@ func (s *AccessGrants) RequestGrant(ctx context.Context, r authapp.StoredGrantRe
 	}
 	if g.Kind == authorization.GrantPolicy {
 		return s.requestPolicyGrant(ctx, r, recovery)
+	}
+	if g.Kind == authorization.GrantRawQuery {
+		return s.requestRawQueryGrant(ctx, r, recovery)
 	}
 	reasons := make([]grantReasonWire, 0, len(g.Reasons))
 	for _, x := range g.Reasons {
@@ -446,7 +459,16 @@ func childFromRow(r custodydb.AccessGrantChild, parent authorization.Grant) (aut
 		return authorization.GrantChild{}, authapp.ErrGrantUnavailable
 	}
 	copy(c.Output.ArtifactDigest[:], r.ArtifactDigest)
-	if !c.Valid() || c.ParentID != parent.ID || c.Output.CaptureID != parent.CaptureID {
+	if parent.Kind == authorization.GrantRawQuery {
+		expected, ok := rawQueryChildOutput(parent, c.Output.ArtifactID)
+		if !ok || c.Output.CaptureID != expected.CaptureID || c.Output.ActionID != expected.ActionID || c.Output.ArtifactDigest != expected.ArtifactDigest || c.ClientID != parent.Requester.ClientID {
+			return authorization.GrantChild{}, authapp.ErrGrantUnavailable
+		}
+		c.Output = expected
+	} else if parent.Kind != authorization.GrantAdHocCapture || c.Output.CaptureID != parent.CaptureID {
+		return authorization.GrantChild{}, authapp.ErrGrantUnavailable
+	}
+	if !c.Valid() || c.ParentID != parent.ID {
 		return authorization.GrantChild{}, authapp.ErrGrantUnavailable
 	}
 	return c, nil
@@ -510,8 +532,8 @@ func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.Gra
 		if err = authorization.CheckMaterialize(parent, in.Output, in.ClientID, registered, now.Time); err != nil {
 			return err
 		}
-		t := parent.Target
-		if _, err = q.ReadGrantOutputLocator(ctx, custodydb.ReadGrantOutputLocatorParams{RootID: id(s.root), ArtifactID: id(in.Output.ArtifactID), CaptureID: id(parent.CaptureID),
+		t := in.Output.Target
+		if _, err = q.ReadGrantOutputLocator(ctx, custodydb.ReadGrantOutputLocatorParams{RootID: id(s.root), ArtifactID: id(in.Output.ArtifactID), CaptureID: id(in.Output.CaptureID),
 			ClusterID: id(t.ClusterID), NamespaceUid: t.NamespaceUID, WorkloadUid: t.WorkloadUID, PodUid: t.PodUID}); errors.Is(err, pgx.ErrNoRows) {
 			// No published artifact of this capture: never an executable target.
 			return authorization.ErrGrantScope
@@ -525,7 +547,7 @@ func (s *AccessGrants) MaterializeGrantChild(ctx context.Context, in authapp.Gra
 				return err
 			}
 		}
-		child, err := q.InsertGrantChild(ctx, custodydb.InsertGrantChildParams{ID: id(in.ChildID), RootID: id(s.root), ParentID: id(in.ParentID), CaptureID: id(parent.CaptureID),
+		child, err := q.InsertGrantChild(ctx, custodydb.InsertGrantChildParams{ID: id(in.ChildID), RootID: id(s.root), ParentID: id(in.ParentID), CaptureID: id(in.Output.CaptureID),
 			ActionID: in.Output.ActionID, ArtifactID: id(in.Output.ArtifactID), ArtifactDigest: in.Output.ArtifactDigest[:], ClientID: in.ClientID})
 		if err != nil {
 			return err

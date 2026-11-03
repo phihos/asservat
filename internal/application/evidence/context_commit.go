@@ -9,8 +9,10 @@ import (
 
 // ContextVerifier authenticates the full chain and checks the native projection.
 // Expected facts must come from accepted control state, never the upload itself.
+// The returned length is exact native bytes after complete verification, not
+// ciphertext size or the admitted maximum; errors return no usable length.
 type ContextVerifier interface {
-	VerifyContext(context.Context, artifact.ContextExpectation, artifact.Copies) error
+	VerifyContext(context.Context, artifact.ContextExpectation, artifact.Copies) (int64, error)
 }
 
 type ContextCustodian struct {
@@ -48,7 +50,7 @@ func (c ContextCustodian) VerifyAndStore(ctx context.Context, e artifact.Context
 	}
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	if err = c.Verifier.VerifyContext(ctx, e, copies); err != nil {
+	if _, err = c.Verifier.VerifyContext(ctx, e, copies); err != nil {
 		return err
 	}
 	return c.Ledger.StoreCopies(ctx, r, copies)

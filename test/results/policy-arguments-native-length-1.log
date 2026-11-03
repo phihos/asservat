@@ -1,0 +1,21 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence
+=== RUN   TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence/argument-observation-companion
+    policy_recording_admission_test.go:477: actual Tick accepted executions=1; native output=8388608 grant executions=1 output=8388608 reservations=1
+    policy_recording_admission_test.go:479: actual raw policy admission replay retained capture/scope/deadline and require-all=false
+    policy_recording_admission_test.go:479: actual argument compiler -> accepted policy/grant -> admission/intent -> API prepare: expired source rolls entire graph back; exactly one dual debit; exact replay and replacement epoch refusal; historical publisher source uses narrow SELECT
+=== RUN   TestContextAdmissionWithRealServices/verified-native-length
+    context_publication_test.go:210: recorded native length <nil> custody unavailable; retain the original attempt and charge
+=== RUN   TestContextAdmissionWithRealServices/verified-native-length-legacy
+    context_publication_test.go:210: recorded native length <nil> custody unavailable; retain the original attempt and charge
+--- FAIL: TestContextAdmissionWithRealServices (8.92s)
+    --- PASS: TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence (6.94s)
+        --- PASS: TestContextAdmissionWithRealServices/policy-recorder-team-action-grant-and-occurrence/argument-observation-companion (6.94s)
+    --- FAIL: TestContextAdmissionWithRealServices/verified-native-length (0.91s)
+    --- FAIL: TestContextAdmissionWithRealServices/verified-native-length-legacy (0.66s)
+=== RUN   TestCustodyUpgradeSchemaWithRealPostgres
+    upgrade_schema_test.go:405: upgrade schema: 129 to 130 by the schema owner, idempotent, floor "asservat:oldest-binary-schema=102", unknown history refused
+--- PASS: TestCustodyUpgradeSchemaWithRealPostgres (4.65s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	13.643s
+FAIL

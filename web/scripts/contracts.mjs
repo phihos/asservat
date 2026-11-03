@@ -99,7 +99,7 @@ await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_
 await operationBundle(['explain_access'], 'access');
 await operationBundle(['preview_access_change'], 'access-preview');
 await operationBundle(['preview_retention_change'], 'retention-preview');
-await operationBundle(['request_policy_grant', 'get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
+await operationBundle(['request_policy_grant', 'request_raw_access', 'get_grant', 'list_reviews', 'decide_review', 'revoke_grant'], 'approvals');
 
 // AJV's standalone ESM source references a small fixed set of CommonJS helpers.
 // Explicit ESM imports let Vite bundle them; no browser require/eval is allowed.

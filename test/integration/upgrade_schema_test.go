@@ -143,6 +143,26 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("original argument authority shape", e)
 		}
 	}
+	var originalRawGrantShape, originalRawGrantGuard, originalRawAuditFunctions string
+	const rawAuditFunctions = `SELECT pg_get_functiondef('public.operation_audit_lane(text)'::regprocedure)||pg_get_functiondef('public.operation_audit_human_input_valid(text,text)'::regprocedure)`
+	const rawGrantShape = `SELECT jsonb_build_object('constraints',(SELECT jsonb_agg(x ORDER BY x) FROM (SELECT pg_get_constraintdef(oid) x FROM pg_constraint WHERE conrelid IN ('access_grant'::regclass,'access_grant_child'::regclass)) q),'columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name,c.ordinal_position) FROM (SELECT table_name,column_name,ordinal_position,is_nullable,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('access_grant','access_grant_child')) c))::text`
+	if head == 131 {
+		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&originalRawAuditFunctions); e != nil {
+			t.Fatal(e)
+		}
+		if e = conn.QueryRow(ctx, rawGrantShape).Scan(&originalRawGrantShape); e != nil {
+			t.Fatal(e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.protect_access_grant()'::regprocedure)`).Scan(&originalRawGrantGuard); e != nil {
+			t.Fatal(e)
+		}
+	}
+	var originalNativeLengthGuard string
+	if head == 130 {
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.protect_context_verification()'::regprocedure)`).Scan(&originalNativeLengthGuard); e != nil {
+			t.Fatal(e)
+		}
+	}
 	upgrade, e := postgres.NewUpgradeSchema(config)
 	if e != nil {
 		t.Fatal(e)
@@ -375,6 +395,37 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("argument authority Up after Down", from, to, e)
 		}
 		t.Log("SQL128 empty Down restored exact four functions/session constraints/column shapes; Up reapplied")
+	}
+	if head == 130 {
+		if _, e = p.DownTo(ctx, head-1); e != nil {
+			t.Fatal("empty native length Down", e)
+		}
+		var guard string
+		var exists bool
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.protect_context_verification()'::regprocedure), EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='context_verification' AND column_name='native_bytes')`).Scan(&guard, &exists); e != nil || guard != originalNativeLengthGuard || exists {
+			t.Fatal("native length Down changed original shape", exists, e)
+		}
+		if _, e = p.Up(ctx); e != nil {
+			t.Fatal("native length Up", e)
+		}
+	}
+	if head == 131 {
+		if _, e = p.DownTo(ctx, 130); e != nil {
+			t.Fatal("empty raw grant Down", e)
+		}
+		var shape, guard, auditFunctions string
+		if e = conn.QueryRow(ctx, rawAuditFunctions).Scan(&auditFunctions); e != nil || auditFunctions != originalRawAuditFunctions {
+			t.Fatal("raw Down changed audit functions", e)
+		}
+		if e = conn.QueryRow(ctx, rawGrantShape).Scan(&shape); e != nil || shape != originalRawGrantShape {
+			t.Fatal("raw Down changed old grant/child shape", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.protect_access_grant()'::regprocedure)`).Scan(&guard); e != nil || guard != originalRawGrantGuard {
+			t.Fatal("raw Down changed original grant guard", e)
+		}
+		if _, e = p.Up(ctx); e != nil {
+			t.Fatal("raw grant Up", e)
+		}
 	}
 	// A version this binary does not know is refused, not skipped.
 	if _, e = conn.Exec(ctx, "INSERT INTO goose_db_version(version_id,is_applied) VALUES($1,true)", head+1); e != nil {

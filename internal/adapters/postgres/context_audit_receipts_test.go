@@ -66,3 +66,23 @@ func TestUnversionedHistoryRemainsHistoricalProgress(t *testing.T) {
 		}
 	}
 }
+
+func TestCurrentCatalogNativeLengthIsOptionalButBounded(t *testing.T) {
+	row := publishedReceiptFixture(t)
+	e, err := currentPublishedContext(row)
+	if err != nil || row.ContextVerification.NativeBytes.Valid {
+		t.Fatal("legacy unknown size changed", err)
+	}
+	for _, size := range []int64{0, 353, e.Registration.NativeLimit} {
+		row.ContextVerification.NativeBytes = pgtype.Int8{Int64: size, Valid: true}
+		if _, err := currentPublishedContext(row); err != nil {
+			t.Fatal("verified length refused", size, err)
+		}
+	}
+	for _, size := range []int64{-1, e.Registration.NativeLimit + 1} {
+		row.ContextVerification.NativeBytes = pgtype.Int8{Int64: size, Valid: true}
+		if _, err := currentPublishedContext(row); err == nil {
+			t.Fatal("invalid verified length accepted", size)
+		}
+	}
+}

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ApprovalsWorkspace } from './ApprovalsWorkspace';
+import { operations as approvalOperations } from './http';
 import type { Data, Input, Operation, Operations, Output } from './http';
 import { validInput_decide_review, validOutput_get_grant, validOutput_list_reviews, validOutput_decide_review } from '../generated/validate-approvals';
 import { id, result, session, SyntheticOperations, acceptedResult, resolvedAcceptedResult } from '../capture/test-fixtures';
@@ -15,7 +16,8 @@ const row = {
   reasons: [{ action_id: 'a1', code: 'rawBytePredicate' }], requested_by: principal('synthetic-developer'), requested_at: iso(-60_000), review_until: iso(3_540_000), preview_deadline: iso(-240_000), capture_deadline_rule: 'acceptanceWithinGrant', capture_window_seconds: 300,
   lifetime_seconds: 3600, can_decide: true, can_revoke: true, approval_navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41),
 } satisfies Data<'list_reviews'>['approvals'][number];
-const grant: Data<'get_grant'> = { ...row, can_resume: false, can_resolve: false, resume_requires_original_client: false, observation_limits: { max_session_seconds: 15, max_observed_bytes: 1 << 30, max_bytes_per_second: 16 << 20, max_concurrent_sessions: 1 },
+type CollectionGrant = Extract<Data<'get_grant'>, { kind: 'adHocCapture' | 'policy' }>;
+const grant: CollectionGrant = { ...row, can_resume: false, can_resolve: false, resume_requires_original_client: false, observation_limits: { max_session_seconds: 15, max_observed_bytes: 1 << 30, max_bytes_per_second: 16 << 20, max_concurrent_sessions: 1 },
   actions: [{ action_id: 'a1', kind: 'packetCapture', execution_mode: 'ongoing', before: '30s', after: '10s', filter: 'tcp[13] & 2 != 0', filter_digest: 'ef'.repeat(32), filter_instructions: 4, max_bytes: 16 << 20, ring_max_bytes: 16 << 20, ring_max_age: '50s', sensitive: ['rawBytePredicate'] }] };
 
 class SyntheticApprovals implements Operations {
@@ -142,8 +144,8 @@ it('does not tell an independent approved-plan reviewer to continue the requeste
 });
 
 
-function teamPolicyGrant(): Data<'get_grant'> {
-  const value: Data<'get_grant'> = { ...structuredClone(grant), kind: 'policy', phase: 'Approved', revision: 2, capture_deadline_rule: 'policyAuthority',
+function teamPolicyGrant(): CollectionGrant {
+  const value: CollectionGrant = { ...structuredClone(grant), kind: 'policy', phase: 'Approved', revision: 2, capture_deadline_rule: 'policyAuthority',
     reasons: [{ action_id: 'a1', code: 'policyCollection' }],
     target: { cluster_id: id(1), namespace: 'payments', namespace_uid: 'namespace-uid', workload_kind: 'Deployment', workload_name: 'api', workload_uid: 'workload-uid' },
     policy: { uid: 'team-policy-uid', executor: principal('installation-policy-executor'), authority_issued_at: iso(-86_400_000), authority_not_after: iso(30*86_400_000), max_executions: 10, max_collected_bytes: 64 << 20, max_observed_bytes: 1 << 30, executions_used: 4, collected_bytes_used: 16 << 20, observed_bytes_used: 4000 },
@@ -187,8 +189,9 @@ it('does not infer team revocation from requester provenance and rejects persona
 
 it('shows profile parameters and endpoint without a fabricated recording ring', async () => {
   const client = new SyntheticApprovals();
-  client.detail = { ...grant, observation_limits: undefined, data_class: 'raw', reasons: [{ action_id: 'heap', code: 'liveProfile' }],
+  const profile: CollectionGrant = { ...grant, observation_limits: undefined, data_class: 'raw', reasons: [{ action_id: 'heap', code: 'liveProfile' }],
     actions: [{ action_id: 'heap', kind: 'profile', execution_mode: 'onTrigger', max_bytes: 16 << 20, sensitive: ['liveProfile'], profile: { runtime: 'go', type: 'heap', mode: 'snapshot', source: 'httpEndpoint', timeout: '5s', force_gc: true, source_ref: 'go-endpoint', source_name: 'go-pprof-loopback', address_mode: 'targetLoopback', port: 6060, path_policy: 'go-pprof/v1', endpoint_digest: 'ab'.repeat(32) } }] };
+  client.detail = profile;
   expect(validOutput_get_grant(result(client.detail))).toBe(true);
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
   expect(await screen.findByText(/Go profile/)).toBeTruthy();
@@ -198,9 +201,9 @@ it('shows profile parameters and endpoint without a fabricated recording ring', 
   expect(screen.getByText('No pre-trigger history')).toBeTruthy();
   expect(screen.queryByText('Syscalls')).toBeNull();
   expect(screen.queryByText(/0 bytes/)).toBeNull();
-  const mixed = structuredClone(client.detail); Object.assign(mixed.actions[0], { ring_max_bytes: 16 << 20 });
+  const mixed = structuredClone(profile); Object.assign(mixed.actions[0], { ring_max_bytes: 16 << 20 });
   expect(validOutput_get_grant(result(mixed))).toBe(false);
-  const missing = structuredClone(client.detail); delete missing.actions[0].profile;
+  const missing = structuredClone(profile); delete missing.actions[0].profile;
   expect(validOutput_get_grant(result(missing))).toBe(false);
 });
 
@@ -212,4 +215,70 @@ it.each([40000, undefined])('shows only an explicitly reviewed observation event
   const limits = await screen.findByText(/Observation limits bound by this approval/);
   if (maximum === undefined) expect(limits.textContent).not.toMatch(/eligible entry and exit probes/);
   else expect(limits.textContent).toContain('40000 eligible entry and exit probes in total');
+});
+
+it('shows cumulative policy argument event reservations independently of bytes', async () => {
+ const client = new SyntheticApprovals(); client.detail = teamPolicyGrant();
+ Object.assign(client.detail.policy!, {max_observed_events:6000,observed_events_used:2000});
+ expect(validOutput_get_grant(result(client.detail))).toBe(true);
+ render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+ expect(await screen.findByText(/2000 of 6000 eligible entry and exit probes/)).toBeTruthy();
+});
+
+function rawGrant(artifactCount = 2): Extract<Data<'get_grant'>, { kind: 'rawQuery' }> {
+  const { target: _target, capture_id: _capture, preview_id: _preview, preview_deadline: _deadline, capture_deadline_rule: _rule, capture_window_seconds: _window, ...common } = row;
+  return { ...common, kind: 'rawQuery', data_class: 'raw', reasons: [], raw_access: {
+    case_id: id(2), reason: 'Inspect existing incident evidence', operations: ['download_artifact'], max_bytes: artifactCount * 512, max_operations: 10000, not_after: iso(3_600_000), artifact_count: artifactCount, bytes_used: 128, operations_used: 1,
+    artifacts: Array.from({ length: artifactCount }, (_, n) => ({ artifact_id: id(100 + n), capture_id: id(42), action_id: 'calls', digest: 'ab'.repeat(32), execution_digest: 'cd'.repeat(32), native_type: 'syscallArguments', native_bytes: 512, expires_at: iso(3_600_000), target: { cluster_id: id(1), namespace_uid: 'namespace-' + n, workload_uid: 'workload-' + n, pod_uid: 'pod-' + n, namespace: 'payments', workload_name: 'api-' + n } })),
+  } };
+}
+it('reviews whole-file raw access with every target and size and no collection controls', async () => {
+  const client = new SyntheticApprovals(); client.detail = rawGrant();
+  expect(validOutput_get_grant(result(client.detail))).toBe(true);
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+  expect(await screen.findByRole('heading', { name: 'Download existing raw evidence' })).toBeTruthy();
+  expect(screen.getByText(/approval starts no collection/)).toBeTruthy();
+  expect(screen.getAllByText('512 bytes')).toHaveLength(2);
+  expect(screen.getByText(/api-0, payments/)).toBeTruthy();
+  expect(screen.getByText(/api-1, payments/)).toBeTruthy();
+  expect(screen.getByText(/10000 download operations/)).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Return to evidence' })).toHaveProperty('href', expect.stringContaining('/cases/' + id(2)));
+  expect(screen.queryByRole('button', { name: 'Continue approved capture' })).toBeNull();
+  expect(screen.queryByText(/preview was valid/)).toBeNull();
+});
+it('validates64 exact raw review artifacts and rejects collection fields or hidden selection truncation', () => {
+  const raw = rawGrant(64);
+  expect(validOutput_get_grant(result(raw))).toBe(true);
+  expect(validOutput_get_grant(result({ ...raw, target: row.target }))).toBe(false);
+  expect(validOutput_get_grant(result({ ...raw, actions: [] }))).toBe(false);
+  expect(validOutput_get_grant(result({ ...raw, raw_access: { ...raw.raw_access, artifacts: [] } }))).toBe(false);
+  expect(validOutput_get_grant(result(rawGrant(65)))).toBe(false);
+  const { artifacts: _artifacts, ...summary } = raw.raw_access;
+  expect(validOutput_list_reviews(result({ approvals: [{ ...raw, raw_access: summary }] }))).toBe(true);
+  expect(validOutput_list_reviews(result({ approvals: [raw] }))).toBe(false);
+});
+it('keeps a64-artifact review with maximal escaped identifiers inside the256KiB get_grant budget', async () => {
+  const raw = rawGrant(64);
+  for (const a of raw.raw_access.artifacts) {
+    a.action_id = '&'.repeat(63); a.native_type = '&'.repeat(64);
+    a.native_bytes = 1099511627776;
+    a.target = { cluster_id: id(1), namespace_uid: '&'.repeat(64), workload_uid: '&'.repeat(64), pod_uid: '&'.repeat(64), namespace: 'a'.repeat(63), workload_kind: 'StatefulSet', workload_name: 'a'.repeat(253), pod_name: 'a'.repeat(253) };
+  }
+  raw.raw_access.reason = '&'.repeat(512);
+  raw.requested_by = { issuer: 'https://identity.invalid/' + '&'.repeat(2000), subject: '&'.repeat(256), client_id: '&'.repeat(256) };
+  raw.decision = { decision: 'approved', decided_by: { ...raw.requested_by }, decided_at: iso(0), reason: '&'.repeat(512), authentication_context: { acr: '&'.repeat(128), authenticated_at: iso(0) } };
+  const output = result(raw);
+  expect(validOutput_get_grant(output)).toBe(true);
+  // Go's encoding/json escapes HTML-sensitive identifiers; match that cost.
+  const size = new TextEncoder().encode(JSON.stringify(output).replaceAll('&', '\\u0026')).length;
+  expect(size).toBeGreaterThan(128 * 1024);
+  expect(size).toBeLessThanOrEqual(256 * 1024);
+  console.info('Raw access maximal escaped review bytes:', size);
+  try {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(output).replaceAll('&', '\\u0026'), { headers: { 'Content-Type': 'application/json' } })));
+    await expect(approvalOperations.call('get_grant', { grant_id: raw.grant_id }, 'csrf', new AbortController().signal)).resolves.toEqual(output);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(' '.repeat(256 * 1024 + 1), { headers: { 'Content-Type': 'application/json' } })));
+    await expect(approvalOperations.call('get_grant', { grant_id: raw.grant_id }, 'csrf', new AbortController().signal)).rejects.toThrow();
+  } finally { vi.unstubAllGlobals(); }
+  expect(validOutput_get_grant(result({ ...raw, raw_access: { ...raw.raw_access, max_operations: 10001 } }))).toBe(false);
 });

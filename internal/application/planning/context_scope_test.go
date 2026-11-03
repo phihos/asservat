@@ -18,6 +18,9 @@ func TestHistoricalContextScopeIdentityRequiresExactCanonicalCompilerShape(t *te
 	if err != nil || s.Actor != in.Executor || s.Target != in.Target.Target() || s.CaptureID != in.CaptureID || !s.Deadline.Equal(in.Deadline) {
 		t.Fatal("historical scope binding", err)
 	}
+	if s.Namespace != in.Target.Request.Namespace.Name || s.WorkloadKind != in.Target.Request.Workload.Kind || s.WorkloadName != in.Target.Request.Workload.Name || s.PodName != "" {
+		t.Fatal("display labels did not come from original scope", s)
+	}
 	for name, change := range map[string]func([]byte) []byte{
 		"unknown": func(b []byte) []byte { return append(b[:len(b)-1], []byte(`,"reason":"never accepted"}`)...) },
 		"duplicate executor": func(b []byte) []byte {

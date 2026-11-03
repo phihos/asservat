@@ -165,7 +165,7 @@ func prepareProfileEncryptedFixture(t *testing.T, dir string, native io.Reader, 
 
 // openProfileEncryptedFixture reads only the exact four fixture objects, with
 // real TLS and the existing product's bounded S3 HTTP range adapter.
-func openProfileEncryptedFixture(t *testing.T, owner context.Context, dir string, f profileEncryptedFixture, block bool) (*FramedNativeSource, <-chan struct{}, func()) {
+func profileEncryptedVerifier(t *testing.T, dir string, f profileEncryptedFixture, block bool, observe ...func(string)) (*ContextVerifier, *projectionTestOpener, <-chan struct{}, func()) {
 	t.Helper()
 	entered, release := make(chan struct{}), make(chan struct{})
 	var enteredOnce, releaseOnce sync.Once
@@ -176,6 +176,9 @@ func openProfileEncryptedFixture(t *testing.T, owner context.Context, dir string
 		if r.Method != http.MethodGet || r.URL.Path != prefix+role || (role != "data" && role != "index" && role != "manifest" && role != "commit") {
 			w.WriteHeader(404)
 			return
+		}
+		if len(observe) > 0 {
+			observe[0](role)
 		}
 		if block && role == "data" {
 			enteredOnce.Do(func() { close(entered) })
@@ -218,6 +221,12 @@ func openProfileEncryptedFixture(t *testing.T, owner context.Context, dir string
 	if err != nil {
 		t.Fatal(err)
 	}
+	return verifier, keys, entered, unblock
+}
+
+func openProfileEncryptedFixture(t *testing.T, owner context.Context, dir string, f profileEncryptedFixture, block bool) (*FramedNativeSource, <-chan struct{}, func()) {
+	t.Helper()
+	verifier, keys, entered, unblock := profileEncryptedVerifier(t, dir, f, block)
 	until, _ := owner.Deadline()
 	opened, err := verifier.OpenNative(owner, f.Source.Expectation, f.Source.Copies, until)
 	if err != nil {

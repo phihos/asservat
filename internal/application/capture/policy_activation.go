@@ -194,19 +194,41 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	if source.Suspended || source.Deleted {
 		return zero, value.ErrChanged
 	}
+	partial, hasRecorder, err := policyObservationPlan(spec)
+	if err != nil {
+		return zero, s.refused("compile", err)
+	}
+	// Reuse this one observation for catalog scope and later acceptance.
+	observed, err := s.Observer.ObserveWorkloadRestarts(ctx, partial.Request())
+	if err != nil {
+		return zero, s.refused("workload", err)
+	}
+	if !source.Valid(s.Now()) || !observed.Valid(s.Now()) || !observed.Answers(partial.Request()) || observed.ClusterID != partial.ClusterID || observed.Namespace.Name != partial.Namespace || observed.Workload.Kind != partial.WorkloadKind || observed.Workload.Name != partial.WorkloadName {
+		return zero, value.ErrChanged
+	}
+	compileUntil := identity.Earlier(author.ValidUntil, identity.Earlier(recovery.FreshUntil, identity.Earlier(source.FreshUntil, observed.FreshUntil)))
+	bounded, stop := context.WithDeadline(ctx, compileUntil)
+	defer stop()
+	ctx = bounded
+	var basis recorderPolicyBasis
+	if hasRecorder && s.CompileRecorder != nil {
+		basis, err = s.recorderPolicyBasis(ctx, author, source, partial, observed)
+		if err != nil {
+			return zero, err
+		}
+		bounded, stop := context.WithDeadline(ctx, basis.until)
+		defer stop()
+		ctx = bounded
+	}
 	compiled, err := CompileRestartPolicy(spec, s.RecipeName, s.RecipeDigest)
 	if s.CompileRecorder != nil {
-		compiled, err = CompilePolicyWithRecorders(spec, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
+		compiled, err = CompilePolicyWithRecorders(ctx, policyObservedCatalogTarget(observed), spec, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
 	}
 	if err != nil {
 		return zero, s.refused("compile", err)
 	}
-	// A probe policy observes its Events too, so a region that cannot read
-	// them (or, for an alert policy, has no Alertmanager) refuses activation
-	// instead of leaving the policy Unknown.
-	observed, err := s.Observer.ObserveWorkloadRestarts(ctx, compiled.Request())
-	if err != nil {
-		return zero, s.refused("workload", err)
+	if ctx.Err() != nil || !s.Now().Before(compileUntil) {
+		return zero, value.ErrChanged
 	}
 	if active, err := s.Ledger.ActiveClusterPolicies(ctx, compiled.ClusterID, source.Revision.UID); err != nil {
 		return zero, s.refused("count", err)
@@ -218,7 +240,7 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 		return zero, s.refused("status", err)
 	}
 	if compiled.Recorder != nil {
-		return s.activateRecorderPolicy(ctx, author, recovery, source, compiled, observed, status, nonce, sharingReviewed)
+		return s.activateRecorderPolicy(ctx, author, recovery, source, compiled, observed, status, nonce, sharingReviewed, basis)
 	}
 	target := authorization.Target{ClusterID: compiled.ClusterID, NamespaceUID: observed.Namespace.UID, WorkloadUID: observed.Workload.UID, PodUID: observed.Workload.UID}
 	delegation, err := s.Ledger.Delegation(ctx, target)

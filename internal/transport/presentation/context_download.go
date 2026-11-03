@@ -154,6 +154,9 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 		if errors.Is(err, identity.ErrDenied) {
 			decision = operationAuditDenied
 		}
+		if prepare && errors.Is(err, authorization.ErrApprovalRequired) {
+			out.Data = OperationFailure{Code: "RawApprovalRequired", Message: "Whole-file download needs independent approval. Review the selected artifact and its verified size, then continue this download after approval.", Retryable: false}
+		}
 	} else {
 		if view.Session.Scope.Principal != initial.Principal || prepare && view.Session.Scope.ArtifactID != input.ArtifactID || !prepare && view.Session.ID != input.DownloadID {
 			return OperationReply{}, stopped("download-scope", artifact.ErrDownloadUnavailable)

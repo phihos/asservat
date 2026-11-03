@@ -138,7 +138,7 @@ func TestCaseProjectionUsesVerifiedVersionAndEffectiveHandlingDates(t *testing.T
 	if a.ArtifactID != artifactID || a.Digest != hash(f.view.Artifacts[0].Version) || a.Kind != "pod-status" || !a.ExpiresAt.Equal(f.view.Artifacts[0].ExpiresAt) || !a.HandlingNotice.ExpiresAt.Equal(a.ExpiresAt) || !a.HandlingNotice.DeleteBy.Equal(f.view.Artifacts[0].DeleteBy) || !a.HandlingNotice.AsOf.Equal(f.view.ObservedAt) {
 		t.Fatal("incorrect version or dates")
 	}
-	for _, private := range []string{"private-namespace", "private-workload", "private-pod", "filename", "sha256", "capture_id", "title", "updated_at", "handlingPolicyRef", "content_path"} {
+	for _, private := range []string{"filename", "sha256", "capture_id", "title", "updated_at", "handlingPolicyRef", "content_path"} {
 		if strings.Contains(string(out.Body), private) {
 			t.Fatal("fabricated or private metadata", private)
 		}
@@ -299,5 +299,50 @@ func TestCaseProjectionLabelsRawPacketCaptures(t *testing.T) {
 	a := result.Data.Artifacts[0]
 	if a.DataClass != "raw" || !slices.Contains(a.HandlingNotice.MayContain, "userContent") {
 		t.Fatalf("raw listing %+v", a)
+	}
+}
+
+func TestCaseProjectionVerifiedSizeAndExactReadableTarget(t *testing.T) {
+	for _, which := range []string{"legacy unknown", "verified empty", "verified nonempty"} {
+		t.Run(which, func(t *testing.T) {
+			s, f, current := caseOperationsFixture(t)
+			a := &f.view.Artifacts[0]
+			a.Namespace = "payments"
+			a.WorkloadKind = "Deployment"
+			a.WorkloadName = "api"
+			a.PodName = "api-abc"
+			if which != "legacy unknown" {
+				n := int64(0)
+				if which == "verified nonempty" {
+					n = 345
+				}
+				a.NativeBytes = &n
+			}
+			reply, err := s.Call(t.Context(), current, "get_case", []byte(caseInput))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out struct {
+				Data struct{ Artifacts []map[string]json.RawMessage }
+			}
+			if json.Unmarshal(reply.Body, &out) != nil || len(out.Data.Artifacts) != 1 {
+				t.Fatal("invalid case result")
+			}
+			row := out.Data.Artifacts[0]
+			size, present := row["verified_native_bytes"]
+			if present != (a.NativeBytes != nil) {
+				t.Fatal("unknown length guessed or verified zero omitted", string(reply.Body))
+			}
+			if present {
+				var got int64
+				if json.Unmarshal(size, &got) != nil || got != *a.NativeBytes {
+					t.Fatal("size changed")
+				}
+			}
+			var target map[string]string
+			if json.Unmarshal(row["target"], &target) != nil || target["cluster_id"] != a.Target.ClusterID || target["namespace_uid"] != a.Target.NamespaceUID || target["workload_uid"] != a.Target.WorkloadUID || target["pod_uid"] != a.Target.PodUID || target["namespace"] != "payments" || target["workload_kind"] != "Deployment" || target["workload_name"] != "api" || target["pod_name"] != "api-abc" {
+				t.Fatal("target identity or accepted names missing", target)
+			}
+		})
 	}
 }

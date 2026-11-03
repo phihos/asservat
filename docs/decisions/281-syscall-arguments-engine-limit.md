@@ -117,3 +117,53 @@ cancellation waits for scan/restoration, and restoration failure closes returned
 pins and retires the locked thread. The existing 128-member bound and original
 capture deadline remain unchanged. Injected namespace tests do not qualify
 native namespace entry; the installed argument workflow must exercise it.
+
+## Finite recurring policy preparation
+
+The same compiled argument mechanism can now be bound into a finite onTrigger
+policy. Ongoing argument sources remain unavailable. The protected automation
+envelope and accepted authority carry the existing cumulative event ceiling;
+absence means zero and preserves legacy source serialization. Independent policy
+review is raw even with captureBuffers false. It binds the exact recipe/mechanism,
+aggregate byte/event pools, finite session and rate limits. Policy and grant
+status report conservative event charges separately from bytes. Replacing a grant
+does not reset the accepted policy's spend.
+
+This reuses SQL128's atomic policy/grant accounting. Incremental cost: zero
+services, credentials, API calls, watches, background loops or configuration
+switches; one optional bounded integer through existing authority/status records
+and one mechanism record in the policy scope. No new failure or fallback state.
+The benefit is the accepted REQ-SYS-002 automatic-policy requirement; omitting
+this field makes the existing event pool unreachable from protected configuration.
+Legacy packet/metadata scope bytes remain unchanged when arguments are absent.
+
+Focused compiler, authority, grant-plan, public-contract and console tests are
+component evidence only. Installed recurring capture and a separate exact-artifact
+human inspection/download approval remain required. A team collection grant never
+confers personal disclosure rights. The manual native qualification is tracked
+separately in implementation-progress.md.
+
+### Protected catalogs for recurring recipes
+
+Policy activation, grant review, status, trigger and existing-recording reads now
+pass their original operation context and exact observed or accepted workload
+scope into the shared compiler. Namespace and organization versions use the same
+protected catalog reader as manual captures; definitions never enter the authored
+policy or become caller-supplied resolved facts. Activation reuses its one workload
+observation and current delegation/permission projection before catalog lookup.
+Later operations retain accepted namespace/workload UIDs; the regional reader
+checks namespace continuity, and the trigger retains its existing workload-UID
+check before any occurrence effect. A changed definition changes scope and requires
+new acceptance. Missing, disabled or deleted versions cannot arm a source.
+
+Builtin-only compilation adds zero catalog reads. A nonbuiltin composition adds
+at most eight exact profile GETs and one namespace GET through the existing
+regional channel; organization versions remain in the protected hub namespace.
+No new listener, credentials, permissions, watch, cache or background loop is
+introduced. Trigger compilation reads the existing accepted authority before
+catalog lookup, including a coalesced busy tick; it still performs at most its
+existing single workload observation and never selects a Pod for catalog access.
+Source, identity, permission and acceptance deadlines bound those reads without
+renewal. Focused component tests cover scope/cancellation, current definitions and
+argument-pin serialization; installed recurring-policy qualification remains
+separate.

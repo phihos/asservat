@@ -221,7 +221,7 @@ func TestCustodyProfileWriteOnlyWithRealServices(t *testing.T) {
 				t.Fatal(err)
 			}
 			verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })
-			err = verifier.VerifyContext(ctx, e, copies)
+			_, err = verifier.VerifyContext(ctx, e, copies)
 			if (err == nil) != (mode == "valid") {
 				t.Fatal("independent publisher verdict", mode, err)
 			}

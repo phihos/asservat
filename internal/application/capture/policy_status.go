@@ -81,8 +81,16 @@ func (s PolicyStatusService) Get(ctx context.Context, current identities.Current
 	}
 	status.MaxGrantStarts = 0
 	if s.CompileRecorder != nil && status.ActiveID != "" && status.AcceptedIntentVersion > 0 && source.Valid(s.Now()) && !source.Suspended && !source.Deleted && source.InstallationID == status.Authority.InstallationID && source.Revision.UID == status.PolicyUID && status.Authority.Valid(s.Now()) {
-		compiled, e := CompilePolicyWithRecorders(spec, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
-		if e == nil && compiled.Recorder != nil {
+		catalogTarget, scopeErr := policyAcceptedCatalogTarget(spec, status.Authority)
+		compileUntil := minPolicyDeadline(source.FreshUntil, status.Authority.NotAfter, r.ValidUntil, i.ValidUntil, recovery.FreshUntil)
+		compileCtx, endCompile := context.WithDeadline(ctx, compileUntil)
+		defer endCompile()
+		var compiled value.RestartPolicy
+		e := scopeErr
+		if e == nil {
+			compiled, e = CompilePolicyWithRecorders(compileCtx, catalogTarget, spec, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
+		}
+		if e == nil && compiled.Recorder != nil && compileCtx.Err() == nil && s.Now().Before(compileUntil) {
 			a := status.Authority
 			scope := RecorderPolicyScope(source.Revision.UID, status.AcceptedIntentVersion, source.CollectionDigest, compiled, a.NamespaceUID, a.WorkloadUID, a.Delegation, a.Owners, a.Actions, a.Limits)
 			starts, e := authapp.PolicyGrantStartsPerExecution(scope, a, compiled.Recorder.RecipeDigest)

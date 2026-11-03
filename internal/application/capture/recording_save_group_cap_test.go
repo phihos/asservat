@@ -1,6 +1,8 @@
 package capture
 
 import (
+	"asservat.local/asservat/internal/domain/targets"
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -17,7 +19,7 @@ func TestRecordingSaveIncidentPodCapIsReviewedIndependentlyOfObservation(t *test
 		t.Helper()
 		spec["target"].(map[string]any)["maxPods"] = cap
 		raw, _ := json.Marshal(spec)
-		p, err := CompilePolicyWithRecorders(raw, "builtin-pod-status-v1", testRecipe, ongoingSaveCompiler)
+		p, err := CompilePolicyWithRecorders(context.Background(), targets.Request{}, raw, "builtin-pod-status-v1", testRecipe, ongoingSaveCompiler)
 		if err != nil {
 			t.Fatal("valid ongoing manual Save incident cap", cap, err)
 		}

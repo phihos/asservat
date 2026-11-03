@@ -1,7 +1,7 @@
 import type { Session } from '../auth/session';
 import { operations, operationMessage, OperationFailure, type Operations, type Operation, type Input, type Data, type CaseDetails, type Artifact, type Download, type CancellationReceipt } from './http';
 
-export type State = { busy: boolean; caseID?: string; details?: CaseDetails; download?: Download; error?: string; preparingArtifact?: string; uncertain?: boolean; cancelling?: boolean; started?: boolean; cancellation?: CancellationReceipt };
+export type State = { busy: boolean; rawApprovalArtifact?: string; caseID?: string; details?: CaseDetails; download?: Download; error?: string; preparingArtifact?: string; uncertain?: boolean; cancelling?: boolean; started?: boolean; cancellation?: CancellationReceipt };
 type Receipt = { artifactID: string; prepareKey: string; downloadID?: string; cancelKey?: string; terminal?: true; continueUntil?: number; restartKey?: string; previousStop?: { downloadID: string; cancelKey: string } };
 const hasArtifactStatus = (value: Data<'cancel_artifact_download'>): value is Download => typeof value.artifact_id === 'string';
 const terminal = new Set(['Completed', 'Cancelled', 'Expired', 'Denied', 'Failed']);
@@ -31,8 +31,8 @@ export class Evidence {
     if (identity !== this.identity || this.state.caseID !== caseID) this.reset();
     this.identity = identity; this.session = session; this.scope = scope;
     this.invalidate(); clearTimeout(this.caseExpiryTimer);
-    this.publish({ caseID, busy: false, details: undefined, download: undefined, cancellation: undefined, error: undefined, started: false, preparingArtifact: this.receipt?.artifactID, uncertain: !!this.receipt && !this.receipt.downloadID, cancelling: !!this.receipt?.cancelKey });
-    const abort = () => { this.invalidate(); clearTimeout(this.caseExpiryTimer); this.session = undefined; this.publish({ busy: false, details: undefined, download: undefined, cancellation: undefined, error: undefined, started: false }); };
+    this.publish({ caseID, busy: false, rawApprovalArtifact: undefined, details: undefined, download: undefined, cancellation: undefined, error: undefined, started: false, preparingArtifact: this.receipt?.artifactID, uncertain: !!this.receipt && !this.receipt.downloadID, cancelling: !!this.receipt?.cancelKey });
+    const abort = () => { this.invalidate(); clearTimeout(this.caseExpiryTimer); this.session = undefined; this.publish({ busy: false, rawApprovalArtifact: undefined, details: undefined, download: undefined, cancellation: undefined, error: undefined, started: false }); };
     scope.addEventListener('abort', abort, { once: true });
     if (scope.aborted) abort(); else void this.refresh();
     return () => { scope.removeEventListener('abort', abort); abort(); };
@@ -42,10 +42,14 @@ export class Evidence {
     this.invalidate(); const generation = this.generation; const scope = this.scope;
     const request = new AbortController(); this.active = request;
     const abort = () => request.abort(); scope.addEventListener('abort', abort, { once: true });
-    this.publish({ busy: true, error: undefined });
+    this.publish({ busy: true, error: undefined, ...(name === 'prepare_artifact_download' ? { rawApprovalArtifact: undefined } : {}) });
     try {
       const result = await this.client.call(name, input, this.session.csrf_token, request.signal);
       if (generation !== this.generation || scope.aborted) return;
+      if (name === 'prepare_artifact_download' && result.status === 'error' && result.data.code === 'RawApprovalRequired' && this.receipt) {
+        this.publish({ rawApprovalArtifact: this.receipt.artifactID });
+        return;
+      }
       if (result.status !== 'ok') throw new OperationFailure(503, result.status === 'error' ? result.data.code : 'Pending', result.status === 'error' ? result.data.message : 'This evidence request is still being prepared. Check the same request again shortly.');
       return result.data as Data<N>;
     } catch (error) { if (generation === this.generation && !scope.aborted) this.publish({ error: operationMessage(error) }); }
@@ -81,6 +85,7 @@ export class Evidence {
   prepare = async (artifact: Artifact) => {
     if (this.state.busy || this.receipt || !this.state.details?.artifacts.some(a => a.artifact_id === artifact.artifact_id) || Date.parse(artifact.expires_at) <= Date.now()) return;
     this.receipt = { artifactID: artifact.artifact_id, prepareKey: this.newID() };
+    this.publish({rawApprovalArtifact:undefined});
     this.publish({ preparingArtifact: artifact.artifact_id, uncertain: true, started: false });
     await this.retryPreparation();
   };

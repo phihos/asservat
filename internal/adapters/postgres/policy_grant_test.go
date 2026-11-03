@@ -29,7 +29,7 @@ func policyGrantTestRow(t *testing.T) custodydb.AccessGrant {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := custodydb.AccessGrant{ID: id(p.ID), RootID: id(p.RootID), Kind: authorization.GrantPolicy, ClusterID: id(a.ClusterID), NamespaceUid: a.NamespaceUID, WorkloadUid: a.WorkloadUID,
+	r := custodydb.AccessGrant{ID: id(p.ID), RootID: id(p.RootID), Kind: authorization.GrantPolicy, ClusterID: id(a.ClusterID), NamespaceUid: pgtype.Text{String: a.NamespaceUID, Valid: true}, WorkloadUid: pgtype.Text{String: a.WorkloadUID, Valid: true},
 		ExecutionDigest: a.ScopeDigest[:], ReviewDigest: make([]byte, 32), DataClass: "extract", Reasons: []byte(`[{"actionID":"packet","code":"rawBytePredicate"}]`), Review: []byte(`{}`), Scope: p.CanonicalScope,
 		RequesterIssuer: p.Actor.Issuer, RequesterSubject: p.Actor.Subject, RequesterClient: p.Actor.ClientID, RequesterKind: string(p.Actor.Kind), RequestOperation: "requestPolicyGrant",
 		LifetimeSeconds: 604800, RequestedAt: ts(p.CreatedAt), ReviewUntil: ts(p.CreatedAt.Add(time.Hour)), Revision: 1,
@@ -43,7 +43,7 @@ func policyGrantTestRow(t *testing.T) custodydb.AccessGrant {
 func TestPolicyGrantRowSeparatesWorkloadScopeAndRequestPrincipal(t *testing.T) {
 	r := policyGrantTestRow(t)
 	g, err := grantFromRow(r)
-	if err != nil || g.Target != (authorization.Target{}) || g.Policy == nil || g.Policy.Workload().WorkloadUID != r.WorkloadUid || !g.Valid() {
+	if err != nil || g.Target != (authorization.Target{}) || g.Policy == nil || g.Policy.Workload().WorkloadUID != r.WorkloadUid.String || !g.Valid() {
 		t.Fatal("policy row lost typed workload or original scope", g, err)
 	}
 	r.RequesterKind = string(identity.Workload)
@@ -55,7 +55,7 @@ func TestPolicyGrantRowSeparatesWorkloadScopeAndRequestPrincipal(t *testing.T) {
 	for name, change := range map[string]func(*custodydb.AccessGrant){
 		"capture substitution":     func(r *custodydb.AccessGrant) { r.CaptureID = r.ID },
 		"pod substitution":         func(r *custodydb.AccessGrant) { r.PodUid = grantText("pod") },
-		"workload mismatch":        func(r *custodydb.AccessGrant) { r.WorkloadUid = "other" },
+		"workload mismatch":        func(r *custodydb.AccessGrant) { r.WorkloadUid.String = "other" },
 		"policy mismatch":          func(r *custodydb.AccessGrant) { r.PolicyUid = grantText("other") },
 		"missing acceptance":       func(r *custodydb.AccessGrant) { r.PolicyAcceptanceID = pgtype.UUID{} },
 		"other operation":          func(r *custodydb.AccessGrant) { r.RequestOperation = "requestGrant" },

@@ -263,6 +263,66 @@
                           "minLength": 1,
                           "maxLength": 64,
                           "description": "Verified native format, when supplied; used to choose a compatible saved-evidence view. It grants no download or analysis authority."
+                        },
+                        "verified_native_bytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1099511627776
+                        },
+                        "target": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "cluster_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "namespace_uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "workload_uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "pod_uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "namespace": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 63,
+                              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                            },
+                            "workload_kind": {
+                              "enum": [
+                                "Deployment",
+                                "StatefulSet"
+                              ]
+                            },
+                            "workload_name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 253,
+                              "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+                            },
+                            "pod_name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 253,
+                              "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+                            }
+                          },
+                          "required": [
+                            "cluster_id",
+                            "namespace_uid",
+                            "workload_uid",
+                            "pod_uid"
+                          ]
                         }
                       },
                       "required": [

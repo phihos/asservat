@@ -25,6 +25,9 @@ const InvestigationInputLimit = 32 << 10
 // bound leaves room for both copies inside the 64 KiB transport response limit.
 const InvestigationOutputLimit = 24 << 10
 
+// Up to64 exact artifacts and readable targets in one independent review.
+const InvestigationGrantReviewOutputLimit = 256 << 10
+
 // Bounded disclosures for16 selected source snapshots with64 retention refs each.
 const InvestigationRecordingSavePreviewOutputLimit = 128 << 10
 
@@ -64,7 +67,7 @@ func (investigationOfflineLoader) Load(string) (any, error) { return nil, ErrInv
 
 // InvestigationToolNames lists every embedded operation contract.
 func InvestigationToolNames() []string {
-	return []string{"cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary"}
+	return []string{"cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary"}
 }
 
 func NewInvestigationContracts() (*InvestigationContracts, error) {
@@ -135,6 +138,9 @@ func (v *InvestigationContracts) validate(name string, b []byte, output bool) er
 	limit := InvestigationInputLimit
 	if output {
 		limit = InvestigationOutputLimit
+		if name == "get_grant" {
+			limit = InvestigationGrantReviewOutputLimit
+		}
 		if name == "preview_recording_save" {
 			limit = InvestigationRecordingSavePreviewOutputLimit
 		}
@@ -244,6 +250,9 @@ func (v *InvestigationContracts) OutputViolation(name string, b []byte) string {
 		return "unknown-tool"
 	}
 	limit := InvestigationOutputLimit
+	if name == "get_grant" {
+		limit = InvestigationGrantReviewOutputLimit
+	}
 	if name == "preview_recording_save" {
 		limit = InvestigationRecordingSavePreviewOutputLimit
 	}

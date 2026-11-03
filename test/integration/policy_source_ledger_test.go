@@ -392,7 +392,7 @@ func TestPolicySourceFixtureFitsOriginalBacking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	compiled, err := captureapp.CompilePolicyWithRecorders(raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(pcap.NewCompiler()))
+	compiled, err := captureapp.CompilePolicyWithRecorders(t.Context(), targets.Request{}, raw, planning.ContextRecipeName, planning.RecipeDigest(), policySourceCompile(pcap.NewCompiler()))
 	if err != nil || compiled.Recorder == nil {
 		t.Fatal("actual source fixture compiler", err)
 	}

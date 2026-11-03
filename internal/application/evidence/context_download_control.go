@@ -216,7 +216,21 @@ func (s ContextDownloadCoordinator) prepare(ctx context.Context, current identit
 		scope = route.Scope
 		until = identity.Earlier(until, route.ValidUntil)
 	}
-	a, err := s.authority(ctx, current, scope, &until)
+	var a artifact.DownloadAuthority
+	if preparation, ok := s.Authority.(interface {
+		CheckDownloadPreparation(context.Context, identities.CurrentIdentity, artifact.DownloadScope) (artifact.DownloadAuthority, error)
+	}); !lookup.Found && ok {
+		a, err = preparation.CheckDownloadPreparation(ctx, current, scope)
+		if err != nil {
+			if errors.Is(err, authorization.ErrApprovalRequired) {
+				return zero, stepped("approval-required", authorization.ErrApprovalRequired)
+			}
+			return zero, collapsed("authority", artifact.ErrDownloadUnavailable, err)
+		}
+		a, err = s.consumeAuthority(ctx, a, scope, &until)
+	} else {
+		a, err = s.authority(ctx, current, scope, &until)
+	}
 	if err != nil {
 		return zero, err
 	}

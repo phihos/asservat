@@ -349,3 +349,51 @@ func TestResponseTransferAcceptsCapacityControlWindowDeadline(t *testing.T) {
 		t.Fatal("refused window did not name its stage", e)
 	}
 }
+
+func TestResponseTransferRawFormatsReserveEveryWindow(t *testing.T) {
+	for _, format := range []string{artifact.RawPCAPNGFormat, artifact.SyscallArgumentsFormat, artifact.PprofFormat, artifact.GoTraceFormat} {
+		t.Run(format, func(t *testing.T) {
+			f, service, req := newResponseTransferFixture(t, artifact.DownloadWindowBytes+17)
+			f.format = format
+			probe := &rawUseProbe{steps: &f.calls}
+			service.RawResults = probe
+			if err := service.Transfer(context.Background(), f, req, f, f); err != nil {
+				t.Fatal(err)
+			}
+			var bytes int64
+			for _, use := range probe.uses {
+				bytes += use.Bytes
+				if use.Operation != "download_artifact" || use.Operations != 0 {
+					t.Fatal(use)
+				}
+			}
+			if len(probe.uses) != 2 || bytes != f.size || probe.ids[0] == probe.ids[1] {
+				t.Fatal("raw windows not charged", probe.uses, probe.ids)
+			}
+			f, service, req = newResponseTransferFixture(t, 17)
+			f.format = format
+			probe = &rawUseProbe{steps: &f.calls, err: artifact.ErrDownloadUnavailable}
+			service.RawResults = probe
+			if err := service.Transfer(context.Background(), f, req, f, f); err == nil || f.chunks != 0 || f.emitted != 0 {
+				t.Fatal("refused raw budget read bytes", f.chunks, f.emitted, err)
+			}
+			f, service, req = newResponseTransferFixture(t, 17)
+			f.format = format
+			if err := service.Transfer(context.Background(), f, req, f, f); err == nil || f.chunks != 0 {
+				t.Fatal("missing raw budget admitted", err)
+			}
+		})
+	}
+}
+
+func TestResponseTransferApprovedFormatsNeedNoRawPool(t *testing.T) {
+	for _, format := range []string{artifact.ContextFormat, artifact.PCAPNGFormat, artifact.SyscallRecordsFormat, artifact.HTTPHeadersFormat} {
+		t.Run(format, func(t *testing.T) {
+			f, service, req := newResponseTransferFixture(t, 17)
+			f.format = format
+			if err := service.Transfer(context.Background(), f, req, f, f); err != nil || f.emitted != 17 {
+				t.Fatal(f.emitted, err)
+			}
+		})
+	}
+}

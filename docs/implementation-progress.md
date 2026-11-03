@@ -3,6 +3,70 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Native41668728510 on `ecc0ef43` passed policy capture/publication, personal raw
+approval and authenticated download size/SHA checks. It failed the shared raw
+pool assertion: one operation was charged but zero bytes. Go533.422s exited1;
+sources unchanged, cleanup complete. Original compressed reports are retained in
+`test/results/policy-native-41668728510`. The native marker/footer/source checks
+were after that assertion and did not run; no completed qualification is claimed.
+
+A local transfer regression reproduced missing byte reservations for syscall
+arguments, pprof and Go trace: the response path recognized only raw PCAP.
+Classification now uses the existing registry's raw-only formats. All four raw
+formats reserve every output window before reading; refusal or a missing grant
+port prevents all content reads. Ordinary context, packet metadata, syscall
+metadata and HTTP extracts need no raw pool. Focused transfer/raw-download races
+passed (1.847s). The installed fixture now retains authenticated synthetic bytes
+and checks the original source/marker before the final accounting assertion.
+
+Native41659215769 on `a62854d5` failed while polling published argument progress
+(Go623.440s, source unchanged, cleanup complete). The publisher reported a
+publication, but progress reconstruction omitted SQL130's verified native size
+from its audit digest. The local regression reproduced this rejection. Progress
+and history SQL projections now read the field and retain it in audit validation;
+NULL legacy records keep their original digest. PostgreSQL race checks passed
+(1.189s), including zero/positive sizes and size-tampering rejection. The actual
+scoped SQL/S3 progress reads passed current and legacy publication cases in
+`verified-native-progress-2` (Go3.332s, exit0, unchanged sources, cleanup complete).
+The preceding `-1` run selected an unrelated skipped test and was rejected by the
+harness; it supplies no service evidence. Original reports are retained.
+
+A separate red/green form regression now permits deselecting an artifact that
+expired during a definitively refused request; it cannot be selected again.
+The exact new selection gets a new key. All ten focused raw-form tests and full
+pre-push gates passed, including322console tests. Installed raw approval/download
+still awaits qualification of this corrected candidate.
+
+PR149 review reproduced a raw-access form that stayed locked after a definitive
+refusal. It now releases the retained request only for a validated non-retryable
+error, preserves entered values, and assigns a new key on explicit resubmission.
+Actual HTTP-client regressions retain the identical request after transport or
+HTTP failure, malformed envelopes, retryable errors and pending replies. The
+focused test failed before the fix and passed all nine cases afterward (4.33s).
+The full console check passed all 321 tests, contract validators and TypeScript;
+`spec-check` passed. CI41657790707 was superseded by this correction, not treated
+as passing evidence.
+
+Manual argument capture is now installed-qualified and merged in
+[PR148](https://github.com/phihos/asservat/pull/148), merge `2a03d7a8` from qualified
+head `9a8e392e`. [Native41654508351](https://github.com/phihos/asservat/actions/runs/41654508351)
+and CI41654206768 passed. The public approved five-second buffer capture produced
+33,488 authenticated native bytes with the expected marker and immutable SQL
+source: 48 retained writes, 96 observed probes and 36,864 charged bytes within
+6,000-event / 96 MiB credit. Coverage remains explicitly unknown. Fresh repeat
+preview preserved composition and expiry; a separate scalar-only capture stopped
+while Running, joined cancellation, reached Cancelled and published no artifact.
+Go exited 0 in 627.735s; source hashes were unchanged, cleanup failures empty and
+build scratch removed. Original reports and synthetic JSONL are retained in
+`test/results/argument-native-41654508351`.
+
+The active candidate is finite recurring arguments plus independent existing-raw
+artifact download approval. It is rebased onto that merge; comparison with the
+previous checkpoint found no non-documentation/non-report file changes, so the
+recorded component and service evidence remains applicable. Its dedicated
+`continuation-policy-arguments` installed workflow is still pending. Grouped and
+ongoing argument sources, saved syscall projections and broader S-05 remain open.
+
 CI41651875701 passed for the native-format fix. The final test-only update reuses
 one compiled case fixture across all17 sequential format assertions (focused race
 2.618s), retains authenticated synthetic native bytes before semantic assertions
@@ -18,7 +82,7 @@ authenticated native download's filename, size and SHA-256 checks. It then faile
 the case-format assertion: `get_case` projected `native_format` only for runtime
 profiles, leaving it empty for the published syscall argument artifact. The
 failure occurs before the native fixture's semantic marker, repeat and Stop
-checks; those remain unqualified. Go632.347s exited1, sources unchanged and
+checks; those were unqualified at that checkpoint. Go632.347s exited1, sources unchanged and
 cleanupFailures empty. CI41647587881 passed; original reports are retained in
 `test/results/argument-native-41648031437`.
 
@@ -29,6 +93,80 @@ mismatched tuples remain omitted. No schema expansion, new lookup or configurati
 is needed. `argument-preflight` now includes the case-projection boundary.
 Full presentation race tests passed (215.710s), browser/MCP case races passed
 (3.023s / 8.765s), and expanded `make argument-preflight pre-push` exited0.
+The added service-to-SQL boundary check passed (`existing-raw-service-1`,
+Go14.365s): actual `RequestRaw` scope/review production, SQL decode/replay,
+independent service approval, schema-validated public `get_grant`, exact child
+materialization, whole-file preparation and immutable spend/replay. Published
+output/version/length are real fixture results; raw classification and selection
+remain explicitly synthetic, so this does not qualify the installed raw catalog.
+Source hashes were unchanged. The harness exited1 because Docker KMS removal
+exceeded120s, although Go exited0. A separate read-back confirmed all three exact
+original container IDs and the owned network absent; original failure and
+`existing-raw-service-1-cleanup-readback.json` are both retained. No fixture remains.
+
+Integrated raw-access gates passed: `make pre-push console-browser-check` exited0,
+including315console tests, TypeScript/build, all repository contracts/architecture/
+SQL checks, and the built console's26journeys/25accessibility scans plus4native
+restart boundaries/2scans (Go27.586s). Full authorization domain/application,
+catalog and PostgreSQL races passed (1.627/1.621/1.029/3.123s). Browser fixtures use
+synthetic current identity/case data; these do not qualify installed raw approval.
+The dedicated installed policy-arguments fixture has passed authored-contract,
+topology and focused race checks (Go1.659s,27harness checks); it has not run natively.
+Manual fixes through50077ab1 are composed here, including independent early-start
+bounds and refusal to report setup timeout as a completed empty observation.
+
+The focused `existing-raw-grants-2` rerun passed (Go10.921s): policy argument
+admission/preparation5.83s and raw grants3.61s, including the new bounded selected
+registration lookup. Sources were unchanged, cleanupFailures empty. Schema131
+handover then passed against real Kubernetes/PostgreSQL/OpenBao/S3 (Go148.217s,
+exit0, unchanged sources, cleanup complete): original schema replay, protected
+native admission, activation, incarnation mismatch refusal and credential
+retirement. Reports are retained in `test/results/raw-grants-schema131`.
+The typed Download review and dedicated policy-arguments installed fixture are
+now composed and locally checked; installed qualification remains pending.
+
+The composed existing-artifact raw approval now uses the existing human grant,
+review, audit and child/use ledger, with SQL131 exact selected-artifact membership
+and nullable collection-only target fields. Browser/MCP request, review and case
+metadata are wired. The actual SDK retained all 64 selected artifact tuples in a
+99,005-byte canonical response / 218,810-byte text-plus-structured frame; ordinary
+MCP responses retain their 64 KiB frame bound. Affected browser/MCP races passed
+(6.470s / 21.859s). These are component checks, not installed raw-download proof.
+
+`existing-raw-grants-1` passed real raw-grant races and replay (4.36s), legacy
+approval/child/pool/revocation checks (5.94s), and SQL131 upgrade/downgrade (3.65s).
+The combined command exited1 (Go19.181s): its policy argument companion retained
+the generic fixture assessment digest after the manual argument-specific fix.
+The offline regression reproduced that mismatch, then passed with the digest
+bound to the actual compiled actions (Go1.135s). Sources remained unchanged and
+cleanup completed without failures. The subsequent focused rerun above passed.
+Installed policy capture plus independent raw approval/download and historical
+unknown-size recovery remain open; no feature exit is claimed by these SQL results.
+
+Follow-up real-service run `policy-arguments-native-length-1` passed the actual
+finite argument policy compiler → accepted team grant → admission/intent → API
+preparation path (6.94s). It verified concurrent one-session dual debit, exact
+replay, expired-source transaction rollback, replacement-epoch refusal and scoped
+historical publisher reads. SQL130 empty upgrade/downgrade qualification passed
+(4.65s). The combined run failed both native-length cases because the verifier's
+INSERT column permission omitted the new field; fixture and production role
+projections now grant only INSERT(native_bytes), with a red/green role regression.
+The failed run had Go13.643s, exit1, sources unchanged and cleanup[]. The focused
+`verified-native-length-2` rerun passed both size cases (Go4.379s, exit0, unchanged
+sources, cleanup[]), including known-length replay, legacy audit compatibility,
+catalog projection and refusal to roll back retained size-bearing verification.
+This is passing policy component evidence, not installed recurring qualification.
+
+The protected policy compiler now resolves namespace/organization profile versions
+through the existing catalog reader after current eligibility, with original
+scope/deadlines and one workload observation. Focused capture/bootstrap races and
+all tagged/untagged integration compilation passed. SQL130 adds verified native
+length from the existing complete verification pass, with no extra payload or
+key read; legacy unknown values and original audit serialization remain unchanged.
+Its component service qualification passed after the role fix. RawQuery domain membership,
+client, pool and original-expiry regressions pass. The later SQL131/public
+composition above supersedes their previous absence; historical unknown-size
+recovery and installed qualification remain pending.
 
 Installed run [41642778383](https://github.com/phihos/asservat/actions/runs/41642778383)
 on9db49637 passed public preview, independent review and approved submission,
@@ -130,6 +268,15 @@ narrow verified syscallArguments type is now admitted through that existing
 facet. Full authorization race tests pass, including same-human/client/version,
 revocation and replay-safe spend. Expanded argument preflight and full pre-push checks passed. Installed
 collection/download remains unqualified.
+
+A separate follow-up implements finite policy compilation and event ceilings
+through protected configuration, acceptance, independent raw review, public
+requests/status and console controls. Focused backend race regressions and all
+30 policy/approval console tests pass. The compiler binds the release's actual
+argument definitions and object digest; missing event authority and changed pins
+are refused. Ongoing argument policies remain unavailable. No new SQL migration
+or runtime service is added. Installed recurring qualification and separate
+human raw-artifact approval/download composition remain pending.
 
 
 [PR #148](https://github.com/phihos/asservat/pull/148) first candidate `44037bb6`

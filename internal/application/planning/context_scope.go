@@ -14,14 +14,16 @@ import (
 // ContextScopeIdentity is historical routing/ownership only. It cannot grant
 // current collection or disclose a record without an independent current check.
 type ContextScopeIdentity struct {
-	Requester          *identity.Principal
-	Actor              identity.Principal
-	Targets            []authorization.Target
-	Target             authorization.Target
-	CaptureID          string
-	ExecutionClass     artifact.ContextExecutionClass
-	Deadline           time.Time
-	ApprovedAcceptance bool
+	// Optional display labels are read from the original canonical scope.
+	Namespace, WorkloadKind, WorkloadName, PodName string
+	Requester                                      *identity.Principal
+	Actor                                          identity.Principal
+	Targets                                        []authorization.Target
+	Target                                         authorization.Target
+	CaptureID                                      string
+	ExecutionClass                                 artifact.ContextExecutionClass
+	Deadline                                       time.Time
+	ApprovedAcceptance                             bool
 }
 
 func (s ContextScopeIdentity) RequestingPrincipal() identity.Principal {
@@ -62,6 +64,9 @@ func ReadContextScopeIdentity(b []byte, want artifact.Digest) (ContextScopeIdent
 		return zero, value.ErrInvalid
 	}
 	out := ContextScopeIdentity{Actor: identity.Principal{Issuer: s.Executor.Issuer, Subject: s.Executor.Subject, ClientID: s.Executor.ClientID, Kind: identity.Kind(s.Executor.Kind)}, Target: authorization.Target{ClusterID: s.Source.ClusterID, NamespaceUID: s.Source.NamespaceUID, WorkloadUID: s.Collection.Spec.Target.Workload.UID, PodUID: s.Pods[0].PodUID}, CaptureID: s.Source.ResourceUID, ExecutionClass: s.Pods[0].ExecutionClass}
+	out.Namespace = s.Collection.Spec.Target.Namespace
+	out.WorkloadKind = s.Collection.Spec.Target.Workload.Kind
+	out.WorkloadName = s.Collection.Spec.Target.Workload.Name
 	out.Deadline, err = time.Parse(time.RFC3339Nano, s.Collection.Spec.Deadline)
 	if err != nil || !out.Actor.Valid() || !out.Target.Valid() || !authorization.UUID(out.CaptureID) || !out.ExecutionClass.Valid() || out.Deadline.Nanosecond()%1000 != 0 {
 		return zero, value.ErrInvalid
@@ -88,6 +93,9 @@ func readRecorderScopeIdentity(b []byte, want artifact.Digest) (ContextScopeIden
 		return zero, value.ErrInvalid
 	}
 	out := ContextScopeIdentity{Actor: identity.Principal{Issuer: s.Executor.Issuer, Subject: s.Executor.Subject, ClientID: s.Executor.ClientID, Kind: identity.Kind(s.Executor.Kind)}, Target: authorization.Target{ClusterID: s.Source.ClusterID, NamespaceUID: s.Source.NamespaceUID, WorkloadUID: s.Target.Workload.UID, PodUID: s.Target.PodUID}, CaptureID: s.Source.ResourceUID, ExecutionClass: artifact.ContextAPIExecution}
+	out.Namespace = s.Target.Namespace
+	out.WorkloadKind = s.Target.Workload.Kind
+	out.WorkloadName = s.Target.Workload.Name
 	if s.Timing == "approvedAcceptance/v1" && s.Approval != nil && s.Deadline == "" {
 		out.ApprovedAcceptance = true
 	} else {

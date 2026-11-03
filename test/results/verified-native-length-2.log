@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/verified-native-length
+=== RUN   TestContextAdmissionWithRealServices/verified-native-length-legacy
+--- PASS: TestContextAdmissionWithRealServices (3.31s)
+    --- PASS: TestContextAdmissionWithRealServices/verified-native-length (1.77s)
+    --- PASS: TestContextAdmissionWithRealServices/verified-native-length-legacy (0.99s)
+PASS
+ok  	asservat.local/asservat/test/integration	4.379s

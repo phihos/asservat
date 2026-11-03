@@ -40,7 +40,7 @@ GRANT UPDATE(id) ON permission_stream,context_capture,custody_pool,custody_alloc
 GRANT UPDATE(id,state,copies_digest) ON custody_attempt TO context_verify_runtime;
 GRANT UPDATE(ciphertext_bytes,ciphertext_sha256,etag,version_id) ON custody_copy TO context_verify_runtime;
 GRANT INSERT ON custody_event TO context_verify_runtime;
-GRANT INSERT(capture_id,root_id,expectation_digest,copies_digest,intent_digest,authority_digest,permission_epoch,permission_sequence) ON context_verification TO context_verify_runtime;
+GRANT INSERT(capture_id,root_id,expectation_digest,copies_digest,intent_digest,authority_digest,permission_epoch,permission_sequence,native_bytes) ON context_verification TO context_verify_runtime;
 
 CREATE ROLE context_verification_audit_runtime LOGIN PASSWORD 'synthetic-context-audit'; GRANT CONNECT ON DATABASE custody_test TO context_verification_audit_runtime; GRANT USAGE ON SCHEMA public TO context_verification_audit_runtime;
 GRANT SELECT ON goose_db_version,permission_stream,context_capture,context_verification TO context_verification_audit_runtime;

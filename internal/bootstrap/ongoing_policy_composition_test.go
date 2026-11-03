@@ -1,7 +1,9 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/domain/targets"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -27,12 +29,12 @@ func TestOngoingPolicyCompilerParityAcrossPublicConsumers(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw := ongoingCompilerComposition(t, tc.mode, tc.before)
-			all, err := recordingSavePolicyCompiler(ongoingCompilerFilters{})(raw)
+			all, err := recordingSavePolicyCompiler(ongoingCompilerFilters{}, nil)(context.Background(), targets.Request{}, raw)
 			if err != nil || len(all) != 1 || all[0].Action.ExecutionMode != "ongoing" {
 				t.Fatal("private original-source compiler", err)
 			}
 			current := all[0]
-			gotAll, err := publicPolicyRecorderCompiler(ongoingCompilerFilters{})(raw)
+			gotAll, err := publicPolicyRecorderCompiler(ongoingCompilerFilters{}, nil)(context.Background(), targets.Request{}, raw)
 			if err != nil || len(gotAll) != 1 {
 				t.Fatal("public lifecycle compiler refused accepted ongoing definition", err)
 			}
@@ -47,7 +49,7 @@ func TestOngoingPolicyCompilerParityAcrossPublicConsumers(t *testing.T) {
 
 func TestExplicitFinitePolicyCompilerScopeRemainsUnchanged(t *testing.T) {
 	raw := ongoingCompilerComposition(t, "onTrigger", "0s")
-	finite, err := firstRecorder(publicPolicyRecorderCompiler(ongoingCompilerFilters{})(raw))
+	finite, err := firstRecorder(publicPolicyRecorderCompiler(ongoingCompilerFilters{}, nil)(context.Background(), targets.Request{}, raw))
 	if err != nil || finite.Action.ExecutionMode != "onTrigger" {
 		t.Fatal("explicit finite compilation", err)
 	}
@@ -63,11 +65,11 @@ func TestExplicitFinitePolicyCompilerScopeRemainsUnchanged(t *testing.T) {
 	if err != nil || original.Digest != finite.Digest || original.RecipeDigest != finite.RecipeDigest || !bytes.Equal(original.Scope, finite.Scope) || !bytes.Equal(original.Recipe, finite.Recipe) {
 		t.Fatal("candidate changed original finite compiler bytes", err)
 	}
-	reader, err := firstRecorder(recordingSavePolicyCompiler(ongoingCompilerFilters{})(raw))
+	reader, err := firstRecorder(recordingSavePolicyCompiler(ongoingCompilerFilters{}, nil)(context.Background(), targets.Request{}, raw))
 	if err != nil || reader.Digest != finite.Digest || reader.RecipeDigest != finite.RecipeDigest || !bytes.Equal(reader.Scope, finite.Scope) || !bytes.Equal(reader.Recipe, finite.Recipe) {
 		t.Fatal("source-capable compiler reinterpreted finite accepted scope", err)
 	}
-	ongoing, err := firstRecorder(recordingSavePolicyCompiler(ongoingCompilerFilters{})(ongoingCompilerComposition(t, "ongoing", "0s")))
+	ongoing, err := firstRecorder(recordingSavePolicyCompiler(ongoingCompilerFilters{}, nil)(context.Background(), targets.Request{}, ongoingCompilerComposition(t, "ongoing", "0s")))
 	if err != nil || ongoing.Digest == finite.Digest || bytes.Equal(ongoing.Scope, finite.Scope) {
 		t.Fatal("lifecycle change reused original acceptance digest", err)
 	}
@@ -165,8 +167,8 @@ func TestTrustedOngoingCompositionBindsRuntimeAndSaveWithoutEffects(t *testing.T
 		t.Fatal("source incident replaced real admitted runner")
 	}
 	raw := ongoingCompilerComposition(t, "ongoing", "0s")
-	actual, err := firstRecorder(trigger.CompileRecorder(raw))
-	expected, readerErr := firstRecorder(recordingSavePolicyCompiler(ongoingCompilerFilters{})(raw))
+	actual, err := firstRecorder(trigger.CompileRecorder(context.Background(), targets.Request{}, raw))
+	expected, readerErr := firstRecorder(recordingSavePolicyCompiler(ongoingCompilerFilters{}, nil)(context.Background(), targets.Request{}, raw))
 	if err != nil || readerErr != nil || actual.Digest != expected.Digest || !bytes.Equal(actual.Scope, expected.Scope) {
 		t.Fatal("actual trigger compiler diverged from source reader", err, readerErr)
 	}

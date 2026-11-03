@@ -127,7 +127,12 @@ func readSourceWindowScopeIdentity(raw []byte, want artifact.Digest) (ContextSco
 	if err != nil || digest != want || !bytes.Equal(encoded, raw) || s.Version != "source-window/v1" && s.Version != "recording-save/v1" || !sourceScopePrincipal(s.Executor).Valid() || !s.Target.Valid() || !authorization.UUID(s.CaptureID) {
 		return ContextScopeIdentity{}, value.ErrInvalid
 	}
-	return ContextScopeIdentity{Actor: sourceScopePrincipal(s.Executor), Target: s.Target, CaptureID: s.CaptureID, ExecutionClass: artifact.ContextAPIExecution, ApprovedAcceptance: true}, nil
+	out := ContextScopeIdentity{Namespace: s.Namespace, PodName: s.PodName, Actor: sourceScopePrincipal(s.Executor), Target: s.Target, CaptureID: s.CaptureID, ExecutionClass: artifact.ContextAPIExecution, ApprovedAcceptance: true}
+	if s.OriginalTarget != nil && s.OriginalTarget.Target() == s.Target {
+		out.WorkloadKind = s.OriginalTarget.Request.Workload.Kind
+		out.WorkloadName = s.OriginalTarget.Request.Workload.Name
+	}
+	return out, nil
 }
 
 // SourceSnapshotLifecycle is independently derived from admitted request facts;

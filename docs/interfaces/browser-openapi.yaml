@@ -3653,7 +3653,8 @@ components:
                 detector:
                   type: object
                   additionalProperties: false
-                  description: The current DebugPolicy's detector configuration (no observed content).
+                  description: The current DebugPolicy's detector configuration (no observed
+                    content).
                   properties:
                     kind:
                       enum:
@@ -3721,7 +3722,12 @@ components:
                 sharing:
                   type: object
                   additionalProperties: false
-                  description: 'Recurring sharing of the acceptance (ADR-239). stopped: a manager stopped future sharing (stop_future_sharing; already claimed captures still publish); policyChanged: the DebugPolicy changed after acceptance, activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id and expected_revision = revision).'
+                  description: 'Recurring sharing of the acceptance (ADR-239). stopped:
+                    a manager stopped future sharing (stop_future_sharing; already claimed
+                    captures still publish); policyChanged: the DebugPolicy changed after
+                    acceptance, activate the new revision to share again. Existing shares
+                    stay until they expire or are revoked (revoke_share with sharing_intent_id
+                    = acceptance_id and expected_revision = revision).'
                   properties:
                     state:
                       enum:
@@ -3767,37 +3773,57 @@ components:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Conservative native-output reservations shared by this acceptance; uncertain spend remains charged. Not measured bytes.
+                  description: Conservative native-output reservations shared by this
+                    acceptance; uncertain spend remains charged. Not measured bytes.
                 max_collected_bytes:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Original accepted cumulative native-output ceiling, shared across grant replacements and controls.
+                  description: Original accepted cumulative native-output ceiling, shared
+                    across grant replacements and controls.
                 observed_bytes_spent:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Conservative pre-filter observation charges shared by this acceptance, including uncertain legacy spend. Not collected output.
+                  description: Conservative pre-filter observation charges shared by this
+                    acceptance, including uncertain legacy spend. Not collected output.
                 max_observed_bytes:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                  description: Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition.
+                  description: Original accepted cumulative pre-filter observation ceiling;
+                    zero permits no continuing acquisition.
                 collection_kind:
                   enum:
                   - podStatus
                   - packetCapture
                   - syscallTrace
-                  description: Accepted collection action; controls available approval commands, not acquisition authority.
+                  description: Accepted collection action; controls available approval
+                    commands, not acquisition authority.
                 attached_grant_id:
                   type: string
                   format: uuid
-                  description: Grant named by the current attachment pointer; does not assert that its authority, budget or recorder readiness currently permits collection.
+                  description: Grant named by the current attachment pointer; does not
+                    assert that its authority, budget or recorder readiness currently
+                    permits collection.
                 max_grant_starts:
                   type: integer
                   minimum: 1
                   maximum: 10000
-                  description: Server-derived ceiling in action-start units for the currently accepted policy grant plan. Policy executions remain a separate once-per-Save counter.
+                  description: Server-derived ceiling in action-start units for the currently
+                    accepted policy grant plan. Policy executions remain a separate once-per-Save
+                    counter.
+                max_observed_events:
+                  type: integer
+                  minimum: 0
+                  maximum: 1000000000
+                  description: Cumulative eligible entry and exit probe ceiling; zero
+                    or absent grants no argument observation.
+                observed_events_spent:
+                  type: integer
+                  minimum: 0
+                  maximum: 1000000000
+                  description: Conservative charged event units, including uncertain observations.
               required:
               - policy_uid
               - acceptance_id
@@ -4382,435 +4408,658 @@ components:
                   type: array
                   maxItems: 100
                   items:
-                    type: object
-                    additionalProperties: false
-                    properties:
-                      grant_id:
-                        type: string
-                        format: uuid
-                      phase:
-                        enum:
-                        - Pending
-                        - Approved
-                        - Denied
-                        - Revoked
-                        - Expired
-                        - Exhausted
-                      revision:
-                        type: integer
-                        minimum: 1
-                        maximum: 3
-                      kind:
-                        enum:
-                        - adHocCapture
-                        - policy
-                      capture_id:
-                        type: string
-                        format: uuid
-                      preview_id:
-                        type: string
-                        format: uuid
-                      execution_digest:
-                        type: string
-                        pattern: ^[a-f0-9]{64}$
-                      review_digest:
-                        type: string
-                        pattern: ^[a-f0-9]{64}$
-                      target:
-                        type: object
-                        additionalProperties: false
-                        properties:
-                          cluster_id:
-                            type: string
-                            format: uuid
-                          namespace:
-                            type: string
-                            minLength: 1
-                            maxLength: 63
-                          workload_kind:
-                            enum:
-                            - Deployment
-                            - StatefulSet
-                            - Pod
-                          workload_name:
-                            type: string
-                            minLength: 1
-                            maxLength: 253
-                          pod_name:
-                            type: string
-                            minLength: 1
-                            maxLength: 253
-                          namespace_uid:
-                            type: string
-                            minLength: 1
-                            maxLength: 64
-                          workload_uid:
-                            type: string
-                            minLength: 1
-                            maxLength: 64
-                        required:
-                        - cluster_id
-                        - namespace
-                        - workload_kind
-                        - workload_name
-                      data_class:
-                        enum:
-                        - metadata
-                        - extract
-                        - raw
-                      reasons:
-                        type: array
-                        minItems: 1
-                        maxItems: 16
-                        items:
+                    oneOf:
+                    - type: object
+                      additionalProperties: false
+                      properties:
+                        grant_id:
+                          type: string
+                          format: uuid
+                        phase:
+                          enum:
+                          - Pending
+                          - Approved
+                          - Denied
+                          - Revoked
+                          - Expired
+                          - Exhausted
+                        revision:
+                          type: integer
+                          minimum: 1
+                          maximum: 3
+                        kind:
+                          enum:
+                          - adHocCapture
+                          - policy
+                        capture_id:
+                          type: string
+                          format: uuid
+                        preview_id:
+                          type: string
+                          format: uuid
+                        execution_digest:
+                          type: string
+                          pattern: ^[a-f0-9]{64}$
+                        review_digest:
+                          type: string
+                          pattern: ^[a-f0-9]{64}$
+                        target:
                           type: object
                           additionalProperties: false
                           properties:
-                            action_id:
+                            cluster_id:
+                              type: string
+                              format: uuid
+                            namespace:
+                              type: string
+                              minLength: 1
+                              maxLength: 63
+                            workload_kind:
+                              enum:
+                              - Deployment
+                              - StatefulSet
+                              - Pod
+                            workload_name:
+                              type: string
+                              minLength: 1
+                              maxLength: 253
+                            pod_name:
+                              type: string
+                              minLength: 1
+                              maxLength: 253
+                            namespace_uid:
                               type: string
                               minLength: 1
                               maxLength: 64
-                            code:
-                              enum:
-                              - rawBytePredicate
-                              - rawPackets
-                              - httpHeaders
-                              - syscallArguments
-                              - liveProfile
-                              - recordingApprovalRequired
-                              - policyCollection
+                            workload_uid:
+                              type: string
+                              minLength: 1
+                              maxLength: 64
                           required:
-                          - action_id
-                          - code
-                      observation_limits:
-                        type: object
-                        additionalProperties: false
-                        properties:
-                          max_session_seconds:
-                            type: integer
-                            minimum: 1
-                            maximum: 3600
-                          max_observed_bytes:
-                            type: integer
-                            minimum: 1
-                            maximum: 1099511627776
-                          max_bytes_per_second:
-                            type: integer
-                            minimum: 1
-                            maximum: 1073741824
-                          max_concurrent_sessions:
-                            type: integer
-                            minimum: 1
-                            maximum: 1000
-                          max_observed_events:
-                            type: integer
-                            minimum: 0
-                            maximum: 1000000000
-                        required:
-                        - max_session_seconds
-                        - max_observed_bytes
-                        - max_bytes_per_second
-                        - max_concurrent_sessions
-                      requested_by:
-                        type: object
-                        additionalProperties: false
-                        properties:
-                          issuer:
-                            type: string
-                            minLength: 1
-                            maxLength: 2048
-                          subject:
-                            type: string
-                            minLength: 1
-                            maxLength: 256
-                          client_id:
-                            type: string
-                            minLength: 1
-                            maxLength: 256
-                        required:
-                        - issuer
-                        - subject
-                        - client_id
-                      requested_at:
-                        type: string
-                        format: date-time
-                      review_until:
-                        type: string
-                        format: date-time
-                      lifetime_seconds:
-                        type: integer
-                        minimum: 1
-                        maximum: 31536000
-                      decision:
-                        type: object
-                        additionalProperties: false
-                        properties:
-                          decision:
-                            enum:
-                            - approved
-                            - denied
-                          decided_by:
+                          - cluster_id
+                          - namespace
+                          - workload_kind
+                          - workload_name
+                        data_class:
+                          enum:
+                          - metadata
+                          - extract
+                          - raw
+                        reasons:
+                          type: array
+                          minItems: 1
+                          maxItems: 16
+                          items:
                             type: object
                             additionalProperties: false
                             properties:
-                              issuer:
+                              action_id:
                                 type: string
                                 minLength: 1
-                                maxLength: 2048
-                              subject:
-                                type: string
-                                minLength: 1
-                                maxLength: 256
-                              client_id:
-                                type: string
-                                minLength: 1
-                                maxLength: 256
+                                maxLength: 64
+                              code:
+                                enum:
+                                - rawBytePredicate
+                                - rawPackets
+                                - httpHeaders
+                                - syscallArguments
+                                - liveProfile
+                                - recordingApprovalRequired
+                                - policyCollection
                             required:
-                            - issuer
-                            - subject
-                            - client_id
-                          decided_at:
-                            type: string
-                            format: date-time
-                          reason:
-                            type: string
-                            minLength: 1
-                            maxLength: 512
-                          authentication_context:
-                            type: object
-                            additionalProperties: false
-                            properties:
-                              acr:
-                                type: string
-                                minLength: 1
-                                maxLength: 128
-                              authenticated_at:
-                                type: string
-                                format: date-time
-                            required:
-                            - acr
-                            - authenticated_at
-                        required:
-                        - decision
-                        - decided_by
-                        - decided_at
-                        - reason
-                      not_after:
-                        type: string
-                        format: date-time
-                      revoked_at:
-                        type: string
-                        format: date-time
-                      revoked_by:
-                        type: object
-                        additionalProperties: false
-                        properties:
-                          issuer:
-                            type: string
-                            minLength: 1
-                            maxLength: 2048
-                          subject:
-                            type: string
-                            minLength: 1
-                            maxLength: 256
-                          client_id:
-                            type: string
-                            minLength: 1
-                            maxLength: 256
-                        required:
-                        - issuer
-                        - subject
-                        - client_id
-                      can_decide:
-                        type: boolean
-                      can_revoke:
-                        type: boolean
-                      approval_navigation_uri:
-                        type: string
-                        format: uri
-                        maxLength: 2048
-                      preview_deadline:
-                        type: string
-                        format: date-time
-                        description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy
-                          previewDeadline plans.
-                      capture_deadline_rule:
-                        enum:
-                        - previewDeadline
-                        - acceptanceWithinGrant
-                        - policyAuthority
-                        description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original
-                          request-anchored grant expiry.
-                      capture_window_seconds:
-                        type: integer
-                        const: 300
-                        description: Maximum window fixed once at acceptance, never beyond original approval expiry.
-                      policy:
-                        type: object
-                        additionalProperties: false
-                        properties:
-                          uid:
-                            type: string
-                            minLength: 1
-                            maxLength: 64
-                          executor:
-                            type: object
-                            additionalProperties: false
-                            properties:
-                              issuer:
-                                type: string
-                                minLength: 1
-                                maxLength: 2048
-                              subject:
-                                type: string
-                                minLength: 1
-                                maxLength: 256
-                              client_id:
-                                type: string
-                                minLength: 1
-                                maxLength: 256
-                            required:
-                            - issuer
-                            - subject
-                            - client_id
-                          authority_issued_at:
-                            type: string
-                            format: date-time
-                          authority_not_after:
-                            type: string
-                            format: date-time
-                          max_executions:
-                            type: integer
-                            minimum: 1
-                            maximum: 10000
-                          executions_used:
-                            type: integer
-                            minimum: 0
-                            maximum: 10000
-                          max_collected_bytes:
-                            type: integer
-                            minimum: 1
-                            maximum: 1099511627776
-                          max_observed_bytes:
-                            type: integer
-                            minimum: 0
-                            maximum: 1099511627776
-                          collected_bytes_used:
-                            type: integer
-                            minimum: 0
-                            maximum: 1099511627776
-                          observed_bytes_used:
-                            type: integer
-                            minimum: 0
-                            maximum: 1099511627776
-                        required:
-                        - uid
-                        - executor
-                        - authority_issued_at
-                        - authority_not_after
-                        - max_executions
-                        - executions_used
-                        - max_collected_bytes
-                        - max_observed_bytes
-                        - collected_bytes_used
-                        - observed_bytes_used
-                    required:
-                    - grant_id
-                    - phase
-                    - revision
-                    - kind
-                    - execution_digest
-                    - review_digest
-                    - target
-                    - data_class
-                    - reasons
-                    - requested_by
-                    - requested_at
-                    - review_until
-                    - lifetime_seconds
-                    - can_decide
-                    - can_revoke
-                    - approval_navigation_uri
-                    - capture_deadline_rule
-                    allOf:
-                    - if:
-                        properties:
-                          capture_deadline_rule:
-                            const: acceptanceWithinGrant
-                      then:
-                        required:
-                        - capture_window_seconds
-                      else:
-                        not:
+                            - action_id
+                            - code
+                        observation_limits:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            max_session_seconds:
+                              type: integer
+                              minimum: 1
+                              maximum: 3600
+                            max_observed_bytes:
+                              type: integer
+                              minimum: 1
+                              maximum: 1099511627776
+                            max_bytes_per_second:
+                              type: integer
+                              minimum: 1
+                              maximum: 1073741824
+                            max_concurrent_sessions:
+                              type: integer
+                              minimum: 1
+                              maximum: 1000
+                            max_observed_events:
+                              type: integer
+                              minimum: 0
+                              maximum: 1000000000
+                          required:
+                          - max_session_seconds
+                          - max_observed_bytes
+                          - max_bytes_per_second
+                          - max_concurrent_sessions
+                        requested_by:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            issuer:
+                              type: string
+                              minLength: 1
+                              maxLength: 2048
+                            subject:
+                              type: string
+                              minLength: 1
+                              maxLength: 256
+                            client_id:
+                              type: string
+                              minLength: 1
+                              maxLength: 256
+                          required:
+                          - issuer
+                          - subject
+                          - client_id
+                        requested_at:
+                          type: string
+                          format: date-time
+                        review_until:
+                          type: string
+                          format: date-time
+                        lifetime_seconds:
+                          type: integer
+                          minimum: 1
+                          maximum: 31536000
+                        decision:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            decision:
+                              enum:
+                              - approved
+                              - denied
+                            decided_by:
+                              type: object
+                              additionalProperties: false
+                              properties:
+                                issuer:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 2048
+                                subject:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 256
+                                client_id:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 256
+                              required:
+                              - issuer
+                              - subject
+                              - client_id
+                            decided_at:
+                              type: string
+                              format: date-time
+                            reason:
+                              type: string
+                              minLength: 1
+                              maxLength: 512
+                            authentication_context:
+                              type: object
+                              additionalProperties: false
+                              properties:
+                                acr:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 128
+                                authenticated_at:
+                                  type: string
+                                  format: date-time
+                              required:
+                              - acr
+                              - authenticated_at
+                          required:
+                          - decision
+                          - decided_by
+                          - decided_at
+                          - reason
+                        not_after:
+                          type: string
+                          format: date-time
+                        revoked_at:
+                          type: string
+                          format: date-time
+                        revoked_by:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            issuer:
+                              type: string
+                              minLength: 1
+                              maxLength: 2048
+                            subject:
+                              type: string
+                              minLength: 1
+                              maxLength: 256
+                            client_id:
+                              type: string
+                              minLength: 1
+                              maxLength: 256
+                          required:
+                          - issuer
+                          - subject
+                          - client_id
+                        can_decide:
+                          type: boolean
+                        can_revoke:
+                          type: boolean
+                        approval_navigation_uri:
+                          type: string
+                          format: uri
+                          maxLength: 2048
+                        preview_deadline:
+                          type: string
+                          format: date-time
+                          description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
+                        capture_deadline_rule:
+                          enum:
+                          - previewDeadline
+                          - acceptanceWithinGrant
+                          - policyAuthority
+                          description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry.
+                        capture_window_seconds:
+                          type: integer
+                          const: 300
+                          description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                        policy:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            uid:
+                              type: string
+                              minLength: 1
+                              maxLength: 64
+                            executor:
+                              type: object
+                              additionalProperties: false
+                              properties:
+                                issuer:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 2048
+                                subject:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 256
+                                client_id:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 256
+                              required:
+                              - issuer
+                              - subject
+                              - client_id
+                            authority_issued_at:
+                              type: string
+                              format: date-time
+                            authority_not_after:
+                              type: string
+                              format: date-time
+                            max_executions:
+                              type: integer
+                              minimum: 1
+                              maximum: 10000
+                            executions_used:
+                              type: integer
+                              minimum: 0
+                              maximum: 10000
+                            max_collected_bytes:
+                              type: integer
+                              minimum: 1
+                              maximum: 1099511627776
+                            max_observed_bytes:
+                              type: integer
+                              minimum: 0
+                              maximum: 1099511627776
+                            collected_bytes_used:
+                              type: integer
+                              minimum: 0
+                              maximum: 1099511627776
+                            observed_bytes_used:
+                              type: integer
+                              minimum: 0
+                              maximum: 1099511627776
+                            max_observed_events:
+                              type: integer
+                              minimum: 0
+                              maximum: 1000000000
+                              description: Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation.
+                            observed_events_used:
+                              type: integer
+                              minimum: 0
+                              maximum: 1000000000
+                              description: Conservative charged event units, including uncertain observations.
+                          required:
+                          - uid
+                          - executor
+                          - authority_issued_at
+                          - authority_not_after
+                          - max_executions
+                          - executions_used
+                          - max_collected_bytes
+                          - max_observed_bytes
+                          - collected_bytes_used
+                          - observed_bytes_used
+                      required:
+                      - grant_id
+                      - phase
+                      - revision
+                      - kind
+                      - execution_digest
+                      - review_digest
+                      - target
+                      - data_class
+                      - reasons
+                      - requested_by
+                      - requested_at
+                      - review_until
+                      - lifetime_seconds
+                      - can_decide
+                      - can_revoke
+                      - approval_navigation_uri
+                      - capture_deadline_rule
+                      allOf:
+                      - if:
+                          properties:
+                            capture_deadline_rule:
+                              const: acceptanceWithinGrant
+                        then:
                           required:
                           - capture_window_seconds
-                    - if:
-                        properties:
-                          kind:
-                            const: adHocCapture
-                      then:
-                        required:
-                        - capture_id
-                        - preview_id
-                        - preview_deadline
-                        properties:
-                          lifetime_seconds:
-                            minimum: 60
-                            maximum: 28800
-                          target:
+                        else:
+                          not:
                             required:
-                            - pod_name
-                            not:
-                              anyOf:
-                              - required:
-                                - namespace_uid
-                              - required:
-                                - workload_uid
-                          capture_deadline_rule:
-                            enum:
-                            - previewDeadline
-                            - acceptanceWithinGrant
-                        not:
-                          anyOf:
-                          - required:
-                            - policy
-                    - if:
-                        properties:
-                          kind:
-                            const: policy
-                      then:
-                        required:
-                        - policy
-                        - not_after
-                        properties:
-                          target:
-                            required:
-                            - namespace_uid
-                            - workload_uid
-                            not:
-                              anyOf:
-                              - required:
-                                - pod_name
-                          capture_deadline_rule:
-                            const: policyAuthority
-                          can_resume:
-                            const: false
-                          can_resolve:
-                            const: false
-                          resume_requires_original_client:
-                            const: false
-                        not:
-                          anyOf:
-                          - required:
-                            - capture_id
-                          - required:
-                            - preview_id
-                          - required:
-                            - preview_deadline
-                          - required:
-                            - result_access
-                          - required:
-                            - remaining_bytes
+                            - capture_window_seconds
+                      - if:
+                          properties:
+                            kind:
+                              const: adHocCapture
+                        then:
+                          required:
+                          - capture_id
+                          - preview_id
+                          - preview_deadline
+                          properties:
+                            lifetime_seconds:
+                              minimum: 60
+                              maximum: 28800
+                            target:
+                              required:
+                              - pod_name
+                              not:
+                                anyOf:
+                                - required:
+                                  - namespace_uid
+                                - required:
+                                  - workload_uid
+                            capture_deadline_rule:
+                              enum:
+                              - previewDeadline
+                              - acceptanceWithinGrant
+                          not:
+                            anyOf:
+                            - required:
+                              - policy
+                      - if:
+                          properties:
+                            kind:
+                              const: policy
+                        then:
+                          required:
+                          - policy
+                          - not_after
+                          properties:
+                            target:
+                              required:
+                              - namespace_uid
+                              - workload_uid
+                              not:
+                                anyOf:
+                                - required:
+                                  - pod_name
+                            capture_deadline_rule:
+                              const: policyAuthority
+                            can_resume:
+                              const: false
+                            can_resolve:
+                              const: false
+                            resume_requires_original_client:
+                              const: false
+                          not:
+                            anyOf:
+                            - required:
+                              - capture_id
+                            - required:
+                              - preview_id
+                            - required:
+                              - preview_deadline
+                            - required:
+                              - result_access
+                            - required:
+                              - remaining_bytes
+                    - type: object
+                      additionalProperties: false
+                      properties:
+                        grant_id:
+                          type: string
+                          format: uuid
+                        phase:
+                          enum:
+                          - Pending
+                          - Approved
+                          - Denied
+                          - Revoked
+                          - Expired
+                          - Exhausted
+                        revision:
+                          type: integer
+                          minimum: 1
+                          maximum: 3
+                        kind:
+                          const: rawQuery
+                        execution_digest:
+                          type: string
+                          pattern: ^[a-f0-9]{64}$
+                        review_digest:
+                          type: string
+                          pattern: ^[a-f0-9]{64}$
+                        data_class:
+                          const: raw
+                        reasons:
+                          type: array
+                          maxItems: 0
+                        requested_by:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            issuer:
+                              type: string
+                              minLength: 1
+                              maxLength: 2048
+                            subject:
+                              type: string
+                              minLength: 1
+                              maxLength: 256
+                            client_id:
+                              type: string
+                              minLength: 1
+                              maxLength: 256
+                          required:
+                          - issuer
+                          - subject
+                          - client_id
+                        requested_at:
+                          type: string
+                          format: date-time
+                        review_until:
+                          type: string
+                          format: date-time
+                        lifetime_seconds:
+                          type: integer
+                          minimum: 1
+                          maximum: 31536000
+                        decision:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            decision:
+                              enum:
+                              - approved
+                              - denied
+                            decided_by:
+                              type: object
+                              additionalProperties: false
+                              properties:
+                                issuer:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 2048
+                                subject:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 256
+                                client_id:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 256
+                              required:
+                              - issuer
+                              - subject
+                              - client_id
+                            decided_at:
+                              type: string
+                              format: date-time
+                            reason:
+                              type: string
+                              minLength: 1
+                              maxLength: 512
+                            authentication_context:
+                              type: object
+                              additionalProperties: false
+                              properties:
+                                acr:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 128
+                                authenticated_at:
+                                  type: string
+                                  format: date-time
+                              required:
+                              - acr
+                              - authenticated_at
+                          required:
+                          - decision
+                          - decided_by
+                          - decided_at
+                          - reason
+                        not_after:
+                          type: string
+                          format: date-time
+                        revoked_at:
+                          type: string
+                          format: date-time
+                        revoked_by:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            issuer:
+                              type: string
+                              minLength: 1
+                              maxLength: 2048
+                            subject:
+                              type: string
+                              minLength: 1
+                              maxLength: 256
+                            client_id:
+                              type: string
+                              minLength: 1
+                              maxLength: 256
+                          required:
+                          - issuer
+                          - subject
+                          - client_id
+                        can_decide:
+                          type: boolean
+                        can_revoke:
+                          type: boolean
+                        approval_navigation_uri:
+                          type: string
+                          format: uri
+                          maxLength: 2048
+                        raw_access:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            case_id:
+                              type: string
+                              format: uuid
+                            reason:
+                              type: string
+                              minLength: 1
+                              maxLength: 512
+                            operations:
+                              type: array
+                              items:
+                                const: download_artifact
+                              minItems: 1
+                              maxItems: 1
+                            max_bytes:
+                              type: integer
+                              minimum: 1
+                              maximum: 1099511627776
+                            max_operations:
+                              const: 10000
+                            not_after:
+                              type: string
+                              format: date-time
+                            artifact_count:
+                              type: integer
+                              minimum: 1
+                              maximum: 64
+                            bytes_used:
+                              type: integer
+                              minimum: 0
+                              maximum: 1099511627776
+                            operations_used:
+                              type: integer
+                              minimum: 0
+                              maximum: 10000
+                          required:
+                          - case_id
+                          - reason
+                          - operations
+                          - max_bytes
+                          - max_operations
+                          - not_after
+                          - artifact_count
+                          - bytes_used
+                          - operations_used
+                      required:
+                      - grant_id
+                      - phase
+                      - revision
+                      - kind
+                      - execution_digest
+                      - review_digest
+                      - data_class
+                      - reasons
+                      - requested_by
+                      - requested_at
+                      - review_until
+                      - lifetime_seconds
+                      - can_decide
+                      - can_revoke
+                      - approval_navigation_uri
+                      - raw_access
               required:
               - approvals
           required:
@@ -6597,6 +6846,53 @@ components:
                         minLength: 1
                         maxLength: 64
                         description: Verified native format, when supplied; used to choose a compatible saved-evidence view. It grants no download or analysis authority.
+                      verified_native_bytes:
+                        type: integer
+                        minimum: 0
+                        maximum: 1099511627776
+                      target:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          cluster_id:
+                            type: string
+                            format: uuid
+                          namespace_uid:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          workload_uid:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          pod_uid:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          namespace:
+                            type: string
+                            minLength: 1
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                          workload_kind:
+                            enum:
+                            - Deployment
+                            - StatefulSet
+                          workload_name:
+                            type: string
+                            minLength: 1
+                            maxLength: 253
+                            pattern: ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$
+                          pod_name:
+                            type: string
+                            minLength: 1
+                            maxLength: 253
+                            pattern: ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$
+                        required:
+                        - cluster_id
+                        - namespace_uid
+                        - workload_uid
+                        - pod_uid
                     required:
                     - artifact_id
                     - digest
@@ -8447,6 +8743,8 @@ components:
             type: string
             pattern: ^[a-f0-9]{64}$
           maxItems: 64
+          minItems: 1
+          uniqueItems: true
         operations:
           type: array
           items:
@@ -8463,6 +8761,8 @@ components:
             - syscall_query
             - download_artifact
           maxItems: 16
+          minItems: 1
+          uniqueItems: true
         reason:
           type: string
           minLength: 1
@@ -8519,6 +8819,8 @@ components:
                   - Pending
                   - Approved
                   - Denied
+                  - Expired
+                  - Revoked
                 approval_uri:
                   type: string
                   format: uri
@@ -8607,309 +8909,96 @@ components:
             status:
               const: ok
             data:
-              type: object
-              additionalProperties: false
-              properties:
-                grant_id:
-                  type: string
-                  format: uuid
-                phase:
-                  enum:
-                  - Pending
-                  - Approved
-                  - Denied
-                  - Revoked
-                  - Expired
-                  - Exhausted
-                revision:
-                  type: integer
-                  minimum: 1
-                  maximum: 3
-                kind:
-                  enum:
-                  - adHocCapture
-                  - policy
-                capture_id:
-                  type: string
-                  format: uuid
-                preview_id:
-                  type: string
-                  format: uuid
-                execution_digest:
-                  type: string
-                  pattern: ^[a-f0-9]{64}$
-                review_digest:
-                  type: string
-                  pattern: ^[a-f0-9]{64}$
-                target:
-                  type: object
-                  additionalProperties: false
-                  properties:
-                    cluster_id:
-                      type: string
-                      format: uuid
-                    namespace:
-                      type: string
-                      minLength: 1
-                      maxLength: 63
-                    workload_kind:
-                      enum:
-                      - Deployment
-                      - StatefulSet
-                      - Pod
-                    workload_name:
-                      type: string
-                      minLength: 1
-                      maxLength: 253
-                    pod_name:
-                      type: string
-                      minLength: 1
-                      maxLength: 253
-                    namespace_uid:
-                      type: string
-                      minLength: 1
-                      maxLength: 64
-                    workload_uid:
-                      type: string
-                      minLength: 1
-                      maxLength: 64
-                  required:
-                  - cluster_id
-                  - namespace
-                  - workload_kind
-                  - workload_name
-                data_class:
-                  enum:
-                  - metadata
-                  - extract
-                  - raw
-                reasons:
-                  type: array
-                  minItems: 1
-                  maxItems: 16
-                  items:
+              oneOf:
+              - type: object
+                additionalProperties: false
+                properties:
+                  grant_id:
+                    type: string
+                    format: uuid
+                  phase:
+                    enum:
+                    - Pending
+                    - Approved
+                    - Denied
+                    - Revoked
+                    - Expired
+                    - Exhausted
+                  revision:
+                    type: integer
+                    minimum: 1
+                    maximum: 3
+                  kind:
+                    enum:
+                    - adHocCapture
+                    - policy
+                  capture_id:
+                    type: string
+                    format: uuid
+                  preview_id:
+                    type: string
+                    format: uuid
+                  execution_digest:
+                    type: string
+                    pattern: ^[a-f0-9]{64}$
+                  review_digest:
+                    type: string
+                    pattern: ^[a-f0-9]{64}$
+                  target:
                     type: object
                     additionalProperties: false
                     properties:
-                      action_id:
+                      cluster_id:
+                        type: string
+                        format: uuid
+                      namespace:
+                        type: string
+                        minLength: 1
+                        maxLength: 63
+                      workload_kind:
+                        enum:
+                        - Deployment
+                        - StatefulSet
+                        - Pod
+                      workload_name:
+                        type: string
+                        minLength: 1
+                        maxLength: 253
+                      pod_name:
+                        type: string
+                        minLength: 1
+                        maxLength: 253
+                      namespace_uid:
                         type: string
                         minLength: 1
                         maxLength: 64
-                      code:
-                        enum:
-                        - rawBytePredicate
-                        - rawPackets
-                        - httpHeaders
-                        - syscallArguments
-                        - liveProfile
-                        - recordingApprovalRequired
-                        - policyCollection
+                      workload_uid:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
                     required:
-                    - action_id
-                    - code
-                observation_limits:
-                  type: object
-                  additionalProperties: false
-                  properties:
-                    max_session_seconds:
-                      type: integer
-                      minimum: 1
-                      maximum: 3600
-                    max_observed_bytes:
-                      type: integer
-                      minimum: 1
-                      maximum: 1099511627776
-                    max_bytes_per_second:
-                      type: integer
-                      minimum: 1
-                      maximum: 1073741824
-                    max_concurrent_sessions:
-                      type: integer
-                      minimum: 1
-                      maximum: 1000
-                    max_observed_events:
-                      type: integer
-                      minimum: 0
-                      maximum: 1000000000
-                  required:
-                  - max_session_seconds
-                  - max_observed_bytes
-                  - max_bytes_per_second
-                  - max_concurrent_sessions
-                requested_by:
-                  type: object
-                  additionalProperties: false
-                  properties:
-                    issuer:
-                      type: string
-                      minLength: 1
-                      maxLength: 2048
-                    subject:
-                      type: string
-                      minLength: 1
-                      maxLength: 256
-                    client_id:
-                      type: string
-                      minLength: 1
-                      maxLength: 256
-                  required:
-                  - issuer
-                  - subject
-                  - client_id
-                requested_at:
-                  type: string
-                  format: date-time
-                review_until:
-                  type: string
-                  format: date-time
-                lifetime_seconds:
-                  type: integer
-                  minimum: 1
-                  maximum: 31536000
-                decision:
-                  type: object
-                  additionalProperties: false
-                  properties:
-                    decision:
-                      enum:
-                      - approved
-                      - denied
-                    decided_by:
+                    - cluster_id
+                    - namespace
+                    - workload_kind
+                    - workload_name
+                  data_class:
+                    enum:
+                    - metadata
+                    - extract
+                    - raw
+                  reasons:
+                    type: array
+                    minItems: 1
+                    maxItems: 16
+                    items:
                       type: object
                       additionalProperties: false
                       properties:
-                        issuer:
+                        action_id:
                           type: string
                           minLength: 1
-                          maxLength: 2048
-                        subject:
-                          type: string
-                          minLength: 1
-                          maxLength: 256
-                        client_id:
-                          type: string
-                          minLength: 1
-                          maxLength: 256
-                      required:
-                      - issuer
-                      - subject
-                      - client_id
-                    decided_at:
-                      type: string
-                      format: date-time
-                    reason:
-                      type: string
-                      minLength: 1
-                      maxLength: 512
-                    authentication_context:
-                      type: object
-                      additionalProperties: false
-                      properties:
-                        acr:
-                          type: string
-                          minLength: 1
-                          maxLength: 128
-                        authenticated_at:
-                          type: string
-                          format: date-time
-                      required:
-                      - acr
-                      - authenticated_at
-                  required:
-                  - decision
-                  - decided_by
-                  - decided_at
-                  - reason
-                not_after:
-                  type: string
-                  format: date-time
-                revoked_at:
-                  type: string
-                  format: date-time
-                revoked_by:
-                  type: object
-                  additionalProperties: false
-                  properties:
-                    issuer:
-                      type: string
-                      minLength: 1
-                      maxLength: 2048
-                    subject:
-                      type: string
-                      minLength: 1
-                      maxLength: 256
-                    client_id:
-                      type: string
-                      minLength: 1
-                      maxLength: 256
-                  required:
-                  - issuer
-                  - subject
-                  - client_id
-                can_decide:
-                  type: boolean
-                can_revoke:
-                  type: boolean
-                approval_navigation_uri:
-                  type: string
-                  format: uri
-                  maxLength: 2048
-                actions:
-                  type: array
-                  minItems: 1
-                  maxItems: 16
-                  items:
-                    type: object
-                    additionalProperties: false
-                    properties:
-                      action_id:
-                        type: string
-                        minLength: 1
-                        maxLength: 64
-                      kind:
-                        enum:
-                        - packetCapture
-                        - syscallTrace
-                        - profile
-                      execution_mode:
-                        enum:
-                        - ongoing
-                        - onTrigger
-                      before:
-                        type: string
-                        minLength: 1
-                        maxLength: 16
-                      after:
-                        type: string
-                        minLength: 1
-                        maxLength: 16
-                      filter:
-                        type: string
-                        minLength: 1
-                        maxLength: 4096
-                      filter_digest:
-                        type: string
-                        pattern: ^[a-f0-9]{64}$
-                      filter_instructions:
-                        type: integer
-                        minimum: 1
-                        maximum: 256
-                      max_bytes:
-                        type: integer
-                        minimum: 1
-                        maximum: 1099511627776
-                      ring_max_bytes:
-                        type: integer
-                        minimum: 1
-                        maximum: 268435456
-                      ring_max_age:
-                        type: string
-                        minLength: 1
-                        maxLength: 16
-                      sensitive:
-                        type: array
-                        maxItems: 4
-                        items:
+                          maxLength: 64
+                        code:
                           enum:
                           - rawBytePredicate
                           - rawPackets
@@ -8917,389 +9006,917 @@ components:
                           - syscallArguments
                           - liveProfile
                           - recordingApprovalRequired
-                      profile:
+                          - policyCollection
+                      required:
+                      - action_id
+                      - code
+                  observation_limits:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      max_session_seconds:
+                        type: integer
+                        minimum: 1
+                        maximum: 3600
+                      max_observed_bytes:
+                        type: integer
+                        minimum: 1
+                        maximum: 1099511627776
+                      max_bytes_per_second:
+                        type: integer
+                        minimum: 1
+                        maximum: 1073741824
+                      max_concurrent_sessions:
+                        type: integer
+                        minimum: 1
+                        maximum: 1000
+                      max_observed_events:
+                        type: integer
+                        minimum: 0
+                        maximum: 1000000000
+                    required:
+                    - max_session_seconds
+                    - max_observed_bytes
+                    - max_bytes_per_second
+                    - max_concurrent_sessions
+                  requested_by:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      issuer:
+                        type: string
+                        minLength: 1
+                        maxLength: 2048
+                      subject:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
+                      client_id:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
+                    required:
+                    - issuer
+                    - subject
+                    - client_id
+                  requested_at:
+                    type: string
+                    format: date-time
+                  review_until:
+                    type: string
+                    format: date-time
+                  lifetime_seconds:
+                    type: integer
+                    minimum: 1
+                    maximum: 31536000
+                  decision:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      decision:
+                        enum:
+                        - approved
+                        - denied
+                      decided_by:
                         type: object
                         additionalProperties: false
                         properties:
-                          runtime:
-                            const: go
-                          type:
-                            enum:
-                            - cpu
-                            - heap
-                            - allocs
-                            - goroutine
-                            - block
-                            - mutex
-                            - threadcreate
-                            - runtimeTrace
-                          mode:
-                            enum:
-                            - snapshot
-                            - interval
-                            - cumulative
-                            - delta
-                          source:
-                            const: httpEndpoint
-                          duration:
+                          issuer:
                             type: string
                             minLength: 1
-                            maxLength: 16
-                          timeout:
+                            maxLength: 2048
+                          subject:
                             type: string
                             minLength: 1
-                            maxLength: 16
-                          force_gc:
-                            type: boolean
-                          source_ref:
+                            maxLength: 256
+                          client_id:
                             type: string
                             minLength: 1
-                            maxLength: 63
-                          source_name:
-                            type: string
-                            minLength: 1
-                            maxLength: 63
-                          address_mode:
-                            enum:
-                            - targetLoopback
-                            - podIP
-                          port:
-                            type: integer
-                            minimum: 1
-                            maximum: 65535
-                          path_policy:
-                            const: go-pprof/v1
-                          endpoint_digest:
-                            type: string
-                            pattern: ^[a-f0-9]{64}$
+                            maxLength: 256
                         required:
-                        - runtime
-                        - type
-                        - mode
-                        - source
-                        - timeout
-                        - force_gc
-                        - source_ref
-                        - source_name
-                        - address_mode
-                        - port
-                        - path_policy
-                        - endpoint_digest
+                        - issuer
+                        - subject
+                        - client_id
+                      decided_at:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                        minLength: 1
+                        maxLength: 512
+                      authentication_context:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          acr:
+                            type: string
+                            minLength: 1
+                            maxLength: 128
+                          authenticated_at:
+                            type: string
+                            format: date-time
+                        required:
+                        - acr
+                        - authenticated_at
                     required:
-                    - action_id
-                    - kind
-                    - execution_mode
-                    - max_bytes
-                    - sensitive
-                    oneOf:
-                    - properties:
-                        kind:
-                          const: profile
-                      required:
-                      - profile
-                      not:
-                        anyOf:
-                        - required:
-                          - before
-                        - required:
-                          - after
-                        - required:
-                          - ring_max_bytes
-                        - required:
-                          - ring_max_age
-                        - required:
-                          - filter
-                        - required:
-                          - filter_digest
-                        - required:
-                          - filter_instructions
-                    - properties:
+                    - decision
+                    - decided_by
+                    - decided_at
+                    - reason
+                  not_after:
+                    type: string
+                    format: date-time
+                  revoked_at:
+                    type: string
+                    format: date-time
+                  revoked_by:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      issuer:
+                        type: string
+                        minLength: 1
+                        maxLength: 2048
+                      subject:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
+                      client_id:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
+                    required:
+                    - issuer
+                    - subject
+                    - client_id
+                  can_decide:
+                    type: boolean
+                  can_revoke:
+                    type: boolean
+                  approval_navigation_uri:
+                    type: string
+                    format: uri
+                    maxLength: 2048
+                  actions:
+                    type: array
+                    minItems: 1
+                    maxItems: 16
+                    items:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        action_id:
+                          type: string
+                          minLength: 1
+                          maxLength: 64
                         kind:
                           enum:
                           - packetCapture
                           - syscallTrace
+                          - profile
+                        execution_mode:
+                          enum:
+                          - ongoing
+                          - onTrigger
+                        before:
+                          type: string
+                          minLength: 1
+                          maxLength: 16
+                        after:
+                          type: string
+                          minLength: 1
+                          maxLength: 16
+                        filter:
+                          type: string
+                          minLength: 1
+                          maxLength: 4096
+                        filter_digest:
+                          type: string
+                          pattern: ^[a-f0-9]{64}$
+                        filter_instructions:
+                          type: integer
+                          minimum: 1
+                          maximum: 256
+                        max_bytes:
+                          type: integer
+                          minimum: 1
+                          maximum: 1099511627776
+                        ring_max_bytes:
+                          type: integer
+                          minimum: 1
+                          maximum: 268435456
+                        ring_max_age:
+                          type: string
+                          minLength: 1
+                          maxLength: 16
+                        sensitive:
+                          type: array
+                          maxItems: 4
+                          items:
+                            enum:
+                            - rawBytePredicate
+                            - rawPackets
+                            - httpHeaders
+                            - syscallArguments
+                            - liveProfile
+                            - recordingApprovalRequired
+                        profile:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            runtime:
+                              const: go
+                            type:
+                              enum:
+                              - cpu
+                              - heap
+                              - allocs
+                              - goroutine
+                              - block
+                              - mutex
+                              - threadcreate
+                              - runtimeTrace
+                            mode:
+                              enum:
+                              - snapshot
+                              - interval
+                              - cumulative
+                              - delta
+                            source:
+                              const: httpEndpoint
+                            duration:
+                              type: string
+                              minLength: 1
+                              maxLength: 16
+                            timeout:
+                              type: string
+                              minLength: 1
+                              maxLength: 16
+                            force_gc:
+                              type: boolean
+                            source_ref:
+                              type: string
+                              minLength: 1
+                              maxLength: 63
+                            source_name:
+                              type: string
+                              minLength: 1
+                              maxLength: 63
+                            address_mode:
+                              enum:
+                              - targetLoopback
+                              - podIP
+                            port:
+                              type: integer
+                              minimum: 1
+                              maximum: 65535
+                            path_policy:
+                              const: go-pprof/v1
+                            endpoint_digest:
+                              type: string
+                              pattern: ^[a-f0-9]{64}$
+                          required:
+                          - runtime
+                          - type
+                          - mode
+                          - source
+                          - timeout
+                          - force_gc
+                          - source_ref
+                          - source_name
+                          - address_mode
+                          - port
+                          - path_policy
+                          - endpoint_digest
                       required:
-                      - before
-                      - after
-                      - ring_max_bytes
-                      - ring_max_age
-                      not:
+                      - action_id
+                      - kind
+                      - execution_mode
+                      - max_bytes
+                      - sensitive
+                      oneOf:
+                      - properties:
+                          kind:
+                            const: profile
                         required:
                         - profile
-                result_access:
-                  type: object
-                  additionalProperties: false
-                  properties:
-                    action_ids:
-                      type: array
-                      minItems: 1
-                      maxItems: 16
-                      items:
+                        not:
+                          anyOf:
+                          - required:
+                            - before
+                          - required:
+                            - after
+                          - required:
+                            - ring_max_bytes
+                          - required:
+                            - ring_max_age
+                          - required:
+                            - filter
+                          - required:
+                            - filter_digest
+                          - required:
+                            - filter_instructions
+                      - properties:
+                          kind:
+                            enum:
+                            - packetCapture
+                            - syscallTrace
+                        required:
+                        - before
+                        - after
+                        - ring_max_bytes
+                        - ring_max_age
+                        not:
+                          required:
+                          - profile
+                  result_access:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      action_ids:
+                        type: array
+                        minItems: 1
+                        maxItems: 16
+                        items:
+                          type: string
+                          minLength: 1
+                          maxLength: 64
+                      operations:
+                        type: array
+                        minItems: 1
+                        maxItems: 1
+                        items:
+                          const: download_artifact
+                      client_ids:
+                        type: array
+                        minItems: 1
+                        maxItems: 4
+                        items:
+                          type: string
+                          minLength: 1
+                          maxLength: 256
+                      max_artifacts:
+                        type: integer
+                        minimum: 1
+                        maximum: 64
+                      max_bytes:
+                        type: integer
+                        minimum: 1
+                        maximum: 274877906944
+                      max_operations:
+                        type: integer
+                        minimum: 1
+                        maximum: 10000
+                      not_after:
+                        type: string
+                        format: date-time
+                      artifacts_used:
+                        type: integer
+                        minimum: 0
+                        maximum: 64
+                      bytes_used:
+                        type: integer
+                        minimum: 0
+                        maximum: 274877906944
+                      operations_used:
+                        type: integer
+                        minimum: 0
+                        maximum: 10000
+                    required:
+                    - action_ids
+                    - operations
+                    - client_ids
+                    - max_artifacts
+                    - max_bytes
+                    - max_operations
+                    - not_after
+                    - artifacts_used
+                    - bytes_used
+                    - operations_used
+                  remaining_bytes:
+                    type: integer
+                    minimum: 0
+                    maximum: 1000000000000
+                  remaining_executions:
+                    type: integer
+                    minimum: 0
+                    maximum: 10000
+                  remaining_observation_bytes:
+                    type: integer
+                    minimum: 0
+                    maximum: 1099511627776
+                  preview_deadline:
+                    type: string
+                    format: date-time
+                    description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
+                  capture_deadline_rule:
+                    enum:
+                    - previewDeadline
+                    - acceptanceWithinGrant
+                    - policyAuthority
+                    description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry.
+                  capture_window_seconds:
+                    type: integer
+                    const: 300
+                    description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                  can_resume:
+                    type: boolean
+                    description: Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority.
+                  can_resolve:
+                    type: boolean
+                    description: Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent.
+                  resume_requires_original_client:
+                    type: boolean
+                    description: Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer.
+                  policy:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      uid:
                         type: string
                         minLength: 1
                         maxLength: 64
-                    operations:
-                      type: array
-                      minItems: 1
-                      maxItems: 1
-                      items:
-                        const: download_artifact
-                    client_ids:
-                      type: array
-                      minItems: 1
-                      maxItems: 4
-                      items:
+                      executor:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          issuer:
+                            type: string
+                            minLength: 1
+                            maxLength: 2048
+                          subject:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                          client_id:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                        required:
+                        - issuer
+                        - subject
+                        - client_id
+                      authority_issued_at:
+                        type: string
+                        format: date-time
+                      authority_not_after:
+                        type: string
+                        format: date-time
+                      max_executions:
+                        type: integer
+                        minimum: 1
+                        maximum: 10000
+                      executions_used:
+                        type: integer
+                        minimum: 0
+                        maximum: 10000
+                      max_collected_bytes:
+                        type: integer
+                        minimum: 1
+                        maximum: 1099511627776
+                      max_observed_bytes:
+                        type: integer
+                        minimum: 0
+                        maximum: 1099511627776
+                      collected_bytes_used:
+                        type: integer
+                        minimum: 0
+                        maximum: 1099511627776
+                      observed_bytes_used:
+                        type: integer
+                        minimum: 0
+                        maximum: 1099511627776
+                      max_observed_events:
+                        type: integer
+                        minimum: 0
+                        maximum: 1000000000
+                        description: Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation.
+                      observed_events_used:
+                        type: integer
+                        minimum: 0
+                        maximum: 1000000000
+                        description: Conservative charged event units, including uncertain observations.
+                    required:
+                    - uid
+                    - executor
+                    - authority_issued_at
+                    - authority_not_after
+                    - max_executions
+                    - executions_used
+                    - max_collected_bytes
+                    - max_observed_bytes
+                    - collected_bytes_used
+                    - observed_bytes_used
+                required:
+                - grant_id
+                - phase
+                - revision
+                - kind
+                - execution_digest
+                - review_digest
+                - target
+                - data_class
+                - reasons
+                - requested_by
+                - requested_at
+                - review_until
+                - lifetime_seconds
+                - can_decide
+                - can_revoke
+                - approval_navigation_uri
+                - actions
+                - capture_deadline_rule
+                - can_resume
+                - can_resolve
+                - resume_requires_original_client
+                allOf:
+                - if:
+                    properties:
+                      capture_deadline_rule:
+                        const: acceptanceWithinGrant
+                  then:
+                    required:
+                    - capture_window_seconds
+                  else:
+                    not:
+                      required:
+                      - capture_window_seconds
+                - if:
+                    properties:
+                      kind:
+                        const: adHocCapture
+                  then:
+                    required:
+                    - capture_id
+                    - preview_id
+                    - preview_deadline
+                    properties:
+                      lifetime_seconds:
+                        minimum: 60
+                        maximum: 28800
+                      target:
+                        required:
+                        - pod_name
+                        not:
+                          anyOf:
+                          - required:
+                            - namespace_uid
+                          - required:
+                            - workload_uid
+                      capture_deadline_rule:
+                        enum:
+                        - previewDeadline
+                        - acceptanceWithinGrant
+                    not:
+                      anyOf:
+                      - required:
+                        - policy
+                - if:
+                    properties:
+                      kind:
+                        const: policy
+                  then:
+                    required:
+                    - policy
+                    - not_after
+                    properties:
+                      target:
+                        required:
+                        - namespace_uid
+                        - workload_uid
+                        not:
+                          anyOf:
+                          - required:
+                            - pod_name
+                      capture_deadline_rule:
+                        const: policyAuthority
+                      can_resume:
+                        const: false
+                      can_resolve:
+                        const: false
+                      resume_requires_original_client:
+                        const: false
+                    not:
+                      anyOf:
+                      - required:
+                        - capture_id
+                      - required:
+                        - preview_id
+                      - required:
+                        - preview_deadline
+                      - required:
+                        - result_access
+                      - required:
+                        - remaining_bytes
+              - type: object
+                additionalProperties: false
+                properties:
+                  grant_id:
+                    type: string
+                    format: uuid
+                  phase:
+                    enum:
+                    - Pending
+                    - Approved
+                    - Denied
+                    - Revoked
+                    - Expired
+                    - Exhausted
+                  revision:
+                    type: integer
+                    minimum: 1
+                    maximum: 3
+                  kind:
+                    const: rawQuery
+                  execution_digest:
+                    type: string
+                    pattern: ^[a-f0-9]{64}$
+                  review_digest:
+                    type: string
+                    pattern: ^[a-f0-9]{64}$
+                  data_class:
+                    const: raw
+                  reasons:
+                    type: array
+                    maxItems: 0
+                  requested_by:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      issuer:
+                        type: string
+                        minLength: 1
+                        maxLength: 2048
+                      subject:
                         type: string
                         minLength: 1
                         maxLength: 256
-                    max_artifacts:
-                      type: integer
-                      minimum: 1
-                      maximum: 64
-                    max_bytes:
-                      type: integer
-                      minimum: 1
-                      maximum: 274877906944
-                    max_operations:
-                      type: integer
-                      minimum: 1
-                      maximum: 10000
-                    not_after:
-                      type: string
-                      format: date-time
-                    artifacts_used:
-                      type: integer
-                      minimum: 0
-                      maximum: 64
-                    bytes_used:
-                      type: integer
-                      minimum: 0
-                      maximum: 274877906944
-                    operations_used:
-                      type: integer
-                      minimum: 0
-                      maximum: 10000
-                  required:
-                  - action_ids
-                  - operations
-                  - client_ids
-                  - max_artifacts
-                  - max_bytes
-                  - max_operations
-                  - not_after
-                  - artifacts_used
-                  - bytes_used
-                  - operations_used
-                remaining_bytes:
-                  type: integer
-                  minimum: 0
-                  maximum: 1000000000000
-                remaining_executions:
-                  type: integer
-                  minimum: 0
-                  maximum: 10000
-                remaining_observation_bytes:
-                  type: integer
-                  minimum: 0
-                  maximum: 1099511627776
-                preview_deadline:
-                  type: string
-                  format: date-time
-                  description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy
-                    previewDeadline plans.
-                capture_deadline_rule:
-                  enum:
-                  - previewDeadline
-                  - acceptanceWithinGrant
-                  - policyAuthority
-                  description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original
-                    request-anchored grant expiry.
-                capture_window_seconds:
-                  type: integer
-                  const: 300
-                  description: Maximum window fixed once at acceptance, never beyond original approval expiry.
-                can_resume:
-                  type: boolean
-                  description: Advisory current original requester/client collection eligibility under this exact approved grant.
-                    Submission rechecks all authority.
-                can_resolve:
-                  type: boolean
-                  description: Advisory original requester/client may recover a possibly accepted request after an approved decision.
-                    Never offered for pending or denied review; a missing acceptance closes the original intent.
-                resume_requires_original_client:
-                  type: boolean
-                  description: Guidance only for the same requesting human on another OAuth client while this marked plan is Approved.
-                    It confers no authority or grant transfer.
-                policy:
-                  type: object
-                  additionalProperties: false
-                  properties:
-                    uid:
-                      type: string
-                      minLength: 1
-                      maxLength: 64
-                    executor:
-                      type: object
-                      additionalProperties: false
-                      properties:
-                        issuer:
-                          type: string
-                          minLength: 1
-                          maxLength: 2048
-                        subject:
-                          type: string
-                          minLength: 1
-                          maxLength: 256
-                        client_id:
-                          type: string
-                          minLength: 1
-                          maxLength: 256
-                      required:
-                      - issuer
-                      - subject
-                      - client_id
-                    authority_issued_at:
-                      type: string
-                      format: date-time
-                    authority_not_after:
-                      type: string
-                      format: date-time
-                    max_executions:
-                      type: integer
-                      minimum: 1
-                      maximum: 10000
-                    executions_used:
-                      type: integer
-                      minimum: 0
-                      maximum: 10000
-                    max_collected_bytes:
-                      type: integer
-                      minimum: 1
-                      maximum: 1099511627776
-                    max_observed_bytes:
-                      type: integer
-                      minimum: 0
-                      maximum: 1099511627776
-                    collected_bytes_used:
-                      type: integer
-                      minimum: 0
-                      maximum: 1099511627776
-                    observed_bytes_used:
-                      type: integer
-                      minimum: 0
-                      maximum: 1099511627776
-                  required:
-                  - uid
-                  - executor
-                  - authority_issued_at
-                  - authority_not_after
-                  - max_executions
-                  - executions_used
-                  - max_collected_bytes
-                  - max_observed_bytes
-                  - collected_bytes_used
-                  - observed_bytes_used
-              required:
-              - grant_id
-              - phase
-              - revision
-              - kind
-              - execution_digest
-              - review_digest
-              - target
-              - data_class
-              - reasons
-              - requested_by
-              - requested_at
-              - review_until
-              - lifetime_seconds
-              - can_decide
-              - can_revoke
-              - approval_navigation_uri
-              - actions
-              - capture_deadline_rule
-              - can_resume
-              - can_resolve
-              - resume_requires_original_client
-              allOf:
-              - if:
-                  properties:
-                    capture_deadline_rule:
-                      const: acceptanceWithinGrant
-                then:
-                  required:
-                  - capture_window_seconds
-                else:
-                  not:
+                      client_id:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
                     required:
-                    - capture_window_seconds
-              - if:
-                  properties:
-                    kind:
-                      const: adHocCapture
-                then:
-                  required:
-                  - capture_id
-                  - preview_id
-                  - preview_deadline
-                  properties:
-                    lifetime_seconds:
-                      minimum: 60
-                      maximum: 28800
-                    target:
-                      required:
-                      - pod_name
-                      not:
-                        anyOf:
-                        - required:
-                          - namespace_uid
-                        - required:
-                          - workload_uid
-                    capture_deadline_rule:
-                      enum:
-                      - previewDeadline
-                      - acceptanceWithinGrant
-                  not:
-                    anyOf:
-                    - required:
-                      - policy
-              - if:
-                  properties:
-                    kind:
-                      const: policy
-                then:
-                  required:
-                  - policy
-                  - not_after
-                  properties:
-                    target:
-                      required:
-                      - namespace_uid
-                      - workload_uid
-                      not:
-                        anyOf:
-                        - required:
-                          - pod_name
-                    capture_deadline_rule:
-                      const: policyAuthority
-                    can_resume:
-                      const: false
-                    can_resolve:
-                      const: false
-                    resume_requires_original_client:
-                      const: false
-                  not:
-                    anyOf:
-                    - required:
-                      - capture_id
-                    - required:
-                      - preview_id
-                    - required:
-                      - preview_deadline
-                    - required:
-                      - result_access
-                    - required:
-                      - remaining_bytes
+                    - issuer
+                    - subject
+                    - client_id
+                  requested_at:
+                    type: string
+                    format: date-time
+                  review_until:
+                    type: string
+                    format: date-time
+                  lifetime_seconds:
+                    type: integer
+                    minimum: 1
+                    maximum: 31536000
+                  decision:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      decision:
+                        enum:
+                        - approved
+                        - denied
+                      decided_by:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          issuer:
+                            type: string
+                            minLength: 1
+                            maxLength: 2048
+                          subject:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                          client_id:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                        required:
+                        - issuer
+                        - subject
+                        - client_id
+                      decided_at:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                        minLength: 1
+                        maxLength: 512
+                      authentication_context:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          acr:
+                            type: string
+                            minLength: 1
+                            maxLength: 128
+                          authenticated_at:
+                            type: string
+                            format: date-time
+                        required:
+                        - acr
+                        - authenticated_at
+                    required:
+                    - decision
+                    - decided_by
+                    - decided_at
+                    - reason
+                  not_after:
+                    type: string
+                    format: date-time
+                  revoked_at:
+                    type: string
+                    format: date-time
+                  revoked_by:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      issuer:
+                        type: string
+                        minLength: 1
+                        maxLength: 2048
+                      subject:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
+                      client_id:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
+                    required:
+                    - issuer
+                    - subject
+                    - client_id
+                  can_decide:
+                    type: boolean
+                  can_revoke:
+                    type: boolean
+                  approval_navigation_uri:
+                    type: string
+                    format: uri
+                    maxLength: 2048
+                  can_resume:
+                    const: false
+                  can_resolve:
+                    const: false
+                  resume_requires_original_client:
+                    const: false
+                  raw_access:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      case_id:
+                        type: string
+                        format: uuid
+                      reason:
+                        type: string
+                        minLength: 1
+                        maxLength: 512
+                      operations:
+                        type: array
+                        items:
+                          const: download_artifact
+                        minItems: 1
+                        maxItems: 1
+                      max_bytes:
+                        type: integer
+                        minimum: 1
+                        maximum: 1099511627776
+                      max_operations:
+                        const: 10000
+                      not_after:
+                        type: string
+                        format: date-time
+                      artifact_count:
+                        type: integer
+                        minimum: 1
+                        maximum: 64
+                      bytes_used:
+                        type: integer
+                        minimum: 0
+                        maximum: 1099511627776
+                      operations_used:
+                        type: integer
+                        minimum: 0
+                        maximum: 10000
+                      artifacts:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            artifact_id:
+                              type: string
+                              format: uuid
+                            capture_id:
+                              type: string
+                              format: uuid
+                            action_id:
+                              type: string
+                              minLength: 1
+                              maxLength: 63
+                            digest:
+                              type: string
+                              pattern: ^[a-f0-9]{64}$
+                            execution_digest:
+                              type: string
+                              pattern: ^[a-f0-9]{64}$
+                            native_type:
+                              type: string
+                              minLength: 1
+                              maxLength: 64
+                            native_bytes:
+                              type: integer
+                              minimum: 0
+                              maximum: 1099511627776
+                            expires_at:
+                              type: string
+                              format: date-time
+                            target:
+                              type: object
+                              additionalProperties: false
+                              properties:
+                                cluster_id:
+                                  type: string
+                                  format: uuid
+                                namespace_uid:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 64
+                                workload_uid:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 64
+                                pod_uid:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 64
+                                namespace:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 63
+                                  pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                                workload_kind:
+                                  enum:
+                                  - Deployment
+                                  - StatefulSet
+                                workload_name:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 253
+                                  pattern: ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$
+                                pod_name:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 253
+                                  pattern: ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$
+                              required:
+                              - cluster_id
+                              - namespace_uid
+                              - workload_uid
+                              - pod_uid
+                          required:
+                          - artifact_id
+                          - capture_id
+                          - action_id
+                          - digest
+                          - execution_digest
+                          - native_type
+                          - native_bytes
+                          - expires_at
+                          - target
+                        minItems: 1
+                        maxItems: 64
+                    required:
+                    - case_id
+                    - reason
+                    - operations
+                    - max_bytes
+                    - max_operations
+                    - not_after
+                    - artifact_count
+                    - bytes_used
+                    - operations_used
+                    - artifacts
+                required:
+                - grant_id
+                - phase
+                - revision
+                - kind
+                - execution_digest
+                - review_digest
+                - data_class
+                - reasons
+                - requested_by
+                - requested_at
+                - review_until
+                - lifetime_seconds
+                - can_decide
+                - can_revoke
+                - approval_navigation_uri
+                - raw_access
           required:
           - status
           - data
@@ -14028,6 +14645,7 @@ components:
                   type: string
                   minLength: 1
                   maxLength: 64
+                  description: RawApprovalRequired is returned only for a fresh preparation whose ordinary access checks passed but no current whole-file grant covers it. Other failures must not open approval.
                 message:
                   type: string
                   minLength: 1
@@ -14267,6 +14885,12 @@ components:
               type: integer
               minimum: 0
               maximum: 1099511627776
+            max_observed_events:
+              type: integer
+              minimum: 0
+              maximum: 1000000000
+              description: Cumulative eligible entry and exit probe ceiling; zero or absent
+                grants no argument observation.
           required:
           - max_executions
           - max_collected_bytes
@@ -14815,26 +15439,34 @@ components:
                 preview_deadline:
                   type: string
                   format: date-time
-                  description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
+                  description: Original passive preview expiry; bounds opening a new approval
+                    review, and also start for legacy previewDeadline plans.
                 capture_deadline_rule:
                   enum:
                   - previewDeadline
                   - acceptanceWithinGrant
                   - policyAuthority
-                  description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry.
+                  description: Manual preview/acceptance window, or the separately accepted
+                    team-policy authority bound by original request-anchored grant expiry.
                 capture_window_seconds:
                   type: integer
                   const: 300
-                  description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                  description: Maximum window fixed once at acceptance, never beyond original
+                    approval expiry.
                 can_resume:
                   type: boolean
-                  description: Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority.
+                  description: Advisory current original requester/client collection eligibility
+                    under this exact approved grant. Submission rechecks all authority.
                 can_resolve:
                   type: boolean
-                  description: Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent.
+                  description: Advisory original requester/client may recover a possibly
+                    accepted request after an approved decision. Never offered for pending
+                    or denied review; a missing acceptance closes the original intent.
                 resume_requires_original_client:
                   type: boolean
-                  description: Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer.
+                  description: Guidance only for the same requesting human on another
+                    OAuth client while this marked plan is Approved. It confers no authority
+                    or grant transfer.
                 policy:
                   type: object
                   additionalProperties: false
@@ -14893,6 +15525,18 @@ components:
                       type: integer
                       minimum: 0
                       maximum: 1099511627776
+                    max_observed_events:
+                      type: integer
+                      minimum: 0
+                      maximum: 1000000000
+                      description: Cumulative eligible entry and exit probe ceiling; zero
+                        or absent grants no argument observation.
+                    observed_events_used:
+                      type: integer
+                      minimum: 0
+                      maximum: 1000000000
+                      description: Conservative charged event units, including uncertain
+                        observations.
                   required:
                   - uid
                   - executor
