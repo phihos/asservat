@@ -358,3 +358,19 @@ func TestProfileWarningsDescribeProfileTiming(t *testing.T) {
 		t.Fatal(warnings)
 	}
 }
+
+func TestProfileWarningUsesOnlyItsReviewedEndpoint(t *testing.T) {
+	endpoint := targets.ProfileEndpointResolution{SourceName: "go-endpoint", AddressMode: "targetLoopback", Port: 6060, PathPolicy: "go-pprof/v1", EndpointDigest: artifact.Digest{1}}
+	plan := planning.RecorderPlan{Input: planning.RecorderInput{Endpoints: []targets.ProfileEndpointResolution{endpoint}}, Actions: []planning.RecorderAction{{Kind: "profile", ProfileRuntime: "any", ProfileType: "cpu", ProfileMode: "interval", Duration: "10s"}}}
+	if warnings := recorderWarnings(plan); len(warnings) != 1 {
+		t.Fatal("sampler received endpoint warning", warnings)
+	}
+	plan.Actions[0].EndpointDigest = hash(endpoint.EndpointDigest)
+	if warnings := recorderWarnings(plan); len(warnings) != 2 || !strings.Contains(warnings[1], "go-endpoint") {
+		t.Fatal("reviewed endpoint omitted", warnings)
+	}
+	plan.Actions[0].EndpointDigest = hash(artifact.Digest{2})
+	if warnings := recorderWarnings(plan); len(warnings) != 1 {
+		t.Fatal("unrelated endpoint shown", warnings)
+	}
+}
