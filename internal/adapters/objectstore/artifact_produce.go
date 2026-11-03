@@ -78,11 +78,7 @@ func (p *ArtifactProducer) Prepare(ctx context.Context, e artifact.ContextExpect
 	if ctx.Err() != nil || !p.now().Before(r.WriteUntil) {
 		return nil, privacy.ErrExpired
 	}
-	if e.Profile != nil {
-		profile := *e.Profile
-		profile.Composition = slices.Clone(profile.Composition)
-		e.Profile = &profile
-	}
+	e.Profile = e.Profile.Clone()
 	e.Audience = slices.Clone(e.Audience)
 	e.RetentionRules = slices.Clone(e.RetentionRules)
 	e.Lifecycle = e.Lifecycle.Clone()

@@ -36,6 +36,7 @@ type Cancellation struct {
 	Phase                  string
 	Revision               int64
 	Requested              bool
+	ApplicationStopUnknown bool
 	ObservedAt, ValidUntil time.Time
 }
 

@@ -61,11 +61,11 @@ func (p ContextProgressObservation) Valid(now time.Time) bool {
 	case "Running":
 		return p.ActionPhase == "Running" && p.ReasonCode == "AcquisitionStarted"
 	case "Failed":
-		return p.ActionPhase == "Failed" && (p.ReasonCode == "AcquisitionFailed" || p.ReasonCode == "PeerMembershipChanged" || p.ReasonCode == "PeerMembershipStale") || p.ActionPhase == "TargetGone" && p.ReasonCode == "PinnedPodGone" || p.ActionPhase == "Denied" && p.ReasonCode == "PodStatusDenied"
+		return p.ActionPhase == "Failed" && (p.ReasonCode == "AcquisitionFailed" || p.ReasonCode == "ProfilerBusy" || p.ReasonCode == "PeerMembershipChanged" || p.ReasonCode == "PeerMembershipStale") || p.ActionPhase == "TargetGone" && p.ReasonCode == "PinnedPodGone" || p.ActionPhase == "Denied" && p.ReasonCode == "PodStatusDenied"
 	case "Finalizing":
 		return p.ActionPhase == "Finalizing" && (p.ReasonCode == "VerificationPending" || p.ReasonCode == "VerificationAuditPending" || p.ReasonCode == "PublicationPending")
 	case "Cancelled":
-		return p.ActionPhase == "Cancelled" && p.ReasonCode == "CancellationJoined"
+		return p.ActionPhase == "Cancelled" && (p.ReasonCode == "CancellationJoined" || p.ReasonCode == "ProfileCancellationUncertain")
 	case "Succeeded":
 		return p.ActionPhase == "Succeeded" && p.ReasonCode == "Published"
 	case "Indeterminate":

@@ -639,6 +639,9 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 			if actionErr != nil {
 				return OperationReply{}, actionErr
 			}
+			if progress.ReasonCode == "ProfileCancellationUncertain" {
+				out.Warnings = append(out.Warnings, "Asservat stopped collecting this profile. Whether the application stopped profiling is unknown.")
+			}
 			data := ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: actions, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, RetryAfterSeconds: progress.RetryAfterSeconds, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: operation}
 			data.CancellationRequested = progress.CancellationRequested
 			data.Reason, data.ReasonState = progress.Reason, progress.ReasonState

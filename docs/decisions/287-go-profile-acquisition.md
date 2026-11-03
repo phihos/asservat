@@ -55,12 +55,33 @@ recording. The node collector has no artifact key authority.
    the exact format and hashes and integrates the separate bounded multi-frame
    transfer change. A received node body or stored ciphertext is not publication.
 
+## Accepted cancellation lifecycle
+
+The existing revision-bound `cancel_capture` operation accepts a profile attempt
+under current ordinary rights. Migration 124 extends the existing cancellation
+journal to the distinct profile expectation; it does not create a new public
+operation, grant, listener or retry loop. A restrictive typed stop travels over
+the existing signed regional control stream, bound to the accepted attempt,
+expectation and exact connector process. It carries no recording source or
+packet parameters. A bounded holder tombstone prevents a delayed start.
+
+Queue acknowledgement is not completion. The connector waits for the actual
+node result and any active storage call to join before recording the typed
+cancellation proof. Confirmed storage wins a concurrent Stop. Known cancellation
+before endpoint work reports that no application profiling started; if the
+endpoint may have started, public progress warns that stopping collection does
+not confirm the application stopped profiling. The original node exclusion
+interval and all uncertain storage charges remain spent. A process replacement
+cannot acknowledge or reconstruct the original attempt.
+
 ## Costs and validation
 
 The implementation plan records the cumulative complexity assessment. A capture
 adds one bounded endpoint resolution at start, one node work item, one endpoint
 GET and one authenticated native upload. It adds no privileges, credentials,
-watch, listener or user-facing tuning setting. Node response memory is reserved
+watch, listener or user-facing tuning setting. An explicit Stop adds one durable
+intent update, one regional control query, at most one node cancellation work item
+and one joined outcome update; it adds no polling loop or automatic retry. Node response memory is reserved
 at the admitted 16 MiB default (64 MiB profile/128 MiB trace maxima), under the
 existing aggregate budget. Connector buffering is frame bounded. The one-shot
 writer avoids up to 38 multipart journal control RPCs at the trace maximum;

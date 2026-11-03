@@ -33,14 +33,15 @@ type APIContextRetention interface {
 }
 
 type APIContextWork struct {
-	Initiator      *identity.Principal      `json:",omitempty"`
-	SourceBinding  *collector.SourceBinding `json:",omitempty"`
-	Accepted       capture.Accepted
-	Target         targets.Request
-	Actor          identity.Principal
-	IntentDigest   artifact.Digest
-	SourceAudience []artifact.AudienceAssignment `json:",omitempty"`
-	SourceTarget   *targets.SourceSnapshotTarget `json:",omitempty"`
+	CancellationRequested bool                     `json:",omitempty"`
+	Initiator             *identity.Principal      `json:",omitempty"`
+	SourceBinding         *collector.SourceBinding `json:",omitempty"`
+	Accepted              capture.Accepted
+	Target                targets.Request
+	Actor                 identity.Principal
+	IntentDigest          artifact.Digest
+	SourceAudience        []artifact.AudienceAssignment `json:",omitempty"`
+	SourceTarget          *targets.SourceSnapshotTarget `json:",omitempty"`
 }
 type APIExecutionCheck struct {
 	Work                  APIContextWork

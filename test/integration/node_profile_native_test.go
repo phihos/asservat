@@ -129,12 +129,12 @@ func profileCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interf
 		if err := os.WriteFile(path, b, 0600); err != nil {
 			t.Fatal(err)
 		}
-		command := exec.CommandContext(ctx, "go", "tool", "pprof", "-top", path)
+		command := exec.CommandContext(ctx, "go", "tool", "pprof", "-symbolize=none", "-top", path)
 		out, err := command.CombinedOutput()
 		if err != nil {
 			t.Fatalf("native local tool: %v %s", err, out)
 		}
-		results["profile-"+name] = map[string]any{"bytes": len(b), "sha256": fmt.Sprintf("%x", sha256.Sum256(b)), "samples": len(parsed.Sample), "started": r.Outcome.StartedAt, "completed": r.Outcome.CompletedAt, "localTool": "go tool pprof -top", "nodeUID": view.Identity.NodeUID, "podUID": string(created.UID)}
+		results["profile-"+name] = map[string]any{"bytes": len(b), "sha256": fmt.Sprintf("%x", sha256.Sum256(b)), "samples": len(parsed.Sample), "started": r.Outcome.StartedAt, "completed": r.Outcome.CompletedAt, "localTool": "go tool pprof -symbolize=none -top", "nodeUID": view.Identity.NodeUID, "podUID": string(created.UID)}
 	}
 	_, cpu := enqueue("cpu", "interval", "targetLoopback", netip.MustParseAddr("127.0.0.1"), 6060, 2*time.Second)
 	r, b := await(cpu.CaptureID)

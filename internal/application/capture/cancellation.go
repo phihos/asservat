@@ -23,6 +23,7 @@ type SnapshotCancellationGroup struct {
 }
 
 type SnapshotCancellationWork struct {
+	Profile   *collector.ProfileStop
 	Group     *SnapshotCancellationGroup
 	Decision  value.Cancellation
 	ClusterID string
@@ -72,7 +73,7 @@ func (s CaptureCancellation) Cancel(ctx context.Context, current identities.Curr
 	until := identity.Earlier(started.Add(5*time.Second), identity.Earlier(i.ValidUntil, recovery.FreshUntil))
 	bounded, cancel := context.WithDeadline(call, until)
 	defer cancel()
-	check := value.CancellationCheck{RootID: s.RootID, Request: request, Identity: i, Recovery: recovery, CheckedAt: started, ValidUntil: until}
+	check := value.CancellationCheck{RootID: s.RootID, Request: request, Identity: i, Recovery: recovery, CheckedAt: s.Now().UTC().Truncate(time.Microsecond), ValidUntil: until}
 	if !check.Valid(s.Now()) {
 		return zero, value.ErrDenied
 	}
@@ -86,7 +87,7 @@ func (s CaptureCancellation) Cancel(ctx context.Context, current identities.Curr
 		return zero, value.ErrChanged
 	}
 	if group := work.Group; group != nil {
-		if work.Snapshot != nil || group.ParentCaptureID != request.CaptureID || len(group.Targets) > value.MaxRecordingSaveGroupChildren {
+		if work.Snapshot != nil || work.Profile != nil || group.ParentCaptureID != request.CaptureID || len(group.Targets) > value.MaxRecordingSaveGroupChildren {
 			return zero, value.ErrChanged
 		}
 		seen := map[string]bool{}
@@ -108,6 +109,17 @@ func (s CaptureCancellation) Cancel(ctx context.Context, current identities.Curr
 		}
 		if firstError != nil {
 			return decision, firstError
+		}
+	}
+	if stop := work.Profile; stop != nil {
+		dispatcher, ok := s.Dispatcher.(interface {
+			CancelProfile(context.Context, string, collector.ProfileStop) error
+		})
+		if !ok || work.Snapshot != nil || work.Group != nil || !decision.Requested || !stop.Valid() || stop.CaptureID != request.CaptureID || stop.RootID != s.RootID || stop.ClusterID != work.ClusterID {
+			return zero, value.ErrChanged
+		}
+		if err = dispatcher.CancelProfile(bounded, work.ClusterID, *stop); err != nil {
+			return decision, err
 		}
 	}
 	if snapshot := work.Snapshot; snapshot != nil {

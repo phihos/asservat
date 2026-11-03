@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
@@ -15,4 +16,8 @@ import (
 // endpoint resolution creates a new start interval.
 type ProfileRecorder interface {
 	StartProfile(ctx context.Context, pin artifact.PinnedPod, started, until time.Time, endpoint targets.ProfileEndpointRequest) (time.Time, error)
+}
+
+type ProfileCanceller interface {
+	CancelProfile(context.Context, collector.ProfileStop) error
 }

@@ -53,3 +53,17 @@ Failing focused tests, domain/application/transport race tests, repository
 pre-push gates, affected real SQL/storage suites with frozen sources, then
 owned native collector and installed capture/approval/download/local-tool tests.
 Record actual exits, source hashes and cleanup. No component pass completes S-05.
+
+## Stop lifecycle extension
+
+The accepted finite lifecycle reuses `cancel_capture`, its SQL revision and
+idempotency journal, and the signed regional control stream (ADR-287). One
+explicit Stop adds one durable request, one regional query, at most one original
+node cancellation work item and one joined outcome update. Zero new watches,
+listeners, credentials, privileges, settings or background loops are added.
+Existing pending/unknown/stored/cancelled outcomes suffice. A typed profile stop
+and joined proof avoid borrowing source/packet fields; no acquisition retry or
+refund follows an uncertain endpoint/backend outcome. Before-start tombstones
+share the same 64-holder bound with recordings and snapshots. Migration 124
+extends the existing immutable cancellation guard and its Down restores the
+previous guard. Native runtime qualification remains separate from SQL tests.

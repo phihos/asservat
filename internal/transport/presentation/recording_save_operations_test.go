@@ -205,35 +205,46 @@ func (f *cancellationOperationFixture) Cancel(_ context.Context, _ identities.Cu
 	return f.decision, f.err
 }
 func TestRecordingCancellationReportsDurableRequestWithoutClaimingJoin(t *testing.T) {
-	audited, ops, actor, _, gate := recordingOperationTestFixture(t)
-	now := ops.config.Now()
-	f := &cancellationOperationFixture{decision: value.Cancellation{CaptureID: "00000000-0000-4000-8000-000000000030", Phase: "Running", Revision: 4, Requested: true, ObservedAt: now, ValidUntil: now.Add(time.Second)}, err: errors.New("private transport failure")}
-	ops.cancellations = f
-	// Acquisition remains disabled; restrictive cancellation uses the existing audit lane.
-	base, err := NewInvestigationOperations(audited.inner.(*InvestigationOperations).captures, nil)
-	if err != nil {
-		t.Fatal(err)
+	for _, uncertain := range []bool{false, true} {
+		audited, ops, actor, _, gate := recordingOperationTestFixture(t)
+		now := ops.config.Now()
+		f := &cancellationOperationFixture{decision: value.Cancellation{CaptureID: "00000000-0000-4000-8000-000000000030", Phase: "Running", ApplicationStopUnknown: uncertain, Revision: 4, Requested: true, ObservedAt: now, ValidUntil: now.Add(time.Second)}, err: errors.New("private transport failure")}
+		ops.cancellations = f
+		// Acquisition remains disabled; restrictive cancellation uses the existing audit lane.
+		base, err := NewInvestigationOperations(audited.inner.(*InvestigationOperations).captures, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		combined, err := NewInvestigationRecordingSaveOperations(base, ops)
+		if err != nil {
+			t.Fatal(err)
+		}
+		audited.inner = combined
+		reply, err := audited.Call(t.Context(), actor, "cancel_capture", []byte(`{"capture_id":"00000000-0000-4000-8000-000000000030","expected_revision":3,"idempotency_key":"cancel-once"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var envelope struct {
+			Status   string
+			Data     RecordingCancellationData
+			Warnings []string
+		}
+		if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || envelope.Data.Phase != "Running" || !envelope.Data.Requested || envelope.Data.Revision != 4 || len(envelope.Warnings) != 1+btoi(uncertain) {
+			t.Fatal(string(reply.Body))
+		}
+		if f.calls != 1 || f.request.ExpectedRevision != 3 || f.request.IdempotencyKey != "cancel-once" || len(gate.outcomes) != 1 || gate.outcomes[0].Effect != "accepted" || strings.Contains(string(reply.Body), "private transport") {
+			t.Fatal("lost durable request audit", f.request, gate.outcomes, string(reply.Body))
+		}
+		if uncertain && !strings.Contains(strings.Join(envelope.Warnings, " "), "does not confirm that the application stopped profiling") {
+			t.Fatal(string(reply.Body))
+		}
 	}
-	combined, err := NewInvestigationRecordingSaveOperations(base, ops)
-	if err != nil {
-		t.Fatal(err)
+}
+func btoi(v bool) int {
+	if v {
+		return 1
 	}
-	audited.inner = combined
-	reply, err := audited.Call(t.Context(), actor, "cancel_capture", []byte(`{"capture_id":"00000000-0000-4000-8000-000000000030","expected_revision":3,"idempotency_key":"cancel-once"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var envelope struct {
-		Status   string
-		Data     RecordingCancellationData
-		Warnings []string
-	}
-	if json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "ok" || envelope.Data.Phase != "Running" || !envelope.Data.Requested || envelope.Data.Revision != 4 || len(envelope.Warnings) != 1 {
-		t.Fatal(string(reply.Body))
-	}
-	if f.calls != 1 || f.request.ExpectedRevision != 3 || f.request.IdempotencyKey != "cancel-once" || len(gate.outcomes) != 1 || gate.outcomes[0].Effect != "accepted" || strings.Contains(string(reply.Body), "private transport") {
-		t.Fatal("lost durable request audit", f.request, gate.outcomes, string(reply.Body))
-	}
+	return 0
 }
 
 func TestRecordingCancellationRespectsOrdinaryCompositionGate(t *testing.T) {

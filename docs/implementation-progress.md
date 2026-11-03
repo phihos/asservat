@@ -1,5 +1,39 @@
 # Sustained implementation progress
 
+## Finite Go profile acquisition and Stop components (2026-11-03)
+
+[ADR-287](decisions/287-go-profile-acquisition.md) now has typed node acquisition,
+exact network-namespace endpoint dialing, one-use regional encrypted storage,
+SQL admission/publication composition and the existing public Stop lifecycle.
+Migration 124 extends the durable cancellation fence to profile expectations.
+The connector waits for actual node/storage completion; a stored result wins
+Stop. Public progress distinguishes known pre-endpoint cancellation from an
+uncertain application profiler. No cancellation refunds storage reservations or
+renews the original profiling/exclusion interval. An observation-completion
+fix retains the cancellation operation's original five-second upper bound.
+
+Real PostgreSQL/S3 run [`profile-stop-sql124-3`](../test/results/profile-stop-sql124-3.log)
+passed in 9.185 seconds, with unchanged frozen sources and no cleanup failures.
+It covers approved profile admission, full final/temporary reservations, exact
+writer binding, replay/replacement refusal, both cancellation outcomes, retained
+charges and migration 123→124/Down/Up. Earlier runs 1 and 2 are retained: the
+fixture first timestamped cancellation before its recovery observation, then
+lacked the current read scope required for capture progress/cancellation. Those
+failures were corrected without bypassing authorization or renewing deadlines.
+
+Focused race checks passed for capture coordination, signing/control streams,
+regional holders, execution and public presentation. A real prepared encrypted
+profile writer against a blocked TLS backend passed cancellation/join coverage;
+backend uncertainty remains charged. Spec (13,446 assertions), architecture,
+Go architecture and vet gates passed. Gadget-tag compilation passed; it is not
+native network-namespace qualification.
+
+Remaining: integrate capacity migration 125 and the installed manual-profile
+fixture, then qualify actual collector CPU/heap/redirect/Stop and the installed
+approval→publication→native download→local pprof workflow, including resources
+at supported limits. No installed profile result or completed S-05 is claimed.
+
+
 ## Profile plans in manual preview (2026-11-03)
 
 Recovered Claude session `06c27237-b261-43c1-9d73-4b617059a89d`, S-05

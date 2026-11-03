@@ -34,6 +34,9 @@ type heldProfile struct {
 	workID          string
 	queued, expires time.Time
 	storing         bool
+	stop            *collector.ProfileStop
+	stopStore       context.CancelFunc
+	mayHaveStarted  bool
 	outcome         evidence.RecordingCollection
 }
 
@@ -41,11 +44,7 @@ type heldProfile struct {
 // budget. One streaming profile reserves that whole working budget regardless
 // of its admitted total bytes; data is encrypted in bounded8MiB frames.
 func (h *ConnectorRecordings) PrepareProfile(p *objectstore.PreparedArtifact, e artifact.ContextExpectation) *preparedProfile {
-	if e.Profile != nil {
-		profile := *e.Profile
-		profile.Composition = append([]byte(nil), profile.Composition...)
-		e.Profile = &profile
-	}
+	e.Profile = e.Profile.Clone()
 	return &preparedProfile{holder: h, prepared: p, expectation: e}
 }
 func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.PreparedArtifact, e artifact.ContextExpectation, pin artifact.PinnedPod, started, until time.Time, endpoint targets.ProfileEndpointRequest) (time.Time, error) {
@@ -106,6 +105,13 @@ func (h *ConnectorRecordings) DeliverProfile(ctx context.Context, node collector
 		h.mu.Unlock()
 		return value.ErrDenied
 	}
+	held.mayHaveStarted = r.Outcome.MayHaveStarted
+	if held.stop != nil {
+		held.prepared = nil
+		held.outcome = h.profileCancelled(held, r.Outcome.MayHaveStarted)
+		h.mu.Unlock()
+		return nil
+	}
 	if r.Failure != "" {
 		failure := "captureFailed"
 		if r.Failure == collector.ReasonCaptureBusy {
@@ -124,17 +130,24 @@ func (h *ConnectorRecordings) DeliverProfile(ctx context.Context, node collector
 	}
 	h.storing += maxStoringBytes
 	held.storing = true
+	storeCtx, cancelStore := context.WithDeadline(ctx, held.expectation.Registration.WriteUntil)
+	defer cancelStore()
+	held.stopStore = cancelStore
 	p, e := held.prepared, held.expectation
 	held.prepared = nil
 	h.mu.Unlock()
 	defer func() { h.mu.Lock(); h.storing -= maxStoringBytes; held.storing = false; h.mu.Unlock() }()
-	copies, err := p.Store(ctx, body, r.Outcome.StartedAt.UTC(), r.Outcome.CompletedAt.UTC())
+	copies, err := p.Store(storeCtx, body, r.Outcome.StartedAt.UTC(), r.Outcome.CompletedAt.UTC())
 	stored := h.now().UTC().Truncate(time.Microsecond)
 	out := evidence.RecordingCollection{State: evidence.RecordingStored, Acquired: held.queued, Completion: artifact.ContextWriterCompletion{RegistrationDigest: privacyapp.RegistrationDigest(e.Registration), ExpectationDigest: held.digest, Copies: copies, StoredAt: stored, ClosedAt: stored}}
 	if err != nil || !out.Valid(e.Registration) {
 		out = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: "storeUnconfirmed"}
 	}
 	h.mu.Lock()
+	held.stopStore = nil
+	if held.stop != nil && out.State != evidence.RecordingStored {
+		out = h.profileCancelled(held, true)
+	}
 	held.outcome = out
 	h.mu.Unlock()
 	if err != nil {
@@ -148,7 +161,11 @@ func (h *ConnectorRecordings) collectProfile(w fleet.APIContextWork) (evidence.R
 	if p == nil {
 		return evidence.RecordingCollection{}, false, nil
 	}
-	if p.expectation.Registration.Location.AttemptID != w.AttemptID || p.digest != w.ExpectationDigest {
+	attemptID := p.expectation.Registration.Location.AttemptID
+	if p.stop != nil {
+		attemptID = p.stop.AttemptID
+	}
+	if attemptID != w.AttemptID || p.digest != w.ExpectationDigest {
 		return evidence.RecordingCollection{}, true, value.ErrDenied
 	}
 	return p.outcome, true, nil
