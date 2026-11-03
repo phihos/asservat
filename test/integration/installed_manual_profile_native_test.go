@@ -82,6 +82,18 @@ func manualProfileStopArguments(cluster, namespace, workload string) map[string]
 	return arguments
 }
 
+func manualProfileStopRequests(preview installedApprovedRecordingPreview, now time.Time) (map[string]any, map[string]any) {
+	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "profile-stop-" + preview.ID}
+	resolution := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"]}
+	// Raw collection currently requires a selected result-access instruction,
+	// even when this separate capture is intended to be stopped before output.
+	// Keep the original expiry and instruction unchanged across submission retries.
+	if len(preview.Lifecycle.Actions) == 1 {
+		original["result_access"] = map[string]any{"actionIds": []string{preview.Lifecycle.Actions[0].ActionID}, "operations": []string{"download_artifact"}, "clientIDs": []string{"mcp"}, "maxArtifacts": 1, "maxBytes": 64 << 20, "maxOperations": 100, "notAfter": now.Add(time.Hour).UTC().Format(time.RFC3339)}
+	}
+	return original, resolution
+}
+
 // This is a second, independently reviewed capture. Stop never mutates or
 // deletes the successfully downloaded first profile, and no endpoint probe
 // starts an unapproved sampler to discover whether the target is busy.
@@ -89,10 +101,10 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 	t.Helper()
 	var preview installedApprovedRecordingPreview
 	read("preview_capture", arguments, &preview)
-	if !preview.readyForApproval(time.Now()) {
+	if !preview.readyForApproval(time.Now()) || len(preview.Lifecycle.Actions) != 1 {
 		t.Fatal("Stop profile lacks an approvable preview", preview.Blockers)
 	}
-	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "profile-stop-" + preview.ID}
+	original, resolution := manualProfileStopRequests(preview, time.Now())
 	pending, code := invoke("request_capture", original)
 	var review struct {
 		URI string `json:"navigation_uri"`
@@ -129,7 +141,7 @@ func qualifyManualProfileStop(t *testing.T, ctx context.Context, arguments map[s
 	continuation := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"], "continue_acquisition": true}
 	resolve := func() (installedJourneyDisposition, error) {
 		var d installedJourneyDisposition
-		read("resolve_capture_request", original, &d)
+		read("resolve_capture_request", resolution, &d)
 		if d.State == "accepted" {
 			receipt.CaptureID = d.CaptureID
 		}

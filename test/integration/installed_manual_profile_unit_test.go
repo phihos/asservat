@@ -88,3 +88,36 @@ func TestInstalledManualProfileFundsOneConservativeSummary(t *testing.T) {
 		t.Fatal("unrelated fixture capacity changed", got.Records)
 	}
 }
+
+func TestInstalledManualProfileStopRequestsUseSeparateWireContracts(t *testing.T) {
+	var preview installedApprovedRecordingPreview
+	if err := json.Unmarshal([]byte(`{"preview_id":"00000000-0000-4000-8000-000000000001","lifecycle_plan":{"actions":[{"actionID":"cpu.cpu"}]}}`), &preview); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+	original, resolution := manualProfileStopRequests(preview, now)
+	wire, err := contracts.NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, input := range map[string]any{"request_capture": original, "resolve_capture_request": resolution} {
+		raw, _ := json.Marshal(input)
+		if err := wire.ValidateInput(name, raw); err != nil {
+			t.Fatal(name, err)
+		}
+	}
+	raw, _ := json.Marshal(original["result_access"])
+	var access struct {
+		ActionIDs                             []string `json:"actionIds"`
+		Operations                            []string `json:"operations"`
+		ClientIDs                             []string `json:"clientIDs"`
+		MaxArtifacts, MaxBytes, MaxOperations int64
+		NotAfter                              time.Time
+	}
+	if json.Unmarshal(raw, &access) != nil || len(access.ActionIDs) != 1 || access.ActionIDs[0] != "cpu.cpu" || len(access.Operations) != 1 || access.Operations[0] != "download_artifact" || len(access.ClientIDs) != 1 || access.ClientIDs[0] != "mcp" || access.MaxArtifacts != 1 || access.MaxBytes != 64<<20 || access.MaxOperations != 100 || !access.NotAfter.Equal(now.Add(time.Hour)) {
+		t.Fatal("Stop raw approval lacks its fixed result-access instruction", string(raw))
+	}
+	if len(resolution) != 2 || resolution["preview_id"] != original["preview_id"] || resolution["idempotency_key"] != original["idempotency_key"] {
+		t.Fatal("resolution is not the original passive identity")
+	}
+}

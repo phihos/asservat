@@ -24,9 +24,33 @@ inventories unchanged and cleanup empty; reports are retained as
 `test/results/profile-service-preflight-{environment.json,log}`. All pre-push
 components passed: the first console invocation lacked local dependencies;
 rerunning that component with the unchanged lockfile passed 299 tests. The
-read-only integration review found no further concrete blocker. Next: exact
-candidate CI and one corrected installed profile focus.
+read-only integration review found no further concrete blocker. Exact candidate CI 41611340296 passed on `ef2f379a`. The installed result
+and remaining Stop qualification are recorded below.
 
+
+## Installed download and summary passed; Stop fixture corrected (2026-11-03)
+
+[Installed run 41611398639](https://github.com/phihos/asservat/actions/runs/41611398639)
+on `ef2f379a` passed approved capture, independent publication and authenticated
+native download: 813 bytes, seven CPU samples, matching native hash and successful
+`go tool pprof` opening. Repeat preview preserved original settings. Read-only
+client download was denied. The saved summary matched the CPU total and used the
+funded 256 MiB worker, ten query units and one joined three-key batch; worker/key
+lifetime closure passed. Go exited 1 after 706.28 seconds because the separate
+Stop capture request omitted its required result-access selection, returning
+`UnsupportedRequest` before approval or capture start. Sources were unchanged;
+cleanup failures were empty. Original logs and environment are retained under
+`test/results/profile-native-41611398639/`. This is partial installed evidence,
+not a passing complete profile workflow.
+
+The Stop fixture now includes its own bounded result-access selection and keeps
+that original instruction across submission retries. Passive resolution uses only
+preview/idempotency identity, as required by its distinct wire contract. A local
+regression first failed on the missing selection, then passed with both actual
+wire schemas and the exact action/client/budget/expiry checks. The focused
+preflight now also runs the capture admission regressions that reject missing raw
+result access. No production authorization or capture contract is relaxed.
+Next: corrected installed Stop qualification and exact-candidate CI/review.
 
 ## Fourth installed profile run and download correction (2026-11-03)
 
