@@ -83,7 +83,7 @@ it('shares one artifact with stable IDs of the own issuer, previews the recipien
   // Default expiry: 24 hours.
   expect(Math.abs(Date.parse(input.expires_at) - before - 24 * hour)).toBeLessThan(5_000);
   // A successful share clears the form; the next share is a new request.
-  expect(screen.queryByRole('list', { name: 'Recipients' })).toBeNull();
+  await waitFor(() => expect(screen.queryByRole('list', { name: 'Recipients' })).toBeNull());
   const writeText = vi.fn().mockResolvedValue(undefined);
   vi.stubGlobal('navigator', { clipboard: { writeText } });
   fireEvent.click(screen.getByRole('button', { name: 'Copy case link' }));

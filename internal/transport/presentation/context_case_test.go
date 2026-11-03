@@ -45,6 +45,8 @@ func TestCaseProjectionProfileKeepsNativeKindAndRawClass(t *testing.T) {
 }
 
 func TestCaseProjectionDiscriminatesVerifiedNativeFormat(t *testing.T) {
+	s, f, current := caseOperationsFixture(t)
+	current.i.Scopes = []string{"evidence:read"}
 	for _, tc := range []struct{ name, evidence, native, class, want string }{
 		{"arguments", "syscallTrace", artifact.SyscallArgumentsArtifact, "raw", artifact.SyscallArgumentsFormat},
 		{"syscall-metadata", "syscallTrace", artifact.SyscallRecordsArtifact, "metadata", artifact.SyscallRecordsFormat},
@@ -65,8 +67,6 @@ func TestCaseProjectionDiscriminatesVerifiedNativeFormat(t *testing.T) {
 		{"legacy-untyped", "", artifact.PodStatusArtifact, "", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s, f, current := caseOperationsFixture(t)
-			current.i.Scopes = []string{"evidence:read"}
 			f.view.Artifacts[0].EvidenceType, f.view.Artifacts[0].DataClass, f.view.Artifacts[0].NativeType = tc.evidence, tc.class, tc.native
 			reply, err := s.Call(t.Context(), current, "get_case", []byte(caseInput))
 			if err != nil {

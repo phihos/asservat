@@ -888,10 +888,10 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 	}
 	if installedJourneyFocus() == "manual-arguments" {
+		qualifyManualArgumentsNative(t, native, receipt.CaptureID, preview.Pods[0].UID, argumentSource)
 		if evidence.Artifacts[0].Kind != "syscallTrace" || evidence.Artifacts[0].NativeFormat != "asservat-syscall-arguments/v1" {
 			t.Fatal("argument artifact native classification", evidence.Artifacts[0])
 		}
-		qualifyManualArgumentsNative(t, native, receipt.CaptureID, preview.Pods[0].UID, argumentSource)
 		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
 		qualifyManualRecorderStop(t, ctx, "arguments", manualArgumentsCaptureInput(cluster, namespace, workload, true), read, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)

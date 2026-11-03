@@ -3,6 +3,15 @@
 
 ## Current delivery workflow (2026-11-03)
 
+CI41651875701 passed for the native-format fix. The final test-only update reuses
+one compiled case fixture across all17 sequential format assertions (focused race
+2.618s), retains authenticated synthetic native bytes before semantic assertions
+(focused native-fixture race2.527s), and waits for the sharing form's async reset.
+The last pre-push run failed only that synchronous sharing assertion; all other
+gates passed. The focused13 sharing tests and full console recheck (304 tests,
+contracts and TypeScript) passed after the correction. Original failure and
+recheck logs are retained in `test/results/argument-final-fixture-checks`.
+
 Installed run [41648031437](https://github.com/phihos/asservat/actions/runs/41648031437)
 on50077ab1 passed approved submission, actual acquisition/publication and the
 authenticated native download's filename, size and SHA-256 checks. It then failed
