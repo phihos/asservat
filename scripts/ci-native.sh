@@ -41,6 +41,7 @@ declare -A suites=(
   [continuation-manual-raw]="env ASSERVAT_JOURNEY_FOCUS=manual-raw $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-manual-http]="env ASSERVAT_JOURNEY_FOCUS=manual-http $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-manual-peers]="env ASSERVAT_JOURNEY_FOCUS=manual-peers $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  [continuation-manual-profile]="env ASSERVAT_JOURNEY_FOCUS=manual-profile $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-policy-recording]="env ASSERVAT_JOURNEY_FOCUS=policy-recording $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-ongoing-save]="env ASSERVAT_JOURNEY_FOCUS=ongoing-save $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-ongoing-save-disk]="env ASSERVAT_JOURNEY_FOCUS=ongoing-save-disk $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"

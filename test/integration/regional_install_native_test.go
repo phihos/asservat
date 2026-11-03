@@ -136,6 +136,13 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		}
 		args = append(args, "--collector-namespace", "asservat-collector", "--collector-name", "asservat-node")
 	}
+	if executor && installedJourneyFocus() == "manual-profile" && index == 1 {
+		endpoints, err := json.Marshal(manualProfileEndpoints())
+		if err != nil {
+			t.Fatal(err)
+		}
+		args = append(args, "--profile-endpoints", string(endpoints))
+	}
 	var first bytes.Buffer
 	if err := bootstrap.RunInstallerCluster(ctx, args, &first); err != nil {
 		t.Fatal("installer-cluster", err)
@@ -991,12 +998,17 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 		// requested line or keeps its CPU busy on demand.
 		command = []string{"/provider-proxy", "signals"}
 	}
+	var ports []core.ContainerPort
+	if installedJourneyFocus() == "manual-profile" {
+		command = []string{"/profile-native"}
+		ports = []core.ContainerPort{{Name: "diagnostics", ContainerPort: 6060}}
+	}
 	// One running replica the installed journey captures from: the product
 	// image's idle proxy under a restricted security context.
 	app, err := region.AppsV1().Deployments(ns.Name).Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "regional-app"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Selector: &meta.LabelSelector{MatchLabels: labels},
 		Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{AutomountServiceAccountToken: ptr.To(false), TerminationGracePeriodSeconds: ptr.To(int64(3)),
 			SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},
-			Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command,
+			Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command, Ports: ports,
 				Resources:       regionalWorkloadResources(nativePaced),
 				SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}}}}}, meta.CreateOptions{})
 	if err != nil {

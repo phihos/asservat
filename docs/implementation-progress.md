@@ -33,6 +33,42 @@ fixture, then qualify actual collector CPU/heap/redirect/Stop and the installed
 approval→publication→native download→local pprof workflow, including resources
 at supported limits. No installed profile result or completed S-05 is claimed.
 
+## Installed manual-profile qualification fixture (2026-11-03)
+
+`continuation-manual-profile` is a separate guarded native focus using the
+existing installer/real-provider/approved-capture harness with one hub and one
+workload cluster. Its restricted synthetic workload exposes a declared
+`diagnostics:6060` port and the operator configures the named
+`go-pprof-loopback` template. The test image records the workload helper hash.
+The public journey requires a real passive preview, independent stepped-up
+review, the original client's raw result-access child, accepted capture,
+semantic publication and authenticated native `.pb.gz` download. It compares
+the download hash and opens the original with `go tool pprof -symbolize=none`.
+A second independently reviewed thirty-second profile is stopped after public
+Running state: exact revision/idempotency, accepted cancellation and terminal
+Cancelled are checked. No endpoint probe starts an unreviewed profile; a Stop
+acknowledgement does not claim the application profiler itself stopped.
+
+The fixture retains the existing eighteen-minute aggregate Go timeout and
+separate disposable-host guard; it does not add profile work to the history
+focus. Production permissions, credentials, configuration and runtime work are
+unchanged by this fixture. Cost is one separate owned two-cluster qualification
+run, with one ten-second completed profile and one thirty-second bounded Stop
+capture. No run has been dispatched. The final frozen candidate must include
+profile acquisition/publication/download, migration 00124 cancellation and
+profile capacity admission fixes before installed qualification.
+
+Local proof: the actual completed/Stop public requests validate and compile
+through the planner with synthetic endpoint answers; fixture selection and
+existing recording tests pass with race detection. The twenty-four Python
+harness selection tests, affected vet, spec/architecture/Go architecture gates,
+278 console tests, console build and repository browser gate pass. The browser
+gate covers twenty-five journeys and twenty-four accessibility scans plus the
+four native-restart boundaries; these remain synthetic public-service evidence,
+not installed profiling. Logs are under `/home/phil/tmp/asservat-profile-*` and
+`/home/phil/tmp/asservat-installed-profile-*`.
+
+
 ## Profile public contract corrections (2026-11-03)
 
 The installed-profile fixture found two local workflow defects before a native
