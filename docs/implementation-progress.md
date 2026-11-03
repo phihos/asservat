@@ -29,6 +29,17 @@ mismatched tuples remain omitted. No schema expansion, new lookup or configurati
 is needed. `argument-preflight` now includes the case-projection boundary.
 Full presentation race tests passed (215.710s), browser/MCP case races passed
 (3.023s / 8.765s), and expanded `make argument-preflight pre-push` exited0.
+The added service-to-SQL boundary check passed (`existing-raw-service-1`,
+Go14.365s): actual `RequestRaw` scope/review production, SQL decode/replay,
+independent service approval, schema-validated public `get_grant`, exact child
+materialization, whole-file preparation and immutable spend/replay. Published
+output/version/length are real fixture results; raw classification and selection
+remain explicitly synthetic, so this does not qualify the installed raw catalog.
+Source hashes were unchanged. The harness exited1 because Docker KMS removal
+exceeded120s, although Go exited0. A separate read-back confirmed all three exact
+original container IDs and the owned network absent; original failure and
+`existing-raw-service-1-cleanup-readback.json` are both retained. No fixture remains.
+
 Integrated raw-access gates passed: `make pre-push console-browser-check` exited0,
 including315console tests, TypeScript/build, all repository contracts/architecture/
 SQL checks, and the built console's26journeys/25accessibility scans plus4native

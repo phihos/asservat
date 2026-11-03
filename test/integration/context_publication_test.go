@@ -287,7 +287,9 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err != nil || record.NativeBytes == nil || record.ExecutionDigest != f.e.PlanDigest {
 			t.Fatal("verified raw-review metadata", err)
 		}
-		qualifyRawQueryGrants(t, ctx, admin, poolFor, f.scenario, f.e, record.Version, *record.NativeBytes)
+		qualifyRawQueryGrants(t, ctx, admin, poolFor, f.scenario, f.e, record.Version, *record.NativeBytes, func() error {
+			return (auditapp.AuthorityPublisher{Ledger: f.scenario.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx)
+		}, releasePermissionBurst)
 	})
 
 	qualifyPermissionPublicationAuditHistory(t, ctx, admin, func(t *testing.T) permissionPublicationAuditFixture {
