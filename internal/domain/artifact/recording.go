@@ -72,6 +72,8 @@ type Recording struct {
 	// budgets (B3); nil for packets, so packet expectation digests are
 	// unchanged.
 	Syscalls *RecordingSyscalls `json:",omitempty"`
+	// Arguments is absent on legacy packet/metadata records, preserving their digests.
+	Arguments *RecordingArguments `json:",omitempty"`
 	// ProtocolSnaplen are a rawPackets recording's per-transport byte caps
 	// over Snaplen (ADR-279); nil otherwise, so other digests are unchanged.
 	ProtocolSnaplen *RecordingProtocolSnaplen `json:",omitempty"`
@@ -204,7 +206,12 @@ func (r *Recording) Valid() bool {
 	if r == nil || len(r.Composition) < 2 || len(r.Composition) > maxRecordingComposition || r.DurationMillis < 1000 || r.MaxBytes < minRecordingBytes || r.MaxBytes > RecordingNativeLimit {
 		return false
 	}
+	if r.Arguments != nil && (r.Kind != "syscallTrace" || r.Profile != "arguments") {
+		return false
+	}
 	switch {
+	case r.Kind == "syscallTrace" && r.Profile == "arguments":
+		return r.Arguments.Valid() && r.Filter == nil && r.Snaplen == 0 && r.DurationMillis <= maxSyscallRecordingMillis && r.Syscalls.valid() && len(r.Syscalls.Names) > 0 && len(r.Syscalls.Names) <= 6 && r.HTTP == nil && r.ProtocolSnaplen == nil && r.Peers == nil
 	case r.Kind == "syscallTrace":
 		return r.Profile == "metadata" && r.Filter == nil && r.Snaplen == RecordingSyscallSnaplen && r.DurationMillis <= maxSyscallRecordingMillis && r.Syscalls.valid() && r.HTTP == nil
 	case r.Kind == "packetCapture" && r.Profile == "rawPackets":
@@ -245,6 +252,10 @@ func (r *Recording) Clone() *Recording {
 		s := *r.Syscalls
 		s.Names = append([]string(nil), r.Syscalls.Names...)
 		out.Syscalls = &s
+	}
+	if r.Arguments != nil {
+		a := *r.Arguments
+		out.Arguments = &a
 	}
 	if r.ProtocolSnaplen != nil {
 		p := *r.ProtocolSnaplen

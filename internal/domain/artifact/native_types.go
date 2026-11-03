@@ -16,9 +16,10 @@ const (
 	PodStatusArtifact = ""
 	PCAPNGArtifact    = "pcapng"
 	// RawPCAPNGArtifact keeps payload prefixes up to approved caps (ADR-279).
-	RawPCAPNGArtifact      = "rawPcapng"
-	SyscallRecordsArtifact = "syscallRecords"
-	HTTPHeadersArtifact    = "httpHeaders"
+	RawPCAPNGArtifact        = "rawPcapng"
+	SyscallRecordsArtifact   = "syscallRecords"
+	SyscallArgumentsArtifact = "syscallArguments"
+	HTTPHeadersArtifact      = "httpHeaders"
 	// PprofArtifact and GoTraceArtifact are a Go endpoint's native response
 	// (ADR-284): gzip-compressed pprof protobuf and the Go execution trace.
 	PprofArtifact   = "pprof"
@@ -26,10 +27,11 @@ const (
 )
 
 const (
-	PCAPNGFormat         = "pcapng"
-	RawPCAPNGFormat      = "pcapng-raw"
-	SyscallRecordsFormat = "asservat-syscall-events/v1"
-	HTTPHeadersFormat    = "http-response-headers/v1"
+	PCAPNGFormat           = "pcapng"
+	RawPCAPNGFormat        = "pcapng-raw"
+	SyscallRecordsFormat   = "asservat-syscall-events/v1"
+	SyscallArgumentsFormat = "asservat-syscall-arguments/v1"
+	HTTPHeadersFormat      = "http-response-headers/v1"
 	// HTTPHeadersNativeLimit is the specified HTTP projection total (16 MiB).
 	HTTPHeadersNativeLimit int64 = 16 << 20
 	// The profile formats are the names of specs/contracts/profile.schema.json.
@@ -61,6 +63,7 @@ var nativeTypes = []NativeType{
 	{Name: PodStatusArtifact, Kind: "kubernetesSnapshot", EvidenceType: "context", MediaType: "application/json", Format: ContextFormat, Extension: ".json", Coverage: "Selected pod-status fields only; no logs, messages or workload configuration.", MaxBytes: MaxContextBytes, DataClasses: []string{"metadata", "raw"}},
 	{Name: PCAPNGArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/x-pcapng", Format: PCAPNGFormat, Extension: ".pcapng", Coverage: "Packet headers of the selected pod, truncated after the transport header; no payload. Filtered, truncated or lost packets are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"metadata"}},
 	{Name: RawPCAPNGArtifact, Kind: "packetCapture", EvidenceType: "packetCapture", MediaType: "application/x-pcapng", Format: RawPCAPNGFormat, Extension: ".pcapng", Coverage: "Packets of the selected pod including payload, truncated at the approved per-transport byte caps; caps limit bytes and do not redact. Filtered or lost packets are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"raw"}},
+	{Name: SyscallArgumentsArtifact, Kind: "syscallTrace", EvidenceType: "syscallTrace", MediaType: "application/x-ndjson", Format: SyscallArgumentsFormat, Extension: ".jsonl", Coverage: "Syscall arguments of the selected pod as JSON Lines, including approved scalar values and bounded memory reads; faults, truncation, unmatched calls and loss are reported.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"raw"}},
 	{Name: SyscallRecordsArtifact, Kind: "syscallTrace", EvidenceType: "syscallTrace", MediaType: "application/x-ndjson", Format: SyscallRecordsFormat, Extension: ".jsonl", Coverage: "Syscall metadata of the selected pod as JSON Lines: names, results, timing and process identity; no arguments or buffers. Lost events are not included.", MaxBytes: StreamingNativeLimit, DataClasses: []string{"metadata"}},
 	{Name: PprofArtifact, Kind: "profile", EvidenceType: "profile", MediaType: ProfileMediaType, Format: PprofFormat, Extension: ".pb.gz", Coverage: "The Go endpoint's pprof response as served (gzip-compressed protobuf); sample labels and symbol names are the application's and are not filtered.", MaxBytes: MaxPprofBytes, DataClasses: []string{"raw"}},
 	{Name: GoTraceArtifact, Kind: "profile", EvidenceType: "profile", MediaType: ProfileMediaType, Format: GoTraceFormat, Extension: ".trace", Coverage: "The Go endpoint's execution trace as served; it can contain goroutine, task and log text written by the application and is not filtered.", MaxBytes: MaxGoTraceBytes, DataClasses: []string{"raw"}},
