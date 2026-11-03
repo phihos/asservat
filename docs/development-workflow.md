@@ -34,8 +34,10 @@ build another test framework or duplicate the production workflow with mocks.
    do not repeat unchanged package evidence merely because another agent also
    worked on the feature. Required checks and their assertions remain intact.
 3. Before costly installed dispatch, inspect the automated review and resolve
-   concrete findings. For migration changes, run the initial-schema bundle/history
-   checks as well as the affected SQL fixture; ordinary migration success does not
+   concrete findings. For migration changes, compile the DDL and exercise empty upgrade/rollback
+   in owned PostgreSQL early. sqlc generation does not compile deferred PL/pgSQL
+   expressions; include representative expression execution. Run the existing
+   upgrade fixture and the initial-schema bundle/history checks as well as the affected SQL fixture; ordinary migration success does not
    prove the installation path accepts the release. With sources frozen, run the
    selected installed workflow in a fresh owned environment. Record the exact commit, real exit, source inventory and cleanup.
    A failure returns to a focused reproduction and boundary review before another

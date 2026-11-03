@@ -57,8 +57,15 @@ current `get_case` metadata and compare its selected profile; lookup never
 creates a native download. Nine focused console files passed 145 tests, with
 a subsequent 46-test cross-case/link check and type checking. Native TLS
 comparison/mismatch, full command bounds and six remote child-role requests
-pass focused races; these component providers do not establish SQL/key authority. The next gate is the composed real-service fixture with frozen
-sources, followed by native comparison against both downloaded originals.
+pass focused races; these component providers do not establish SQL/key authority. The repository pre-push gate passed, including 416 console tests and 69-package /
+433-edge architecture checks. The first service run stopped during SQL133
+migration before any Go test; all 4,008 recorded sources stayed unchanged and
+cleanup was complete. Original failure reports remain archived. A focused
+PostgreSQL 18.6 reproduction then fixed CASE parsing, JSON extraction/deletion
+precedence and rollback constraint ordering. Up133→Down132→Up133 passed with
+exact schema/function restoration and owned-container/volume cleanup. This
+compile/empty-history probe is not paired query qualification. The full service
+gate is being rerun on frozen sources; native comparison remains pending.
 No comparison requirement or installed result is marked complete. The argument job's cold-start/teardown
 headroom also needs improvement before later installed campaigns. No timeout was
 raised. These saved-view fixtures do not complete arbitrary `syscall_query`,

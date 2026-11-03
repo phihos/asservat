@@ -37,10 +37,37 @@ source, separate aggregate-read eligibility and source-aware result policy to
 the same query coordinator. The original raw source remains regional. The typed
 result is a bounded extract, with no raw share fallback or native-download
 authority. Migration 127 funds ten query units; the protected optional public
-route uses the existing 256 MiB regional worker and original key/native/read
-authority. The browser exposes an explicit saved pprof view with exact source
-version and original query expiry. Installed qualification is still pending;
-existing pod-status and HTTP-header scopes keep their wire form.
+route requires the existing 256 MiB minimum and original key/native/read
+authority. ADR-295 gives new installations a shared 384 MiB worker profile;
+previously accepted 256 MiB profiles remain eligible for summaries. The browser exposes an explicit saved pprof view with exact source
+version and original query expiry. Actual installed qualification is recorded
+in implementation progress; existing pod-status and HTTP-header scopes retain
+their wire form.
+
+## Profile comparison candidate
+
+[ADR-295](../decisions/295-two-source-profile-comparison.md) composes exactly two
+independently authorized pprof sources in the same regional worker. Immutable
+baseline/incident roles bind both cases, artifacts, versions and original
+cutoffs. Their accepted physical reader must match; there is no credential or
+store union. Migration 133 reserves 20 conservative units atomically (10 per
+source, or 20 once for one workload), one worker and one batch. The batch owns
+two compact key children, each with three irreversible key slots.
+
+Both complete native hashes must pass before a comparison or content-free
+semantic mismatch. Full aggregation precedes top-N selection. Browser and MCP
+use `compare_profiles` and the same `get_query_result`; public provenance names
+both versions. The console can explicitly load an earlier evidence case through
+the existing authorized metadata read before selecting its baseline. The paid
+result or refusal retains its original live owner through acknowledged audit
+and joined transport closure. Failed audit or unknown closure retains spend.
+
+The new shared installer profile declares 384 MiB physical/transient memory and
+500m CPU, identified by `shared-query/v3`; this costs 128 MiB more per active
+worker. No service, credential, setting, watch or extra Job is added. Existing
+accepted profiles retain their original bytes and deny comparison below the
+new floor. Component/race evidence does not qualify SQL triggers, native worker
+resources or installed behavior; current gaps remain in implementation progress.
 
 ## Public composition candidate
 

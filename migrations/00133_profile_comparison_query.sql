@@ -294,7 +294,7 @@ BEGIN
    bp->>'ClusterID' IS DISTINCT FROM ba.cluster_id::text OR bp->>'NamespaceUID' IS DISTINCT FROM ba.namespace_uid OR bp->>'WorkloadUID' IS DISTINCT FROM ba.workload_uid OR
    bs->>'ClusterID' IS DISTINCT FROM ba.cluster_id::text OR bs->>'NamespaceUID' IS DISTINCT FROM ba.namespace_uid OR bs->>'WorkloadUID' IS DISTINCT FROM ba.workload_uid OR
    (bp->>'AllocationRevision')::bigint IS DISTINCT FROM ba.revision OR bp->'PoolSource' IS DISTINCT FROM ba.pool_source OR bp->'PolicySource' IS DISTINCT FROM ba.policy_source OR
-   (bp->'Profile'-'Path') IS DISTINCT FROM (b.profile-'Path') OR (bp#>'{Profile,Path}'-ARRAY['ID','TargetClusterID']) IS DISTINCT FROM (NEW.query#>'{Plan,Profile,Path}'-ARRAY['ID','TargetClusterID']) OR bp#>>'{Profile,Path,TargetClusterID}' IS DISTINCT FROM ba.cluster_id::text OR
+   ((bp->'Profile')-'Path') IS DISTINCT FROM (b.profile-'Path') OR ((bp#>'{Profile,Path}')-ARRAY['ID','TargetClusterID']) IS DISTINCT FROM ((NEW.query#>'{Plan,Profile,Path}')-ARRAY['ID','TargetClusterID']) OR bp#>>'{Profile,Path,TargetClusterID}' IS DISTINCT FROM ba.cluster_id::text OR
    NOT public.context_query_shared_profile_current(NEW.root_id,bp->'Profile') OR NOT public.context_query_capacity_allocation_current(NEW.root_id,ba.id) OR
    ((ba.cluster_id,ba.namespace_uid,ba.workload_uid)=(a.cluster_id,a.namespace_uid,a.workload_uid)) IS DISTINCT FROM (ba.id=a.id) OR
    (bp->>'HardUntil')::timestamptz IS DISTINCT FROM b.hard_until OR (bp->>'EffectsUntil')::timestamptz IS DISTINCT FROM b.effects_until OR (bp->>'CleanupUntil')::timestamptz IS DISTINCT FROM b.cleanup_until OR (bp->>'RetireBy')::timestamptz IS DISTINCT FROM b.retire_by OR n>=(bp->>'ValidUntil')::timestamptz OR n<(bp->>'ObservedAt')::timestamptz THEN
@@ -340,12 +340,12 @@ BEGIN
      (NEW.native_operation->>'Until')::timestamptz>(NEW.batch->>'Until')::timestamptz OR
      NEW.native_authority->'Scope' IS DISTINCT FROM q.query->'Scope' OR
      NEW.native_operation->'SourceVersion' IS DISTINCT FROM q.query#>'{Scope,Version}' OR
-     NEW.native_operation->'Path' IS DISTINCT FROM (NEW.native_authority#>'{Environment,Path}'-'Purpose') OR NEW.native_operation->'Processing' IS DISTINCT FROM NEW.native_authority#>'{Environment,Processing}' OR
-     CASE WHEN q.query#>'{Scope,Comparison}' IS NOT NULL THEN
+     NEW.native_operation->'Path' IS DISTINCT FROM ((NEW.native_authority#>'{Environment,Path}')-'Purpose') OR NEW.native_operation->'Processing' IS DISTINCT FROM NEW.native_authority#>'{Environment,Processing}' OR
+     (CASE WHEN q.query#>'{Scope,Comparison}' IS NOT NULL THEN
       NOT public.capacity_json_fields(NEW.native_operation->'Baseline',ARRAY['Path','Processing','SourceVersion']) OR
       NEW.native_authority#>'{Baseline,Baseline}' IS NOT NULL OR NEW.native_authority#>'{Baseline,Scope}' IS DISTINCT FROM public.context_query_comparison_source(q.query->'Scope',true) OR
-      NEW.native_operation#>'{Baseline,SourceVersion}' IS DISTINCT FROM q.query#>'{Scope,Comparison,Baseline,Version}' OR NEW.native_operation#>'{Baseline,Path}' IS DISTINCT FROM (NEW.native_authority#>'{Baseline,Environment,Path}'-'Purpose') OR NEW.native_operation#>'{Baseline,Processing}' IS DISTINCT FROM NEW.native_authority#>'{Baseline,Environment,Processing}'
-     ELSE NEW.native_operation ? 'Baseline' OR NEW.native_authority ? 'Baseline' END THEN
+      NEW.native_operation#>'{Baseline,SourceVersion}' IS DISTINCT FROM q.query#>'{Scope,Comparison,Baseline,Version}' OR NEW.native_operation#>'{Baseline,Path}' IS DISTINCT FROM ((NEW.native_authority#>'{Baseline,Environment,Path}')-'Purpose') OR NEW.native_operation#>'{Baseline,Processing}' IS DISTINCT FROM NEW.native_authority#>'{Baseline,Environment,Processing}'
+     ELSE NEW.native_operation ? 'Baseline' OR NEW.native_authority ? 'Baseline' END) THEN
      RAISE EXCEPTION 'query native identity mismatch' USING ERRCODE='23514';
     END IF;
    ELSIF NOT NEW.native_closed OR NEW.native_operation IS DISTINCT FROM OLD.native_operation OR NEW.native_authority IS DISTINCT FROM OLD.native_authority THEN
@@ -395,7 +395,7 @@ BEGIN
     (NEW.binding->>'CreatedAt')::timestamptz<(key_batch.batch->>'StartedAt')::timestamptz OR (NEW.binding->>'CreatedAt')::timestamptz>n OR n>=(NEW.binding->>'Until')::timestamptz OR
     (NEW.binding->>'Until')::timestamptz>(key_batch.batch->>'Until')::timestamptz OR (NEW.binding->>'Until')::timestamptz>(key_batch.native_authority->>'ValidUntil')::timestamptz OR (NEW.binding->>'Until')::timestamptz>(q.query->>'ProviderUntil')::timestamptz THEN RAISE EXCEPTION 'comparison key parent mismatch' USING ERRCODE='23514'; END IF;
    IF NEW.source_ordinal IS NULL OR NEW.child_id=NEW.batch_id OR NEW.binding->>'ID' IS DISTINCT FROM NEW.child_id::text OR NEW.binding->>'QueryID' IS DISTINCT FROM q.id::text OR NEW.binding->>'BatchID' IS DISTINCT FROM NEW.batch_id::text OR (NEW.binding->>'SourceOrdinal')::integer IS DISTINCT FROM NEW.source_ordinal OR
-    NEW.binding->'SourceVersion' IS DISTINCT FROM CASE NEW.source_ordinal WHEN 0 THEN q.query#>'{Scope,Comparison,Baseline,Version}' WHEN 1 THEN q.query#>'{Scope,Version}' END THEN RAISE EXCEPTION 'comparison key child mismatch' USING ERRCODE='23514'; END IF;
+    NEW.binding->'SourceVersion' IS DISTINCT FROM (CASE NEW.source_ordinal WHEN 0 THEN q.query#>'{Scope,Comparison,Baseline,Version}' WHEN 1 THEN q.query#>'{Scope,Version}' END) THEN RAISE EXCEPTION 'comparison key child mismatch' USING ERRCODE='23514'; END IF;
   ELSIF NEW.source_ordinal IS NOT NULL OR NEW.child_id IS DISTINCT FROM NEW.batch_id THEN RAISE EXCEPTION 'legacy key child mismatch' USING ERRCODE='23514'; END IF;
   IF TG_OP='INSERT' THEN
    IF NEW.used_roles<>0 OR q.active_batch IS DISTINCT FROM NEW.batch_id THEN RAISE EXCEPTION 'query key binding unavailable' USING ERRCODE='23514'; END IF;
@@ -795,15 +795,15 @@ DROP INDEX context_query_comparison_key_child;
 DROP INDEX context_query_legacy_key_child;
 ALTER TABLE context_query_key_binding DROP CONSTRAINT context_query_key_binding_pkey;
 ALTER TABLE context_query_key_binding ADD PRIMARY KEY(batch_id);
+ALTER TABLE context_query_key_binding DROP CONSTRAINT context_query_key_binding_binding_check;
 ALTER TABLE context_query_key_binding DROP COLUMN child_id;
 ALTER TABLE context_query_key_binding DROP COLUMN source_ordinal;
-ALTER TABLE context_query_key_binding DROP CONSTRAINT context_query_key_binding_binding_check;
 ALTER TABLE context_query_key_binding ADD CONSTRAINT context_query_key_binding_binding_check CHECK(jsonb_typeof(binding)='object' AND octet_length(binding::text) BETWEEN 2 AND CASE WHEN binding#>>'{Authority,Scope,NativeType}' IN ('syscallRecords','syscallArguments') THEN 49152 ELSE 16384 END);
 ALTER TABLE context_query DROP COLUMN baseline_allocation_id;
+ALTER TABLE download_worker DROP CONSTRAINT download_worker_intent_json_check;
 ALTER TABLE download_worker DROP COLUMN baseline_query_allocation_id;
 ALTER TABLE context_query DROP CONSTRAINT context_query_query_check;
 ALTER TABLE context_query ADD CONSTRAINT context_query_query_check CHECK(jsonb_typeof(query)='object' AND octet_length(query::text) BETWEEN 2 AND 65536);
-ALTER TABLE download_worker DROP CONSTRAINT download_worker_intent_json_check;
 ALTER TABLE download_worker ADD CONSTRAINT download_worker_intent_json_check CHECK(octet_length(intent_json) BETWEEN 1 AND 65536);
 ALTER TABLE context_query_batch DROP CONSTRAINT context_query_batch_batch_check;
 ALTER TABLE context_query_batch ADD CONSTRAINT context_query_batch_batch_check CHECK(jsonb_typeof(batch)='object' AND octet_length(batch::text) BETWEEN 2 AND 16384);
