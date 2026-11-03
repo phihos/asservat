@@ -18,8 +18,14 @@ exact `7c869f8d` CI passed, but changed-source qualification remains required.
 
 [Development workflow](development-workflow.md) records the agreed work limits,
 agent responsibilities and retained debug procedure. The last installed failure
-and focused correction are immediately below. Next: resolve preflight/review
-findings, then run the corrected installed focus once.
+and focused correction are immediately below. The local preflight passed all selected race packages and installed-request
+checks. The combined SQL/S3/OpenBao preflight passed in 11.897s, with source
+inventories unchanged and cleanup empty; reports are retained as
+`test/results/profile-service-preflight-{environment.json,log}`. All pre-push
+components passed: the first console invocation lacked local dependencies;
+rerunning that component with the unchanged lockfile passed 299 tests. The
+read-only integration review found no further concrete blocker. Next: exact
+candidate CI and one corrected installed profile focus.
 
 
 ## Fourth installed profile run and download correction (2026-11-03)
