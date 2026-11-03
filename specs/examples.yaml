@@ -47,6 +47,9 @@ examples:
 - file: examples/mcp-profile-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: get_profile_summary
+- file: examples/mcp-profile-delta-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: get_profile_summary
 - file: examples/access-binding.yaml
   schema: https://asservat.io/spec/v1/access-binding.schema.json
 - file: examples/permission-source-namespace.yaml

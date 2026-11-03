@@ -1614,9 +1614,17 @@
                               "type": "number"
                             },
                             "fraction": {
-                              "type": "number",
-                              "minimum": 0,
-                              "maximum": 1
+                              "description": "Flat divided by total for nonnegative samples with positive total; null for signed delta samples or a zero total.",
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 1
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
                             }
                           },
                           "required": [
