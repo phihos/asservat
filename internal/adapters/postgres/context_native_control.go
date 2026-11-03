@@ -40,11 +40,23 @@ func (c contextNativeControl) canRespond() bool {
 // key/read effects. A local close, emitted byte count or unacknowledged result
 // cannot establish even that eligibility after an attempted first-context read.
 func firstContextResponseOutcome(r artifact.DownloadResponse, windows []artifact.DownloadWindow) bool {
-	if !r.Valid() || !r.Closed || r.Plan.Selection.Length > artifact.RemoteNativeLimit || r.Plan.Windows() != 1 || r.WindowCount != 1 || r.CompletedWindows != 1 || r.ActiveWindowID != "" || r.EmittedBytes != r.Plan.Selection.Length || len(windows) != 1 {
+	count := r.Plan.Windows()
+	if !r.Valid() || !r.Closed || r.Plan.Selection.Length > artifact.MaxGoTraceBytes || r.Plan.Selection.Offset > artifact.MaxGoTraceBytes-r.Plan.Selection.Length || count < 1 || count > 2 || r.WindowCount != count || r.CompletedWindows != count || r.ActiveWindowID != "" || r.EmittedBytes != r.Plan.Selection.Length || int64(len(windows)) != count {
 		return false
 	}
-	w := windows[0]
-	return w.Valid() && w.ResponseID == r.ID && w.SessionID == r.SessionID && w.OwnerID == r.OwnerID && w.Generation == r.Generation && w.Ordinal == 1 && w.Offset == r.Plan.Selection.Offset && w.Length == r.Plan.Selection.Length && w.IntentAcknowledged && w.OutcomeAcknowledged && w.Outcome != nil && w.Outcome.Success && w.Outcome.VerifiedFinal && w.Outcome.EmittedBytes == w.Length
+	offset, remaining := r.Plan.Selection.Offset, r.Plan.Selection.Length
+	seen := make(map[string]bool, len(windows))
+	for i, w := range windows {
+		length := min(artifact.DownloadWindowBytes, remaining)
+		final := int64(i)+1 == count
+		if !w.Valid() || seen[w.ID] || w.ResponseID != r.ID || w.SessionID != r.SessionID || w.OwnerID != r.OwnerID || w.Generation != r.Generation || w.Ordinal != int64(i)+1 || w.Offset != offset || w.Length != length || !w.IntentAcknowledged || !w.OutcomeAcknowledged || w.Outcome == nil || !w.Outcome.Success || w.Outcome.VerifiedFinal != final || w.Outcome.EmittedBytes != length {
+			return false
+		}
+		seen[w.ID] = true
+		offset += length
+		remaining -= length
+	}
+	return remaining == 0
 }
 
 // Call only while holding the original session lock. This is a minimized

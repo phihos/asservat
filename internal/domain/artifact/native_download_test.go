@@ -41,3 +41,26 @@ func TestPreparedDownloadMetadataFollowsType(t *testing.T) {
 		t.Fatal("pod status download limit", nt.DownloadLimit())
 	}
 }
+
+func TestProfileNativeDownloadSpansStorageFrames(t *testing.T) {
+	const id = "10000000-0000-4000-8000-000000000001"
+	for _, name := range []string{PprofArtifact, GoTraceArtifact} {
+		typ, ok := LookupNativeType(name)
+		if !ok {
+			t.Fatal(name)
+		}
+		if typ.DownloadLimit() != typ.MaxBytes {
+			t.Errorf("%s download cap %d truncates declared native limit %d", name, typ.DownloadLimit(), typ.MaxBytes)
+		}
+		for _, size := range []int64{FrameBytes + 1, typ.MaxBytes} {
+			m := NativeDownloadMetadata{Filename: typ.Filename(id), Format: typ.Format, Coverage: typ.Coverage, Size: size, SHA256: Digest{1}}
+			if !ValidNativeDownloadMetadata(id, m) {
+				t.Errorf("%s native metadata rejected at %d bytes", name, size)
+			}
+			m.Size = typ.MaxBytes + 1
+			if ValidNativeDownloadMetadata(id, m) {
+				t.Fatal("accepted oversized native profile")
+			}
+		}
+	}
+}

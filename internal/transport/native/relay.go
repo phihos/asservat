@@ -169,7 +169,7 @@ func (r *RelayConversation) Serve(ctx context.Context, worker Stream) error {
 		}
 		return r.forward(ctx, r.upstream, worker, contracts.NativeDoneFrame, control(contracts.NativeDoneFrame, "joined", 0))
 	case "read-context-response":
-		if command.Length < 1 || command.Length > artifact.RemoteNativeLimit {
+		if command.Length < 1 || command.Length > artifact.DownloadWindowBytes {
 			return contracts.ErrNativeProtocol
 		}
 		for left := command.Length; left > 0; left -= chunk {

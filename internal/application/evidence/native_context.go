@@ -83,6 +83,11 @@ func NativeWindowReadWork(t artifact.NativeType) int64 {
 	if t.Name == artifact.PodStatusArtifact {
 		return ContextDownloadReadWork
 	}
+	if t.DownloadLimit() > artifact.FrameBytes {
+		// A 64 MiB response window can straddle nine encrypted storage frames
+		// and two index pages. Charge this worst case even for a shorter range.
+		return 9*(artifact.FrameBytes+artifact.CipherOverhead) + 2*(artifact.PageBytes+artifact.CipherOverhead)
+	}
 	return artifact.FrameBytes + artifact.CipherOverhead + artifact.PageBytes + artifact.CipherOverhead
 }
 
@@ -322,7 +327,7 @@ func (r *RegionalContextResult) Read(ctx context.Context, o value.NativeOperatio
 // check; any failure stops the window and is not retried in this process.
 func (r *RegionalContextResult) ReadWindow(ctx context.Context, o value.NativeOperation, source NativeContextSource, window string, offset, length int64, deliver func(context.Context, []byte) error) error {
 	limit := source.Expectation.Type().DownloadLimit()
-	if o.Kind != value.NativeResponse || deliver == nil || !value.UUID(window) || !source.Valid(o.SourceVersion) || o.Processing.Location != source.Expectation.Registration.Location || o.Path.StoreID != source.Expectation.Registration.StoreID || offset < 0 || length < 1 || offset > limit || length > limit-offset {
+	if o.Kind != value.NativeResponse || deliver == nil || !value.UUID(window) || !source.Valid(o.SourceVersion) || o.Processing.Location != source.Expectation.Registration.Location || o.Path.StoreID != source.Expectation.Registration.StoreID || offset < 0 || length < 1 || length > artifact.DownloadWindowBytes || offset > limit || length > limit-offset {
 		return artifact.ErrInvalid
 	}
 	call, leave, e := r.enter(ctx, o)

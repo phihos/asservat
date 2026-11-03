@@ -110,7 +110,14 @@ func (t NativeType) Filename(artifactID string) string { return "artifact-" + ar
 const RemoteNativeLimit = FrameBytes
 
 // DownloadLimit is the type's native size bound on the installed download path.
-func (t NativeType) DownloadLimit() int64 { return min(t.MaxBytes, RemoteNativeLimit) }
+func (t NativeType) DownloadLimit() int64 {
+	// Profiles use bounded response windows across their registered native size.
+	// Recorder acquisition retains its existing separately qualified ceiling.
+	if t.Name == PprofArtifact || t.Name == GoTraceArtifact {
+		return t.MaxBytes
+	}
+	return min(t.MaxBytes, RemoteNativeLimit)
+}
 
 // DownloadEvidenceType reports an evidence type the installed download path
 // serves (ADR-248): pod-status context, packet captures (PCAPNG) and syscall

@@ -82,7 +82,7 @@ func commandValues(c contracts.NativeCommand, h contracts.NativeHello, target va
 			return o, source, until, contracts.ErrNativeProtocol
 		}
 	case value.NativeResponse:
-		if !value.UUID(c.WindowID) || c.LeaseSequence < 1 || c.Offset < 0 || c.Length < 1 || nativeDecodeBounded(c.Source, &source, contracts.NativeCommandBytes) != nil || !source.Valid(o.SourceVersion) {
+		if !value.UUID(c.WindowID) || c.LeaseSequence < 1 || c.Offset < 0 || c.Length < 1 || c.Length > artifact.DownloadWindowBytes || nativeDecodeBounded(c.Source, &source, contracts.NativeCommandBytes) != nil || !source.Valid(o.SourceVersion) {
 			return o, source, until, contracts.ErrNativeProtocol
 		}
 		if limit := source.Expectation.Type().DownloadLimit(); c.Offset > limit || c.Length > limit-c.Offset {
