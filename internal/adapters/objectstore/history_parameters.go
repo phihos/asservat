@@ -1,6 +1,7 @@
 package objectstore
 
 import (
+	"asservat.local/asservat/internal/application/audit"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -8,6 +9,7 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 	"io"
+	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore/framed"
 	"asservat.local/asservat/internal/adapters/objectstore/manifest"
@@ -224,7 +226,9 @@ func (s HistoryObjects) Write(ctx context.Context, e value.HistoryExpectation, b
 			}
 		}
 		key := historyPrefix(e) + artifact.Role(i)
+		began := time.Now()
 		o, err := s.Store.PutSmall(call, key, body)
+		audit.MarkStep(ctx, "o-put-"+artifact.Role(i), began)
 		if errors.Is(err, ErrExists) {
 			// A re-executed write of the same claimed bundle (ADR-280) accepts
 			// only the byte-identical object an earlier attempt created.
@@ -252,11 +256,13 @@ func (s HistoryObjects) Read(ctx context.Context, e value.HistoryExpectation, c 
 	call, cancel := context.WithDeadline(ctx, e.Registration.ExpiresAt)
 	defer cancel()
 	for i, r := range c {
+		began := time.Now()
 		_, b, err := s.Store.readAcknowledgedControlAudit(call, Object{Key: historyPrefix(e) + artifact.Role(i), VersionID: r.VersionID, ETag: r.ETag, Bytes: r.Bytes, SHA256: r.SHA256}, historyObjectLimits[i])
 		if err != nil {
 			out.Clear()
 			return HistoryBundle{}, err
 		}
+		audit.MarkStep(ctx, "o-get-"+artifact.Role(i), began)
 		out[i] = b
 	}
 	if !out.Valid() {

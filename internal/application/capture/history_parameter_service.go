@@ -1,6 +1,7 @@
 package capture
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -49,6 +50,9 @@ type HistoryParameterService struct {
 	Now                    func() time.Time
 	// ReportFailure receives only closed operation/stage/context-state words.
 	ReportFailure func(string)
+	// ReportTiming, if set, receives "write" or "read" and that operation's
+	// fixed step names with duration buckets. Diagnostic only.
+	ReportTiming func(string, string)
 }
 
 func (s HistoryParameterService) configured() bool {
@@ -57,7 +61,18 @@ func (s HistoryParameterService) configured() bool {
 
 func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Accepted, i identity.Identity, p value.HistoryParameters, source *value.HistoryLineage) (failure error) {
 	stage := "input"
-	defer func() { s.reportFailure(ctx, "write", stage, failure) }()
+	// The history operation keeps its own step timing (the request's
+	// recorder is bounded and shared); reported once, diagnostic only.
+	ctx, steps := auditapp.WithStepTimes(ctx)
+	began, total := time.Now(), time.Now()
+	defer func() {
+		auditapp.MarkStep(ctx, "hw-"+stage, began)
+		auditapp.MarkStep(ctx, "hw-total", total)
+		if s.ReportTiming != nil {
+			s.ReportTiming("write", steps.String())
+		}
+		s.reportFailure(ctx, "write", stage, failure)
+	}()
 	if !s.configured() || ctx == nil || !p.Valid() || !acceptedContext(accepted, accepted.SubmissionDigest) || p.OriginalExecutionDigest != accepted.ScopeDigest || accepted.Replay {
 		return value.ErrHistoryUnavailable
 	}
@@ -78,18 +93,18 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	}
 	// Validate and bound the immutable plaintext before reserving storage or
 	// invoking any KMS/backend operation.
-	stage = "parameters"
+	stage = markHistoryStage(ctx, "hw-", stage, "parameters", &began)
 	plain, err := value.CanonicalHistoryParameters(p)
 	if err != nil {
 		return err
 	}
 	clear(plain)
-	stage = "keys"
+	stage = markHistoryStage(ctx, "hw-", stage, "keys", &began)
 	selector, settings, err := HistoryParameterKeys(s.Keys, s.RootID, p)
 	if err != nil {
 		return err
 	}
-	stage = "recovery"
+	stage = markHistoryStage(ctx, "hw-", stage, "recovery", &began)
 	recovery, err := s.Recovery.RecoveryState(ctx)
 	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
 		return value.ErrHistoryUnavailable
@@ -98,13 +113,13 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	// The actual retained member is a metadata-selector witness only. Current
 	// retention selectors cover namespace/workload; all children independently
 	// establish that same workload and remain separately authorized below SQL.
-	stage = "retention"
+	stage = markHistoryStage(ctx, "hw-", stage, "retention", &began)
 	retention, err := s.Retention.ResolveCaseMetadata(ctx, privacy.Input{ControlKind: "case-metadata", Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "other", AnchorAt: accepted.CreatedAt})
 	if err != nil {
 		return err
 	}
 	expiry, deleteBy := retention.ExpiresAt, retention.DeleteBy
-	stage = "source"
+	stage = markHistoryStage(ctx, "hw-", stage, "source", &began)
 	if source != nil {
 		if !source.Valid(s.Now()) {
 			return value.ErrSettingsUnavailable
@@ -121,22 +136,22 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	r.ExpiresAt = expiry
 	r.DeleteBy = deleteBy
 	e := value.HistoryExpectation{RootID: s.RootID, CaptureID: accepted.CaptureID, Registration: r, SelectorKey: selector, SettingsKey: settings, MACVersion: s.Keys.AccountVersion(), OriginalExecutionDigest: accepted.ScopeDigest}
-	stage = "expectation"
+	stage = markHistoryStage(ctx, "hw-", stage, "expectation", &began)
 	if !e.Valid() {
 		return value.ErrSettingsUnavailable
 	}
-	stage = "reserve"
+	stage = markHistoryStage(ctx, "hw-", stage, "reserve", &began)
 	storage, err := s.Ledger.ReserveHistoryParameters(ctx, value.HistoryReservation{Expectation: e, Identity: i, Recovery: recovery, Limits: s.Limits, SummaryExpiresAt: retention.ExpiresAt, Retention: retention, Source: source})
 	if err != nil {
 		return err
 	}
-	stage = "seal"
+	stage = markHistoryStage(ctx, "hw-", stage, "seal", &began)
 	bundle, err := s.Codec.SealHistory(ctx, e, p)
 	if err != nil {
 		return err
 	}
 	defer bundle.Clear()
-	stage = "prepare"
+	stage = markHistoryStage(ctx, "hw-", stage, "prepare", &began)
 	session, err := s.Regional.PrepareHistory(ctx, p.Target.ClusterID, accepted.CaptureID)
 	if err != nil && ctx.Err() == nil {
 		// ADR-280: nothing is claimed yet; open the regional session once more.
@@ -148,29 +163,29 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	defer session.Close()
 	operation, cancel := context.WithDeadline(ctx, session.NotAfter())
 	defer cancel()
-	stage = "bundle"
+	stage = markHistoryStage(ctx, "hw-", stage, "bundle", &began)
 	bundleDigest, err := value.HistoryCiphertextsDigest(bundle)
 	if err != nil {
 		return err
 	}
 	// Reserve, seal and the attach consumed time: the claim's authority ends
 	// with the recovery observation it uses, so use a current one.
-	stage = "recovery-claim"
+	stage = markHistoryStage(ctx, "hw-", stage, "recovery-claim", &began)
 	if recovery, err = s.currentRecovery(operation); err != nil {
 		return err
 	}
-	stage = "claim"
+	stage = markHistoryStage(ctx, "hw-", stage, "claim", &began)
 	authority, err := s.Ledger.ClaimHistoryWrite(operation, value.HistoryWriteRequest{Storage: storage, Identity: i, Recovery: recovery, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch(), BundleDigest: bundleDigest})
 	if err != nil {
 		return err
 	}
-	stage = "execute"
+	stage = markHistoryStage(ctx, "hw-", stage, "execute", &began)
 	reply, err := session.ExecuteHistory(operation, authority, bundle, artifact.Copies{})
 	if err != nil && !errors.Is(err, artifact.ErrIntegrity) && operation.Err() == nil {
 		// ADR-280: one re-execution of the same claim and bundle through a
 		// fresh regional session of the same executor process; the region
 		// accepts only byte-identical objects an earlier attempt created.
-		stage = "execute-retry"
+		stage = markHistoryStage(ctx, "hw-", stage, "execute-retry", &began)
 		// The failed session's attachment holds this capture's route: the
 		// router refuses a second attachment for the same capture, so the
 		// re-execution could never attach while it stayed open (installed
@@ -186,7 +201,7 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	if err != nil {
 		return err
 	}
-	stage = "completion"
+	stage = markHistoryStage(ctx, "hw-", stage, "completion", &began)
 	if reply.WriterCompletion == nil || !reply.WriterCompletion.Valid(e) || reply.WriterCompletion.OperationID != authority.RequestID || reply.WriterCompletion.ProcessEpoch != authority.ExecutorEpoch || reply.Copies.Validate(r) != nil || reply.WriterCompletion.CopiesDigest != value.HistoryCopiesDigest(reply.Copies) {
 		return artifact.ErrIntegrity
 	}
@@ -195,11 +210,11 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 			return artifact.ErrIntegrity
 		}
 	}
-	stage = "recovery-settle"
+	stage = markHistoryStage(ctx, "hw-", stage, "recovery-settle", &began)
 	if recovery, err = s.currentRecovery(ctx); err != nil {
 		return err
 	}
-	stage = "settle"
+	stage = markHistoryStage(ctx, "hw-", stage, "settle", &began)
 	return s.Ledger.CompleteHistoryWrite(ctx, value.HistoryWriteResult{Authority: authority, Copies: reply.Copies, Completion: *reply.WriterCompletion, Recovery: recovery})
 }
 
@@ -220,29 +235,40 @@ func (s HistoryParameterService) ListCaptureHistory(ctx context.Context, q value
 }
 func (s HistoryParameterService) ReadCaptureSettings(ctx context.Context, q value.SettingsQuery) (result value.CaptureSettings, failure error) {
 	stage := "input"
-	defer func() { s.reportFailure(ctx, "read", stage, failure) }()
+	// The history operation keeps its own step timing (the request's
+	// recorder is bounded and shared); reported once, diagnostic only.
+	ctx, steps := auditapp.WithStepTimes(ctx)
+	began, total := time.Now(), time.Now()
+	defer func() {
+		auditapp.MarkStep(ctx, "hr-"+stage, began)
+		auditapp.MarkStep(ctx, "hr-total", total)
+		if s.ReportTiming != nil {
+			s.ReportTiming("read", steps.String())
+		}
+		s.reportFailure(ctx, "read", stage, failure)
+	}()
 	var zero value.CaptureSettings
 	if !s.configured() || !q.Valid(s.Now()) || q.RootID != s.RootID {
 		return zero, value.ErrDenied
 	}
-	stage = "storage"
+	stage = markHistoryStage(ctx, "hr-", stage, "storage", &began)
 	storage, required, err := s.Ledger.ReadHistoryStorage(ctx, q)
 	if err != nil {
 		return zero, err
 	}
-	stage = "legacy"
+	stage = markHistoryStage(ctx, "hr-", stage, "legacy", &began)
 	if !required {
 		if s.Legacy == nil {
 			return zero, value.ErrSettingsUnavailable
 		}
 		return s.Legacy.ReadCaptureSettings(ctx, q)
 	}
-	stage = "retention"
+	stage = markHistoryStage(ctx, "hr-", stage, "retention", &began)
 	retained, err := s.Retention.ResolveRetainedCaseMetadata(ctx, storage.Retention.Input, storage.Effective, storage.Retention.Origins)
 	if err != nil || !s.Now().Before(retained.ExpiresAt) {
 		return zero, value.ErrSettingsUnavailable
 	}
-	stage = "prepare"
+	stage = markHistoryStage(ctx, "hr-", stage, "prepare", &began)
 	session, err := s.Regional.PrepareHistory(ctx, storage.Expectation.Registration.Location.ClusterID, q.CaptureID)
 	if err != nil {
 		return zero, value.ErrSettingsUnavailable
@@ -251,25 +277,25 @@ func (s HistoryParameterService) ReadCaptureSettings(ctx context.Context, q valu
 	operation, cancel := context.WithDeadline(ctx, session.NotAfter())
 	defer cancel()
 	in := value.HistoryReadRequest{Retention: retained, Query: q, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch()}
-	stage = "authorize"
+	stage = markHistoryStage(ctx, "hr-", stage, "authorize", &began)
 	permission, err := s.Ledger.AuthorizeHistoryRead(operation, in)
 	if err != nil {
 		return zero, err
 	}
-	stage = "execute"
+	stage = markHistoryStage(ctx, "hr-", stage, "execute", &began)
 	reply, err := session.ExecuteHistory(operation, permission.Authority, value.HistoryCiphertexts{}, permission.Storage.Copies)
 	if err != nil {
 		return zero, value.ErrSettingsUnavailable
 	}
 	defer reply.Bundle.Clear()
-	stage = "open"
+	stage = markHistoryStage(ctx, "hr-", stage, "open", &began)
 	p, err := s.Codec.OpenHistory(operation, permission.Storage.Expectation, permission.Storage.Copies, reply.Bundle)
 	if err != nil {
 		return zero, value.ErrSettingsUnavailable
 	}
 	// The original operation stays finite across provider/object I/O. A second
 	// current SQL check grants no extra lifetime and prevents stale disclosure.
-	stage = "final"
+	stage = markHistoryStage(ctx, "hr-", stage, "final", &began)
 	final, err := s.Ledger.AuthorizeHistoryRead(operation, in)
 	if err != nil || !s.Now().Before(permission.Authority.NotAfter) || value.HistoryExpectationDigest(final.Storage.Expectation) != value.HistoryExpectationDigest(permission.Storage.Expectation) {
 		return zero, value.ErrSettingsUnavailable
@@ -414,4 +440,12 @@ func (s HistoryParameterService) cleanupExpiredPreviews(ctx context.Context, nex
 	defer end()
 	_, err := s.PreviewCleanup.DeleteExpiredContextPreviews(cleanup)
 	return now.Add(30 * time.Second), err
+}
+
+// markHistoryStage records the finished stage's bucketed duration in the
+// caller's step timing (diagnostic only) and returns the next stage.
+func markHistoryStage(ctx context.Context, prefix, finished, next string, began *time.Time) string {
+	auditapp.MarkStep(ctx, prefix+finished, *began)
+	*began = time.Now()
+	return next
 }
