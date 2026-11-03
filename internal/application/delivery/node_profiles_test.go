@@ -18,15 +18,20 @@ type profileSink struct {
 	results []collector.ProfileResult
 	bytes   []byte
 	err     error
+	during  func()
 }
 
 func (s *profileSink) DeliverProfile(_ context.Context, _ collector.Identity, r collector.ProfileResult, body io.Reader) error {
+	if s.during != nil {
+		s.during()
+	}
 	s.results = append(s.results, r)
 	s.bytes, _ = io.ReadAll(body)
 	return s.err
 }
 func TestProfileDeliveryBindsProcessRequestAndSingleUse(t *testing.T) {
 	ch, _, clock, _ := newChannel(t)
+	clock.t = time.Now().UTC().Truncate(time.Microsecond)
 	peer, _ := enroll(t, ch, epochA)
 	const id = "00000000-0000-4000-8000-000000000001"
 	// Use a real-shaped immutable UID while retaining the enrolled test process.
@@ -70,6 +75,16 @@ func TestProfileDeliveryBindsProcessRequestAndSingleUse(t *testing.T) {
 	}
 	if len(sink.results) != 0 {
 		t.Fatal("invalid result reached sink")
+	}
+	sink.during = func() {
+		stop, end := context.WithDeadline(t.Context(), now.Add(time.Second))
+		defer end()
+		if _, err := ch.EnqueueProfileCancel(stop, id, p.CaptureID, w.ID, now.Add(time.Second)); err != nil {
+			t.Error("active upload lost restrictive cancellation identity", err)
+		}
+		if err := ch.DeliverProfile(t.Context(), peer, epochA, r, bytes.NewBufferString("abc")); !errors.Is(err, ErrNodeConflict) {
+			t.Error("active upload accepted duplicate delivery", err)
+		}
 	}
 	sink.err = errors.New("unknown store result")
 	if err := ch.DeliverProfile(context.Background(), peer, epochA, r, bytes.NewBufferString("abcdef")); !errors.Is(err, ErrNodeUnavailable) {

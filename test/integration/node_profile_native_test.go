@@ -1,6 +1,8 @@
 package integration
 
 import (
+	"asservat.local/asservat/internal/adapters/diagnostics"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -65,12 +67,7 @@ func profileCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interf
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	pod := restrictedPod("profile-workload", image)
-	pod.Spec.Containers[0].Command = []string{"/profile-native"}
-	pod.Spec.Containers[0].Args = nil
-	pod.Spec.Containers[0].Ports = []core.ContainerPort{{Name: "diagnostics", ContainerPort: 6060}, {Name: "health", ContainerPort: 8080}}
-	pod.Spec.Containers[0].Resources = core.ResourceRequirements{Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("500m"), core.ResourceMemory: resource.MustParse("64Mi")}, Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("16Mi")}}
-	pod.Spec.Containers[0].ReadinessProbe = &core.Probe{ProbeHandler: core.ProbeHandler{HTTPGet: &core.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt32(8080)}}, PeriodSeconds: 1}
+	pod := nativeProfileWorkloadPod("profile-workload", image)
 	created, err := k.CoreV1().Pods(namespace).Create(ctx, pod, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -142,6 +139,12 @@ func profileCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interf
 	_, heap := enqueue("heap", "snapshot", "podIP", netip.MustParseAddr(created.Status.PodIP), 8080, 0)
 	r, b = await(heap.CaptureID)
 	qualify("heap-pod-ip", r, b)
+	_, trace := enqueue("runtimeTrace", "interval", "targetLoopback", netip.MustParseAddr("127.0.0.1"), 6060, 2*time.Second)
+	r, b = await(trace.CaptureID)
+	if r.Failure != "" || !r.Outcome.ResponseComplete || diagnostics.CheckGoTrace(bytes.NewReader(b)) != nil {
+		t.Fatal("genuine native trace failed", r)
+	}
+	results["profile-trace-loopback"] = map[string]any{"bytes": len(b), "sha256": fmt.Sprintf("%x", sha256.Sum256(b)), "parser": "production Go trace verifier"}
 	_, redirect := enqueue("cpu", "interval", "targetLoopback", netip.MustParseAddr("127.0.0.1"), 6070, time.Second)
 	r, b = await(redirect.CaptureID)
 	if r.Failure == "" || len(b) != 0 {
@@ -163,4 +166,14 @@ func profileCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interf
 		t.Fatal("cancel fabricated success or lost uncertain start", r)
 	}
 	results["profileCancellationUncertain"] = true
+}
+
+func nativeProfileWorkloadPod(name, image string) *core.Pod {
+	pod := restrictedPod(name, image)
+	pod.Spec.Containers[0].Command = []string{"/profile-native"}
+	pod.Spec.Containers[0].Args = nil
+	pod.Spec.Containers[0].Ports = []core.ContainerPort{{Name: "diagnostics", ContainerPort: 6060}, {Name: "health", ContainerPort: 8080}}
+	pod.Spec.Containers[0].Resources = core.ResourceRequirements{Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("500m"), core.ResourceMemory: resource.MustParse("64Mi")}, Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("16Mi")}}
+	pod.Spec.Containers[0].ReadinessProbe = &core.Probe{ProbeHandler: core.ProbeHandler{HTTPGet: &core.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt32(8080)}}, PeriodSeconds: 1}
+	return pod
 }

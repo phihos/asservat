@@ -82,9 +82,13 @@ func (c *NodeChannel) DeliverProfile(ctx context.Context, peer NodePeer, epoch s
 		c.mu.Unlock()
 		return ErrNodeConflict
 	}
-	delete(e.captures, r.WorkID)
+	// Fence duplicate result delivery before handing off any bytes. Retain only
+	// this original cancellation identity while the sink owns the active upload.
+	pending.cancelOnly = true
+	e.captures[r.WorkID] = pending
 	id, sink := e.id, c.profileSink
 	c.mu.Unlock()
+	defer func() { c.mu.Lock(); delete(e.captures, r.WorkID); c.mu.Unlock() }()
 	if err := sink.DeliverProfile(ctx, id, r, io.LimitReader(body, o.NativeBytes)); err != nil {
 		return ErrNodeUnavailable
 	}

@@ -1,5 +1,36 @@
 # Sustained implementation progress
 
+## Profile upload Stop and maximum-input fixture (2026-11-03)
+
+Blocked-upload regressions reproduced two Stop gaps: node cancellation reached
+only acquisition, and the regional channel discarded the cancellation identity
+at upload-header receipt. Stop now cancels the exact body-upload context too;
+the channel keeps its existing one-use cancellation-only entry until the sink
+joins. Failed acquisition may still send its single bounded zero-byte failure
+receipt. Original deadlines, byte reservations and uncertain managed-storage
+charges are unchanged. A real TLS cancellation test confirmed that the current
+transport joins its active native reader before returning buffer ownership;
+no additional reader-ownership mechanism was introduced.
+
+The `collector-profile` native fixture now has genuine CPU/heap/short-trace
+checks plus deliberately malformed 128 MiB trace-shaped responses. Two distinct
+Restricted targets fill the existing 256 MiB node reservation; a third request
+must fail before endpoint acquisition. While uploads are blocked it records
+collector process RSS/high-water mark and held reservations, then observes Stop
+and actual reservation release. It accommodates the existing control connection
+pool and poll interval without extending capture/upload deadlines. The production
+parser must reject the malformed input. This fixture has no SQL publisher and
+makes no installed catalog-refusal claim.
+
+Local checks passed: full race suites for delivery (1.063 seconds), node transport
+(1.691 seconds) and bootstrap (77.467 seconds), affected vet, spec/architecture/
+Go architecture, integration fixture compilation and helper binary compilation.
+The native workflow dynamically accepts both `collector-profile` and
+`continuation-manual-profile`. These new native checks have not been dispatched;
+measured maximum-input resource qualification and installed publication remain
+pending on the final combined candidate.
+
+
 ## Capture-preview outer composition window (2026-11-03)
 
 Migration 00126 now aligns the SQL audit trigger with this prospective

@@ -119,3 +119,58 @@ func TestNodeProfileCancelKeepsUncertainRuntimeSlotUntilOriginalDeadline(t *test
 	}
 	n.wg.Wait()
 }
+
+func TestNodeProfileStopCancelsBlockedUploadAndJoinsBeforeRelease(t *testing.T) {
+	_, q, reader, e, _, now := profileHolderFixture(t)
+	p := collector.ProfileCapture{CaptureID: e.CaptureUID, CollectorEpoch: q.node.Epoch, ExpectationDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AddressMode: reader.plan.AddressMode, Address: reader.plan.RouteIP, Port: reader.plan.Port, Host: "localhost", Request: execution.GoProfileRequest{Binding: e.Binding(), Pin: reader.plan.Pin, NodeUID: q.node.NodeUID, NodeBootID: q.node.BootID, SourceRef: "pprof", EndpointDigest: e.Profile.EndpointDigest, Parameters: reader.plan.Parameters, NativeLimit: 16 << 20, NotBefore: now, Deadline: now.Add(5 * time.Second)}}
+	w := collector.Work{ID: e.CaptureUID, Sequence: 1, Kind: collector.WorkProfileCapture, NotAfter: now.Add(time.Second), Profile: &p}
+	budget, err := collector.NewBudget(collector.Ceilings{FrozenBytes: 32 << 20, UploadBytesPerSecond: 1 << 20, UploadBurstBytes: 1 << 20}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	entered, cancelled, join := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	parent, end := context.WithCancel(t.Context())
+	defer end()
+	defer close(join)
+	n := &nodeProfiles{identity: func() collector.Identity { return q.node }, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu,
+		acquire: func(ctx context.Context, _ collector.ProfileCapture, out io.Writer) (execution.GoProfileOutcome, error) {
+			_, err := out.Write([]byte("native"))
+			return execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: time.Now().UTC(), MayHaveStarted: true, ResponseComplete: err == nil, NativeBytes: 6}, err
+		},
+		upload: func(ctx context.Context, _ string, _ collector.ProfileResult, _ io.Reader) error {
+			close(entered)
+			<-ctx.Done()
+			close(cancelled)
+			<-join
+			return ctx.Err()
+		}}
+	if r := n.start(parent, q.node.Epoch, w); r.Outcome != collector.OutcomeAccepted {
+		t.Fatal(r)
+	}
+	<-entered
+	cancel := collector.Work{ID: "22222222-2222-4222-8222-222222222222", Sequence: 2, Kind: collector.WorkCancelProfileCapture, NotAfter: now.Add(time.Second), CancelProfile: &collector.PacketCancel{CaptureID: p.CaptureID, WorkID: w.ID}}
+	if r := n.stop(cancel); r.Outcome != collector.OutcomeAccepted {
+		t.Fatal(r)
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("Stop did not cancel the exact active upload")
+	}
+	mu.Lock()
+	held := budget.Usage(time.Now()).FrozenReserved
+	mu.Unlock()
+	if held != p.Request.NativeLimit {
+		t.Fatal("unjoined upload released budget", held)
+	}
+	// Cleanup joins before the test returns; release is never inferred from Stop alone.
+	t.Cleanup(func() {
+		n.wg.Wait()
+		mu.Lock()
+		defer mu.Unlock()
+		if budget.Usage(time.Now()).FrozenReserved != 0 {
+			t.Error("joined upload retained local buffer charge")
+		}
+	})
+}

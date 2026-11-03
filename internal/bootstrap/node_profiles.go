@@ -32,6 +32,8 @@ type nodeProfiles struct {
 type runningProfile struct {
 	captureID, workID string
 	cancel            context.CancelFunc
+	cancelUpload      context.CancelFunc
+	stopRequested     bool
 	uncertainUntil    time.Time
 }
 
@@ -129,6 +131,22 @@ func (n *nodeProfiles) run(parent, action context.Context, cancel context.Cancel
 	// plus the existing transport margin; an action cancellation never renews it.
 	upload, cancelUpload := context.WithDeadline(parent, p.Request.Deadline.Add(30*time.Second))
 	defer cancelUpload()
+	// Stop applies to the exact active body upload as well as acquisition. A
+	// stopped acquisition may still report its single zero-byte failure receipt.
+	n.budgetMu.Lock()
+	running := n.running[p.Request.Pin.UID]
+	if running.stopRequested && len(data) > 0 {
+		result.Failure = collector.ReasonCaptureFailed
+		result.Outcome.ResponseComplete = false
+		result.Outcome.NativeBytes = 0
+		uncertain = result.Outcome.MayHaveStarted
+		data = nil
+	}
+	if len(data) > 0 {
+		running.cancelUpload = cancelUpload
+		n.running[p.Request.Pin.UID] = running
+	}
+	n.budgetMu.Unlock()
 	if len(data) == 0 {
 		_ = n.upload(upload, epoch, result, bytes.NewReader(nil))
 		return
@@ -146,9 +164,14 @@ func (n *nodeProfiles) stop(w collector.Work) collector.Receipt {
 	}
 	n.budgetMu.Lock()
 	defer n.budgetMu.Unlock()
-	for _, r := range n.running {
+	for pod, r := range n.running {
 		if r.captureID == w.CancelProfile.CaptureID && r.workID == w.CancelProfile.WorkID {
+			r.stopRequested = true
+			n.running[pod] = r
 			r.cancel()
+			if r.cancelUpload != nil {
+				r.cancelUpload()
+			}
 			reply.Outcome, reply.Reason = collector.OutcomeAccepted, ""
 			return reply
 		}

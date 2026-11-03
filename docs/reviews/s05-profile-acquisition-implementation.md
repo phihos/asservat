@@ -67,3 +67,33 @@ refund follows an uncertain endpoint/backend outcome. Before-start tombstones
 share the same 64-holder bound with recordings and snapshots. Migration 124
 extends the existing immutable cancellation guard and its Down restores the
 previous guard. Native runtime qualification remains separate from SQL tests.
+
+## Maximum acquisition resource qualification
+
+The native collector fixture now includes a deliberately malformed 128 MiB
+trace-shaped response. It separately retains genuine small pprof/trace checks.
+Two distinct Restricted workload Pods fill the existing 256 MiB node frozen
+budget while their uploads are blocked; a third request must be refused before
+HTTP acquisition. The fixture records the real collector process RSS/high-water
+mark, original process identity, held/released reservations and cancellation
+join. It uses the existing Docker/crictl fixture observation pattern, without
+new product instrumentation, permissions, listeners or transport connections.
+Go allocator residency after join is measured, not expected to vanish at once.
+
+The additional test cost is three Restricted synthetic Pods (each 500m CPU and
+64 MiB memory maximum), 256 MiB of node-local endpoint input and bounded waits
+for existing 15-second status reports/25-second polls. The production parser
+must reject the invalid trace before publication eligibility; this component
+fixture has no SQL publisher and does not claim installed catalog refusal.
+Unknown/malformed input at the accepted ceiling is the concrete memory risk,
+so a small valid profile alone would not qualify this bound.
+
+The blocking-upload regression reproduced two restrictive Stop gaps: the node
+cancelled only acquisition, and the channel removed the cancellation identity
+when upload headers arrived. Stop now also cancels the original body-upload
+context; the channel retains its existing one-use cancellation-only entry until
+the sink joins. Duplicate result delivery stays refused. A real TLS regression
+shows the transport already joins its active reader on cancellation, so no new
+reader-owner machinery is added. These changes add zero RPCs, timers, credentials
+or fallback states and never extend an upload deadline or release uncertain
+managed-storage charges.

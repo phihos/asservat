@@ -65,9 +65,12 @@ the existing signed regional control stream, bound to the accepted attempt,
 expectation and exact connector process. It carries no recording source or
 packet parameters. A bounded holder tombstone prevents a delayed start.
 
-Queue acknowledgement is not completion. The connector waits for the actual
-node result and any active storage call to join before recording the typed
-cancellation proof. Confirmed storage wins a concurrent Stop. Known cancellation
+Queue acknowledgement is not completion. Stop cancels the exact acquisition
+and any active body-upload context, while retaining the original upload margin
+for a single zero-byte acquisition failure receipt. The channel retains its
+one-use cancellation-only entry until the sink returns. The connector waits
+for the actual node result and any active storage call to join before recording
+the typed cancellation proof. Confirmed storage wins a concurrent Stop. Known cancellation
 before endpoint work reports that no application profiling started; if the
 endpoint may have started, public progress warns that stopping collection does
 not confirm the application stopped profiling. The original node exclusion

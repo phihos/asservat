@@ -305,6 +305,7 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 
 	if f.ProfileImage != "" {
 		profileCaptureNative(t, ctx, k, s.Channel, second, workload, f.ProfileImage, f.Work, results)
+		profileResourcesNative(t, ctx, k, s.Channel, second, workload, f.ProfileImage, f.CollectorNamespace, results)
 	} else if f.RingDiskBytes > 0 {
 		// 3a. ADR-278: byte cap, restart and full volume of the disk ring.
 		ringDiskNative(t, ctx, k, s.Channel, f.CollectorNamespace, f.RingDiskBytes, workload, f.Busybox, results)
