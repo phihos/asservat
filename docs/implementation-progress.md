@@ -3,6 +3,21 @@
 
 ## Current delivery workflow (2026-11-03)
 
+Candidate `fe9c4f19` passed CI41634155293 and automated review. Installed run
+[41634428539](https://github.com/phihos/asservat/actions/runs/41634428539)
+passed schema preparation but failed the first public argument preview before
+acquisition. Go exited1 after481.005s; sourceUnchangedDuringTest was true and
+cleanupFailures empty. Timings reached preview persistence; no contemporaneous
+SQL error was reported. A local regression using actual argument definitions,
+release gadget pins and the public operation reproduced a271-character warning
+against the unchanged256-character response bound. Splitting the read explanation
+from the numeric limits fixes the message without changing authority or schema.
+Expanded argument preflight passed, including presentation/MCP races and
+installed-fixture preflight (Go2.096s); full repository pre-push gates passed. This run is not
+evidence of argument collection or publication. Terminal reports are retained in
+`test/results/argument-native-41634428539`.
+
+
 Corrected candidate `1fa80a98` passed automated code review, but installed run
 [41630936553](https://github.com/phihos/asservat/actions/runs/41630936553)
 failed before collection in schema preparation (Go48.577s, exit1,

@@ -31,6 +31,7 @@ type recorderFixture struct {
 	access      *authorization.ResultAccess
 	// resolved supplies namespace catalog profiles (the service reads them).
 	resolved []planning.CatalogProfile
+	filters  compiler.FilterCompiler
 }
 
 type oneInstruction struct{}
@@ -60,7 +61,11 @@ func (f *recorderFixture) PreviewComposition(_ context.Context, _ identities.Cur
 		return app.RecorderPreviewResult{}, err
 	}
 	input := planning.RecorderInput{CaptureID: "00000000-0000-4000-8000-000000000045", Executor: f.i.Principal, Target: target, Composition: *in.Composition, Retention: r, Deadline: now.Add(time.Minute)}
-	plan, err := compiler.CompileRecorder(input, oneInstruction{}, now)
+	filters := f.filters
+	if filters == nil {
+		filters = oneInstruction{}
+	}
+	plan, err := compiler.CompileRecorder(input, filters, now)
 	if needed := (compiler.PeerResolutionNeeded{}); errors.As(err, &needed) {
 		// ADR-283 PR 2: a synthetic regional resolution of two members.
 		input.Peers = []targets.PeerResolution{{Request: needed.Request, Members: []targets.PeerMember{{Kind: "Pod", UID: "db-a", IP: "10.0.0.11"}, {Kind: "Pod", UID: "db-b", IP: "10.0.0.12"}}, ResolvedAt: now}}
