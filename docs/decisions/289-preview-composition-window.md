@@ -42,6 +42,10 @@ expiry through RepeatedFrom.ExpiresAt. No field gains a later authority expiry.
 The operation-level selection also covers direct previews so browser and MCP
 choose one predictable bound before inspecting sensitive settings. It adds
 no schema field, client knob, retry, background task or new regional RPC.
+The existing longer-operation timing selection now gives previews their own
+`preview_capture` (and `preview_capture/service-failed`) doubling-report
+sequence instead of the shared `normal` lane sequence. Sampling remains bounded
+and carries no additional private values or I/O.
 
 ## Complexity gate
 

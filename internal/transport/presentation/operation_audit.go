@@ -341,8 +341,8 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		}
 	}()
 	lane, timing.admitted = audit.OperationLane(op), time.Now()
-	// Evidence reads get their own timing sequence, so a few reads among many
-	// other normal-lane calls still reach the doubling report.
+	// Longer composed operations get their own timing sequence, so infrequent
+	// previews, captures or evidence reads still reach the doubling report.
 	event = lane
 	if audit.OperationRequestWindow(op) > 5*time.Second {
 		event = op
