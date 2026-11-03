@@ -1,0 +1,422 @@
+package integration
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"reflect"
+	"sort"
+	"strings"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// The native file already passed independent download hash and capture-source
+// checks at each caller. This independent oracle does not call the production
+// approved projector, and none of its values supply product authority.
+func installedSyscallExpected(native []byte, nativeType, pod string) ([]artifact.SyscallMetadataEvent, []query.SyscallCount, query.SyscallRecordCounts, error) {
+	var counts query.SyscallRecordCounts
+	if len(native) == 0 || native[len(native)-1] != '\n' {
+		return nil, nil, counts, errors.New("native syscall file is incomplete")
+	}
+	lines := bytes.Split(bytes.TrimSuffix(native, []byte{'\n'}), []byte{'\n'})
+	if nativeType == artifact.SyscallArgumentsArtifact {
+		if len(lines) < 3 {
+			return nil, nil, counts, errors.New("missing native argument records")
+		}
+		var header artifact.ArgumentHeader
+		var footer artifact.ArgumentFooter
+		if json.Unmarshal(lines[0], &header) != nil || json.Unmarshal(lines[len(lines)-1], &footer) != nil || header.Record != "header" || header.PodUID != pod || footer.Record != "footer" || footer.Retained != uint64(len(lines)-2) {
+			return nil, nil, counts, errors.New("native argument framing differs")
+		}
+		lines = lines[1 : len(lines)-1]
+	} else if nativeType != artifact.SyscallRecordsArtifact {
+		return nil, nil, counts, errors.New("unsupported syscall source")
+	}
+	events := make([]artifact.SyscallMetadataEvent, 0, len(lines))
+	byName := map[string]query.SyscallCount{}
+	for _, line := range lines {
+		var event artifact.SyscallMetadataEvent
+		if nativeType == artifact.SyscallArgumentsArtifact {
+			var raw artifact.ArgumentEventLine
+			if json.Unmarshal(line, &raw) != nil || raw.Record != "event" {
+				return nil, nil, counts, errors.New("invalid raw native event")
+			}
+			e := raw.Event
+			event = artifact.SyscallMetadataEvent{Identity: artifact.SyscallMetadataIdentity{ProcessRef: e.Identity.ProcessRef, ThreadRef: e.Identity.ThreadRef, PodUID: e.Identity.PodUID}, Syscall: e.Syscall, ABI: e.ABI, Timestamp: e.Timestamp, DurationNS: e.DurationNS, Outcome: e.Outcome, Errno: e.Errno}
+		} else if json.Unmarshal(line, &event) != nil {
+			return nil, nil, counts, errors.New("invalid metadata native event")
+		}
+		if !event.WellFormed() || event.Identity.PodUID != pod {
+			return nil, nil, counts, errors.New("native metadata identity/shape differs")
+		}
+		events = append(events, event)
+		counts.RecordCount++
+		switch event.Outcome {
+		case "unmatched":
+			counts.UnmatchedEvents++
+		case "unfinished":
+			counts.UnfinishedEvents++
+		case "unknown":
+			counts.UnknownEvents++
+		}
+		row := byName[event.Syscall]
+		row.Syscall, row.Count = event.Syscall, row.Count+1
+		if event.Outcome == "error" {
+			row.Errors++
+		}
+		if event.DurationNS != nil {
+			row.PairedCount++
+			row.TotalDurationNS += *event.DurationNS
+		}
+		byName[event.Syscall] = row
+	}
+	rows := make([]query.SyscallCount, 0, len(byName))
+	for _, row := range byName {
+		rows = append(rows, row)
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].Syscall < rows[j].Syscall })
+	return events, rows, counts, nil
+}
+
+type installedSyscallReply struct {
+	installedJourneyEnvelope
+	DataClass  string `json:"data_class"`
+	Next       string `json:"next_cursor"`
+	Provenance []struct {
+		ArtifactID string `json:"artifactID"`
+		Digest     string `json:"digest"`
+	} `json:"provenance"`
+}
+
+func installedSyscallFailureCode(reply installedSyscallReply) string {
+	if reply.Status != "error" {
+		return ""
+	}
+	var failure struct {
+		Code string `json:"code"`
+	}
+	if json.Unmarshal(reply.Data, &failure) != nil {
+		return ""
+	}
+	return failure.Code
+}
+
+// Captured buffers can include a trailing newline or another bounded suffix.
+// Forbid their actual encoding, rather than assuming base64(marker) appears
+// unchanged inside base64(marker+suffix).
+func installedSyscallForbidden(native []byte, marker string) ([]string, error) {
+	if marker == "" {
+		return nil, nil
+	}
+	forbidden := []string{marker, base64.StdEncoding.EncodeToString([]byte(marker))}
+	found := false
+	for _, line := range bytes.Split(native, []byte{'\n'}) {
+		if len(line) == 0 {
+			continue
+		}
+		var record artifact.ArgumentEventLine
+		if json.Unmarshal(line, &record) != nil {
+			return nil, errors.New("invalid native argument record")
+		}
+		if record.Record != "event" {
+			continue
+		}
+		for _, argument := range record.Event.Arguments {
+			if !strings.HasPrefix(argument.Value, "base64:") {
+				continue
+			}
+			encoded := strings.TrimPrefix(argument.Value, "base64:")
+			decoded, err := base64.StdEncoding.Strict().DecodeString(encoded)
+			if err != nil {
+				return nil, err
+			}
+			if bytes.Contains(decoded, []byte(marker)) {
+				found = true
+				forbidden = append(forbidden, encoded, argument.Value)
+			}
+			clear(decoded)
+		}
+	}
+	if !found {
+		return nil, errors.New("native argument file lacks the synthetic sensitive buffer")
+	}
+	return forbidden, nil
+}
+
+type installedSyscallPage struct {
+	Kind     string                          `json:"kind"`
+	Rows     []query.SyscallCount            `json:"rows"`
+	Events   []artifact.SyscallMetadataEvent `json:"events"`
+	Coverage struct {
+		Dropped    *uint64  `json:"dropped_events"`
+		Unmatched  uint64   `json:"unmatched_events"`
+		Unfinished uint64   `json:"unfinished_events"`
+		Unknown    uint64   `json:"unknown_events"`
+		Records    uint64   `json:"record_count"`
+		Truncated  *bool    `json:"truncated"`
+		Gaps       []string `json:"gaps"`
+	} `json:"coverage"`
+	Observed time.Time `json:"query_observed_at"`
+	Expires  time.Time `json:"query_expires_at"`
+}
+
+func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version, nativeType, pod string, native []byte, expires time.Time, marker string, check installedProjectionCheck) {
+	t.Helper()
+	if check == nil {
+		t.Fatal("syscall projections require independent SQL readback")
+	}
+	expectedEvents, expectedRows, expectedCounts, err := installedSyscallExpected(native, nativeType, pod)
+	if err != nil || len(expectedEvents) < 2 || len(expectedRows) == 0 {
+		t.Fatal("native syscall oracle", err)
+	}
+	forbidden, err := installedSyscallForbidden(native, marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := identity.approvedTokenSource(origin)
+	if _, err := source.Token(ctx); err != nil {
+		t.Fatal(err)
+	}
+	wire, err := contracts.NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := sdk.NewClient(&sdk.Implementation{Name: "installed-saved-syscalls", Version: "1"}, nil)
+	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, source.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	call := func(name string, args any) installedSyscallReply {
+		t.Helper()
+		began := time.Now()
+		response, err := session.CallTool(ctx, &sdk.CallToolParams{Name: name, Arguments: args})
+		if err != nil {
+			t.Fatal("syscall operation outcome unavailable; no replay", name, err)
+		}
+		raw, err := json.Marshal(response.StructuredContent)
+		var out installedSyscallReply
+		if err != nil || wire.ValidateOutput(name, raw) != nil || json.Unmarshal(raw, &out) != nil || response.IsError != (out.Status == "error") || len(raw) > query.ContextResultBytes {
+			t.Fatal("syscall public response contract", name)
+		}
+		if marker != "" {
+			for _, sensitive := range forbidden {
+				if bytes.Contains(raw, []byte(sensitive)) {
+					t.Fatal("synthetic credential escaped approved response", name)
+				}
+			}
+		}
+		t.Logf("installed saved syscall %s status=%s elapsed=%s", name, out.Status, time.Since(began))
+		return out
+	}
+	deniedCheck := check(artifactID)
+	if denied := call("prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "syscall-read-only-denied"}); denied.Status != "error" {
+		t.Fatal("read-only syscall session obtained native download")
+	}
+	deniedCheck("", "")
+	// Each verify waits joined SQL/native closure and exact terminal Pod/Job.
+	// Only a subsequent real query supplies product demand cleanup; observe
+	// retirement of the first four without inventing a sixth query for the last.
+	var previousRetirement func()
+	run := func(tool string, args map[string]any, wantError string) (installedSyscallReply, installedSyscallPage) {
+		t.Helper()
+		verify := check(artifactID)
+		out := call(tool, args)
+		operation, handle := out.RequestID, ""
+		var observed, until time.Time
+		for poll := 0; out.Status == "pending"; poll++ {
+			var pending struct {
+				Handle   string    `json:"query_handle"`
+				Retry    int       `json:"retry_after_seconds"`
+				Observed time.Time `json:"query_observed_at"`
+				Expires  time.Time `json:"query_expires_at"`
+			}
+			if json.Unmarshal(out.Data, &pending) != nil || pending.Handle == "" || pending.Retry < 1 || pending.Observed.IsZero() || !pending.Expires.After(pending.Observed) || pending.Expires.After(expires) {
+				t.Fatal("invalid pending syscall query")
+			}
+			if poll == 0 {
+				handle, observed, until = pending.Handle, pending.Observed, pending.Expires
+			}
+			if pending.Handle != handle || !pending.Expires.Equal(until) || poll >= 4 {
+				t.Fatal("syscall query renewed original identity/deadline or polls")
+			}
+			next, err := installedProjectionPollTime(observed, until, time.Now(), time.Duration(pending.Retry)*time.Second, poll)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if installedJourneyPause(ctx, time.Until(next)) != nil {
+				t.Fatal(ctx.Err())
+			}
+			out = call("get_query_result", map[string]string{"query_handle": handle})
+		}
+		if handle != "" && out.Status == "ok" {
+			var nested struct {
+				Handle  string                `json:"query_handle"`
+				Tool    string                `json:"tool_name"`
+				Result  installedSyscallReply `json:"result"`
+				Expires time.Time             `json:"query_expires_at"`
+			}
+			if json.Unmarshal(out.Data, &nested) != nil || nested.Handle != handle || nested.Tool != tool || nested.Result.RequestID != out.RequestID || !nested.Expires.Equal(until) {
+				t.Fatal("syscall poll changed its exact result association")
+			}
+			out = nested.Result
+		}
+		if wantError != "" {
+			if out.Status != "error" || installedSyscallFailureCode(out) != wantError {
+				t.Fatal("changed syscall cursor was accepted", out.Status, installedSyscallFailureCode(out))
+			}
+		} else if out.Status != "ok" || out.DataClass != "extract" || len(out.Provenance) != 1 || out.Provenance[0].ArtifactID != artifactID || out.Provenance[0].Digest != version {
+			t.Fatal("syscall result changed source/class", out.Status, installedSyscallFailureCode(out))
+		}
+		retired := verify(handle, operation)
+		if retired == nil {
+			t.Fatal("syscall query lacks joined SQL/worker/key evidence")
+		}
+		if previousRetirement != nil {
+			previousRetirement()
+		}
+		previousRetirement = retired
+		var page installedSyscallPage
+		if wantError != "" {
+			return out, page
+		}
+		decoder := json.NewDecoder(bytes.NewReader(out.Data))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&page) != nil || page.Observed.IsZero() || !page.Expires.After(page.Observed) || page.Expires.After(expires) || !until.IsZero() && !page.Expires.Equal(until) {
+			t.Fatal("syscall page lost original dates or closed metadata fields")
+		}
+		if tool == "get_syscall_summary" && (page.Kind != "syscallSummary" || page.Events != nil) || tool == "get_syscall_events" && (page.Kind != "syscallEvents" || page.Rows != nil) {
+			t.Fatal("syscall result changed its selected view")
+		}
+		c := page.Coverage
+		if c.Dropped != nil || c.Truncated != nil || len(c.Gaps) == 0 || !strings.Contains(strings.ToLower(strings.Join(c.Gaps, " ")), "unknown") || c.Records != expectedCounts.RecordCount || c.Unmatched != expectedCounts.UnmatchedEvents || c.Unfinished != expectedCounts.UnfinishedEvents || c.Unknown != expectedCounts.UnknownEvents {
+			t.Fatal("syscall projection invented coverage or changed full-file counters", c, expectedCounts)
+		}
+		return out, page
+	}
+	base := func() map[string]any {
+		return map[string]any{"case_id": caseID, "artifact_id": artifactID, "limit": 100}
+	}
+	_, summary := run("get_syscall_summary", base(), "")
+	if summary.Kind != "syscallSummary" || len(summary.Events) != 0 || len(summary.Rows) == 0 || len(summary.Rows) > min(100, len(expectedRows)) || !reflect.DeepEqual(summary.Rows, expectedRows[:len(summary.Rows)]) {
+		t.Fatal("summary differs from independently counted downloaded native events")
+	}
+	// Pick a name actually repeated in the source; a one-record prefix must
+	// continue at the next matching native event, independent of other names.
+	name := ""
+	for _, row := range expectedRows {
+		if row.Count >= 2 {
+			name = row.Syscall
+			break
+		}
+	}
+	if name == "" {
+		t.Fatal("captured fixture lacks a repeatable syscall for continuation")
+	}
+	var filtered []artifact.SyscallMetadataEvent
+	var errorsOnly []artifact.SyscallMetadataEvent
+	for _, event := range expectedEvents {
+		if event.Syscall == name {
+			filtered = append(filtered, event)
+			if event.Outcome == "error" {
+				errorsOnly = append(errorsOnly, event)
+			}
+		}
+	}
+	args := base()
+	args["limit"], args["syscall_names"] = 1, []string{name}
+	first, page := run("get_syscall_events", args, "")
+	if page.Kind != "syscallEvents" || len(page.Rows) != 0 || len(page.Events) != 1 || !reflect.DeepEqual(page.Events, filtered[:1]) || first.Next == "" {
+		t.Fatal("filtered first native event/cursor differs")
+	}
+	args = base()
+	args["syscall_names"], args["cursor"] = []string{name}, first.Next
+	_, page = run("get_syscall_events", args, "")
+	if len(page.Events) == 0 || len(page.Events) > min(100, len(filtered)-1) || !reflect.DeepEqual(page.Events, filtered[1:1+len(page.Events)]) {
+		t.Fatal("cursor skipped or substituted a native matching event")
+	}
+	args = base()
+	args["syscall_names"], args["errors_only"] = []string{name}, true
+	_, page = run("get_syscall_events", args, "")
+	if len(page.Events) != min(100, len(errorsOnly)) || len(page.Events) > 0 && !reflect.DeepEqual(page.Events, errorsOnly[:len(page.Events)]) {
+		t.Fatal("error display filter differs from native outcomes")
+	}
+	args = base()
+	args["cursor"], args["syscall_names"], args["errors_only"] = first.Next, []string{name}, true
+	run("get_syscall_events", args, "InvalidCursor")
+	// All five workers reached joined closure and their original terminal
+	// lifetime. The last retains its conservative charge until ordinary cleanup;
+	// this fixture does not claim a final retirement/refund it did not observe.
+	t.Logf("installed saved syscalls: source=%s recorded=%d names=%d, read-only OAuth, exact native summary/events/filter/continuation, changed-filter refusal, unknown acquisition coverage and no sensitive marker; five one-batch queries with independent SQL/key/Pod readback", nativeType, len(expectedEvents), len(expectedRows))
+}
+
+func TestInstalledSyscallNativeOracleKeepsOnlyMetadata(t *testing.T) {
+	duration := uint64(7)
+	event := artifact.RawArgumentEvent{Identity: artifact.ArgumentIdentity{PodUID: "pod", ProcessRef: "process", ThreadRef: "thread"}, Syscall: "write", ABI: "x86_64", Timestamp: "2026-11-03T10:00:00Z", DurationNS: &duration, Outcome: "error", Errno: "EIO", Arguments: []artifact.ArgumentValue{{Name: "buffer", Value: "base64:" + base64.StdEncoding.EncodeToString([]byte(manualArgumentsMarker+"\n"))}}}
+	var native bytes.Buffer
+	for _, v := range []any{artifact.ArgumentHeader{Record: "header", PodUID: "pod"}, artifact.ArgumentEventLine{Record: "event", Event: event}, artifact.ArgumentFooter{Record: "footer", Retained: 1}} {
+		b, err := json.Marshal(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Fprintln(&native, string(b))
+	}
+	events, rows, counts, err := installedSyscallExpected(native.Bytes(), artifact.SyscallArgumentsArtifact, "pod")
+	if err != nil || len(events) != 1 || counts.RecordCount != 1 || len(rows) != 1 || rows[0] != (query.SyscallCount{Syscall: "write", Count: 1, Errors: 1, PairedCount: 1, TotalDurationNS: 7}) {
+		t.Fatal(events, rows, counts, err)
+	}
+	body, _ := json.Marshal(events)
+	if bytes.Contains(body, []byte(manualArgumentsMarker)) || bytes.Contains(body, []byte("arguments")) || bytes.Contains(body, []byte(base64.StdEncoding.EncodeToString([]byte(manualArgumentsMarker)))) {
+		t.Fatal("raw fields entered expected metadata")
+	}
+	if _, _, _, err := installedSyscallExpected(native.Bytes()[:native.Len()-1], artifact.SyscallArgumentsArtifact, "pod"); err == nil {
+		t.Fatal("partial native file accepted")
+	}
+	forbidden, err := installedSyscallForbidden(native.Bytes(), manualArgumentsMarker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, s := range forbidden {
+		if s == base64.StdEncoding.EncodeToString([]byte(manualArgumentsMarker+"\n")) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("actual captured buffer encoding with newline was not forbidden")
+	}
+}
+
+func TestInstalledSyscallFailureUsesEnvelopeData(t *testing.T) {
+	wire, err := contracts.NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(map[string]any{"schema_version": "mcp-result/v1", "request_id": "11111111-1111-4111-8111-111111111111", "data_class": "metadata", "status": "error", "truncated": false, "next_cursor": nil, "narrowing_hint": nil, "data": map[string]any{"code": "InvalidCursor", "message": "Start again without a cursor.", "retryable": false}, "warnings": []string{}, "provenance": []any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range []string{"get_syscall_events", "get_query_result"} {
+		if err := wire.ValidateOutput(tool, body); err != nil {
+			t.Fatal(tool, err)
+		}
+		var reply installedSyscallReply
+		if json.Unmarshal(body, &reply) != nil || installedSyscallFailureCode(reply) != "InvalidCursor" {
+			t.Fatal("typed refusal did not decode from envelope data")
+		}
+		reply.Status = "ok"
+		if installedSyscallFailureCode(reply) != "" {
+			t.Fatal("successful data became a refusal")
+		}
+	}
+}

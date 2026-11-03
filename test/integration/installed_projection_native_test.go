@@ -15,6 +15,7 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
+	artifactvalue "asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -47,10 +48,26 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 			return n
 		}
 		before := countDownloads()
+		grantState := func() string {
+			t.Helper()
+			var state string
+			if err := admin.QueryRow(ctx, `SELECT jsonb_build_array(
+ (SELECT count(*) FROM access_grant WHERE root_id=$1),
+ (SELECT count(*) FROM access_grant_use WHERE root_id=$1),
+ (SELECT coalesce(sum(bytes),0) FROM access_grant_use WHERE root_id=$1),
+ (SELECT coalesce(sum(operations),0) FROM access_grant_use WHERE root_id=$1))::text`, root).Scan(&state); err != nil {
+				t.Fatal("approved-only grant readback", err)
+			}
+			return state
+		}
+		beforeGrants := grantState()
 		return func(handle, operation string) func() {
 			t.Helper()
 			if countDownloads() != before {
 				t.Fatal("read-only approved workflow created a native download session")
+			}
+			if grantState() != beforeGrants {
+				t.Fatal("read-only approved workflow created an approval or spent raw disclosure pool")
 			}
 			if operation == "" {
 				return nil
@@ -89,6 +106,20 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 							t.Fatal("profile summary actual worker memory limit", err)
 						}
 						t.Log("installed profile summary: exact 256 MiB Pod limit and transient declaration, ten query units, one consumed three-key batch")
+					}
+					if intent.Query.Scope.NativeType == artifactvalue.SyscallRecordsArtifact || intent.Query.Scope.NativeType == artifactvalue.SyscallArgumentsArtifact {
+						if batches != 1 || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.SyscallProjectionWorkerBytes || intent.Query.Plan.Profile.Worker.MemoryBytes != query.SyscallProjectionWorkerBytes {
+							t.Fatal("syscall view did not retain its one-batch 256 MiB reservation")
+						}
+						var units int
+						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != query.SyscallProjectionQueryUnits {
+							t.Fatal("syscall projection source charge", units, err)
+						}
+						pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(limit, observed.Binding.Pod, meta.GetOptions{})
+						if err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != query.SyscallProjectionWorkerBytes {
+							t.Fatal("syscall projection actual worker memory limit", err)
+						}
+						t.Log("installed syscall view: exact 256 MiB Pod limit and transient declaration, two query units, one consumed three-key batch")
 					}
 					observed.Intent = intent.Worker
 					if !observed.Valid() {

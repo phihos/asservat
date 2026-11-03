@@ -892,6 +892,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if evidence.Artifacts[0].Kind != "syscallTrace" || evidence.Artifacts[0].NativeFormat != "asservat-syscall-arguments/v1" {
 			t.Fatal("argument artifact native classification", evidence.Artifacts[0])
 		}
+		qualifyInstalledSyscallProjections(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, artifact.SyscallArgumentsArtifact, preview.Pods[0].UID, native, evidence.Artifacts[0].Expires, manualArgumentsMarker, summaryCheck)
 		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
 		qualifyManualRecorderStop(t, ctx, "arguments", manualArgumentsCaptureInput(cluster, namespace, workload, true), read, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
@@ -925,6 +926,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		events := ongoingSyscallEvents(t, native, first.Identity.PodUID, time.Now())
 		t.Logf("manual syscall recording %s: %d metadata events, %d bytes", receipt.CaptureID, events, len(native))
+		qualifyInstalledSyscallProjections(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, artifact.SyscallRecordsArtifact, first.Identity.PodUID, native, evidence.Artifacts[0].Expires, "", summaryCheck)
 		return
 	}
 	if installedJourneyFocus() == "manual-http" {
