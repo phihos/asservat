@@ -341,7 +341,11 @@ only a valid unchanged storage selection with insufficient margin may wait for
 a fresh observation, within all original authority cutoffs and one demand
 attempt. Implementation and complete capture race checks pass. Native48 included
 the change and reached acquisition/publication, without establishing that
-consumption polling caused that success; complete installed qualification remains open.
+consumption polling caused that success. The earlier-hint heap repeat passed
+in native41818585176 at `80593f93`, with exact phase/count evidence still
+synthetic/source-only. PR160 merged as `5b765322` with eligible PR CI41821140504
+passed and the entire tree equal to the qualified head; broader installed
+lifecycle qualification remains open.
 
 [ADR-212 — Remaining interval before one-use API preparation](212-api-preparation-remaining-interval.md)
 requires one second remaining before the first preparation insert and preserves
@@ -1116,6 +1120,6 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-286: Bounded Go analyzer isolation](286-bounded-go-analyzer-isolation.md): maintainer-delegated M1 decision permits qualified data-only Go analyzers in the regional worker with bounded inputs, output and process resources, original authority and joined cancellation; native tools retain ADR-036. No analyzer is qualified by this contract amendment.
 
 - [ADR-292: independent submission start phase](292-independent-submission-start-phase.md): admission and start each retain at most five seconds inside the original request and authority bounds; installed profile rerun pending.
-- [ADR-291: bounded profile summary](291-bounded-profile-summary.md): internal typed pprof aggregate authority and selection/result composition; raw provenance and ordinary audience preserved, metadata-only shares unchanged; resource funding, SQL and public activation pending.
+- [ADR-291: bounded profile summary](291-bounded-profile-summary.md): internal typed pprof aggregate authority and selection/result composition; raw provenance and ordinary audience preserved, metadata-only shares unchanged; named installed CPU/heap summaries, SQL/key funding and native parity pass. PR160 merged as `5b765322` after eligible PR CI41821140504, with the full tree equal to qualified `80593f93`. Maximum-input containment and installed heap browser interaction remain pending.
 
 - [ADR-293: existing-artifact raw approval](293-existing-artifact-raw-approval.md): reuse independent review and disclosure accounting for exact published artifacts; verified native length comes from the existing publication pass. Implementation and installed qualification pending.

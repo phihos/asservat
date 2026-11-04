@@ -1,6 +1,6 @@
 # ADR-291 — Bounded profile summary authority and query composition
 
-Date: 2026-11-03. Status: accepted implementation candidate; installed qualification pending.
+Date: 2026-11-03. Status: implemented; named installed CPU/heap summaries pass; maximum-input containment remains pending.
 Requirements: REQ-PRF-003/005, REQ-EVD-005, REQ-MCP-003/005.
 Depends on [ADR-286](286-bounded-go-analyzer-isolation.md).
 
@@ -93,11 +93,14 @@ Stream verified native chunks into the analyzer rather than retaining another
 its object graph. Neither post-parse counts nor a per-query Go memory setting
 provide a hard heap bound. Physical worker resources, pre-parse shape controls,
 all allocation dimensions and provider work must be measured and funded before
-admission is enabled. The physical worker remains 256 MiB. The original installed query declaration
-now declares the same 256 MiB as worker transient capacity, replacing its
-insufficient 8 MiB declaration. Summary admission independently requires both
-physical and declared transient capacity at least 256 MiB; older profiles still
-serve their existing tools and fail this new summary compatibility check. No new
+admission is enabled for the intended workload. The legacy summary compatibility
+floor remains 256 MiB for both physical and declared transient capacity. The
+current shared installer declares 384 MiB for both under ADR-295, replacing the
+earlier 256 MiB installed declaration and insufficient 8 MiB transient value.
+The named CPU/heap runs qualify their actual inputs at 384 MiB; maximum-shape
+composed worker cost remains pending. Summary admission still requires the
+legacy floor; older configurations below it serve their existing tools and
+fail summary compatibility. No new
 reacceptance state, worker template, credential or physical reservation is added. Preserve the original 20-second projection operation bound
 unless actual qualified measurements justify a separate change.
 
@@ -109,9 +112,9 @@ No new table, credential, network destination, worker kind or lifecycle state is
 required by this design. The owned PostgreSQL/S3/OpenBao fixture proves actual approved profile
 admission, API execution completion, independent publication, current C-03
 read authority and SQL query accounting. Native target/process observations and
-worker ownership remain synthetic. Installed SQL/key/worker composition,
-cgroup lifecycle and public MCP output remain unqualified until the combined
-installed focus passes. Browser component and built-browser fixtures use
+worker ownership remain synthetic. Those fixture results alone do not qualify installed SQL/key/worker composition,
+cgroup lifecycle or public MCP output. Named installed CPU/heap focuses provide
+separate scoped evidence in the current implementation ledger. Browser component and built-browser fixtures use
 explicitly synthetic summary responses; they do not substitute for that run.
 
 ## Complexity gate
@@ -126,7 +129,7 @@ explicitly synthetic summary responses; they do not substitute for that run.
 | 6. Added states | Zero persistent lifecycle states; existing pending/refused/uncertain closure. |
 | 7. Machinery configuration | None; operator resource limits still need qualification. |
 | 8. Dependencies | Existing google/pprof parser and worker process/cgroup lifecycle. |
-| 9. Aggregate cost | One worker and one read batch per summary; ten read-work units, zero extra Jobs/PVCs/watches; declared transient 256 MiB reuses physical worker. Installed resource qualification pending. |
+| 9. Aggregate cost | One worker and one read batch per summary; ten read-work units, zero extra Jobs/PVCs/watches; current installed declaration 384 MiB matches the physical worker. Named CPU/heap inputs pass; maximum-input containment remains pending. |
 | 10. Rollback | Migration 127 changes functions only; no new tables. Empty-history downgrade restores old definitions; retained summaries refuse atomically. Removing the optional route disables new summary requests. |
 | 11. Smaller fix | A tool-name-only addition would bypass source, classification and funding checks. Reuse existing ports; qualify the complete optional runtime before release. |
 
@@ -155,5 +158,11 @@ existing regional query/approval/native-download path. It selects snapshot,
 native preparation, then checks the separately authorized original's exact unit,
 signed total, nullable duration and target. The same fixture's CPU route retains
 its expiry, refusals and Stop proofs. Existing384MiB resources and funded query
-units remain unchanged. Local component/built-console checks pass; current native
-qualification and scope are in [implementation progress](../implementation-progress.md).
+units remain unchanged. Local component/built-console checks pass. Native41818585176 on `80593f93`
+also passed this namespace heap MCP workflow: 531 native bytes, two samples,
+4,326,741 signed `inuse_space` bytes and null duration, followed by fresh repeat
+preview without another capture. All 4,117 source hashes match the frozen head;
+Go exited 0 in 580.027s, cleanup was empty and scratch was removed. Installed
+heap React interaction and maximum-input containment remain open. PR160 merged
+as `5b765322` after eligible `pull_request` CI41821140504 passed, with the entire
+merge tree equal to qualified `80593f93`. Originals and scope are in [implementation progress](../implementation-progress.md).

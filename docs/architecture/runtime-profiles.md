@@ -1,10 +1,20 @@
 # Bounded Go runtime-profile acquisition
 
-This component implements the C-11/C-23 mechanism boundary for the existing
-`profile` action (REQ-PRF-001/002 and REQ-LIF-001). It is not an installed profile
-feature. Profile-specific acceptance, start/quota admission, protected endpoint catalog acceptance,
-protected node networking, semantic verification and publication remain required.
-The existing 4096-byte pod-status authorities and public routes are unchanged.
+The C-11/C-23 acquisition mechanism serves the existing `profile` action
+(REQ-PRF-001/002 and REQ-LIF-001). Installed manual and finite-policy Go CPU
+workflows now compose protected planning, independent approval, admission,
+publication, inspection and native pprof download. The namespace heap MCP
+workflow also passed at `80593f93` in native41818585176: read-only `inuse_space`
+summary, authenticated original, exact signed total and a fresh repeat preview.
+PR160 merged as `5b765322106c8b76e5c73a87577548856b6d609c` after eligible
+`pull_request` CI41821140504 passed; its full tree equals qualified `80593f93`.
+
+These are named Linux/amd64 reference workflows. Installed heap React
+interaction, maximum-input analyzer containment, runtime trace and broader S-05
+qualification remain open. See [the current evidence](../implementation-progress.md)
+for originals and limits. The initial mechanism and staged-test boundaries below
+describe which facts each layer supplies; component checks alone establish no
+installed authority.
 
 ## Lifetime and authority contract
 
@@ -123,13 +133,13 @@ retention, workload quotas, encrypted custody, audit and independent verificatio
 must cover the output and partial copies. No sample/label redaction is claimed
 for the preserved original. Managed deletion cannot erase downloaded copies.
 
-## Qualification and remaining composition
+## Initial mechanism qualification boundary
 
 The staged tests exercise synthetic HTTP and the existing framed encoder; test
 guards and node connections are explicitly synthetic. Passing them does not
 qualify real node routing, runtime-domain mutual exclusion, production authority,
 object-store custody/publication, native-download permissions or the UI/MCP flow.
-No public/Helm profile capability is enabled by these new files. The integration
+The mechanism files alone enable no public/Helm profile capability. The integration
 sequence is accepted endpoint/template resolution and profile-specific admission,
 qualified node dialer/current guard, bounded custody/manifest verification, then
 the same shared capture/catalog/native-download workflow and isolated analysis.
@@ -287,3 +297,16 @@ scope before reconstructing the reviewed endpoint. The read retains the original
 request/preview deadlines and post-read cancellation checks. Existing covering
 grants return before this reconstruction; builtin profiles need no remote catalog
 read. Submission still performs its existing current-catalog and authority checks.
+
+
+The named installed heap run41818585176 passed on `80593f93` with a snapshot,
+16 MiB output cap, five-second endpoint timeout and no forced GC. SQL checked
+the installed Pod memory limit of 384 MiB and matching transient reservation,
+ten units and one joined three-role key batch before authorized native
+preparation. These are configured limits/reservations, not peak RSS. The 531-byte native original
+opened with local pprof; its two samples sum to 4,326,741 bytes, exactly matching
+the summary with null duration. This is a sampled total, not physical heap/RSS.
+The subsequent fresh preview passed without collecting another profile. The
+successful logs contain no detailed owner/demand phase markers; exact phase
+ordering/count evidence remains source inspection and synthetic tests. No
+installed heap browser click or maximum-shape resource claim follows.

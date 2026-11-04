@@ -1,6 +1,6 @@
 # ADR-213 — Storage readiness at consumption
 
-Date: 2026-10-20. Status: implemented; component race checks pass; installed qualification pending.
+Date: 2026-10-20. Status: implemented; component races and named installed heap repeat pass; broader lifecycle qualification remains open.
 Requirements: REQ-CAP-002–003, REQ-EXE-002; S-02.
 Refines [ADR-200](200-on-demand-capacity-refresh.md).
 
@@ -444,7 +444,7 @@ the standing delivery authorization; it is smaller than adding combined
 regional RPCs, another wait, new configuration or a longer observation interval.
 The existing demand remains non-authoritative and subject to the same finite
 root/workload limits. Local ordering/timing and joined-cleanup regressions are
-required; installed qualification of this change is still pending.
+required; the named installed result is recorded below.
 
 The staged application regression reproduces the old refusal at4.036s and
 completes after overlap in3.309s, with one review/demand and two independent
@@ -456,3 +456,22 @@ requires the existing API execution class and recorder wiring, matching the
 existing acquisition boundary. These results do not prove real demand completion
 or installed availability. Original reports are retained under
 `test/results/heap-profile-local/profile-repeat-readiness-*`.
+
+
+Native41818585176 at `80593f93` passed the complete named heap MCP workflow and
+fresh repeat preview. The preview completed in one 4.495s attempt between two
+successful settings reads, retaining immutable composition and original source
+expiry; no repeat capture was requested. Go exited 0 in 580.027s, all 4,117
+reported source hashes match the committed head, source stayed unchanged,
+cleanup was empty and build scratch was removed. Originals and independent
+checks are in `test/results/heap-profile-native-41818585176/`.
+
+The successful logs contain no detailed hint, review or demand phase markers.
+They establish installed repeat success under the unchanged original bounds,
+not native measurements of exact phase order/count, demand insertion or worker
+consumption. The one-review/one-demand and ordering assertions remain source
+and synthetic staged-test evidence. The earlier failed run's underlying demand
+outcome remains undetermined. Broader storage lifecycle/availability and maximum
+analyzer containment are not established. PR160 merged as `5b765322` after
+eligible `pull_request` CI41821140504 passed; the entire merge tree equals
+qualified `80593f93`.
