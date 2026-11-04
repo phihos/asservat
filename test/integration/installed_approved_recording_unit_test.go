@@ -62,6 +62,9 @@ func TestInstalledApprovedRecordingFixtureShape(t *testing.T) {
 			if got := installedRecordingFocus(); got != wantRecording {
 				t.Fatalf("recording focus parent-return guard=%v; want %v", got, wantRecording)
 			}
+			if got, want := installedApprovedRecordingExpiryProof(tc.focus), tc.focus != "profile-comparison"; got != want {
+				t.Fatalf("manual preview expiry proof=%v; want %v", got, want)
+			}
 			if (tc.focus == "approved-recording" || tc.focus == "native-paced") && (installedRegionalInstallerChecks(1) || !installedRegionalInstallerChecks(2)) {
 				t.Fatal("approved focus changed regional feature/chain coverage")
 			}

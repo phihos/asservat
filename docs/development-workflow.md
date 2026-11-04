@@ -10,7 +10,8 @@ The integrator owns the candidate and the next observable user outcome. Assign
 short tasks against that exact base: implementation with file ownership,
 integration review, or a reproduction. Agents report the commit, actual test
 exit and remaining gap. They do not independently run broad gates or dispatch
-hosted suites. Integrate completed changes promptly instead of building long
+hosted suites. Freeze sources only after every writer has completed or explicitly
+acknowledged the freeze; an interim passing test report does not end editing. Integrate completed changes promptly instead of building long
 chains of dependent branches.
 
 Before the first full CI push, finish the independent producer/consumer

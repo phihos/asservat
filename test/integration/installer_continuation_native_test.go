@@ -564,6 +564,11 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					measurement = &nativePacingMeasurement{admin: admin, root: p.RootID, providers: providers, traffic: f.NativeTrafficHelper}
 				}
 				if installedJourneyFocus() == "profile-comparison" {
+					defer func() {
+						if t.Failed() {
+							diagnose()
+						}
+					}()
 					var sources []installedProfileComparisonSource
 					for index := 0; index < 2; index++ {
 						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {

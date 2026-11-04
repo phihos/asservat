@@ -202,6 +202,7 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal("second source current SQL fence omitted", kind)
 		}
 	}
+	qualifyProfileComparisonNativeSources(t, f, ledger, q, request, authority)
 	workers, e := postgres.NewProjectionWorkers(ledger, f.workerProfile)
 	if e != nil {
 		t.Fatal(e)
@@ -289,6 +290,11 @@ func qualifyProfileComparisonQueries(t *testing.T, f *queryLedgerFixture) {
 	}
 	if e = ledger.CompleteReadBatch(ctx, batch, querySQLClosed{batch}); e != nil {
 		t.Fatal("paired batch closes only after outcome", e)
+	}
+	progress, e := installedProfileComparisonProgress(ctx, admin, root, q.OperationID)
+	var progressFields map[string]any
+	if e != nil || len(progress) > 1024 || json.Unmarshal([]byte(progress), &progressFields) != nil || len(progressFields) != 11 || progressFields["key_children"] != float64(2) || progressFields["batch_claimed"] != true || progressFields["native_operation_recorded"] != true || progressFields["native_closed"] != true {
+		t.Fatal("content-free operator progress observation", e)
 	}
 	qualifyComparisonCrossAllocationSQL(t, f, q, authority, invocation)
 	refuseRetainedComparisonDowngrade(t, f)

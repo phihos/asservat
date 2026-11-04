@@ -32,94 +32,80 @@ There is no claim of last-worker capacity refund. Reports are retained in
 `test/results/syscall-native-41712526480/` and
 `test/results/syscall-native-41712531115/`. Original failed reports remain below.
 
-The next outcome is two-source `compare_profiles` under REQ-PRF-005 / SC-PRF-005.
-The integration candidate is `feature/profile-comparison` in
-`/home/phil/Projekte/asservat-profile-comparison`, based on main `d9e0bcd1`.
-Paired ordinary authority and exact plans are implemented locally, retaining both
-original cutoffs and one principal-account proposal. The internal service admits
-one compound query; typed semantic refusals retain the charged delivery through
-audit acknowledgement and joined close. Public composed tests pass for distinct
-sources, identical-artifact roles, pending/poll results, changed input, failed
-audit acknowledgement and uncertain close (presentation race: 56.429s; contract:
-1.461s; bootstrap: 4.582s). These are local component results, not SQL/installed
-qualification. Reports are in `test/results/profile-comparison-service/`.
+The active outcome is two-source `compare_profiles` under REQ-PRF-005 /
+SC-PRF-005 (ADR-295). PR152 remains unmerged. Its integration worktree is
+`/home/phil/Projekte/asservat-profile-comparison`, branch
+`feature/profile-comparison`, based on main `d9e0bcd1`. Exact CI41744343580
+passed on the preceding candidate `b3507934`; the latest runtime/test changes
+still need exact-current CI and installed qualification.
 
-The measured heavy two-source encrypted parser peaked at 252.363 MiB RSS in
-1.202s, with synthetic key providers and no cgroup/whole-worker qualification.
-ADR-295 therefore selects a provisional comparison-only 384 MiB physical and
-transient floor. The new installer uses 384 MiB for the shared worker profile
-and query transient budget (+128 MiB per active worker); legacy accepted profiles
-and the summary admission floor remain unchanged.
-SQL133 atomic two-workload accounting and independent key children, complete
-native worker/public composition and the React baseline selection are locally
-implemented. The console can explicitly load an earlier evidence case through
-current `get_case` metadata and compare its selected profile; lookup never
-creates a native download. Nine focused console files passed 145 tests, with
-a subsequent 46-test cross-case/link check and type checking. Native TLS
-comparison/mismatch, full command bounds and six remote child-role requests
-pass focused races; these component providers do not establish SQL/key authority. The repository pre-push gate passed, including 416 console tests and 69-package /
-433-edge architecture checks. The final sequential real-service gate on
-`4bf33ee0` passed: comparison suite 12.864s; legacy summary/producer and SQL133
-upgrade/rollback suite 16.619s. Both 4,009-file source inventories independently
-match the current files, with no changes during either run and cleanup failures
-`[]`. Reports are retained in `test/results/profile-comparison-service/`.
-The pair fixture uses the compiled hub-runtime grants. It proves real C3/C7,
-20-unit same-artifact admission/replay, two key children/six SQL role spends,
-second-source fences and a worker reservation. Cross-workload 10+10 atomicity,
-second-budget refusal and both-workload capacity use a real second enrollment
-with an explicitly synthetic unpublished route. C14 ownership is synthetic;
-these SQL masks are not mTLS unwrap or installed-worker evidence.
+The implementation independently authorizes both immutable sources, aggregates
+complete cumulative function values before top-N ranking, and retains one paid
+owner through semantic/size refusals and joined closure. SQL133 atomically
+charges20 units, covers both workloads with one worker and retains two distinct
+three-role key children. The console explicitly selects a baseline, including
+an earlier authorized case. New installations declare384MiB physical/transient
+shared workers (+128MiB per active worker), with500mCPU unchanged; old accepted
+profiles remain usable for their qualified operations. The heavy local parser
+probe peaked at252.363MiB RSS in1.202s with synthetic key providers. That is not
+maximum-input VM/cgroup or whole-worker qualification.
 
-The original failed reports remain archived. Fixes covered SQL expression and
-rollback ordering, fresh databases for protected root fixtures, real process
-grant coverage (one new baseline-allocation INSERT column), and joined SQL role
-cleanup. The schema133 installation handover also passed in a fresh owned cluster
-(147.876s), with 4,061 independently matched source hashes and complete cleanup.
-This is bootstrap/schema authority qualification, not installed comparison.
-Reviewed exact CI and the prepared native two-capture browser/MCP journey are
-next.
-Final independent boundary review reproduced a large-result refusal losing its
-native/public owner. The fix distinguishes authenticated output overflow from
-parser/input limits and preserves the exact paid refusal through native version
-wrapping, audit acknowledgement and joined close. Focused races passed across
-parser, reader, encrypted adapter and native transport; C18/C20 direct/poll,
-failed-audit and unknown-close comparisons passed in 1.073s / 23.349s. Original
-red reports remain archived. Native comparison qualification is still pending.
-PR152 is open. The first native dispatch (41737480379, frozen75567e10)
-stopped before bootstrap: the Python harness supplied two clusters while the
-Go consumer expected three for the new focus. Go exited1 in0.020s; all4,064
-source hashes matched the frozen tree, cleanup was complete and build scratch
-was removed. It collected no profile and qualifies no comparison behavior.
-The shared profile-focus registration and actual consumer preflight are now
-fixed (red reproduced; focused race3.595s passed). The same already-required
-pinned builder is prefetched for this suite, overlapping its observed20s serial
-pull without adding an image or changing20m/18m limits. Original reports remain
-in `test/results/profile-comparison-native-41737480379/`.
-CI41740242503 caught one stale parser-test assertion after the reviewed output-size
-refusal change: oversized valid output now returns `ErrRecordTooLarge`, while
-unsafe arithmetic retains `artifact.ErrLimit`. The old assertion failed locally;
-its corrected exclusive error check and the full diagnostics race package pass
-(14.419s). This changes only a test assertion; the frozen native candidate
-`ddddfd90` and production sources remain unchanged. Original red/green and CI
-logs are retained in `test/results/profile-comparison-service/`.
-The second frozen native run41740409366 exited1 in699.891s before either
-profile capture: the capacity root never became ready. All4,064 source hashes
-independently match `ddddfd90`; sources were unchanged, cleanup failures are
-`[]` and build scratch was removed. Raising the synthetic fixture from10 to40
-records/account also raised its capture/query history reservation:10,752
-capture/system objects plus8,960 query objects exceed its fixed10,000-object
-system reserve. Required bytes remain below8GiB. The fixture fix reallocates
-its existing100,000-object pool to20,000 system /30,000 shared-burst objects
-for this focus only. The preflight uses actual account/record/object inputs and
-production pool/root/query compilers, retaining synthetic other cost dimensions;
-it reproduces the original refusal and passes the corrected combined19,712-object
-reservation (focused race3.254s; vet and spec-check pass). No production capacity
-limit is relaxed. CI41742136578 passed on the preceding test-corrected `9ac44e0a`. Original reports are in
-`test/results/profile-comparison-native-41740409366/`.
-No comparison requirement or installed result is marked complete. The argument job's cold-start/teardown
-headroom also needs improvement before later installed campaigns. No timeout was
-raised. These saved-view fixtures do not complete arbitrary `syscall_query`,
-grouped/ongoing arguments, a wider kernel matrix or a supported release.
+Local verification:
+
+- `make profile-preflight` and `make pre-push` pass on the latest composition,
+  including416 console tests, Go architecture/contracts, SQL generation,
+  specification, Helm and vet checks. Native React fixture compilation/races
+  pass2.379s; JavaScript syntax and the existing aborted-response helper pass.
+- Fresh SQL/S3 paired-source/ledger qualification passes13.506s, with harness
+  exit0,4,015 independently matching hashes, unchanged sources and cleanup `[]`.
+  It exercises the production paired-source constructor, current second-source
+  fences, atomic same/distinct-workload charging and the compiled hub-runtime
+  grant. C14 ownership/key-role writes in that fixture remain explicitly
+  synthetic; actual worker enrollment/native key binding are not qualified there.
+- A composed real-runtime orchestration test reproduced a separate original
+  caller-cutoff bug. Three added lines bound serialized `NativeOperation.Until`
+  by the original caller deadline. Paired/scalar/claim/current/result/closure
+  races pass (evidence1.041s, native1.137s); downstream original-bound and
+  cancellation races also pass. Authority/transport ports in those tests are
+  synthetic. This does not establish the hosted503 cause.
+- Earlier SQL133 upgrade/rollback, legacy summary/producer, schema133 initial
+  handover (147.876s;4,061 matching hashes), and synthetic built-console browser
+  checks remain scoped evidence in `test/results/profile-comparison-service/`.
+
+Installed attempts, with original reports retained:
+
+- Native41737480379, frozen75567e10: Go exit1 in0.020s before bootstrap; the new
+  focus expected three clusters instead of the harness's two. The reproduced
+  consumer registration mismatch was fixed.
+- Native41740409366, frozen`ddddfd90`: Go exit1 in699.891s before collection;
+  the40-record fixture required10,752 capture/system plus8,960 query objects
+  against10,000 system objects. The comparison focus now reallocates its fixed
+  pool to20,000 system/30,000 shared-burst objects, with100,000 total and all
+  bytes unchanged. Production compiler preflight preserves the original refusal.
+- Native41744342117, frozen`b3507934`: Go exit1 in835.356s. Capacity became
+  ready; two CPU captures (1,174/1,081 native bytes,9/10 samples) passed complete
+  authenticated download and offline pprof opening. The first cross-case
+  comparison admitted20 units and bound one worker; one poll was pending, then
+  HTTP503, with an active batch and no committed key children. No query-time
+  SQL error was logged. All4,065 hashes match; sources were unchanged, cleanup
+  was `[]` and scratch was removed. The failing runtime stage remains unproven.
+
+The next selected native run keeps the first read-only MCP comparison and uses
+actual installed React for the second, same-artifact20-unit query. It adds no
+capture/query/worker charge. Comparison no longer repeats the manual suite's
+two deliberate120-second preview-expiry waits or repeat previews; the manual
+focus retains those proofs. Installed time savings are unmeasured. Failure-only
+process/Pod diagnostics and content-free worker/batch progress expose the
+missing stage. The20-minute job/18-minute Go limits stay unchanged.
+
+A preceding local SQL attempt passed its Go assertions17.332s but the harness
+correctly exited1 after a late unit-test edit invalidated the source freeze;
+that report is retained and is not clean qualification. All writers must finish
+or acknowledge a freeze before external qualification.
+
+No complete comparison requirement, S-05 slice or supported release is claimed.
+Actual React success, the hosted runtime failure, maximum-input containment,
+broader native negative cases and the remaining specification remain open.
 
 ### Earlier checkpoints
 

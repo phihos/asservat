@@ -67,6 +67,12 @@ func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code str
 	return reply.Status == "error" && code == "NotAvailable" && json.Unmarshal(reply.Data, &failure) == nil && failure.Code == code && failure.Retryable
 }
 
+// The ordinary manual focuses qualify submission after preview expiry. The
+// comparison focus reuses that capture path twice to qualify saved analysis.
+func installedApprovedRecordingExpiryProof(focus string) bool {
+	return focus != "profile-comparison"
+}
+
 // approvedRecordingArguments is the actual public request, validated offline
 // before the expensive installed qualification. It is never authority.
 func approvedRecordingArguments(cluster, namespace, workload string) map[string]any {
@@ -536,14 +542,17 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if code := browserCall(browser, "request_capture", original, nil); code != "NotAvailable" && code != "ReviewChanged" {
 		t.Fatal("public predictable key transferred requester intent to reviewer", code)
 	}
-	waitStarted := time.Now()
-	if err := installedJourneyPause(ctx, time.Until(preview.Expires.Add(20*time.Millisecond))); err != nil {
-		t.Fatal(err)
+	var realWait time.Duration
+	if installedApprovedRecordingExpiryProof(installedJourneyFocus()) {
+		waitStarted := time.Now()
+		if err := installedJourneyPause(ctx, time.Until(preview.Expires.Add(20*time.Millisecond))); err != nil {
+			t.Fatal(err)
+		}
+		if !time.Now().After(preview.Expires) {
+			t.Fatal("real preview has not expired")
+		}
+		realWait = time.Since(waitStarted)
 	}
-	if !time.Now().After(preview.Expires) {
-		t.Fatal("real preview has not expired")
-	}
-	realWait := time.Since(waitStarted)
 	// Ordinary approved HTTP traffic uses the exact selected Pod proxy.
 	// The paced branch below uses its owned node directly to that same Pod.
 	cfg, err := clientcmd.BuildConfigFromFlags("", regionalConfig)
@@ -913,7 +922,6 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	if installedProfileFocus() {
 		qualifyManualProfileNative(t, ctx, native, receipt.CaptureID)
-		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
 		if installedJourneyFocus() == "profile-comparison" {
 			retirement, err := finishInstalledSyscallNativeDownload(downloadID, invoke, stoppedDownload)
 			if err != nil {
@@ -922,6 +930,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			profileCapture[0].Captured(transport, installedProfileComparisonSource{CaseID: progress.CaseID, ArtifactID: evidence.Artifacts[0].ID, Version: evidence.Artifacts[0].Digest, Native: native, Expires: evidence.Artifacts[0].Expires, Retirement: retirement})
 			return
 		}
+		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
 		qualifyInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, native, evidence.Artifacts[0].Expires, summaryCheck)
 		qualifyManualRecorderStop(t, ctx, "profile", manualProfileStopArguments(cluster, namespace, workload), read, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)

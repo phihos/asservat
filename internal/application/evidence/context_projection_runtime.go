@@ -144,6 +144,9 @@ func (s *ProjectionRuntime) ReadProjection(ctx context.Context, q query.ContextQ
 		return nil, query.ErrUnavailable
 	}
 	until := identity.Earlier(start.Batch.Until, identity.Earlier(a.ValidUntil, q.ProviderUntil))
+	if deadline, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, deadline)
+	}
 	call, stop := context.WithDeadline(ctx, until)
 	fail := true
 	defer func() {

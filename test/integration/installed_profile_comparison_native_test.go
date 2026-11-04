@@ -83,18 +83,6 @@ func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identi
 		t.Fatal(err)
 	}
 	browser := identity.consoleSession(t, ctx, cert, address, origin)
-	browserCall := func(name string, args any) installedComparisonReply {
-		t.Helper()
-		started := time.Now()
-		// This helper uses the real HttpOnly session, exact Origin and CSRF,
-		// validates the same canonical wire body, and never sends a bearer.
-		reply, status, err := browser.operation(ctx, name, args, "")
-		if err != nil || status != http.StatusOK {
-			t.Fatal("browser comparison operation outcome unknown; no replay", name, status, err)
-		}
-		t.Logf("installed browser comparison %s status=%s elapsed=%s", name, reply.Status, time.Since(started))
-		return installedComparisonReply{reply}
-	}
 	// Existing two-worker cohort bookkeeping only defers independent terminal
 	// reads; each RPC/result is joined before the next query. Charges stay spent.
 	proofs := &installedSyscallProofCohort{}
@@ -102,9 +90,6 @@ func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identi
 	for index, pair := range [2][2]installedProfileComparisonSource{sources, {sources[1], sources[1]}} {
 		verify := check(pair)
 		call := mcpCall
-		if index == 1 {
-			call = browserCall
-		}
 		if index == 0 {
 			denied := call("prepare_artifact_download", map[string]string{"artifact_id": pair[1].ArtifactID, "idempotency_key": "comparison-read-only-denied-" + pair[1].ArtifactID})
 			if denied.Status != "error" {
@@ -112,12 +97,30 @@ func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identi
 			}
 			verify("", "")
 		}
+		operation, handle := "", ""
+		// Retain early locators before browser response/render validation, so
+		// failures still attempt independent known query/key/worker inspection.
+		proofs.add(t, func() func() { return verify(handle, operation) })
+		var finishBrowser func()
+		if index == 1 {
+			call, finishBrowser = installedProfileComparisonBrowser(t, ctx, browser, address, pair[1], func(reply installedComparisonReply) {
+				if operation == "" {
+					operation = reply.RequestID
+				}
+				if handle == "" && reply.Status == "pending" {
+					var pending struct {
+						Handle string `json:"query_handle"`
+					}
+					if json.Unmarshal(reply.Data, &pending) == nil {
+						handle = pending.Handle
+					}
+				}
+			})
+			defer finishBrowser()
+		}
 		selection := query.ProfileComparisonSelection{SampleType: "cpu", Normalization: query.ProfileComparisonRate, TopN: 20}
 		result := call("compare_profiles", map[string]any{"case_id": pair[1].CaseID, "artifact_id": pair[1].ArtifactID, "baseline_case_id": pair[0].CaseID, "baseline_artifact_id": pair[0].ArtifactID, "sample_type": "cpu", "normalization": "perSecond", "top_n": 20})
-		operation, handle := result.RequestID, ""
-		// Register before interpreting content: even a failing assertion still
-		// attempts exact known query SQL/key/worker terminal inspection.
-		proofs.add(t, func() func() { return verify(handle, operation) })
+		operation = result.RequestID
 		if index == 0 {
 			for _, source := range sources {
 				source.Retirement()
@@ -219,13 +222,14 @@ func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identi
 					t.Fatal("same-artifact comparison changed values")
 				}
 			}
+			finishBrowser()
 		}
 	}
 	proofs.flush(t)
 	if proofs.queries != installedProfileComparisonQueries || proofs.joined != installedProfileComparisonQueries {
 		t.Fatal("comparison terminal proof count", proofs.queries, proofs.joined)
 	}
-	t.Log("installed profile comparison: two independent cross-case native captures, distinct and same-artifact rate comparisons, ordinary read-only MCP OAuth plus real browser-session HTTP/Origin/CSRF parity, exact role/version provenance, independent full native cumulative aggregation, two joined one-worker/six-key batches and original download positive retirement; final terminal workers remain fully charged pending normal later cleanup demand")
+	t.Log("installed profile comparison: two independent cross-case native captures, distinct comparison through ordinary read-only MCP OAuth and same-artifact comparison through actual installed React with the original HttpOnly session/Origin/CSRF, rendered function rows, exact role/version provenance, independent full native cumulative aggregation, two joined one-worker/six-key batches and original download positive retirement; final terminal workers remain fully charged pending normal later cleanup demand")
 }
 
 // A separate fixture calculation: parse the downloaded originals, accumulate
