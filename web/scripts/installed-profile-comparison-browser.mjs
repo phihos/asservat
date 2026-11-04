@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
 import { readInstalledHistoryResponse, parseInstalledHistoryText } from './installed-history-response.mjs';
 import { validOutput_get_case } from '../src/generated/validate-evidence.js';
+import { checkInstalledProfileCaseRefreshes } from './installed-profile-case-proof.mjs';
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
 async function command() {
@@ -31,6 +32,7 @@ let stage = 'session';
 let complete = false;
 let page;
 let caseDiagnostic;
+let attachmentDiagnostic;
 const errors = [];
 const timeline = [];
 const started = Date.now();
@@ -46,7 +48,7 @@ try {
     window.fetch = async (input, init) => {
       const response = await original(input, init);
       const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
-      if (/^\/api\/v1\/operations\/(get_case|compare_profiles|get_profile_summary|get_query_result|prepare_artifact_download|get_artifact_download)$/.test(path) && response.status === 200) {
+      if ((path === '/auth/refresh' || /^\/api\/v1\/operations\/(get_case|compare_profiles|get_profile_summary|get_query_result|prepare_artifact_download|get_artifact_download)$/.test(path)) && response.status === 200) {
         const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
         response.clone().text().then(text => { if (text.length <= 32_768) replies.set(key, text); }, () => {});
       }
@@ -75,6 +77,27 @@ try {
     const path = new URL(request.url()).pathname;
     if (path.startsWith('/api/')) timeline.push(`+${Date.now() - started}ms failed ${/^net::ERR_[A-Z_]+$/.exec(request.failure()?.errorText ?? '')?.[0] ?? 'other'} ${path}`);
   });
+  const responseReads = new WeakMap();
+  async function readResponse(response, path) {
+    if (responseReads.has(response)) return responseReads.get(response);
+    let read = await readInstalledHistoryResponse(response);
+    let pageConsumed = false;
+    if (read.requestFailed && read.readFailure.includes('ERR_ABORTED') && response.status() === 200) {
+      const key = path + '\n' + (response.request().postData() ?? '');
+      let text = null;
+      for (const until = Date.now() + 2000; Date.now() < until;) {
+        text = await page.evaluate(k => { const value = window.__installedReplies.get(k) ?? null; window.__installedReplies.delete(k); return value; }, key);
+        if (text !== null) break;
+        await page.waitForTimeout(100);
+      }
+      if (text === null) return { read, pageConsumed, superseded: true }; // No extra fetch or replay.
+      read = parseInstalledHistoryText(200, text);
+      pageConsumed = true;
+    }
+    const value = { read, pageConsumed };
+    responseReads.set(response, value);
+    return value;
+  }
   async function observed(name, from) {
     const names = Array.isArray(name) ? name : [name];
     for (let index = from, end = Date.now() + 30_000; Date.now() < end;) {
@@ -83,20 +106,8 @@ try {
       const path = new URL(response.url()).pathname;
       const operationName = path.split('/').at(-1);
       if (!names.includes(operationName)) continue;
-      let read = await readInstalledHistoryResponse(response);
-      let pageConsumed = false;
-      if (read.requestFailed && read.readFailure.includes('ERR_ABORTED') && response.status() === 200) {
-        const key = path + '\n' + (response.request().postData() ?? '');
-        let text = null;
-        for (const until = Date.now() + 2000; Date.now() < until;) {
-          text = await page.evaluate(k => { const value = window.__installedReplies.get(k) ?? null; window.__installedReplies.delete(k); return value; }, key);
-          if (text !== null) break;
-          await page.waitForTimeout(100);
-        }
-        if (text === null) continue; // Superseded before consumption, no replay.
-        read = parseInstalledHistoryText(200, text);
-        pageConsumed = true;
-      }
+      const { read, pageConsumed, superseded } = await readResponse(response, path);
+      if (superseded) continue; // Original observer skips a page-superseded reply.
       if (name === 'get_case') {
         const reply = read.reply;
         const artifacts = Array.isArray(reply?.data?.artifacts) ? reply.data.artifacts : [];
@@ -253,15 +264,22 @@ try {
       }
       const ready = response.reply.data;
       assert.equal(ready.content_path, '/api/v1/downloads/' + original + '/content');
-      stage = 'heap-native-attachment';
+      stage = 'heap-native-link';
       const link = page.getByRole('link', { name: 'Download native file', exact: true });
       await expect(link).toHaveAttribute('href', ready.content_path);
       const downloadEvent = page.waitForEvent('download');
       await link.click();
       const download = await downloadEvent;
+      attachmentDiagnostic = { urlMatch: download.url() === config.origin + ready.content_path, filenameMatch: download.suggestedFilename() === 'artifact-' + config.artifactID + '.pb.gz', body: 'pending' };
+      stage = 'heap-native-attachment-url';
       assert.equal(download.url(), config.origin + ready.content_path);
+      stage = 'heap-native-attachment-filename';
       assert.equal(download.suggestedFilename(), 'artifact-' + config.artifactID + '.pb.gz');
-      assert.equal(await download.failure(), null, 'native browser attachment completion');
+      stage = 'heap-native-attachment-body';
+      const failure = await download.failure();
+      attachmentDiagnostic.body = failure === null ? 'complete' : 'failed';
+      assert.equal(failure, null, 'native browser attachment completion');
+      stage = 'heap-native-attachment-save';
       await download.saveAs(config.nativeDestination);
       nativeCompleted = true;
       event({ kind: 'native', file: 'heap-native.pb.gz', filename: download.suggestedFilename() });
@@ -269,7 +287,23 @@ try {
     }
     if (next.kind === 'close') {
       assert(terminal && compareRequests === 1 && pollRequests <= 4, 'exact original query count');
-      assert.equal(caseRequests, 1, 'no extra timing metadata read');
+      stage = 'case-current-refresh';
+      const observations = [];
+      for (const response of seen) {
+        const path = new URL(response.url()).pathname;
+        if (path === '/auth/refresh' && response.status() === 200 || path === '/api/v1/operations/get_case') {
+          const { read } = await readResponse(response, path);
+          assert.equal(read.http, 200, 'current metadata/session HTTP response');
+          assert.equal(response.request().method(), 'POST', 'existing same-origin session/case POST');
+          assert.equal(await response.request().headerValue('origin'), config.origin);
+          assert(/^[A-Za-z0-9_-]{43}$/.test(await response.request().headerValue('x-csrf-token') ?? ''), 'original CSRF transport');
+          assert.equal(await response.request().headerValue('authorization'), null);
+          if (path === '/api/v1/operations/get_case') assert.equal(JSON.parse(response.request().postData()).case_id, config.caseID);
+          observations.push({ kind: path === '/auth/refresh' ? 'session' : 'case', reply: read.reply });
+        }
+      }
+      assert.equal(checkInstalledProfileCaseRefreshes({ heap, caseID: config.caseID, artifactID: config.artifactID, observations }), caseRequests, 'all actual case reads verified');
+      process.stderr.write(`installed profile current metadata reads=${caseRequests}; same-human refresh/source/timing pins checked\n`);
       await expect(timing).toBeVisible();
       if (heap) {
         assert(heapSummaryChecked && nativeCompleted, 'rendered summary and native download before joined close');
@@ -348,7 +382,7 @@ try {
     alerts: Math.min(8, await page.getByRole('alert').count()), pageErrors: Math.min(8, errors.length),
     refresh: await page.getByRole('button', { name: 'Check evidence access', exact: true }).count() > 0,
   } : {};
-  process.stderr.write(`installed comparison failure stage=${stage} category=${category} dom=${JSON.stringify(dom)}\n` + timeline.slice(-40).join('\n') + '\n');
+  process.stderr.write(`installed comparison failure stage=${stage} category=${category} dom=${JSON.stringify(dom)} attachment=${JSON.stringify(attachmentDiagnostic ?? null)}\n` + timeline.slice(-40).join('\n') + '\n');
   process.exitCode = 1;
 } finally {
   await context.close();
