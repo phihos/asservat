@@ -1093,7 +1093,11 @@ func installedPodDiagnostics(t *testing.T, c context.Context, api kubernetes.Int
 			if x := s.LastTerminationState.Terminated; x != nil {
 				reason, exit = x.Reason, x.ExitCode
 			}
-			t.Logf("diagnostics: %s pod %s container %s ready %v restarts %d last %q exit %d", name, pod.Name, s.Name, s.Ready, s.RestartCount, reason, exit)
+			currentTermination := "unobserved"
+			if x := s.State.Terminated; x != nil {
+				currentTermination = fmt.Sprintf("reason=%q exit=%d", x.Reason, x.ExitCode)
+			}
+			t.Logf("diagnostics: %s pod %s container %s ready %v restarts %d last %q exit %d current termination %s", name, pod.Name, s.Name, s.Ready, s.RestartCount, reason, exit, currentTermination)
 			for _, previous := range []bool{true, false} {
 				logs, e := api.CoreV1().Pods(namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: s.Name, Previous: previous, Timestamps: true, TailLines: ptr.To(int64(400)), LimitBytes: ptr.To(int64(65536))}).DoRaw(c)
 				if e == nil && len(logs) > 0 {
