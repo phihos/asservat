@@ -2,7 +2,9 @@
 
 ## Current shared profile candidate (2026-11-04)
 
-The next PR162 candidate incorporates the measured Repeat phase fix. Previous
+The published PR162 candidate `c2d4f74b` incorporates the measured Repeat phase fix.
+Required pull-request CI41891225797 passed every job, including `ci-ok`.
+Previous
 `1cba8f74` passed genuine pull-request CI41879540541 and
 [installed heap41879673486](../test/results/heap-browser-native-41879673486/README.md)
 (Go/harness0,587.634s): actual React summary, ten-unit/three-role SQL proof,
@@ -44,8 +46,27 @@ full-browser/service gates passed at8cde9451. Browser passed70.715s with28journe
 all4,077 submitted Git blobs with unchanged sources, clean cleanup and no owned
 containers left. Original reports and output readbacks are in
 [profile-repeat-phase-final-local](../test/results/profile-repeat-phase-final-local/README.md).
-New pushed-head CI and fresh heap/trace qualification remain required. TLS is a
-parked unpublished follow-up; full S-05/specification completion remains open.
+Fresh [heap41891716697 attempt2](../test/results/heap-browser-native-41891716697/README.md)
+passed at `c2d4f74b` (Go/harness0,601.602s): actual React summary, ten-unit/three-key
+SQL proof, authenticated903B native/localpprof and fresh Repeat5.228s. Attempt1
+failed the runner's4GiB build-scratch precheck before Go or source inventory;
+the one failed-job infrastructure retry is recorded separately.
+
+[Trace41891721966](../test/results/runtime-trace-native-41891721966/README.md)
+failed at the same head (Go/harness1,532.931s). Capture, semantic summary refusal,
+authenticated81,056B native download and offline Go trace parsing passed; Repeat
+waited7.875s before refusing. The first storage demand expired after3.97s at
+`claim/post` under the original owner-candidates cutoff19:07:53.173336Z. A later
+demand succeeded0.770s after preview refusal. All4,136 submitted sources in each
+product run matched Git; unchanged-source, scratch-removal and cleanup checks
+passed. This is an incomplete installed trace workflow, so PR162 remains open.
+
+The next focused investigation is the discovery/initial-SQL deadline carried
+through both the direct owner client and actual receiving server. Preserve the
+original five-second observation request and native-proof intervals; reproduce
+the boundary before changing phase ownership. No further preview-timeout
+increase or native rerun is planned without that evidence. TLS is a private,
+locally checked follow-up; full S-05/specification completion remains open.
 Earlier checkpoints follow.
 
 ## Latest comparison qualification (2026-11-04)
