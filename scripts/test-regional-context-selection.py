@@ -179,13 +179,18 @@ class RegionalContextSelection(unittest.TestCase):
 
     def test_heap_summary_precedes_authorized_native_preparation(self):
         source = (Path(__file__).resolve().parents[1]/"test/integration/installed_approved_recording_native_test.go").read_text()
-        joined = source.index('heap phase: read-only summary completed with joined SQL worker/key proof')
-        preparing = source.index('heap phase: separately authorized native preparation begins')
-        prepare_call = source.index('\n\tprepareDownload()', preparing)
-        self.assertLess(source.index('heapSummary = queryInstalledProfileSummary('), joined)
+        check = source.index('verify := summaryCheck(row.ID)')
+        browser = source.index('call, downloadNative, finishBrowser := installedProfileBrowser(', check)
+        summary = source.index('heapSummary := queryInstalledProfileSummary(', browser)
+        joined = source.index('heap phase: installed React summary completed with joined SQL worker/key proof', summary)
+        preparing = source.index('heap phase: separately authorized browser native preparation begins', joined)
+        native = source.index('native, _ := downloadNative()', preparing)
+        self.assertLess(check, browser)
+        self.assertLess(browser, summary)
+        self.assertLess(summary, joined)
         self.assertLess(joined, preparing)
-        self.assertLess(preparing, prepare_call)
-        self.assertLess(prepare_call, source.index('installedProfileSummaryMatchesNative(heapSummary, native'))
+        self.assertLess(preparing, native)
+        self.assertLess(native, source.index('installedProfileSummaryMatchesNative(heapSummary, native', native))
 
     def test_parent_recording_focus_returns_before_third_cluster(self):
         # Bind the actual parent control flow, not merely its inner journey's
