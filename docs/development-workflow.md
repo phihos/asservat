@@ -57,6 +57,28 @@ candidate, checks, next blocker. Retain original reports and consequential ADRs;
 avoid new checkpoint essays for routine fixes. Reuse evidence only when its
 relevant sources and environment are unchanged, and state its scope.
 
+## Required PR check events
+
+Before treating a green `ci-ok` as satisfying the PR rule, read back its event,
+head and conclusion, for example with
+`gh run view RUN_ID --json event,headSha,conclusion`. GitHub evaluates required
+workflow-job checks only from eligible events, including `pull_request` and
+`push`; a successful `workflow_dispatch` on the same head does not fulfill the
+PR ruleset. See [GitHub's required-check event documentation](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated).
+
+If an incident leaves the PR without its eligible run, preserve the qualified
+head and verify the missing event before spending another full matrix on manual
+CI. Retrigger the existing PR once by closing and reopening it without a source
+change, then verify the actual PR run. Record manual CI as code validation,
+separately from required-check and merge readback. Native qualification uses
+`workflow_dispatch` intentionally and remains unchanged. This changes no
+workflow, ruleset, required check or gate.
+
+PR160 demonstrates the distinction: manual CI41818290363 passed with
+`workflow_dispatch`; required PR CI41821140504 passed with `pull_request` on the
+same `80593f93` head. The normal merge `5b765322` has the identical complete tree,
+so its native qualification remains applicable without another installed run.
+
 ## Retained debugging environments
 
 The context harness already supports `--keep-on-failure`; use it for an owned
