@@ -2,6 +2,8 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/netip"
 	"sync"
@@ -12,6 +14,70 @@ import (
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/execution"
 )
+
+func TestNodeProfilePreservesKnownUnavailableAndBusyWithoutRetry(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		failure error
+		want    collector.Reason
+	}{
+		{"unavailable", execution.ErrProfileUnavailable, collector.Reason("ProfileUnavailable")},
+		{"wrapped-unavailable", fmt.Errorf("acquisition: %w", execution.ErrProfileUnavailable), collector.Reason("ProfileUnavailable")},
+		{"busy", execution.ErrProfilerBusy, collector.ReasonCaptureBusy},
+		{"generic", errors.New("unknown acquisition failure"), collector.ReasonCaptureFailed},
+		{"same-text", errors.New(execution.ErrProfileUnavailable.Error()), collector.ReasonCaptureFailed},
+		{"cancelled", context.Canceled, collector.ReasonCaptureFailed},
+		{"limit", execution.ErrProfileLimit, collector.ReasonCaptureFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, q, reader, e, _, now := profileHolderFixture(t)
+			p := collector.ProfileCapture{CaptureID: e.CaptureUID, CollectorEpoch: q.node.Epoch, ExpectationDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AddressMode: reader.plan.AddressMode, Address: reader.plan.RouteIP, Port: reader.plan.Port, Host: "localhost", Request: execution.GoProfileRequest{Binding: e.Binding(), Pin: reader.plan.Pin, NodeUID: q.node.NodeUID, NodeBootID: q.node.BootID, SourceRef: "pprof", EndpointDigest: e.Profile.EndpointDigest, Parameters: reader.plan.Parameters, NativeLimit: 16 << 20, NotBefore: now, Deadline: now.Add(5 * time.Second)}}
+			w := collector.Work{ID: e.CaptureUID, Sequence: 1, Kind: collector.WorkProfileCapture, NotAfter: now.Add(time.Second), Profile: &p}
+			budget, err := collector.NewBudget(collector.Ceilings{FrozenBytes: 32 << 20, UploadBytesPerSecond: 1 << 20, UploadBurstBytes: 1 << 20}, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var mu sync.Mutex
+			calls, uploads := 0, 0
+			var result collector.ProfileResult
+			n := &nodeProfiles{identity: func() collector.Identity { return q.node }, now: func() time.Time { return now }, budget: func() *collector.Budget { return budget }, budgetMu: &mu,
+				acquire: func(context.Context, collector.ProfileCapture, io.Writer) (execution.GoProfileOutcome, error) {
+					calls++
+					return execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: now, MayHaveStarted: true}, tc.failure
+				},
+				upload: func(_ context.Context, _ string, r collector.ProfileResult, body io.Reader) error {
+					uploads++
+					result = r
+					b, err := io.ReadAll(body)
+					if err != nil || len(b) != 0 {
+						t.Error("refusal delivered native bytes", err)
+					}
+					return nil
+				}}
+			if r := n.start(t.Context(), q.node.Epoch, w); r.Outcome != collector.OutcomeAccepted {
+				t.Fatal(r)
+			}
+			n.wg.Wait()
+			if result.Failure != tc.want || !result.Valid() || result.Outcome.ResponseComplete || result.Outcome.NativeBytes != 0 || !result.Outcome.MayHaveStarted {
+				t.Fatal("typed refusal or uncertainty lost", result)
+			}
+			mu.Lock()
+			held := n.running[p.Request.Pin.UID]
+			usage := budget.Usage(now)
+			mu.Unlock()
+			if !held.uncertainUntil.Equal(p.Request.Deadline) || usage.FrozenReserved != 0 {
+				t.Fatal("refusal changed original uncertain lifetime or leaked joined memory", held, usage)
+			}
+			if r := n.start(t.Context(), q.node.Epoch, w); r.Outcome == collector.OutcomeAccepted {
+				t.Fatal("refused acquisition replayed")
+			}
+			n.wg.Wait()
+			if calls != 1 || uploads != 1 {
+				t.Fatal("refusal retried", calls, uploads)
+			}
+		})
+	}
+}
 
 func TestNodeProfileOwnsBudgetAndRejectsReplay(t *testing.T) {
 	const id = "00000000-0000-4000-8000-000000000001"

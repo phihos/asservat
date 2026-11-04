@@ -256,3 +256,13 @@ is HTTP acquisition, with UTC microsecond display precision and unknown
 cross-source clock uncertainty/process attribution. It adds no object/key reads
 or raw authority to case lookup; legacy records remain unknown. Qualification is
 tracked in [implementation progress](../implementation-progress.md).
+
+## Explicit refused acquisitions (ADR-298)
+
+The existing diagnostics `ErrProfileUnavailable` and `ErrProfilerBusy` observations
+remain distinct through node results, regional terminal completion and SQL/public
+progress. Missing or disabled endpoints report `Failed` / `ProfileUnavailable`;
+application-owned conflicts report `Failed` / `ProfilerBusy`. These terminal
+outcomes create no evidence, replacement target, automatic retry or refund.
+Only the application owner may stop its profiler. Qualification is pending in
+[ADR-298](../decisions/298-explicit-go-profile-refusals.md).

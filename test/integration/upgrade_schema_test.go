@@ -138,7 +138,12 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	}
 	var originalAcquisitionGuard, originalAcquisitionShape string
 	const acquisitionShape = `SELECT jsonb_build_object('columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.ordinal_position) FROM (SELECT column_name,ordinal_position,is_nullable,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='context_verification') c),'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY conname) FROM pg_constraint WHERE conrelid='context_verification'::regclass))::text`
-	if head == 134 {
+	if head == 134 || head == 135 {
+		if head == 135 {
+			if _, e = p.DownTo(ctx, 133); e != nil {
+				t.Fatal("capture pre134 verification guard", e)
+			}
+		}
 		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.protect_context_verification()'::regprocedure)`).Scan(&originalAcquisitionGuard); e != nil {
 			t.Fatal(e)
 		}
@@ -156,7 +161,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		if e = conn.QueryRow(ctx, comparisonShape).Scan(&originalComparisonShape); e != nil {
 			t.Fatal(e)
 		}
-		if _, e = p.UpTo(ctx, 133); e != nil {
+		if _, e = p.UpTo(ctx, head-1); e != nil {
 			t.Fatal("restore previous schema before upgrade", e)
 		}
 	}
@@ -164,6 +169,13 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	var originalStreamGuard, originalProcessingProjector, originalExecutionGuard string
 	if e = conn.QueryRow(ctx, profileDefinitions).Scan(&originalStreamGuard, &originalProcessingProjector, &originalExecutionGuard); e != nil {
 		t.Fatal("previous profile functions", e)
+	}
+	const refusalExecutionShape = `SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY conname)::text FROM pg_constraint WHERE conrelid='context_execution'::regclass`
+	var originalRefusalExecutionShape string
+	if head == 135 {
+		if e = conn.QueryRow(ctx, refusalExecutionShape).Scan(&originalRefusalExecutionShape); e != nil {
+			t.Fatal(e)
+		}
 	}
 	const profileCancelDefinition = `SELECT pg_get_functiondef('public.guard_snapshot_cancel()'::regprocedure)`
 	var originalCancellation string
@@ -298,7 +310,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		t.Log("resource projection Down restored exact validators and unchanged trust; Up restored104; no old-decoder rollback qualification")
 	}
-	if head == 133 || head == 134 {
+	if head == 133 || head == 134 || head == 135 {
 		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
 		qualifySavedSyscallQueryFunctions(t, ctx, conn)
 		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
@@ -321,7 +333,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
 		t.Logf("comparison%d→132→%d: exact twelve existing function definitions, table/index/constraint shape and trust restored; closed pair/20 units/one batch", head, head)
 	}
-	if head == 134 {
+	if head == 134 || head == 135 {
 		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
 		qualifySavedSyscallQueryFunctions(t, ctx, conn)
 		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
@@ -338,10 +350,29 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		if e = conn.QueryRow(ctx, `SELECT row_to_json(t)::text FROM fleet_trust t`).Scan(&trust); e != nil || trust != originalTrust {
 			t.Fatal("acquisition Down changed trust/recovery", e)
 		}
-		if from, to, e = upgrade.Run(ctx); e != nil || from != 133 || to != 134 {
+		if from, to, e = upgrade.Run(ctx); e != nil || from != 133 || to != head {
 			t.Fatal("acquisition Up after Down", from, to, e)
 		}
-		t.Log("acquisition134→133→134: paired nullable timing, exact native-length guard/shape restored and trust unchanged; prior query parity retained")
+		t.Logf("acquisition%d→133→%d: paired nullable timing, exact native-length guard/shape restored and trust unchanged; prior query parity retained", head, head)
+	}
+	if head == 135 {
+		if _, e = p.DownTo(ctx, 134); e != nil {
+			t.Fatal("empty profile refusal Down", e)
+		}
+		var guard, shape, trust string
+		if e = conn.QueryRow(ctx, `SELECT pg_get_functiondef('public.guard_context_execution()'::regprocedure)`).Scan(&guard); e != nil || guard != originalExecutionGuard {
+			t.Fatal("profile refusal Down changed existing immutable execution guard", e)
+		}
+		if e = conn.QueryRow(ctx, refusalExecutionShape).Scan(&shape); e != nil || shape != originalRefusalExecutionShape {
+			t.Fatal("profile refusal Down changed existing phase/empty-result constraints", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT row_to_json(t)::text FROM fleet_trust t`).Scan(&trust); e != nil || trust != originalTrust {
+			t.Fatal("profile refusal Down changed trust/recovery", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != 134 || to != 135 {
+			t.Fatal("profile refusal Up after Down", from, to, e)
+		}
+		t.Log("profile refusal135→134→135: exact existing execution guard/constraints restored and trust unchanged")
 	}
 	if head == 132 {
 		qualifySavedSyscallQueryFunctions(t, ctx, conn)

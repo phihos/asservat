@@ -120,6 +120,8 @@ func (n *nodeProfiles) run(parent, action context.Context, cancel context.Cancel
 		result.Failure = collector.ReasonCaptureFailed
 		if errors.Is(err, execution.ErrProfilerBusy) {
 			result.Failure = collector.ReasonCaptureBusy
+		} else if errors.Is(err, execution.ErrProfileUnavailable) {
+			result.Failure = collector.ReasonProfileUnavailable
 		}
 		result.Outcome.ResponseComplete = false
 		result.Outcome.Format = p.Request.Parameters.Format()

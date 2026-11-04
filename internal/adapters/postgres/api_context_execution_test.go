@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"encoding/json"
+	"github.com/jackc/pgx/v5/pgtype"
+	"reflect"
 	"testing"
 	"time"
 
@@ -94,9 +96,36 @@ func TestAPIVerificationAuditRequiresExactCompletedResult(t *testing.T) {
 		t.Fatal("verification predates completed result")
 	}
 }
+
+func TestAPIProfileUnavailableOutcomeHasNoAcquisitionOrCopies(t *testing.T) {
+	_, terminal, row := apiCompletedFixture(t)
+	terminal.Phase, terminal.AcquiredAt, terminal.Copies = "profileUnavailable", time.Time{}, artifact.Copies{}
+	if !terminal.Valid() {
+		t.Fatal("known profile refusal is not a valid terminal outcome")
+	}
+	row.Phase, row.AcquiredAt, row.CopiesJson, row.CopiesDigest = terminal.Phase, pgtype.Timestamptz{}, nil, nil
+	if got, err := apiExecution(row); err != nil || !reflect.DeepEqual(got, terminal) {
+		t.Fatal("stored profile refusal lost exact execution identity", err)
+	}
+	for name, change := range map[string]func(*value.APIExecution){
+		"acquired":           func(r *value.APIExecution) { r.AcquiredAt = r.StartedAt },
+		"copies":             func(r *value.APIExecution) { r.Copies[0].Bytes = 1 },
+		"unstarted":          func(r *value.APIExecution) { r.StartedAt = time.Time{} },
+		"uncompleted":        func(r *value.APIExecution) { r.CompletedAt = time.Time{} },
+		"reverse completion": func(r *value.APIExecution) { r.CompletedAt = r.StartedAt.Add(-time.Microsecond) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			bad := terminal
+			change(&bad)
+			if bad.Valid() {
+				t.Fatal("malformed profile refusal acquired evidence or lost terminal bounds")
+			}
+		})
+	}
+}
 func TestAPIExecutionProgressUsesItsDurableOutcome(t *testing.T) {
 	f, r, _ := apiCompletedFixture(t)
-	for _, tc := range []struct{ state, phase, reason string }{{"prepared", "Pending", "DispatchUnconfirmed"}, {"started", "Running", "AcquisitionStarted"}, {"captureFailed", "Failed", "AcquisitionFailed"}, {"targetGone", "Failed", "PinnedPodGone"}, {"denied", "Failed", "PodStatusDenied"}, {"peerMembershipChanged", "Failed", "PeerMembershipChanged"}, {"peerMembershipStale", "Failed", "PeerMembershipStale"}, {"profilerBusy", "Failed", "ProfilerBusy"}, {"storeUnconfirmed", "Indeterminate", "StorageOutcomeUnconfirmed"}, {"stored", "Finalizing", "VerificationPending"}} {
+	for _, tc := range []struct{ state, phase, reason string }{{"prepared", "Pending", "DispatchUnconfirmed"}, {"started", "Running", "AcquisitionStarted"}, {"captureFailed", "Failed", "AcquisitionFailed"}, {"targetGone", "Failed", "PinnedPodGone"}, {"denied", "Failed", "PodStatusDenied"}, {"peerMembershipChanged", "Failed", "PeerMembershipChanged"}, {"peerMembershipStale", "Failed", "PeerMembershipStale"}, {"profilerBusy", "Failed", "ProfilerBusy"}, {"profileUnavailable", "Failed", "ProfileUnavailable"}, {"storeUnconfirmed", "Indeterminate", "StorageOutcomeUnconfirmed"}, {"stored", "Finalizing", "VerificationPending"}} {
 		t.Run(tc.state, func(t *testing.T) {
 			x := r
 			x.Phase = tc.state
@@ -111,7 +140,7 @@ func TestAPIExecutionProgressUsesItsDurableOutcome(t *testing.T) {
 				x.AcquiredAt = time.Time{}
 				x.CompletedAt = time.Time{}
 			}
-			if tc.state == "captureFailed" || tc.state == "targetGone" || tc.state == "denied" || tc.state == "peerMembershipChanged" || tc.state == "peerMembershipStale" || tc.state == "profilerBusy" {
+			if tc.state == "captureFailed" || tc.state == "targetGone" || tc.state == "denied" || tc.state == "peerMembershipChanged" || tc.state == "peerMembershipStale" || tc.state == "profilerBusy" || tc.state == "profileUnavailable" {
 				x.AcquiredAt = time.Time{}
 			}
 			out, err := progressFacts(f, x)

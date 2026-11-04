@@ -930,6 +930,7 @@ export interface components {
                     action_id: string;
                     /** @enum {unknown} */
                     phase: "Pending" | "WaitingApproval" | "Queued" | "Running" | "Finalizing" | "Succeeded" | "Partial" | "Skipped" | "Denied" | "TimedOut" | "Failed" | "TargetGone" | "Unsupported" | "Indeterminate" | "Cancelled";
+                    /** @description Bounded stable action reason. Failed Go profile acquisition reports ProfileUnavailable when the endpoint is unavailable or disabled, or ProfilerBusy for an existing conflicting profiling session that Asservat did not stop. Other existing reason strings retain their current meaning; a reason never authorizes retry or replacement. */
                     reason_code?: string;
                     /**
                      * Format: uuid

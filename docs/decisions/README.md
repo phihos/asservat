@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-298 — Explicit Go endpoint refusals](298-explicit-go-profile-refusals.md)
+preserves known missing-endpoint failures through progress and verifies
+application-owned profiler coexistence without retry, stop or refund.
+Implementation and qualification are in progress.
+
 [ADR-297 — Verified profile acquisition metadata](297-verified-profile-acquisition-metadata.md)
 retains already authenticated acquisition windows for existing case metadata
 reads, with unknown legacy clocks/process identity and no additional key reads.

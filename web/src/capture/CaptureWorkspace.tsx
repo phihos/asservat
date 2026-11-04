@@ -72,6 +72,13 @@ const sharingLabels: Record<NonNullable<Progress['sharing']>['state'], string> =
 };
 
 const actionLabels: Record<string, string> = { Finalizing: 'Verifying and publishing', TargetGone: 'The selected Pod no longer exists; nothing was collected', Denied: 'Kubernetes denied reading the Pod status; nothing was collected' };
+function profileRefusalMessage(action: Progress['actions'][number]): string | undefined {
+  if (action.phase !== 'Failed') return;
+  switch (action.reason_code) {
+    case 'ProfileUnavailable': return 'The Go profile endpoint is unavailable or disabled. No profile was collected for this action. Check the endpoint configuration before preparing a new request.';
+    case 'ProfilerBusy': return 'A conflicting profile session is already running. Asservat did not stop it. No profile was collected for this action.';
+  }
+}
 const evidenceLabels: Record<HistoryEntry['evidence_state'], string> = {
   pending: 'Evidence pending', available: 'Evidence available', partial: 'Partial evidence', expired: 'Evidence expired', unavailable: 'No evidence',
 };
@@ -244,7 +251,10 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         {state.progress.phase === 'Finalizing' && <p>Uploaded evidence still needs verification and publication before it is available.</p>}
         {state.progress.reason_state === 'available' && state.progress.reason !== undefined && <section aria-label="Save reason"><h3>Reason</h3><p className="capture-reason">{state.progress.reason}</p></section>}
         {state.progress.reason_state === 'unavailable' && <p className="notice">The save reason is unavailable. Capture status remains available.</p>}
-        <ul className="progress-actions">{state.progress.actions.map(action => <li key={action.action_instance_id ?? action.action_id}><span><span>{action.action_id === 'pod-status' ? 'Pod status' : action.action_id}</span>{action.pod_name && <> · <span title={action.pod_uid}>{action.pod_name}</span></>}</span><span>{actionLabels[action.phase] ?? action.phase}</span></li>)}</ul>
+        <ul className="progress-actions">{state.progress.actions.map(action => {
+          const refusal = profileRefusalMessage(action);
+          return <li key={action.action_instance_id ?? action.action_id}><span><span>{action.action_id === 'pod-status' ? 'Pod status' : action.action_id}</span>{action.pod_name && <> · <span title={action.pod_uid}>{action.pod_name}</span></>}{refusal && <><br/><span className="field-help">{refusal}</span></>}</span><span>{actionLabels[action.phase] ?? action.phase}</span></li>;
+        })}</ul>
         {(state.progress.cancellation_requested || state.cancellationStatus === 'requested') && !['Succeeded', 'Partial', 'Failed', 'Cancelled', 'Indeterminate'].includes(state.progress.phase) && <p role="status">Cancellation requested. Waiting for unfinished snapshots to stop; stored results remain available.</p>}
         {state.progress.operation === 'recordingSave' && state.progress.can_cancel && !state.progress.cancellation_requested && !['Succeeded', 'Partial', 'Failed', 'Cancelled', 'Indeterminate'].includes(state.progress.phase) && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.cancelRecordingSave()}>{state.cancellationStatus === 'unconfirmed' ? 'Retry cancellation' : 'Cancel recording save'}</Button>}
         {state.progress.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}

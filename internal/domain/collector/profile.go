@@ -62,5 +62,5 @@ func (r ProfileResult) Valid() bool {
 	if r.Failure == "" {
 		return !o.StartedAt.IsZero() && o.ResponseComplete && o.MayHaveStarted && o.NativeBytes > 0
 	}
-	return !o.ResponseComplete && (r.Failure == ReasonCaptureFailed || r.Failure == ReasonTargetNotFound || r.Failure == ReasonTargetHostNet || r.Failure == ReasonCaptureBusy)
+	return !o.ResponseComplete && (r.Failure == ReasonCaptureFailed || r.Failure == ReasonTargetNotFound || r.Failure == ReasonTargetHostNet || r.Failure == ReasonCaptureBusy || r.Failure == ReasonProfileUnavailable)
 }

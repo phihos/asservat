@@ -932,6 +932,15 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
 		qualifyInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, native, evidence.Artifacts[0].Expires, summaryCheck)
+		if len(profileCapture) != 1 || profileCapture[0].Refused == nil {
+			t.Fatal("manual profile refusal SQL evidence is unavailable")
+		}
+		qualifyManualProfileRefusals(t, ctx, region, namespace, preview.Pods[0].Name, preview.Pods[0].UID, manualProfileArguments(cluster, namespace, workload), read, invoke, func(grantID string) {
+			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
+			if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent installed profile refusal review", "idempotency_key": "approve-profile-refusal-" + grantID}, nil); code != "" {
+				t.Fatal("profile refusal independent approval", code)
+			}
+		}, profileCapture[0].Refused)
 		qualifyManualRecorderStop(t, ctx, "profile", manualProfileStopArguments(cluster, namespace, workload), read, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
 			if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent installed profile Stop review", "idempotency_key": "approve-stop-" + grantID}, nil); code != "" {

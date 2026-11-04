@@ -172,7 +172,7 @@ func (s *APIContextExecutions) requestSnapshotCancellationInTransaction(ctx cont
 			phase = "Running"
 		case "stored":
 			phase = "Finalizing"
-		case "captureFailed", "targetGone", "denied", "peerMembershipChanged", "peerMembershipStale", "profilerBusy":
+		case "captureFailed", "targetGone", "denied", "peerMembershipChanged", "peerMembershipStale", "profilerBusy", "profileUnavailable":
 			phase = "Failed"
 		case "storeUnconfirmed":
 			phase = "Indeterminate"

@@ -36,6 +36,7 @@ type installedProfileComparisonSource struct {
 type installedProfileCaptureContinuation struct {
 	InitializeProcessing bool
 	Captured             func(http.RoundTripper, installedProfileComparisonSource)
+	Refused              func(captureID, grantID, reason string) time.Time
 }
 type installedProfileComparisonCheck func([2]installedProfileComparisonSource) func(queryID, operationID string) func()
 

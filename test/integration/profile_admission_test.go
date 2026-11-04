@@ -30,12 +30,12 @@ import (
 // reviewer inputs. This does not claim an installed profiler or native stop.
 func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario) {
 	t.Run("profile-approved-admission-stream-binding", func(t *testing.T) {
-		for _, mayHaveStarted := range []bool{false, true} {
-			name := "before-endpoint"
-			if mayHaveStarted {
-				name = "after-endpoint"
-			}
-			t.Run(name, func(t *testing.T) {
+		for _, mode := range []struct {
+			name                        string
+			mayHaveStarted, unavailable bool
+		}{{name: "before-endpoint"}, {name: "after-endpoint", mayHaveStarted: true}, {name: "endpoint-unavailable", unavailable: true}} {
+			mayHaveStarted := mode.mayHaveStarted
+			t.Run(mode.name, func(t *testing.T) {
 				recordingScenarioSlots = 8
 				defer func() { recordingScenarioSlots = 1 }()
 				s := create(t)
@@ -260,6 +260,10 @@ func qualifyProfileAdmission(t *testing.T, ctx context.Context, admin *pgxpool.P
 				running, err := execSQL.RecordAPIStart(ctx, check, bound, disposition)
 				if err != nil {
 					t.Fatal("profile start", err)
+				}
+				if mode.unavailable {
+					qualifyProfileUnavailableOutcome(t, ctx, admin, pools.ordinary, s, execSQL, running, check, r.ReservedBytes()+plan.TemporaryBytes(), g.ID)
+					return
 				}
 				var revision int64
 				if err = admin.QueryRow(ctx, "SELECT progress_revision FROM context_capture WHERE root_id=$1 AND id=$2", p.RootID, p.CaptureID).Scan(&revision); err != nil {
