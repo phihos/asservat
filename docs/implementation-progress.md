@@ -50,7 +50,24 @@ committed blobs, sources stayed unchanged and cleanup was `[]`. Reports are in
 runtime SQL grants with synthetic protected endpoint/target/reviewer facts; it
 checks ReadAPIContextWork, not preparation/start or multipart streaming. The six
 unchanged legacy mode passes from68025 remain applicable. No deadline or approval
-is relaxed. Exact-current CI and installed policy-profile qualification are next.
+is relaxed.
+
+Full CI41765866339 passed on `eb27d1f1`. The first selected installed policy
+run41766118858 failed (Go480.443s) at a fixture assertion before collection
+approval or any capture. Actual protected endpoint lookup, policy acceptance and
+pending review succeeded; composition returned generated source binding
+`e182567ed4d9af482fdcdb399`, while the fixture expected its authored alias
+`api-local-pprof`. All4,085 source hashes independently match committed `eb27d1f1`,
+sources stayed unchanged, cleanup was `[]` and scratch was removed. Originals
+are retained in `test/results/policy-profile-native-41766118858/`.
+
+The same assertion reproduced locally (Go0.015s). The fixture now derives the
+expected generated binding from the original authored composition through the
+production compiler, independently of the returned review. Focused races passed
+in1.744s; the authored unscoped alias is refused, and the definition, parameters,
+named port and address mode remain checked. Independent review found no blocker.
+Only test files change; production and real-SQL qualification remain unchanged.
+The installed acquisition/publication/raw-approval/download result is pending.
 
 Saved syscall views are merged in [PR150](https://github.com/phihos/asservat/pull/150),
 main `381820beabb16caceb3b378e5f007e094cd1dd15`. Its full tree matches qualified

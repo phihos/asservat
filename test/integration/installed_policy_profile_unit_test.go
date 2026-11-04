@@ -29,3 +29,18 @@ func TestInstalledPolicyProfileProtectedInputs(t *testing.T) {
 		}
 	}
 }
+
+func TestInstalledPolicyProfileReviewUsesNormalizedBinding(t *testing.T) {
+	binding := installedPolicyProfileExpectedBinding(t, installedPolicyProfileSpec("11111111-1111-4111-8111-111111111111", "payments", "api"))
+	// Model the actual public review's normalized source identity. Other facts
+	// are the fixture's fixed operator definition and builtin CPU parameters.
+	review := installedPolicyProfileReview{Runtime: "go", Type: "cpu", Mode: "interval", Duration: "10s", Timeout: "15s", SourceRef: binding.Name, SourceName: binding.TemplateRef, SourceKind: "templateBinding", AddressMode: binding.AddressMode, DefinitionDigest: strings.Repeat("a", 64), DeclaredPortName: binding.PortName, MinimumPort: 6060, MaximumPort: 6060}
+	if !installedPolicyProfileReviewMatches(review, binding) {
+		t.Fatal("actual composed binding rejected by installed review assertion", binding.Name)
+	}
+	wrong := review
+	wrong.SourceRef = "api-local-pprof"
+	if installedPolicyProfileReviewMatches(wrong, binding) {
+		t.Fatal("unscoped authored alias accepted as concrete composed binding")
+	}
+}

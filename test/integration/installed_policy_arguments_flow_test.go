@@ -206,25 +206,9 @@ func qualifyInstalledFiniteRawPolicy(t *testing.T, ctx context.Context, admin *p
 		Phase    string     `json:"phase"`
 		NotAfter *time.Time `json:"not_after"`
 		Actions  []struct {
-			Kind     string `json:"kind"`
-			MaxBytes int64  `json:"max_bytes"`
-			Profile  *struct {
-				Runtime          string `json:"runtime"`
-				Type             string `json:"type"`
-				Mode             string `json:"mode"`
-				Duration         string `json:"duration"`
-				Timeout          string `json:"timeout"`
-				ForceGC          bool   `json:"force_gc"`
-				SourceRef        string `json:"source_ref"`
-				SourceName       string `json:"source_name"`
-				SourceKind       string `json:"source_kind"`
-				DefinitionDigest string `json:"definition_digest"`
-				DeclaredPortName string `json:"declared_port_name"`
-				MinimumPort      uint16 `json:"minimum_port"`
-				MaximumPort      uint16 `json:"maximum_port"`
-				Port             uint16 `json:"port"`
-				EndpointDigest   string `json:"endpoint_digest"`
-			} `json:"profile"`
+			Kind     string                        `json:"kind"`
+			MaxBytes int64                         `json:"max_bytes"`
+			Profile  *installedPolicyProfileReview `json:"profile"`
 		} `json:"actions"`
 		Decision *struct {
 			By struct {
@@ -256,7 +240,7 @@ func qualifyInstalledFiniteRawPolicy(t *testing.T, ctx context.Context, admin *p
 			t.Fatal("profile approval has no exact action review")
 		}
 		p := collection.Actions[0].Profile
-		if p.Runtime != "go" || p.Type != "cpu" || p.Mode != "interval" || p.Duration != "10s" || p.Timeout != "15s" || p.ForceGC || p.SourceRef != "api-local-pprof" || p.SourceName != "go-pprof-loopback" || p.SourceKind != "templateBinding" || len(p.DefinitionDigest) != 64 || p.DeclaredPortName != "diagnostics" || p.MinimumPort != 6060 || p.MaximumPort != 6060 || p.Port != 0 || p.EndpointDigest != "" {
+		if !installedPolicyProfileReviewMatches(*p, installedPolicyProfileExpectedBinding(t, policySpec)) {
 			t.Fatal("profile review lost stable definition/parameters or invented a concrete Pod endpoint", p)
 		}
 	}
