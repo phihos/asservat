@@ -522,6 +522,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			waitInstalledPublisherSettled(t, c, api, desired.TargetNamespace, installation)
 		}
 		diagnose := func() {
+			installedCapacityCurrentDiagnostics(ctx, admin.QueryRow, p.RootID, installation, t.Logf)
 			installedSQLActivityDiagnostics(ctx, admin.Query, installation, t.Logf)
 			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker", contracts.PublisherName(installation))
 			c, end := context.WithTimeout(ctx, 20*time.Second)
