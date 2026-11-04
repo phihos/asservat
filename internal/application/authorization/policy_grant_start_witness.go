@@ -17,33 +17,43 @@ import (
 // recorder scope. The one implemented source action contributes at most one
 // snapshot per selected Pod, capped by the existing sixteen-source operation.
 // It returns zero for legacy units rather than silently migrating old grants.
-func PolicyGrantStartsPerExecution(scope []byte, a value.AcceptedPolicyAuthority, recipe artifact.Digest) (int, error) {
+type acceptedRecorderPolicyScope struct {
+	Format, SourceUID         string
+	IntentVersion             int64
+	Collection                artifact.Digest
+	Policy                    capture.RestartPolicy
+	NamespaceUID, WorkloadUID string
+	Delegation                identity.Revision
+	Owners                    []artifact.AudienceAssignment
+	Actions                   []string
+	Limits                    value.AutomationLimits
+}
+
+func acceptedRecorderPolicy(scope []byte, a value.AcceptedPolicyAuthority, recipe artifact.Digest) (capture.RestartPolicy, error) {
 	if len(scope) < 2 || len(scope) > value.GrantMaxScopeBytes || sha256.Sum256(scope) != a.ScopeDigest {
-		return 0, value.ErrGrantScope
+		return capture.RestartPolicy{}, value.ErrGrantScope
 	}
-	var accepted struct {
-		Format, SourceUID         string
-		IntentVersion             int64
-		Collection                artifact.Digest
-		Policy                    capture.RestartPolicy
-		NamespaceUID, WorkloadUID string
-		Delegation                identity.Revision
-		Owners                    []artifact.AudienceAssignment
-		Actions                   []string
-		Limits                    value.AutomationLimits
-	}
+	var accepted acceptedRecorderPolicyScope
 	decoder := json.NewDecoder(bytes.NewReader(scope))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(&accepted) != nil {
-		return 0, value.ErrGrantScope
+		return capture.RestartPolicy{}, value.ErrGrantScope
 	}
 	var extra any
 	if decoder.Decode(&extra) != io.EOF {
-		return 0, value.ErrGrantScope
+		return capture.RestartPolicy{}, value.ErrGrantScope
 	}
 	p := accepted.Policy
 	if accepted.Format != "policy-scope/recorder/v1" || accepted.SourceUID != a.PolicyUID || accepted.IntentVersion < 1 || accepted.Collection == (artifact.Digest{}) || accepted.NamespaceUID != a.NamespaceUID || accepted.WorkloadUID != a.WorkloadUID || accepted.Delegation != a.Delegation || accepted.Limits != a.Limits || !slices.Equal(accepted.Owners, a.Owners) || !slices.Equal(accepted.Actions, a.Actions) || p.ClusterID != a.ClusterID || !p.Valid() || p.Recorder == nil || p.Recorder.RecipeDigest != recipe {
-		return 0, value.ErrGrantScope
+		return capture.RestartPolicy{}, value.ErrGrantScope
+	}
+	return p, nil
+}
+
+func PolicyGrantStartsPerExecution(scope []byte, a value.AcceptedPolicyAuthority, recipe artifact.Digest) (int, error) {
+	p, err := acceptedRecorderPolicy(scope, a, recipe)
+	if err != nil {
+		return 0, err
 	}
 	if !p.RecordingSaves || p.Recorder.Action.ExecutionMode != "ongoing" || p.IncidentPods < 2 {
 		return 0, nil

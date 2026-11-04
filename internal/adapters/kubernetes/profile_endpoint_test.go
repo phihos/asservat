@@ -2,8 +2,36 @@ package kubernetes
 
 import (
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/targets"
+	"context"
+	"errors"
 	"testing"
 )
+
+func TestProfileEndpointDefinitionAdapterNeedsNoPodObservation(t *testing.T) {
+	cluster := "00000000-0000-4000-8000-000000000001"
+	// No Kubernetes transport is installed: this path reads protected static
+	// endpoint metadata and cannot accidentally observe/select a Pod.
+	p, err := (&PodTargets{client: &PermissionClient{clusterID: cluster}}).WithProfileEndpoints([]contracts.RegionalProfileEndpoint{{Name: "go-pprof", Kind: "template", AddressModes: []string{"targetLoopback"}, LoopbackFamily: "ipv4", MinPort: 6000, MaxPort: 6999}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := targets.ProfileEndpointDefinitionRequest{ClusterID: cluster, Namespace: configuration.NamespaceRef{Name: "app", UID: "namespace"}, SourceRef: "local", Bindings: []targets.ProfileEndpointBinding{{Name: "local", TemplateRef: "go-pprof", AddressMode: "targetLoopback", PortName: "diagnostics"}}}
+	a, err := p.ResolveProfileEndpointDefinition(t.Context(), r)
+	if err != nil || !a.Answers(r) || a.Port != 0 {
+		t.Fatal("definition resolution", err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err = p.ResolveProfileEndpointDefinition(ctx, r); err == nil {
+		t.Fatal("cancelled lookup returned metadata")
+	}
+	r.ClusterID = "00000000-0000-4000-8000-000000000009"
+	if _, err = p.ResolveProfileEndpointDefinition(t.Context(), r); !errors.Is(err, targets.ErrInvalid) {
+		t.Fatal("foreign region answered", err)
+	}
+}
 
 func TestProfileEndpointConfigurationIsBoundedAndDeterministic(t *testing.T) {
 	template := contracts.RegionalProfileEndpoint{Name: "go-pprof-loopback", Kind: "template", AddressModes: []string{"targetLoopback"}, LoopbackFamily: "ipv4", MinPort: 6060, MaxPort: 6060}

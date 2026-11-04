@@ -188,6 +188,9 @@ func (s GrantService) RequestPolicy(ctx context.Context, current identities.Curr
 	if err != nil {
 		return zero, false, err
 	}
+	if !PolicyProfileGrantScopeValid(g) {
+		return zero, false, value.ErrGrantScope
+	}
 	probe := g
 	probe.RequestedAt = s.Now()
 	probe.ReviewUntil = probe.RequestedAt.Add(value.GrantReviewWindow)

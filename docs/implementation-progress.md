@@ -1,7 +1,32 @@
 # Sustained implementation progress
 
 
-## Current delivery workflow (2026-11-03)
+## Current delivery workflow (2026-11-04)
+
+**Active outcome:** finite policy-triggered Go endpoint profiles (S-05 increment6,
+ADR-296). Integration worktree `/home/phil/Projekte/asservat-policy-profiles`,
+branch `feature/policy-go-profiles`; base tree equals main `c52f7f57` after
+PR152/153. Scope: stable endpoint-definition approval, exact triggering-Pod child
+admission, existing finite Go acquisition, separate raw-result approval and native
+download. Implementation is underway; no new policy-profile service/native result
+is claimed. The original complete-spec goal remains active.
+
+Planning, grant/SQL and runtime/review changes have disjoint owners. Required
+next checks are focused compiler/review regressions, real atomic policy admission,
+repository gates, then one frozen-source fresh disposable-VM policy-profile
+workflow. No new service/lease/watch/credential/RBAC is planned; preserve existing
+manual and packet/syscall scope bytes and original deadlines.
+
+Local integrated library preflight and integration races passed; `make pre-push`
+passed all checks (418 console tests, 69 packages / 434 dependency edges,
+13,535 spec assertions). `make console-browser-check` passed in33.151s, including
+27 journeys /26 accessibility scans, four restart boundaries and the existing
+profile-comparison driver. Identity/case facts there are synthetic. New focused
+compiler tests cover15 finite mode/GC combinations, exact manual/parent recipe
+and provenance parity, stable definition scopes, private query pairing and
+cancellation. The new real-SQL profile fixture is ready for execution but is not
+yet qualified. No installed policy-profile success is claimed. Local gate logs
+are retained in `test/results/policy-profile-service/`.
 
 Saved syscall views are merged in [PR150](https://github.com/phihos/asservat/pull/150),
 main `381820beabb16caceb3b378e5f007e094cd1dd15`. Its full tree matches qualified

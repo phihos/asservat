@@ -34,7 +34,8 @@ const (
 	queryResolvePacketPeers = "resolve-packet-peers"
 	// ADR-285: one Go profile action's endpoint, resolved from the region's
 	// profile endpoint configuration and the exact Pod's port declarations.
-	queryResolveProfileEndpoint = "resolve-profile-endpoint"
+	queryResolveProfileEndpoint    = "resolve-profile-endpoint"
+	queryProfileEndpointDefinition = "profile-endpoint-definition"
 	// ADR-248: whether the target Pod's node collector offers the packet
 	// recorder now.
 	queryPacketRecorder        = "packet-recorder"
@@ -77,6 +78,12 @@ type ProfileTargets interface {
 // resolution (ADR-285). A region without it answers unsupported.
 type ProfileEndpointTargets interface {
 	ResolveProfileEndpoint(context.Context, targets.ProfileEndpointRequest) (targets.ProfileEndpointResolution, error)
+}
+
+// ProfileEndpointDefinitions is optional target-independent public metadata;
+// absence refuses policy profile compilation without selecting a Pod.
+type ProfileEndpointDefinitions interface {
+	ResolveProfileEndpointDefinition(context.Context, targets.ProfileEndpointDefinitionRequest) (targets.ProfileEndpointDefinitionResolution, error)
 }
 
 // PeerTargets is the region's optional Kubernetes peer resolution (ADR-283
@@ -453,6 +460,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if resolver, ok := s.targets.(ProfileEndpointTargets); ok {
 			out, e = resolver.ResolveProfileEndpoint(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryProfileEndpointDefinition:
+		var r targets.ProfileEndpointDefinitionRequest
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(ProfileEndpointDefinitions); ok {
+			out, e = resolver.ResolveProfileEndpointDefinition(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}

@@ -12,12 +12,17 @@ import (
 	"asservat.local/asservat/internal/transport/conversion"
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 )
 
 // Shared inert lifecycle compilation for the accepted-source reader and this
 // unmerged native candidate. It grants no source/manual acquisition authority.
-func recordingSavePolicyCompiler(filters planningapp.FilterCompiler, profiles captureapp.CatalogProfiles) captureapp.PolicyRecorderCompiler {
+type policyProfileEndpointDefinitions interface {
+	ResolveProfileEndpointDefinition(context.Context, targets.ProfileEndpointDefinitionRequest) (targets.ProfileEndpointDefinitionResolution, error)
+}
+
+func recordingSavePolicyCompiler(filters planningapp.FilterCompiler, profiles captureapp.CatalogProfiles, endpoints ...captureapp.ContextProfileEndpoints) captureapp.PolicyRecorderCompiler {
 	return func(ctx context.Context, scope targets.Request, raw json.RawMessage) ([]planvalue.PolicyRecorderConfiguration, error) {
 		var wire contracts.CaptureComposition
 		if err := json.Unmarshal(raw, &wire); err != nil {
@@ -48,8 +53,40 @@ func recordingSavePolicyCompiler(filters planningapp.FilterCompiler, profiles ca
 			}
 		}
 		all, err := planningapp.CompileOngoingPolicyRecorders(*composition, filters)
+		var needed planningapp.PolicyProfileEndpointNeeded
+		if errors.As(err, &needed) {
+			if ctx == nil || ctx.Err() != nil || !authorization.UUID(scope.ClusterID) || !identity.Text(scope.Namespace.Name, 63) || !identity.Text(scope.Namespace.UID, 64) || !identity.Text(scope.Workload.UID, 64) || scope.PodUID != "" || scope.PodName != "" {
+				return nil, planvalue.ErrInvalid
+			}
+			if len(endpoints) != 1 {
+				return nil, planvalue.CompositionError{Code: planvalue.CompositionRecorderUnavailable, Path: needed.Path, Reason: "this installation cannot resolve policy profile endpoint definitions"}
+			}
+			reader, ok := endpoints[0].(policyProfileEndpointDefinitions)
+			if !ok {
+				return nil, planvalue.CompositionError{Code: planvalue.CompositionRecorderUnavailable, Path: needed.Path, Reason: "this installation cannot resolve policy profile endpoint definitions"}
+			}
+			request := targets.ProfileEndpointDefinitionRequest{ClusterID: scope.ClusterID, Namespace: scope.Namespace, SourceRef: needed.SourceRef, Bindings: needed.Bindings}
+			answer, readErr := reader.ResolveProfileEndpointDefinition(ctx, request)
+			if readErr != nil {
+				return nil, planningapp.EndpointResolutionRefusal(planningapp.EndpointResolutionNeeded{Path: needed.Path}, readErr)
+			}
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			if !answer.Answers(request) {
+				return nil, planvalue.ErrInvalid
+			}
+			pin, pinErr := planningapp.PolicyProfileEndpointFromResolution(answer)
+			if pinErr != nil {
+				return nil, pinErr
+			}
+			all, err = planningapp.CompileOngoingPolicyRecorders(*composition, filters, pin)
+		}
 		if err != nil {
 			return nil, err
+		}
+		if ctx != nil && ctx.Err() != nil {
+			return nil, ctx.Err()
 		}
 		for _, cfg := range all {
 			if cfg.Filter != nil && planningapp.RawBytePredicate(cfg.Action.Filter) && packets.CheckPrefixProgram(cfg.Filter.Program) != nil {

@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/execution"
 	value "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
@@ -59,33 +60,46 @@ func ResolveProfileEndpointPlan(entries []ProfileEndpointEntry, network targets.
 	for _, b := range r.Bindings {
 		in.Bindings = append(in.Bindings, value.GoEndpointBinding{Name: b.Name, TemplateRef: b.TemplateRef, AddressMode: b.AddressMode, PortName: b.PortName})
 	}
+	in.Catalog = profileEndpointCatalog(entries, r.Target.Namespace)
+	in.Catalog.ObservedAt, in.Catalog.FreshUntil = now, until
+	plan, err := ResolveGoProfileEndpoint(in, now)
+	if err != nil {
+		return out, profileEndpointTargetError(err)
+	}
+	return plan, nil
+}
+
+func profileEndpointTargetError(err error) error {
+	switch {
+	case errors.Is(err, value.ErrProfileEndpointAmbiguous):
+		return targets.ErrEndpointAmbiguous
+	case errors.Is(err, value.ErrProfileEndpointUnavailable):
+		return targets.ErrEndpointUnavailable
+	case errors.Is(err, value.ErrProfileEndpointDenied):
+		return targets.ErrEndpointDenied
+	case errors.Is(err, value.ErrProfileHostNetwork):
+		return targets.ErrEndpointHostNetwork
+	default:
+		return targets.ErrInvalid
+	}
+}
+
+func profileEndpointCatalog(entries []ProfileEndpointEntry, namespace configuration.NamespaceRef) value.GoEndpointCatalog {
+	var catalog value.GoEndpointCatalog
 	for _, e := range entries {
-		if len(e.Namespaces) > 0 && !slices.Contains(e.Namespaces, r.Target.Namespace.Name) {
+		if len(e.Namespaces) > 0 && !slices.Contains(e.Namespaces, namespace.Name) {
 			continue // not applicable: indistinguishable from absent
 		}
 		d := cloneProfileDefinition(e.Definition)
 		d.ScopeNamespaceUID = ""
 		if len(e.Namespaces) > 0 {
-			d.ScopeNamespaceUID = r.Target.Namespace.UID
+			d.ScopeNamespaceUID = namespace.UID
 		}
 		if e.Profile {
-			in.Catalog.Profiles = append(in.Catalog.Profiles, value.GoEndpointProfile{Definition: d, AddressMode: e.AddressMode, Port: e.Port})
+			catalog.Profiles = append(catalog.Profiles, value.GoEndpointProfile{Definition: d, AddressMode: e.AddressMode, Port: e.Port})
 		} else {
-			in.Catalog.Templates = append(in.Catalog.Templates, d)
+			catalog.Templates = append(catalog.Templates, d)
 		}
 	}
-	plan, err := ResolveGoProfileEndpoint(in, now)
-	switch {
-	case errors.Is(err, value.ErrProfileEndpointAmbiguous):
-		return out, targets.ErrEndpointAmbiguous
-	case errors.Is(err, value.ErrProfileEndpointUnavailable):
-		return out, targets.ErrEndpointUnavailable
-	case errors.Is(err, value.ErrProfileEndpointDenied):
-		return out, targets.ErrEndpointDenied
-	case errors.Is(err, value.ErrProfileHostNetwork):
-		return out, targets.ErrEndpointHostNetwork
-	case err != nil:
-		return out, targets.ErrInvalid
-	}
-	return plan, nil
+	return catalog
 }

@@ -65,6 +65,45 @@ func TestPacketPolicyCaptureEligibilityKeepsCurrentTeamAndAudience(t *testing.T)
 	}
 }
 
+func TestProfilePolicyCaptureEligibilityKeepsCurrentDelegationAndAudience(t *testing.T) {
+	for _, mode := range []string{"current", "outside-envelope", "sponsor-denied", "source-expired", "changed-identity"} {
+		t.Run(mode, func(t *testing.T) {
+			i, a, p, target, now := policyCaptureFixture()
+			a.Actions = []string{"profile"}
+			a.Creator.Subject = "departed-profile-creator"
+			a.Limits.MaxObservedBytes = 0
+			p.Envelope.AllowedActions = []string{"profile"}
+			p.Envelope.MaxObservedBytes = 0
+			i = PolicyExecutorIdentity(a, now, now.Add(3*time.Second))
+			switch mode {
+			case "outside-envelope":
+				p.Envelope.AllowedActions = []string{"packetCapture"}
+			case "sponsor-denied":
+				p.Permissions.Denies = []CurrentAssignment{p.Permissions.Allows[0]}
+			case "source-expired":
+				p.FreshUntil = now
+			case "changed-identity":
+				i.Policy.Digest[0] ^= 1
+			}
+			e := PolicyContextEligibility(i, a, p, target, now)
+			if mode != "current" {
+				if e.Eligible {
+					t.Fatal("profile policy bypassed current authority", mode)
+				}
+				return
+			}
+			if !e.Eligible || e.Principal != a.Executor || len(e.DefaultAudience) != 2 || len(e.ContributingAssignments) != 1 || e.ContributingAssignments[0] != a.Owners[0] || e.ValidUntil.After(i.ValidUntil) {
+				t.Fatal("profile policy lost delegation, complete audience or original interval", e)
+			}
+			for _, member := range e.DefaultAudience {
+				if member.SubjectID == a.Creator.Subject || member.Kind == "Workload" {
+					t.Fatal("profile creator/executor joined audience", member)
+				}
+			}
+		})
+	}
+}
+
 func TestPolicyExecutorCaptureEligibilityFailsClosed(t *testing.T) {
 	for _, name := range []string{"sponsor-denied", "executor-denied", "sponsor-removed", "envelope-expired", "binding-expired", "executions-exceed-envelope", "action-not-delegated", "envelope-drops-action", "other-identity", "other-scope", "stale-delegation", "expired-identity", "no-readers"} {
 		t.Run(name, func(t *testing.T) {

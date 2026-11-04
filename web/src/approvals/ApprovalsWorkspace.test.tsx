@@ -207,6 +207,41 @@ it('shows profile parameters and endpoint without a fabricated recording ring', 
   expect(validOutput_get_grant(result(missing))).toBe(false);
 });
 
+it.each(['templateBinding', 'administratorProfile'] as const)('shows a recurring profile endpoint definition (%s)', async sourceKind => {
+  const client = new SyntheticApprovals();
+  const policy: CollectionGrant = { ...teamPolicyGrant(), data_class: 'raw', observation_limits: undefined,
+    actions: [{ action_id: 'cpu', kind: 'profile', execution_mode: 'onTrigger', max_bytes: 16 << 20, sensitive: ['liveProfile'], profile: {
+      runtime: 'go', type: 'cpu', mode: 'interval', source: 'httpEndpoint', duration: '10s', timeout: '15s', force_gc: false,
+      source_ref: 'go-endpoint', source_name: 'go-pprof-loopback', address_mode: 'targetLoopback', path_policy: 'go-pprof/v1',
+      source_kind: sourceKind, definition_digest: 'cd'.repeat(32),
+      ...(sourceKind === 'templateBinding' ? { declared_port_name: 'pprof', minimum_port: 6000, maximum_port: 7000 } : { port: 6060 }),
+    } }] };
+  client.detail = policy;
+  expect(validOutput_get_grant(result(policy))).toBe(true);
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)}/>);
+  expect(await screen.findByText(/cpu · interval/)).toBeTruthy();
+  expect(screen.getByText(/forced GC disabled/)).toBeTruthy();
+  expect(screen.getByText(/Every triggering Pod must match this reviewed endpoint definition/)).toBeTruthy();
+  expect(screen.getByText('cd'.repeat(32))).toBeTruthy();
+  if (sourceKind === 'templateBinding') {
+    expect(screen.getByText(/named TCP port pprof, allowed range 6000–7000/)).toBeTruthy();
+    expect(screen.getByText(/Pod template binding/)).toBeTruthy();
+    expect(screen.queryByText(/TCP port 6060/)).toBeNull();
+  } else {
+    expect(screen.getByText(/TCP port 6060/)).toBeTruthy();
+    expect(screen.getByText(/Administrator endpoint profile/)).toBeTruthy();
+    expect(screen.queryByText(/named TCP port/)).toBeNull();
+  }
+  expect(screen.queryByText(/Pod api-a/)).toBeNull();
+  expect(screen.queryByText(/Observation limits bound by this approval/)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Continue approved capture' })).toBeNull();
+  for (const patch of [{ endpoint_digest: 'ab'.repeat(32) }, { definition_digest: null }, { source_kind: 'unknown' }, { unknown: true },
+    ...(sourceKind === 'templateBinding' ? [{ port: 6060 }, { declared_port_name: undefined }, { minimum_port: 0 }, { maximum_port: 65536 }] : [{ declared_port_name: 'pprof' }, { minimum_port: 6000 }, { port: undefined }])]) {
+    const invalid = structuredClone(policy); Object.assign(invalid.actions[0].profile!, patch);
+    expect(validOutput_get_grant(result(invalid))).toBe(false);
+  }
+});
+
 it.each([40000, undefined])('shows only an explicitly reviewed observation event ceiling (%s)', async maximum => {
   const client = new SyntheticApprovals();
   client.detail = { ...grant, observation_limits: { ...grant.observation_limits!, ...(maximum === undefined ? {} : { max_observed_events: maximum }) } };

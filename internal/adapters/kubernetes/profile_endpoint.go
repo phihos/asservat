@@ -115,6 +115,22 @@ func (c *PodTargets) ResolveProfileEndpoint(ctx context.Context, r value.Profile
 	return planner.ResolveProfileEndpointRequest(c.endpoints, network, r, c.client.now())
 }
 
+// ResolveProfileEndpointDefinition selects the protected regional definition
+// for a policy's already observed namespace. It does not observe/dial a Pod.
+func (c *PodTargets) ResolveProfileEndpointDefinition(ctx context.Context, r value.ProfileEndpointDefinitionRequest) (value.ProfileEndpointDefinitionResolution, error) {
+	if c == nil || c.client == nil || ctx == nil || ctx.Err() != nil || !r.Valid() || r.ClusterID != c.client.clusterID {
+		return value.ProfileEndpointDefinitionResolution{}, value.ErrInvalid
+	}
+	out, err := planner.ResolveProfileEndpointDefinition(c.endpoints, r)
+	if err != nil {
+		return value.ProfileEndpointDefinitionResolution{}, err
+	}
+	if ctx.Err() != nil {
+		return value.ProfileEndpointDefinitionResolution{}, ctx.Err()
+	}
+	return out, nil
+}
+
 // ResolveProfilePlan repeats the protected endpoint resolution before dispatch,
 // retaining the route only inside the connector/node control path.
 func (c *PodTargets) ResolveProfilePlan(ctx context.Context, r value.ProfileEndpointRequest) (plan.GoEndpointPlan, error) {

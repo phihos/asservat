@@ -18,7 +18,7 @@ import (
 )
 
 func installedRecordingFocus() bool {
-	return installedJourneyFocus() == "approved-recording" || installedJourneyFocus() == "manual-syscall" || installedJourneyFocus() == "manual-arguments" || installedJourneyFocus() == "manual-mixed" || installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-http" || installedJourneyFocus() == "manual-peers" || installedProfileFocus() || installedJourneyFocus() == "native-paced" || installedJourneyFocus() == "policy-recording" || installedJourneyFocus() == "policy-arguments" || installedOngoingFocus()
+	return installedJourneyFocus() == "approved-recording" || installedJourneyFocus() == "manual-syscall" || installedJourneyFocus() == "manual-arguments" || installedJourneyFocus() == "manual-mixed" || installedJourneyFocus() == "manual-raw" || installedJourneyFocus() == "manual-http" || installedJourneyFocus() == "manual-peers" || installedProfileFocus() || installedJourneyFocus() == "native-paced" || installedJourneyFocus() == "policy-recording" || installedJourneyFocus() == "policy-arguments" || installedJourneyFocus() == "policy-profile" || installedOngoingFocus()
 }
 
 // This is a separate reviewed public capture request, before independent

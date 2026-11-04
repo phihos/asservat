@@ -1,9 +1,14 @@
 # Decision records
 
+[ADR-296 — Finite policy-triggered Go profiles](296-finite-policy-go-profiles.md)
+extends the existing policy/grant path with stable endpoint-definition approval
+and independently pinned triggering Pods. Implementation and qualification are
+in progress.
+
 [ADR-295 — Two-source approved profile comparison](295-two-source-profile-comparison.md)
 selects one regional worker, two independently authorized source identities and
-atomic paired accounting/key children. Components and design are prepared; public
-composition and native qualification remain pending.
+atomic paired accounting/key children. The bounded public MCP/React workflow is implemented and natively qualified;
+maximum-input containment and wider negative qualification remain open.
 
 [ADR-294 — Fixed saved-syscall projections](294-saved-syscall-projections.md)
 selects two version/filter-bound extracts using the existing regional worker.

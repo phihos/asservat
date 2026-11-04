@@ -566,6 +566,31 @@
                                 "endpoint_digest": {
                                   "type": "string",
                                   "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "source_kind": {
+                                  "enum": [
+                                    "templateBinding",
+                                    "administratorProfile"
+                                  ]
+                                },
+                                "definition_digest": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "declared_port_name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "minimum_port": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 65535
+                                },
+                                "maximum_port": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 65535
                                 }
                               },
                               "required": [
@@ -578,9 +603,111 @@
                                 "source_ref",
                                 "source_name",
                                 "address_mode",
-                                "port",
-                                "path_policy",
-                                "endpoint_digest"
+                                "path_policy"
+                              ],
+                              "oneOf": [
+                                {
+                                  "required": [
+                                    "port",
+                                    "endpoint_digest"
+                                  ],
+                                  "not": {
+                                    "anyOf": [
+                                      {
+                                        "required": [
+                                          "source_kind"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "definition_digest"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "declared_port_name"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "minimum_port"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "maximum_port"
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "required": [
+                                    "source_kind",
+                                    "definition_digest"
+                                  ],
+                                  "not": {
+                                    "anyOf": [
+                                      {
+                                        "required": [
+                                          "endpoint_digest"
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "oneOf": [
+                                    {
+                                      "properties": {
+                                        "source_kind": {
+                                          "const": "templateBinding"
+                                        }
+                                      },
+                                      "required": [
+                                        "declared_port_name",
+                                        "minimum_port",
+                                        "maximum_port"
+                                      ],
+                                      "not": {
+                                        "anyOf": [
+                                          {
+                                            "required": [
+                                              "port"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "properties": {
+                                        "source_kind": {
+                                          "const": "administratorProfile"
+                                        }
+                                      },
+                                      "required": [
+                                        "port"
+                                      ],
+                                      "not": {
+                                        "anyOf": [
+                                          {
+                                            "required": [
+                                              "declared_port_name"
+                                            ]
+                                          },
+                                          {
+                                            "required": [
+                                              "minimum_port"
+                                            ]
+                                          },
+                                          {
+                                            "required": [
+                                              "maximum_port"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
                               ]
                             }
                           },
@@ -1061,6 +1188,48 @@
                                 ]
                               }
                             ]
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "kind": {
+                              "const": "policy"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ]
+                        },
+                        "then": {
+                          "properties": {
+                            "actions": {
+                              "items": {
+                                "properties": {
+                                  "profile": {
+                                    "required": [
+                                      "definition_digest"
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "else": {
+                          "properties": {
+                            "actions": {
+                              "items": {
+                                "properties": {
+                                  "profile": {
+                                    "required": [
+                                      "endpoint_digest"
+                                    ]
+                                  }
+                                }
+                              }
+                            }
                           }
                         }
                       }

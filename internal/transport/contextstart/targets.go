@@ -194,6 +194,27 @@ func (t Targets) ResolveProfileEndpoint(ctx context.Context, r targets.ProfileEn
 	return out, nil
 }
 
+// ResolveProfileEndpointDefinition asks the existing regional metadata exchange
+// for a protected definition, preserving the original request/receiver deadline.
+func (t Targets) ResolveProfileEndpointDefinition(ctx context.Context, r targets.ProfileEndpointDefinitionRequest) (targets.ProfileEndpointDefinitionResolution, error) {
+	var out targets.ProfileEndpointDefinitionResolution
+	if !r.Valid() || t.Router == nil || t.Now == nil || ctx == nil || ctx.Err() != nil {
+		return out, targets.ErrInvalid
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	call, diagnostics := NewStreamDiagnosticContext(call)
+	until, err := t.Router.Query(call, r.ClusterID, queryProfileEndpointDefinition, r, &out)
+	if err != nil {
+		t.report("endpoint-definition/"+queryStep(err, diagnostics), "")
+		return targets.ProfileEndpointDefinitionResolution{}, err
+	}
+	if call.Err() != nil || !t.Now().Before(until) || !out.Answers(r) {
+		return targets.ProfileEndpointDefinitionResolution{}, targets.ErrUnavailable
+	}
+	return out.Clone(), nil
+}
+
 // ListCaptureProfiles asks the target's region for its namespace catalog
 // (one bounded LIST). A mismatched answer is unavailable.
 func (t Targets) ListCaptureProfiles(ctx context.Context, r targets.ProfileListRequest) (targets.ProfileCatalogAnswer, error) {

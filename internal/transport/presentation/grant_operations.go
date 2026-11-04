@@ -212,19 +212,24 @@ type grantAction struct {
 }
 
 type grantProfile struct {
-	Runtime        string `json:"runtime"`
-	Type           string `json:"type"`
-	Mode           string `json:"mode"`
-	Source         string `json:"source"`
-	Duration       string `json:"duration,omitempty"`
-	Timeout        string `json:"timeout"`
-	ForceGC        bool   `json:"force_gc"`
-	SourceRef      string `json:"source_ref"`
-	SourceName     string `json:"source_name"`
-	AddressMode    string `json:"address_mode"`
-	Port           uint16 `json:"port"`
-	PathPolicy     string `json:"path_policy"`
-	EndpointDigest string `json:"endpoint_digest"`
+	Runtime          string `json:"runtime"`
+	Type             string `json:"type"`
+	Mode             string `json:"mode"`
+	Source           string `json:"source"`
+	Duration         string `json:"duration,omitempty"`
+	Timeout          string `json:"timeout"`
+	ForceGC          bool   `json:"force_gc"`
+	SourceRef        string `json:"source_ref"`
+	SourceName       string `json:"source_name"`
+	AddressMode      string `json:"address_mode"`
+	Port             uint16 `json:"port,omitzero"`
+	PathPolicy       string `json:"path_policy"`
+	EndpointDigest   string `json:"endpoint_digest,omitempty"`
+	SourceKind       string `json:"source_kind,omitempty"`
+	DefinitionDigest string `json:"definition_digest,omitempty"`
+	DeclaredPortName string `json:"declared_port_name,omitempty"`
+	MinimumPort      uint16 `json:"minimum_port,omitzero"`
+	MaximumPort      uint16 `json:"maximum_port,omitzero"`
 }
 
 type grantLimits struct {
@@ -384,7 +389,7 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 	for _, a := range r.Actions {
 		x := grantAction{ActionID: a.ActionID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, Before: a.Before, After: a.After, Filter: a.Filter, FilterInstructions: a.FilterInstructions, MaxBytes: a.MaxBytes, RingMaxBytes: a.RingMaxBytes, RingMaxAge: a.RingMaxAge, Sensitive: slices.Clone(a.Sensitive)}
 		if p := a.Profile; p != nil {
-			x.Profile = &grantProfile{Runtime: p.Runtime, Type: p.Type, Mode: p.Mode, Source: p.Source, Duration: p.Duration, Timeout: p.Timeout, ForceGC: p.ForceGC, SourceRef: p.SourceRef, SourceName: p.SourceName, AddressMode: p.AddressMode, Port: p.Port, PathPolicy: p.PathPolicy, EndpointDigest: p.EndpointDigest}
+			x.Profile = &grantProfile{Runtime: p.Runtime, Type: p.Type, Mode: p.Mode, Source: p.Source, Duration: p.Duration, Timeout: p.Timeout, ForceGC: p.ForceGC, SourceRef: p.SourceRef, SourceName: p.SourceName, AddressMode: p.AddressMode, Port: p.Port, PathPolicy: p.PathPolicy, EndpointDigest: p.EndpointDigest, SourceKind: p.SourceKind, DefinitionDigest: p.DefinitionDigest, DeclaredPortName: p.DeclaredPortName, MinimumPort: p.MinimumPort, MaximumPort: p.MaximumPort}
 		}
 		if x.Sensitive == nil {
 			x.Sensitive = []string{}

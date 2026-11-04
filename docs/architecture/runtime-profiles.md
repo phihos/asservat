@@ -232,3 +232,16 @@ is protected catalog definition/acceptance and observation, profile admission
 and runtime-domain reservation, current credential policy, qualified node/netns
 dialing and guard composition, then the existing encrypted custody/publication
 and authenticated native-download workflow. No public capability is enabled.
+
+
+## Finite policy endpoint scope
+
+[ADR-296](../decisions/296-finite-policy-go-profiles.md) reuses C-03 policy
+authority/approval, C-04 compilation, C-06 execution and the existing node/region
+profile transport. A target-independent endpoint definition lookup runs over
+the existing regional standby query path. Its selected protected definition and
+binding enter the accepted policy configuration; concrete Pod routing remains a
+separate child observation. Full hash-pinned grant scope is matched to that child
+inside atomic admission. No new component, durable table, worker kind, listener,
+credential or ongoing observation lease is introduced. Actual implementation and
+qualification are tracked in [implementation progress](../implementation-progress.md).

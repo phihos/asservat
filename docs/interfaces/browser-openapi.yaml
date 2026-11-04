@@ -9610,6 +9610,25 @@ components:
                             endpoint_digest:
                               type: string
                               pattern: ^[a-f0-9]{64}$
+                            source_kind:
+                              enum:
+                              - templateBinding
+                              - administratorProfile
+                            definition_digest:
+                              type: string
+                              pattern: ^[a-f0-9]{64}$
+                            declared_port_name:
+                              type: string
+                              minLength: 1
+                              maxLength: 63
+                            minimum_port:
+                              type: integer
+                              minimum: 1
+                              maximum: 65535
+                            maximum_port:
+                              type: integer
+                              minimum: 1
+                              maximum: 65535
                           required:
                           - runtime
                           - type
@@ -9620,9 +9639,55 @@ components:
                           - source_ref
                           - source_name
                           - address_mode
-                          - port
                           - path_policy
-                          - endpoint_digest
+                          oneOf:
+                          - required:
+                            - port
+                            - endpoint_digest
+                            not:
+                              anyOf:
+                              - required:
+                                - source_kind
+                              - required:
+                                - definition_digest
+                              - required:
+                                - declared_port_name
+                              - required:
+                                - minimum_port
+                              - required:
+                                - maximum_port
+                          - required:
+                            - source_kind
+                            - definition_digest
+                            not:
+                              anyOf:
+                              - required:
+                                - endpoint_digest
+                            oneOf:
+                            - properties:
+                                source_kind:
+                                  const: templateBinding
+                              required:
+                              - declared_port_name
+                              - minimum_port
+                              - maximum_port
+                              not:
+                                anyOf:
+                                - required:
+                                  - port
+                            - properties:
+                                source_kind:
+                                  const: administratorProfile
+                              required:
+                              - port
+                              not:
+                                anyOf:
+                                - required:
+                                  - declared_port_name
+                                - required:
+                                  - minimum_port
+                                - required:
+                                  - maximum_port
                       required:
                       - action_id
                       - kind
@@ -9943,6 +10008,28 @@ components:
                         - result_access
                       - required:
                         - remaining_bytes
+                - if:
+                    properties:
+                      kind:
+                        const: policy
+                    required:
+                    - kind
+                  then:
+                    properties:
+                      actions:
+                        items:
+                          properties:
+                            profile:
+                              required:
+                              - definition_digest
+                  else:
+                    properties:
+                      actions:
+                        items:
+                          properties:
+                            profile:
+                              required:
+                              - endpoint_digest
               - type: object
                 additionalProperties: false
                 properties:
@@ -15657,6 +15744,25 @@ components:
                           endpoint_digest:
                             type: string
                             pattern: ^[a-f0-9]{64}$
+                          source_kind:
+                            enum:
+                            - templateBinding
+                            - administratorProfile
+                          definition_digest:
+                            type: string
+                            pattern: ^[a-f0-9]{64}$
+                          declared_port_name:
+                            type: string
+                            minLength: 1
+                            maxLength: 63
+                          minimum_port:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
+                          maximum_port:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
                         required:
                         - runtime
                         - type
@@ -15667,9 +15773,55 @@ components:
                         - source_ref
                         - source_name
                         - address_mode
-                        - port
                         - path_policy
-                        - endpoint_digest
+                        oneOf:
+                        - required:
+                          - port
+                          - endpoint_digest
+                          not:
+                            anyOf:
+                            - required:
+                              - source_kind
+                            - required:
+                              - definition_digest
+                            - required:
+                              - declared_port_name
+                            - required:
+                              - minimum_port
+                            - required:
+                              - maximum_port
+                        - required:
+                          - source_kind
+                          - definition_digest
+                          not:
+                            anyOf:
+                            - required:
+                              - endpoint_digest
+                          oneOf:
+                          - properties:
+                              source_kind:
+                                const: templateBinding
+                            required:
+                            - declared_port_name
+                            - minimum_port
+                            - maximum_port
+                            not:
+                              anyOf:
+                              - required:
+                                - port
+                          - properties:
+                              source_kind:
+                                const: administratorProfile
+                            required:
+                            - port
+                            not:
+                              anyOf:
+                              - required:
+                                - declared_port_name
+                              - required:
+                                - minimum_port
+                              - required:
+                                - maximum_port
                     required:
                     - action_id
                     - kind
@@ -15790,34 +15942,26 @@ components:
                 preview_deadline:
                   type: string
                   format: date-time
-                  description: Original passive preview expiry; bounds opening a new approval
-                    review, and also start for legacy previewDeadline plans.
+                  description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
                 capture_deadline_rule:
                   enum:
                   - previewDeadline
                   - acceptanceWithinGrant
                   - policyAuthority
-                  description: Manual preview/acceptance window, or the separately accepted
-                    team-policy authority bound by original request-anchored grant expiry.
+                  description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry.
                 capture_window_seconds:
                   type: integer
                   const: 300
-                  description: Maximum window fixed once at acceptance, never beyond original
-                    approval expiry.
+                  description: Maximum window fixed once at acceptance, never beyond original approval expiry.
                 can_resume:
                   type: boolean
-                  description: Advisory current original requester/client collection eligibility
-                    under this exact approved grant. Submission rechecks all authority.
+                  description: Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority.
                 can_resolve:
                   type: boolean
-                  description: Advisory original requester/client may recover a possibly
-                    accepted request after an approved decision. Never offered for pending
-                    or denied review; a missing acceptance closes the original intent.
+                  description: Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent.
                 resume_requires_original_client:
                   type: boolean
-                  description: Guidance only for the same requesting human on another
-                    OAuth client while this marked plan is Approved. It confers no authority
-                    or grant transfer.
+                  description: Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer.
                 policy:
                   type: object
                   additionalProperties: false
@@ -15880,14 +16024,12 @@ components:
                       type: integer
                       minimum: 0
                       maximum: 1000000000
-                      description: Cumulative eligible entry and exit probe ceiling; zero
-                        or absent grants no argument observation.
+                      description: Cumulative eligible entry and exit probe ceiling; zero or absent grants no argument observation.
                     observed_events_used:
                       type: integer
                       minimum: 0
                       maximum: 1000000000
-                      description: Conservative charged event units, including uncertain
-                        observations.
+                      description: Conservative charged event units, including uncertain observations.
                   required:
                   - uid
                   - executor
@@ -16000,6 +16142,28 @@ components:
                       - result_access
                     - required:
                       - remaining_bytes
+              - if:
+                  properties:
+                    kind:
+                      const: policy
+                  required:
+                  - kind
+                then:
+                  properties:
+                    actions:
+                      items:
+                        properties:
+                          profile:
+                            required:
+                            - definition_digest
+                else:
+                  properties:
+                    actions:
+                      items:
+                        properties:
+                          profile:
+                            required:
+                            - endpoint_digest
           required:
           - status
           - data

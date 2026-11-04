@@ -165,10 +165,16 @@ func endpointRequest(t targets.Request, x expandedAction) targets.ProfileEndpoin
 	p := x.profile
 	d, _ := profileDuration(p)
 	r := targets.ProfileEndpointRequest{Target: t, SourceRef: p.Source.ProfileRef, Type: p.Type, Mode: p.Mode, DurationSeconds: int64(d / time.Second), ForceGC: p.ForceGC, NativeLimit: x.action.Limits.MaxBytes}
-	for _, b := range x.bindings {
-		r.Bindings = append(r.Bindings, targets.ProfileEndpointBinding{Name: b.Name, TemplateRef: b.TemplateRef, AddressMode: b.AddressMode, PortName: b.PortName})
-	}
+	r.Bindings = profileEndpointBindings(x)
 	return r
+}
+
+func profileEndpointBindings(x expandedAction) []targets.ProfileEndpointBinding {
+	var bindings []targets.ProfileEndpointBinding
+	for _, b := range x.bindings {
+		bindings = append(bindings, targets.ProfileEndpointBinding{Name: b.Name, TemplateRef: b.TemplateRef, AddressMode: b.AddressMode, PortName: b.PortName})
+	}
+	return bindings
 }
 
 // resolveEndpoints attaches the frozen region answer to every Go endpoint

@@ -33,7 +33,7 @@ func (s *teamRecordingAuthority) AcceptedPolicyAuthority(context.Context, string
 }
 func (s *teamRecordingAuthority) PolicyAutomationAuthority(ctx context.Context, a authorization.AcceptedPolicyAuthority, target authorization.Target) (authorization.AutomationProjection, error) {
 	p, err := s.f.Permissions(ctx, target)
-	return authorization.AutomationProjection{InstallationID: a.InstallationID, Delegation: a.Delegation, Envelope: authorization.AutomationEnvelope{AllowedActions: []string{"packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: a.Limits.MaxExecutions, MaxBytes: a.Limits.MaxBytes, MaxObservedBytes: a.Limits.MaxObservedBytes}, ObservedAt: s.f.now, FreshUntil: s.f.now.Add(30 * time.Second), Permissions: p}, err
+	return authorization.AutomationProjection{InstallationID: a.InstallationID, Delegation: a.Delegation, Envelope: authorization.AutomationEnvelope{AllowedActions: s.authority.Actions, MaxLifetimeSeconds: 3600, MaxExecutions: a.Limits.MaxExecutions, MaxBytes: a.Limits.MaxBytes, MaxObservedBytes: a.Limits.MaxObservedBytes}, ObservedAt: s.f.now, FreshUntil: s.f.now.Add(30 * time.Second), Permissions: p}, err
 }
 
 type teamRecordingSettings struct {
