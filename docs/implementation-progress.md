@@ -10,7 +10,8 @@ synthetic profiles outside the measured worker (100,000 samples/functions/locati
 protobufs), serves exactly two fixed inputs through the existing endpoint, and
 probes the original query worker after each of the existing two comparisons.
 This is one accepted shape, not all simultaneous parser maxima or a complete
-resource/cancellation matrix. Production Go, RBAC, services and limits are unchanged.
+resource/cancellation matrix. The production diagnostic now retains the earliest private authority source label;
+collection/analysis decisions, authority dates, RBAC, services and limits are unchanged.
 
 Local pre-push/profile gates passed441 console tests and4.469s fixture races
 after integration with the heap repair. The unchanged one-second encrypted
@@ -102,9 +103,38 @@ local comparer and isolate the approved storage-reader boundary. Both exact file
 results in0.985s/1.154s, with process RSS237.2MiB/248.4MiB. The original ten-second
 durations and700,000/1,100,000 totals are retained. This excludes production
 storage/authority/framing/transport, so no installed resource claim follows;
-evidence is in `test/results/profile-heavy-exact-comparer-local/`. The worker's
-five-second S3/key HTTP request cap is a concrete code fact, not yet a demonstrated
-cause. Existing operation, worker and job deadlines remain unchanged. The
+evidence is in `test/results/profile-heavy-exact-comparer-local/`. The S3 adapter copies the worker HTTP client and sets a thirty-second total
+request cap; five-second dial/TLS/header bounds and the separate key client's
+five-second cap remain. A five-second S3 body timeout was an unconfirmed initial
+hypothesis and does not describe this composed client. Existing operation, worker and job deadlines remain unchanged.
+
+The existing `until-authority/comparison` label establishes that this poll's
+original authority cutoff was reached: `projectionRequest.cut` emits it only
+after the request is cancelled and the retained minimum deadline has passed.
+It does not identify which source observation supplied that minimum. Local full
+approved-reader tests pass with the exact pair, both the normal and worker HTTP
+clients, six-second frame-body delays and a six-second parser delay. Crossing the
+original twenty-second context reproduces unavailability with all six keys used.
+The existing real-TLS projection seam also joins after a six-second reader, beyond
+its initial five-second observation. These rule out those deterministic local
+reader/transport hypotheses; they are not installed resource qualification.
+
+The focused diagnostic update records query, batch, invocation, operation and
+authority timestamps in the existing bounded fixture read. It adds no database
+call, privilege, runtime state or deadline. The comparison authorizer now retains
+the closed earliest child/source label instead of replacing it with generic
+`comparison`; this changes no authority date, digest or wire field. Meaningful
+RED/GREEN cases cover a widened baseline recheck, an earlier incident, ties and
+a genuinely stricter final recheck. Focused authority/consumer races passed
+in1.182s/1.114s; independent review found no blocker. The observed
+benefit is identifying the actual expired interval after this failure; costs are
+zero additional API calls, state, privileges, watches or runtime dependencies.
+Originals are in `test/results/profile-heavy-read-boundary-local/`. A single next
+installed run is scoped to the same pair, comparisons, limits, funding and original
+deadlines with these diagnostics. It may identify the limiting source; it does
+not presume that the large-input workflow has been repaired. No timeout is raised.
+
+ The
 prepared trace/browser follow-ups are consolidated into one unpublished test
 candidate to share one CI matrix; their installed results remain separate.
 

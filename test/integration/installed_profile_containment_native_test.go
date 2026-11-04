@@ -150,17 +150,22 @@ func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxp
 		var nativeClosed, closed, active, uncertain bool
 		var units, keys int
 		var rootSpent int64
-		var roleMasks json.RawMessage
+		var roleMasks, readDeadlines json.RawMessage
 		read := func() error {
 			readCall, stopRead := context.WithTimeout(call, 2*time.Second)
 			defer stopRead()
 			return admin.QueryRow(readCall, `SELECT q.query,w.intent_json,w.job_json,w.binding_json,coalesce(b.native_closed,false),coalesce(b.closed,false),q.active_batch IS NOT NULL,q.uncertain,
  context_query_units(q.query->'Scope'),(SELECT count(*) FROM context_query_key_binding k WHERE k.query_id=q.id AND k.used_roles=7),
  (SELECT allocated FROM context_query_backing WHERE root_id=q.root_id),
- coalesce((SELECT jsonb_agg(jsonb_build_object('ordinal',source_ordinal,'used_roles',used_roles) ORDER BY source_ordinal) FROM context_query_key_binding WHERE query_id=q.id),'[]'::jsonb)
+ coalesce((SELECT jsonb_agg(jsonb_build_object('ordinal',source_ordinal,'used_roles',used_roles) ORDER BY source_ordinal) FROM context_query_key_binding WHERE query_id=q.id),'[]'::jsonb),
+ jsonb_build_object('batchStartedAt',b.batch->'StartedAt','batchUntil',b.batch->'Until',
+ 'requestStartedAt',b.batch->'Request'->'Call'->'StartedAt','requestUntil',b.batch->'Request'->'Call'->'Until',
+ 'operationStartedAt',b.native_operation->'StartedAt','operationUntil',b.native_operation->'Until',
+ 'authorityCheckedAt',b.native_authority->'CheckedAt','authorityValidUntil',b.native_authority->'ValidUntil',
+ 'accessUntil',b.native_authority->'AccessUntil')
  FROM context_query q JOIN download_worker w ON w.root_id=q.root_id AND w.id=q.worker_id AND w.query_id=q.id
  LEFT JOIN context_query_batch b ON b.query_id=q.id AND b.generation=q.generation
- WHERE q.root_id=$1 AND q.operation_id=$2`, root, operation).Scan(&rawQuery, &rawIntent, &rawJob, &rawBinding, &nativeClosed, &closed, &active, &uncertain, &units, &keys, &rootSpent, &roleMasks)
+ WHERE q.root_id=$1 AND q.operation_id=$2`, root, operation).Scan(&rawQuery, &rawIntent, &rawJob, &rawBinding, &nativeClosed, &closed, &active, &uncertain, &units, &keys, &rootSpent, &roleMasks, &readDeadlines)
 		}
 		if operation == "" {
 			failure = errors.New("no acknowledged original query locator; resource failure remains unknown")
@@ -183,6 +188,8 @@ func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxp
 			return
 		}
 		record["queryID"], record["workerID"], record["workerUntil"], record["queryUnits"], record["rootUnits"], record["fullyConsumedChildren"] = q.ID, q.WorkerID, q.WorkerUntil, units, rootSpent, keys
+		record["observedAt"], record["queryCreatedAt"], record["queryDeadline"] = time.Now().UTC(), q.CreatedAt, q.Deadline
+		record["planHardUntil"], record["baselinePlanHardUntil"], record["readDeadlines"] = q.Plan.HardUntil, q.BaselinePlan.HardUntil, readDeadlines
 		record["nativeClosed"], record["closed"], record["active"], record["uncertain"] = nativeClosed, closed, active, uncertain
 		record["keyRoles"], record["sourcePodUIDs"] = roleMasks, [2]string{baseline.PodUID, q.Scope.PodUID}
 		if complete {
@@ -204,7 +211,8 @@ func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxp
 				failure = errors.New("resource observer lacks exact paid/joined comparison")
 				return
 			}
-			record["nativeClosed"], record["closed"], record["active"], record["uncertain"], record["keyRoles"] = nativeClosed, closed, active, uncertain, roleMasks
+			record["nativeClosed"], record["closed"], record["active"], record["uncertain"], record["keyRoles"], record["readDeadlines"] = nativeClosed, closed, active, uncertain, roleMasks, readDeadlines
+			record["observedAt"] = time.Now().UTC()
 		}
 		readPod := func() (*core.Pod, error) {
 			podCall, stopPod := context.WithTimeout(call, 2*time.Second)
