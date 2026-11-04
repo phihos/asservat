@@ -2,56 +2,50 @@
 
 ## Current shared profile candidate (2026-11-04)
 
-PR162 has a new integrated follow-up awaiting publication/qualification. The
-previous frozen `6effd250` runs completed with later-boundary failures; all4,132
-submitted source hashes, including registered browser helpers, matched Git in
-both native runs, with unchanged sources, clean cleanup and removed scratch.
+The next PR162 candidate incorporates the measured Repeat phase fix. Previous
+`1cba8f74` passed genuine pull-request CI41879540541 and
+[installed heap41879673486](../test/results/heap-browser-native-41879673486/README.md)
+(Go/harness0,587.634s): actual React summary, ten-unit/three-role SQL proof,
+authenticated534B native download, local pprof and fresh Repeat passed. All4,135
+submitted sources matched Git; cleanup passed. Heavy comparison remains qualified
+at c6 in [41863091784](../test/results/profile-heavy-native-41863091784/README.md).
 
-| Workflow/source | Verified result | Remaining boundary |
-| --- | --- | --- |
-| [Heavy comparison at c6](../test/results/profile-heavy-native-41863091784/README.md) | Native41863091784 Go/harness0,683.416s; MCP/React/full SQL/key/source and both live probes pass. Peaks228.07/240.00MiB under384MiB,500m throttling observed, no swap/high/max/OOM. | One accepted shape, with exact c6 source/image attribution. |
-| [Heap browser at6eff](../test/results/heap-browser-native-41872233069/README.md) | Native41872233069 Go/harness1,589.462s. Actual summary/SQL and native link/URL/filename/body plus in-process SHA/size checks pass, as do same-human/source case-refresh checks. | Later close-state assertion expected expired while a real refresh cleared the view to idle. No independently retained raw native/pprof/repeat proof. |
-| [Runtime trace at6eff](../test/results/runtime-trace-native-41872236223/README.md) | Native41872236223 Go/harness1,525.298s. Capture, semantic pprof refusal, all zero-query guards, authenticated76,500B trace/hash and offline Go trace parsing to508B scheduler pprof pass. | Fresh Repeat preview fails storage readiness after4.530477s. |
+[Trace41879675203](../test/results/runtime-trace-native-41879675203/README.md)
+exited1/508.941s after capture, semantic refusal/zero-query checks, authenticated
+74,983B trace/hash and offline Go trace parsing passed. Repeat preview refused
+at17:55:47.091773703Z; the existing demand succeeded1.508s later after4.5s work.
+All source/cleanup audits passed. The inner5s composition and1s reserve could
+not accommodate that valid source operation plus planning. Original target and
+recovery observations also expire within5s, so increasing that timeout alone
+would incorrectly reuse stale facts; the advancing-clock regression proves it.
 
-The heap close mismatch is reproduced through the real SessionGate resume path,
-HTTP refresh/case reads and an already-started native transfer, using synthetic
-service facts. A validated post-summary same-human refresh may leave an idle
-view only with cleared rows/status/alerts, no old Close view and an enabled
-Inspect control. No-refresh expiry still requires the exact expired state.
-The meaningful old-order RED exits1/20.798s; all three heap states plus comparison
-pass44.226s with original clock/session/minute bounds. No production behavior or
-new default client request is introduced. See
-[heap-browser-refresh-close-local](../test/results/heap-browser-refresh-close-local/README.md).
+The scoped fix allocates8s up front for authenticated single-profile repeats,
+keeps initial recovery before the same nonauthoritative review/demand, then uses
+the same recorder RPC's complete fresh target and new final authority facts
+after readiness. One additional current recovery read must retain installation,
+issuer epoch and the full revision; it never extends the first proof. Exact
+original target pins, parent/identity/history/source deadlines and all final
+permission/capability/retention/storage checks remain. Ordinary classification
+and non-profile requests retain5s, including their response reserve. A catalog
+returned after classification expiry cannot enter the longer phase. Preview-only
+browser requests use15s, matching the existing public15s bound; other calls10s.
 
-CI41872117868 failed because an unconditional Go test launched the JavaScript
-proof without Ajv installed in the Go-only job. The unchanged proof now runs in
-the existing frontend npm check, and the Go bridge is removed. All assertions
-remain. The full affected Go package passes50.213s without frontend modules;
-frontend checks pass441 tests plus the proof. No dependency, lockfile, skip or
-Go-job npm setup is added. See
-[profile-ci-proof-gate-local](../test/results/profile-ci-proof-gate-local/README.md).
+Costs: three SQL queries/one transaction per affected repeat, up to12 additional
+existing logical storage polls on a stalled repeat, zero added Kubernetes reads,
+roles, owners, watches, pools or capture requests. The measured composed path
+passes5.684s; fifteen source/deadline cases and actual late-return/reserve/browser
+regressions pass. Both independent reviews found no blockers. Exact commands,
+intermediate failures and source identities are in
+[profile-repeat-phase-local](../test/results/profile-repeat-phase-local/README.md).
 
-Trace's early hint, one demand and32MiB funding are correct. Its final native
-source-guard probe failed without an exact original cutoff or underlying body
-error in the old log. The new private diagnostic preserves closed cutoff labels,
-exact original UTC end/remaining and deadline/cancel/body/transport categories.
-Actual authority/min/context/guard/API/cache/wait decisions remain unchanged;
-valid403 StatusError denial remains valid. This is attribution only, not a
-repeat-availability fix or retrospective proof of its cause. Actual HTTPS and
-original-cutoff regressions pass, including affected races2.289s/12.584s. See
-[trace-repeat-diagnostic-local](../test/results/trace-repeat-diagnostic-local/README.md).
-
-Independent reviews found no blockers. Complete local pre-push/profile/Go
-architecture/specification/architecture/design/browser gates pass:441 console
-tests,5.666s fixture races and69.992s full browser gate with28 journeys,
-27 accessibility scans, no external requests or CSP/runtime errors. Exact
-commands, source attribution and generated-output readbacks are in
-[profile-refresh-observation-final-local](../test/results/profile-refresh-observation-final-local/README.md).
-
-Final pushed-head CI and fresh heap/trace qualification remain required. Heavy
-proof stays attributed to c6; the follow-ups preserve comparison/worker/parser/
-resource behavior. TLS preparation is parked and unpublished; credential work
-has not started. Full S-05 and the complete specification goal remain active.
+Complete local pre-push/profile/Go architecture/specification/architecture/design/
+full-browser/service gates passed at8cde9451. Browser passed70.715s with28journeys/
+27accessibility scans. Both real SQL/S3/KMS service fixtures passed; each matched
+all4,077 submitted Git blobs with unchanged sources, clean cleanup and no owned
+containers left. Original reports and output readbacks are in
+[profile-repeat-phase-final-local](../test/results/profile-repeat-phase-final-local/README.md).
+New pushed-head CI and fresh heap/trace qualification remain required. TLS is a
+parked unpublished follow-up; full S-05/specification completion remains open.
 Earlier checkpoints follow.
 
 ## Latest comparison qualification (2026-11-04)
