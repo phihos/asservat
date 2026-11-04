@@ -303,10 +303,15 @@ func (g *OwnerWorkloadProtection) proveObjectIdentity(ctx context.Context, start
 		if json.Unmarshal(raw, &object) != nil || object.APIVersion != "apps/v1" || object.Kind != "Deployment" || !ownerMetadata(object.ObjectMeta, g.plan.ControlNamespace.Name, g.plan.Deployment, g.plan.DeploymentUID) {
 			return zero, authentication.UserInfo{}, configurationSourceError(configurationSourceProbeObjectShape, cfg.ErrChanged)
 		}
+		probeRemaining := time.Duration(0)
+		if until, ok := ctx.Deadline(); ok {
+			probeRemaining = time.Until(until)
+		}
 		response := g.probe.api.Put().AbsPath(path).Param("dryRun", "All").Param("fieldValidation", "Strict").Body(raw).MaxRetries(0).Do(ctx)
-		raw, _ = response.Raw()
+		var rawErr error
+		raw, rawErr = response.Raw()
 		if permissionJSON(raw, permissionPageBytes, 131072) != nil {
-			return zero, authentication.UserInfo{}, configurationSourceError(configurationSourceProbeDenialBody, cfg.ErrUnavailable)
+			return zero, authentication.UserInfo{}, ownerProbeFailure(ctx, rawErr, probeRemaining)
 		}
 		err = response.Error()
 		var status apierrors.APIStatus

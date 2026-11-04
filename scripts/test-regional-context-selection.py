@@ -13,6 +13,7 @@ import json
 import tempfile
 import hashlib
 import subprocess
+from types import SimpleNamespace
 
 spec = importlib.util.spec_from_file_location("context_fixture", Path(__file__).with_name("test-context-storage.py"))
 fixture = importlib.util.module_from_spec(spec)
@@ -20,6 +21,130 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_accepted_heavy_alias_keeps_existing_focus_limits_and_pins_variant(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fake=Path(directory)/"python3"
+            fake.write_text('#!/usr/bin/python3\nimport json,os,sys\nprint(json.dumps({"args":sys.argv[1:],"focus":os.environ.get("ASSERVAT_JOURNEY_FOCUS"),"variant":os.environ.get("ASSERVAT_PROFILE_VARIANT")}))\n')
+            fake.chmod(0o755)
+            env=dict(os.environ,PATH=directory+os.pathsep+os.environ["PATH"],ASSERVAT_PROFILE_VARIANT="heap")
+            result=subprocess.run([str(Path(__file__).with_name("ci-native.sh")),"continuation-profile-comparison-heavy"],env=env,capture_output=True,text=True,check=True)
+            selected=json.loads(result.stdout)
+            self.assertEqual(selected,{"args":["scripts/test-context-storage.py","--initial-bootstrap-chain","--runtime-provider-pair","--installer-continuation"],"focus":"profile-comparison","variant":"accepted-heavy"})
+        with patch.dict(os.environ,{"ASSERVAT_JOURNEY_FOCUS":"profile-comparison","ASSERVAT_PROFILE_VARIANT":"accepted-heavy"}):
+            self.assertEqual(fixture.qualification_profile_variant(os.environ),"accepted-heavy")
+            self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True),"18m")
+            self.assertEqual(fixture.qualification_cluster_count(3,installer_continuation=True),2)
+        with self.assertRaises(ValueError):
+            fixture.qualification_profile_variant({"ASSERVAT_JOURNEY_FOCUS":"manual-profile","ASSERVAT_PROFILE_VARIANT":"accepted-heavy"})
+        workflow=(Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
+        for step in ("Disposable-host guard","tshark"):
+            at=workflow.index("name: "+step)
+            self.assertIn("continuation-profile-comparison-heavy",workflow[workflow.rfind("      - if:",0,at):at])
+        self.assertIn("timeout-minutes: 20",workflow)
+        source=(Path(__file__).resolve().parents[1]/"test/integration/installed_profile_comparison_native_test.go").read_text()
+        self.assertLess(source.index("resources[0](index, handle, operation, pair, true)"),source.index("\n\tproofs.flush(t)"))
+
+    def test_accepted_heavy_generator_image_provenance_and_nonroot_readability(self):
+        # This checks provenance plumbing with synthetic bytes; the separate
+        # real generator component proves that its native pprof is accepted.
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            (root/"test/results").mkdir(parents=True)
+            image=root/"image";image.mkdir()
+            generator=root/"profile-heavy-generator.test"
+            def compile_fake(command,**kwargs):
+                output=Path(command[command.index("-o")+1])
+                output.write_bytes(b"synthetic trusted build output")
+                self.assertEqual(kwargs["env"]["CGO_ENABLED"],"0")
+            def generate_fake(command,**kwargs):
+                generator_sha=hashlib.sha256(generator.read_bytes()).hexdigest()
+                manifest={"format":"accepted-heavy-pprof-fixture/v1","generator_binary_sha256":generator_sha,"profile_type":"cpu","sample_type":"cpu","unit":"nanoseconds","duration_ns":10000000000,"inputs":[]}
+                for side in ("baseline","incident"):
+                    p=image/("profile-heavy-"+side+".pb.gz")
+                    with p.open("wb") as out:out.truncate(8*1024**2+1)
+                    with p.open("rb") as source:digest=hashlib.file_digest(source,"sha256").hexdigest()
+                    manifest["inputs"].append({"filename":p.name,"side":side,"native_bytes":p.stat().st_size,"native_sha256":digest,"protobuf_bytes":16*1024**2-56,"functions":100000,"locations":100000,"samples":100000,"frame_visits":1048576,"sample_location_references":1048576,"inline_lines":100000,"values_per_sample":16,"sample_types":16,"numeric_label_records_with_units":32768,"shared_object_units":662144})
+                (image/"profile-heavy-manifest.json").write_text(json.dumps(manifest))
+                self.assertNotIn("GOMEMLIMIT",kwargs["env"])
+                self.assertEqual(kwargs["env"]["GOMAXPROCS"],"2")
+                return SimpleNamespace(pid=12345,returncode=None)
+            report={}
+            with patch.object(fixture,"ROOT",root),patch.object(fixture.subprocess,"run",side_effect=compile_fake),patch.object(fixture.subprocess,"Popen",side_effect=generate_fake),patch.object(fixture.os,"wait4",return_value=(12345,0,SimpleNamespace(ru_maxrss=487412,ru_utime=2.0,ru_stime=0.2))):
+                metadata=fixture.prepare_profile_containment_fixture({"CGO_ENABLED":"0","GOMEMLIMIT":"must-not-leak"},root,image,report)
+            self.assertFalse(any((root/"test/results").iterdir()), "producer wrote generated artifacts before explicit terminal collection")
+            self.assertEqual(metadata["OutputDirectory"],str(root/"profile-containment"))
+            self.assertTrue((root/"profile-containment/profile-heavy-generation.log").is_file())
+            self.assertTrue((root/"profile-containment/profile-heavy-manifest.json").is_file())
+            self.assertEqual(report["profileHeavyGeneration"]["peakRSSKiB"],487412)
+            self.assertEqual(report["profileHeavyGeneration"]["exitCode"],0)
+            self.assertFalse(report["profileHeavyGeneration"]["timedOut"])
+            self.assertEqual(report["profileHeavyImageNativeBytes"],2*(8*1024**2+1))
+            self.assertEqual(metadata["ResourceProbeSHA256"],hashlib.sha256((image/"worker-resource-probe").read_bytes()).hexdigest())
+            for item in metadata["Manifest"]["inputs"]:
+                self.assertEqual((image/item["filename"]).stat().st_mode&0o777,0o444)
+            p=image/metadata["Manifest"]["inputs"][0]["filename"]
+            p.chmod(0o600)
+            with p.open("r+b") as f:f.write(b"changed")
+            with self.assertRaisesRegex(RuntimeError,"hash/bound"):
+                fixture.validate_profile_heavy_manifest(image,metadata["Manifest"]["generator_binary_sha256"])
+
+    def test_failed_heavy_producer_retains_original_artifacts_for_terminal_collection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            results=root/"test/results"; results.mkdir(parents=True)
+            work=root/"private-run"; work.mkdir(mode=0o700)
+            image=work/"image"; image.mkdir()
+            def compile_fake(command,**kwargs):
+                Path(command[command.index("-o")+1]).write_bytes(b"synthetic generator binary")
+            def fail_fake(command,**kwargs):
+                kwargs["stdout"].write(b"synthetic producer terminal failure")
+                (image/"profile-heavy-manifest.json").write_bytes(b"partial producer manifest")
+                return SimpleNamespace(pid=12345,returncode=None)
+            report={}
+            with patch.object(fixture,"ROOT",root),patch.object(fixture.subprocess,"run",side_effect=compile_fake),patch.object(fixture.subprocess,"Popen",side_effect=fail_fake),patch.object(fixture.os,"wait4",return_value=(12345,256,SimpleNamespace(ru_maxrss=1,ru_utime=0.0,ru_stime=0.0))):
+                with self.assertRaisesRegex(RuntimeError,"separate producer failed"):
+                    fixture.prepare_profile_containment_fixture({"CGO_ENABLED":"0"},work,image,report)
+            self.assertEqual(report["profileHeavyGeneration"]["exitCode"],1)
+            self.assertFalse(any(results.iterdir()))
+            collected=fixture.collect_profile_containment_artifacts(work,results)
+            destination=Path(collected["directory"])
+            self.assertEqual((destination/"profile-heavy-generation.log").read_bytes(),b"synthetic producer terminal failure")
+            self.assertEqual((destination/"profile-heavy-manifest.json").read_bytes(),b"partial producer manifest")
+
+    def test_containment_terminal_collection_preserves_success_and_failure_before_cleanup(self):
+        for complete in (False, True):
+            with self.subTest(complete=complete), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory)
+                work=root/"private-run"; work.mkdir(mode=0o700)
+                artifacts=work/"profile-containment"; artifacts.mkdir(mode=0o700)
+                results=root/"results"; results.mkdir()
+                (artifacts/"profile-heavy-generation.log").write_bytes(b"trusted generator output")
+                (artifacts/"profile-heavy-manifest.json").write_text('{"synthetic":true}')
+                kind="complete" if complete else "failure"
+                name=f"profile-worker-containment-0-{kind}.json"
+                (artifacts/name).write_text(json.dumps({"resourceQualified":complete}))
+                (artifacts/"unrelated-private-file").write_text("must not be collected")
+                self.assertFalse(any(results.iterdir()))
+                report=fixture.collect_profile_containment_artifacts(work,results)
+                expected=["profile-heavy-generation.log","profile-heavy-manifest.json",name]
+                self.assertEqual(report["files"],expected)
+                destination=Path(report["directory"])
+                self.assertEqual(destination.parent,results)
+                for name in expected:
+                    self.assertEqual((destination/name).read_bytes(),(artifacts/name).read_bytes())
+                self.assertFalse((destination/"unrelated-private-file").exists())
+                # Collection survives the actual following private-work cleanup.
+                import shutil
+                shutil.rmtree(work)
+                self.assertEqual(json.loads((destination/f"profile-worker-containment-0-{kind}.json").read_text()),{"resourceQualified":complete})
+        source=inspect.getsource(fixture.main)
+        terminal=source.index('finally:\n            report["testExit"]')
+        collect=source.index("collect_profile_containment_artifacts(work",terminal)
+        cleanup=source.index('keep = keep_on_failure',terminal)
+        self.assertLess(terminal,collect)
+        self.assertLess(collect,cleanup)
+        self.assertIsNone(fixture.collect_profile_containment_artifacts(root/"absent",results))
+
     def test_heap_alias_uses_existing_focus_and_closed_variant(self):
         # Execute only the dispatcher against a fake Python executable: no
         # harness, provider, image build or Kubernetes operation is started.
@@ -54,13 +179,18 @@ class RegionalContextSelection(unittest.TestCase):
 
     def test_heap_summary_precedes_authorized_native_preparation(self):
         source = (Path(__file__).resolve().parents[1]/"test/integration/installed_approved_recording_native_test.go").read_text()
-        joined = source.index('heap phase: read-only summary completed with joined SQL worker/key proof')
-        preparing = source.index('heap phase: separately authorized native preparation begins')
-        prepare_call = source.index('\n\tprepareDownload()', preparing)
-        self.assertLess(source.index('heapSummary = queryInstalledProfileSummary('), joined)
+        check = source.index('verify := summaryCheck(row.ID)')
+        browser = source.index('call, downloadNative, finishBrowser := installedProfileBrowser(', check)
+        summary = source.index('heapSummary := queryInstalledProfileSummary(', browser)
+        joined = source.index('heap phase: installed React summary completed with joined SQL worker/key proof', summary)
+        preparing = source.index('heap phase: separately authorized browser native preparation begins', joined)
+        native = source.index('native, _ := downloadNative()', preparing)
+        self.assertLess(check, browser)
+        self.assertLess(browser, summary)
+        self.assertLess(summary, joined)
         self.assertLess(joined, preparing)
-        self.assertLess(preparing, prepare_call)
-        self.assertLess(prepare_call, source.index('installedProfileSummaryMatchesNative(heapSummary, native'))
+        self.assertLess(preparing, native)
+        self.assertLess(native, source.index('installedProfileSummaryMatchesNative(heapSummary, native', native))
 
     def test_parent_recording_focus_returns_before_third_cluster(self):
         # Bind the actual parent control flow, not merely its inner journey's

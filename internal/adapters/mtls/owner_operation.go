@@ -77,7 +77,7 @@ func NewOwnerObservationOperation(ctx context.Context, pin value.OwnerObservatio
 	o.initial = facts.Clone()
 	o.facts = facts.Clone()
 	o.registration = first
-	o.until = identity.Earlier(o.until, identity.Earlier(facts.FreshUntil, first.FreshUntil))
+	o.until = identity.Earlier(o.until, facts.FreshUntil)
 	finalCall, stopFinal := context.WithDeadline(root, o.until)
 	defer stopFinal()
 	last, err := o.current(finalCall)
@@ -85,7 +85,6 @@ func NewOwnerObservationOperation(ctx context.Context, pin value.OwnerObservatio
 		cancel()
 		return nil, value.ErrUnavailable
 	}
-	o.until = identity.Earlier(o.until, last.FreshUntil)
 	return o, nil
 }
 func ownerOperationPeerMatches(f value.OwnerObservationNativeFacts, r value.OwnerRegistrationObservation) bool {
@@ -187,18 +186,18 @@ func (o *OwnerObservationOperation) read(ctx context.Context, ordinal int) (cont
 		return z, answerStep("registration", value.ErrUnavailable, err)
 	}
 	o.mu.Lock()
-	o.until = identity.Earlier(o.until, r.FreshUntil)
-	registryEnd := o.until
+	registryEnd := identity.Earlier(o.until, r.FreshUntil)
 	o.mu.Unlock()
-	registryCall, stopRegistry := context.WithDeadline(call, registryEnd)
-	defer stopRegistry()
+	if !o.now().Before(registryEnd) {
+		return z, answerStep("registration-expired", value.ErrUnavailable, nil)
+	}
 	facts := o.facts.Clone()
 	if ordinal == 4 {
-		facts, err = o.native.Final(registryCall)
+		facts, err = o.native.Final(call)
 		if err != nil || !facts.Final || !facts.Valid(o.now()) || !sameOwnerOperationFacts(o.initial, facts) || !ownerOperationPeerMatches(facts, r) {
 			return z, answerStep("final-native", value.ErrUnavailable, err)
 		}
-		nativeCall, stopNative := context.WithDeadline(registryCall, identity.Earlier(registryEnd, facts.FreshUntil))
+		nativeCall, stopNative := context.WithDeadline(call, facts.FreshUntil)
 		defer stopNative()
 		r, err = o.current(nativeCall)
 		if err != nil || !sameOwnerOperationRegistration(o.registration, r) {
@@ -217,7 +216,7 @@ func (o *OwnerObservationOperation) read(ctx context.Context, ordinal int) (cont
 		}
 		return z, answerStep(step, value.ErrUnavailable, nil)
 	}
-	o.until = identity.Earlier(o.until, identity.Earlier(facts.FreshUntil, r.FreshUntil))
+	o.until = identity.Earlier(o.until, facts.FreshUntil)
 	facts.FreshUntil = identity.Earlier(facts.FreshUntil, o.until)
 	if !facts.Valid(o.now()) {
 		return z, answerStep("window", value.ErrUnavailable, nil)
@@ -294,12 +293,12 @@ func (o *OwnerObservationOperation) checkRetained(ctx context.Context, requireFi
 	if o.closed || o.root.Err() != nil || call.Err() != nil || ctx.Err() != nil || (requireFinal && (!o.facts.Final || o.ordinal != 4)) || !o.facts.Valid(o.now()) || !ownerOperationPeerMatches(o.facts, r) {
 		return time.Time{}, value.ErrUnavailable
 	}
-	o.until = identity.Earlier(o.until, r.FreshUntil)
-	if !o.now().Before(o.until) {
+	until := identity.Earlier(o.until, r.FreshUntil)
+	if !o.now().Before(until) {
 		return time.Time{}, value.ErrUnavailable
 	}
 	good = true
-	return o.until, nil
+	return until, nil
 }
 
 // This ingress admits only the original installed regional TLS identity. It has

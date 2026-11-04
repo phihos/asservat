@@ -26,7 +26,11 @@ constructors support existing evidence-read twenty-second windows and the
 fifteen-second `request_capture` and `preview_capture` composition windows
 (ADR-268 and [ADR-289](../decisions/289-preview-composition-window.md));
 singleton application starts remain bounded to their original five seconds. Manual groups carry the server-owned original request bounds before deriving short admission observations (ADR-269); selected audit and snapshot deadlines remain fixed on first admission. They cannot be renewed by Continue or replay.
-The selected window is fixed before request ownership, never widened later. A browser session's expiry also applies.
+The selected window is fixed before request ownership, never widened later. A browser session's expiry also applies. The real browser session resolver validates its five-second settings
+observation on each persisted read; that observation and credential-refresh
+scheduling metadata do not replace the returned identity's independently verified
+expiry. Later session/current-identity reads and final disclosure still require
+current settings and an unrevoked session ([ADR-300](../decisions/300-browser-evidence-request-lifetime.md)).
 Later observations cannot renew that interval. A shorter current observation
 permanently shortens the request handle, including when concurrent provider
 reads complete out of order. A final locked check applies the earliest observed

@@ -130,3 +130,16 @@ func TestCredentialRefreshScheduleCanBeImmediatelyDueWithoutExtendingIdentity(t 
 		t.Fatal("schedule extended short identity", v.Identity.ValidUntil)
 	}
 }
+
+func TestBrowserCredentialSchedulingWindowDoesNotShortenVerifiedIdentity(t *testing.T) {
+	f, s := newFixture()
+	f.c.KeyUntil = f.now.Add(time.Minute)
+	observation, err := s.ObserveCredential(t.Context(), "synthetic-access")
+	if err != nil || !observation.Identity.ValidUntil.Equal(f.now.Add(30*time.Second)) || !observation.Window.FreshUntil.Equal(f.now.Add(5*time.Second)) {
+		t.Fatal("real verified policy and scheduling windows", err, observation)
+	}
+	identity, window, err := resolveBrowserCredential(t.Context(), s, "synthetic-access", s.Now)
+	if err != nil || !identity.ValidUntil.Equal(observation.Identity.ValidUntil) || window != observation.Window {
+		t.Fatal("token refresh scheduling shortened actual identity authority", err, identity.ValidUntil, observation.Identity.ValidUntil)
+	}
+}

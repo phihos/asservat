@@ -25,7 +25,18 @@ All routes require direct, correctly addressed HTTPS. This handler does not trus
 
 Each use revalidates the current access token, group freshness and protected issuer/client eligibility. SQL session expiry never extends token/group freshness. The initial refresh schedule is the earlier of one minute, access-token expiry minus fifteen seconds and fixed session expiry; stricter current group freshness can force an earlier refresh. A policy/key-service outage does not cause refresh or stale-claim fallback.
 
-Current SQL reads/creation additionally return a transient `SessionObservation`: exact settings revision, original observation time and the earlier of its original five-second deadline and fixed session expiry. This value is not persisted as a reusable lease; a new read cannot extend it. `BrowserSession.Current` distinguishes it from stored credentials and CSRF-only reads. The callback and final resolver recheck the exact session identity and current observation after I/O/cancellation, then shorten the returned identity to its earliest token/policy/session/settings deadline. Downstream checks cannot accidentally keep using a minute-long identity after its browser authority ended. Bounded observation freshness remains distinct from immediate cancellation delivery; no public effect path is enabled by this handoff alone.
+Current SQL reads/creation additionally return a transient `SessionObservation`: exact settings revision, original observation time and the earlier of its original five-second deadline and fixed session expiry. This value is not persisted as a reusable lease; a new read cannot extend it. `BrowserSession.Current` distinguishes it from stored credentials and CSRF-only reads. The callback retains its original settings handoff. Current session resolution
+checks the exact session identity and fresh persisted observation after
+I/O/cancellation, then caps request identity at the independently verified
+token/key/group/policy and actual session expiries. The operation owner keeps its
+original selected window; ordinary requests stay five seconds and evidence reads
+can use the existing twenty seconds. Every later resolution/final check still
+requires fresh current settings and cannot revive a revoked session. The
+five-second credential scheduling window does not truncate that identity.
+[ADR-300](../decisions/300-browser-evidence-request-lifetime.md) amends the earlier
+observation-to-request coupling without extending an observation, changing the
+settings observer or adding a renewal loop. Current-state checks are distinct
+from instantaneous interruption during in-flight work.
 
 If creation has an unknown outcome or the callback cannot hand off a current identity, make one independent, at-most-one-second attempt to revoke its exact newly generated session ID. This still runs after client cancellation, preserves the original failure and never revokes an existing session. It prevents known failed callbacks from unnecessarily consuming the per-user session ceiling when storage is available. If cleanup also fails, the original finite expiry remains; do not claim removal or renew the credentials. A successful callback keeps its session.
 

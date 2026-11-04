@@ -68,7 +68,7 @@ jobs:
           NATIVE_SUITE: "${{ matrix.suite }}"
         run: |
           builder=()
-          if [[ $NATIVE_SUITE == continuation-manual-arguments || $NATIVE_SUITE == continuation-manual-syscall || $NATIVE_SUITE == continuation-profile-comparison || $NATIVE_SUITE == continuation-policy-profile ]]; then
+          if [[ $NATIVE_SUITE == continuation-manual-arguments || $NATIVE_SUITE == continuation-manual-syscall || $NATIVE_SUITE == continuation-profile-comparison || $NATIVE_SUITE == continuation-profile-comparison-heavy || $NATIVE_SUITE == continuation-policy-profile ]]; then
             builder=(experiments/syscall-argument-budget/pins.json)
           fi
           grep -ohE '[a-z0-9./-]+@sha256:[0-9a-f]{64}' scripts/test-*.py "${builder[@]}" | sort -u > /tmp/images
@@ -78,7 +78,7 @@ jobs:
           console: "${{ !startsWith(matrix.suite, 'collector-') }}"
           sql-tools: "${{ !startsWith(matrix.suite, 'collector-') }}"
           kind: "true"
-          helm: "${{ startsWith(matrix.suite, 'helm') || startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || startsWith(matrix.suite, 'continuation-manual-') || matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || matrix.suite == 'continuation-policy-arguments' || matrix.suite == 'continuation-policy-profile' || startsWith(matrix.suite, 'continuation-ongoing-') }}"
+          helm: "${{ startsWith(matrix.suite, 'helm') || startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || startsWith(matrix.suite, 'continuation-manual-') || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || matrix.suite == 'continuation-policy-arguments' || matrix.suite == 'continuation-policy-profile' || startsWith(matrix.suite, 'continuation-ongoing-') }}"
       # ADR-243 decision 4: the harness's product image links the pinned
       # static libpcap (make hub-binary), shared with ci.yml's pcap-check
       # cache; building it needs flex and bison. The collector image does not.
@@ -93,12 +93,12 @@ jobs:
       # ADR-246: collector suites load BPF programs into the runner's kernel.
       # This fresh, disposable VM is the only place that creates the guard
       # file without which the harness and the collector refuse to start.
-      - if: startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || startsWith(matrix.suite, 'continuation-manual-') || matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || matrix.suite == 'continuation-policy-arguments' || matrix.suite == 'continuation-policy-profile' || startsWith(matrix.suite, 'continuation-ongoing-')
+      - if: startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || startsWith(matrix.suite, 'continuation-manual-') || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || matrix.suite == 'continuation-policy-arguments' || matrix.suite == 'continuation-policy-profile' || startsWith(matrix.suite, 'continuation-ongoing-')
         name: Disposable-host guard
         run: sudo touch /etc/asservat-disposable-host
       # ADR-248: the collector suites open the downloaded PCAPNG with tshark
       # (offline file read only; nothing captures on the runner itself).
-      - if: matrix.suite != 'continuation-manual-profile' && matrix.suite != 'continuation-manual-heap' && matrix.suite != 'continuation-profile-comparison' && matrix.suite != 'continuation-manual-arguments' && matrix.suite != 'continuation-policy-arguments' && matrix.suite != 'continuation-policy-profile' && (startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || startsWith(matrix.suite, 'continuation-manual-') || matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || matrix.suite == 'continuation-policy-arguments' || matrix.suite == 'continuation-policy-profile' || startsWith(matrix.suite, 'continuation-ongoing-'))
+      - if: matrix.suite != 'continuation-manual-profile' && matrix.suite != 'continuation-manual-heap' && matrix.suite != 'continuation-manual-trace' && matrix.suite != 'continuation-profile-comparison' && matrix.suite != 'continuation-profile-comparison-heavy' && matrix.suite != 'continuation-manual-arguments' && matrix.suite != 'continuation-policy-arguments' && matrix.suite != 'continuation-policy-profile' && (startsWith(matrix.suite, 'collector-') || matrix.suite == 'continuation-approved-recording' || startsWith(matrix.suite, 'continuation-manual-') || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-native-paced' || matrix.suite == 'continuation-policy-recording' || matrix.suite == 'continuation-policy-arguments' || matrix.suite == 'continuation-policy-profile' || startsWith(matrix.suite, 'continuation-ongoing-'))
         name: tshark
         timeout-minutes: 3
         run: |
@@ -112,17 +112,17 @@ jobs:
           fi
           tshark --version | head -1
           capinfos --version | head -1
-      # History and saved comparison drive real React on the installed image.
+      # History, saved comparison and heap inspection drive installed React.
       # Reuse console CI's pinned Playwright browser/cache; no new image.
-      - if: matrix.suite == 'continuation-approved-recording' || matrix.suite == 'continuation-profile-comparison'
+      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap'
         id: playwright
         run: echo "version=$(node -p "require('./web/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - if: matrix.suite == 'continuation-approved-recording' || matrix.suite == 'continuation-profile-comparison'
+      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap'
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - if: matrix.suite == 'continuation-approved-recording' || matrix.suite == 'continuation-profile-comparison'
+      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap'
         name: Installed React browser
         timeout-minutes: 3
         working-directory: web

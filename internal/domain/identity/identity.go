@@ -32,7 +32,9 @@ const EvidenceReadRequestWindow = 20 * time.Second
 const RecordingSaveRequestWindow = 15 * time.Second
 
 // CapturePreviewRequestWindow bounds history lookup plus fresh preview creation.
-// Settings and preview stages retain their independent five-second bounds.
+// Settings reads keep five seconds; history-backed Go profile preview
+// composition selects eight seconds up front. Independent observations retain
+// their own original five-second bounds.
 const CapturePreviewRequestWindow = 15 * time.Second
 
 type Kind string

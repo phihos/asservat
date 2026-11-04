@@ -97,7 +97,7 @@ def source_hashes():
     files = [ROOT/"go.mod", ROOT/"go.sum", Path(__file__), ROOT/"scripts/fetch-gadget.sh", ROOT/"scripts/ci-native.sh", ROOT/".github/workflows/native.yml"]
     files += [ROOT/"scripts/package-argument-gadget.py"]
     files += [ROOT/"experiments/syscall-argument-budget"/name for name in ("prepare.py", "pins.json", "program.patch", "budget.h")]
-    files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs", ROOT/"web/scripts/installed-profile-comparison-browser.mjs", ROOT/"web/src/generated/validate-evidence.js"]
+    files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs", ROOT/"web/scripts/installed-profile-comparison-browser.mjs", ROOT/"web/scripts/installed-profile-case-proof.mjs", ROOT/"web/src/generated/validate-auth.js", ROOT/"web/src/generated/validate-evidence.js"]
     files += list((ROOT/"cmd").rglob("*.go")) + list((ROOT/"internal").rglob("*.go")) + list((ROOT/"test/integration").rglob("*.go"))
     files += [ROOT/"scripts/helm_registry.py", ROOT/"scripts/native_kube_audit.py"] + list((ROOT/"charts/asservat").rglob("*"))
     files = [p for p in files if p.is_file()]
@@ -401,14 +401,107 @@ def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False,
 
 def qualification_profile_variant(base):
     variant = base.get("ASSERVAT_PROFILE_VARIANT", "") or "cpu"
-    if variant not in ("cpu", "heap") or (variant == "heap" and base.get("ASSERVAT_JOURNEY_FOCUS") != "manual-profile"):
+    if variant not in ("cpu", "heap", "accepted-heavy", "trace") or (variant in ("heap", "trace") and base.get("ASSERVAT_JOURNEY_FOCUS") != "manual-profile") or (variant == "accepted-heavy" and base.get("ASSERVAT_JOURNEY_FOCUS") != "profile-comparison"):
         raise ValueError("Invalid installed profile fixture variant/focus")
     return variant
+
+
+def validate_profile_heavy_manifest(directory, generator_sha):
+    path = directory / "profile-heavy-manifest.json"
+    if not path.is_file() or path.stat().st_size > 16384:
+        raise RuntimeError("Accepted-heavy manifest missing or oversized")
+    manifest = json.loads(path.read_text())
+    if (manifest.get("format") != "accepted-heavy-pprof-fixture/v1" or manifest.get("generator_binary_sha256") != generator_sha
+            or manifest.get("profile_type") != "cpu" or manifest.get("sample_type") != "cpu" or manifest.get("unit") != "nanoseconds"
+            or manifest.get("duration_ns") != 10000000000 or len(manifest.get("inputs", [])) != 2):
+        raise RuntimeError("Accepted-heavy generator provenance mismatch")
+    for index, side in enumerate(("baseline", "incident")):
+        item = manifest["inputs"][index]
+        name = "profile-heavy-"+side+".pb.gz"
+        source = directory / name
+        if item.get("filename") != name or item.get("side") != side or not source.is_file() or source.stat().st_size != item.get("native_bytes"):
+            raise RuntimeError("Accepted-heavy fixed input file mismatch")
+        with source.open("rb") as content:
+            digest = hashlib.file_digest(content, "sha256").hexdigest()
+        if digest != item.get("native_sha256") or not 8*1024**2 < source.stat().st_size <= 16*1024**2:
+            raise RuntimeError("Accepted-heavy native input hash/bound mismatch")
+        expected = {"functions":100000,"locations":100000,"samples":100000,"frame_visits":1048576,"sample_location_references":1048576,"inline_lines":100000,"values_per_sample":16,"sample_types":16,"numeric_label_records_with_units":32768,"shared_object_units":662144}
+        if any(item.get(key) != value for key,value in expected.items()) or not 16*1024**2-128 <= item.get("protobuf_bytes",0) <= 16*1024**2:
+            raise RuntimeError("Accepted-heavy structural bound mismatch")
+    return manifest
+
+
+def prepare_profile_containment_fixture(build_env, work, image_dir, report):
+    # Separate trusted producer: its graph/encryption-free native generation
+    # must not be mistaken for384MiB worker/application memory consumption.
+    artifacts = work / "profile-containment"
+    artifacts.mkdir(mode=0o700)
+    generator = work / "profile-heavy-generator.test"
+    subprocess.run(["go","test","-c","-o",str(generator),"./internal/adapters/objectstore"],cwd=ROOT,env=build_env,check=True)
+    with generator.open("rb") as content:
+        generator_sha = hashlib.file_digest(content, "sha256").hexdigest()
+    generate_env = dict(build_env, ASSERVAT_PROFILE_ACCEPTED_HEAVY_DIR=str(image_dir), GOMAXPROCS="2", GOGC="100")
+    generate_env.pop("GOMEMLIMIT",None)
+    log = artifacts / "profile-heavy-generation.log"
+    began = time.monotonic()
+    with log.open("wb") as output:
+        process = subprocess.Popen([str(generator),"-test.run","^TestProfileAcceptedHeavyNativeFixture$","-test.v"],cwd=ROOT,env=generate_env,stdout=output,stderr=subprocess.STDOUT)
+        timed_out = False
+        while True:
+            waited, status, usage = os.wait4(process.pid,os.WNOHANG)
+            if waited:
+                break
+            if time.monotonic()-began > 60:
+                timed_out = True
+                process.kill()
+                _, status, usage = os.wait4(process.pid,0)
+                break
+            time.sleep(0.05)
+        process.returncode = os.waitstatus_to_exitcode(status)
+    generation = {"binarySHA256":generator_sha,"elapsedSeconds":time.monotonic()-began,"peakRSSKiB":usage.ru_maxrss,"userCPUSeconds":usage.ru_utime,"systemCPUSeconds":usage.ru_stime,"exitCode":process.returncode,"timedOut":timed_out,"scope":"separate build producer outside workload/worker cgroups"}
+    report["profileHeavyGeneration"] = generation
+    manifest_path = image_dir / "profile-heavy-manifest.json"
+    if manifest_path.is_file() and manifest_path.stat().st_size <= 16384:
+        shutil.copyfile(manifest_path, artifacts/"profile-heavy-manifest.json")
+    if process.returncode != 0:
+        raise RuntimeError("Accepted-heavy separate producer failed")
+    manifest = validate_profile_heavy_manifest(image_dir,generator_sha)
+    for item in manifest["inputs"]:
+        (image_dir/item["filename"]).chmod(0o444)  # FROMscratch workload UID65532 must read fixed synthetic input files.
+    probe = image_dir / "worker-resource-probe"
+    subprocess.run(["go","build","-trimpath","-buildvcs=false","-o",str(probe),"./test/fixtures/worker-resource-probe/main.go"],cwd=ROOT,env=build_env,check=True)
+    with probe.open("rb") as content:
+        probe_sha = hashlib.file_digest(content,"sha256").hexdigest()
+    metadata = {"ResourceProbeSHA256":probe_sha,"OutputDirectory":str(artifacts),"Manifest":manifest}
+    report["profileContainment"] = metadata
+    report["profileHeavyImageNativeBytes"] = sum(item["native_bytes"] for item in manifest["inputs"])
+    report["profileResourceProbeBytes"] = probe.stat().st_size
+    return metadata
+
+
+def collect_profile_containment_artifacts(work, results):
+    """Collect only this run's fixed synthetic producer/observer files at terminal."""
+    artifacts = work / "profile-containment"
+    if not artifacts.is_dir():
+        return None
+    destination = results / ("profile-worker-containment-" + work.name)
+    destination.mkdir(mode=0o700)
+    names = ["profile-heavy-generation.log", "profile-heavy-manifest.json"]
+    names += [f"profile-worker-containment-{index}-{kind}.json" for index in range(2) for kind in ("complete", "failure")]
+    collected = []
+    for name in names:
+        source = artifacts / name
+        if source.is_file():
+            shutil.copyfile(source, destination / name)
+            collected.append(name)
+    return {"directory": str(destination), "files": collected, "scope": "explicit terminal collection from the private harness directory, including failed runs"}
 
 
 def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False):
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
     profile_variant = qualification_profile_variant(os.environ)
+    if profile_variant == "accepted-heavy" and not installer_continuation:
+        raise ValueError("Accepted-heavy requires the installed comparison continuation")
     collector_qualification = installer_continuation and focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "policy-profile", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed")
     native_paced = installer_continuation and focus == "native-paced"
     native_traffic_probe = test_pattern == NATIVE_TRAFFIC_PROBE
@@ -472,7 +565,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             report["goVersion"] = run(["go", "version"])
             report["installedHistoryBrowserQualification"] = collector_qualification and focus == "approved-recording"
             report["installedProfileComparisonBrowserQualification"] = collector_qualification and focus == "profile-comparison"
-            report["installedProfileVariant"] = profile_variant if collector_qualification and focus == "manual-profile" else None
+            report["installedHeapBrowserQualification"] = collector_qualification and focus == "manual-profile" and profile_variant == "heap"
+            report["installedProfileVariant"] = profile_variant if collector_qualification and focus in ("manual-profile","profile-comparison") else None
             report["installedPolicyRecordingFocus"] = collector_qualification and focus == "policy-recording"
             report["installedPolicyArgumentsFocus"] = collector_qualification and focus == "policy-arguments"
             report["installedPolicyProfileFocus"] = collector_qualification and focus == "policy-profile"
@@ -496,6 +590,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             subprocess.run(["make", "--no-print-directory", "hub-binary", "HUB_BINARY="+str(image_dir/"asservat"), "ASSERVAT_BUILD_TMP="+build_env["TMPDIR"]], cwd=ROOT, env=build_env, check=True)
             subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"provider-proxy"), "./test/fixtures/provider-proxy/main.go"], cwd=ROOT, env=build_env, check=True)
             helper_copy = ""
+            containment_fixture = None
+            if profile_variant == "accepted-heavy":
+                containment_fixture = prepare_profile_containment_fixture(build_env,work,image_dir,report)
+                helper_copy += "COPY profile-heavy-baseline.pb.gz /profile-heavy-baseline.pb.gz\nCOPY profile-heavy-incident.pb.gz /profile-heavy-incident.pb.gz\nCOPY worker-resource-probe /worker-resource-probe\n"
             if focus in ("manual-profile", "profile-comparison", "policy-profile"):
                 subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"profile-native"), "./test/fixtures/profile-native/main.go"], cwd=ROOT, env=build_env, check=True)
                 helper_copy += "COPY profile-native /profile-native\n"
@@ -617,6 +715,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     time.sleep(.25)
                 else: raise RuntimeError("fixture did not become ready")
             fixture = {"s3": "http://"+s3ip+":8333", "kms": "http://"+baoip+":8200", "postgres":dsn, "postgresContainer": pgname, "nativeProviders":native_providers, "clusters": []}
+            if containment_fixture is not None:
+                fixture["ProfileContainment"] = containment_fixture
             if native_paced:
                 fixture["nativeSQLStatistics"] = True
             if installer_continuation:
@@ -901,6 +1001,14 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         finally:
             report["testExit"] = exit_code
             failures = []
+            try:
+                artifacts = collect_profile_containment_artifacts(work, ROOT/"test/results")
+                if artifacts is not None:
+                    report["profileContainmentArtifacts"] = artifacts
+            except OSError as exc:
+                report["profileContainmentArtifactError"] = type(exc).__name__
+                exit_code = 1
+                report["testExit"] = exit_code
             if native_paced:
                 try:
                     if not audit_started or len(audit_nodes) != 2:

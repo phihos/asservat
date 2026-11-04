@@ -133,3 +133,47 @@ it('never cancels a fully read response body, only an unfinished one', async () 
   expect(cancelled).toHaveBeenCalled();
   cancelled.mockRestore();
 });
+
+it('allows the accepted fifteen-second preview composition without replay', async () => {
+  vi.useFakeTimers();
+  try {
+    let requestSignal: AbortSignal | undefined;
+    const fetcher = vi.fn((_url: string, init: RequestInit) => new Promise<Response>((resolve, reject) => {
+      requestSignal = init.signal as AbortSignal;
+      requestSignal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+      setTimeout(() => resolve(json(previewResult())), 12_000);
+    }));
+    vi.stubGlobal('fetch', fetcher);
+    const pending = operations.call('preview_capture', { target_ref: target, preset_ref: { name: 'pod-status', version: 'v1' } }, 'csrf', new AbortController().signal);
+    const outcome = pending.then(value => ({ value }), error => ({ error }));
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(requestSignal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(await outcome).toHaveProperty('value');
+    expect(fetcher).toHaveBeenCalledOnce();
+  } finally { vi.useRealTimers(); }
+});
+
+it('keeps ordinary capture reads at ten seconds and honors original caller cancellation', async () => {
+  vi.useFakeTimers();
+  try {
+    for (const mode of ['ordinary', 'cancel-preview'] as const) {
+      let requestSignal: AbortSignal | undefined;
+      const fetcher = vi.fn((_url: string, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
+        requestSignal = init.signal as AbortSignal;
+        requestSignal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+      }));
+      vi.stubGlobal('fetch', fetcher);
+      const caller = new AbortController();
+      const pending = mode === 'ordinary'
+        ? operations.call('get_capture', { capture_id: id(1) }, 'csrf', caller.signal)
+        : operations.call('preview_capture', { target_ref: target, preset_ref: { name: 'pod-status', version: 'v1' } }, 'csrf', caller.signal);
+      const outcome = pending.then(() => 'delivered', () => 'aborted');
+      if (mode === 'ordinary') await vi.advanceTimersByTimeAsync(10_000);
+      else caller.abort();
+      expect(await outcome).toBe('aborted');
+      expect(requestSignal?.aborted).toBe(true);
+      expect(fetcher).toHaveBeenCalledOnce();
+    }
+  } finally { vi.useRealTimers(); }
+});

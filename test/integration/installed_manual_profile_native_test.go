@@ -282,9 +282,26 @@ func qualifyManualProfileNative(t *testing.T, ctx context.Context, native []byte
 		t.Fatal(err)
 	}
 	// Disable symbol lookup: all names must come from the native artifact.
-	out, err := exec.CommandContext(ctx, "go", "tool", "pprof", "-top", "-symbolize=none", path).CombinedOutput()
-	if err != nil || !strings.Contains(string(out), "main.burnCPU") {
-		t.Fatalf("native pprof cannot open the synthetic CPU sample: %v\n%s", err, out)
+	args := []string{"tool", "pprof", "-top", "-symbolize=none"}
+	wantFunction := "main.burnCPU"
+	heavy := installedAcceptedHeavyComparison()
+	if heavy {
+		// The accepted fixture has sixteen counters and 100k functions:
+		// pprof's last-counter/default fraction hides its small CPU entries.
+		// Compact labels omit the native padding comment without editing it.
+		args = append(args, "-sample_index=cpu", "-nodecount=20", "-nodefraction=0", "-compact_labels=true")
+		wantFunction = "synthetic."
+	}
+	out, err := exec.CommandContext(ctx, "go", append(args, path)...).CombinedOutput()
+	if err != nil || !strings.Contains(string(out), wantFunction) {
+		diagnostic := out
+		if heavy && len(diagnostic) > 16<<10 {
+			diagnostic = diagnostic[:16<<10]
+		}
+		t.Fatalf("native pprof cannot open the synthetic CPU sample: %v (output %d bytes; diagnostic prefix)\n%s", err, len(out), diagnostic)
+	}
+	if installedAcceptedHeavyComparison() {
+		t.Log("accepted-heavy synthetic pprof input opened locally; this is worker containment input, not sampled application CPU or overhead qualification")
 	}
 	if err := os.WriteFile(prefix+"-pprof.txt", out, 0600); err != nil {
 		t.Fatal(err)

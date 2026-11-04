@@ -72,7 +72,9 @@ func (s *ContextProjectionPolicies) ContextProjectionPolicy(ctx context.Context,
 		out.Clients = append(out.Clients, value.ContextProjectionClient{Issuer: c.Issuer, ID: c.ID, Kind: c.Kind, Purposes: slices.Clone(c.Purposes)})
 	}
 	out.ObservedAt, out.FreshUntil = raw.ObservedAt, raw.FreshUntil
-	if d, ok := call.Deadline(); ok {
+	// The five-second child bounds lookup I/O; the completed observation
+	// retains its own original interval and the original caller's cutoff.
+	if d, ok := ctx.Deadline(); ok {
 		out.FreshUntil = identity.Earlier(out.FreshUntil, d)
 	}
 	if call.Err() != nil || !out.Valid(s.now()) {

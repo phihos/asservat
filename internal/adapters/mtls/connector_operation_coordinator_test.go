@@ -341,11 +341,21 @@ func TestOperationCoordinatorFinalFailuresSuppressResult(t *testing.T) {
 	}
 }
 func TestOperationCoordinatorOwnerWireMutationIsTerminal(t *testing.T) {
-	for _, mode := range []string{"v1", "bracket", "channel", "leaf", "request", "native-start", "native-end", "configuration", "missing-final", "early-final"} {
+	for _, mode := range []string{"v1", "bracket", "channel", "leaf", "request", "native-start", "native-end", "old-producer-native-expired", "configuration", "missing-final", "early-final"} {
 		t.Run(mode, func(t *testing.T) {
 			x := newOperationCoordinatorFixture(t, "current")
 			x.probeHook = func(p *contracts.ClusterObservationOperationProbe) {
 				n := 2
+				if mode == "old-producer-native-expired" && p.Ordinal == 1 {
+					end := x.f.clock().Add(time.Second).Format(time.RFC3339Nano)
+					p.Owner.NativeUntil = end
+					p.Owner.RegistrationUntil = end
+					return
+				}
+				if mode == "old-producer-native-expired" && p.Ordinal == 2 {
+					x.f.advance.Store(int64(1100 * time.Millisecond))
+					return
+				}
 				if mode == "missing-final" {
 					n = 4
 				}
@@ -556,8 +566,8 @@ func TestOperationOwnerCarriesShorterCutoffs(t *testing.T) {
 		})
 		x.native.finalHook = func(ctx context.Context, v *value.OwnerObservationNativeFacts) error {
 			d, _ := ctx.Deadline()
-			if d.After(registryEnd) {
-				t.Error("final native lost earlier registry cutoff")
+			if d.After(x.request.NotAfter) {
+				t.Error("final native exceeded original request cutoff")
 			}
 			v.FreshUntil = nativeEnd
 			return nil
@@ -580,8 +590,8 @@ func TestOperationOwnerCarriesShorterCutoffs(t *testing.T) {
 		x.pairDeadlineHook = func(ctx context.Context, n int) {
 			if n == 3 {
 				d, _ := ctx.Deadline()
-				if d.After(end) {
-					t.Error("following SQL pair lost post-metadata owner cutoff")
+				if d.After(x.request.NotAfter) {
+					t.Error("fresh SQL pair exceeded original request cutoff")
 				}
 			}
 		}
@@ -612,4 +622,61 @@ func TestOperationOwnerCarriesShorterCutoffs(t *testing.T) {
 			t.Fatal("expired original interval continued SQL", err, calls)
 		}
 	})
+}
+
+// Genuine native source/workload ends remain immutable, even though the next
+// SQL observation could be independently fresh under the original request.
+func TestOperationCoordinatorPreservesOriginalSourceEnds(t *testing.T) {
+	for _, kind := range []string{"native", "source", "workload"} {
+		t.Run(kind, func(t *testing.T) {
+			x := newOperationCoordinatorFixture(t, "current")
+			short := x.f.clock().Add(time.Second)
+			x.regionalNative.readHook = func(ctx context.Context, n int, v *value.ConnectorObservationNativeValue) error {
+				if n == 1 {
+					switch kind {
+					case "native":
+						v.NativeUntil = short
+						v.Source.Observation.FreshUntil = short
+						v.Workload.FreshUntil = short
+					case "source":
+						v.Source.Observation.FreshUntil = short
+					case "workload":
+						v.Workload.FreshUntil = short
+					}
+				}
+				return nil
+			}
+			x.probeHook = func(p *contracts.ClusterObservationOperationProbe) {
+				if p.Ordinal == 2 {
+					x.f.advance.Store(int64(1100 * time.Millisecond))
+				}
+			}
+			if out, err := x.hub.ObserveClusterOperation(x.ctx, x.request, x.operation); err == nil || out.RequestID != "" || x.metadata != 0 || x.receipts != 0 {
+				t.Fatal("original hard end renewed", err, x.metadata, x.receipts)
+			}
+		})
+	}
+}
+
+func TestOperationCoordinatorOldProducerShortNativeIsNeverUnclipped(t *testing.T) {
+	x := newOperationCoordinatorFixture(t, "current")
+	// The fixture clock is frozen at a whole second. Using clock()+1 as a
+	// real context deadline leaves 0–1 seconds and intermittently expires in
+	// the middle of this valid exchange. Allocate a full real second without
+	// extending the original five-second request or changing fixture authority.
+	short := identity.Earlier(time.Now().Add(time.Second), x.request.NotAfter)
+	t.Logf("old producer cutoff=%s original request=%s wall headroom=%s", short.Format(time.RFC3339Nano), x.request.NotAfter.Format(time.RFC3339Nano), time.Until(short))
+	x.probeHook = func(p *contracts.ClusterObservationOperationProbe) {
+		if p.Ordinal == 1 {
+			p.Owner.NativeUntil = short.Format(time.RFC3339Nano)
+			p.Owner.RegistrationUntil = short.Format(time.RFC3339Nano)
+		}
+	}
+	out, err := x.hub.ObserveClusterOperation(x.ctx, x.request, x.operation)
+	if err != nil {
+		t.Fatal("old producer exchange refused", err, "wall remaining", time.Until(short))
+	}
+	if out.Interval.FreshUntil.After(short) || x.proofs != 4 || x.receipts != 1 {
+		t.Fatal("old producer native end was widened", out.Interval.FreshUntil, x.proofs, x.receipts)
+	}
 }

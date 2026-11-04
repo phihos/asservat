@@ -218,7 +218,7 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 		return zero, answerStep("candidates", value.ErrUnavailable, err)
 	}
 	peer := value.PeerCertificate{Binding: c.leaf.Binding, Digest: c.leaf.Digest, NotBefore: c.leaf.NotBefore, NotAfter: c.leaf.NotAfter}
-	owner, err := checkOwnerOperation(call, &c.state, c.verifier, c.registry, current, c.pin, r, peer, p.Owner, p.Ordinal, c.now)
+	owner, err := checkOwnerOperation(call, &c.state, c.verifier, c.registry, current, c.pin, r, peer, p.Owner, p.Ordinal, false, c.now)
 	if err != nil || owner.owner != c.owner {
 		return zero, answerStep("owner", value.ErrUnavailable, err)
 	}
@@ -231,16 +231,16 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 		original := owner
 		c.origin = &original
 	}
-	c.narrow(owner.until, "owner")
+	c.narrow(owner.nativeUntil, "owner-native")
 	saved := owner
 	c.lastOwner = &saved
 	until = c.until
 	c.mu.Unlock()
-	bounded, narrow := context.WithDeadline(call, until)
+	bounded, narrow := context.WithDeadline(call, identity.Earlier(until, owner.until))
 	defer narrow()
 	operation := c.operation
 	if p.Ordinal == 1 {
-		operation, err = c.producer.begin(c.ctx, bounded, &c.state, c.leaf, r)
+		operation, err = c.producer.begin(c.ctx, call, &c.state, c.leaf, r)
 		if err != nil {
 			return zero, answerStep("begin", value.ErrUnavailable, err)
 		}
@@ -251,7 +251,7 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 	if operation == nil {
 		return zero, answerStep("operation", value.ErrUnavailable, nil)
 	}
-	reply, err := operation.read(bounded, p.Ordinal)
+	reply, err := operation.read(call, p.Ordinal)
 	if err != nil || bounded.Err() != nil {
 		return zero, answerStep("read", value.ErrUnavailable, err)
 	}
@@ -294,25 +294,21 @@ func (c *ConnectorObservationOperationChannel) ObserveCluster(ctx context.Contex
 	if !sameConnectorObservationRequest(original, value.OwnerObservationRequest{RootID: r.RootID, ID: r.ID, Challenge: r.Challenge, RequestedAt: r.RequestedAt, NotAfter: r.NotAfter}) {
 		return zero, value.ErrDenied
 	}
-	if err := c.checkSelectedOwner(call); err != nil {
+	_, err = c.checkSelectedOwner(call)
+	if err != nil {
 		return zero, err
 	}
-	c.mu.Lock()
-	metadataEnd := c.until
-	c.mu.Unlock()
-	bounded, stop := context.WithDeadline(call, metadataEnd)
+	bounded, stop := context.WithDeadline(call, c.until)
 	defer stop()
 	result, err := c.metadata.ObserveCluster(bounded, r.Clone())
 	if err != nil || call.Err() != nil {
 		return zero, value.ErrUnavailable
 	}
-	if err := c.checkSelectedOwner(bounded); err != nil {
+	until, err := c.checkSelectedOwner(call)
+	if err != nil {
 		return zero, err
 	}
-	c.mu.Lock()
-	until := c.until
-	c.mu.Unlock()
-	current, stopCurrent := context.WithDeadline(bounded, until)
+	current, stopCurrent := context.WithDeadline(call, until)
 	defer stopCurrent()
 	digest, err := app.ClusterObservationRequestDigest(r)
 	if err != nil {
@@ -324,7 +320,7 @@ func (c *ConnectorObservationOperationChannel) ObserveCluster(ctx context.Contex
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.closed || c.failed || c.ctx.Err() != nil || !c.now().Before(c.until) || c.producer.credentials.observationKeysCurrent(current, c.keys) != nil {
+	if c.closed || c.failed || c.ctx.Err() != nil || !c.now().Before(c.until) || c.producer.credentials.observationKeysCurrent(current, c.keys) != nil || current.Err() != nil {
 		return zero, value.ErrUnavailable
 	}
 	c.digest = digest
@@ -340,14 +336,15 @@ func (c *ConnectorObservationOperationChannel) AcceptObservationReceipt(ctx cont
 	}
 	success := false
 	defer func() { finish(success) }()
-	if err := c.checkSelectedOwner(call); err != nil {
+	phaseEnd, err := c.checkSelectedOwner(call)
+	if err != nil {
 		return err
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	current, stopCurrent := context.WithDeadline(call, c.until)
+	current, stopCurrent := context.WithDeadline(call, phaseEnd)
 	defer stopCurrent()
-	if r.Format != contracts.ClusterObservationOperationExchangeFormat || r.ExchangeID != c.exchangeID || r.RequestID != c.request.ID || r.Challenge != c.request.Challenge || r.RequestDigest != ownerObservationHex(c.digest) || c.digest == (artifact.Digest{}) || c.closed || c.failed || call.Err() != nil || c.ctx.Err() != nil || !c.now().Before(c.until) || c.producer.credentials.observationKeysCurrent(current, c.keys) != nil {
+	if r.Format != contracts.ClusterObservationOperationExchangeFormat || r.ExchangeID != c.exchangeID || r.RequestID != c.request.ID || r.Challenge != c.request.Challenge || r.RequestDigest != ownerObservationHex(c.digest) || c.digest == (artifact.Digest{}) || c.closed || c.failed || call.Err() != nil || c.ctx.Err() != nil || !c.now().Before(c.until) || c.producer.credentials.observationKeysCurrent(current, c.keys) != nil || current.Err() != nil {
 		return value.ErrDenied
 	}
 	c.received = true
@@ -357,34 +354,35 @@ func (c *ConnectorObservationOperationChannel) AcceptObservationReceipt(ctx cont
 
 // A retained numbered own proof supplies only its original native bracket. Each
 // metadata/receipt boundary still reads current candidates/SQL and actual TLS.
-func (c *ConnectorObservationOperationChannel) checkSelectedOwner(ctx context.Context) error {
+func (c *ConnectorObservationOperationChannel) checkSelectedOwner(ctx context.Context) (time.Time, error) {
 	c.mu.Lock()
 	last, until := c.lastOwner, c.until
 	closed := c.closed || c.failed || c.ctx.Err() != nil
 	c.mu.Unlock()
 	if last == nil || ctx == nil || ctx.Err() != nil || closed || !c.now().Before(until) {
-		return value.ErrUnavailable
+		return time.Time{}, value.ErrUnavailable
 	}
-	// Every previously observed cap reaches the next actual candidate/SQL
-	// read immediately. A later caller cannot renew this operation's bound.
+	// Genuine native/source/caller hard ends still bound every fresh read.
+	// The previous reply supplies identity and native correlation, not current
+	// SQL authority; this read independently checks the same selected peer.
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	candidates, err := c.candidates.ReadOwnerObservationCandidates(call)
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
 	peer := value.PeerCertificate{Binding: c.leaf.Binding, Digest: c.leaf.Digest, NotBefore: c.leaf.NotBefore, NotAfter: c.leaf.NotAfter}
-	checked, err := checkOwnerOperation(call, &c.state, c.verifier, c.registry, candidates, c.pin, c.request, peer, last.wire, last.wire.Ordinal, c.now)
+	checked, err := checkOwnerOperation(call, &c.state, c.verifier, c.registry, candidates, c.pin, c.request, peer, last.wire, last.wire.Ordinal, true, c.now)
 	if err != nil || !checked.continues(*last) {
-		return value.ErrUnavailable
+		return time.Time{}, value.ErrUnavailable
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.narrow(checked.until, "owner-check")
+	c.narrow(checked.nativeUntil, "owner-native-check")
 	if c.closed || c.failed || c.ctx.Err() != nil || call.Err() != nil || ctx.Err() != nil || !c.now().Before(c.until) {
-		return value.ErrUnavailable
+		return time.Time{}, value.ErrUnavailable
 	}
-	return nil
+	return checked.until, nil
 }
 
 func (c *ConnectorObservationOperationChannel) fail() {

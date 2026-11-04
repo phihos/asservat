@@ -1,0 +1,309 @@
+{
+  "format": "accepted-history-capacity-local-archive/v1",
+  "proof_base": "0ff891eede9b84d176289338dd10ca0830e4eed6",
+  "campaign_count": 7,
+  "entries": [
+    {
+      "path": "01-setup-role/history-managed-capacity-harness.log.gz",
+      "source": "/home/phil/.cache/asservat-build/history-managed-capacity-harness.log",
+      "sourceBytes": 54,
+      "sourceSha256": "9587688910ed4e24cf6caa4dd5948f368a6dae43e3b4a2234760f6cc8bd91e18",
+      "storedBytes": 74,
+      "storedSha256": "c2e7f8314e41f8fbf5f136dfc56a91190ea5d9dcf87767a4642b21babc763070",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "01-setup-role/history-managed-capacity-boundary-environment.json.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-boundary-environment.json",
+      "sourceBytes": 521483,
+      "sourceSha256": "eaa0e8ff8d5187528a2cb60f425c298cd6312f242e5f0801b2c99021efdf4cb9",
+      "storedBytes": 195676,
+      "storedSha256": "c55fde8e8f525ec48f4720b82284ee0cf8f956c9932e3a0b62ff1efd39ca55b6",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "01-setup-role/history-managed-capacity-boundary.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-boundary.log",
+      "sourceBytes": 2610,
+      "sourceSha256": "2e56ad770a25ad8612c9fbf791645b48e51c4ba0d20f99fc3ea36247a8a466c3",
+      "storedBytes": 650,
+      "storedSha256": "5aedc81b2ad66513511af66de3fc7a6dde66092c376511117eb897f553a63f86",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "01-setup-role/history-managed-capacity-boundary-postgres.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-boundary-postgres.log",
+      "sourceBytes": 10593,
+      "sourceSha256": "7b6def2994dbdc2f4b7b8324282fb65cff66a84ec108cce25c57f80e6ec19de9",
+      "storedBytes": 1859,
+      "storedSha256": "76b550a4def0e80b7f68051bfc75bdfddd63613706cc2926b45d0231b78d3adf",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "02-setup-anchor/history-managed-capacity-contract-red-harness.log.gz",
+      "source": "/home/phil/.cache/asservat-build/history-managed-capacity-contract-red-harness.log",
+      "sourceBytes": 58,
+      "sourceSha256": "d75b41e4644b7300c03090552cacd5d9bab2a340036016802c09e6db91e2f9f1",
+      "storedBytes": 78,
+      "storedSha256": "2cfac85ddf9ecdba4b932c7457ecbea1f0f7b41f51ebdc4db382e9fe01814466",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "02-setup-anchor/history-managed-capacity-contract-red-environment.json.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-contract-red-environment.json",
+      "sourceBytes": 521482,
+      "sourceSha256": "19375eddde350910a1a6ecb75e304ebc4866ce07cd8588a3cccf6b5652117496",
+      "storedBytes": 195676,
+      "storedSha256": "73d0483dea9f68b51880b4c3ca5f143130e3b32ff0ad297c0ee9ef9265de19da",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "02-setup-anchor/history-managed-capacity-contract-red.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-contract-red.log",
+      "sourceBytes": 2663,
+      "sourceSha256": "ffd2c11fed86e73b8497dbdc1b0403733ba8104eb6e42c931f58b58ad9456f4d",
+      "storedBytes": 656,
+      "storedSha256": "d1f563eaa2029ae19c6041c2e474a0af415139e70daffc9e0a26cc4abcae7170",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "02-setup-anchor/history-managed-capacity-contract-red-postgres.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-contract-red-postgres.log",
+      "sourceBytes": 11112,
+      "sourceSha256": "56e0da5f1ab75bf7f7a7095753f0c56aa0d54b1972de5772bdea2d58024a20f7",
+      "storedBytes": 2156,
+      "storedSha256": "b2d00a74d31bbe9616ec85eb09fa7e797885a3025a446ccaaf2ecf730a9c854a",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "03-wrapped-error-assertion/history-managed-capacity-contract-red-2-harness.log.gz",
+      "source": "/home/phil/.cache/asservat-build/history-managed-capacity-contract-red-2-harness.log",
+      "sourceBytes": 60,
+      "sourceSha256": "030943eba7aa056c8a057a10ec1e084d2642f39afbd38bb14a0778116660fe35",
+      "storedBytes": 79,
+      "storedSha256": "925d710d39f868bbe574c83051c8470a53a7e0a55467bd73f7816a624b735b91",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "03-wrapped-error-assertion/history-managed-capacity-contract-red-2-environment.json.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-contract-red-2-environment.json",
+      "sourceBytes": 521483,
+      "sourceSha256": "19ef0244071adb891c48cd9b0ff3f90cb1fd8014c9e6871a6dfcad2c887e9960",
+      "storedBytes": 195686,
+      "storedSha256": "660a7a3e8cafedd108bc10ee482b95c932828a40b3e04d39bda20e4c6f66b1ac",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "03-wrapped-error-assertion/history-managed-capacity-contract-red-2.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-contract-red-2.log",
+      "sourceBytes": 2697,
+      "sourceSha256": "3b7378866912e1cfd95a0e88b7ada3bab1614a2ac158b59614576e0e315fd083",
+      "storedBytes": 681,
+      "storedSha256": "80815091bf8cc976d9913238a31a585fee08f672528ae6916c916ae310e3eeea",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "03-wrapped-error-assertion/history-managed-capacity-contract-red-2-postgres.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-contract-red-2-postgres.log",
+      "sourceBytes": 11643,
+      "sourceSha256": "844a1f952948f3810a1d4da77f6d38cff58a317632b3a0032362bed8d148d44c",
+      "storedBytes": 2173,
+      "storedSha256": "6868f3954e80986b79ae4f12003c57d9e10639babdd090656e904e16f0faf8ef",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "04-desired-contract-red/history-managed-capacity-contract-red-3-harness.log.gz",
+      "source": "/home/phil/.cache/asservat-build/history-managed-capacity-contract-red-3-harness.log",
+      "sourceBytes": 60,
+      "sourceSha256": "617659539946759313c1ed23e90ccbb4715f10c997dcd8729a33e524db794b10",
+      "storedBytes": 79,
+      "storedSha256": "7f44c0429dd477acaf79a6e7f579aec9dbc9a5541e7148092cd0bd2613eb1a11",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "04-desired-contract-red/history-managed-capacity-contract-red-3-environment.json.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-contract-red-3-environment.json",
+      "sourceBytes": 521482,
+      "sourceSha256": "ce1af3bd9acfc103267709f5c5a88297707accb40359a184e0ef9dce8c6c12bb",
+      "storedBytes": 195676,
+      "storedSha256": "c282710ede78c326f9fea7d1ac35323aa174511e76065a5701c390e3b3d97f2f",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "04-desired-contract-red/history-managed-capacity-contract-red-3.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-contract-red-3.log",
+      "sourceBytes": 3573,
+      "sourceSha256": "80254035b8eda4872e244777677efffc63f028c26bd4d9fddfc8520410e613da",
+      "storedBytes": 929,
+      "storedSha256": "c1c12d5795b0df771732f5041d3e7cf68f8d843b8a373663e0e27224b5a7a534",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "04-desired-contract-red/history-managed-capacity-contract-red-3-postgres.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-contract-red-3-postgres.log",
+      "sourceBytes": 11643,
+      "sourceSha256": "662718b687afd3e9cd2724932436acc4652ed75323dac3fcb92f23bcffc710bc",
+      "storedBytes": 2179,
+      "storedSha256": "7e6d6053779154edfac41733df0eaeed7bfec1463df739659c07622ad933d244",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "05-managed-green/history-managed-capacity-green-harness.log.gz",
+      "source": "/home/phil/.cache/asservat-build/history-managed-capacity-green-harness.log",
+      "sourceBytes": 51,
+      "sourceSha256": "d1d270497a0f5e933330f5abd83dc3be31c23c80ec232bfc15b350e38d160d37",
+      "storedBytes": 71,
+      "storedSha256": "e7233d902d1df59bae7e5d5711a8ce6844f6b798ec63fd6415b6487c6b920eb3",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "05-managed-green/history-managed-capacity-green-environment.json.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-green-environment.json",
+      "sourceBytes": 523712,
+      "sourceSha256": "e47aec6fd2fa90b343dd0c0fda8a0d9c5fd0a88c7b3982a15bf1488dc5b7f72a",
+      "storedBytes": 195839,
+      "storedSha256": "eb80c408e352deaa75b3b1a477976f81e36ad6a4172d020271918489fdaaa231",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "05-managed-green/history-managed-capacity-green.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-managed-capacity-green.log",
+      "sourceBytes": 4773,
+      "sourceSha256": "a1368df17a8eeca14e0ff967600dc8df61181139eebf8ecd01302c5baa44f0e6",
+      "storedBytes": 850,
+      "storedSha256": "49fe3389e4f192c0b357cf3da755b5e3e0e60cfae49ea354245a93aeb3db8a5c",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "06-upgrade-green/history-capacity-upgrade-harness.log.gz",
+      "source": "/home/phil/.cache/asservat-build/history-capacity-upgrade-harness.log",
+      "sourceBytes": 45,
+      "sourceSha256": "6c95ebc997b1aa5524f200cdac7f039146c1a043bb89722553d2620f8eae1ae4",
+      "storedBytes": 63,
+      "storedSha256": "0b74858f52592a8d0e561762176e28f0df65f1cf692084086a0e469b1d08e903",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "06-upgrade-green/history-capacity-upgrade-environment.json.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-capacity-upgrade-environment.json",
+      "sourceBytes": 569236,
+      "sourceSha256": "167ac272e0d7fe9f2d2ac69351aca273f76ce0f85a9f1f31bd0e985ecc22eb21",
+      "storedBytes": 198083,
+      "storedSha256": "f63eec89bf52029918fd38c427e901912ae26a0eeef6067bc10d293666b390fd",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "06-upgrade-green/history-capacity-upgrade.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-capacity-upgrade.log",
+      "sourceBytes": 54220,
+      "sourceSha256": "45d751a3dbdd00814eb9f3ab0850e1fd5963ad5999343530d515625b9cbe4b1c",
+      "storedBytes": 3170,
+      "storedSha256": "052e74dffe13914461632d4469e961003ded1b71efea52db2fa53c67283f9aa9",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "07-lifecycle-green/history-capacity-lifecycle-harness.log.gz",
+      "source": "/home/phil/.cache/asservat-build/history-capacity-lifecycle-harness.log",
+      "sourceBytes": 47,
+      "sourceSha256": "69f98ce7e03b5cc5f945b064b6e62107b219df4148834810fd32c0eefeedd332",
+      "storedBytes": 67,
+      "storedSha256": "9bc96e31873b0647767cfa898ed273642b2be9778d4fd838e1550e05014239c6",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "07-lifecycle-green/history-capacity-lifecycle-environment.json.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-capacity-lifecycle-environment.json",
+      "sourceBytes": 520716,
+      "sourceSha256": "9b7f6fec43d44ba2bfe83bab9786a46c7e191916c768e34390baccf5a1c86cb6",
+      "storedBytes": 195612,
+      "storedSha256": "3b9792328e837403eefa2299830f2aac152d19dfce653f63861de5e8595da976",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "07-lifecycle-green/history-capacity-lifecycle.log.gz",
+      "source": "/home/phil/Projekte/asservat-history-managed-capacity/test/results/history-capacity-lifecycle.log",
+      "sourceBytes": 776,
+      "sourceSha256": "e6bb9649774dd814618e5a351f291a3815a56f70b27a06fcaac0a540ba6932b8",
+      "storedBytes": 352,
+      "storedSha256": "8a220631e6796623095484526ba4038685a36fd40950c80a24fd1ad71836cf4e",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "history-managed-capacity-handoff.json.gz",
+      "source": "/home/phil/.cache/asservat-build/history-managed-capacity-handoff.json",
+      "sourceBytes": 14381,
+      "sourceSha256": "de200c879a5d5cdd1037892bc3fb061c53f545bc19fb3b4b89b34288bd200850",
+      "storedBytes": 2760,
+      "storedSha256": "fec953e1cbdf976510d4c6e7d4a956e8d570fef53f6b6133a552fefe85527276",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "independent-campaign-audit.json.gz",
+      "source": "/home/phil/.cache/asservat-build/history-managed-capacity-independent-audit.json",
+      "sourceBytes": 35471,
+      "sourceSha256": "519a72cf0ea8f2a7ef1a5e00e92b32b51eae10ffc655c9162b984896c5ba26f1",
+      "storedBytes": 2795,
+      "storedSha256": "d54a9c79f9d6a185db4e0de6dbb244b68583d9aca15f9ada14d40d1ea25a7957",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "source-reuse-audit.json.gz",
+      "source": "/home/phil/.cache/asservat-build/accepted-history-source-reuse-audit.json",
+      "sourceBytes": 667,
+      "sourceSha256": "1dcc35833368414fd1fc089bce803e1a373b9988dbe1b74e24a066e97c5bd115",
+      "storedBytes": 416,
+      "storedSha256": "76a1c01581a6654ea2079cce4da780b7cba137321ccb1dc3bd9ac25b5e21ca8f",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "product/handoff.json.gz",
+      "source": "/home/phil/.cache/asservat-build/accepted-history-capacity/handoff.json",
+      "sourceBytes": 5424,
+      "sourceSha256": "73654d8c4f13d1ad1737fa570f031caa1c924f7d46b8c632f19e470afac88e42",
+      "storedBytes": 2513,
+      "storedSha256": "c04be72d9f4c40be3dfe1d30e694a2220a4ab2c70bc1a5c9074909dbf9414cf5",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "product/frozen-static-checks.log.gz",
+      "source": "/home/phil/.cache/asservat-build/accepted-history-capacity/frozen-static-checks.log",
+      "sourceBytes": 782,
+      "sourceSha256": "6843beeffcf9392e07471895188004e51905a5d151eda34855a8ed88115c5005",
+      "storedBytes": 477,
+      "storedSha256": "38701524fab272f11106d1a004ec02e0627869709fe0f3995357b3a38a70c59e",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "product/frozen-focused-race.log.gz",
+      "source": "/home/phil/.cache/asservat-build/accepted-history-capacity/frozen-focused-race.log",
+      "sourceBytes": 128,
+      "sourceSha256": "8e8b0a3b2b78544770fe970ad6d059b231c1987c3e49786d212bb58f3b7341ab",
+      "storedBytes": 99,
+      "storedSha256": "30d497722a54af9f730f1657d05862c72d0a7e230af610526698f9d13d7bff8d",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "root/final-managed-history-gates.log.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-worker-containment/final-managed-history-gates.log",
+      "sourceBytes": 12033,
+      "sourceSha256": "1f7decf8d1d2c3064d9ccfd633be717579dd21c023dcb597bacb12090f612c51",
+      "storedBytes": 2638,
+      "storedSha256": "59b73dee05e8247582c3e704551894cd7a9c155de29428a1a09c8b13ba19059f",
+      "encoding": "gzip; level=9; mtime=0"
+    },
+    {
+      "path": "root/gate-provenance.json.gz",
+      "source": "/home/phil/.cache/asservat-build/accepted-history-root-gates-provenance.json",
+      "sourceBytes": 1609,
+      "sourceSha256": "728154db367e6d98bb26ec16c42cc433da3b68b93553819d50833da372e6927c",
+      "storedBytes": 844,
+      "storedSha256": "9db2add92d41043c6af4ee1112f3651301907626d4807954066caa3a11a5517e",
+      "encoding": "gzip; level=9; mtime=0"
+    }
+  ],
+  "readme": {
+    "bytes": 5774,
+    "sha256": "6c14618dd30e764ea45c63247772552cc0fa58965a93486bc07062617da2860c"
+  },
+  "not_installed_qualification": true
+}

@@ -205,6 +205,12 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		// or charged, and a later page request may succeed.
 		return s.refusal(record.ID, name, record.Until, httpHeaderNotAvailable, operationAuditDenied, operationEffectNone, false)
 	}
+	if d == nil && name == "get_profile_summary" && analysisapp.ProfileSummaryUnavailableBeforeAdmission(err) {
+		// C18 proved no query admission was attempted. Access, missing/unsupported
+		// source and provider failures share one nondisclosing result; audit and the
+		// original final identity/deadline checks still precede delivery.
+		return s.refusal(record.ID, name, record.Until, profileSummaryNotAvailable, operationAuditUnspecified, operationEffectNone, true)
+	}
 	if err != nil || d == nil {
 		// The service's own closed stage names this refusal in the report.
 		return OperationReply{}, stoppedAt("query", err, ErrOperationDelivery)
@@ -475,6 +481,8 @@ func (s *ContextProjectionOperations) WithProfileSummaries(profiles ProfileSumma
 }
 
 const profileSummaryHandling = "SensitiveDataHandling: Function names may contain user data. This summary omits raw samples, labels, paths and addresses. Automatic deletion covers Asservat-managed copies; copies already delivered cannot be recalled."
+
+var profileSummaryNotAvailable = OperationFailure{Code: "NotAvailable", Message: "This profile summary is not available with your current access or service conditions. Check your access or try again later.", Retryable: true}
 
 var profileSummaryTooLarge = OperationFailure{Code: "AnalysisUnavailable", Message: "This profile summary does not fit the response limit. Select fewer hotspots.", Retryable: false}
 

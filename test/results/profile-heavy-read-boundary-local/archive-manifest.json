@@ -1,0 +1,121 @@
+{
+  "format": "asservat-local-profile-heavy-read-boundary-archive/v1",
+  "measuredSourceHead": "b5d42f9557897b40ca5d6506ffc3c9bd4946f373",
+  "files": [
+    {
+      "path": "reader-report.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heavy-native-reader-repro/report.json",
+      "sourceBytes": 4663,
+      "sourceSha256": "3fafca6592555e379ae4b28fa1839e9fdf82558dc82cae37159db2df6a3c2e9c",
+      "storedBytes": 1789,
+      "storedSha256": "83d51165e3dce03a5b71e6cbd671d0b3f0544a4ef9bb340e600c8afbf2fb163e",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "reader-discriminator.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heavy-native-reader-repro/discriminator.log",
+      "sourceBytes": 2546,
+      "sourceSha256": "d7f93e1bb48a07818d9bb26faba26f3ab064fc994d60dc0d88ca6ef57c9ac701",
+      "storedBytes": 543,
+      "storedSha256": "da356df9d303c98fd81ccffe513f39d79e251fec635d000d228c59c411248a82",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "reader-heavy_native_repro_test.go.gz",
+      "source": "/home/phil/.cache/asservat-build/heavy-native-reader-repro/heavy_native_repro_test.go",
+      "sourceBytes": 13756,
+      "sourceSha256": "2bee147aa1dfe4fdc8ba7dff6d0a4489c735a4bff215a22726c3096f10cb1c10",
+      "storedBytes": 4886,
+      "storedSha256": "59e8672c39fa7eff08aaebd33fd40371fa2b3542386193f58ad53e0a4c4fff4c",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "reader-authority-bound-contracts.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heavy-native-reader-repro/authority-bound-contracts.log",
+      "sourceBytes": 568,
+      "sourceSha256": "1df535bda26c7771d95edc0bdc90fe7dc6b8f55621a2eff0717a424e1ec4cf82",
+      "storedBytes": 243,
+      "storedSha256": "db7717b54e1add5d3e79f94a1f4b62da0e75687f822665847b9b46adaed00170",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "reader-paid-poll-owner-contract.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heavy-native-reader-repro/paid-poll-owner-contract.log",
+      "sourceBytes": 221,
+      "sourceSha256": "43b35d4b3975dc709308e6bda62159e567910466bae8b42a3a3d7459337a7b95",
+      "storedBytes": 156,
+      "storedSha256": "20b1547000b76a74d785216e534598d4a6ac119440fa1a7486b0c115972808fe",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "reader-initial-compile-failure.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heavy-native-reader-repro/initial-compile-failure.log",
+      "sourceBytes": 305,
+      "sourceSha256": "7bfaa227c726808476b37de2e3151890ecbfe7255407f38401734e0623ec1be8",
+      "storedBytes": 171,
+      "storedSha256": "d4c888cfdf67de2abcfca0f0440f5a9af39ae2492a160860b7a0ad4d517a8ba6",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "reader-initial-fixture-client-setup-failure.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heavy-native-reader-repro/initial-fixture-client-setup-failure.log",
+      "sourceBytes": 1244,
+      "sourceSha256": "2aaf91220b6f5989f2abab0effb0b4576e4bbcc0bae77fd15c8a402dac637f0f",
+      "storedBytes": 270,
+      "storedSha256": "0486d733fc4ed10726bbe5299b41a70f5ebab47771c26056711ac0fb013bde18",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "tls-report.json.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-heavy-lease-repro/report.json",
+      "sourceBytes": 1053,
+      "sourceSha256": "399f4b570d2e032e3ecf7d79afaa7e5b037e16a87fc9483378afc60e2dbe6650",
+      "storedBytes": 646,
+      "storedSha256": "dbcaa398170b2b0e2f92aba8542d632f36dbb877b31119d8d5437b33d23bb7dc",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "tls-six-second-tls.log.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-heavy-lease-repro/six-second-tls.log",
+      "sourceBytes": 568,
+      "sourceSha256": "e47938d4af17637f9130f206712d63ef1c155ecae986eea13b7c3e369f199b10",
+      "storedBytes": 298,
+      "storedSha256": "9abba124d264520f4fe6f10e983bb62b1543284370428f74c866217cc6a09917",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "tls-heavy_lease_temporary_test.go.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-heavy-lease-repro/heavy_lease_temporary_test.go",
+      "sourceBytes": 6443,
+      "sourceSha256": "2d73502b67a03397a4e4c74c0ff455fa2e80663edaa2243bba28af66048c5bcb",
+      "storedBytes": 2301,
+      "storedSha256": "ac18fe02dbf940cb19aea1256a7dd94bac5a2bd74447b9193bb81f94bf2457de",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "tls-build.log.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-heavy-lease-repro/build.log",
+      "sourceBytes": 309,
+      "sourceSha256": "cd7b16b7d2926f1a6e43f16bb3897ed52260a9cbe8bcc1665032c88dd90b2ce9",
+      "storedBytes": 147,
+      "storedSha256": "d2007e6642ea2db21cbb3ff5ae50360aae3e5ffceb1afc6cc553f0f3e44ac173",
+      "compression": "gzip level9 mtime0"
+    },
+    {
+      "path": "tls-build-final.log.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-heavy-lease-repro/build-final.log",
+      "sourceBytes": 0,
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "storedBytes": 20,
+      "storedSha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "compression": "gzip level9 mtime0"
+    }
+  ],
+  "excluded": [
+    "test binaries",
+    "native payload duplicates",
+    "private fixture files",
+    "credentials"
+  ],
+  "readback": "All source bytes compared to cache, inflated archives compared byte-for-byte, deterministic recompression compared byte-for-byte; see README."
+}

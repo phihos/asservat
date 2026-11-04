@@ -28,10 +28,12 @@ func qualifyInstalledProfileSummary(t *testing.T, ctx context.Context, identity 
 
 // Query and join before a separately authorized native download. The returned
 // aggregate supplies no raw authority; the downloaded original validates it.
-func queryInstalledProfileSummary(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version, sampleType string, expires time.Time, check installedProjectionCheck) query.ProfileSummary {
+// Heap may replace only the query/polls with the installed React caller. The
+// read-only MCP native denial still runs, without admitting a second query.
+func queryInstalledProfileSummary(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version, sampleType string, expires time.Time, check installedProjectionCheck, browserCall ...func(string, any) installedComparisonReply) query.ProfileSummary {
 	t.Helper()
-	if check == nil {
-		t.Fatal("profile summary requires independent SQL readback")
+	if check == nil || len(browserCall) > 1 {
+		t.Fatal("profile summary requires independent SQL readback and at most one browser caller")
 	}
 	verify := check(artifactID)
 	source := identity.approvedTokenSource(origin)
@@ -48,14 +50,7 @@ func queryInstalledProfileSummary(t *testing.T, ctx context.Context, identity *i
 		t.Fatal(err)
 	}
 	defer session.Close()
-	type summaryReply struct {
-		installedJourneyEnvelope
-		DataClass  string `json:"data_class"`
-		Provenance []struct {
-			ArtifactID string `json:"artifactID"`
-			Digest     string `json:"digest"`
-		} `json:"provenance"`
-	}
+	type summaryReply = installedComparisonReply
 	call := func(name string, args any) summaryReply {
 		t.Helper()
 		began := time.Now()
@@ -76,6 +71,17 @@ func queryInstalledProfileSummary(t *testing.T, ctx context.Context, identity *i
 		t.Fatal("read-only profile session obtained native download")
 	}
 	verify("", "")
+	if len(browserCall) == 1 {
+		call = browserCall[0]
+	}
+	return queryInstalledProfileSummaryWithCall(t, ctx, caseID, artifactID, version, sampleType, expires, call, verify)
+}
+
+// Preserve the exact canonical source/handle/deadline checks across MCP and
+// installed React. The caller supplies an already independently funded verifier.
+func queryInstalledProfileSummaryWithCall(t *testing.T, ctx context.Context, caseID, artifactID, version, sampleType string, expires time.Time, call func(string, any) installedComparisonReply, verify func(string, string) func()) query.ProfileSummary {
+	t.Helper()
+	type summaryReply = installedComparisonReply
 	result := call("get_profile_summary", map[string]any{"case_id": caseID, "artifact_id": artifactID, "sample_type": sampleType, "top_n": 20})
 	operation, handle := result.RequestID, ""
 	var observed, until time.Time

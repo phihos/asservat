@@ -5,10 +5,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	httppprof "net/http/pprof"
+	"net/url"
+	"os"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
@@ -29,16 +32,30 @@ func burnCPU() {
 	observed.Store(n)
 }
 func main() {
-	for i := 0; i < 128; i++ {
-		retained = append(retained, make([]byte, 32<<10))
-	}
-	runtime.GC() // fixture setup gives snapshot heap profiling a retained baseline
-	go func() {
-		for {
-			burnCPU()
-			runtime.Gosched()
+	var heavy *acceptedHeavy
+	if len(os.Args) != 1 {
+		if len(os.Args) != 2 || os.Args[1] != "--accepted-heavy" {
+			log.Fatal("unknown synthetic profile workload mode")
 		}
-	}()
+		var err error
+		heavy, err = openAcceptedHeavy([2]string{"/profile-heavy-baseline.pb.gz", "/profile-heavy-incident.pb.gz"})
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer heavy.Close()
+	}
+	if heavy == nil {
+		for i := 0; i < 128; i++ {
+			retained = append(retained, make([]byte, 32<<10))
+		}
+		runtime.GC() // fixture setup gives snapshot heap profiling a retained baseline
+		go func() {
+			for {
+				burnCPU()
+				runtime.Gosched()
+			}
+		}()
+	}
 	profiles := http.NewServeMux()
 	profiles.Handle("/debug/pprof/", http.DefaultServeMux)
 	var missing atomic.Bool
@@ -46,6 +63,10 @@ func main() {
 	profiles.HandleFunc("/debug/pprof/profile", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			requests.Add(1)
+		}
+		if heavy != nil {
+			heavy.ServeHTTP(w, r)
+			return
 		}
 		if missing.Load() {
 			http.NotFound(w, r)
@@ -62,6 +83,10 @@ func main() {
 	var ownerMu sync.Mutex
 	ownerRunning := false
 	workload.HandleFunc("POST /fixture/profile-mode", func(w http.ResponseWriter, r *http.Request) {
+		if heavy != nil {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
 		body, err := io.ReadAll(io.LimitReader(r.Body, 8))
 		if err != nil || string(body) != "normal" && string(body) != "missing" {
 			w.WriteHeader(http.StatusBadRequest)
@@ -71,6 +96,10 @@ func main() {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	workload.HandleFunc("POST /fixture/cpu-profiler/start", func(w http.ResponseWriter, _ *http.Request) {
+		if heavy != nil {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
 		ownerMu.Lock()
 		defer ownerMu.Unlock()
 		if ownerRunning || pprof.StartCPUProfile(io.Discard) != nil {
@@ -139,3 +168,68 @@ func main() {
 type zeroReader struct{}
 
 func (zeroReader) Read(b []byte) (int, error) { clear(b); return len(b), nil }
+
+// acceptedHeavy streams prebuilt test inputs. Graph generation and parser
+// preflight run in a separate build process, never in this small workload.
+// An attempted transfer consumes its ordinal even if the client disconnects.
+type acceptedHeavy struct {
+	files [2]*os.File
+	sizes [2]int64
+	next  atomic.Uint32
+}
+
+func openAcceptedHeavy(paths [2]string) (*acceptedHeavy, error) {
+	h := &acceptedHeavy{}
+	for index, path := range paths {
+		file, err := os.Open(path)
+		if err != nil {
+			h.Close()
+			return nil, err
+		}
+		h.files[index] = file
+		info, err := file.Stat()
+		if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 16<<20 {
+			h.Close()
+			return nil, fmt.Errorf("invalid prebuilt profile input %d", index)
+		}
+		h.sizes[index] = info.Size()
+	}
+	return h, nil
+}
+
+func (h *acceptedHeavy) Close() {
+	for _, file := range h.files {
+		if file != nil {
+			_ = file.Close()
+		}
+	}
+}
+
+func (h *acceptedHeavy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if r.Method != http.MethodGet || err != nil || len(query) != 2 || len(query["debug"]) != 1 || query.Get("debug") != "0" || len(query["seconds"]) != 1 || query.Get("seconds") != "10" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if r.Context().Err() != nil {
+		w.WriteHeader(http.StatusRequestTimeout)
+		return
+	}
+	// Saturate at two so even repeated invalid retries cannot wrap the counter
+	// and replay the fixed pair.
+	var ordinal uint32
+	for {
+		ordinal = h.next.Load()
+		if ordinal >= 2 {
+			w.WriteHeader(http.StatusGone)
+			return
+		}
+		if h.next.CompareAndSwap(ordinal, ordinal+1) {
+			break
+		}
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.FormatInt(h.sizes[ordinal], 10))
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = io.CopyN(w, io.NewSectionReader(h.files[ordinal], 0, h.sizes[ordinal]), h.sizes[ordinal])
+}

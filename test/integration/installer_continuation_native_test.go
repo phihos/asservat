@@ -529,6 +529,13 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
+		if installedJourneyFocus() == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant()) {
+			defer func() {
+				if t.Failed() {
+					diagnose()
+				}
+			}()
+		}
 		if installedJourneyFocus() == "policy-profile" {
 			t.Run("policy-profile", func(t *testing.T) {
 				qualifyInstalledPolicyProfile(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, diagnose)
@@ -579,9 +586,18 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					var sources []installedProfileComparisonSource
 					for index := 0; index < 2; index++ {
 						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {
+							if installedAcceptedHeavyComparison() {
+								if err := acceptedHeavySourceMatches(f.ProfileContainment, index, source.Native); err != nil {
+									t.Fatal("accepted-heavy original downloaded source", err)
+								}
+							}
 							sources = append(sources, source)
 							if len(sources) == 2 {
-								qualifyInstalledProfileComparison(t, ctx, identity, transport, publicRoot, publicAddress, origin, [2]installedProfileComparisonSource{sources[0], sources[1]}, installedProfileComparisonSQLCheck(t, ctx, admin, api, p.RootID))
+								var resourceObservers []installedComparisonResourceObserver
+								if installedAcceptedHeavyComparison() {
+									resourceObservers = []installedComparisonResourceObserver{installedComparisonResources(t, ctx, admin, api, f.Clusters[0].Config, p.RootID, f.ProfileContainment)}
+								}
+								qualifyInstalledProfileComparison(t, ctx, identity, transport, publicRoot, publicAddress, origin, [2]installedProfileComparisonSource{sources[0], sources[1]}, installedProfileComparisonSQLCheck(t, ctx, admin, api, p.RootID), resourceObservers...)
 							}
 						}})
 					}
@@ -589,6 +605,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					var profileChecks []installedProfileCaptureContinuation
 					if installedJourneyFocus() == "manual-profile" {
 						profileChecks = []installedProfileCaptureContinuation{{InitializeProcessing: true, Refused: installedProfileRefusalSQLCheck(t, ctx, admin, p.RootID)}}
+						if installedRuntimeTraceVariant() {
+							profileChecks[0].NoQueries = installedRuntimeTraceNoQueries(t, ctx, admin, p.RootID)
+						}
 					}
 					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
 				}
@@ -1084,7 +1103,11 @@ func installedPodDiagnostics(t *testing.T, c context.Context, api kubernetes.Int
 			if x := s.LastTerminationState.Terminated; x != nil {
 				reason, exit = x.Reason, x.ExitCode
 			}
-			t.Logf("diagnostics: %s pod %s container %s ready %v restarts %d last %q exit %d", name, pod.Name, s.Name, s.Ready, s.RestartCount, reason, exit)
+			currentTermination := "unobserved"
+			if x := s.State.Terminated; x != nil {
+				currentTermination = fmt.Sprintf("reason=%q exit=%d", x.Reason, x.ExitCode)
+			}
+			t.Logf("diagnostics: %s pod %s container %s ready %v restarts %d last %q exit %d current termination %s", name, pod.Name, s.Name, s.Ready, s.RestartCount, reason, exit, currentTermination)
 			for _, previous := range []bool{true, false} {
 				logs, e := api.CoreV1().Pods(namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: s.Name, Previous: previous, Timestamps: true, TailLines: ptr.To(int64(400)), LimitBytes: ptr.To(int64(65536))}).DoRaw(c)
 				if e == nil && len(logs) > 0 {

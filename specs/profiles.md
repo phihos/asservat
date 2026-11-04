@@ -172,6 +172,16 @@ use credentials. See the [runtime-profile boundary](../docs/architecture/runtime
 
 ### Manual profile preview
 
+History-backed single-profile repeat previews use a prospectively selected
+eight-second composition inside the existing fifteen-second public request.
+They retain initial recovery before the one readiness hint, then independently
+read final exact-target and current facts after readiness; no old observation
+is renewed. A fresh recovery proof must preserve the original installation,
+issuer epoch and full revision. Original parent/token/policy/source expiry and
+final current checks remain mandatory. This metadata composition neither
+collects another profile nor obtains a new approval.
+
+
 [ADR-285](../docs/decisions/285-profile-preview-plans.md) connects the passive
 endpoint planner to manual preview through regional installation configuration.
 The review freezes the public definition and endpoint digests without dialing

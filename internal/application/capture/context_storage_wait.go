@@ -191,6 +191,11 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 	}
 	select {
 	case <-w.done:
+	case <-wait.Done():
+		// A possible-profile hint can have a longer upfront context than
+		// the classified ordinary request. Join it at this consumer's
+		// existing readiness cutoff, leaving its response reserve intact.
+		w.close()
 	case <-call.Done():
 		w.close()
 		return zero, expired()

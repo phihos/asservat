@@ -527,7 +527,11 @@ func (s ContextProjectionService) begin(ctx context.Context, current identities.
 	a, err := s.Results.Authority.ResolveProjectionCurrent(o.ctx, current, candidate)
 	if err != nil || !a.Valid(s.Results.Now()) || a.Scope.Candidate() != candidate || a.Scope.BeginTool() != tool || a.Environment.InstallationID != s.Results.InstallationID ||
 		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten("resolved-authority/"+a.Bound, a.ValidUntil) {
-		return nil, queryCollapsed("authority", value.ErrUnavailable, err)
+		refusal := queryCollapsed("authority", value.ErrUnavailable, err)
+		if tool == "get_profile_summary" {
+			return nil, &profileSummaryPreAdmissionRefusal{cause: refusal}
+		}
+		return nil, refusal
 	}
 	var q value.ContextQuery
 	if a.Scope.Comparison != (value.ProfileComparisonWindow{}) {

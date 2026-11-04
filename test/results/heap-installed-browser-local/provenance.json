@@ -1,0 +1,150 @@
+{
+  "originalPreparation": "2a46bd909afa849b97b540f40a7cd362b3155262",
+  "integratedSource": "370d2dd36fbe13bd51a4818db788aec3ec829bc6",
+  "parentTrace": "a5d15db664c9aac57f1286d2752205ce644337cb",
+  "localBrowserGate": {
+    "command": "env PATH=/home/phil/.cache/asservat-build/spec-venv/bin:/home/phil/.cache/asservat-build/bin:<inheritedPATH> TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOFLAGS='-buildvcs=false -p=2' make console-browser-check",
+    "exit": 0,
+    "goSeconds": 48.768,
+    "journeys": 28,
+    "accessibilityScans": 27
+  },
+  "scope": "Actual built React/GoTLS HTTP/driver with synthetic current session, case, query and download facts. Installed browser path, actual selected console grant, worker/accounting/native lifecycle remain unrun. Old-driver RED precedes heap mode; no production change.",
+  "restoredGeneratedTrackedFiles": [
+    "test/results/console-browser/capture-review-mobile.png",
+    "test/results/console-browser/capture-review.png",
+    "test/results/console-browser/case-evidence-mobile.png",
+    "test/results/console-browser/case-evidence.png",
+    "test/results/console-browser/report.json",
+    "test/results/console-native-restart/failed-native-ready.png"
+  ],
+  "removedOwnedUntrackedFilesAfterArchival": [
+    "test/results/console-browser/heap-summary-mobile.png",
+    "test/results/console-browser/policy-budgets.png",
+    "test/results/console-browser/policy-manager.png",
+    "test/results/console-browser/profile-summary-mobile.png",
+    "test/results/console-browser/saved-syscall-events-mobile.png"
+  ],
+  "files": [
+    {
+      "path": "heap-browser-driver-red.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-driver-red.log",
+      "sha256": "bcf363d03095ebe268d483e360a6a9ee9fc61b6b8ffefa75858d9155a8cd3880",
+      "bytes": 1273
+    },
+    {
+      "path": "heap-browser-driver-green.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-driver-green.log",
+      "sha256": "0f786137d3f8d4a01389b98202a9bf56d4172ebada6e0e679b7a6169ec96bd91",
+      "bytes": 1330
+    },
+    {
+      "path": "heap-browser-built-race.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-built-race.log",
+      "sha256": "90f183e7f6ddae9e9cacf96a2eadff3e80d8a544298806a8015664e0fc6558c4",
+      "bytes": 2384
+    },
+    {
+      "path": "heap-browser-final-focused-race.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-final-focused-race.log",
+      "sha256": "9dafb3a463324d8d6dcc5eafd9696e2295146e81dbe941e7b4aaf3350585b8a5",
+      "bytes": 53
+    },
+    {
+      "path": "heap-browser-selection.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-selection.log",
+      "sha256": "6f75a31c67524e73d50ce119fb4aff1f3416319c0134de5f53c07e69c7b53af7",
+      "bytes": 100
+    },
+    {
+      "path": "heap-browser-trace-selection.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-trace-selection.log",
+      "sha256": "58976e1ebef02b28fad1bcf93e82831c9ac8cc4bf93fac3ea64e4eed88432c50",
+      "bytes": 101
+    },
+    {
+      "path": "heap-browser-console-build.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-console-build.log",
+      "sha256": "c3b29717839fd2d5357f4e4ef2c28235c12ac535bbf67181fae7f5dc2e5c375b",
+      "bytes": 1101
+    },
+    {
+      "path": "heap-browser-final-console-check.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-final-console-check.log",
+      "sha256": "5955687d9e422efe216e943a35dbbd9a16dfbc96fe28eb3b05e3a14d5620c257",
+      "bytes": 5357
+    },
+    {
+      "path": "heap-browser-preparation.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-preparation.json",
+      "sha256": "a8485515d8c2157898ad1b56d48e326c6f3d158d46eaf85abf186c29e0a42ee9",
+      "bytes": 3394
+    },
+    {
+      "path": "screenshots/console-browser/capture-review-mobile.png",
+      "source": "test/results/console-browser/capture-review-mobile.png",
+      "sha256": "97394c8896821c803603f416d95219036a7187c185b1c2c8b37c152ea36b282a",
+      "bytes": 100771
+    },
+    {
+      "path": "screenshots/console-browser/capture-review.png",
+      "source": "test/results/console-browser/capture-review.png",
+      "sha256": "f1b7f6eb747c1b993c8725f7811417f3aa0469f29759669f3f726ca25020613a",
+      "bytes": 115229
+    },
+    {
+      "path": "screenshots/console-browser/case-evidence-mobile.png",
+      "source": "test/results/console-browser/case-evidence-mobile.png",
+      "sha256": "f3b6b5a802763dd7adb4d00e19877c00fc5e4c5468bc5d77ee7f8608e42e6e2b",
+      "bytes": 51032
+    },
+    {
+      "path": "screenshots/console-browser/case-evidence.png",
+      "source": "test/results/console-browser/case-evidence.png",
+      "sha256": "9dc8b6aeb3844f471abb779b483aa9df648759cfe08de711ab71c376e399e0ac",
+      "bytes": 60677
+    },
+    {
+      "path": "screenshots/console-browser/report.json",
+      "source": "test/results/console-browser/report.json",
+      "sha256": "9c5d4c92a0494c6f75bd986020094046dd9f5f58030c7fc166b1d21dcc597eb6",
+      "bytes": 4138
+    },
+    {
+      "path": "screenshots/console-native-restart/failed-native-ready.png",
+      "source": "test/results/console-native-restart/failed-native-ready.png",
+      "sha256": "9eaf44544ee71e172204dad3f9571aa155957d998b1ed74be6c14edfc9702474",
+      "bytes": 117880
+    },
+    {
+      "path": "screenshots/console-browser/heap-summary-mobile.png",
+      "source": "test/results/console-browser/heap-summary-mobile.png",
+      "sha256": "d34bf8e600d585ca9580c309c8284f902ffb08a9ac7c097ead14e12d11e86410",
+      "bytes": 239745
+    },
+    {
+      "path": "screenshots/console-browser/policy-budgets.png",
+      "source": "test/results/console-browser/policy-budgets.png",
+      "sha256": "9c2b0451cc743e08b33991cd2845ce514ac9bd1c92774bc597e207b22afb9e19",
+      "bytes": 168290
+    },
+    {
+      "path": "screenshots/console-browser/policy-manager.png",
+      "source": "test/results/console-browser/policy-manager.png",
+      "sha256": "10f8c376593311992eaf405785cfbaafb2d7580ac5c5a418fab4dfdba1589302",
+      "bytes": 140461
+    },
+    {
+      "path": "screenshots/console-browser/profile-summary-mobile.png",
+      "source": "test/results/console-browser/profile-summary-mobile.png",
+      "sha256": "842254d77ecd0a596ef1655f734387aba1af1a249a223510400049755cbfa880",
+      "bytes": 234918
+    },
+    {
+      "path": "screenshots/console-browser/saved-syscall-events-mobile.png",
+      "source": "test/results/console-browser/saved-syscall-events-mobile.png",
+      "sha256": "f1ae80f3dac099132e9edc916f66509cd5d6bee457c42e92512b39268f51d767",
+      "bytes": 182076
+    }
+  ]
+}

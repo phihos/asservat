@@ -1,0 +1,423 @@
+{
+  "format": "asservat-profile-repeat-phase-local/v1",
+  "originalFinalSource": "ed9bc6d17a82674eebcede1fbe237019bca740c4",
+  "base": "1cba8f74721e10b0c96225c670fd98e7035c479d",
+  "integratedHead": "8cde94516cde72026420b02f0613bc764723b7b7",
+  "sourceCommitMapping": [
+    {
+      "original": "c66cb47594febee1a1febc94c2362b69c398bf47",
+      "integrated": "b222eef521b588116f83c75607d3a6af15f6b36d",
+      "stablePatchID": "47e56c6bdb595c50536a30a12f3542335076cf47",
+      "equal": true
+    },
+    {
+      "original": "ed9bc6d17a82674eebcede1fbe237019bca740c4",
+      "integrated": "8cde94516cde72026420b02f0613bc764723b7b7",
+      "stablePatchID": "5f981f210cde3f69d0a0502b398350db97d707e8",
+      "equal": true
+    }
+  ],
+  "all11SourceFileIdentities": [
+    {
+      "path": "docs/architecture/runtime-profiles.md",
+      "sha256": "d39e4372361ce9776fee3ed1238a37a7a2b67c8c1b6d71269bb92c8b29316cd5",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    },
+    {
+      "path": "docs/decisions/285-profile-preview-plans.md",
+      "sha256": "e2fcca783cfa3a918574bdffab9f1fb72137143fef51e2ba04ca4e474f063062",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    },
+    {
+      "path": "internal/application/capture/context_storage_reserve_test.go",
+      "sha256": "91a46e163ee0eeda66a423e6eb8255477fb8ee0baf34a5637e48708c9aa9c43f",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    },
+    {
+      "path": "internal/application/capture/context_storage_wait.go",
+      "sha256": "b42c928673704e518749bd6d9843f8c77d7d9ee4d7d292b0d73871dc073c936e",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    },
+    {
+      "path": "internal/application/capture/profile_repeat_budget_test.go",
+      "sha256": "c49c401779ea775c4c77a08ac72fda5800f5095112872e5a1b6139b9da708e49",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    },
+    {
+      "path": "internal/application/capture/profile_repeat_readiness_test.go",
+      "sha256": "6cdbadd19b5f3ecb14d2d3161f8621314e4217f2cbb038b67a38b548c7d596e3",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    },
+    {
+      "path": "internal/application/capture/recorder_preview.go",
+      "sha256": "b518d81e07a561dd5db14b476a134b380998f59d6edcef4b72979ef32619d2ac",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    },
+    {
+      "path": "internal/domain/identity/identity.go",
+      "sha256": "586cdb9490ecc5676fbd28dbe1aba0455ba182b236685e608dde38344fc7867f",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    },
+    {
+      "path": "specs/profiles.md",
+      "sha256": "4fd774c735dfc5455ae168c485c7f73ed0a7a33a6c35a036461f2aae7f6ccef3",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    },
+    {
+      "path": "web/src/capture/http.test.ts",
+      "sha256": "d6c3159719fff4ee84cd91c1380f783a4075388d99152967da52fb6c1a398e4e",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    },
+    {
+      "path": "web/src/capture/http.ts",
+      "sha256": "66e22e689dc1bb2f5adf641dae1927c9d5e9d582906d8eb2406f7d2689bab9f9",
+      "sourceIntegratedAndWorkingTreeMatch": true
+    }
+  ],
+  "scope": "Real phase-composition implementation with local synthetic authority/adapter facts. Not installed availability qualification; not proof of older native invalid-body cause. No collector acquisition or approval occurs in the preview tests.",
+  "verifiedFinalChecks": [
+    {
+      "name": "http-green",
+      "command": "web/node_modules/.bin/vitest run --root web src/capture/http.test.ts",
+      "cwd": "/home/phil/Projekte/asservat-profile-repeat-preview-budget",
+      "envOverrides": {},
+      "exit": 0,
+      "log": "/home/phil/.cache/asservat-build/profile-repeat-http-green.log",
+      "bytes": 230,
+      "sha256": "2f5185d0c898cc4a5309f9fee8a835e94473ff9767c239be7bfbbec448d3afb8",
+      "scopeNote": "CurrentHTTPsource;20tests pass1.78s."
+    },
+    {
+      "name": "typecheck",
+      "command": "node_modules/.bin/tsc --noEmit",
+      "cwd": "/home/phil/Projekte/asservat-profile-repeat-preview-budget/web",
+      "envOverrides": {},
+      "exit": 0,
+      "log": "/home/phil/.cache/asservat-build/profile-repeat-http-typecheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "scopeNote": "Currentwebsource, no errors."
+    },
+    {
+      "name": "final-classification-race",
+      "command": "TMPDIR=/home/phil/.cache/asservat-build/heap-browser-tmp go test -race -v ./internal/application/capture -run '^Test(ProfileRepeat|ContextStorageResponseReserve|RecorderPreview|Composition)' -count=1 -timeout=75s",
+      "cwd": "/home/phil/Projekte/asservat-profile-repeat-preview-budget",
+      "envOverrides": {
+        "TMPDIR": "/home/phil/.cache/asservat-build/heap-browser-tmp"
+      },
+      "exit": 0,
+      "log": "/home/phil/.cache/asservat-build/profile-repeat-classification-final-race.log",
+      "bytes": 10504,
+      "sha256": "ed368af0aeac3bd3d71a13f967e1d046d0aa8a675a4c82f78a495fb448d0ac92",
+      "scopeNote": "Finaled9bc6d1source;14.829s. All15measuredcases pass; delayedcatalog denies BEFOREfreshRecovery/recorder, supportedpositive5.684345s, ordinaryhintjoin4.00s."
+    }
+  ],
+  "earlierChecks": {
+    "phaseSplitCaptureRace": "c66cb475 source, before final classification guard; exit0/24.664s.",
+    "presentationRace": "Pre-final reserve correction, exit0/108.317s. Identity package compiled with no matching tests. This is partial earlier source evidence, not final-source combined public qualification.",
+    "redSourceScope": "Initial measured REDs used production1cba plus an earlier uncommitted positive version of the new test. Eight-alone changed only innercap temporarily and restored it. Final source fixtures contain additional negatives.",
+    "intermediateFailures": [
+      {
+        "log": "/home/phil/.cache/asservat-build/profile-repeat-measured-budget-green-debug.log",
+        "exit": 1,
+        "bytes": 364,
+        "sha256": "2053b488dd403955e6ad6cc35c33c4adb31553f642c5e3ce902947054ae1df4d",
+        "note": "Intermediate fresh-test-port ProcessingCoverage failed to honor its original caller bound; corrected test adapter to match actual bounded producer, no production workaround."
+      },
+      {
+        "log": "/home/phil/.cache/asservat-build/profile-repeat-budget-negatives.log",
+        "exit": 1,
+        "bytes": 394,
+        "sha256": "659908f5cfb816ea77d95355530c20dc44fb1b2cd567842e31eaaa2fc7fbe44f",
+        "note": "New measured negatives passed; old test expected hint-target timestamp to authorize wholeplan, updated for independently read finaltarget contract."
+      },
+      {
+        "log": "/home/phil/.cache/asservat-build/profile-repeat-reserve-and-fallback-green.log",
+        "exit": 1,
+        "bytes": 345,
+        "sha256": "f83dc9278307bdc8d812f72d94ddb38caecff14c33ef735f385e5ed270e79d0c",
+        "note": "Reserve and measuredcases passed; warmunsupported test initially expected publicplan-only but actualbaseline history returns dependency refusal. Baseline independently verified and expectation corrected."
+      }
+    ],
+    "warmUnsupported": "Original1cba recorder implementation independently returned existing ErrProfileChanged for warm unsupported history; no public plan-only success was fabricated."
+  },
+  "contract": [
+    "Profilehistoryrepeat prospectively8s insideexistingouter15; classification/nonprofile5; browserpreview15 othercaptureops10.",
+    "Initialcurrentrecovery andtargetreview retainedbeforeonehint. Hint is non-authoritative; originalsourceworker5s unaffected.",
+    "Afterreadiness sameexistingcompleteResolveProfileRecorder returnsfreshnamespace/workload/Pod with exactoriginalRequest+Pin; finalfacts independentlyread.",
+    "One freshrecoveryread sameInstallationID+IssuerEpoch+FULLRevision, own5s interval; initialproof neverextended.",
+    "Existingwait.Done cancellation/actualjoin preservesordinary4sreadiness/5s request andonefinalread; no secondDemand.",
+    "Parent/token/policy/history/cancel/currentdeny/finalchecks retained.",
+    "Before switching to the upfront8s profile budget, explicitly recheck the original5s classification context cancellation and exact actual deadline; a late valid catalog response cannot revive it."
+  ],
+  "complexity": {
+    "addedSQLQueriesPerProfileRepeat": 3,
+    "addedSQLTransactionsPerProfileRepeat": 1,
+    "addedKubernetesReads": 0,
+    "newAPIsRolesWatchesCachesPoolsConfigOrBackgroundOwners": 0,
+    "additionalSQLLoadForRRepeatsPerSecond": "3Rqueries/Rtransactions",
+    "collectionOrApprovalFromPreview": false,
+    "maxAdditionalExistingLogicalStoragePollsPerStalledRepeat": 12,
+    "pollingNote": "Existing250ms polling maycontinue3s longer under8vs5; this is additional logicalstorage reads, not a claimed fixed physicalSQLquerycount."
+  },
+  "independentReviews": [
+    "syscall_sql reviewed c66 and finaled9: NO BLOCKERS; no reviewer tests or edits.",
+    "syscall_parser found and verified finalclassification fix; exacted9 read-only finalreview: no remaining blockers."
+  ],
+  "archive": [
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-budget-handoff.json",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-budget-handoff.json.gz",
+      "originalBytes": 15563,
+      "originalSHA256": "9cf42ff5c86fe951444a2ae46cacec10ee6e491c99f2034909dbbe8ce5354e7d",
+      "gzipBytes": 4733,
+      "gzipSHA256": "9ae79e7af8f9379a8ad775b9b9435cbe3cba0559b549f5e9fc05de26d6a9e895",
+      "gitBlob": "6b9a14a245c43205dbf07f807bd6833ae986af4c",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-measured-budget-red.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-measured-budget-red.log.gz",
+      "originalBytes": 293,
+      "originalSHA256": "6eb65524a881de51d7fe8ecaf5882182ac0d741a148f48e73f0fd5e8846d5516",
+      "gzipBytes": 230,
+      "gzipSHA256": "d8456fb37576bcb5fd799a317488ce7c657b731a0e890870890beafdc70a51ad",
+      "gitBlob": "b1a7c024f11765e502b6a1b37a10b4571b860e41",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-measured-eight-alone-red.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-measured-eight-alone-red.log.gz",
+      "originalBytes": 293,
+      "originalSHA256": "2704e61eeffe2ace3cf507ab70fe870d63b73d520c9c653b205baaf919ec50ed",
+      "gzipBytes": 230,
+      "gzipSHA256": "11043f0b749cc9a183489b7912454953f1390e3fe2b42ee4c12b77333c89642f",
+      "gitBlob": "9f05892cb2490920f1e12a89358c12d58ffeee07",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-measured-budget-green.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-measured-budget-green.log.gz",
+      "originalBytes": 65,
+      "originalSHA256": "5a1c70799793dfcacc4cf0ddb9ab7284a36cb3fc1afb53fb1fa1d75d9b5445c2",
+      "gzipBytes": 76,
+      "gzipSHA256": "d5b114ea71f1f3ebf07505de0445d945a304a0f679013848b5c3343f06e0833d",
+      "gitBlob": "8e7a684101ed56c7d417a2f6d6b02ff5246908b2",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-http-red.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-http-red.log.gz",
+      "originalBytes": 1123,
+      "originalSHA256": "77e11d171fe5d576d5d91281a48b9c49c53ab57f6c8e92e525acb7dd35068cde",
+      "gzipBytes": 578,
+      "gzipSHA256": "8fcd06c84a1612aa8109b4afe3fc5d22bbacf1e6fd110b4b1b4d268bc57aca72",
+      "gitBlob": "c485db9e0f9845daf9d89554211ef351a610d7fb",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-http-green.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-http-green.log.gz",
+      "originalBytes": 230,
+      "originalSHA256": "2f5185d0c898cc4a5309f9fee8a835e94473ff9767c239be7bfbbec448d3afb8",
+      "gzipBytes": 193,
+      "gzipSHA256": "167842511b1b377b755f5d51842a4326f68373027e6eac85e68d0714f567fef6",
+      "gitBlob": "35f8a3d655360ff715ffaf3f8e81e4cafc14285c",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-http-typecheck.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-http-typecheck.log.gz",
+      "originalBytes": 0,
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzipBytes": 20,
+      "gzipSHA256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "gitBlob": "86e43ea3218b5890302b754bbf8927f94e79f7ee",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-budget-race.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-budget-race.log.gz",
+      "originalBytes": 220,
+      "originalSHA256": "40c8003c597f2b3328aea0e6864145a11f64e6af11123a4b2546f99d13aa5b60",
+      "gzipBytes": 132,
+      "gzipSHA256": "81a5f0faf429a5f1bb9d9177b0a8556626e5036e329c16b3ebb6a2411cb32d02",
+      "gitBlob": "8a02f317a95e0b336fda8a335abd00c696396ba6",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-nonprofile-reserve-red.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-nonprofile-reserve-red.log.gz",
+      "originalBytes": 300,
+      "originalSHA256": "da2a3ece210d8fae3d78fb36b6a771a63a25718d50d4df564d569ae82256f17f",
+      "gzipBytes": 225,
+      "gzipSHA256": "4b3d3da7b8a855121500ce522c992f6a91a76d7d0b63461dd031e3d3f6a69b9d",
+      "gitBlob": "03b0dd41722b87ea091f2ad32e64b5b5349b7088",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-nonprofile-five-second-red.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-nonprofile-five-second-red.log.gz",
+      "originalBytes": 300,
+      "originalSHA256": "5c226c84a29d5aa86f4bc569000ff50ee5a85bf0c01d407be44101913629e568",
+      "gzipBytes": 226,
+      "gzipSHA256": "621a5d21f44dd4419a79f84ab77c312d73fc2b2d9e9fefed8d537ab8bdbaf293",
+      "gitBlob": "45b6b9dd25e9c3f5f3e81b3eada96e007af00c91",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-warm-unsupported-baseline.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-warm-unsupported-baseline.log.gz",
+      "originalBytes": 65,
+      "originalSHA256": "ea7a11bc20811ea0bb35c600e35024cf0e42a159481896eb00c3198986295f66",
+      "gzipBytes": 76,
+      "gzipSHA256": "3924fee6381ed610c64500ddd00759e8f5c3104ef0a82c065356c8655236019f",
+      "gitBlob": "f3efe094f194543b1773752ffe7909939f759c27",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-budget-final-race.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-budget-final-race.log.gz",
+      "originalBytes": 30645,
+      "originalSHA256": "670d10680f13754c4bf2df40d0837390c79230a9f2c0472f36cc41596cb87b28",
+      "gzipBytes": 3508,
+      "gzipSHA256": "2ee26892646e48dcd715675e7ec9b5a03ffc05d031b3312fef19d856cf70de86",
+      "gitBlob": "f306d1033a782ba55b7a660e9460e0a739db9db3",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-classification-late-red.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-classification-late-red.log.gz",
+      "originalBytes": 313,
+      "originalSHA256": "d3a2bd13264ad79a9972e76d3ce6e60a695a3105cf4ca88cca3cb06c45f46c47",
+      "gzipBytes": 210,
+      "gzipSHA256": "453fda2a70d80b8cf7020e7979124d38f8563ecb18081edb9a0de4875513aca9",
+      "gitBlob": "7502a16c16cb3a29c4fd94194756219c4f73a1cc",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-classification-final-race.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-classification-final-race.log.gz",
+      "originalBytes": 10504,
+      "originalSHA256": "ed368af0aeac3bd3d71a13f967e1d046d0aa8a675a4c82f78a495fb448d0ac92",
+      "gzipBytes": 1392,
+      "gzipSHA256": "36ecc91da0e1d20ff9d61449b0c4ad1909dcee7edff8e2d5e1df6daf8b4a538d",
+      "gitBlob": "e611f9a0c6181a5abb3a163e049c717e28efd573",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-measured-budget-green-debug.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-measured-budget-green-debug.log.gz",
+      "originalBytes": 364,
+      "originalSHA256": "2053b488dd403955e6ad6cc35c33c4adb31553f642c5e3ce902947054ae1df4d",
+      "gzipBytes": 255,
+      "gzipSHA256": "3285df3cc69d50afb3c1e34a910433108704272b94d3011fdbf096c7666e4e05",
+      "gitBlob": "ce83af403e87fccdc3c2b346f949e401a1bd6027",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-budget-negatives.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-budget-negatives.log.gz",
+      "originalBytes": 394,
+      "originalSHA256": "659908f5cfb816ea77d95355530c20dc44fb1b2cd567842e31eaaa2fc7fbe44f",
+      "gzipBytes": 236,
+      "gzipSHA256": "361c7073c12c7bcd6fc260555ffcaf680e3dfabf0a9865def371b03c01b92dc4",
+      "gitBlob": "7961ebca8bdd6cf88d627e0a84eb3a56a16d75a1",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-reserve-and-fallback-green.log",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-reserve-and-fallback-green.log.gz",
+      "originalBytes": 345,
+      "originalSHA256": "f83dc9278307bdc8d812f72d94ddb38caecff14c33ef735f385e5ed270e79d0c",
+      "gzipBytes": 228,
+      "gzipSHA256": "aadaca1e61e901b63f2f6b8f867c312c05733b5a27d081126d6f1ccef4bd0b0a",
+      "gitBlob": "c7f43b0becc747090b7dc35e83b0159c20a43d61",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-recorder-preview-before.go",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-recorder-preview-before.go.gz",
+      "originalBytes": 10591,
+      "originalSHA256": "d3f704ff1470681918040537c7166c86bd4d7180762236b474068eca96d1fe2a",
+      "gzipBytes": 2998,
+      "gzipSHA256": "3f08d4d923952885564e86f2b71490853a169f4579f6ebc7ef9cd7b6c8c256bd",
+      "gitBlob": "16f5e89bfe92f812c2b81adffc4b572b14c0a8c6",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-repeat-recorder-preview-final-before-warm-comparison.go",
+      "kind": "original-cache-record",
+      "archive": "profile-repeat-recorder-preview-final-before-warm-comparison.go.gz",
+      "originalBytes": 13792,
+      "originalSHA256": "ed8edfec86ba23fcef5a1ab44fdeed68ad2279c531d6dc573d72fcef85a0ced3",
+      "gzipBytes": 3807,
+      "gzipSHA256": "540815d6d32e9816dd552e035657b4d27c5416ca899398a8caf91649046090bb",
+      "gitBlob": "149a99f85ce54f37ebf50bfbeecde8fba5074f13",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "git format-patch -1 --stdout c66cb47594febee1a1febc94c2362b69c398bf47",
+      "kind": "original-signed-source-patch",
+      "archive": "c66cb47594febee1a1febc94c2362b69c398bf47.patch.gz",
+      "originalBytes": 32054,
+      "originalSHA256": "b9e6f537ce23bae6de322eb996ce5fe91156364f81258da88ec9a8e3269f6418",
+      "gzipBytes": 9627,
+      "gzipSHA256": "551668f2dbb35b3378cef0c14d5b1d27b8a95680a8ea280929d547389c628300",
+      "gitBlob": "320fefadb5f637c8128e04667955157a39f9d414",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    },
+    {
+      "source": "git format-patch -1 --stdout ed9bc6d17a82674eebcede1fbe237019bca740c4",
+      "kind": "original-signed-source-patch",
+      "archive": "ed9bc6d17a82674eebcede1fbe237019bca740c4.patch.gz",
+      "originalBytes": 5064,
+      "originalSHA256": "9917395f1cd89d2258ce3f51b9ed135aa161e2ce6c337304e76541b8b6a8506a",
+      "gzipBytes": 2034,
+      "gzipSHA256": "5c613a0b69bbe56cb05cf1e6c9cb7a5c48bf8d1f1a30644515e261f51bdbb8cf",
+      "gitBlob": "2eca44e82aaa54070d37a47d7605b70042546278",
+      "completeDecompressedReadbackMatches": true,
+      "gitBlobReadbackMatches": true
+    }
+  ],
+  "compression": "gzip level9, mtime0, emptyfilename; every complete original/decompressed/Git-object comparison matched. Git hash-object writes archive blobs only, no index/commit.",
+  "publication": "Archive only; no source/shared docs edits, gate rerun, commit, push or hosted/native operation. Root final integrated qualification is separate and ongoing."
+}

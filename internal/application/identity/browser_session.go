@@ -374,7 +374,10 @@ func (s BrowserSessions) resolveKey(ctx context.Context, key [32]byte, allowRefr
 	if i.Principal != current.Principal {
 		return out, value.ErrDenied
 	}
-	i.ValidUntil = value.Earlier(i.ValidUntil, current.Observation.FreshUntil)
+	// Current checked the original five-second settings observation after the
+	// final session read. Its lease is a freshness precondition for this read;
+	// the returned identity retains token/key/policy and actual session expiry.
+	i.ValidUntil = value.Earlier(i.ValidUntil, current.ExpiresAt)
 	if !i.Valid(s.Now()) {
 		return out, value.ErrDenied
 	}

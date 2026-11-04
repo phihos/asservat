@@ -83,6 +83,15 @@ func (q *Queries) ChangeHistoryQuota(ctx context.Context, arg ChangeHistoryQuota
 	return result.RowsAffected(), nil
 }
 
+const checkHistoryCapacityAdmission = `-- name: CheckHistoryCapacityAdmission :exec
+DO $$ BEGIN SET CONSTRAINTS public.zzz_capacity_new_admission IMMEDIATE; END $$
+`
+
+func (q *Queries) CheckHistoryCapacityAdmission(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, checkHistoryCapacityAdmission)
+	return err
+}
+
 const claimHistoryParameterWrite = `-- name: ClaimHistoryParameterWrite :execrows
 UPDATE capture_history_parameter SET state='write_claimed',write_id=$3,write_digest=$4,write_started_at=$5,write_until=$6,write_executor_epoch=$7 WHERE root_id=$1 AND capture_id=$2 AND state='reserved' AND write_id IS NULL
 `
@@ -137,6 +146,18 @@ func (q *Queries) CompleteHistoryParameterWrite(ctx context.Context, arg Complet
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const deferHistoryCapacityAdmission = `-- name: DeferHistoryCapacityAdmission :exec
+DO $$ BEGIN SET CONSTRAINTS public.zzz_capacity_new_admission DEFERRED; END $$
+`
+
+// sqlc 1.31.1 resolves a bare named SET CONSTRAINTS as a table reference.
+// Fixed anonymous blocks preserve the exact server-side constraint operation
+// without a fake schema object or an extra persistent SQL function.
+func (q *Queries) DeferHistoryCapacityAdmission(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deferHistoryCapacityAdmission)
+	return err
 }
 
 const deleteSettledHistoryParameters = `-- name: DeleteSettledHistoryParameters :execrows

@@ -1015,6 +1015,9 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 	var ports []core.ContainerPort
 	if installedProfileFocus() || installedJourneyFocus() == "policy-profile" {
 		command = []string{"/profile-native"}
+		if installedAcceptedHeavyComparison() {
+			command = append(command, "--accepted-heavy")
+		}
 		ports = []core.ContainerPort{{Name: "diagnostics", ContainerPort: 6060}}
 	}
 	// One running replica the installed journey captures from: the product

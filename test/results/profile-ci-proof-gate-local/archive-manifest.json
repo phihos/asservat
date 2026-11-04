@@ -1,0 +1,111 @@
+{
+  "format": "profile-ci-proof-gate-local-archive/v1",
+  "ciRun": 41872117868,
+  "ciJob": 126721823311,
+  "ciSource": "6effd250a4d8c114d6815da1a422dfee3bbec716",
+  "isolatedFix": "5d5145a9596220bfa5050eea758491babfe0262e",
+  "rootCherryPick": "7a73f77b630ff44b2ba93493282aec70b11d9d32",
+  "entries": [
+    {
+      "path": "test-shard0.log.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-ci-41872117868/test-shard0.log",
+      "sourceBytes": 57739,
+      "sourceSha256": "d9336191b0f58ec3972a197d7fa9dcce39080dd1f6e468aadc6d07b329fb4469",
+      "storedBytes": 12189,
+      "storedSha256": "8d5c7b042dd00eaf042ac6339434662ff155d8cc11638862a13cd7fea05c380b",
+      "encoding": "gzip; mtime=0; level=9"
+    },
+    {
+      "path": "test-shard0-job.json.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-ci-41872117868/test-shard0-job.json",
+      "sourceBytes": 2057,
+      "sourceSha256": "1cf8222be466f4f71f2569ceccb7393a2c07e586ecb54076006c3c0b0437b21f",
+      "storedBytes": 609,
+      "storedSha256": "94322d44a9a725cb6e9f83bf70432bed0799b40c012d074c0eb64b9f62c38450",
+      "encoding": "gzip; mtime=0; level=9"
+    },
+    {
+      "path": "run.json.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-ci-41872117868/run.json",
+      "sourceBytes": 12203,
+      "sourceSha256": "c24be1850e94e71711089b57efae7d07b6bc4a54905c46cef9790ff7f435d9cf",
+      "storedBytes": 1654,
+      "storedSha256": "c0c395cb94e4ba4b27345ecfc803ec056ba7b474bd3229870ed44691d9273c08",
+      "encoding": "gzip; mtime=0; level=9"
+    },
+    {
+      "path": "handoff.json.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-ci-proof-gate/handoff.json",
+      "sourceBytes": 2533,
+      "sourceSha256": "d6ef104d0bd89d3689c923875f6b7f99c1d95ff780bfa195905b04b554fd4e79",
+      "storedBytes": 1114,
+      "storedSha256": "008db0f4362c0d0b556994678e7d4e65e1b58d85976676f9fc36d78912e481ea",
+      "encoding": "gzip; mtime=0; level=9"
+    },
+    {
+      "path": "red-no-frontend-deps.log.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-ci-proof-gate/red-no-frontend-deps.log",
+      "sourceBytes": 1477,
+      "sourceSha256": "7c3d8641e7b06fa2e93e11be031837f25e6e4c9897b9adb0b652700f59adc6c5",
+      "storedBytes": 608,
+      "storedSha256": "11a49f9a21553dfd45c889c4e58d31a2fbe825e7462b7c7f73f39e7d42826b56",
+      "encoding": "gzip; mtime=0; level=9"
+    },
+    {
+      "path": "green-go-no-frontend-deps.log.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-ci-proof-gate/green-go-no-frontend-deps.log",
+      "sourceBytes": 54,
+      "sourceSha256": "06fc407be76546a8e6804b6edede8dcb5b17c2ed0829a66960dd132ac30efd22",
+      "storedBytes": 67,
+      "storedSha256": "7f4549a397a52752963ebc030963b6decf9e005fe1a7898bf6c1e6f6ced8c83e",
+      "encoding": "gzip; mtime=0; level=9"
+    },
+    {
+      "path": "green-console-check.log.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-ci-proof-gate/green-console-check.log",
+      "sourceBytes": 1560,
+      "sourceSha256": "3a71b1fd573c37e572c307bfe6e13f268edb1a62f6f93d7a5501312fc6b14c0a",
+      "storedBytes": 725,
+      "storedSha256": "5fcc9f8c201a633ab6b6bfaf7b1df76afb4c4fdb98793230ded292e7b1043511",
+      "encoding": "gzip; mtime=0; level=9"
+    },
+    {
+      "path": "source-inventory.json.gz",
+      "source": "derived from exact Git blobs; git show/rev-parse/cat-file",
+      "sourceBytes": 3836,
+      "sourceSha256": "b09610ebe37d36db0f8a5785399a7fd238af5088c93b16f4abf6caecf4d7c2d0",
+      "storedBytes": 788,
+      "storedSha256": "448efef60a039c4e1cc96306879ab95c67b6de24ce8f24d0b4baa73cb45f2ba1",
+      "encoding": "gzip; mtime=0; level=9"
+    },
+    {
+      "path": "fix.patch.gz",
+      "source": "git diff --binary 6effd250a4d8c114d6815da1a422dfee3bbec716 5d5145a9596220bfa5050eea758491babfe0262e",
+      "sourceBytes": 1475,
+      "sourceSha256": "5d735f03b8675004a3d5969590da81ce98d42232c36e6eac1a58f9d25515788f",
+      "storedBytes": 681,
+      "storedSha256": "63e2f6bd163ab0a79d5f219bc0e6815364bb1b4b17eb214cd1915b88825fbff4",
+      "encoding": "gzip; mtime=0; level=9"
+    },
+    {
+      "path": "installed-profile-case-proof-test.mjs.gz",
+      "source": "git:5d5145a9596220bfa5050eea758491babfe0262e:web/scripts/installed-profile-case-proof-test.mjs",
+      "sourceBytes": 3746,
+      "sourceSha256": "907e08a8548eef4bd29fec0f2544a7717b795b11b4d2c48269196b532e03c290",
+      "storedBytes": 1435,
+      "storedSha256": "1c5a7aac819ec75daf2aab357deb66a47e78e78d4618c9359470554dd442e350",
+      "encoding": "gzip; mtime=0; level=9"
+    },
+    {
+      "path": "installed-profile-case-proof.mjs.gz",
+      "source": "git:5d5145a9596220bfa5050eea758491babfe0262e:web/scripts/installed-profile-case-proof.mjs",
+      "sourceBytes": 3132,
+      "sourceSha256": "86f01239ec51e0a1c10a7c5f5cdaa4133f91925ad7d08369a06c045a678f5aff",
+      "storedBytes": 1153,
+      "storedSha256": "7adbbaf044b9136c9ec80970877fc78137957cbb3a25c3533b7d2f6ef880ffce",
+      "encoding": "gzip; mtime=0; level=9"
+    }
+  ],
+  "readmeBytes": 2329,
+  "readmeSha256": "8d3f68244aeddabc6b2e2e86d691aaad4594bfbce38532e74d9c9da59531edb2"
+}

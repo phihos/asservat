@@ -87,6 +87,11 @@ func (s ContextProjectionAuthority) checkProfileComparison(ctx context.Context, 
 		return zero, projectionRefused("comparison", analysis.ErrUnavailable, err)
 	}
 	checked.CheckedAt = baseline.CheckedAt
+	// A recheck may inherit this same deadline as its request bound. Preserve
+	// the original source cause whenever that original interval wins or ties.
+	if !checked.ValidUntil.Before(baseline.ValidUntil) {
+		checked.Bound = baseline.Bound
+	}
 	checked.ValidUntil = identity.Earlier(baseline.ValidUntil, checked.ValidUntil)
 	checked.AccessUntil = identity.Earlier(baseline.AccessUntil, checked.AccessUntil)
 	checked.DeleteBy = identity.Earlier(baseline.DeleteBy, checked.DeleteBy)
@@ -104,7 +109,13 @@ func (s ContextProjectionAuthority) checkProfileComparison(ctx context.Context, 
 	out.ValidUntil = identity.Earlier(checked.ValidUntil, incident.ValidUntil)
 	out.AccessUntil = identity.Earlier(checked.AccessUntil, incident.AccessUntil)
 	out.DeleteBy = identity.Earlier(checked.DeleteBy, incident.DeleteBy)
-	out.Bound = "comparison"
+	// checkProjection produces closed report labels only. Original baseline
+	// wins ties: later checks may inherit its interval as a request bound.
+	// An earlier incident keeps its cause unless baseline recheck is stricter.
+	out.Bound = "comparison/baseline/" + checked.Bound
+	if incident.ValidUntil.Before(baseline.ValidUntil) && !checked.ValidUntil.Before(incident.ValidUntil) {
+		out.Bound = "comparison/incident/" + incident.Bound
+	}
 	out.DecisionDigest = artifact.Digest{}
 	// The full pair, both independent decisions and all original/shortened
 	// bounds belong to one digest. Nil Baseline leaves legacy encoding unchanged.

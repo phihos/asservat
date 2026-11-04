@@ -475,8 +475,12 @@ A query requires its own admitted operation kind, SQL query/batch/key facets,
 current worker/owner routing and separate credential grants. Any shared private
 wire needs an explicitly versioned, closed query command whose peer/operation
 checks cannot accept a download command. The query response sends only the fixed
-approved DTO, not arbitrary native ranges. It obeys five-second request bounds,
-not the native download whole-response lifetime. Protected installer/provider
+approved DTO, not arbitrary native ranges. Its original evidence-read request
+window is twenty seconds ([ADR-291](../decisions/291-bounded-profile-summary.md));
+earlier caller/source cutoffs still win. The placement-policy lookup has its own
+five-second I/O limit, which does not replace the shared policy observation
+lifetime ([ADR-214](../decisions/214-bounded-download-policy-observation.md)).
+It does not use the native download whole-response lifetime. Protected installer/provider
 configuration and negative cross-purpose probes must establish this authority
 before public enablement. No old worker, accepted profile or installation pin is
 silently rebound to a new purpose.

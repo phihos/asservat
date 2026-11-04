@@ -61,6 +61,25 @@ closed summary within 24 KiB and refuses oversized output without trimming. The 
 existing 24 KiB envelope budget. An oversized selected result refuses and asks
 for fewer hotspots; it never silently trims the selection.
 
+## Source refusal before admission
+
+REQ-PRF-005 and SC-PRF-003/005 retain Go traces as native evidence, not pprof
+query sources. C-18 now marks only `get_profile_summary` authority-resolution
+failures that occur before query admission as a private zero-query refusal.
+C-20 returns the same canonical, content-free `NotAvailable` for denied access,
+missing or unsupported sources and unavailable source/provider observations.
+Including provider failures at this specific boundary is intentional; it avoids
+an existence distinction and does not claim that the source is absent or that
+the caller lacks a permission. The audit remains `unavailable` with effect `none`.
+
+The original invocation's audit acknowledgement, final current identity,
+cancellation and deadline checks remain mandatory before delivering that error.
+A failed audit or expired/cancelled request still returns a transport failure.
+Other nonclassified failures and uncertain attempted/post-admission errors keep
+the existing unavailable transport outcome; they cannot claim zero effects.
+No SQL/source allowlist is widened, Go traces do not acquire a query route,
+and no query worker, read/key batch or query charge is created by the refusal.
+
 ## Browser and public timing
 
 Initial pending and ready summary data carry `query_observed_at` and

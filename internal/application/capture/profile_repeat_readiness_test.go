@@ -192,7 +192,7 @@ func TestProfileRepeatReadinessJoinsCatalogErrorsAndCancellation(t *testing.T) {
 	}
 }
 
-func TestProfileRepeatReadinessKeepsOriginalSourceAndTargetBounds(t *testing.T) {
+func TestProfileRepeatReadinessKeepsHistoryBoundAndSeparatesHintTarget(t *testing.T) {
 	for _, bound := range []string{"history", "target"} {
 		t.Run(bound, func(t *testing.T) {
 			x, service, reader := namespaceHeapHistory(t)
@@ -217,8 +217,15 @@ func TestProfileRepeatReadinessKeepsOriginalSourceAndTargetBounds(t *testing.T) 
 			f.svc.Profiles = repeatReadinessCatalog{storedProfileCatalog: x.catalog, check: func(ctx context.Context) error {
 				select {
 				case got := <-entered:
-					if !got.Equal(until) {
-						t.Errorf("%s deadline renewed: %s want %s", bound, got, until)
+					want := until
+					if bound == "target" {
+						// The initial target now scopes the hint's exact identity,
+						// not final authority. Only the independent recorder read
+						// may supply a fresh target for the final plan.
+						want = f.now.Add(5 * time.Second)
+					}
+					if !got.Equal(want) {
+						t.Errorf("%s hint bound: %s want %s", bound, got, want)
 					}
 				case <-ctx.Done():
 					t.Error("early owner did not reach storage")

@@ -1,7 +1,413 @@
 # Sustained implementation progress
 
+## Current shared profile candidate (2026-11-04)
+
+The published PR162 candidate `00fca3ee` incorporates the measured Repeat and
+owner-observation phase fixes. Required pull-request CI41900935231 passed every
+job, including `ci-ok`.
+Previous
+`1cba8f74` passed genuine pull-request CI41879540541 and
+[installed heap41879673486](../test/results/heap-browser-native-41879673486/README.md)
+(Go/harness0,587.634s): actual React summary, ten-unit/three-role SQL proof,
+authenticated534B native download, local pprof and fresh Repeat passed. All4,135
+submitted sources matched Git; cleanup passed. Heavy comparison remains qualified
+at c6 in [41863091784](../test/results/profile-heavy-native-41863091784/README.md).
+
+[Trace41879675203](../test/results/runtime-trace-native-41879675203/README.md)
+exited1/508.941s after capture, semantic refusal/zero-query checks, authenticated
+74,983B trace/hash and offline Go trace parsing passed. Repeat preview refused
+at17:55:47.091773703Z; the existing demand succeeded1.508s later after4.5s work.
+All source/cleanup audits passed. The inner5s composition and1s reserve could
+not accommodate that valid source operation plus planning. Original target and
+recovery observations also expire within5s, so increasing that timeout alone
+would incorrectly reuse stale facts; the advancing-clock regression proves it.
+
+The scoped fix allocates8s up front for authenticated single-profile repeats,
+keeps initial recovery before the same nonauthoritative review/demand, then uses
+the same recorder RPC's complete fresh target and new final authority facts
+after readiness. One additional current recovery read must retain installation,
+issuer epoch and the full revision; it never extends the first proof. Exact
+original target pins, parent/identity/history/source deadlines and all final
+permission/capability/retention/storage checks remain. Ordinary classification
+and non-profile requests retain5s, including their response reserve. A catalog
+returned after classification expiry cannot enter the longer phase. Preview-only
+browser requests use15s, matching the existing public15s bound; other calls10s.
+
+Costs: three SQL queries/one transaction per affected repeat, up to12 additional
+existing logical storage polls on a stalled repeat, zero added Kubernetes reads,
+roles, owners, watches, pools or capture requests. The measured composed path
+passes5.684s; fifteen source/deadline cases and actual late-return/reserve/browser
+regressions pass. Both independent reviews found no blockers. Exact commands,
+intermediate failures and source identities are in
+[profile-repeat-phase-local](../test/results/profile-repeat-phase-local/README.md).
+
+Complete local pre-push/profile/Go architecture/specification/architecture/design/
+full-browser/service gates passed at8cde9451. Browser passed70.715s with28journeys/
+27accessibility scans. Both real SQL/S3/KMS service fixtures passed; each matched
+all4,077 submitted Git blobs with unchanged sources, clean cleanup and no owned
+containers left. Original reports and output readbacks are in
+[profile-repeat-phase-final-local](../test/results/profile-repeat-phase-final-local/README.md).
+Fresh [heap41891716697 attempt2](../test/results/heap-browser-native-41891716697/README.md)
+passed at `c2d4f74b` (Go/harness0,601.602s): actual React summary, ten-unit/three-key
+SQL proof, authenticated903B native/localpprof and fresh Repeat5.228s. Attempt1
+failed the runner's4GiB build-scratch precheck before Go or source inventory;
+the one failed-job infrastructure retry is recorded separately.
+
+[Trace41891721966](../test/results/runtime-trace-native-41891721966/README.md)
+failed at the same head (Go/harness1,532.931s). Capture, semantic summary refusal,
+authenticated81,056B native download and offline Go trace parsing passed; Repeat
+waited7.875s before refusing. The first storage demand expired after3.97s at
+`claim/post` under the original owner-candidates cutoff19:07:53.173336Z. A later
+demand succeeded0.770s after preview refusal. All4,136 submitted sources in each
+product run matched Git; unchanged-source, scratch-removal and cleanup checks
+passed. This is an incomplete installed trace workflow, so PR162 remains open.
+
+The discovery/initial-SQL deadline coupling is reproduced and fixed locally in
+the complete existing v2 pipeline, including the actual direct client/receiver,
+numbered proofs and transport. The first real-TLS test failed1.022s with almost
+four seconds left on the original request; the independent numbered-proof test
+also exposed a later transport cutoff. The same paths now pass with current
+exact peer/configuration proofs owning their respective phases. The original
+five-second request and genuine native/source/workload/token/peer cutoffs remain;
+constructed proofs are never extended. Eight existing production files change,
+with zero added API/SQL reads, roles, protocol fields, retries or caches.
+
+Focused races passed bootstrap15.384s, mTLS8.128s and transport1.910s. Negative
+checks retain fixed-current expiry, cancellation/loser cleanup, shorter parents,
+native/source/workload expiry and older-producer hard bounds. Both independent
+reviews found no blockers. Integrated pre-push/profile gates passed; the final
+selected races passed15.389s/8.097s/1.911s after a test-only clock correction. The
+earlier compatibility failure came from using a whole-second frozen clock for
+a real one-second context deadline, leaving0–1s of actual time. The correction
+allocates the intended real second within the unchanged original request;
+30 repeated race runs passed and expiry negatives are unchanged. The initial
+batch exit1 and final selected-race exit0 remain distinct in
+[owner-observation-phase-local](../test/results/owner-observation-phase-local/README.md).
+Fresh [trace41901024982](../test/results/runtime-trace-native-41901024982/README.md)
+at `00fca3ee` exited Go/harness1 after500.682s. Capture, publication, semantic
+refusal, authenticated85,612B native download and offline trace parsing passed.
+History had already failed `write/reserve/live`: PostgreSQL23514 from
+`require_capacity_new_admission` at20:05:16.381. The first settings read returned
+`ParametersUnavailable`; Repeat was not reached. All4,137 submitted sources
+matched Git; unchanged-source, scratch and cleanup checks passed. The generic
+database refusal cannot establish which internal guard condition failed.
+
+The existing history service fixture lacks a managed capacity source, so it
+does not exercise that admission guard. A real managed-source regression now
+tests the actual compiled writer, expired workload binding, fresh control and
+atomic rollback. Preserve ADR-272's after-start order: history-before-start
+previously starved acquisition. History is separately charged1,671,168bytes and
+four object slots; it is not prepaid by capture admission. The proposed exact
+accepted-capture metadata guard retains current identity, recovery, retention,
+pool/allocation/control/quota and original deadlines, with an atomic verified
+association. The managed regression now proves the coupling: with the root
+current and only the workload binding expired, the old guard refuses history
+and rolls back all custody/quota/debit changes; refreshing that same binding
+permits the exact1,671,168B/four-slot charge. Earlier fixture setup and diagnostic
+assertion failures remain distinct from this desired-state RED.
+
+ADR-301 and schema136 implement accepted-history admission in the existing
+transaction. Only the existing custody capacity constraint becomes deferrable,
+initially immediate. History defers it, performs the same separately charged
+inserts, establishes a strict exact accepted-capture association, then explicitly
+flushes the constraint before final authority/deadline checks. Missing JSON,
+wrong scope/allocation and unassociated attempts cannot select this path.
+Current compiled pool, physical funding, root/control/quota/paused/overdue and
+all original dates remain enforced. No new rows, roles, GUCs, observations,
+retries or lifecycle handoffs are added; the history transaction adds two fixed
+SQL commands and bounded indexed association reads.
+
+At frozen58c1df31, managed SQL passed9.982s, upgrade/downgrade6.850s and history/
+native-length lifecycle9.799s in three separate owned fixtures. Exact135 function
+and trigger restoration, default/deferred/unassociated admission, malformed and
+mismatched association, expired/paused backing, insufficient quota, exact debit,
+idempotent replay and existing history eviction/prefix cleanup passed. All4,080
+submitted source hashes in each fixture matched Git; sources stayed unchanged
+and cleanup was empty. Root integrated pre-push and affected races passed at
+0ff891ee (capture2.415s/PostgreSQL1.191s). Originals, source identities and failed
+setup/RED scopes are retained in
+[accepted-history-capacity-local](../test/results/accepted-history-capacity-local/README.md).
+New final-candidate CI and fresh installed trace qualification remain required;
+no installed history/Repeat success is claimed yet.
+TLS is a private, locally checked follow-up; full S-05/specification completion
+remains open.
+Earlier checkpoints follow.
+
+## Latest comparison qualification (2026-11-04)
+
+[Native41855035000 attempt2](https://github.com/phihos/asservat/actions/runs/41855035000/attempts/2)
+ran frozen `02e62a8931f1041733988c26b3226859ff8de21a`. Both MCP and React
+accepted-heavy comparisons completed, including rendered-row parity, joined native
+reads and the two live resource probes. Peak whole-container memory was262.95MiB
+and230.84MiB under384MiB; both observed500m CPU throttling, zero swap and zero
+memory high/max/OOM events. Native operations took18.966s and18.554s inside the
+original nearly20s requests. These counters include the finite observer through
+its snapshot; they do not measure analyzer-only cost, future idle time, capture
+overhead or all parser maxima. Existing root spending reached40 units without
+extra approvals or native downloads. All4,123 source hashes matched Git, sources
+stayed unchanged, cleanup was empty and build scratch was removed.
+
+The complete test nevertheless exited1 after673.948s: its deferred first live
+Pod lookup ran after that worker's original cutoff and normal retirement had
+removed the Pod. Successful earlier live probes are retained separately from
+this failed final assertion. Attempt1 was an infrastructure ENOSPC failure before
+the test, followed by one failed-job retry; it provides no runtime result.
+Original artifacts and audits are in
+`test/results/profile-heavy-native-41855035000/`.
+
+The fixture correction captures exact original SQL/Pod/key/source evidence after
+each result, before the next comparison can retire that Pod, and defers terminal
+joins and positive retirement checks. It must preserve failure-path inspection,
+original deadlines and charges;404 is never accepted as positive live evidence.
+The scheduling regression reproduces the original late-read failure; focused
+races pass2.480s and34 harness selector checks pass. Missing original Jobs require
+stored positive SQL retirement immediately; surviving exact terminal Jobs remain
+charged. No shared syscall cohort or production code changes. Independent review found no blocker; fresh installed qualification remains pending.
+Exact local commands and evidence are in `test/results/comparison-live-proof-local/`. PR CI for the previous frozen
+02e head passed; that does not validate the fixture correction.
+The same candidate now includes the prepared test-only native runtime-trace and
+heap React/native-download journeys. Trace uses a separate immutable5s/32MiB
+profile, rejects pprof summaries without creating query state, opens the native
+.trace offline and performs a fresh repeat review. Heap verifies the default
+inuse_space summary before one browser native download and independent pprof
+parity. Existing CPU/heap/heavy/trace variants, funding and18min Go/20min job
+limits remain unchanged. Local pre-push/profile checks pass441 console tests and
+5.749s affected fixture races; design/specification/architecture gates pass.
+The heap driver now validates rendered rows and metadata before native transfer;
+its3s-view/4s-transfer regression fails under the old ordering and both heap cases
+plus comparison pass24.071s after correction. Final review tightened the check:
+once original expiry elapses, rows must be cleared and the exact expired UI state
+is required; the focused final check passes24.037s. No extra query or extended
+lifetime is introduced. Independent final review found no blockers. Originals
+and exact source attribution are in `test/results/profile-combined-final-local/`.
+One shared final CI candidate and three separate fresh native runs are planned;
+these local results do not establish installed heap-browser or trace success.
+The full S-05 and specification goal remains active.
 
 ## Current delivery workflow (2026-11-04)
+
+**Active outcome:** qualify one accepted-heavy two-source pprof comparison in the
+existing installed384MiB/500m worker. The test-only candidate prebuilds two
+synthetic profiles outside the measured worker (100,000 samples/functions/locations,
+1,048,576 references,16 values/sample,32,768 numeric labels and16MiB-minus56-byte
+protobufs), serves exactly two fixed inputs through the existing endpoint, and
+probes the original query worker after each of the existing two comparisons.
+This is one accepted shape, not all simultaneous parser maxima or a complete
+resource/cancellation matrix. The production policy adapter now separates its metadata-read timeout from the
+original source/caller lifetime; private diagnostics retain the earliest source
+label. RBAC, services, cache intervals, resource limits and job deadlines are unchanged.
+
+Local pre-push/profile gates passed441 console tests and4.469s fixture races
+after integration with the heap repair. The unchanged one-second encrypted
+component pair completed and cancelled its second source under a384MiB Docker
+cap:259.7/202.7MiB peaks,0OOM events, both sources closed and containers removed.
+Those input hashes differ from the prepared ten-second installed pair. CPU500m
+was configured but effective throttling was not demonstrated on this workstation.
+Reports, actual exits, known commands and explicit provenance gaps are retained
+in `test/results/profile-worker-containment-local/`; installed proof is pending.
+
+Complexity review: (1) previous deployed comparisons used small samples; this is
+a required untrusted-input resource boundary, not an observed production OOM.
+(2)No accepted risk or guarantee is strengthened. (3)Useful bounded analysis is
+a normal workflow; this shape stresses an uncommon large input. (4)Reuses the
+existing framed comparison fixture and native suite. (5)0 production privileges,
+credentials or exposure. (6)0 product failure/fallback states. (7)0 product settings;
+one closed test variant. (8)Existing Docker/Kubernetes cgroups only. (9)0 runtime
+background cost; each existing query gets one finite test-only probe including its cost, with
+unchanged40-unit funding. Initial SQL and individual SQL/API/exec calls have
+at most2s; a successful observation and100ms close polling keep the original
+worker cutoff (at most its remaining60s), rather than sharing an arbitrary2s
+aggregate. Failure diagnostics retain the2s total bound. Separate generation
+uses measured build-process resources; no graph construction occurs in the small
+workload/worker. (10)No migration or rollout change; default fixture mode remains.
+(11)A finite probe is smaller than a metric service; standalone parser RSS cannot
+measure the installed crypto/transport/runtime envelope. Native/cgroup/CPU/lifecycle
+results remain required before making the corresponding installed claim.
+
+
+Review of the initial resource candidate found that its successful observer
+incorrectly inherited the two-second lookup deadline. The fixture now derives
+the complete observation from the original caller/worker cutoff. Generated
+producer/observer artifacts stage in the existing private0700 harness directory
+and only six fixed files are collected into a unique results folder after Go
+terminates, including failed runs. Actual filesystem tests reproduce the old
+early source-tree write (RED) and pass with terminal collection (GREEN);34 Python
+checks and4.211s affected races pass. Integrated profile preflight passed4.448s
+fixture races; Python34 and affected repository gates also pass. Independent
+review found no blocker. Originals are retained in
+`test/results/profile-worker-containment-review-fix/`. No
+full observer-orchestration regression is claimed from these concrete SQL/exec
+ports; the installed sequence remains unrun. Initial CI41826790336 was cancelled
+as superseded before any heavy native dispatch.
+
+**First installed heavy attempt:** [native 41830591107](https://github.com/phihos/asservat/actions/runs/41830591107)
+failed on `87df6794064de4423d92745d826aab735dd36b78` (Go exit 1,
+528.356s), while eligible PR CI41830439009 passed on the same head. The first
+approved capture reached authenticated native download. Its local `go tool pprof`
+command exited 0, but selected `counter-15`; the default node fraction dropped all
+100,000 small functions, so the fixture's expected `synthetic.` text was absent.
+This is a local CLI selection/assertion failure. The run reached no comparison
+or worker cgroup probe and establishes no installed resource result.
+
+All 4,123 reported source hashes independently match the committed head; source
+stayed unchanged, cleanup was empty and scratch was removed. The 9,394,862-byte
+native exactly matches the prepared baseline digest. Originals and audit are
+retained in `test/results/profile-heavy-native-41830591107/`.
+
+The focused fixture repair reproduces the old missing-function assertion against
+that exact file, then opens it with explicit CPU selection, top 20 functions,
+zero node fraction and compact labels. Output is 2,518 bytes rather than the
+1.35MB default comment banner. Both CLI commands exit 0; only the old fixture
+assertion fails. Independent review found no blocker, and affected fixture races
+passed in 3.864s. Default CPU/heap commands, native bytes, production analyzer,
+fixture shape, budgets and deadlines stay unchanged. Local originals are retained
+in `test/results/profile-heavy-cli-fix-local/`. A fresh installed qualification
+remains pending.
+
+**Second installed heavy attempt:** [native 41834018171](https://github.com/phihos/asservat/actions/runs/41834018171)
+failed on `b5d42f9557897b40ca5d6506ffc3c9bd4946f373` (Go exit 1,
+627.902s). Eligible PR CI41833979360 passed. Both approved captures, authenticated
+native downloads and corrected local CPU pprof checks passed. The first comparison
+was admitted and polled pending once; the next poll failed with HTTP 503 and
+operation outcome unknown, so it was not replayed. The worker stopped at
+`native/conversation/read/approved`; the hub reported
+`until-authority/comparison/prepare/projection`. The original worker cutoff was
+still later than this failure.
+
+Both three-role key children were consumed, which establishes key opening, not
+complete payload reads or final authentication. No comparison or cgroup probe
+succeeded. A later fixture diagnostic prints the previous termination state's
+default exit value, so it supplies neither the current exit code nor an OOM
+counter. All 4,123 source hashes match the committed head, sources stayed
+unchanged, cleanup was empty and scratch was removed. Originals and audit are
+retained in `test/results/profile-heavy-native-41834018171/`.
+
+Before another installed run, reproduce the exact ten-second pair through the
+local comparer and isolate the approved storage-reader boundary. Both exact files pass the standalone comparer: valid20-row raw/per-second
+results in0.985s/1.154s, with process RSS237.2MiB/248.4MiB. The original ten-second
+durations and700,000/1,100,000 totals are retained. This excludes production
+storage/authority/framing/transport, so no installed resource claim follows;
+evidence is in `test/results/profile-heavy-exact-comparer-local/`. The S3 adapter copies the worker HTTP client and sets a thirty-second total
+request cap; five-second dial/TLS/header bounds and the separate key client's
+five-second cap remain. A five-second S3 body timeout was an unconfirmed initial
+hypothesis and does not describe this composed client. Existing operation, worker and job deadlines remain unchanged.
+
+The existing `until-authority/comparison` label establishes that this poll's
+original authority cutoff was reached: `projectionRequest.cut` emits it only
+after the request is cancelled and the retained minimum deadline has passed.
+It does not identify which source observation supplied that minimum. Local full
+approved-reader tests pass with the exact pair, both the normal and worker HTTP
+clients, six-second frame-body delays and a six-second parser delay. Crossing the
+original twenty-second context reproduces unavailability with all six keys used.
+The existing real-TLS projection seam also joins after a six-second reader, beyond
+its initial five-second observation. These rule out those deterministic local
+reader/transport hypotheses; they are not installed resource qualification.
+
+The focused diagnostic update records query, batch, invocation, operation and
+authority timestamps in the existing bounded fixture read. It adds no database
+call, privilege, runtime state or deadline. The comparison authorizer now retains
+the closed earliest child/source label instead of replacing it with generic
+`comparison`; this changes no authority date, digest or wire field. Meaningful
+RED/GREEN cases cover a widened baseline recheck, an earlier incident, ties and
+a genuinely stricter final recheck. Focused authority/consumer races passed
+in1.182s/1.114s; independent review found no blocker. The observed
+benefit is identifying the actual expired interval after this failure; costs are
+zero additional API calls, state, privileges, watches or runtime dependencies.
+Originals are in `test/results/profile-heavy-read-boundary-local/`. A single next
+installed run is scoped to the same pair, comparisons, limits, funding and original
+deadlines with these diagnostics. It may identify the limiting source; it does
+not presume that the large-input workflow has been repaired. No timeout is raised.
+
+ The
+prepared trace/browser follow-ups are consolidated into one unpublished test
+candidate to share one CI matrix; their installed results remain separate.
+
+**Third installed attempt identified the cutoff:**
+[native41841610822](https://github.com/phihos/asservat/actions/runs/41841610822)
+failed on `f7eaa6f41db402d648b712af3abf75d44016b8f0` (Go exit1,
+631.429s); eligible PR CI41841561234 passed. Both captures/native downloads and
+CPU pprof checks passed. The first comparison reached
+`until-authority/comparison/baseline/environment/policy`. Its authority was
+checked at14:05:43.759953903Z, native operation started at14:05:44.708001Z and
+expired at14:05:49.025030Z: only4.317s of operation budget. The original public
+request ended at14:06:03.581638Z and query/worker at14:06:19.287603Z. Both key
+children were spent; no comparison or cgroup measurement completed. All4,123
+source hashes match the frozen head, source remained unchanged, cleanup was empty
+and scratch removed. Originals are retained in
+`test/results/profile-heavy-native-41841610822/`.
+
+The metadata policy adapter created a five-second child for its read, then used
+that child's deadline to truncate the returned policy observation. The actual
+shared download-policy observation can remain valid for sixty seconds. This
+extra adapter cutoff, rather than an aged capacity SQL observation, explains the
+identified limiting component. The focused repair retains the five-second I/O
+limit and post-read cancellation checks, but clips returned source freshness to
+the original parent deadline. It changes no shared cache interval/headroom or
+original caller/source/action lifetime and adds no source read or runtime state.
+[ADR-214](decisions/214-bounded-download-policy-observation.md) records the
+correction. The composed shared-cache regression fails before the repair and
+passes afterward: original sixty-second policy, twenty-second caller, one-second
+caller and cancellation retain their own bounds; lookup I/O remains five seconds.
+Six seconds of injected-clock consumption stays valid only under the covering
+original cutoff. The underlying live read count stays one; no cache hit renews it.
+Affected C3/C18 races passed1.382s/1.114s, independent review found no blocker and
+integrated `make pre-push` exited0 (441 console tests). Unchanged parser, framing,
+transport and worker-resource preflight evidence remains attributed to the earlier
+head; the current policy change has its own focused composed regression and will
+receive full Go CI plus one installed qualification. Another installed
+qualification remains required.
+
+**Post-policy-repair MCP resource pass; browser still failed:**
+[native41846328376](https://github.com/phihos/asservat/actions/runs/41846328376)
+ran `4552bfd0e6500842facf297d91de9a15d8dd1394` (Go exit1,
+666.969s); eligible PR CI41846243126 passed. Both native inputs matched the
+prepared ten-second pair and opened with pprof. The first MCP comparison returned
+success in10.502s. Its exact original worker/query/source/key joins closed, with
+20 units spent, both three-role children consumed, `nativeClosed/closed=true`
+and no active batch. The live probe measured276,090,880B (263.30MiB) peak under
+402,653,184B (384MiB), zero swap and zero memory max/high/OOM/OOM-kill events.
+CPU quota was50,000/100,000us;76 of119 periods were throttled, for3,971,457us.
+Whole-worker CPU usage through the probe was4,263,251us, including observer cost.
+These are one original container's cumulative counters through its snapshot,
+not analyzer-only cost or its future idle lifetime. Pod/container/image and
+probe-binary digests matched the original build.
+
+The second, React comparison failed at `until-request`: its original request was
+14:36:16.208050Z through14:36:20.887547Z (4.679s), with only3.330s for the native
+operation. Root spending reached40 units and both key children were consumed,
+but that result and its resource probe did not complete. No second-worker
+resource/exit/OOM claim follows. All4,123 source hashes match the frozen head;
+sources stayed unchanged, cleanup was empty and scratch removed. Originals and
+separate first-pass/second-failure evidence are retained in
+`test/results/profile-heavy-native-41846328376/`.
+
+The real browser identity path had two independent five-second return caps:
+refresh-scheduling metadata and the current settings observation. The focused
+repair separates them from request lifetime under
+[ADR-300](decisions/300-browser-evidence-request-lifetime.md). Every session SQL
+read still validates original five-second settings before and after I/O. Returned
+identity retains actual token/key/group/policy/session expiries; the request keeps
+its original selected twenty-second maximum, with shorter bounds and cancellation
+unchanged. Ordinary requests stay five seconds; callback creation keeps its
+original settings handoff. No SQL migration, cache, loop or extra read is added.
+
+Two independent RED stages prove both caps through the real identity service,
+browser-session application and current-request constructor over existing
+synthetic backing ports. Six seconds of injected-clock work succeeds only with
+fresh current settings; stale/revoked settings, shorter original bounds and
+changed identity still deny. Affected identity/browser/presentation races passed
+1.053s/49.886s/53.612s; independent review found no blocker. The real owned
+Keycloak/PostgreSQL/OpenBao/S3 identity suite then passed in11.472s on committed
+`0b1ebbeb`, with all3,969 source hashes independently matched, unchanged source
+and cleanup[]. This is provider/session component qualification, not an installed
+browser comparison. Integrated pre-push also passed441 console tests; the
+compiled Go TLS/session/operations and React browser gate passed35.109s with
+28 journeys and27 accessibility scans, using synthetic service facts. These
+originals and provider/unit evidence are retained in
+`test/results/browser-evidence-request-window-local/`. Test diagnostics now
+report observed current termination separately from the previous-state exit
+value, without adding an API read. The exact installed browser comparison
+remains pending.
 
 **Latest verified outcome:** the installed Go heap snapshot MCP workflow passed
 at `80593f9398ad9bf909afe9fd46a34752b3060ba1` in

@@ -1123,3 +1123,7 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [ADR-291: bounded profile summary](291-bounded-profile-summary.md): internal typed pprof aggregate authority and selection/result composition; raw provenance and ordinary audience preserved, metadata-only shares unchanged; named installed CPU/heap summaries, SQL/key funding and native parity pass. PR160 merged as `5b765322` after eligible PR CI41821140504, with the full tree equal to qualified `80593f93`. Maximum-input containment and installed heap browser interaction remain pending.
 
 - [ADR-293: existing-artifact raw approval](293-existing-artifact-raw-approval.md): reuse independent review and disclosure accounting for exact published artifacts; verified native length comes from the existing publication pass. Implementation and installed qualification pending.
+
+- [ADR-300: browser evidence request lifetime](300-browser-evidence-request-lifetime.md): preserve current settings/session reads and original token/session/caller bounds without using five-second settings or refresh-scheduling observations as the entire evidence-read lifetime; real browser qualification pending.
+
+- [ADR-301: accepted history metadata capacity](301-accepted-history-metadata-capacity.md): separately charge settings of an exact accepted capture under current root, pool/allocation, quota, identity, recovery and retention checks; live-workload observation remains required for new acquisition, not this metadata write. Atomic association and installed qualification pending.

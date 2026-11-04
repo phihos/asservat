@@ -59,8 +59,8 @@ func TestOperationChannelCarriesSelectedOwnerCutoffs(t *testing.T) {
 				if x.metadata != 0 {
 					postReads++
 					end, finite := ctx.Deadline()
-					if mode == "following-candidate" && (!finite || end.After(before)) {
-						t.Error("post-metadata candidate lost original shorter owner cutoff")
+					if mode == "following-candidate" && (!finite || end.After(x.request.NotAfter)) {
+						t.Error("independent candidate read exceeded original request")
 					}
 				}
 				return oldCandidates.ReadOwnerObservationCandidates(ctx)
@@ -103,7 +103,7 @@ func TestOperationChannelExpiredRetainedCutoffDeniesBeforeAnotherRead(t *testing
 	}
 	x.channel.candidates = selected
 	x.f.advance.Store(int64(6 * time.Second))
-	if err := x.channel.checkSelectedOwner(x.ctx); err == nil || reads != 0 {
+	if _, err := x.channel.checkSelectedOwner(x.ctx); err == nil || reads != 0 {
 		t.Fatal("expired retained cutoff admitted another candidate read", err, reads)
 	}
 }

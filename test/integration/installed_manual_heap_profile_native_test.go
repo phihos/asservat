@@ -19,6 +19,16 @@ func installedHeapProfileVariant() bool {
 	switch variant := os.Getenv("ASSERVAT_PROFILE_VARIANT"); variant {
 	case "", "cpu":
 		return false
+	case "accepted-heavy":
+		if installedJourneyFocus() != "profile-comparison" {
+			panic("accepted-heavy fixture variant requires profile-comparison focus")
+		}
+		return false
+	case "trace":
+		if installedJourneyFocus() != "manual-profile" {
+			panic("trace fixture variant requires manual-profile focus")
+		}
+		return false
 	case "heap":
 		if installedJourneyFocus() != "manual-profile" {
 			panic("heap fixture variant requires manual-profile focus")

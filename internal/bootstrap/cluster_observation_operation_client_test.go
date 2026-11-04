@@ -64,10 +64,6 @@ func (r *localDirectRegistry) ReadOwnerRegistration(ctx context.Context, c value
 	}
 	v, err := r.OwnerCertificateRegistry.ReadOwnerRegistration(ctx, c)
 	if !r.until.IsZero() {
-		end, _ := ctx.Deadline()
-		if r.reads.Load() > 1 && end.After(r.until) {
-			return value.OwnerRegistrationObservation{}, value.ErrUnavailable
-		}
 		if v.FreshUntil.After(r.until) {
 			v.FreshUntil = r.until
 		}
@@ -152,8 +148,8 @@ func TestDirectHolderOriginalShorterSQLDeadline(t *testing.T) {
 	native.mu.Lock()
 	last := native.last
 	native.mu.Unlock()
-	if last == nil || last.facts.FreshUntil.After(registry.until) {
-		t.Fatal("native Begin exceeded original SQL cutoff")
+	if last == nil || !last.facts.FreshUntil.Equal(r.NotAfter) {
+		t.Fatal("native Begin inherited consumed SQL cutoff")
 	}
 }
 func TestDirectHolderCloseJoinsNativeBeginAndLosingTransport(t *testing.T) {

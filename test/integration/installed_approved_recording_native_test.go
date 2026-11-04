@@ -26,7 +26,6 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
-	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/transport/presentation"
@@ -72,7 +71,7 @@ func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code str
 // The ordinary manual focuses qualify submission after preview expiry. The
 // comparison focus reuses that capture path twice to qualify saved analysis.
 func installedApprovedRecordingExpiryProof(focus string) bool {
-	return focus != "profile-comparison" && !(focus == "manual-profile" && installedHeapProfileVariant())
+	return focus != "profile-comparison" && !(focus == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant()))
 }
 
 // approvedRecordingArguments is the actual public request, validated offline
@@ -82,6 +81,9 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 		return manualArgumentsCaptureInput(cluster, namespace, workload, false)
 	}
 	if installedProfileFocus() {
+		if installedRuntimeTraceVariant() {
+			return manualRuntimeTraceArguments(cluster, namespace, workload)
+		}
 		if installedHeapProfileVariant() {
 			return manualHeapProfileArguments(cluster, namespace, workload)
 		}
@@ -393,6 +395,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		publishNamespaceCaptureProfile(t, ctx, regionalConfig, namespace, manualHeapProfileName, "v1", definition)
 	}
+	if installedProfileFocus() && installedRuntimeTraceVariant() {
+		definition, err := manualRuntimeTraceDefinition()
+		if err != nil {
+			t.Fatal(err)
+		}
+		publishNamespaceCaptureProfile(t, ctx, regionalConfig, namespace, manualRuntimeTraceName, "v1", definition)
+	}
 	var peerIPs []string
 	if installedJourneyFocus() == "manual-peers" {
 		// ADR-283: the peer Pod runs before preview resolves its membership.
@@ -420,11 +429,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "approved-preview-" + preview.ID}
 	if installedJourneyFocus() == "manual-raw" || installedProfileFocus() || installedJourneyFocus() == "manual-arguments" {
 		// ADR-279: raw output downloads only through result-access children of
-		// the requesting human's own client.
+		// the requesting human's explicitly selected result client.
 		if len(preview.Lifecycle.Actions) != 1 {
 			t.Fatal("raw preview lacks its one action", preview.Lifecycle)
 		}
-		original["result_access"] = map[string]any{"actionIds": []string{preview.Lifecycle.Actions[0].ActionID}, "operations": []string{"download_artifact"}, "clientIDs": []string{"mcp"},
+		original["result_access"] = map[string]any{"actionIds": []string{preview.Lifecycle.Actions[0].ActionID}, "operations": []string{"download_artifact"}, "clientIDs": []string{installedProfileResultClient()},
 			"maxArtifacts": 1, "maxBytes": 64 << 20, "maxOperations": 100, "notAfter": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}
 	}
 	pending, code := invoke("request_capture", original)
@@ -807,24 +816,80 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-http" {
 		wantClass = "extract"
 	}
-	if installedProfileFocus() && (evidence.Artifacts[0].Kind != "profile" || evidence.Artifacts[0].NativeFormat != "pprof") {
+	wantProfileFormat := "pprof"
+	if installedProfileFocus() && installedRuntimeTraceVariant() {
+		wantProfileFormat = "go-trace"
+	}
+	if installedProfileFocus() && (evidence.Artifacts[0].Kind != "profile" || evidence.Artifacts[0].NativeFormat != wantProfileFormat) {
 		t.Fatal("published profile is mislabeled", evidence.Artifacts[0].Kind)
 	}
 	if evidence.Artifacts[0].DataClass != wantClass {
 		t.Fatal("case lists the recording with another data class", evidence.Artifacts[0].DataClass, wantClass)
 	}
-	var heapSummary query.ProfileSummary
+	if installedProfileFocus() && installedRuntimeTraceVariant() {
+		qualifyRuntimeTraceCase(t, evidence.Artifacts[0].Target, evidence.Artifacts[0].ProfileAcquisition, cluster, namespace, workload, preview.Pods[0].UID, preview.Pods[0].Name)
+		if len(profileCapture) != 1 || profileCapture[0].NoQueries == nil {
+			t.Fatal("trace query-absence SQL evidence missing")
+		}
+		profileCapture[0].NoQueries(receipt.CaptureID, evidence.Artifacts[0].ID)
+		qualifyRuntimeTraceSummaryDenied(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID)
+		profileCapture[0].NoQueries(receipt.CaptureID, evidence.Artifacts[0].ID)
+	}
 	if installedProfileFocus() && installedHeapProfileVariant() {
 		row := evidence.Artifacts[0]
 		facts := row.ProfileAcquisition
 		if row.Target.ClusterID != cluster || row.Target.Namespace != namespace || row.Target.WorkloadName != workload || row.Target.PodUID != preview.Pods[0].UID || (row.Target.PodName != "" && row.Target.PodName != preview.Pods[0].Name) || facts == nil || facts.RequestedType != "heap" || facts.Mode != "snapshot" || facts.RequestedDurationMillis != nil || facts.ForceGC || facts.StartedAt == nil || facts.CompletedAt == nil || facts.CompletedAt.Before(*facts.StartedAt) || facts.ClockUncertaintyMillis != nil || facts.ProcessAttribution != "unknown" {
 			t.Fatalf("heap acquisition lost the approved original target/snapshot parameters: target=%+v profile=%+v", row.Target, facts)
 		}
-		heapSummary = queryInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, row.ID, row.Digest, "inuse_space", row.Expires, summaryCheck)
+		if summaryCheck == nil {
+			t.Fatal("heap browser requires independent SQL summary check")
+		}
+		verify := summaryCheck(row.ID)
+		var ownedHandle, ownedOperation string
+		checked := false
+		// Register failure proof before browser ownership; deferred browser close
+		// joins first, including failures after an early pending event.
+		defer func() {
+			if ownedHandle != "" && !checked {
+				verify(ownedHandle, ownedOperation)
+			}
+		}()
+		call, downloadNative, finishBrowser := installedProfileBrowser(t, ctx, self, address, installedProfileComparisonSource{CaseID: progress.CaseID, ArtifactID: row.ID, Version: row.Digest, Expires: row.Expires}, "heap", func(reply installedComparisonReply) {
+			if ownedOperation == "" {
+				ownedOperation = reply.RequestID
+			}
+			if reply.Status == "pending" && ownedHandle == "" {
+				var pending struct {
+					Handle string `json:"query_handle"`
+				}
+				if json.Unmarshal(reply.Data, &pending) == nil {
+					ownedHandle = pending.Handle
+				}
+			}
+		})
+		defer finishBrowser()
+		heapSummary := queryInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, row.ID, row.Digest, "inuse_space", row.Expires, func(string) func(string, string) func() {
+			return func(handle, operation string) func() {
+				if handle != "" {
+					checked = true
+				}
+				return verify(handle, operation)
+			}
+		}, call)
 		if heapSummary.Unit != "bytes" || heapSummary.DurationSeconds != nil || heapSummary.Total <= 0 {
 			t.Fatal("heap snapshot summary invented duration or lost allocation bytes", heapSummary)
 		}
-		t.Log("heap phase: read-only summary completed with joined SQL worker/key proof; no native preparation was admitted")
+		t.Log("heap phase: installed React summary completed with joined SQL worker/key proof; read-only MCP native preparation denied, no native preparation admitted yet; console is the explicitly reviewed result client")
+		t.Log("heap phase: separately authorized browser native preparation begins after the joined summary")
+		native, _ := downloadNative()
+		finishBrowser()
+		qualifyManualHeapNative(t, ctx, native, receipt.CaptureID)
+		if err := installedProfileSummaryMatchesNative(heapSummary, native, "main.main"); err != nil {
+			t.Fatal("browser heap summary differs from authenticated browser native original", err)
+		}
+		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke, diagnose)
+		t.Log("installed heap snapshot: namespace profile, independent collection review selecting only console result access, original Pod, no forced GC; real installed React untouched inuse_space default, one summary before one authenticated browser attachment; exact signed native total/bytes and null duration, MCP fresh repeat verified")
+		return
 	}
 	if measurement != nil {
 		if err := finishRecording(); err != nil {
@@ -851,9 +916,6 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal(err)
 		}
 	}
-	if installedProfileFocus() && installedHeapProfileVariant() {
-		t.Log("heap phase: separately authorized native preparation begins after the joined read-only summary")
-	}
 	prepareDownload()
 	downloadID, deadline := download.DownloadID, download.ExpiresAt
 	if downloadID == "" || deadline.IsZero() || !time.Now().Before(deadline) || deadline.After(evidence.Artifacts[0].Expires) {
@@ -875,6 +937,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	nativeLimit := int64(artifact.RecordingNativeLimit)
 	if installedProfileFocus() {
 		nativeLimit = artifact.MaxPprofBytes
+		if installedRuntimeTraceVariant() {
+			nativeLimit = 32 << 20
+		}
 	}
 	if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil || *download.SizeBytes < 1 || *download.SizeBytes > nativeLimit {
 		diagnose()
@@ -896,6 +961,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	extension := ".pcapng"
 	if installedProfileFocus() {
 		extension = ".pb.gz"
+		if installedRuntimeTraceVariant() {
+			extension = ".trace"
+		}
 	}
 	if installedJourneyFocus() == "manual-syscall" || installedJourneyFocus() == "manual-arguments" {
 		extension = ".jsonl"
@@ -942,13 +1010,10 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		return
 	}
 	if installedProfileFocus() {
-		if installedHeapProfileVariant() {
-			qualifyManualHeapNative(t, ctx, native, receipt.CaptureID)
-			if err := installedProfileSummaryMatchesNative(heapSummary, native, "main.main"); err != nil {
-				t.Fatal("read-only heap summary differs from subsequently authorized native original", err)
-			}
+		if installedRuntimeTraceVariant() {
+			qualifyManualRuntimeTraceNative(t, ctx, native, receipt.CaptureID)
+			profileCapture[0].NoQueries(receipt.CaptureID, evidence.Artifacts[0].ID)
 			qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke, diagnose)
-			t.Log("installed heap snapshot: namespace profile, independent collection review with selected result access, original Pod, no forced GC, read-only inuse_space summary before separate authenticated native download; exact signed native total/bytes and null duration verified")
 			return
 		}
 		qualifyManualProfileNative(t, ctx, native, receipt.CaptureID)

@@ -374,3 +374,55 @@ SQL/TLS/ordinal-four wire composition or an installed workflow. The exact
 within-bracket status overlap remains the separately proven synthetic HTTPS
 regression. No BPF, Gadget or node collector ran locally. Native 40849033981's
 combined final-native failure is still unattributed; no hosted retry followed.
+
+## Current SQL observations and the original operation interval
+
+The installed trace continuation on `c2d4f74b` exposed an availability defect in
+an agent-added lifetime coupling: a guarded-workload claim failed after 3.97s
+at the earlier candidate observation's cutoff, although the original request
+was bounded independently to five seconds. The later demand completed 0.770s
+after the repeat preview had already refused. This is measured failure evidence;
+it does not establish the candidate producer's observation start or a successful
+fixed installed route.
+
+The direct HWORK → holder → regional path now allocates its one original native
+operation under the original request/caller interval before consuming discovery.
+Complete candidates, Ready routes and the first exact SQL registration must be
+valid when selected; only a complete, independently checked positive locator
+consumes that discovery phase. Cancelling and joining losing lookups does not
+turn the consumed discovery timestamp into a later claim deadline. Original
+caller cancellation still closes the selected native handle and joins every
+loser. The selected Pod/process/leaf/configuration identities never change.
+
+Every existing current SQL check remains. Later phases consume independently
+fresh observations of the same complete immutable registration and accepted
+configuration. Their original timestamps are checked at use, never rewritten.
+The first SQL observation becomes an identity anchor after consumption; its
+timestamps are not cached current authority. Fixed expired current observations, changed configuration,
+retired peers, cancellation and expired discovery before positive selection all
+refuse. The older owner-mTLS routing-admission path remains conservative and
+unchanged; its shorter constructed native interval remains a hard bound.
+
+The existing numbered proof fields separate the original native bracket
+(`NativeUntil`) from each current SQL observation (`RegistrationUntil`). A new
+ordinal validates both while fresh and reads current SQL independently. A
+retained old reply can anchor only its exact channel, identities and original
+native bracket; its old SQL observation does not authorize a later phase.
+Current SQL is still read at every existing retained-proof boundary. Native,
+source, workload, token, certificate, stream and original request cutoffs remain
+hard, including a shorter `NativeUntil` received from an older producer.
+No consumer widens such an interval. Final output is bounded by its current
+proof and every genuine hard cutoff. Native-final diagnostics report the actual
+native-final context, rather than the already consumed POST SQL deadline.
+
+This changes eight existing production files in the same v2 pipeline. Added
+Kubernetes reads, SQL reads, privileges, credentials, retries, watches, caches,
+services, settings and protocol fields: **zero**. Successful H counts stay one
+candidate read, one Ready read, six current registration reads, one native Begin
+and Final, one locator GET and one claim POST, with at most two shared sockets.
+Existing source/metadata reads, conservative unknown spend and joined cleanup
+are unchanged. The benefit applies to ordinary installed capacity refreshes,
+not just large profiles. The prior cumulative SQL/discovery coupling was an
+engineering choice, not a maintainer requirement; the original five-second
+request is unchanged. Focused real-TLS tests use synthetic SQL/native authority
+and demonstrate the lifetime boundary, not installed Kubernetes qualification.

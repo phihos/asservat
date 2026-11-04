@@ -279,6 +279,24 @@ manual qualification passed under
 [ADR-298](../decisions/298-explicit-go-profile-refusals.md); broader modes remain open.
 
 
+## Refusing a summary before admission
+
+Under [ADR-291](../decisions/291-bounded-profile-summary.md), only a
+`get_profile_summary` authority-resolution failure proven to precede any query
+admission carries C-18's private pre-admission refusal marker. C-20 turns it into
+a content-free `NotAvailable`; denied, missing, unsupported and unavailable
+source/provider cases share that same response and unavailable/none audit
+outcome. REQ-PRF-005 and SC-PRF-003/005 therefore preserve native Go trace download
+without attempting a pprof worker. This includes provider failure at that exact
+pre-admission boundary, rather than misreporting it as an attempted query.
+
+Audit completion, final current identity and original cancellation/deadline still
+gate error delivery. Nonclassified and attempted/post-admission errors retain
+their existing transport failure and conservative effects. SQL native-source
+allowlists, ordinary rights, native parsers, funding and worker limits are
+unchanged. Component composition tests use synthetic publication/permission
+ports and do not establish installed trace qualification.
+
 ## Saved heap summary selection
 
 C-20 passes C-16’s existing saved acquisition type to its source-scoped summary
@@ -289,6 +307,19 @@ worker and native-download boundaries remain separate. The focused heap
 qualification and its current limits are recorded in
 [implementation progress](../implementation-progress.md).
 
+
+A history-backed single-profile repeat allocates eight seconds at entry within
+the existing fifteen-second public preview window. Its one readiness hint is
+not target or recovery authority. Initial recovery and current review remain
+before it. The existing complete recorder resolution runs after readiness and
+must return the same pinned target; final capability, eligibility, retention
+and storage facts are independently read. One fresh recovery read must match
+the initial installation, issuer epoch and full revision. Each final proof
+retains its own original interval, and earlier request/history/policy ends and
+final checks still apply. This adds three SQL reads/one bounded transaction,
+zero Kubernetes reads or new background work. The browser selects the existing
+fifteen-second preview bound up front; other capture operations retain ten
+seconds. See [ADR-285](../decisions/285-profile-preview-plans.md).
 
 Stored previews omit catalog documents. When creating a new profile review with
 selected result access, the capture service reloads the exact referenced catalog

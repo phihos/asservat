@@ -141,11 +141,10 @@ func (h *HubConnectorObservationOperation) ObserveClusterOperation(ctx context.C
 	until = identity.Earlier(until, firstEnd)
 	current, stopCurrent := context.WithDeadline(call, until)
 	defer stopCurrent()
-	ownerEnd, err := operation.checkRetained(current, false)
+	_, err = operation.checkRetained(current, false)
 	if err != nil {
 		return zero, &operationStep{"retained", err}
 	}
-	until = identity.Earlier(until, ownerEnd)
 	currentOwner, stopOwner := context.WithDeadline(current, until)
 	defer stopOwner()
 	result, err := h.stream.ExchangeClusterObservation(currentOwner, request.Clone())
@@ -153,11 +152,11 @@ func (h *HubConnectorObservationOperation) ObserveClusterOperation(ctx context.C
 	if err != nil || digestErr != nil || !result.Matches(request, digest, h.now()) || current.Err() != nil {
 		return zero, &operationStep{"exchange", errors.Join(value.ErrUnavailable, err)}
 	}
-	ownerEnd, err = operation.checkRetained(currentOwner, false)
+	_, err = operation.checkRetained(currentOwner, false)
 	if err != nil {
 		return zero, &operationStep{"retained-after", err}
 	}
-	until = identity.Earlier(until, identity.Earlier(ownerEnd, result.Interval.FreshUntil))
+	until = identity.Earlier(until, result.Interval.FreshUntil)
 	final, stopFinal := context.WithDeadline(currentOwner, until)
 	defer stopFinal()
 	last, err := h.registry.ReadConnectorObservationOperation(final, ownerRequest, source, source.leaf, 3)
@@ -251,12 +250,9 @@ func (p *hubConnectorOperationProofs) ReadConnectorObservationOperation(ctx cont
 	if peerErr != nil || current != peer || call.Err() != nil || !p.hub.now().Before(until) {
 		return zero, answerStep("region-window", value.ErrUnavailable, nil)
 	}
-	end, err := p.operation.checkRetained(call, false)
+	_, err = p.operation.checkRetained(call, false)
 	if err != nil {
 		return zero, answerStep("retained", err, nil)
 	}
-	out.NativeUntil = identity.Earlier(ownerObservationTime(out.NativeUntil), end).UTC().Format(time.RFC3339Nano)
-	out.SourceFreshUntil = identity.Earlier(ownerObservationTime(out.SourceFreshUntil), end).UTC().Format(time.RFC3339Nano)
-	out.WorkloadFreshUntil = identity.Earlier(ownerObservationTime(out.WorkloadFreshUntil), end).UTC().Format(time.RFC3339Nano)
 	return out, nil
 }

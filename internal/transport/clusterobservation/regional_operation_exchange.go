@@ -85,7 +85,7 @@ func ServeRegionalObservationOperation(ctx context.Context, connection regionalO
 			if original.ID == "" {
 				original = probe.Owner.Request
 			}
-			until = identity.Earlier(until, identity.Earlier(readTime(original.NotAfter), identity.Earlier(readTime(probe.Owner.NativeUntil), readTime(probe.Owner.RegistrationUntil))))
+			until = identity.Earlier(until, identity.Earlier(readTime(original.NotAfter), readTime(probe.Owner.NativeUntil)))
 			proofCall, stopProof := context.WithDeadline(bounded, until)
 			proof, e := connection.AnswerConnectorObservation(proofCall, probe)
 			stopProof()

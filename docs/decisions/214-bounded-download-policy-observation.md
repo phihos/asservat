@@ -193,3 +193,24 @@ client, purpose, path and regions, and recovery, processing, ordinary
 the raw five-second policy. Refusals now name their closed stage
 (`query refused: excerpt/<stage> (<class>) left@<bucket>`), so the next installed
 run confirms or refutes the policy cost as the refusing stage.
+
+
+## Preserve policy lifetime across a bounded metadata read (2026-11-04)
+
+The accepted-heavy comparison exposed a separate adapter defect.
+`ContextProjectionPolicies` copied the shared observation but clipped its
+returned `FreshUntil` to the temporary five-second metadata-read context.
+Native41841610822 recorded an original twenty-second public request but only
+4.317s remaining for the worker operation, ending at
+`comparison/baseline/environment/policy`. This was an extra lookup-derived
+cutoff, not a new maintainer freshness requirement.
+
+Keep the five-second metadata I/O limit and reject cancellation or expiry after
+the read. The returned policy retains the source observation's original
+`ObservedAt`/`FreshUntil`, shortened only by the original caller deadline.
+The twenty-second evidence-read request and every earlier identity, permission,
+retention, processing, query and worker cutoff still apply. This neither renews
+an observation nor changes the sixty-second shared cache, its five-second
+refresh headroom or direct administration. No extra source reads, watchers,
+credentials, state or configuration are added. The failing original and focused
+regressions remain separate from the next installed qualification.

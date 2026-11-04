@@ -1,0 +1,5 @@
+Owner-observation phase local evidence
+
+Original RED/intermediate failures and initial integrated gate exit1 are retained alongside final focused races. Initial pre-push/profile passed, selected compatibility race failed; final selected race passed after positive fixture clock correction only. Deterministic gzip files preserve exact original bytes; verification.json records raw/stored SHA256, sizes and complete decompressed/Git-object readback. The original handoff and cache preparation retain their historical pending statuses.
+
+The source patch separates consumed discovery/SQL observations from later independently current proofs while retaining original native/source/workload/token/peer/request hard ends. Local real TLS uses synthetic installation authority. This archive does not qualify an installed TRACE continuation; that run remains pending. The integrated gate includes console-check, not a new full console-browser or external service fixture. No source, quota, permission or request-timeout increase is implied.
