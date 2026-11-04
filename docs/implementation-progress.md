@@ -3,6 +3,38 @@
 
 ## Current delivery workflow (2026-11-04)
 
+**Active outcome:** complete the existing Go heap snapshot inspection/download
+workflow under REQ-PRF-001/003/005. The browser now suggests editable
+`inuse_space` from saved heap acquisition metadata, preserving same-source edits
+and resetting on a new case/artifact/version; verified query results alone supply
+units. The focused `continuation-manual-heap` fixture publishes an immutable
+namespace profile (snapshot,16MiB,5s,no forced GC), obtains one ordinary read-only
+summary before authorized native preparation, then compares native type/unit,
+signed total, nullable duration and original target. Existing collection review
+and selected-result authority are reused.
+
+The isolated candidate is `/home/phil/Projekte/asservat-heap-profile-inspection`,
+branch `feature/heap-profile-inspection`, based on main71bf8d61. Local pre-push
+passed441 console tests, integrated fixture races passed3.871s, and the actual
+built-console browser passed34.452s (28journeys/27accessibility scans;375/320px;
+no external requests or CSP/runtime errors). Browser data are synthetic; installed
+heap qualification remains pending. Original RED/green reports and screenshots
+are retained in `test/results/heap-profile-local/`.
+
+Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
+selection for a saved heap; frequency is unmeasured, and this is an existing
+first-release requirement. Metadata/default conventions and the existing
+namespace profile/query/download paths suffice. Production additions:0 API calls,
+permissions, credentials, watches, workers, dependencies, configuration or fallback
+states. Mounting makes0 queries. Test-only selection adds one closed heap variant
+to the existing manual-profile harness; CPU/refusal/Stop checks remain in their
+original route. One heap plus history needs35.25MiB/12objects and one10-unit
+summary, within unchanged141MiB/48objects/root12 and6,720/10,000 system objects.
+The384MiB worker and18min Go/20min job ceilings are unchanged. Source-scoped UI
+state is reversible; merely asking users to guess the counter preserves the
+reproduced failure. Full S-05 and complete-spec work remain active.
+
+
 Explicit Go endpoint refusals ([ADR-298](decisions/298-explicit-go-profile-refusals.md))
 are merged in [PR158](https://github.com/phihos/asservat/pull/158), main
 `620a59eb1ab363fe2dbedeffae26b3fe5d2d5a51`. The entire merge tree equals qualified
@@ -32,10 +64,6 @@ difference report. Earlier failed or provenance-limited runs remain separate.
 No physical refund, remote application Stop, continuous availability,
 maximum-input analysis, S-05 or whole-spec exit is implied.
 
-Next is the prepared heap snapshot workflow: editable `inuse_space` suggestion,
-read-only summary before separately authorized native download, no forced GC and
-native parity. Its isolated local gates/built-browser proof pass; installed heap
-qualification is still pending. The complete-spec goal remains active.
 
 
 Finite policy-triggered Go endpoint profiles (S-05 increment6, ADR-296) are merged

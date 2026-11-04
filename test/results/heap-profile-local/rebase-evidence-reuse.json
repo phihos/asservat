@@ -1,0 +1,22 @@
+{
+  "measuredCheckpoint": "59b0c228",
+  "rebasedCheckpoint": "8c94201e8e3a5bc6da0808f2dd813d42b88ac17f",
+  "newBase": "71bf8d61a7e0cde2a8247ee59de825a84d53142a",
+  "comparedRoots": [
+    "api",
+    "cmd",
+    "internal",
+    "migrations",
+    "go.mod",
+    "go.sum",
+    "charts",
+    "web",
+    "scripts",
+    "Makefile",
+    "test/integration",
+    "test/fixtures",
+    ".github"
+  ],
+  "changedFilesWithinRoots": [],
+  "scope": "Local pre-push/race/built-console evidence retains original checkpoint identity. Rebase incorporated only merged refusal documentation/results, with unchanged product, fixture and browser code. New local architecture/ledger wording is separately design-checked; native qualification remains pending."
+}
