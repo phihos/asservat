@@ -20,6 +20,7 @@ function event(value) {
 }
 const config = await command();
 const heap = config.mode === 'heap';
+assert(config.restoreDuringNative === undefined || typeof config.restoreDuringNative === 'boolean' && (!config.restoreDuringNative || heap), 'closed local restoration selection');
 assert(['comparison', 'heap'].includes(config.mode), 'fixed profile browser mode');
 const origin = new URL(config.origin);
 assert.equal(origin.protocol, 'https:');
@@ -231,6 +232,7 @@ try {
     }
   }
   let heapSummaryChecked = false;
+  let heapRenderedCaseRequests = 0;
   let handle;
   let terminal = false;
   let terminalComparison;
@@ -267,9 +269,18 @@ try {
       stage = 'heap-native-link';
       const link = page.getByRole('link', { name: 'Download native file', exact: true });
       await expect(link).toHaveAttribute('href', ready.content_path);
+      const refreshedFrom = seen.length;
+      if (config.restoreDuringNative) {
+        // Synthetic local lifecycle event after the real anchor activation.
+        // The actual SessionGate listener performs current HTTP session reads.
+        await link.evaluate(element => element.addEventListener('click', () => {
+          queueMicrotask(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+        }, { once: true }));
+      }
       const downloadEvent = page.waitForEvent('download');
       await link.click();
       const download = await downloadEvent;
+      if (config.restoreDuringNative) await observed('get_case', refreshedFrom);
       attachmentDiagnostic = { urlMatch: download.url() === config.origin + ready.content_path, filenameMatch: download.suggestedFilename() === 'artifact-' + config.artifactID + '.pb.gz', body: 'pending' };
       stage = 'heap-native-attachment-url';
       assert.equal(download.url(), config.origin + ready.content_path);
@@ -304,23 +315,45 @@ try {
       }
       assert.equal(checkInstalledProfileCaseRefreshes({ heap, caseID: config.caseID, artifactID: config.artifactID, observations }), caseRequests, 'all actual case reads verified');
       process.stderr.write(`installed profile current metadata reads=${caseRequests}; same-human refresh/source/timing pins checked\n`);
+      stage = 'close-profile-timing';
       await expect(timing).toBeVisible();
       if (heap) {
         assert(heapSummaryChecked && nativeCompleted, 'rendered summary and native download before joined close');
         const table = panel.getByRole('table', { name: 'Profile function costs', exact: true });
-        // A separately authorized download may outlast this original view.
-        // Accept clearing only with the actual expired state, never renew it.
+        // Session reattachment clears the old projection to idle. Accept that
+        // only after the successful same-human/current-source proof above.
+        // Without that refresh, the original expiry still requires Expired.
         const viewExpires = Date.parse(terminalComparison.query_expires_at);
+        stage = 'close-summary-original-expiry';
         assert(Number.isFinite(viewExpires), 'original summary expiry');
-        if (Date.now() >= viewExpires || await table.count() === 0) {
+        if (caseRequests > heapRenderedCaseRequests) {
+          stage = 'close-summary-refreshed-idle-rows';
           await expect(table).toHaveCount(0);
-          await expect(panel.getByRole('status')).toHaveText('This view has expired. Inspect again to request a fresh view.');
-          process.stderr.write('installed heap summary expired during native download; no additional query\n');
+          stage = 'close-summary-refreshed-idle-status';
+          await expect(panel.getByRole('status')).toHaveCount(0);
+          await expect(panel.getByRole('alert')).toHaveCount(0);
+          stage = 'close-summary-refreshed-idle-control';
+          await expect(panel.getByRole('button', { name: 'Inspect saved profile', exact: true })).toBeEnabled();
+          await expect(panel.getByRole('button', { name: 'Close view', exact: true })).toHaveCount(0);
+          process.stderr.write('installed heap summary cleared to idle after verified current session/case refresh; no additional query\n');
         } else {
-          await expect(table).toBeVisible();
+          if (Date.now() >= viewExpires || await table.count() === 0) {
+            stage = 'close-summary-cleared-rows';
+            await expect(table).toHaveCount(0);
+            stage = 'close-summary-expired-status';
+            await expect(panel.getByRole('status')).toHaveText('This view has expired. Inspect again to request a fresh view.');
+            process.stderr.write('installed heap summary expired during native download; no additional query\n');
+          } else {
+            stage = 'close-summary-current-rows';
+            await expect(table).toBeVisible();
+          }
+          stage = 'close-summary-control';
+          await panel.getByRole('button', { name: 'Close view', exact: true }).click();
+          stage = 'close-summary-final-cleared-rows';
+          await expect(table).toHaveCount(0);
         }
-        await panel.getByRole('button', { name: 'Close view', exact: true }).click();
-        await expect(table).toHaveCount(0);
+        stage = 'close-summary-no-new-query';
+        assert(compareRequests === 1 && pollRequests <= 4, 'no automatic replacement query after current session refresh');
       } else {
         await expect(panel.getByRole('table', { name: 'Profile acquisition details', exact: true })).toBeVisible();
         await assertRenderedResult(terminalComparison);
@@ -369,6 +402,7 @@ try {
         stage = 'heap-summary-rendered';
         await assertRenderedResult(terminalComparison);
         heapSummaryChecked = true;
+        heapRenderedCaseRequests = caseRequests;
         process.stderr.write('installed heap summary rows/bytes/null duration checked before native download\n');
       }
     }

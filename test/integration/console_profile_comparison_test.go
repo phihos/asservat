@@ -118,7 +118,8 @@ func TestConsoleProfileComparisonWithBuiltPackage(t *testing.T) {
 // comparison choice, request or operation in the existing browser journey.
 type consoleSyntheticProfileTimingCases struct {
 	*consoleSyntheticCases
-	heap bool
+	heap       bool
+	acquiredAt time.Time // Optional immutable synthetic producer fact across current case reads.
 }
 
 func (s *consoleSyntheticProfileTimingCases) GetContextCase(ctx context.Context, current identities.CurrentIdentity, id string) (catalog.ContextCase, error) {
@@ -126,7 +127,10 @@ func (s *consoleSyntheticProfileTimingCases) GetContextCase(ctx context.Context,
 	if err != nil {
 		return view, err
 	}
-	start := time.Now().UTC().Truncate(time.Microsecond).Add(-11 * time.Second)
+	start := s.acquiredAt
+	if start.IsZero() {
+		start = time.Now().UTC().Truncate(time.Microsecond).Add(-11 * time.Second)
+	}
 	view.Artifacts[0].ProfileAcquisition = &artifact.ProfileAcquisitionMetadata{Type: "cpu", Mode: "interval", DurationMillis: 10000, Acquisition: &artifact.AcquisitionWindow{StartedAt: start, CompletedAt: start.Add(10*time.Second + 222*time.Millisecond)}}
 	if s.heap {
 		view.Artifacts[0].ProfileAcquisition.Type, view.Artifacts[0].ProfileAcquisition.Mode, view.Artifacts[0].ProfileAcquisition.DurationMillis = "heap", "snapshot", 0

@@ -34,7 +34,7 @@ func installedProfileComparisonBrowser(t *testing.T, ctx context.Context, browse
 
 // Heap mode uses the same installed React/session transport and one existing
 // query. Native bytes stay in a Go-owned private directory, never stdout.
-func installedProfileBrowser(t *testing.T, ctx context.Context, browser *installedBrowser, address string, source installedProfileComparisonSource, mode string, observed func(installedComparisonReply)) (func(string, any) installedComparisonReply, func() ([]byte, installedJourneyDownload), func()) {
+func installedProfileBrowser(t *testing.T, ctx context.Context, browser *installedBrowser, address string, source installedProfileComparisonSource, mode string, observed func(installedComparisonReply), restoreDuringNative ...bool) (func(string, any) installedComparisonReply, func() ([]byte, installedJourneyDownload), func()) {
 	t.Helper()
 	origin, err := url.Parse(browser.base)
 	if err != nil || browser.client.Jar == nil || observed == nil {
@@ -61,7 +61,14 @@ func installedProfileBrowser(t *testing.T, ctx context.Context, browser *install
 	nativeDirectory := t.TempDir()
 	nativePath := filepath.Join(nativeDirectory, "heap-native.pb.gz")
 	proxy := installedHistoryBrowserTunnel(t, ctx, browser.base, address)
-	config, err := json.Marshal(map[string]any{"origin": browser.base, "proxy": proxy, "cookies": cookies, "caseID": source.CaseID, "artifactID": source.ArtifactID, "mode": mode, "nativeDestination": nativePath})
+	if len(restoreDuringNative) > 1 || len(restoreDuringNative) == 1 && restoreDuringNative[0] && mode != "heap" {
+		t.Fatal("invalid local browser session-restore selection")
+	}
+	input := map[string]any{"origin": browser.base, "proxy": proxy, "cookies": cookies, "caseID": source.CaseID, "artifactID": source.ArtifactID, "mode": mode, "nativeDestination": nativePath}
+	if len(restoreDuringNative) == 1 && restoreDuringNative[0] {
+		input["restoreDuringNative"] = true
+	}
+	config, err := json.Marshal(input)
 	if err != nil || len(config) > 16<<10 {
 		clear(config)
 		t.Fatal("installed comparison private input bound")

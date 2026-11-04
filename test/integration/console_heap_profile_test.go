@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -35,12 +36,16 @@ func TestConsoleHeapProfileWithBuiltPackage(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) { testConsoleHeapProfileWithBuiltPackage(t, expireDuringNative) })
 	}
+	t.Run("session-refresh-during-native", func(t *testing.T) { testConsoleHeapProfileWithBuiltPackage(t, false, true) })
 }
 
-func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative bool) {
+func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative bool, restore ...bool) {
 	if os.Getenv("ASSERVAT_CONSOLE_BROWSER_TEST") != "1" {
 		t.Skip("set ASSERVAT_CONSOLE_BROWSER_TEST=1 after building web/dist")
 	}
+	restoreDuringNative := len(restore) == 1 && restore[0]
+	refreshedCase := make(chan struct{})
+	var refreshCalls atomic.Int64
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +59,7 @@ func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative boo
 	}
 	sessions := &consoleRestartSessions{&consoleSyntheticSessions{origin: origin, state: "ready", expiresAt: time.Now().Add(5 * time.Minute)}}
 	sessionHandler := browser.SessionHandler{Origin: origin, Issuer: "https://identity.invalid", Sessions: sessions}
-	cases := &consoleSyntheticProfileTimingCases{heap: true, consoleSyntheticCases: &consoleSyntheticCases{state: "ready", profile: true, expiresAt: time.Now().Add(time.Hour)}}
+	cases := &consoleSyntheticProfileTimingCases{heap: true, acquiredAt: time.Now().UTC().Truncate(time.Microsecond).Add(-11 * time.Second), consoleSyntheticCases: &consoleSyntheticCases{state: "ready", profile: true, expiresAt: time.Now().Add(time.Hour)}}
 	caseOps, err := presentation.NewContextCaseOperations(presentation.ContextCaseOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: func() string { return consoleCaptureID(501) }}, cases)
 	if err != nil {
 		t.Fatal(err)
@@ -102,6 +107,9 @@ func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative boo
 	}
 	server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v1/session" || strings.HasPrefix(r.URL.Path, "/auth/") {
+			if r.URL.Path == "/auth/refresh" {
+				refreshCalls.Add(1)
+			}
 			sessionHandler.ServeHTTP(w, r)
 		} else if strings.HasPrefix(r.URL.Path, "/api/v1/operations/") {
 			if expireDuringNative && r.URL.Path == "/api/v1/operations/get_profile_summary" {
@@ -112,6 +120,20 @@ func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative boo
 				comparison.mu.Unlock()
 			}
 			operations.ServeHTTP(w, r)
+			if restoreDuringNative && r.URL.Path == "/api/v1/operations/get_case" {
+				cases.mu.Lock()
+				second := cases.calls == 2
+				cases.mu.Unlock()
+				if second {
+					downloads.mu.Lock()
+					started := downloads.nativeCalls == 1
+					downloads.mu.Unlock()
+					if !started {
+						t.Error("synthetic restoration preceded the original native request")
+					}
+					close(refreshedCase)
+				}
+			}
 		} else if strings.HasPrefix(r.URL.Path, browser.DownloadContentPrefix) {
 			cookie, e := r.Cookie(browser.SessionCookie)
 			if e != nil {
@@ -143,7 +165,21 @@ func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative boo
 			w.Header().Set("Content-Disposition", `attachment; filename="artifact-`+consoleCaptureID(81)+`.pb.gz"`)
 			w.Header().Set("Content-Type", "application/octet-stream")
 			w.Header().Set("Content-Length", strconv.Itoa(len(downloads.native)))
-			_, _ = w.Write(downloads.native)
+			body := downloads.native
+			if restoreDuringNative {
+				// Keep the real attachment open while the actual SessionGate
+				// restoration listener performs a fresh same-human session/case read.
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(body[:1]) // Chromium starts the attachment after its first byte.
+				body = body[1:]
+				w.(http.Flusher).Flush()
+				select {
+				case <-refreshedCase:
+				case <-r.Context().Done():
+					return
+				}
+			}
+			_, _ = w.Write(body)
 		} else {
 			static.ServeHTTP(w, r)
 		}
@@ -158,7 +194,7 @@ func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative boo
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	events := 0
-	call, nativeDownload, finish := installedProfileBrowser(t, ctx, b, server.Listener.Addr().String(), installedProfileComparisonSource{CaseID: consoleCaptureID(80), ArtifactID: consoleCaptureID(81), Expires: cases.expiresAt}, "heap", func(installedComparisonReply) { events++ })
+	call, nativeDownload, finish := installedProfileBrowser(t, ctx, b, server.Listener.Addr().String(), installedProfileComparisonSource{CaseID: consoleCaptureID(80), ArtifactID: consoleCaptureID(81), Expires: cases.expiresAt}, "heap", func(installedComparisonReply) { events++ }, restoreDuringNative)
 	defer finish()
 	joined := false
 	summary := queryInstalledProfileSummaryWithCall(t, ctx, consoleCaptureID(80), consoleCaptureID(81), "09"+strings.Repeat("00", 31), "inuse_space", cases.expiresAt, call, func(handle, operation string) func() {
@@ -191,7 +227,15 @@ func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative boo
 	if expireDuringNative {
 		wantPrepares = 1
 	}
-	if events != 2 || comparison.starts != 1 || comparison.polls != 1 || cases.calls != 1 || downloads.stats.Accepted != 1 || len(downloads.stats.PrepareKeys) != wantPrepares || wantPrepares == 2 && downloads.stats.PrepareKeys[0] != downloads.stats.PrepareKeys[1] || downloads.nativeCalls != 1 {
+	wantCases := 1
+	if restoreDuringNative {
+		wantCases = 2
+	}
+	refreshes := refreshCalls.Load()
+	if restoreDuringNative && (!time.Now().Before(expires) || refreshes != 2) {
+		t.Fatal("short current same-human restoration must preserve original unexpired summary cutoff and make exactly two session reads", refreshes)
+	}
+	if events != 2 || comparison.starts != 1 || comparison.polls != 1 || cases.calls != wantCases || downloads.stats.Accepted != 1 || len(downloads.stats.PrepareKeys) != wantPrepares || wantPrepares == 2 && downloads.stats.PrepareKeys[0] != downloads.stats.PrepareKeys[1] || downloads.nativeCalls != 1 {
 		t.Fatal("extra synthetic acquisition/query/download", events, comparison.starts, comparison.polls, cases.calls, downloads.stats, downloads.nativeCalls)
 	}
 	t.Logf("summary interval=%s; native body hold=%t", expires.Sub(observed), expireDuringNative)
