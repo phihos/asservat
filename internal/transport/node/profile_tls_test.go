@@ -54,7 +54,8 @@ func largestProfileTLSRoots(t *testing.T) execution.GoProfileTLSMaterial {
 	return execution.GoProfileTLSMaterial{RootsPEM: canonical, RootsDigest: digest, ServerName: strings.Repeat("a", 63) + "." + strings.Repeat("a", 63) + "." + strings.Repeat("a", 63) + "." + strings.Repeat("a", 61)}
 }
 
-func TestProfileTLSMaximumClosedPollEncodingAndMixedWork(t *testing.T) {
+func maximumProfileTLSWork(t *testing.T) collector.Work {
+	t.Helper()
 	const id = "11111111-1111-4111-8111-111111111111"
 	now := time.Date(9999, 12, 31, 23, 58, 0, 999999000, time.UTC)
 	material := largestProfileTLSRoots(t)
@@ -64,7 +65,15 @@ func TestProfileTLSMaximumClosedPollEncodingAndMixedWork(t *testing.T) {
 	if !p.Valid() {
 		t.Fatal("maximum TLS request invalid")
 	}
-	profile := collector.Work{ID: id, Sequence: ^uint64(0), Kind: collector.WorkProfileCapture, NotAfter: now.Add(time.Second), Profile: &p}
+	return collector.Work{ID: id, Sequence: ^uint64(0), Kind: collector.WorkProfileCapture, NotAfter: now.Add(time.Second), Profile: &p}
+}
+
+func TestProfileTLSMaximumClosedPollEncodingAndMixedWork(t *testing.T) {
+	const id = "11111111-1111-4111-8111-111111111111"
+	now := time.Date(9999, 12, 31, 23, 58, 0, 999999000, time.UTC)
+	profile := maximumProfileTLSWork(t)
+	p := *profile.Profile
+	material := p.TLS
 	packet := collector.PacketCapture{CaptureID: id, PodUID: id, Program: make([]planning.BPFInstruction, 256), ProgramDigest: [32]byte{1}, Duration: 30 * time.Second, MaxBytes: 8 << 20}
 	for i := range packet.Program {
 		packet.Program[i] = planning.BPFInstruction{Code: 65535, Jt: 255, Jf: 255, K: ^uint32(0)}
