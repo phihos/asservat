@@ -103,3 +103,59 @@ func TestProjectionPoliciesReuseTheSharedPolicyObservation(t *testing.T) {
 		t.Fatal("projection and download share one observation interval")
 	}
 }
+
+// The lookup budget bounds I/O, not the lifetime of its completed protected
+// observation. A six-second approved read still belongs to its original caller.
+func TestProjectionPoliciesKeepSharedObservationBeyondLookupDeadline(t *testing.T) {
+	for _, parentInterval := range []time.Duration{0, 20 * time.Second, time.Second} {
+		t.Run(parentInterval.String(), func(t *testing.T) {
+			f, _, _, _ := newEnvironmentFixture()
+			started := f.now
+			originalObserved, originalFresh := f.policy.ObservedAt, f.policy.FreshUntil
+			now := func() time.Time { return f.now }
+			readDeadlineChecked := false
+			shared, err := NewDownloadPolicyObservations(observationPolicyReader(func(read context.Context) (privacy.DownloadPolicy, error) {
+				deadline, ok := read.Deadline()
+				if !ok || deadline.After(started.Add(5*time.Second)) {
+					t.Fatal("protected lookup exceeded its original five-second I/O budget", deadline)
+				}
+				readDeadlineChecked = true
+				return f.DownloadPolicy(read)
+			}), now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			service, err := NewContextProjectionPolicies(shared, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx := t.Context()
+			wantUntil := started.Add(privacy.DownloadPolicyObservationInterval)
+			if parentInterval > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithDeadline(ctx, started.Add(parentInterval))
+				defer cancel()
+				wantUntil, _ = ctx.Deadline()
+			}
+			path := f.policy.Paths[0]
+			out, err := service.ContextProjectionPolicy(ctx, path.TargetClusterID, path.StoreID, "")
+			if err != nil || !out.Valid(f.now) || !out.ObservedAt.Equal(originalObserved) || !out.FreshUntil.Equal(wantUntil) {
+				t.Fatalf("lookup deadline replaced source/caller bound: observed=%v until=%v want=%v error=%v", out.ObservedAt, out.FreshUntil, wantUntil, err)
+			}
+			if !readDeadlineChecked || f.policyReads != 1 || !f.policy.ObservedAt.Equal(originalObserved) || !f.policy.FreshUntil.Equal(originalFresh) {
+				t.Fatal("lookup changed source observation or repeated live reads")
+			}
+			f.now = started.Add(6 * time.Second)
+			wantValid := parentInterval == 0 || parentInterval > 6*time.Second
+			if out.Valid(f.now) != wantValid {
+				t.Fatal("six-second consumption lost original source/caller interval", out.FreshUntil)
+			}
+			if wantValid {
+				again, err := service.ContextProjectionPolicy(ctx, path.TargetClusterID, path.StoreID, "")
+				if err != nil || !again.ObservedAt.Equal(out.ObservedAt) || !again.FreshUntil.Equal(wantUntil) || f.policyReads != 1 {
+					t.Fatal("cache hit renewed original observation or lost caller cutoff", err)
+				}
+			}
+		})
+	}
+}
