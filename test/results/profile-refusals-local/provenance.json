@@ -1,0 +1,12 @@
+{
+  "sourceCommit": "92ef4dda96479bdd70377fa70b054bc67e1dbe5c",
+  "profilePreflightExit": 0,
+  "prePushExit": 0,
+  "consoleBrowserExit": 0,
+  "consoleBrowserGoSeconds": 33.62,
+  "scope": "Frozen local profile races/prepush and built React/Go TLS with synthetic sessions/targets.27journeys/26accessibility scans plus restart/comparisonmobile drivers; no installed refusal proof.",
+  "reports": [
+    "test/results/console-browser/report.json"
+  ],
+  "originalArtifactsRestored": true
+}

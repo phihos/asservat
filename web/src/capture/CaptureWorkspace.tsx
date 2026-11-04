@@ -76,7 +76,7 @@ function profileRefusalMessage(action: Progress['actions'][number]): string | un
   if (action.phase !== 'Failed') return;
   switch (action.reason_code) {
     case 'ProfileUnavailable': return 'The Go profile endpoint is unavailable or disabled. No profile was collected for this action. Check the endpoint configuration before preparing a new request.';
-    case 'ProfilerBusy': return 'A conflicting profile session is already running. Asservat did not stop it. No profile was collected for this action.';
+    case 'ProfilerBusy': return 'Profiling is busy or a previous session may still be running. Asservat did not stop another session. No profile result is available for this action.';
   }
 }
 const evidenceLabels: Record<HistoryEntry['evidence_state'], string> = {

@@ -1,6 +1,6 @@
 # ADR-298: explicit Go endpoint refusals
 
-Status: implementation direction; qualification pending.
+Status: implemented; local/service qualification passed, native qualification pending.
 
 ## Observed problem and decision
 
@@ -19,7 +19,10 @@ new operation or narrowing the general reason-string contract. Add the terminal 
 state contract and map it to public `Failed` / `ProfileUnavailable`, just as
 `profilerBusy` already maps to `Failed` / `ProfilerBusy`. Keep all other errors
 and existing generic failure behavior unchanged. Missing means a reviewed adapter
-observation, never inferred from an arbitrary failure. Make database migration135
+observation, never inferred from an arbitrary failure. Existing `ProfilerBusy`
+can also reflect node capacity or an original uncertain-runtime slot; public
+guidance says busy or possibly still running rather than claiming an application
+profiler definitely exists in every case. Make database migration135
 additive and refuse downgrade while retained new-phase rows exist; retain the
 current immutable execution guard and completed-state timing/custody rules.
 
@@ -61,3 +64,31 @@ installed profile journey for exact public refusals and retained accounting;
 reuse its authority/quota/approval pipeline and existing suites/time limits.
 No local fixture is an installed qualification; record actual exits, frozen
 source hashes and cleanup before claiming either workflow.
+
+## Local qualification
+
+The typed mapping and UI loss were reproduced with failing focused tests before
+fixing them. Integrated profile races and pre-push gates passed (435 console
+tests; 13,543 specification assertions), as did built-console browser checks
+(33.620s, 27 journeys/26 accessibility scans plus restart/comparison drivers).
+Three independent read-only cross-reviews found no blocking defects.
+
+The focused real PostgreSQL/S3/OpenBao profile-admission outcome test passed
+4.168s: terminal/replay/immutable failure, actual authorized progress, no new
+cancellation work, no evidence/observation and original reservations retained.
+Its missing-endpoint observation is synthetic. Schema135→134→135 and original
+guard/constraint restoration passed6.049s. All4,052 source hashes match committed
+blobs, sources unchanged, cleanup failures empty and scratch removed.
+
+Fresh owned Kubernetes/PostgreSQL/S3/OpenBao empty-schema loading and original
+compiled activation Pod passed147.435s. All4,106 hashes match committed blobs;
+sources unchanged, cleanup failures empty and scratch removed. Original reports
+are retained in `test/results/profile-refusals-services/`,
+`test/results/profile-refusals-schema/` and `test/results/profile-refusals-local/`. The
+first service run's read-only native proof used a JSON operator on bytea; that
+failed run remains under `test/results/profile-refusals-first-service/`. Correct
+UTF-8 JSON decoding fixed the proof without changing the runtime outcome.
+
+Collector-native `collector-profile` and installed `continuation-manual-profile`
+qualification remain pending, under their existing time limits. No installed
+refusal/coexistence, broader profile matrix, S-05 or full-spec exit is claimed.

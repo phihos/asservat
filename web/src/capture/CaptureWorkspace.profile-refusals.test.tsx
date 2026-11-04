@@ -9,7 +9,7 @@ const controllers: Investigation[] = [];
 afterEach(() => { cleanup(); controllers.forEach(controller => controller.reset()); controllers.length = 0; vi.unstubAllGlobals(); vi.useRealTimers(); window.history.replaceState(null, '', '/'); });
 const messages = {
   ProfileUnavailable: 'The Go profile endpoint is unavailable or disabled. No profile was collected for this action. Check the endpoint configuration before preparing a new request.',
-  ProfilerBusy: 'A conflicting profile session is already running. Asservat did not stop it. No profile was collected for this action.',
+  ProfilerBusy: 'Profiling is busy or a previous session may still be running. Asservat did not stop another session. No profile result is available for this action.',
 };
 function refusal(reason: string, phase: 'Failed' | 'Running' = 'Failed') {
   const value = progressResult(); if (value.status !== 'ok') throw new Error();
