@@ -166,10 +166,12 @@ type GoEndpointInput struct {
 // and the target network namespace. RouteIP alone must never authorize dialing.
 // The exact Pod/node/boot must be independently rechecked by a qualified dialer.
 type GoEndpointPlan struct {
-	SourceRef, SourceKind  string
-	Definition             GoEndpointDefinition
-	DefinitionDigest       artifact.Digest
-	EndpointDigest         artifact.Digest
+	SourceRef, SourceKind string
+	Definition            GoEndpointDefinition
+	DefinitionDigest      artifact.Digest
+	EndpointDigest        artifact.Digest
+	// Public material is supplied separately; the definition binds its digest.
+	TLSMaterial            execution.GoProfileTLSMaterial `json:"-"`
 	Target                 targets.Request
 	Pin                    artifact.PinnedPod
 	NodeUID, NodeBootID    string
