@@ -1,0 +1,11 @@
+{
+  "head": "b35079344e750861497e9ac9100354aebb1ab980",
+  "testExit": 1,
+  "goElapsedSeconds": 835.356,
+  "sourceFilesMatchedToFrozenHead": 4065,
+  "mismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "failure": "two real CPU captures and authenticated native downloads succeeded; first cross-case20-unit comparison admitted, one worker, first poll pending; second poll HTTP503, no key children committed; comparison unqualified"
+}

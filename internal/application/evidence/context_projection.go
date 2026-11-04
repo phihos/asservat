@@ -2,6 +2,7 @@ package evidence
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"sync"
 	"time"
@@ -89,10 +90,30 @@ func (w *RegionalContextProjection) StopLocal() {
 }
 
 func ProjectionSourceMatches(s NativeContextSource, q value.ContextQuery, a value.ContextProjectionAuthority) bool {
+	return projectionSourceScopeMatches(s, q.Scope, a)
+}
+
+func projectionSourceScopeMatches(s NativeContextSource, scope value.ContextProjectionScope, a value.ContextProjectionAuthority) bool {
 	e := s.Expectation
-	return s.Valid(q.Scope.Version) && projectionExpectation(e, q.Scope) &&
+	return s.Valid(scope.Version) && projectionExpectation(e, scope) &&
 		e.Registration.Location == a.Environment.Location && e.Registration.StoreID == a.Environment.StoreID &&
 		!a.AccessUntil.After(e.Registration.ExpiresAt) && !a.DeleteBy.After(e.Registration.DeleteBy)
+}
+
+// CanonicalProjectionExpectationBound retains capture admission's complete
+// expectation ceiling, including all provenance and Go's canonical escaping.
+func CanonicalProjectionExpectationBound(s NativeContextSource) bool {
+	b, err := json.Marshal(s.Expectation)
+	defer clear(b)
+	return err == nil && len(b) <= 65536
+}
+
+func ProjectionComparisonSourcesMatch(sources [2]NativeContextSource, scope value.ContextProjectionScope, a value.ContextProjectionAuthority) bool {
+	b, bok := scope.BaselineScope()
+	i, iok := scope.IncidentScope()
+	return bok && iok && a.Scope == scope && a.Baseline != nil &&
+		CanonicalProjectionExpectationBound(sources[0]) && CanonicalProjectionExpectationBound(sources[1]) &&
+		projectionSourceScopeMatches(sources[0], b, *a.Baseline) && projectionSourceScopeMatches(sources[1], i, a)
 }
 
 // projectionExpectation requires the published expectation to be exactly the
@@ -149,6 +170,11 @@ func (c projectionReadContext) Deadline() (time.Time, bool) {
 }
 
 func (w *RegionalContextProjection) ExecuteProjection(ctx context.Context, start value.ContextReadStart, owner ContextProjectionRequestOwner) (*RegionalProjectionRead, error) {
+	// Paired reads use ProjectionRuntime's admitted native command and its two
+	// durable key children. This older local executor has no paired provider.
+	if w != nil && w.query.Scope.Comparison != (value.ProfileComparisonWindow{}) {
+		return nil, value.ErrUnavailable
+	}
 	if w == nil || ctx == nil || ctx.Err() != nil || w.ctx.Err() != nil || owner == nil || !start.Fresh || start.ClaimID != start.Batch.ID ||
 		!start.Batch.Matches(w.query) || start.Batch.Worker != w.worker || owner.Request() != start.Batch.Request {
 		return nil, value.ErrUnavailable
@@ -288,10 +314,12 @@ func (r *RegionalProjectionRead) check(ctx context.Context) (value.ContextProjec
 	work, cancel := r.context(ctx)
 	defer cancel()
 	a, err := r.owner.CheckCurrent(work)
+	a = ownedProjectionAuthority(a)
 	if err != nil || !r.start.Batch.Current(r.worker.query, a, r.worker.now()) || !r.proof.Matches(r.worker.query, r.worker.worker, r.worker.now()) || !r.shorten(a.ValidUntil) {
 		return value.ContextProjectionAuthority{}, value.ErrUnavailable
 	}
 	actual, err := r.execution.CheckCurrent(work)
+	actual = ownedProjectionAuthority(actual)
 	if err != nil || !r.start.Batch.Current(r.worker.query, actual, r.worker.now()) || !sameProjectionAuthority(a, actual) || !r.shorten(actual.ValidUntil) || work.Err() != nil || !r.proof.Matches(r.worker.query, r.worker.worker, r.worker.now()) {
 		return value.ContextProjectionAuthority{}, value.ErrUnavailable
 	}
@@ -304,6 +332,14 @@ func (r *RegionalProjectionRead) check(ctx context.Context) (value.ContextProjec
 	return a, nil
 }
 
+func ownedProjectionAuthority(a value.ContextProjectionAuthority) value.ContextProjectionAuthority {
+	if a.Baseline != nil {
+		baseline := *a.Baseline
+		a.Baseline = &baseline
+	}
+	return a
+}
+
 func sameProjectionAuthority(a, b value.ContextProjectionAuthority) bool {
 	strip := func(v value.ContextProjectionAuthority) value.ContextProjectionAuthority {
 		v.CheckedAt, v.ValidUntil = time.Time{}, time.Time{}
@@ -312,7 +348,19 @@ func sameProjectionAuthority(a, b value.ContextProjectionAuthority) bool {
 		v.Environment.Processing.ObservedAt, v.Environment.Processing.ValidUntil = time.Time{}, time.Time{}
 		v.Retention.ObservedAt, v.Retention.ValidUntil = time.Time{}, time.Time{}
 		v.AccessUntil, v.DeleteBy = v.AccessUntil.UTC(), v.DeleteBy.UTC()
+		v.Bound = "" // operator diagnostics are neither serialized nor authority
 		return v
+	}
+	if (a.Baseline == nil) != (b.Baseline == nil) {
+		return false
+	}
+	if a.Baseline != nil {
+		if a.Baseline.Baseline != nil || b.Baseline.Baseline != nil {
+			return false
+		}
+		baselineA, baselineB := *a.Baseline, *b.Baseline
+		a.Baseline, b.Baseline = nil, nil
+		return strip(a) == strip(b) && strip(baselineA) == strip(baselineB)
 	}
 	return strip(a) == strip(b)
 }

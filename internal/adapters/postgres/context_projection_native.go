@@ -84,7 +84,7 @@ func projectionNativeRecord(row custodydb.ContextQueryBatch, q query.ContextQuer
 	b, e := queryBatch(row, q)
 	var o value.NativeOperation
 	var a query.ContextProjectionAuthority
-	if e != nil || queryDecode(row.NativeOperation, 16384, &o) != nil || queryDecode(row.NativeAuthority, 65536, &a) != nil || !o.Valid() || o.Kind != value.NativeProjection || o.Reference.Parent() != (value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: q.ID}) || o.Reference.InstallationID != q.Plan.InstallationID || o.Reference.WorkerID != q.WorkerID || o.Reference.OperationID != b.ID || o.Reference.Fence != b.Generation || o.ParentID != b.ID || o.Generation != b.Generation || o.SourceVersion != q.Scope.Version || o.Path != a.Environment.Path.AcquisitionPath() || !o.Processing.Equal(a.Environment.Processing) || o.Until.After(b.Until) || o.Until.After(a.ValidUntil) || o.HubProcessEpoch != b.Request.HubProcessEpoch {
+	if e != nil || queryDecode(row.NativeOperation, 16384, &o) != nil || queryDecode(row.NativeAuthority, comparisonAuthorityBytes, &a) != nil || len(row.NativeAuthority) > projectionAuthorityBytes(a) || a.Scope != q.Scope || !projectionNativeBaselineMatches(o, a) || !o.Valid() || o.Kind != value.NativeProjection || o.Reference.Parent() != (value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: q.ID}) || o.Reference.InstallationID != q.Plan.InstallationID || o.Reference.WorkerID != q.WorkerID || o.Reference.OperationID != b.ID || o.Reference.Fence != b.Generation || o.ParentID != b.ID || o.Generation != b.Generation || o.SourceVersion != q.Scope.Version || o.Path != a.Environment.Path.AcquisitionPath() || !o.Processing.Equal(a.Environment.Processing) || o.Until.After(b.Until) || o.Until.After(a.ValidUntil) || o.HubProcessEpoch != b.Request.HubProcessEpoch {
 		return b, o, a, query.ErrUnavailable
 	}
 	return b, o, a, nil
@@ -196,7 +196,7 @@ func (s *ProjectionNativeOperations) LocateProjectionNativeOperation(ctx context
 
 func (s *ProjectionNativeOperations) ClaimProjectionNative(ctx context.Context, start query.ContextReadStart, a query.ContextProjectionAuthority, o value.NativeOperation) error {
 	b := start.Batch
-	if s == nil || !start.Fresh || start.ClaimID != b.ID || !o.CurrentValid(time.Now()) || o.Kind != value.NativeProjection || o.Reference.QueryID != b.QueryID || o.Reference.WorkerID != b.Worker.WorkerID || o.Reference.OperationID != b.ID || o.Reference.Fence != b.Generation || o.ParentID != b.ID || o.Generation != b.Generation || o.HubProcessEpoch != b.Request.HubProcessEpoch || o.StartedAt.Before(b.StartedAt) || o.Until.After(b.Until) || o.Until.After(a.ValidUntil) || o.Path != a.Environment.Path.AcquisitionPath() || !o.Processing.Equal(a.Environment.Processing) {
+	if s == nil || !start.Fresh || start.ClaimID != b.ID || !o.CurrentValid(time.Now()) || o.Kind != value.NativeProjection || o.SourceVersion != a.Scope.Version || o.Reference.QueryID != b.QueryID || o.Reference.WorkerID != b.Worker.WorkerID || o.Reference.OperationID != b.ID || o.Reference.Fence != b.Generation || o.ParentID != b.ID || o.Generation != b.Generation || o.HubProcessEpoch != b.Request.HubProcessEpoch || o.StartedAt.Before(b.StartedAt) || o.Until.After(b.Until) || o.Until.After(a.ValidUntil) || o.Path != a.Environment.Path.AcquisitionPath() || !o.Processing.Equal(a.Environment.Processing) || !projectionNativeBaselineMatches(o, a) {
 		return query.ErrUnavailable
 	}
 	return s.queries.withBatch(ctx, b, a, func(ctx context.Context, tx *custodydb.Queries, q query.ContextQuery, row custodydb.ContextQueryBatch) error {
@@ -219,12 +219,12 @@ func (s *ProjectionNativeOperations) ClaimProjectionNative(ctx context.Context, 
 			return e
 		}
 		encoded, e := queryJSON(o)
-		if e != nil {
-			return e
+		if e != nil || len(encoded) > 16384 {
+			return query.ErrUnavailable
 		}
 		authority, e := queryJSON(a)
-		if e != nil {
-			return e
+		if e != nil || len(authority) > projectionAuthorityBytes(a) {
+			return query.ErrUnavailable
 		}
 		affected, e := tx.OpenProjectionNativeBatch(ctx, custodydb.OpenProjectionNativeBatchParams{ID: id(b.ID), QueryID: id(q.ID), NativeOperation: encoded, NativeAuthority: authority})
 		if e != nil || affected != 1 {
@@ -272,34 +272,82 @@ func (s *ProjectionNativeOperations) CompleteProjectionNative(ctx context.Contex
 
 func (s *ProjectionNativeOperations) ReadProjectionSource(ctx context.Context, q query.ContextQuery, a query.ContextProjectionAuthority, r query.ContextQueryRequest) (evidence.NativeContextSource, error) {
 	var out evidence.NativeContextSource
+	if q.Scope.Comparison != (query.ProfileComparisonWindow{}) {
+		return out, query.ErrUnavailable
+	}
 	e := s.queries.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, _ custodydb.ContextQueryBacking, _ custodydb.ContextQueryAllocation) error {
-		row, e := tx.ReadPublishedContext(ctx, custodydb.ReadPublishedContextParams{ArtifactID: id(q.Scope.ArtifactID), RootID: id(q.Scope.RootID)})
-		if e != nil {
-			return e
-		}
-		expected, e := currentPublishedContext(row)
-		if e != nil {
-			return e
-		}
-		attempt, e := tx.ReadAttempt(ctx, row.ContextCapture.AttemptID)
-		if e != nil {
-			return e
-		}
-		stored, e := record(ctx, tx, attempt, expected.Registration.StoreID)
-		if e != nil {
-			return e
-		}
-		if stored.State != artifact.StoredUnpublished || !stored.Registration.Equal(expected.Registration) || stored.Copies.Validate(expected.Registration) != nil || !bytes.Equal(attempt.CopiesDigest, row.ContextVerification.CopiesDigest) {
-			return query.ErrUnavailable
-		}
-		out = evidence.NativeContextSource{Expectation: expected, Copies: stored.Copies}
-		if !evidence.ProjectionSourceMatches(out, q, a) {
-			return query.ErrUnavailable
-		}
-		return nil
+		var err error
+		out, err = readProjectionSource(ctx, tx, q, a, false)
+		return err
 	})
 	if e != nil {
 		return evidence.NativeContextSource{}, e
 	}
 	return out, nil
+}
+
+// ReadProjectionComparisonSources retains both independently verified complete
+// sources in one guarded transaction. Labels remain baseline0, incident1 even
+// when SQL allocation locks use a different order or both labels name one copy.
+func (s *ProjectionNativeOperations) ReadProjectionComparisonSources(ctx context.Context, q query.ContextQuery, a query.ContextProjectionAuthority, r query.ContextQueryRequest) ([2]evidence.NativeContextSource, error) {
+	var out [2]evidence.NativeContextSource
+	if q.Scope.Comparison == (query.ProfileComparisonWindow{}) || a.Baseline == nil {
+		return out, query.ErrUnavailable
+	}
+	e := s.queries.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, _ custodydb.ContextQueryBacking, _ custodydb.ContextQueryAllocation) error {
+		for ordinal := range out {
+			source, authority := projectionQuerySource(q, a, ordinal == 0)
+			var err error
+			out[ordinal], err = readProjectionSource(ctx, tx, source, authority, true)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if e != nil {
+		return [2]evidence.NativeContextSource{}, e
+	}
+	return out, nil
+}
+
+func readProjectionSource(ctx context.Context, tx *custodydb.Queries, q query.ContextQuery, a query.ContextProjectionAuthority, comparison bool) (evidence.NativeContextSource, error) {
+	var out evidence.NativeContextSource
+	row, e := tx.ReadPublishedContext(ctx, custodydb.ReadPublishedContextParams{ArtifactID: id(q.Scope.ArtifactID), RootID: id(q.Scope.RootID)})
+	if e != nil {
+		return out, e
+	}
+	expected, e := currentPublishedContext(row)
+	if e != nil {
+		return out, e
+	}
+	// Pair control sizing relies on the existing admitted 64KiB canonical
+	// expectation contract, not the much larger unconstrained domain maximum.
+	// Re-encode the complete authenticated value; never truncate native facts.
+	if comparison && !evidence.CanonicalProjectionExpectationBound(evidence.NativeContextSource{Expectation: expected}) {
+		return out, query.ErrUnavailable
+	}
+	attempt, e := tx.ReadAttempt(ctx, row.ContextCapture.AttemptID)
+	if e != nil {
+		return out, e
+	}
+	stored, e := record(ctx, tx, attempt, expected.Registration.StoreID)
+	if e != nil {
+		return out, e
+	}
+	if stored.State != artifact.StoredUnpublished || !stored.Registration.Equal(expected.Registration) || stored.Copies.Validate(expected.Registration) != nil || !bytes.Equal(attempt.CopiesDigest, row.ContextVerification.CopiesDigest) {
+		return out, query.ErrUnavailable
+	}
+	out = evidence.NativeContextSource{Expectation: expected, Copies: stored.Copies}
+	if !evidence.ProjectionSourceMatches(out, q, a) {
+		return evidence.NativeContextSource{}, query.ErrUnavailable
+	}
+	return out, nil
+}
+
+func projectionNativeBaselineMatches(o value.NativeOperation, a query.ContextProjectionAuthority) bool {
+	if a.Scope.Comparison == (query.ProfileComparisonWindow{}) {
+		return a.Baseline == nil && o.Baseline == (value.NativeProjectionSource{})
+	}
+	return a.Baseline != nil && o.Baseline.SourceVersion == a.Scope.Comparison.Baseline.Version && o.Baseline.Path == a.Baseline.Environment.Path.AcquisitionPath() && o.Baseline.Processing.Equal(a.Baseline.Environment.Processing)
 }

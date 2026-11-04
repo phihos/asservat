@@ -64,7 +64,7 @@ func profileSummaryNative(t *testing.T) []byte {
 	return b.Bytes()
 }
 
-func prepareProfileEncryptedFixture(t *testing.T, dir string, native io.Reader, wrongWholeHash bool) profileEncryptedFixture {
+func prepareProfileEncryptedFixture(t *testing.T, dir string, native io.Reader, wrongWholeHash bool, keys ...evidence.KeySealer) profileEncryptedFixture {
 	t.Helper()
 	// Reuse the existing synthetic expectation constructor; its prepared context
 	// handle is never stored or treated as profile authority.
@@ -79,7 +79,7 @@ func prepareProfileEncryptedFixture(t *testing.T, dir string, native io.Reader, 
 	if err := e.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	copies := prepareEncryptedProjectionSource(t, dir, native, e, wrongWholeHash)
+	copies := prepareEncryptedProjectionSource(t, dir, native, e, wrongWholeHash, keys...)
 	f := profileEncryptedFixture{Source: evidence.NativeContextSource{Expectation: e, Copies: copies}, Scope: testProjectionScope()}
 	s := &f.Scope
 	s.CaseID, s.CaptureID = e.CaseID, e.CaptureUID
@@ -103,12 +103,16 @@ func prepareProfileEncryptedFixture(t *testing.T, dir string, native io.Reader, 
 
 // prepareEncryptedProjectionSource shares only synthetic frame/manifest setup;
 // each caller supplies its own exact source expectation and projection scope.
-func prepareEncryptedProjectionSource(t *testing.T, dir string, native io.Reader, e artifact.ContextExpectation, wrongWholeHash bool) artifact.Copies {
+func prepareEncryptedProjectionSource(t *testing.T, dir string, native io.Reader, e artifact.ContextExpectation, wrongWholeHash bool, keys ...evidence.KeySealer) artifact.Copies {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
 	}
-	encoder, err := framed.Prepare(t.Context(), e.Binding(), contextWriterTestKeys{})
+	var sealer evidence.KeySealer = contextWriterTestKeys{}
+	if len(keys) > 0 {
+		sealer = keys[0]
+	}
+	encoder, err := framed.Prepare(t.Context(), e.Binding(), sealer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +151,7 @@ func prepareEncryptedProjectionSource(t *testing.T, dir string, native io.Reader
 		t.Fatal(err)
 	}
 	defer clear(plain)
-	metadata, err := framed.PrepareManifest(t.Context(), e.Binding(), contextWriterTestKeys{})
+	metadata, err := framed.PrepareManifest(t.Context(), e.Binding(), sealer)
 	if err != nil {
 		t.Fatal(err)
 	}

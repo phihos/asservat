@@ -1074,28 +1074,29 @@ type ContextProcessing struct {
 }
 
 type ContextQuery struct {
-	ID             pgtype.UUID
-	RootID         pgtype.UUID
-	AllocationID   pgtype.UUID
-	AccountID      pgtype.UUID
-	PrincipalKey   []byte
-	Actor          []byte
-	Query          []byte
-	InitialRequest []byte
-	OperationID    pgtype.UUID
-	WorkerID       pgtype.UUID
-	CreatedAt      pgtype.Timestamptz
-	Deadline       pgtype.Timestamptz
-	CleanupUntil   pgtype.Timestamptz
-	RetireBy       pgtype.Timestamptz
-	IssuerEpoch    pgtype.UUID
-	PostmasterAt   pgtype.Timestamptz
-	DatabaseOid    pgtype.Uint32
-	Generation     int16
-	ActiveBatch    pgtype.UUID
-	Polls          int64
-	Controls       int64
-	Uncertain      bool
+	ID                   pgtype.UUID
+	RootID               pgtype.UUID
+	AllocationID         pgtype.UUID
+	AccountID            pgtype.UUID
+	PrincipalKey         []byte
+	Actor                []byte
+	Query                []byte
+	InitialRequest       []byte
+	OperationID          pgtype.UUID
+	WorkerID             pgtype.UUID
+	CreatedAt            pgtype.Timestamptz
+	Deadline             pgtype.Timestamptz
+	CleanupUntil         pgtype.Timestamptz
+	RetireBy             pgtype.Timestamptz
+	IssuerEpoch          pgtype.UUID
+	PostmasterAt         pgtype.Timestamptz
+	DatabaseOid          pgtype.Uint32
+	Generation           int16
+	ActiveBatch          pgtype.UUID
+	Polls                int64
+	Controls             int64
+	Uncertain            bool
+	BaselineAllocationID pgtype.UUID
 }
 
 type ContextQueryAllocation struct {
@@ -1175,10 +1176,12 @@ type ContextQueryCapacity struct {
 }
 
 type ContextQueryKeyBinding struct {
-	BatchID   pgtype.UUID
-	QueryID   pgtype.UUID
-	Binding   []byte
-	UsedRoles int16
+	BatchID       pgtype.UUID
+	QueryID       pgtype.UUID
+	Binding       []byte
+	UsedRoles     int16
+	ChildID       pgtype.UUID
+	SourceOrdinal pgtype.Int2
 }
 
 type ContextQueryPrincipal struct {
@@ -1561,24 +1564,25 @@ type DownloadWindow struct {
 }
 
 type DownloadWorker struct {
-	ID                pgtype.UUID
-	SessionID         pgtype.UUID
-	RootID            pgtype.UUID
-	InstallationID    pgtype.UUID
-	AllocationID      pgtype.UUID
-	PrincipalKey      []byte
-	Generation        int64
-	IntentJson        []byte
-	RunUntil          pgtype.Timestamptz
-	AuditReceiptJson  []byte
-	ClaimedAt         pgtype.Timestamptz
-	JobJson           []byte
-	BindingJson       []byte
-	TerminationJson   []byte
-	RetiredProofJson  []byte
-	QueryID           pgtype.UUID
-	QueryAllocationID pgtype.UUID
-	AbandonedAt       pgtype.Timestamptz
+	ID                        pgtype.UUID
+	SessionID                 pgtype.UUID
+	RootID                    pgtype.UUID
+	InstallationID            pgtype.UUID
+	AllocationID              pgtype.UUID
+	PrincipalKey              []byte
+	Generation                int64
+	IntentJson                []byte
+	RunUntil                  pgtype.Timestamptz
+	AuditReceiptJson          []byte
+	ClaimedAt                 pgtype.Timestamptz
+	JobJson                   []byte
+	BindingJson               []byte
+	TerminationJson           []byte
+	RetiredProofJson          []byte
+	QueryID                   pgtype.UUID
+	QueryAllocationID         pgtype.UUID
+	AbandonedAt               pgtype.Timestamptz
+	BaselineQueryAllocationID pgtype.UUID
 }
 
 type DownloadWorkerCertificate struct {

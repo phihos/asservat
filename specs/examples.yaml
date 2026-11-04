@@ -414,3 +414,8 @@ examples:
 - file: examples/mcp-context-query-pending.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: get_query_result
+- file: examples/mcp-profile-comparison-input.json
+  input_tool: compare_profiles
+- file: examples/mcp-profile-comparison-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: compare_profiles

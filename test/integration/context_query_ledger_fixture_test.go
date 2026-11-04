@@ -126,12 +126,16 @@ func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin
 
 func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects, qualify func(*testing.T, *queryLedgerFixture), profileSource ...bool) {
 	isProfile := len(profileSource) > 0 && profileSource[0]
+	isComparison := len(profileSource) > 1 && profileSource[1]
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 		queryLedgerQualification(t, f)
 		if isProfile {
 			q := f.qualification.ContextQuery
 			q.Profile.Worker.MemoryBytes, q.Profile.Worker.WorkerTransientBytes = value.ProfileSummaryWorkerBytes, value.ProfileSummaryWorkerBytes
 			q.RootQueries, q.PrincipalQueries, q.WorkloadQueries = 20, 20, 20
+			if isComparison {
+				comparisonLedgerQualification(q)
+			}
 			var err error
 			q.Envelope, err = q.Required()
 			if err != nil || !f.qualification.Valid() {
@@ -187,6 +191,9 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	profile := syntheticWorkerProfile(f.input.InstallationID)
 	if isProfile {
 		profile.MemoryBytes = value.ProfileSummaryWorkerBytes
+		if isComparison {
+			profile.MemoryBytes = value.ProfileComparisonWorkerBytes
+		}
 	}
 	profile.ClusterID = scope.ClusterID
 	profile.Configuration = f.qualification.ContextQuery.Profile.Source

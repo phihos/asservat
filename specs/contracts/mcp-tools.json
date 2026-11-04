@@ -1932,7 +1932,7 @@
                         ]
                       },
                       "comparable": {
-                        "type": "boolean"
+                        "const": true
                       },
                       "rows": {
                         "type": "array",
@@ -1953,13 +1953,19 @@
                               ]
                             },
                             "baseline": {
-                              "type": "number"
+                              "type": "number",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
                             },
                             "incident": {
-                              "type": "number"
+                              "type": "number",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
                             },
                             "delta": {
-                              "type": "number"
+                              "type": "number",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
                             }
                           },
                           "required": [
@@ -1979,6 +1985,425 @@
                           "maxLength": 512
                         },
                         "maxItems": 16
+                      },
+                      "aggregation": {
+                        "const": "cumulative"
+                      },
+                      "case_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "artifact_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "baseline_case_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "baseline_artifact_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "source_version": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "baseline_source_version": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "baseline": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "profile_type": {
+                            "enum": [
+                              "cpu",
+                              "heap",
+                              "allocs",
+                              "goroutine",
+                              "block",
+                              "mutex",
+                              "threadcreate"
+                            ]
+                          },
+                          "mode": {
+                            "enum": [
+                              "snapshot",
+                              "cumulative",
+                              "delta",
+                              "interval"
+                            ]
+                          },
+                          "force_gc": {
+                            "type": "boolean"
+                          },
+                          "duration_seconds": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "exclusiveMinimum": 0,
+                                "maximum": 86400
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "total": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "period": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "unit": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "value": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "unit",
+                                  "value"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "symbol_status": {
+                            "enum": [
+                              "complete",
+                              "partial",
+                              "missing"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "profile_type",
+                          "mode",
+                          "force_gc",
+                          "duration_seconds",
+                          "total",
+                          "period",
+                          "symbol_status"
+                        ],
+                        "allOf": [
+                          {
+                            "if": {
+                              "properties": {
+                                "profile_type": {
+                                  "enum": [
+                                    "cpu"
+                                  ]
+                                }
+                              }
+                            },
+                            "then": {
+                              "properties": {
+                                "mode": {
+                                  "enum": [
+                                    "interval"
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "if": {
+                              "properties": {
+                                "profile_type": {
+                                  "enum": [
+                                    "heap",
+                                    "goroutine"
+                                  ]
+                                }
+                              }
+                            },
+                            "then": {
+                              "properties": {
+                                "mode": {
+                                  "enum": [
+                                    "snapshot",
+                                    "delta"
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "if": {
+                              "properties": {
+                                "profile_type": {
+                                  "enum": [
+                                    "allocs",
+                                    "block",
+                                    "mutex",
+                                    "threadcreate"
+                                  ]
+                                }
+                              }
+                            },
+                            "then": {
+                              "properties": {
+                                "mode": {
+                                  "enum": [
+                                    "cumulative",
+                                    "delta"
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "if": {
+                              "properties": {
+                                "force_gc": {
+                                  "const": true
+                                }
+                              }
+                            },
+                            "then": {
+                              "properties": {
+                                "profile_type": {
+                                  "const": "heap"
+                                },
+                                "mode": {
+                                  "const": "snapshot"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "incident": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "profile_type": {
+                            "enum": [
+                              "cpu",
+                              "heap",
+                              "allocs",
+                              "goroutine",
+                              "block",
+                              "mutex",
+                              "threadcreate"
+                            ]
+                          },
+                          "mode": {
+                            "enum": [
+                              "snapshot",
+                              "cumulative",
+                              "delta",
+                              "interval"
+                            ]
+                          },
+                          "force_gc": {
+                            "type": "boolean"
+                          },
+                          "duration_seconds": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "exclusiveMinimum": 0,
+                                "maximum": 86400
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "total": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "period": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "unit": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "value": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "unit",
+                                  "value"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "symbol_status": {
+                            "enum": [
+                              "complete",
+                              "partial",
+                              "missing"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "profile_type",
+                          "mode",
+                          "force_gc",
+                          "duration_seconds",
+                          "total",
+                          "period",
+                          "symbol_status"
+                        ],
+                        "allOf": [
+                          {
+                            "if": {
+                              "properties": {
+                                "profile_type": {
+                                  "enum": [
+                                    "cpu"
+                                  ]
+                                }
+                              }
+                            },
+                            "then": {
+                              "properties": {
+                                "mode": {
+                                  "enum": [
+                                    "interval"
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "if": {
+                              "properties": {
+                                "profile_type": {
+                                  "enum": [
+                                    "heap",
+                                    "goroutine"
+                                  ]
+                                }
+                              }
+                            },
+                            "then": {
+                              "properties": {
+                                "mode": {
+                                  "enum": [
+                                    "snapshot",
+                                    "delta"
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "if": {
+                              "properties": {
+                                "profile_type": {
+                                  "enum": [
+                                    "allocs",
+                                    "block",
+                                    "mutex",
+                                    "threadcreate"
+                                  ]
+                                }
+                              }
+                            },
+                            "then": {
+                              "properties": {
+                                "mode": {
+                                  "enum": [
+                                    "cumulative",
+                                    "delta"
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "if": {
+                              "properties": {
+                                "force_gc": {
+                                  "const": true
+                                }
+                              }
+                            },
+                            "then": {
+                              "properties": {
+                                "profile_type": {
+                                  "const": "heap"
+                                },
+                                "mode": {
+                                  "const": "snapshot"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "build_status": {
+                        "enum": [
+                          "same",
+                          "different",
+                          "unknown"
+                        ]
+                      },
+                      "sampling_status": {
+                        "enum": [
+                          "same",
+                          "different",
+                          "unknown"
+                        ]
+                      },
+                      "acquisition_status": {
+                        "enum": [
+                          "same",
+                          "different"
+                        ]
+                      },
+                      "query_observed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                      },
+                      "query_expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
@@ -1987,8 +2412,75 @@
                       "normalization",
                       "comparable",
                       "rows",
-                      "limitations"
+                      "limitations",
+                      "aggregation",
+                      "case_id",
+                      "artifact_id",
+                      "baseline_case_id",
+                      "baseline_artifact_id",
+                      "source_version",
+                      "baseline_source_version",
+                      "baseline",
+                      "incident",
+                      "build_status",
+                      "sampling_status",
+                      "acquisition_status",
+                      "query_observed_at",
+                      "query_expires_at"
+                    ],
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "normalization": {
+                              "const": "perSecond"
+                            }
+                          }
+                        },
+                        "then": {
+                          "properties": {
+                            "baseline": {
+                              "properties": {
+                                "mode": {
+                                  "enum": [
+                                    "interval",
+                                    "delta"
+                                  ]
+                                },
+                                "duration_seconds": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 86400
+                                }
+                              }
+                            },
+                            "incident": {
+                              "properties": {
+                                "mode": {
+                                  "enum": [
+                                    "interval",
+                                    "delta"
+                                  ]
+                                },
+                                "duration_seconds": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 86400
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
                     ]
+                  },
+                  "data_class": {
+                    "const": "extract"
+                  },
+                  "provenance": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 2
                   }
                 },
                 "required": [
@@ -2015,12 +2507,27 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 60
+                      },
+                      "query_observed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                      },
+                      "query_expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "retry_after_seconds",
+                      "query_observed_at",
+                      "query_expires_at"
                     ]
+                  },
+                  "data_class": {
+                    "const": "metadata"
                   }
                 },
                 "required": [
@@ -2075,6 +2582,9 @@
                       "message",
                       "retryable"
                     ]
+                  },
+                  "data_class": {
+                    "const": "metadata"
                   }
                 },
                 "required": [
@@ -9186,7 +9696,7 @@
     },
     {
       "name": "preview_capture",
-      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human\u2019s selected result inspection/download; never an issued grant.",
+      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human’s selected result inspection/download; never an issued grant.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -12545,7 +13055,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 512,
-            "description": "Optional 1\u2013512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
+            "description": "Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
           },
           "sharing": {
             "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
@@ -13704,7 +14214,7 @@
     },
     {
       "name": "cancel_artifact_download",
-      "description": "Stop this caller and client\u2019s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
+      "description": "Stop this caller and client’s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,

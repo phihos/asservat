@@ -10,19 +10,21 @@ SELECT * FROM download_worker WHERE id=$1 AND root_id=$2 FOR UPDATE;
 SELECT count(*)::bigint AS total,
  count(*) FILTER (WHERE coalesce(d.cluster_id,q.cluster_id)=sqlc.arg(cluster_id)
    AND coalesce(d.namespace_uid,q.namespace_uid)=sqlc.arg(namespace_uid)
-   AND coalesce(d.workload_uid,q.workload_uid)=sqlc.arg(workload_uid))::bigint AS workload,
+   AND coalesce(d.workload_uid,q.workload_uid)=sqlc.arg(workload_uid)
+   OR b.cluster_id=sqlc.arg(cluster_id) AND b.namespace_uid=sqlc.arg(namespace_uid) AND b.workload_uid=sqlc.arg(workload_uid))::bigint AS workload,
  count(*) FILTER (WHERE w.principal_key=sqlc.arg(principal_key))::bigint AS principal
 FROM download_worker w
 LEFT JOIN download_allocation d ON d.id=w.allocation_id
 LEFT JOIN context_query_allocation q ON q.id=w.query_allocation_id
+LEFT JOIN context_query_allocation b ON b.id=w.baseline_query_allocation_id
 WHERE w.installation_id=sqlc.arg(installation_id) AND w.retired_proof_json IS NULL AND w.abandoned_at IS NULL;
 
 -- name: ReadQueryAcquisitionWorker :one
 SELECT * FROM download_worker WHERE query_id=$1 AND root_id=$2;
 
 -- name: InsertQueryAcquisitionWorker :exec
-INSERT INTO download_worker(id,query_id,root_id,installation_id,query_allocation_id,principal_key,generation,intent_json,run_until)
-VALUES($1,$2,$3,$4,$5,$6,1,$7,$8);
+INSERT INTO download_worker(id,query_id,root_id,installation_id,query_allocation_id,principal_key,generation,intent_json,run_until,baseline_query_allocation_id)
+VALUES($1,$2,$3,$4,$5,$6,1,$7,$8,$9);
 
 -- name: InsertDownloadWorker :exec
 INSERT INTO download_worker(id,session_id,root_id,installation_id,allocation_id,principal_key,generation,intent_json,run_until)

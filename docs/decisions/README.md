@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-295 — Two-source approved profile comparison](295-two-source-profile-comparison.md)
+selects one regional worker, two independently authorized source identities and
+atomic paired accounting/key children. Components and design are prepared; public
+composition and native qualification remain pending.
+
 [ADR-294 — Fixed saved-syscall projections](294-saved-syscall-projections.md)
 selects two version/filter-bound extracts using the existing regional worker.
 Source authority, public composition and the two owned metadata/argument saved-view

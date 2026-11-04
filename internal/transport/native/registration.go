@@ -3,6 +3,7 @@ package native
 import (
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
@@ -35,6 +36,7 @@ func (r *HubRouter) RegisterNativeExchange(ctx context.Context, input evidence.N
 	}
 	operation := input.Operation
 	var projection json.RawMessage
+	var baselinePayload json.RawMessage
 	if operation.Kind == value.NativeProjection {
 		if input.Projection == nil || !input.Projection.Valid() || input.Projection.Version != operation.SourceVersion {
 			return nil, artifact.ErrInvalid
@@ -43,7 +45,20 @@ func (r *HubRouter) RegisterNativeExchange(ctx context.Context, input evidence.N
 		if e != nil {
 			return nil, e
 		}
+		if input.Projection.Comparison != (query.ProfileComparisonWindow{}) {
+			if input.BaselineSource == nil || !evidence.NativeComparisonSourcesMatch([2]evidence.NativeContextSource{*input.BaselineSource, source}, *input.Projection, operation) {
+				return nil, artifact.ErrInvalid
+			}
+			baselinePayload, e = json.Marshal(input.BaselineSource)
+			if e != nil {
+				return nil, e
+			}
+		} else if input.BaselineSource != nil || operation.Baseline != (value.NativeProjectionSource{}) {
+			return nil, artifact.ErrInvalid
+		}
 	} else if input.Projection != nil {
+		return nil, artifact.ErrInvalid
+	} else if input.BaselineSource != nil || operation.Baseline != (value.NativeProjectionSource{}) {
 		return nil, artifact.ErrInvalid
 	}
 	delivery := input.Delivery
@@ -73,7 +88,7 @@ func (r *HubRouter) RegisterNativeExchange(ctx context.Context, input evidence.N
 		if operation.Kind == value.NativeObserve {
 			payload = []byte("null")
 		}
-		command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: nativeReference(operation), Kind: string(operation.Kind), Projection: projection, Source: payload, Operation: wire, ParentID: operation.ParentID, Generation: operation.Generation, LeaseSequence: lease.Sequence, Until: lease.Until.UTC().Format(time.RFC3339Nano)}
+		command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: nativeReference(operation), Kind: string(operation.Kind), Projection: projection, Source: payload, BaselineSource: baselinePayload, Operation: wire, ParentID: operation.ParentID, Generation: operation.Generation, LeaseSequence: lease.Sequence, Until: lease.Until.UTC().Format(time.RFC3339Nano)}
 		if operation.Kind == value.NativeResponse {
 			command.Until = operation.Until.UTC().Format(time.RFC3339Nano)
 			command.WindowID = delivery.WindowID

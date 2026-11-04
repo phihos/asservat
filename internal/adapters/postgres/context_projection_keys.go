@@ -62,6 +62,9 @@ func (s *ProjectionNativeOperations) BindProjectionNativeKeys(ctx context.Contex
 			return e
 		}
 		end := identity.Earlier(b.Until, identity.Earlier(a.ValidUntil, identity.Earlier(o.Until, proof.ValidUntil)))
+		if q.Scope.Comparison != (query.ProfileComparisonWindow{}) {
+			return insertProjectionComparisonKeyChildren(ctx, tx, q, b, a, scope, proof, now.Time, end)
+		}
 		binding := query.ContextProjectionKeyBinding{Purpose: query.ContextProjectionPurpose, ClaimID: b.ID, Batch: b, SourceVersion: q.Scope.Version, Scope: scope, Worker: proof, Authority: a, CreatedAt: now.Time, Until: end}
 		if !binding.Valid(q, now.Time) {
 			return auth.ErrKeyDenied
@@ -99,6 +102,9 @@ func (s *ProjectionKeys) Resolve(ctx context.Context, peer value.KeyPeer, r valu
 	call, stop := context.WithTimeout(ctx, 5*time.Second)
 	defer stop()
 	row, e := custodydb.New(s.queries.ledger.pool).ReadProjectionKeyBinding(call, id(r.AuthorityID))
+	if errors.Is(e, pgx.ErrNoRows) {
+		return s.resolveComparisonKeyChild(call, peer, r)
+	}
 	if e != nil {
 		return out, auth.ErrKeyDenied
 	}

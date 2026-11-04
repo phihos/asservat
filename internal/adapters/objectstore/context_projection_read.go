@@ -25,6 +25,7 @@ type ContextProjectionReader struct {
 	pages     evidence.HTTPHeaderPager
 	summarize evidence.ProfileSummarizer
 	syscalls  evidence.SyscallProjector
+	compare   evidence.ProfileComparer
 }
 
 func NewContextProjectionReader(store *CustodyStore) (*ContextProjectionReader, error) {
@@ -188,7 +189,7 @@ func (r *ContextProjectionReader) ServeProfileSummaries(f evidence.ProfileSummar
 
 func (r *ContextProjectionReader) readProfileSummary(ctx context.Context, source evidence.NativeContextSource, scope value.ContextProjectionScope, keys evidence.KeyOpener, until time.Time) (value.ProjectionResult, error) {
 	var zero value.ProjectionResult
-	if r.store == nil || r.summarize == nil || ctx == nil || ctx.Err() != nil || keys == nil || !scope.Valid() || !source.Valid(scope.Version) {
+	if r.store == nil || r.summarize == nil || ctx == nil || ctx.Err() != nil || keys == nil || !scope.Valid() || scope.Comparison != (value.ProfileComparisonWindow{}) || !source.Valid(scope.Version) {
 		return zero, value.ErrUnavailable
 	}
 	deadline, ok := ctx.Deadline()

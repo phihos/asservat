@@ -1,0 +1,11 @@
+{
+  "base": "18395236b65dcb562fcf27d6e4fc40ce629f6a9c",
+  "goExit": 1,
+  "goSeconds": 10.495,
+  "sourceUnchangedDuringTest": true,
+  "sourceFilesMatched": 4016,
+  "mismatches": [],
+  "cleanupFailures": [],
+  "expectedFailure": "production NativeKeyAuthority rejected ordinal0 manifest-key child UUID before ProjectionKeys delegation",
+  "secondaryFixtureFailure": "narrow-role cleanup outlived administrator pool; both lifecycle entrypoints now use bounded nested subtests"
+}

@@ -4,6 +4,8 @@ export declare function validInput_get_file_excerpt(value: unknown): value is co
 export declare function validOutput_get_file_excerpt(value: unknown): value is components['schemas']['McpOutput_get_file_excerpt'];
 export declare function validInput_get_profile_summary(value: unknown): value is components['schemas']['McpInput_get_profile_summary'];
 export declare function validOutput_get_profile_summary(value: unknown): value is components['schemas']['McpOutput_get_profile_summary'];
+export declare function validInput_compare_profiles(value: unknown): value is components['schemas']['McpInput_compare_profiles'];
+export declare function validOutput_compare_profiles(value: unknown): value is components['schemas']['McpOutput_compare_profiles'];
 export declare function validInput_get_syscall_summary(value: unknown): value is components['schemas']['McpInput_get_syscall_summary'];
 export declare function validOutput_get_syscall_summary(value: unknown): value is components['schemas']['McpOutput_get_syscall_summary'];
 export declare function validInput_get_syscall_events(value: unknown): value is components['schemas']['McpInput_get_syscall_events'];

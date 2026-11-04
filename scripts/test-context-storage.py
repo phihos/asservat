@@ -97,7 +97,7 @@ def source_hashes():
     files = [ROOT/"go.mod", ROOT/"go.sum", Path(__file__), ROOT/"scripts/fetch-gadget.sh", ROOT/"scripts/ci-native.sh", ROOT/".github/workflows/native.yml"]
     files += [ROOT/"scripts/package-argument-gadget.py"]
     files += [ROOT/"experiments/syscall-argument-budget"/name for name in ("prepare.py", "pins.json", "program.patch", "budget.h")]
-    files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs"]
+    files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs", ROOT/"web/scripts/installed-profile-comparison-browser.mjs", ROOT/"web/src/generated/validate-evidence.js"]
     files += list((ROOT/"cmd").rglob("*.go")) + list((ROOT/"internal").rglob("*.go")) + list((ROOT/"test/integration").rglob("*.go"))
     files += [ROOT/"scripts/helm_registry.py", ROOT/"scripts/native_kube_audit.py"] + list((ROOT/"charts/asservat").rglob("*"))
     files = [p for p in files if p.is_file()]
@@ -380,7 +380,7 @@ def qualify_direct_helper_issuer(env, report):
 
 def qualification_cluster_count(default_count, installer_continuation=False):
     """Owned topology: one hub plus one workload cluster for these focuses."""
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "policy-arguments", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
         return 2
     return default_count
 
@@ -388,7 +388,7 @@ def qualification_cluster_count(default_count, installer_continuation=False):
 def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False, native_traffic_probe=False):
     if native_traffic_probe:
         return "2m"
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "policy-arguments", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed"):
         return "18m"
     if installer_continuation:
         # The installed journey waits for its capture's ten-minute expiry; the
@@ -401,7 +401,7 @@ def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False,
 
 def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False):
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
-    collector_qualification = installer_continuation and focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "native-paced", "policy-recording", "policy-arguments", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed")
+    collector_qualification = installer_continuation and focus in ("approved-recording", "manual-syscall", "manual-arguments", "manual-mixed", "manual-raw", "manual-http", "manual-peers", "manual-profile", "profile-comparison", "native-paced", "policy-recording", "policy-arguments", "ongoing-save", "ongoing-save-disk", "ongoing-incident", "ongoing-syscall", "ongoing-mixed")
     native_paced = installer_continuation and focus == "native-paced"
     native_traffic_probe = test_pattern == NATIVE_TRAFFIC_PROBE
     guard = Path("/etc/asservat-disposable-host")
@@ -463,6 +463,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 report["buildScratch"] = str(build_scratch)
             report["goVersion"] = run(["go", "version"])
             report["installedHistoryBrowserQualification"] = collector_qualification and focus == "approved-recording"
+            report["installedProfileComparisonBrowserQualification"] = collector_qualification and focus == "profile-comparison"
             report["installedPolicyRecordingFocus"] = collector_qualification and focus == "policy-recording"
             report["installedPolicyArgumentsFocus"] = collector_qualification and focus == "policy-arguments"
             report["sourceHashes"] = source_hashes()
@@ -485,7 +486,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             subprocess.run(["make", "--no-print-directory", "hub-binary", "HUB_BINARY="+str(image_dir/"asservat"), "ASSERVAT_BUILD_TMP="+build_env["TMPDIR"]], cwd=ROOT, env=build_env, check=True)
             subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"provider-proxy"), "./test/fixtures/provider-proxy/main.go"], cwd=ROOT, env=build_env, check=True)
             helper_copy = ""
-            if focus == "manual-profile":
+            if focus in ("manual-profile", "profile-comparison"):
                 subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"profile-native"), "./test/fixtures/profile-native/main.go"], cwd=ROOT, env=build_env, check=True)
                 helper_copy += "COPY profile-native /profile-native\n"
                 report["profileWorkloadSHA256"] = hashlib.sha256((image_dir/"profile-native").read_bytes()).hexdigest()

@@ -27,6 +27,13 @@ type ContextQueryPlans interface {
 	ContextQueryPlan(context.Context, value.ContextProjectionAuthority) (value.ContextQueryPlan, error)
 }
 
+// ContextComparisonPlans is an optional fixed-pair facet. Index zero is the
+// baseline and index one the incident; absence leaves comparisons unavailable.
+// Both snapshots must be read with one proposed principal account identity.
+type ContextComparisonPlans interface {
+	ContextComparisonPlans(context.Context, value.ContextProjectionAuthority) ([2]value.ContextQueryPlan, error)
+}
+
 // ContextQueryInvocation is the original process-owned C-20 invocation, created
 // only after C-08 acknowledges its intent. It does not implement another audit
 // journal/writer. CheckOutcome recognizes only the exact immutable delivery
@@ -42,11 +49,12 @@ type ContextQueryInvocation interface {
 // C-20 owner compares it with its normalized input before any effect; C-18
 // neither computes another MAC nor accepts an unrelated acknowledged intent.
 type ContextQueryInput struct {
-	Selection value.ContextExcerptSelection
-	Headers   value.HTTPHeaderSelection
-	Profile   value.ProfileSummaryRequest
-	Syscalls  value.SyscallQueryRequest
-	QueryID   string
+	Selection  value.ContextExcerptSelection
+	Headers    value.HTTPHeaderSelection
+	Profile    value.ProfileSummaryRequest
+	Comparison value.ProfileComparisonRequest
+	Syscalls   value.SyscallQueryRequest
+	QueryID    string
 }
 
 type ContextQueryAdmission struct {

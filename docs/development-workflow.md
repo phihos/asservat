@@ -10,14 +10,19 @@ The integrator owns the candidate and the next observable user outcome. Assign
 short tasks against that exact base: implementation with file ownership,
 integration review, or a reproduction. Agents report the commit, actual test
 exit and remaining gap. They do not independently run broad gates or dispatch
-hosted suites. Integrate completed changes promptly instead of building long
+hosted suites. Freeze sources only after every writer has completed or explicitly
+acknowledged the freeze; an interim passing test report does not end editing. Integrate completed changes promptly instead of building long
 chains of dependent branches.
 
-Before the installed test, follow the feature through installer output, public
+Before the first full CI push, finish the independent producer/consumer
+review, including private and public result envelopes and charged refusal
+ownership. Before the installed test, follow the feature through installer output, public
 request, approval/admission, dispatch, storage credentials, publication, native
 download, projection and cancellation. Check producer output against the real
 consumer, including evidence types, data classes, client policies and resource
-limits. Use a small composed regression for each discovered mismatch; do not
+limits. Service fixtures must exercise the compiled process SQL grants;
+administrator or ad hoc fixture roles can hide missing column and row-lock
+permissions. Protected installation-root fixtures each need a fresh database. Use a small composed regression for each discovered mismatch; do not
 build another test framework or duplicate the production workflow with mocks.
 
 ## Verification tiers
@@ -32,10 +37,16 @@ build another test framework or duplicate the production workflow with mocks.
    producer/publication and funded summary ledger against owned SQL/S3 fixtures.
    Run the full Go gate once per final candidate, locally or in exact-commit CI;
    do not repeat unchanged package evidence merely because another agent also
-   worked on the feature. Required checks and their assertions remain intact.
+   worked on the feature. For browser flows or installed-driver changes, run
+   `make console-browser-check`: reuse the exact driver against compiled React,
+   real metadata HTTP decoding and controlled local service facts before the
+   costly installed run. Component tests that inject a controller do not cover
+   that boundary. Required checks and their assertions remain intact.
 3. Before costly installed dispatch, inspect the automated review and resolve
-   concrete findings. For migration changes, run the initial-schema bundle/history
-   checks as well as the affected SQL fixture; ordinary migration success does not
+   concrete findings. For migration changes, compile the DDL and exercise empty upgrade/rollback
+   in owned PostgreSQL early. sqlc generation does not compile deferred PL/pgSQL
+   expressions; include representative expression execution. Run the existing
+   upgrade fixture and the initial-schema bundle/history checks as well as the affected SQL fixture; ordinary migration success does not
    prove the installation path accepts the release. With sources frozen, run the
    selected installed workflow in a fresh owned environment. Record the exact commit, real exit, source inventory and cleanup.
    A failure returns to a focused reproduction and boundary review before another

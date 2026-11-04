@@ -563,7 +563,24 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					}
 					measurement = &nativePacingMeasurement{admin: admin, root: p.RootID, providers: providers, traffic: f.NativeTrafficHelper}
 				}
-				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID))
+				if installedJourneyFocus() == "profile-comparison" {
+					defer func() {
+						if t.Failed() {
+							diagnose()
+						}
+					}()
+					var sources []installedProfileComparisonSource
+					for index := 0; index < 2; index++ {
+						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {
+							sources = append(sources, source)
+							if len(sources) == 2 {
+								qualifyInstalledProfileComparison(t, ctx, identity, transport, publicRoot, publicAddress, origin, [2]installedProfileComparisonSource{sources[0], sources[1]}, installedProfileComparisonSQLCheck(t, ctx, admin, api, p.RootID))
+							}
+						}})
+					}
+				} else {
+					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID))
+				}
 			})
 			return
 		}
@@ -973,6 +990,9 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	if installedJourneyFocus() == "manual-profile" {
 		records = 10
 	}
+	if installedJourneyFocus() == "profile-comparison" {
+		records = installedProfileComparisonQueries * query.ProfileComparisonQueryUnits
+	}
 	// The saved-syscall journey performs five distinct paid queries, including
 	// the changed-filter cursor refusal. Retiring a worker never refunds a
 	// query unit; fund exactly five two-unit source reads in these two foci.
@@ -1000,8 +1020,9 @@ func installNativeCapacityObjects(t *testing.T, ctx context.Context, api kuberne
 		return map[string]int64{"bytes": bytes, "objects": objects}
 	}
 	upload := map[string]int64{"bytesPerSecond": 134217728, "burstBytes": 16777216}
+	systemObjects, burstObjects := installedCapacityObjectPartitions()
 	pool := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceStoragePool", "metadata": map[string]any{"name": "capacity"}, "spec": map[string]any{
-		"storageProfileRef": "dedicated", "capacity": amount(137438953472, 100000), "safetyHeadroom": amount(17179869184, 10000), "systemReserve": amount(8589934592, 10000), "sharedBurst": amount(42949672960, 40000),
+		"storageProfileRef": "dedicated", "capacity": amount(137438953472, 100000), "safetyHeadroom": amount(17179869184, 10000), "systemReserve": amount(8589934592, systemObjects), "sharedBurst": amount(42949672960, burstObjects),
 		"protectedAllocations": []any{map[string]any{"budgetPolicyRef": "applications", "workloadSlots": 4, "protectedPerWorkload": amount(17179869184, 10000)}},
 		"upload":               upload, "maxUploadRequestsPerSecond": 100, "capacityAssurance": "qualifiedReservedBackend"}}
 	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": "applications"}, "spec": map[string]any{

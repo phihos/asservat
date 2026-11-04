@@ -1,0 +1,14 @@
+{
+  "head": "ddddfd90a2ad0bcdefcb1d077b83bbf6b8046838",
+  "testExit": 1,
+  "goElapsedSeconds": 699.891,
+  "sourceFilesMatchedToFrozenHead": 4064,
+  "localLaterChanges": [
+    "internal/adapters/diagnostics/profile_comparison_test.go"
+  ],
+  "mismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "failure": "capacity root never ReadyAt after five minutes; before profile capture/comparison"
+}

@@ -8,7 +8,7 @@ import (
 )
 
 func queryOperation(name string) bool {
-	return name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || syscallQueryOperation(name) || name == "get_query_result"
+	return name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || name == "compare_profiles" || syscallQueryOperation(name) || name == "get_query_result"
 }
 
 func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
@@ -29,6 +29,21 @@ func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
 			Names                                            []string
 			ErrorsOnly                                       bool
 		}{name, view.DisplayVersion(), in.CaseID, in.ArtifactID, in.Cursor, in.Limit, in.Names, in.ErrorsOnly})
+	}
+
+	if name == "compare_profiles" {
+		var in ProfileComparisonOperationInput
+		if err := json.Unmarshal(raw, &in); err != nil {
+			return nil, err
+		}
+		selection, err := analysis.NormalizeProfileComparisonSelection(in.SampleType, in.Normalization, in.TopN)
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(struct {
+			Tool, DisplayVersion, CaseID, ArtifactID, BaselineCaseID, BaselineArtifactID, SampleType, Normalization string
+			TopN                                                                                                    int
+		}{name, analysis.ProfileComparisonDisplayVersion, in.CaseID, in.ArtifactID, in.BaselineCaseID, in.BaselineArtifactID, selection.SampleType, selection.Normalization, selection.TopN})
 	}
 
 	if name == "get_profile_summary" {
@@ -97,4 +112,15 @@ type ProfileSummaryOperationInput struct {
 	ArtifactID string `json:"artifact_id"`
 	SampleType string `json:"sample_type"`
 	TopN       int    `json:"top_n"`
+}
+
+// ProfileComparisonOperationInput fixes both roles in the audited selection.
+type ProfileComparisonOperationInput struct {
+	CaseID             string `json:"case_id"`
+	ArtifactID         string `json:"artifact_id"`
+	BaselineCaseID     string `json:"baseline_case_id"`
+	BaselineArtifactID string `json:"baseline_artifact_id"`
+	SampleType         string `json:"sample_type"`
+	Normalization      string `json:"normalization"`
+	TopN               int    `json:"top_n"`
 }

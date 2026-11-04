@@ -99,13 +99,24 @@ func newHubOperationChecked(gate *evidence.NativeFrameGate, checked *checkedNati
 	// replace a source after reviewing/admitting the operation.
 	c.Operation = append(json.RawMessage(nil), c.Operation...)
 	c.Source = append(json.RawMessage(nil), c.Source...)
+	c.BaselineSource = append(json.RawMessage(nil), c.BaselineSource...)
 	c.Projection = append(json.RawMessage(nil), c.Projection...)
 	var projectionScope query.ContextProjectionScope
 	if o.Kind == value.NativeProjection {
 		if nativeDecode(c.Projection, &projectionScope) != nil || !projectionScope.Valid() || projectionScope.Version != o.SourceVersion {
 			return nil, artifact.ErrInvalid
 		}
+		if projectionScope.Comparison != (query.ProfileComparisonWindow{}) {
+			var baseline evidence.NativeContextSource
+			if nativeDecodeBounded(c.BaselineSource, &baseline, contracts.NativeCommandBytes) != nil || !evidence.NativeComparisonSourcesMatch([2]evidence.NativeContextSource{baseline, expected}, projectionScope, o) {
+				return nil, artifact.ErrInvalid
+			}
+		} else if len(c.BaselineSource) != 0 || o.Baseline != (value.NativeProjectionSource{}) {
+			return nil, artifact.ErrInvalid
+		}
 	} else if len(c.Projection) != 0 {
+		return nil, artifact.ErrInvalid
+	} else if len(c.BaselineSource) != 0 || o.Baseline != (value.NativeProjectionSource{}) {
 		return nil, artifact.ErrInvalid
 	}
 	encoded, e := json.Marshal(expected)
@@ -413,6 +424,7 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 		select {
 		case o.projection <- p:
 		case <-work.Done():
+			p.Clear()
 			return work.Err()
 		}
 	} else {

@@ -22,6 +22,7 @@ type NativeContextReader struct {
 	pages     evidence.HTTPHeaderPager
 	summarize evidence.ProfileSummarizer
 	syscalls  evidence.SyscallProjector
+	compare   evidence.ProfileComparer
 }
 
 var _ evidence.NativeContextRead = (*NativeContextReader)(nil)

@@ -28,11 +28,12 @@ type NativeProjectionExchange interface {
 }
 
 type NativeExchangeRegistration struct {
-	Operation  value.NativeOperation
-	Projection *query.ContextProjectionScope
-	Source     NativeContextSource
-	Delivery   artifact.DownloadDeliveryLease
-	Complete   NativeCompletion
+	Operation      value.NativeOperation
+	Projection     *query.ContextProjectionScope
+	Source         NativeContextSource
+	BaselineSource *NativeContextSource
+	Delivery       artifact.DownloadDeliveryLease
+	Complete       NativeCompletion
 }
 
 // The local registrar retains callbacks in the original hub process only.

@@ -38,6 +38,8 @@ const HTTPHeadersDisplayVersion = "approved-http-headers-page/v1"
 
 const ProfileSummaryDisplayVersion = "approved-pprof-summary/v1"
 
+const ProfileComparisonDisplayVersion = "approved-pprof-comparison/v1"
+
 // ProjectionSource is one of the closed published sources: pod-status
 // metadata, an httpHeaders extract, or raw pprof input for the distinct
 // approved summary operation (ADR-291). Every field must match exactly; no other native type,
@@ -70,6 +72,11 @@ func LookupProjectionSource(nativeType string) (ProjectionSource, bool) {
 // LookupProjectionSourceFor binds a closed display purpose as well as its
 // native input. A syscall source supports two distinct approved views.
 func LookupProjectionSourceFor(nativeType, displayVersion string) (ProjectionSource, bool) {
+	if nativeType == artifact.PprofArtifact && displayVersion == ProfileComparisonDisplayVersion {
+		known, _ := LookupProjectionSource(nativeType)
+		known.DisplayVersion = displayVersion
+		return known, true
+	}
 	if nativeType == artifact.SyscallRecordsArtifact || nativeType == artifact.SyscallArgumentsArtifact {
 		if displayVersion != SyscallSummaryDisplayVersion && displayVersion != SyscallEventsDisplayVersion {
 			return ProjectionSource{}, false
@@ -167,6 +174,7 @@ type ContextProjectionCandidate struct {
 	Headers                                                                             HTTPHeaderWindow        `json:",omitzero"`
 	Profile                                                                             ProfileSummarySelection `json:",omitzero"`
 	Syscalls                                                                            SyscallWindow           `json:",omitzero"`
+	Comparison                                                                          ProfileComparisonWindow `json:",omitzero"`
 }
 
 func (c ContextProjectionCandidate) Valid() bool {
@@ -183,6 +191,9 @@ func (c ContextProjectionCandidate) RouteValid() bool {
 
 // Source derives the view identity from the closed typed selection.
 func (c ContextProjectionCandidate) Source() (ProjectionSource, bool) {
+	if c.Comparison != (ProfileComparisonWindow{}) {
+		return LookupProjectionSourceFor(c.NativeType, ProfileComparisonDisplayVersion)
+	}
 	if c.NativeType == artifact.SyscallRecordsArtifact || c.NativeType == artifact.SyscallArgumentsArtifact {
 		return LookupProjectionSourceFor(c.NativeType, c.Syscalls.View.DisplayVersion())
 	}
@@ -190,6 +201,9 @@ func (c ContextProjectionCandidate) Source() (ProjectionSource, bool) {
 }
 
 func (c ContextProjectionCandidate) selectionValid() bool {
+	if c.Comparison != (ProfileComparisonWindow{}) {
+		return c.NativeType == artifact.PprofArtifact && c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Syscalls == (SyscallWindow{}) && c.Profile.Valid() && c.Comparison.candidateValid(c)
+	}
 	if c.NativeType != artifact.SyscallRecordsArtifact && c.NativeType != artifact.SyscallArgumentsArtifact && c.Syscalls != (SyscallWindow{}) {
 		return false
 	}
@@ -218,16 +232,22 @@ type ContextProjectionScope struct {
 	Headers                                                                             HTTPHeaderWindow        `json:",omitzero"`
 	Profile                                                                             ProfileSummarySelection `json:",omitzero"`
 	Syscalls                                                                            SyscallWindow           `json:",omitzero"`
+	Comparison                                                                          ProfileComparisonWindow `json:",omitzero"`
 }
 
 func (s ContextProjectionScope) Valid() bool {
 	src, ok := s.Source()
-	return ok && s.Candidate().Valid() && s.Version != (artifact.Digest{}) &&
+	return ok && s.Candidate().Valid() && s.Version != (artifact.Digest{}) && s.comparisonResolved() &&
 		s.SourceProjectionDigest == src.ProjectionDigest && s.SourceFormat == src.Format && s.DisplayVersion == src.DisplayVersion
 }
 
 // Source is the closed projection source this scope reads.
 func (s ContextProjectionScope) Source() (ProjectionSource, bool) {
+	if s.Comparison != (ProfileComparisonWindow{}) || s.DisplayVersion == ProfileComparisonDisplayVersion {
+		if s.NativeType != artifact.PprofArtifact || s.Comparison == (ProfileComparisonWindow{}) || s.DisplayVersion != ProfileComparisonDisplayVersion {
+			return ProjectionSource{}, false
+		}
+	}
 	if (s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact) && s.Syscalls.View.DisplayVersion() != s.DisplayVersion {
 		return ProjectionSource{}, false
 	}
@@ -235,9 +255,11 @@ func (s ContextProjectionScope) Source() (ProjectionSource, bool) {
 }
 
 func (s ContextProjectionScope) Candidate() ContextProjectionCandidate {
+	comparison := s.Comparison
+	comparison.Baseline.Version = artifact.Digest{}
 	return ContextProjectionCandidate{RootID: s.RootID, CaseID: s.CaseID, ArtifactID: s.ArtifactID, CaptureID: s.CaptureID,
 		ClusterID: s.ClusterID, NamespaceUID: s.NamespaceUID, WorkloadUID: s.WorkloadUID, PodUID: s.PodUID,
-		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers, Profile: s.Profile, Syscalls: s.Syscalls}
+		Selection: s.Selection, Principal: s.Principal, NativeType: s.NativeType, Headers: s.Headers, Profile: s.Profile, Syscalls: s.Syscalls, Comparison: comparison}
 }
 
 // ContextProjectionPath is accepted placement for this query purpose. It is not
@@ -295,9 +317,33 @@ type ContextProjectionAuthority struct {
 	// Bound names the component whose interval set ValidUntil, for the
 	// operator report only. It is never persisted, digested or authority.
 	Bound string `json:"-"`
+	// Baseline is present only on a compound comparison. It owns exactly one
+	// independently authorized legacy summary child; nested pairs are invalid.
+	Baseline *ContextProjectionAuthority `json:",omitempty"`
 }
 
 func (a ContextProjectionAuthority) Valid(now time.Time) bool {
+	if a.Scope.Comparison == (ProfileComparisonWindow{}) {
+		return a.Baseline == nil && a.validSingle(now)
+	}
+	// Check depth before invoking any child validation, including self-cycles.
+	b := a.Baseline
+	if b == nil || b.Baseline != nil || b.Scope.Comparison != (ProfileComparisonWindow{}) {
+		return false
+	}
+	baseline, ok := a.Scope.BaselineScope()
+	return ok && b.Scope == baseline && b.Valid(now) && a.validSingle(now) &&
+		CommonProfileComparisonReader(b.Environment, a.Environment) &&
+		// Permission revisions identify the single root-wide accepted stream,
+		// not a target's selected assignments (postgres permissionProjection).
+		a.PermissionRevision == b.PermissionRevision && a.IdentityRevision == b.IdentityRevision &&
+		a.Environment.Recovery.IssuerEpoch == b.Environment.Recovery.IssuerEpoch &&
+		a.Environment.Recovery.Revision == b.Environment.Recovery.Revision &&
+		!a.CheckedAt.After(b.CheckedAt) && !a.ValidUntil.After(b.ValidUntil) &&
+		!a.AccessUntil.After(b.AccessUntil) && !a.DeleteBy.After(b.DeleteBy)
+}
+
+func (a ContextProjectionAuthority) validSingle(now time.Time) bool {
 	return a.Scope.Valid() && a.Environment.Valid(now) && a.Environment.RootID == a.Scope.RootID &&
 		a.Environment.Principal == a.Scope.Principal && a.Environment.Location.ClusterID == a.Scope.ClusterID &&
 		a.Environment.Location.ArtifactID == a.Scope.ArtifactID && a.Environment.Processing.CaptureID == a.Scope.CaptureID &&

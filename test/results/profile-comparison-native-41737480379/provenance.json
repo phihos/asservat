@@ -1,0 +1,10 @@
+{
+  "head": "75567e10abb2f428b506f86bd706b1279e2fca09",
+  "testExit": 1,
+  "goElapsedSeconds": 0.02,
+  "mismatches": [],
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "failure": "fixture expected3 clusters for new focus; harness created2; stopped before bootstrap/capture/comparison",
+  "sourceFilesMatchedToFrozenHead": 4064
+}

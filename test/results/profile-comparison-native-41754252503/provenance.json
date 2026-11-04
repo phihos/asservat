@@ -1,0 +1,12 @@
+{
+  "head": "112c01852c2947c9600e2a3dc56f645ca20813b2",
+  "testExit": 1,
+  "goElapsedSeconds": 623.227,
+  "sourceFilesMatchedToFrozenHead": 4069,
+  "mismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "successfulScope": "two CPU captures/full native downloads/pprof; distinct cross-case read-only MCP comparison; independent cumulative calculation, two consumed3-role key children, joined batch/public closure and384MiB worker/terminal proof;20units",
+  "failure": "second actual React comparison failed during case setup after get_case HTTP200; no Compare click or second paid query; body/DOM cause not yet established"
+}

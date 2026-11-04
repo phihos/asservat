@@ -184,7 +184,7 @@ func buildConnectorBacking(c contracts.InstallerConnectorSettings, b contracts.I
 // global worker/hub/provider admission limits are not multiplied per query.
 // These are configured ceilings, not measured overhead or a new deployment.
 func installedQueryBudget(p contracts.InstallerCapacitySettings, newID func() string) (app.ContextQueryQualification, error) {
-	rev := identity.Revision{UID: newID(), Generation: 1, Digest: profileDigest("shared-query/v2", p)}
+	rev := identity.Revision{UID: newID(), Generation: 1, Digest: profileDigest("shared-query/v3", p)}
 	// Four paid status polls and 32 state transitions bound retained SQL work.
 	// One worker intent, one enrollment and two signing audits are independent.
 	const polls, controls, signs int64 = 4, 32, 2
@@ -193,7 +193,7 @@ func installedQueryBudget(p contracts.InstallerCapacitySettings, newID func() st
 	wal := max(p.Footprints.Native.TransitionWALBytes, p.Metadata.TransitionWALBytes)
 	h := app.QueryHistoryQualification{Layout: app.ContextQueryHistoryLayout, Revision: rev, FixedBytes: p.Metadata.FixedRowBytes, PrincipalBytes: p.Metadata.AccountRowBytes, AllocationBytes: p.Metadata.AccountRowBytes, RowBytes: row, FixedQueryRows: 10, InvocationRows: 1, ControlRows: 1, TransitionWALBytes: wal, BackupCopies: p.Backup.BackupCopies, WALCopies: p.Backup.WALCopies, AuditCipherBytes: 64 << 10, BackupHorizon: time.Duration(p.Backup.HorizonSeconds) * time.Second, RetirementCleanup: time.Duration(p.Backup.CleanupBudgetSeconds) * time.Second}
 	profile := query.ContextQueryResourceProfile{ID: newID(), Source: rev, Qualification: rev, Path: query.ContextProjectionPath{Purpose: query.ContextProjectionPurpose}, Lifetime: query.ContextMaxQueryTime, PollLimit: polls, ControlTransitionLimit: controls,
-		Worker: query.ContextQueryWorkerLimits{CPUMilli: downloadWorkerCPUMillis, MemoryBytes: downloadWorkerMemoryBytes, EphemeralStorageBytes: 4 << 20, WorkerTransientBytes: query.ProfileSummaryWorkerBytes, HubTransientBytes: 128 << 10, ProviderConcurrency: 1, AuthenticationConcurrency: 1, Runtime: query.ContextMaxQueryTime, CredentialLifetime: 2 * time.Minute, ProviderEffectLifetime: time.Minute, Cleanup: time.Duration(p.Backup.CleanupBudgetSeconds) * time.Second},
+		Worker: query.ContextQueryWorkerLimits{CPUMilli: downloadWorkerCPUMillis, MemoryBytes: downloadWorkerMemoryBytes, EphemeralStorageBytes: 4 << 20, WorkerTransientBytes: query.ProfileComparisonWorkerBytes, HubTransientBytes: 128 << 10, ProviderConcurrency: 1, AuthenticationConcurrency: 1, Runtime: query.ContextMaxQueryTime, CredentialLifetime: 2 * time.Minute, ProviderEffectLifetime: time.Minute, Cleanup: time.Duration(p.Backup.CleanupBudgetSeconds) * time.Second},
 		Cost:   query.ContextQueryCost{Workers: 1, ReadBatches: query.ContextMaxReadBatches, ReadBytes: query.ContextMaxReadBatches * query.ContextBatchReadWork, StructuredBytes: query.ContextMaxReadBatches * query.ContextResultBytes, WireBytes: query.ContextMaxReadBatches * query.ContextWireBytes, UnwrapAttempts: 3 * query.ContextMaxReadBatches, ProviderRequests: 100, AuthenticationRequests: 100, SigningAttempts: signs, AuditObjects: 2*(1+polls) + 2 + signs, SQLRows: rows}}
 	// Operator values are validated by the complete qualification below. Use
 	// checked products here before constructing any persistent declaration.

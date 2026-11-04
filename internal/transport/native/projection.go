@@ -51,6 +51,13 @@ type syscallProjectionReply struct {
 	TooLarge      bool                      `json:",omitempty"`
 }
 
+type profileComparisonReply struct {
+	BaselineVersion, IncidentVersion artifact.Digest
+	Comparison                       *query.ProfileComparison `json:",omitempty"`
+	IncompatibleProfiles             bool                     `json:",omitempty"`
+	TooLarge                         bool                     `json:",omitempty"`
+}
+
 // encodeProjectionResult is the worker's payload for the scope's result. A
 // page sends the longest record prefix within HTTPHeaderPageWireBytes; its
 // continuation starts at the first omitted record.
@@ -67,6 +74,22 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 		return b, nil
 	}
 	if scope.NativeType == artifact.PprofArtifact {
+		if scope.Comparison != (query.ProfileComparisonWindow{}) {
+			reply := profileComparisonReply{BaselineVersion: scope.Comparison.Baseline.Version, IncidentVersion: scope.Version, Comparison: r.Comparison, IncompatibleProfiles: r.IncompatibleProfiles, TooLarge: r.TooLarge}
+			b, e := json.Marshal(reply)
+			if e != nil {
+				clear(b)
+				return nil, contracts.ErrNativeProtocol
+			}
+			if len(b) > query.ContextResultBytes {
+				clear(b)
+				// The complete authenticated result is valid, but its private
+				// version envelope also spends the fixed result-byte allowance.
+				// Retain a positively acknowledged, content-free size refusal.
+				return json.Marshal(profileComparisonReply{BaselineVersion: scope.Comparison.Baseline.Version, IncidentVersion: scope.Version, TooLarge: true})
+			}
+			return b, nil
+		}
 		b, e := json.Marshal(r.Summary)
 		if e != nil || len(b) > query.ProfileSummaryBytes {
 			clear(b)
@@ -120,6 +143,15 @@ func decodeProjectionResult(b []byte, scope query.ContextProjectionScope) (query
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol
 		}
 	case artifact.PprofArtifact:
+		if scope.Comparison != (query.ProfileComparisonWindow{}) {
+			var reply profileComparisonReply
+			if nativeDecodeBounded(b, &reply, query.ContextResultBytes) != nil || reply.BaselineVersion != scope.Comparison.Baseline.Version || reply.IncidentVersion != scope.Version {
+				return query.ProjectionResult{}, contracts.ErrNativeProtocol
+			}
+			r.Comparison, r.IncompatibleProfiles = reply.Comparison, reply.IncompatibleProfiles
+			r.TooLarge = reply.TooLarge
+			break
+		}
 		var summary query.ProfileSummary
 		if len(b) > query.ProfileSummaryBytes || nativeDecode(b, &summary) != nil {
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol
@@ -162,6 +194,7 @@ func (o *HubOperation) Projection(ctx context.Context) (query.ProjectionResult, 
 	select {
 	case p := <-o.projection:
 		if _, e := o.gate.Check(ctx); e != nil {
+			p.Clear()
 			return zero, e
 		}
 		return p, nil

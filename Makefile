@@ -24,7 +24,7 @@ console-build:
 	cd web && npm run build
 
 console-browser-check: console-build
-	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart)WithBuiltPackage$$' -v ./test/integration
+	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison)WithBuiltPackage$$' -v ./test/integration
 
 .PHONY: openapi-check
 openapi-check:
@@ -234,8 +234,8 @@ history-storage-integration:
 # Fast component preflight for the complete profile path. No external fixtures.
 .PHONY: profile-preflight
 profile-preflight:
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestInstalledProfile|TestDownloadWorkerProfileAndPathTemplate|TestPublicProfileSummary|TestPublicSnapshotCancellation|TestSourceWork|TestConnectorProfile|TestProfile|TestSharedManifest|TestNativeTypeRegistry|TestNodeProfile|TestOneShotProfile|TestCurrentDownloadEnvironment)' ./internal/bootstrap ./internal/domain/privacy ./internal/domain/artifact ./internal/domain/analysis ./internal/application/authorization ./internal/application/capture ./internal/application/analysis ./internal/adapters/objectstore ./internal/adapters/objectstore/manifest ./internal/adapters/jose ./internal/transport/contextstart
-	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalledManualProfile' ./test/integration
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^(TestInstalledProfile|TestDownloadWorkerProfileAndPathTemplate|TestPublicProfile|TestComparison|TestProjectionComparison|TestNativeComparison|TestPublicSnapshotCancellation|TestSourceWork|TestConnectorProfile|TestProfile|TestPprof|TestReadProfile|TestSharedManifest|TestNativeTypeRegistry|TestNodeProfile|TestOneShotProfile|TestCurrentDownloadEnvironment)' ./internal/bootstrap ./internal/domain/privacy ./internal/domain/artifact ./internal/domain/analysis ./internal/application/authorization ./internal/application/capture ./internal/application/analysis ./internal/application/evidence ./internal/adapters/diagnostics ./internal/adapters/objectstore ./internal/adapters/objectstore/manifest ./internal/adapters/jose ./internal/transport/contextstart ./internal/transport/native ./internal/adapters/postgres
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -race -count=1 -timeout=3m -run '^TestInstalled(ManualProfile|ProfileComparison|ApprovedRecordingFixtureShape)' ./test/integration
 
 # Finite argument composition, without loading a collector or external services.
 .PHONY: argument-preflight
@@ -247,4 +247,6 @@ argument-preflight:
 # Owned SQL/S3 service composition, after local preflight and source freeze.
 .PHONY: profile-service-preflight
 profile-service-preflight:
-	$(PYTHON) scripts/test-custody.py --fleet --run '^(TestCustodyProfileWriteOnlyWithRealServices|TestProfileSummaryQueryLedgerWithRealPostgres)$$' --result-name profile-service-preflight
+	# Each protected capacity-root fixture requires its own pristine database.
+	$(PYTHON) scripts/test-custody.py --fleet --run '^TestProfileComparisonQueryLedgerWithRealPostgres$$' --result-name profile-comparison-service-preflight
+	$(PYTHON) scripts/test-custody.py --fleet --run '^(TestCustodyProfileWriteOnlyWithRealServices|TestProfileSummaryQueryLedgerWithRealPostgres|TestCustodyUpgradeSchemaWithRealPostgres)$$' --result-name profile-service-preflight

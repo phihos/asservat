@@ -32,13 +32,129 @@ There is no claim of last-worker capacity refund. Reports are retained in
 `test/results/syscall-native-41712526480/` and
 `test/results/syscall-native-41712531115/`. Original failed reports remain below.
 
-The next outcome is two-source `compare_profiles` under REQ-PRF-005 / SC-PRF-005.
-Pure components and fixed-pair contracts are prepared in an isolated local branch;
-paired current authority, atomic accounting/key children, worker/public composition
-and native comparison remain pending. The argument job's cold-start/teardown
-headroom also needs improvement before later installed campaigns. No timeout was
-raised. These saved-view fixtures do not complete arbitrary `syscall_query`,
-grouped/ongoing arguments, a wider kernel matrix or a supported release.
+The active outcome is two-source `compare_profiles` under REQ-PRF-005 /
+SC-PRF-005 (ADR-295). PR152 remains unmerged. Its integration worktree is
+`/home/phil/Projekte/asservat-profile-comparison`, branch
+`feature/profile-comparison`, based on main `d9e0bcd1`. Exact CI41744343580
+passed on the preceding candidate `b3507934`; the latest runtime/test changes
+still need exact-current CI and installed qualification.
+
+The implementation independently authorizes both immutable sources, aggregates
+complete cumulative function values before top-N ranking, and retains one paid
+owner through semantic/size refusals and joined closure. SQL133 atomically
+charges20 units, covers both workloads with one worker and retains two distinct
+three-role key children. The console explicitly selects a baseline, including
+an earlier authorized case. New installations declare384MiB physical/transient
+shared workers (+128MiB per active worker), with500mCPU unchanged; old accepted
+profiles remain usable for their qualified operations. The heavy local parser
+probe peaked at252.363MiB RSS in1.202s with synthetic key providers. That is not
+maximum-input VM/cgroup or whole-worker qualification.
+
+Local verification:
+
+- `make profile-preflight` and `make pre-push` pass on the latest composition,
+  including416 console tests, Go architecture/contracts, SQL generation,
+  specification, Helm and vet checks. Native React fixture compilation/races
+  pass2.379s; JavaScript syntax and the existing aborted-response helper pass.
+- Fresh SQL/S3 paired-source/ledger qualification passes13.506s, with harness
+  exit0,4,015 independently matching hashes, unchanged sources and cleanup `[]`.
+  It exercises the production paired-source constructor, current second-source
+  fences, atomic same/distinct-workload charging and the compiled hub-runtime
+  grant. C14 ownership/key-role writes in that fixture remain explicitly
+  synthetic; actual worker enrollment/native key binding are not qualified there.
+- A composed real-runtime orchestration test reproduced a separate original
+  caller-cutoff bug. Three added lines bound serialized `NativeOperation.Until`
+  by the original caller deadline. Paired/scalar/claim/current/result/closure
+  races pass (evidence1.041s, native1.137s); downstream original-bound and
+  cancellation races also pass. Authority/transport ports in those tests are
+  synthetic. This does not establish the hosted503 cause.
+- Earlier SQL133 upgrade/rollback, legacy summary/producer, schema133 initial
+  handover (147.876s;4,061 matching hashes), and synthetic built-console browser
+  checks remain scoped evidence in `test/results/profile-comparison-service/`.
+
+Installed attempts, with original reports retained:
+
+- Native41737480379, frozen75567e10: Go exit1 in0.020s before bootstrap; the new
+  focus expected three clusters instead of the harness's two. The reproduced
+  consumer registration mismatch was fixed.
+- Native41740409366, frozen`ddddfd90`: Go exit1 in699.891s before collection;
+  the40-record fixture required10,752 capture/system plus8,960 query objects
+  against10,000 system objects. The comparison focus now reallocates its fixed
+  pool to20,000 system/30,000 shared-burst objects, with100,000 total and all
+  bytes unchanged. Production compiler preflight preserves the original refusal.
+- Native41744342117, frozen`b3507934`: Go exit1 in835.356s. Capacity became
+  ready; two CPU captures (1,174/1,081 native bytes,9/10 samples) passed complete
+  authenticated download and offline pprof opening. The first cross-case
+  comparison admitted20 units and bound one worker; one poll was pending, then
+  HTTP503, with an active batch and no committed key children. No query-time
+  SQL error was logged. All4,065 hashes match; sources were unchanged, cleanup
+  was `[]` and scratch was removed. The failing runtime stage remains unproven.
+
+The next selected native run keeps the first read-only MCP comparison and uses
+actual installed React for the second, same-artifact20-unit query. It adds no
+capture/query/worker charge. Comparison no longer repeats the manual suite's
+two deliberate120-second preview-expiry waits or repeat previews; the manual
+focus retains those proofs. Installed time savings are unmeasured. Failure-only
+process/Pod diagnostics and content-free worker/batch progress expose the
+missing stage. The20-minute job/18-minute Go limits stay unchanged.
+
+A preceding local SQL attempt passed its Go assertions17.332s but the harness
+correctly exited1 after a late unit-test edit invalidated the source freeze;
+that report is retained and is not clean qualification. All writers must finish
+or acknowledge a freeze before external qualification.
+
+CI41749864086 passed on `18395236`. The instrumented native41749912523
+exited1 in610.482s. All4,069 hashes matched; sources were unchanged, cleanup
+was `[]` and scratch was removed. It reached actual worker enrollment,
+certificate activation, native claim and two committed key children, then
+refused the artifact read before either child fully consumed its roles. The
+first query returned HTTP503; React’s second query was not reached. The focused
+journey took118.27s versus363.18s previously, after omitting duplicate expiry
+waits. These are failed-run timings, not a product overhead measurement.
+
+The newly exposed dispatcher defect is concrete: `NativeKeyAuthority.Resolve`
+classifies projection authority through the legacy batch-only lookup. Paired
+requests use child UUIDs, so that lookup returns no row and rejects the request
+before the comparison resolver. The dispatcher now uses one
+primary-key presence lookup for legacy and paired projection children, retaining
+three purpose branches, ambiguity rejection and all current validation/spend
+checks. No lookup, schema, privilege, API, watch or setting is added. A fresh
+real-SQL regression first reproduced the first manifest-child denial (Go10.495s).
+After the fix, paired and legacy shared lifecycle fixtures pass12.717s/9.346s;
+both4,016-file inventories match independently, sources were unchanged and
+cleanup was `[]`. They exercise audited worker SQL enrollment/certificate
+activation, native claim/binding, production dispatch, role order4→5→7,
+replay/mismatched-request refusal and paid closure. Pod/token/issuer/join facts
+and the scoped key reference are controlled fixture inputs; these are not real
+key-backend unwrap or installed comparison qualification. Both fixture entry
+points also close narrow roles before their administrator pool. Original reports remain in
+`test/results/profile-comparison-native-41749912523/`.
+
+CI41754221481 passed on `112c0185`. Native41754252503 exited1 in623.227s,
+but its first cross-case read-only MCP comparison completed: full native
+calculation, both three-role key children, public/native batch closure and
+exact384MiB worker/terminal proof passed with20 units. The second installed
+React query was not started: its driver failed during baseline selection after
+`get_case` returnedHTTP200. All4,069 source hashes match, sources were unchanged,
+cleanup was `[]` and scratch was removed. Reports are retained in
+`test/results/profile-comparison-native-41754252503/`.
+
+A local reproduction using the existing GoTLS/built-React console fixture and
+actual metadata decoder confirms valid ordinary profile metadata and a rendered
+comparison panel. The exact wrapping-label locator matches0 elements; the
+semantic baseline combobox matches1. The driver now selects by exact semantic
+combobox role/name. The same installed driver/wrapper passes the full local
+pending/poll/render/close path in3.77s (race package4.834s), and the existing
+console-browser check now selects this regression. That full check passes
+33.075s, including the earlier27 journeys/26 accessibility scans and native
+restart checks. Bounded case-response/DOM/assertion diagnostics retain no case
+body, cookies or function names. Identity, case/query services and source facts
+in this local fixture are synthetic; it does not substitute for the remaining
+installed React qualification. No production UI or permission change is made.
+
+No complete comparison requirement, S-05 slice or supported release is claimed.
+Actual React success after the dispatch fix, maximum-input containment,
+broader native negative cases and the remaining specification remain open.
 
 ### Earlier checkpoints
 

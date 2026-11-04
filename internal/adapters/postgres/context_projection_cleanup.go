@@ -17,7 +17,7 @@ import (
 // allocation. Only the physical worker slot can close under these exact proofs.
 func (s *ProjectionWorkers) cleanupState(row custodydb.DownloadWorker) (evidence.ProjectionWorkerState, error) {
 	var i query.ContextProjectionWorkerIntent
-	if s == nil || queryDecode(row.IntentJson, 65536, &i) != nil || !i.Valid() || i.Query.Scope.RootID != s.queries.root || i.Worker.Profile != s.profile {
+	if s == nil || queryDecode(row.IntentJson, comparisonQueryBytes, &i) != nil || !i.Valid() || i.Query.Scope.RootID != s.queries.root || i.Worker.Profile != s.profile {
 		return evidence.ProjectionWorkerState{}, query.ErrUnavailable
 	}
 	return projectionWorkerState(row, i.Query)

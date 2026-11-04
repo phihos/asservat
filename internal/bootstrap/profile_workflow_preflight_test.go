@@ -55,3 +55,22 @@ func TestInstalledProfileSummaryCapacity(t *testing.T) {
 		t.Fatal("unfunded installed summary", err)
 	}
 }
+
+func TestInstalledProfileComparisonCapacity(t *testing.T) {
+	settings := capacityProfileFixture()
+	settings.Records = query.ProfileComparisonQueryUnits
+	qualification, err := installedQueryBudget(settings, sequentialIDs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if qualification.Profile.Source.Digest == profileDigest("shared-query/v2", settings) {
+		t.Fatal("new shared resource declaration reused the previous identity")
+	}
+	worker := qualification.Profile.Worker
+	if worker.MemoryBytes != query.ProfileComparisonWorkerBytes || worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes || qualification.PrincipalQueries < query.ProfileComparisonQueryUnits || qualification.WorkloadQueries < query.ProfileComparisonQueryUnits {
+		t.Fatal("comparison producer/consumer capacity mismatch", qualification)
+	}
+	if _, err = qualification.Required(); err != nil {
+		t.Fatal("unfunded installed comparison", err)
+	}
+}

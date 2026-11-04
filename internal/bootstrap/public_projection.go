@@ -124,6 +124,9 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	// Existing accepted worker and per-query backing gates remain mandatory.
 	// Old smaller transient profiles still serve older tools; summary admission
 	// independently refuses them without rewriting their accepted budget.
+	if profile.MemoryBytes >= query.ProfileComparisonWorkerBytes {
+		service.ComparisonRoutes = routes
+	}
 	if profile.MemoryBytes >= query.ProfileSummaryWorkerBytes {
 		service.ProfileRoutes = routes
 	}

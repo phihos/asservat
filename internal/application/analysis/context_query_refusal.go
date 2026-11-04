@@ -11,6 +11,7 @@ const (
 	ContextProjectionNoRefusal ContextProjectionRefusal = iota
 	ContextProjectionInvalidCursor
 	ContextProjectionRecordTooLarge
+	ContextProjectionIncompatibleProfiles
 )
 
 func (d *ContextProjectionDelivery) Refusal() ContextProjectionRefusal {
@@ -40,6 +41,10 @@ func (d *ContextProjectionDelivery) RefuseOversizedResult() bool {
 }
 
 func (d *ContextProjectionDelivery) clearProjectionLocked() {
+	if d.comparison != nil {
+		d.comparison.Clear()
+		d.comparison = nil
+	}
 	clear(d.excerpt.Lines)
 	d.excerpt = value.ContextExcerpt{}
 	clear(d.page.Records)

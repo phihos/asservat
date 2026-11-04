@@ -1,0 +1,79 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000301",
+  "data_class": "extract",
+  "status": "ok",
+  "data": {
+    "sample_type": "cpu",
+    "unit": "nanoseconds",
+    "normalization": "perSecond",
+    "comparable": true,
+    "rows": [
+      {
+        "function": "synthetic.work",
+        "baseline": 10000000,
+        "incident": 10000000,
+        "delta": 0
+      }
+    ],
+    "limitations": [
+      "Short sampled profiles do not establish statistical significance or a definitive regression.",
+      "Native build identity is unknown for at least one input.",
+      "Rates and deltas round independently from exact native integer ratios; subtracting displayed rates can differ from the displayed delta. Ranking uses displayed deltas."
+    ],
+    "aggregation": "cumulative",
+    "case_id": "00000000-0000-4000-8000-000000000201",
+    "artifact_id": "00000000-0000-4000-8000-000000000202",
+    "baseline_case_id": "00000000-0000-4000-8000-000000000101",
+    "baseline_artifact_id": "00000000-0000-4000-8000-000000000102",
+    "source_version": "2222222222222222222222222222222222222222222222222222222222222222",
+    "baseline_source_version": "1111111111111111111111111111111111111111111111111111111111111111",
+    "baseline": {
+      "profile_type": "cpu",
+      "mode": "interval",
+      "force_gc": false,
+      "duration_seconds": 30,
+      "total": 300000000,
+      "period": {
+        "type": "cpu",
+        "unit": "nanoseconds",
+        "value": 10000000
+      },
+      "symbol_status": "complete"
+    },
+    "incident": {
+      "profile_type": "cpu",
+      "mode": "interval",
+      "force_gc": false,
+      "duration_seconds": 10,
+      "total": 100000000,
+      "period": {
+        "type": "cpu",
+        "unit": "nanoseconds",
+        "value": 10000000
+      },
+      "symbol_status": "complete"
+    },
+    "build_status": "unknown",
+    "sampling_status": "same",
+    "acquisition_status": "same",
+    "query_observed_at": "2026-11-03T20:00:00Z",
+    "query_expires_at": "2026-11-03T20:01:00Z"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [
+    "SensitiveDataHandling: This evidence may contain personal or user data. Minimize disclosure, review recipients and use organization-approved clients. Automatic deletion follows source deadlines and covers Asservat-managed copies only; copies already delivered to users or agents cannot be recalled. Authorized artifact notices show current access cutoffs and deletion status."
+  ],
+  "provenance": [
+    {
+      "artifactID": "00000000-0000-4000-8000-000000000102",
+      "digest": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "artifactID": "00000000-0000-4000-8000-000000000202",
+      "digest": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ]
+}

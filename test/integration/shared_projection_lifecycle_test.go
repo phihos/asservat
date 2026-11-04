@@ -35,7 +35,9 @@ import (
 // real framed join is qualified separately by TestNativeApprovedProjection*.
 func TestSharedProjectionLifecycleWithRealServices(t *testing.T) {
 	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
-		withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifySharedProjectionLifecycle)
+		t.Run("legacy-projection-native-key-authority", func(t *testing.T) {
+			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifySharedProjectionLifecycle)
+		})
 	})
 }
 
@@ -79,9 +81,15 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
 		t.Fatal(err)
 	}
 	keyScope := value.KeyScope{InstallationID: base.input.InstallationID, Purpose: "artifact", KeyID: "query-fixture"}
-	keys, err := postgres.NewProjectionKeys(keyLedger, keyScope)
+	projectionKeys, err := postgres.NewProjectionKeys(keyLedger, keyScope)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Match key-service startup's actual closed dispatcher. Calling the
+	// projection delegate alone misses classification of compact child IDs.
+	keys, err := postgres.NewNativeKeyAuthority(ctx, keyPool, root, profile, keyScope, postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	if err != nil || keys.WithProjectionKeys(projectionKeys) != nil {
+		t.Fatal("compiled native key authority composition", err)
 	}
 	metadata := compiled("hub-runtime")
 	catalog, err := postgres.NewContextPublications(ctx, metadata, root)
@@ -95,6 +103,13 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
 	gate := authapp.ContextProjectionAuthority{RootID: root, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: base.input.InstallationID, Policies: f.policies, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}, Now: time.Now}
 	expected := f.published.Expectation
 	scope := query.ContextProjectionScope{RootID: root, CaseID: expected.CaseID, CaptureID: expected.CaptureUID, ArtifactID: expected.Registration.Location.ArtifactID, ClusterID: expected.Registration.Location.ClusterID, NamespaceUID: expected.NamespaceUID, WorkloadUID: expected.WorkloadUID, PodUID: expected.PodUID, Version: evidence.ContextCopiesDigest(f.published.Copies), SourceProjectionDigest: query.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: query.ContextDisplayVersion, Selection: query.LineSelection{LineStart: 1, MaxLines: 14}, Principal: s.a.Plan.Input.Executor}
+	comparison := expected.NativeType == artifact.PprofArtifact
+	if comparison {
+		scope.NativeType, scope.SourceFormat, scope.DisplayVersion = artifact.PprofArtifact, artifact.PprofFormat, query.ProfileComparisonDisplayVersion
+		scope.SourceProjectionDigest, scope.Selection = artifact.Digest{}, query.LineSelection{}
+		scope.Profile = query.ProfileSummarySelection{SampleType: "cpu", TopN: 20}
+		scope.Comparison = query.ProfileComparisonWindow{Normalization: query.ProfileComparisonRaw, Baseline: query.ProfileComparisonBaseline{CaseID: scope.CaseID, ArtifactID: scope.ArtifactID, CaptureID: scope.CaptureID, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID, Version: scope.Version}}
+	}
 	policy := f.audit.Normal.Policy
 	journal, err := postgres.NewHealthyOperationJournal(ctx, compiled("hub-runtime"), policy, s.recovery.guard)
 	if err != nil {
@@ -161,12 +176,21 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
 	jobs := &sharedProjectionJobs{podUID: custodyID()}
 	admission := evidence.ProjectionWorkerAdmission{Ledger: workers, Jobs: jobs, Audit: objects, Now: time.Now}
 	runtime := evidence.ProjectionRuntime{Workers: workers, Identities: workers, Jobs: jobs, Now: time.Now}
-	initial, intent, stopInitial := request("get_file_excerpt")
-	plan, err := f.current.ContextQueryPlan(initial.ctx, initial.authority)
-	if err != nil {
-		t.Fatal("actual shared plan", err)
+	initial, intent, stopInitial := request(scope.BeginTool())
+	var q query.ContextQuery
+	if comparison {
+		plans, e := f.current.ContextComparisonPlans(initial.ctx, initial.authority)
+		if e != nil {
+			t.Fatal("actual shared comparison plans", e)
+		}
+		q, err = query.NewProfileComparisonQuery(custodyID(), intent.ID, custodyID(), initial.authority, plans[0], plans[1], time.Now().UTC().Truncate(time.Microsecond))
+	} else {
+		plan, e := f.current.ContextQueryPlan(initial.ctx, initial.authority)
+		if e != nil {
+			t.Fatal("actual shared plan", e)
+		}
+		q, err = query.NewContextQuery(custodyID(), intent.ID, custodyID(), initial.authority, plan, time.Now().UTC().Truncate(time.Microsecond))
 	}
-	q, err := query.NewContextQuery(custodyID(), intent.ID, custodyID(), initial.authority, plan, time.Now().UTC().Truncate(time.Microsecond))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,6 +265,9 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
 	}
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	operation := value.NativeOperation{Reference: value.NativeReference{InstallationID: base.input.InstallationID, QueryID: q.ID, WorkerID: q.WorkerID, OperationID: start.Batch.ID, Fence: start.Batch.Generation}, Kind: value.NativeProjection, HubPodUID: custodyID(), HubProcessEpoch: r.HubProcessEpoch, WorkerPodUID: jobs.worker.Binding.PodUID, WorkerPublicKey: publicKey, SourceVersion: q.Scope.Version, ParentID: start.Batch.ID, Generation: start.Batch.Generation, StartedAt: n, Until: identity.Earlier(start.Batch.Until, a.ValidUntil), Path: a.Environment.Path.AcquisitionPath(), Processing: a.Environment.Processing}
+	if comparison {
+		operation.Baseline = value.NativeProjectionSource{SourceVersion: scope.Comparison.Baseline.Version, Path: a.Baseline.Environment.Path.AcquisitionPath(), Processing: a.Baseline.Environment.Processing}
+	}
 	if err = operations.ClaimProjectionNative(poll.ctx, start, a, operation); err != nil {
 		t.Fatal("compiled native operation", err)
 	}
@@ -253,9 +280,16 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if _, err = operations.ObserveProjectionNativeOperation(poll.ctx, swapped, cert.Peer); err == nil {
 		t.Fatal("certificate authorized another query")
 	}
-	source, err := operations.ReadProjectionSource(poll.ctx, q, a, r)
-	if err != nil || !source.Valid(scope.Version) || evidence.ContextExpectationDigest(source.Expectation) != evidence.ContextExpectationDigest(expected) {
-		t.Fatal("real published source", err)
+	if comparison {
+		sources, e := operations.ReadProjectionComparisonSources(poll.ctx, q, a, r)
+		if e != nil || !evidence.ProjectionComparisonSourcesMatch(sources, scope, a) {
+			t.Fatal("real published comparison sources", e)
+		}
+	} else {
+		source, e := operations.ReadProjectionSource(poll.ctx, q, a, r)
+		if e != nil || !source.Valid(scope.Version) || evidence.ContextExpectationDigest(source.Expectation) != evidence.ContextExpectationDigest(expected) {
+			t.Fatal("real published source", e)
+		}
 	}
 	proof := value.AcquisitionPeerProof{Binding: jobs.worker.Binding, Peer: cert.Peer, TokenDigest: artifact.Digest{7}, ObservedAt: n, FreshUntil: identity.Earlier(n.Add(5*time.Second), cert.Peer.NotAfter)}
 	if err = operations.BindProjectionNativeKeys(poll.ctx, start, a, operation, keyScope, evidence.NativeOrigin{Lease: lease, Proof: proof}); err != nil {
@@ -276,20 +310,60 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
 			t.Fatal("compiled hub/key process boundary", e)
 		}
 	}
-	var last value.KeyRequestInfo
-	for _, role := range []query.ContextProjectionKeyRole{query.ContextProjectionDataKey, query.ContextProjectionIndexKey, query.ContextProjectionManifestKey} {
-		binding, e := evidence.ArtifactKeyBinding(expected.Binding(), string(role))
+	keyIDs := []string{start.Batch.ID}
+	if comparison {
+		ids, e := query.ProfileComparisonKeyChildIDs(start.Batch.ID)
 		if e != nil {
 			t.Fatal(e)
 		}
-		last = value.KeyRequestInfo{Scope: keyScope, Operation: "unwrap", AuthorityID: start.Batch.ID, RequestDigest: artifact.Digest{byte(role.Mask())}, Binding: binding, Reference: "asservat-local-keyset/v1/" + keyScope.InstallationID + "/artifact/" + keyScope.KeyID + "/1"}
-		permit, e := keys.Resolve(poll.ctx, cert.Peer, last)
-		if e != nil || !permit.Valid(cert.Peer, last, time.Now()) {
-			t.Fatal("compiled key-service role", role, e)
+		keyIDs = ids[:]
+		// Ordinals are immutable even when their source AAD is identical. A
+		// same-artifact comparison still owes two separately spent children.
+		if _, e = base.admin.Exec(poll.ctx, "UPDATE context_query_key_binding SET source_ordinal=1-source_ordinal WHERE batch_id=$1", start.Batch.ID); e == nil {
+			t.Fatal("comparison child ordinal swap accepted")
 		}
 	}
-	if _, err = keys.Resolve(poll.ctx, cert.Peer, last); err == nil {
-		t.Fatal("used key role was replenished")
+	for ordinal, keyID := range keyIDs {
+		// Framed native reads authenticate the manifest, then framed.Open
+		// opens data and index keys. Cover 4 -> 5 -> 7, not just 1 -> 3 -> 7.
+		for _, role := range []query.ContextProjectionKeyRole{query.ContextProjectionManifestKey, query.ContextProjectionDataKey, query.ContextProjectionIndexKey} {
+			binding, e := evidence.ArtifactKeyBinding(expected.Binding(), string(role))
+			if e != nil {
+				t.Fatal(e)
+			}
+			// The fixture's object encryption uses authorityTestKeys. This scoped
+			// reference exercises SQL authorization, not a production key unwrap.
+			request := value.KeyRequestInfo{Scope: keyScope, Operation: "unwrap", AuthorityID: keyID, RequestDigest: artifact.Digest{byte(role.Mask())}, Binding: binding, Reference: "asservat-local-keyset/v1/" + keyScope.InstallationID + "/artifact/" + keyScope.KeyID + "/1"}
+			wrong := request
+			wrong.AuthorityID = custodyID()
+			if _, e = keys.Resolve(poll.ctx, cert.Peer, wrong); e == nil {
+				t.Fatal("unknown key authority dispatched")
+			}
+			wrong = request
+			wrong.Binding = []byte("different-source-binding")
+			if _, e = keys.Resolve(poll.ctx, cert.Peer, wrong); e == nil {
+				t.Fatal("wrong source AAD consumed a role")
+			}
+			wrongPeer := cert.Peer
+			wrongPeer.Certificate[0] ^= 1
+			if _, e = keys.Resolve(poll.ctx, wrongPeer, request); e == nil {
+				t.Fatal("different worker certificate consumed a role")
+			}
+			if comparison {
+				wrong = request
+				wrong.AuthorityID = start.Batch.ID
+				if _, e = keys.Resolve(poll.ctx, cert.Peer, wrong); e == nil {
+					t.Fatal("comparison parent batch substituted for key child")
+				}
+			}
+			permit, e := keys.Resolve(poll.ctx, cert.Peer, request)
+			if e != nil || !permit.Valid(cert.Peer, request, time.Now()) {
+				t.Fatal("compiled native key authority role", ordinal, role, e)
+			}
+			if _, e = keys.Resolve(poll.ctx, cert.Peer, request); e == nil {
+				t.Fatal("used key role was replenished", ordinal, role)
+			}
+		}
 	}
 	if err = ledger.CompleteReadBatch(poll.ctx, start.Batch, querySQLClosed{start.Batch}); err == nil {
 		t.Fatal("private closure without outcome acknowledgement released batch")
@@ -302,25 +376,26 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if err = ledger.CompleteReadBatch(ctx, start.Batch, querySQLClosed{start.Batch}); err != nil {
 		t.Fatal("closed batch after real encrypted outcome", err)
 	}
-	var downloads, workersCount, certificates, keyRoles, queries, allocated int64
+	var downloads, workersCount, certificates, keyRoles, keyChildren, queries, allocated int64
 	var nativeClosed, closed, active, audited, claimed, bound bool
 	if err = base.admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM artifact_download),
  (SELECT count(*) FROM download_worker WHERE query_id=$1 AND session_id IS NULL),
  (SELECT count(*) FROM download_worker_certificate WHERE worker_id=$2 AND activated_at IS NOT NULL AND audit_receipt_json IS NOT NULL),
- (SELECT used_roles FROM context_query_key_binding WHERE batch_id=$3),
+ (SELECT sum(used_roles) FROM context_query_key_binding WHERE batch_id=$3),
+ (SELECT count(*) FROM context_query_key_binding WHERE batch_id=$3),
  (SELECT count(*) FROM context_query WHERE root_id=$4),(SELECT allocated FROM context_query_backing WHERE root_id=$4),
  b.native_closed,b.closed,q.active_batch IS NOT NULL,w.audit_receipt_json IS NOT NULL,w.claimed_at IS NOT NULL,w.binding_json IS NOT NULL
- FROM context_query_batch b JOIN context_query q ON q.id=b.query_id JOIN download_worker w ON w.id=q.worker_id WHERE b.id=$3`, q.ID, q.WorkerID, start.Batch.ID, root).Scan(&downloads, &workersCount, &certificates, &keyRoles, &queries, &allocated, &nativeClosed, &closed, &active, &audited, &claimed, &bound); err != nil {
+ FROM context_query_batch b JOIN context_query q ON q.id=b.query_id JOIN download_worker w ON w.id=q.worker_id WHERE b.id=$3`, q.ID, q.WorkerID, start.Batch.ID, root).Scan(&downloads, &workersCount, &certificates, &keyRoles, &keyChildren, &queries, &allocated, &nativeClosed, &closed, &active, &audited, &claimed, &bound); err != nil {
 		t.Fatal("independent final state", err)
 	}
-	if downloads != 0 || workersCount != 1 || certificates != 1 || keyRoles != 7 || queries != 1 || allocated != 1 || !nativeClosed || !closed || active || !audited || !claimed || !bound {
-		t.Fatalf("unexpected paid final state: downloads=%d workers=%d certificates=%d roles=%d queries=%d allocated=%d nativeClosed=%t closed=%t active=%t audited=%t claimed=%t bound=%t", downloads, workersCount, certificates, keyRoles, queries, allocated, nativeClosed, closed, active, audited, claimed, bound)
+	if downloads != 0 || workersCount != 1 || certificates != 1 || keyRoles != int64(7*len(keyIDs)) || keyChildren != int64(len(keyIDs)) || queries != 1 || allocated != scope.QueryUnits() || !nativeClosed || !closed || active || !audited || !claimed || !bound {
+		t.Fatalf("unexpected paid final state: downloads=%d workers=%d certificates=%d roles=%d children=%d queries=%d allocated=%d nativeClosed=%t closed=%t active=%t audited=%t claimed=%t bound=%t", downloads, workersCount, certificates, keyRoles, keyChildren, queries, allocated, nativeClosed, closed, active, audited, claimed, bound)
 	}
 	stored, err := ledger.LookupQuery(ctx, scope.Principal, q.ID)
 	if err != nil || !stored.Equal(q) {
 		t.Fatal("lifecycle changed original query/deadlines", err)
 	}
-	t.Logf("compiled shared query lifecycle: one read-only query/worker, independent enrollment, one signing attempt, three spent key roles, native+public batch closed, no download session; initial_ms=%d poll_ms=%d; Job/Pod/proof/issuer/join inputs synthetic, no native installed or latency qualification", initialElapsed.Milliseconds(), time.Since(pollIntent.CreatedAt).Milliseconds())
+	t.Logf("compiled shared query lifecycle through production NativeKeyAuthority: one read-only query/worker, independent enrollment, one signing attempt, %d independently spent key roles, native+public batch closed, no download session; initial_ms=%d poll_ms=%d; Job/Pod/proof/issuer/join inputs synthetic, no native installed or latency qualification", 3*len(keyIDs), initialElapsed.Milliseconds(), time.Since(pollIntent.CreatedAt).Milliseconds())
 }
 
 type sharedProjectionOwner struct {

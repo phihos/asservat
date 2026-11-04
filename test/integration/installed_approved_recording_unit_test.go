@@ -45,7 +45,7 @@ func TestInstalledApprovedRecordingFixtureShape(t *testing.T) {
 		clusters int
 		fast     bool
 	}{
-		{"approved-recording", 2, true}, {"manual-syscall", 2, true}, {"manual-arguments", 2, true}, {"manual-mixed", 2, true}, {"manual-raw", 2, true}, {"manual-http", 2, true}, {"manual-peers", 2, true}, {"manual-profile", 2, true}, {"policy-recording", 2, true}, {"policy-arguments", 2, true}, {"ongoing-save", 2, true}, {"ongoing-save-disk", 2, true}, {"ongoing-incident", 2, true}, {"ongoing-syscall", 2, true}, {"ongoing-mixed", 2, true}, {"native-paced", 2, true}, {"journey", 2, true}, {"browser", 2, true},
+		{"approved-recording", 2, true}, {"manual-syscall", 2, true}, {"manual-arguments", 2, true}, {"manual-mixed", 2, true}, {"manual-raw", 2, true}, {"manual-http", 2, true}, {"manual-peers", 2, true}, {"manual-profile", 2, true}, {"profile-comparison", 2, true}, {"policy-recording", 2, true}, {"policy-arguments", 2, true}, {"ongoing-save", 2, true}, {"ongoing-save-disk", 2, true}, {"ongoing-incident", 2, true}, {"ongoing-syscall", 2, true}, {"ongoing-mixed", 2, true}, {"native-paced", 2, true}, {"journey", 2, true}, {"browser", 2, true},
 		{"policy", 2, true}, {"alert", 2, true}, {"logresource", 2, true},
 		{"restart", 2, true}, {"upgrade", 2, true}, {"share", 2, true},
 		{"chain", 2, false}, {"clusters", 3, true}, {"", 3, false}, {"unknown", 3, false},
@@ -58,9 +58,12 @@ func TestInstalledApprovedRecordingFixtureShape(t *testing.T) {
 			if got := installedFastFixture(); got != tc.fast {
 				t.Fatalf("fast feature fixture=%v; want %v", got, tc.fast)
 			}
-			wantRecording := tc.focus == "approved-recording" || tc.focus == "manual-syscall" || tc.focus == "manual-arguments" || tc.focus == "manual-mixed" || tc.focus == "manual-raw" || tc.focus == "manual-http" || tc.focus == "manual-peers" || tc.focus == "manual-profile" || tc.focus == "native-paced" || tc.focus == "policy-recording" || tc.focus == "policy-arguments" || tc.focus == "ongoing-save" || tc.focus == "ongoing-save-disk" || tc.focus == "ongoing-incident" || tc.focus == "ongoing-syscall" || tc.focus == "ongoing-mixed"
+			wantRecording := tc.focus == "approved-recording" || tc.focus == "manual-syscall" || tc.focus == "manual-arguments" || tc.focus == "manual-mixed" || tc.focus == "manual-raw" || tc.focus == "manual-http" || tc.focus == "manual-peers" || tc.focus == "manual-profile" || tc.focus == "profile-comparison" || tc.focus == "native-paced" || tc.focus == "policy-recording" || tc.focus == "policy-arguments" || tc.focus == "ongoing-save" || tc.focus == "ongoing-save-disk" || tc.focus == "ongoing-incident" || tc.focus == "ongoing-syscall" || tc.focus == "ongoing-mixed"
 			if got := installedRecordingFocus(); got != wantRecording {
 				t.Fatalf("recording focus parent-return guard=%v; want %v", got, wantRecording)
+			}
+			if got, want := installedApprovedRecordingExpiryProof(tc.focus), tc.focus != "profile-comparison"; got != want {
+				t.Fatalf("manual preview expiry proof=%v; want %v", got, want)
 			}
 			if (tc.focus == "approved-recording" || tc.focus == "native-paced") && (installedRegionalInstallerChecks(1) || !installedRegionalInstallerChecks(2)) {
 				t.Fatal("approved focus changed regional feature/chain coverage")

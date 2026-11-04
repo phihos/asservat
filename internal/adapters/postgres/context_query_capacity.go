@@ -26,6 +26,7 @@ type SharedContextQueryPlans struct {
 }
 
 var _ app.ContextQueryPlans = (*SharedContextQueryPlans)(nil)
+var _ app.ContextComparisonPlans = (*SharedContextQueryPlans)(nil)
 var _ ContextQueryBackingGuard = (*SharedContextQueryPlans)(nil)
 
 func NewSharedContextQueryPlans(ctx context.Context, pool *pgxpool.Pool, root, installation string, profile authorization.DownloadWorkerProfile) (*SharedContextQueryPlans, error) {
@@ -81,6 +82,77 @@ func (s *SharedContextQueryPlans) ContextQueryPlan(ctx context.Context, a value.
 	if !out.Valid(a.Scope, time.Now()) {
 		return value.ContextQueryPlan{}, value.ErrUnavailable
 	}
+	return out, nil
+}
+
+// ContextComparisonPlans performs only the existing protected read/lock
+// function twice in one transaction. PostgreSQL READ ONLY cannot be used:
+// that function deliberately takes FOR SHARE locks. No admission, principal
+// creation or allocation mutation occurs in this facet.
+func (s *SharedContextQueryPlans) ContextComparisonPlans(ctx context.Context, a value.ContextProjectionAuthority) ([2]value.ContextQueryPlan, error) {
+	var out [2]value.ContextQueryPlan
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || a.Baseline == nil ||
+		!a.Valid(time.Now()) || a.Scope.RootID != s.root || a.Environment.InstallationID != s.installation {
+		return out, value.ErrUnavailable
+	}
+	until := identity.Earlier(time.Now().Add(5*time.Second), identity.Earlier(a.ValidUntil, a.Baseline.ValidUntil))
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	account, err := uuid.NewRandom()
+	if err != nil {
+		return out, value.ErrUnavailable
+	}
+	err = s.ledger.transaction(call, func(q *custodydb.Queries) error {
+		var e error
+		out, e = s.readComparisonPlans(call, q, a, account.String())
+		return e
+	})
+	now := time.Now()
+	incident, ok := a.Scope.IncidentScope()
+	if err != nil || call.Err() != nil || !ok || !a.Valid(now) ||
+		!out[0].Valid(a.Baseline.Scope, now) || !out[1].Valid(incident, now) {
+		return [2]value.ContextQueryPlan{}, value.ErrUnavailable
+	}
+	return out, nil
+}
+
+type sharedComparisonPlanReader interface {
+	ReadSharedContextQueryPlan(context.Context, custodydb.ReadSharedContextQueryPlanParams) ([]byte, error)
+}
+
+func (s *SharedContextQueryPlans) readComparisonPlans(ctx context.Context, reader sharedComparisonPlanReader, a value.ContextProjectionAuthority, proposedAccount string) ([2]value.ContextQueryPlan, error) {
+	var out [2]value.ContextQueryPlan
+	if s == nil || ctx == nil || ctx.Err() != nil || reader == nil || !authorization.UUID(proposedAccount) ||
+		a.Baseline == nil || !a.Valid(time.Now()) || a.Scope.RootID != s.root || a.Environment.InstallationID != s.installation {
+		return out, value.ErrUnavailable
+	}
+	incident, ok := a.Scope.IncidentScope()
+	if !ok {
+		return out, value.ErrUnavailable
+	}
+	sources := [2]value.ContextProjectionAuthority{*a.Baseline, a}
+	sources[1].Scope, sources[1].Baseline = incident, nil
+	for i, source := range sources {
+		actor, err := json.Marshal(source.Scope.Principal)
+		if err != nil {
+			return [2]value.ContextQueryPlan{}, value.ErrUnavailable
+		}
+		path, err := json.Marshal(source.Environment.Path)
+		if err != nil {
+			return [2]value.ContextQueryPlan{}, value.ErrUnavailable
+		}
+		raw, err := reader.ReadSharedContextQueryPlan(ctx, custodydb.ReadSharedContextQueryPlanParams{RootID: id(s.root), ClusterID: id(source.Scope.ClusterID), NamespaceUid: source.Scope.NamespaceUID, WorkloadUid: source.Scope.WorkloadUID, Actor: actor, PrincipalKey: principalKey(source.Scope.Principal), ProposedAccount: id(proposedAccount), Path: path})
+		if err != nil || queryDecode(raw, 65536, &out[i]) != nil || ctx.Err() != nil ||
+			!out[i].Valid(source.Scope, time.Now()) || out[i].InstallationID != s.installation ||
+			out[i].Profile.Path != source.Environment.Path || !s.matches(out[i].Profile) {
+			return [2]value.ContextQueryPlan{}, value.ErrUnavailable
+		}
+	}
+	if !a.Valid(time.Now()) || !value.ProfileComparisonPlansMatch(a.Scope, out[0], out[1]) {
+		return [2]value.ContextQueryPlan{}, value.ErrUnavailable
+	}
+	// Preserve the returned accepted snapshots exactly. The original context
+	// and each authority independently bound use; no field is rewritten here.
 	return out, nil
 }
 

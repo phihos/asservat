@@ -68,6 +68,9 @@ func (s ContextProjectionAuthority) CheckProjectionCurrent(ctx context.Context, 
 	if !scope.Valid() {
 		return analysis.ContextProjectionAuthority{}, analysis.ErrInvalid
 	}
+	if scope.Comparison != (analysis.ProfileComparisonWindow{}) {
+		return s.checkProfileComparison(ctx, source, scope.Candidate(), &scope)
+	}
 	return s.checkProjection(ctx, source, scope.Candidate(), &scope)
 }
 
@@ -75,6 +78,9 @@ func (s ContextProjectionAuthority) CheckProjectionCurrent(ctx context.Context, 
 // target eligibility. The route candidate contains no asserted source version;
 // C-18 does not need a protected catalog read to construct this input.
 func (s ContextProjectionAuthority) ResolveProjectionCurrent(ctx context.Context, source identities.CurrentIdentity, candidate analysis.ContextProjectionCandidate) (analysis.ContextProjectionAuthority, error) {
+	if candidate.Comparison != (analysis.ProfileComparisonWindow{}) {
+		return s.checkProfileComparison(ctx, source, candidate, nil)
+	}
 	return s.checkProjection(ctx, source, candidate, nil)
 }
 

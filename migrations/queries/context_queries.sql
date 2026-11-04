@@ -17,8 +17,8 @@ SELECT * FROM context_query WHERE id=$1 AND root_id=$2 FOR UPDATE;
 SELECT * FROM context_query WHERE id=$1 AND root_id=$2 AND actor=$3;
 
 -- name: InsertContextQuery :one
-INSERT INTO context_query(id,root_id,allocation_id,account_id,principal_key,actor,query,initial_request,operation_id,worker_id,created_at,deadline,cleanup_until,retire_by,issuer_epoch,postmaster_at,database_oid)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *;
+INSERT INTO context_query(id,root_id,allocation_id,account_id,principal_key,actor,query,initial_request,operation_id,worker_id,created_at,deadline,cleanup_until,retire_by,issuer_epoch,postmaster_at,database_oid,baseline_allocation_id)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *;
 
 -- name: ReadContextQueryCall :one
 SELECT * FROM context_query_call WHERE operation_id=$1 AND query_id=$2;
@@ -68,14 +68,35 @@ WHERE id=$1 AND query_id=$2 AND NOT closed AND NOT native_closed AND native_oper
 INSERT INTO context_query_worker(query_id,worker_id,binding,proof) VALUES($1,$2,$3,$4);
 
 -- name: ReadProjectionKeyBinding :one
-SELECT * FROM context_query_key_binding WHERE batch_id=$1;
+SELECT * FROM context_query_key_binding WHERE batch_id=$1 AND source_ordinal IS NULL;
+
+-- name: ReadProjectionKeyAuthority :one
+-- Presence only: legacy child_id=batch_id; comparison children have distinct
+-- IDs. The selected resolver still verifies its complete immutable binding.
+SELECT child_id FROM context_query_key_binding WHERE child_id=$1;
 
 -- name: LockProjectionKeyBinding :one
-SELECT * FROM context_query_key_binding WHERE batch_id=$1 FOR UPDATE;
+SELECT * FROM context_query_key_binding WHERE batch_id=$1 AND source_ordinal IS NULL FOR UPDATE;
 
 -- name: InsertProjectionKeyBinding :exec
-INSERT INTO context_query_key_binding(batch_id,query_id,binding) VALUES($1,$2,$3);
+INSERT INTO context_query_key_binding(batch_id,query_id,binding,child_id) VALUES($1,$2,$3,$1);
 
 -- name: ConsumeProjectionKeyRole :execrows
 UPDATE context_query_key_binding SET used_roles=used_roles|sqlc.arg(role)::smallint
-WHERE batch_id=sqlc.arg(batch_id) AND (used_roles&sqlc.arg(role)::smallint)=0;
+WHERE batch_id=sqlc.arg(batch_id) AND source_ordinal IS NULL AND (used_roles&sqlc.arg(role)::smallint)=0;
+
+-- name: ReadProjectionComparisonKeyChild :one
+SELECT * FROM context_query_key_binding WHERE child_id=$1 AND source_ordinal IS NOT NULL;
+
+-- name: LockProjectionComparisonKeyChild :one
+SELECT * FROM context_query_key_binding WHERE child_id=$1 AND source_ordinal IS NOT NULL FOR UPDATE;
+
+-- name: ProjectionComparisonKeyChildren :many
+SELECT * FROM context_query_key_binding WHERE batch_id=$1 AND source_ordinal IS NOT NULL ORDER BY source_ordinal;
+
+-- name: InsertProjectionComparisonKeyChild :exec
+INSERT INTO context_query_key_binding(child_id,batch_id,query_id,source_ordinal,binding) VALUES($1,$2,$3,$4,$5);
+
+-- name: ConsumeProjectionComparisonKeyRole :execrows
+UPDATE context_query_key_binding SET used_roles=used_roles|sqlc.arg(role)::smallint
+WHERE child_id=sqlc.arg(child_id) AND source_ordinal IS NOT NULL AND (used_roles&sqlc.arg(role)::smallint)=0;

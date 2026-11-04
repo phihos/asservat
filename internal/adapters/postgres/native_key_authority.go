@@ -11,10 +11,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// NativeKeyAuthority selects between the two immutable prepaid key identities:
-// the original metadata batch and a separate response window. This is a closed
-// purpose-specific union, never try-one-then-fallback after denial/unknown spend.
-// Both delegates use the same scoped key-service credential and their existing
+// NativeKeyAuthority selects among three immutable prepaid key purposes:
+// download preparation, response windows and approved projections. Projection
+// children include legacy batch IDs and distinct comparison child IDs. This is
+// a closed union, never try-one-then-fallback after denial/unknown spend.
+// All delegates use the same scoped key-service credential and their existing
 // independent current SQL/effect checks before irreversible slot consumption.
 type NativeKeyAuthority struct {
 	preparation *DownloadKeys
@@ -53,7 +54,7 @@ func (s *NativeKeyAuthority) Resolve(ctx context.Context, peer value.KeyPeer, r 
 	_, second := q.ReadNativeKey(ctx, custodydb.ReadNativeKeyParams{WindowID: id(r.AuthorityID), RootID: id(root)})
 	third := error(pgx.ErrNoRows)
 	if s.projection != nil {
-		_, third = q.ReadProjectionKeyBinding(ctx, id(r.AuthorityID))
+		_, third = q.ReadProjectionKeyAuthority(ctx, id(r.AuthorityID))
 	}
 	// Timeouts, permission errors, corrupt/ambiguous presence and missing rows are
 	// unavailable. Never send a failed/depleted preparation to the window writer.

@@ -15,7 +15,7 @@ import (
 // by the key service. No metadata/download operation or byte response is used.
 func (r *NativeContextReader) ReadApprovedContext(ctx context.Context, source evidence.NativeContextSource, o value.NativeOperation, scope query.ContextProjectionScope, until time.Time) (query.ProjectionResult, error) {
 	var zero query.ProjectionResult
-	if r == nil || ctx == nil || ctx.Err() != nil || o.Kind != value.NativeProjection || !o.CurrentValid(time.Now()) || o.Reference.InstallationID != r.scope.InstallationID || !scope.Valid() || scope.Version != o.SourceVersion {
+	if r == nil || ctx == nil || ctx.Err() != nil || o.Kind != value.NativeProjection || !o.CurrentValid(time.Now()) || o.Reference.InstallationID != r.scope.InstallationID || !scope.Valid() || scope.Comparison != (query.ProfileComparisonWindow{}) || o.Baseline != (value.NativeProjectionSource{}) || scope.Version != o.SourceVersion {
 		return zero, &readRefusal{query.ErrUnavailable, &contextReadStage{"operation", query.ErrUnavailable}}
 	}
 	end, ok := ctx.Deadline()
@@ -44,6 +44,7 @@ func (r *NativeContextReader) projectionReader() (*ContextProjectionReader, erro
 	reader.pages = r.pages
 	reader.summarize = r.summarize
 	reader.syscalls = r.syscalls
+	reader.compare = r.compare
 	return reader, nil
 }
 

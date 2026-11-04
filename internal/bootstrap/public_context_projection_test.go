@@ -130,3 +130,18 @@ func TestPublicContextProjectionRejectsPartialOrForeignServices(t *testing.T) {
 		})
 	}
 }
+
+func TestPublicProfileComparisonRequiresInstalledTypedRoute(t *testing.T) {
+	c, services := publicContextOperationFixture(t)
+	services.Projection = publicProjectionFixture(c)
+	without, err := NewPublicContextOperations(c, services)
+	if err != nil || presentation.BrowserOperationSupported(without, "compare_profiles") {
+		t.Fatal("comparison implicitly enabled", err)
+	}
+	services.Projection.ComparisonRoutes = &publicProjectionPorts{}
+	c.CollectionEnabled = false
+	with, err := NewPublicContextOperations(c, services)
+	if err != nil || !presentation.BrowserOperationSupported(with, "compare_profiles") || !slices.Contains(with.ToolNames(), "compare_profiles") {
+		t.Fatal("typed retained comparison missing", err)
+	}
+}

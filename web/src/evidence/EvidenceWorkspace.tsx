@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
+import { caseIDFromPath } from '../routes';
 import { Evidence } from './evidence';
 import type { Artifact, Download } from './http';
+import { ProfileComparisonView } from '../projection/ProfileComparisonView';
 import { ProfileSummaryView } from '../projection/ProfileSummaryView';
 import { SyscallProjectionView } from '../projection/SyscallProjectionView';
 import { ContextProjectionView } from '../projection/ContextProjectionView';
@@ -28,6 +30,41 @@ function SavedProfileSummary({ session, scope, caseID, artifact }: { session: Se
   const [controller] = useState(() => ContextProjection.profile());
   return <ProfileSummaryView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest}/>;
 }
+function baselineCaseID(text: string): string | undefined {
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(text)) return text;
+  try {
+    const link = new URL(text, window.location.origin);
+    if (link.origin !== window.location.origin || link.search || link.hash || link.username || link.password) return;
+    return caseIDFromPath(link.pathname);
+  } catch { return; }
+}
+function SavedProfileComparison({ session, scope, caseID, artifact, profiles }: { session: Session; scope: AbortSignal; caseID: string; artifact: Artifact; profiles: Artifact[] }) {
+  const [controller] = useState(() => ContextProjection.comparison());
+  const [baselineEvidence] = useState(() => new Evidence());
+  const baselineState = useSyncExternalStore(baselineEvidence.subscribe, baselineEvidence.snapshot);
+  const [baselineCase, setBaselineCase] = useState('');
+  const requestedCase = baselineCaseID(baselineCase);
+  const [lookup, setLookup] = useState<{ caseID: string; session: Session; scope: AbortSignal }>();
+  const loadedCase = lookup?.session === session && lookup.scope === scope && !scope.aborted ? lookup.caseID : '';
+  useEffect(() => {
+    if (!loadedCase) { baselineEvidence.reset(); return; }
+    return baselineEvidence.attach(session, scope, loadedCase);
+  }, [baselineEvidence, lookup, loadedCase, session, scope]);
+  // Existing case reads provide the choices. A typed case ID never supplies an
+  // artifact/version or comparison authority, and no native bytes are fetched.
+  const loaded = !!loadedCase && baselineState.caseID === loadedCase && baselineState.details?.case.access !== 'shared'
+    ? (baselineState.details?.artifacts ?? []).filter(source => source.kind === 'profile' && source.native_format === 'pprof' && source.data_class === 'raw' && Date.parse(source.expires_at) > Date.now()) : [];
+  const baselines = profiles.map(source => ({ caseID, artifactID: source.artifact_id, version: source.digest, label: `Profile ${source.artifact_id}` }));
+  if (loadedCase !== caseID) baselines.push(...loaded.map(source => ({ caseID: loadedCase, artifactID: source.artifact_id, version: source.digest, label: `Profile ${source.artifact_id} · case ${loadedCase}` })));
+  return <div>
+    <label>Baseline evidence link or case ID <input value={baselineCase} onChange={event => { controller.close(); setLookup(undefined); setBaselineCase(event.target.value); }}/></label>
+    <Button className="button secondary" isDisabled={baselineState.busy || !requestedCase} onPress={() => { controller.close(); if (requestedCase) setLookup({ caseID: requestedCase, session, scope }); }}>Load baseline case profiles</Button>
+    {baselineState.busy && <p role="status">Checking baseline case access…</p>}
+    {baselineState.error && <p role="alert">Baseline case profiles are unavailable or access could not be checked.</p>}
+    {loadedCase && !baselineState.busy && baselineState.details && loaded.length === 0 && <p role="status">No available profiles in this baseline case.</p>}
+    <ProfileComparisonView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest} baselines={baselines}/>
+  </div>;
+}
 function SavedSyscallViews({ session, scope, caseID, artifact }: { session: Session; scope: AbortSignal; caseID: string; artifact: Artifact }) {
   const [controller] = useState(() => ContextProjection.syscalls());
   return <SyscallProjectionView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest}/>;
@@ -46,6 +83,7 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
   useEffect(() => { heading.current?.focus(); }, []);
   const download = state.download;
   const pending = !!state.preparingArtifact;
+  const profiles = state.details?.case.access !== 'shared' ? (state.details?.artifacts ?? []).filter(artifact => artifact.kind === 'profile' && artifact.native_format === 'pprof' && artifact.data_class === 'raw' && Date.parse(artifact.expires_at) > Date.now()) : [];
   return <div className="capture-workspace evidence-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>Evidence</h1><p>Inspect the saved details, or download the native file for your preferred compatible local tools.</p></div>
     {state.error && <p role="alert" className="notice">{state.error}</p>}
@@ -63,7 +101,7 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
         <Handling artifact={artifact}/>
         {Date.parse(artifact.expires_at) <= Date.now() ? <p>Evidence access has expired.</p> : <>
           {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <SavedPodStatus session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id}/>}
-          {artifact.kind === 'profile' && artifact.native_format === 'pprof' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared' && <SavedProfileSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/>}
+          {artifact.kind === 'profile' && artifact.native_format === 'pprof' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared' && <><SavedProfileSummary session={session} scope={scope} caseID={caseID} artifact={artifact}/><SavedProfileComparison session={session} scope={scope} caseID={caseID} artifact={artifact} profiles={profiles}/></>}
           {artifact.kind === 'syscallTrace' && (artifact.native_format === 'asservat-syscall-events/v1' && artifact.data_class === 'metadata' || artifact.native_format === 'asservat-syscall-arguments/v1' && artifact.data_class === 'raw' && state.details?.case.access !== 'shared') && <SavedSyscallViews session={session} scope={scope} caseID={caseID} artifact={artifact}/>}
           <Button className="button" isDisabled={state.busy || pending} onPress={() => void controller.prepare(artifact)}>Download</Button>
           {state.details?.case.access !== 'shared' && <>

@@ -26,7 +26,7 @@ import (
 // They are bounds, not a qualified capacity claim.
 const (
 	downloadWorkerCPUMillis         = 500
-	downloadWorkerMemoryBytes       = 256 << 20
+	downloadWorkerMemoryBytes       = 384 << 20
 	downloadWorkerMaxRuntimeSeconds = 3600
 )
 

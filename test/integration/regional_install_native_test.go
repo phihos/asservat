@@ -136,7 +136,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		}
 		args = append(args, "--collector-namespace", "asservat-collector", "--collector-name", "asservat-node")
 	}
-	if executor && installedJourneyFocus() == "manual-profile" && index == 1 {
+	if executor && installedProfileFocus() && index == 1 {
 		endpoints, err := json.Marshal(manualProfileEndpoints())
 		if err != nil {
 			t.Fatal(err)
@@ -999,7 +999,7 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 		command = []string{"/provider-proxy", "signals"}
 	}
 	var ports []core.ContainerPort
-	if installedJourneyFocus() == "manual-profile" {
+	if installedProfileFocus() {
 		command = []string{"/profile-native"}
 		ports = []core.ContainerPort{{Name: "diagnostics", ContainerPort: 6060}}
 	}
