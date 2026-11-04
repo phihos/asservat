@@ -823,7 +823,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if heapSummary.Unit != "bytes" || heapSummary.DurationSeconds != nil || heapSummary.Total <= 0 {
 			t.Fatal("heap snapshot summary invented duration or lost allocation bytes", heapSummary)
 		}
-		t.Log("heap phase: read-only summary completed with joined SQL worker/key proof; native preparation has not been issued")
+		t.Log("heap phase: read-only summary completed with joined SQL worker/key proof; no native preparation was admitted")
 	}
 	if measurement != nil {
 		if err := finishRecording(); err != nil {
@@ -947,7 +947,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 				t.Fatal("read-only heap summary differs from subsequently authorized native original", err)
 			}
 			qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
-			t.Log("installed heap snapshot: namespace profile, independent raw approval, original Pod, no forced GC, read-only inuse_space summary before separate authenticated native download; exact signed native total/bytes and null duration verified")
+			t.Log("installed heap snapshot: namespace profile, independent collection review with selected result access, original Pod, no forced GC, read-only inuse_space summary before separate authenticated native download; exact signed native total/bytes and null duration verified")
 			return
 		}
 		qualifyManualProfileNative(t, ctx, native, receipt.CaptureID)
