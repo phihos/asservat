@@ -2,8 +2,9 @@
 
 ## Current shared profile candidate (2026-11-04)
 
-The published PR162 candidate `c2d4f74b` incorporates the measured Repeat phase fix.
-Required pull-request CI41891225797 passed every job, including `ci-ok`.
+The published PR162 candidate `00fca3ee` incorporates the measured Repeat and
+owner-observation phase fixes. Required pull-request CI41900935231 passed every
+job, including `ci-ok`.
 Previous
 `1cba8f74` passed genuine pull-request CI41879540541 and
 [installed heap41879673486](../test/results/heap-browser-native-41879673486/README.md)
@@ -82,8 +83,25 @@ allocates the intended real second within the unchanged original request;
 30 repeated race runs passed and expiry negatives are unchanged. The initial
 batch exit1 and final selected-race exit0 remain distinct in
 [owner-observation-phase-local](../test/results/owner-observation-phase-local/README.md).
-New eligible PR CI and fresh installed trace qualification remain pending.
-No further preview-timeout increase is made.
+Fresh [trace41901024982](../test/results/runtime-trace-native-41901024982/README.md)
+at `00fca3ee` exited Go/harness1 after500.682s. Capture, publication, semantic
+refusal, authenticated85,612B native download and offline trace parsing passed.
+History had already failed `write/reserve/live`: PostgreSQL23514 from
+`require_capacity_new_admission` at20:05:16.381. The first settings read returned
+`ParametersUnavailable`; Repeat was not reached. All4,137 submitted sources
+matched Git; unchanged-source, scratch and cleanup checks passed. The generic
+database refusal cannot establish which internal guard condition failed.
+
+The existing history service fixture lacks a managed capacity source, so it
+does not exercise that admission guard. A real managed-source regression now
+tests the actual compiled writer, expired workload binding, fresh control and
+atomic rollback. Preserve ADR-272's after-start order: history-before-start
+previously starved acquisition. History is separately charged1,671,168bytes and
+four object slots; it is not prepaid by capture admission. The proposed exact
+accepted-capture metadata guard retains current identity, recovery, retention,
+pool/allocation/control/quota and original deadlines, with an atomic verified
+association. Production changes await the managed regression; no new installed
+run or preview-timeout increase is made.
 TLS is a private, locally checked follow-up; full S-05/specification completion
 remains open.
 Earlier checkpoints follow.
