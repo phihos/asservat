@@ -40,8 +40,17 @@ The focused protected-true/edited4MiB reproduction failed before the fix and
 passed after normalizing only that marker in a cloned comparison value. The
 frozen child scope, required raw/liveProfile grant, all acquisition fields and
 other sensitive reasons remain checked. Independent review and repeated
-`make pre-push` passed; the fresh real-SQL rerun remains pending. No deadline or
-approval is relaxed.
+`make pre-push` passed. Fresh selected real-SQL qualification at `a164776e`
+passed (Go10.949s/harness0): one4MiB native allowance and execution, exact replay,
+zero observation spend/sessions, missing/changed-definition/exhausted admission
+rollback, and original-grant acquisition read after reattachment plus denial
+following original revocation. All4,031 source hashes independently match the
+committed blobs, sources stayed unchanged and cleanup was `[]`. Reports are in
+`test/results/policy-profile-admission-fixed-a164/`. This component uses compiled
+runtime SQL grants with synthetic protected endpoint/target/reviewer facts; it
+checks ReadAPIContextWork, not preparation/start or multipart streaming. The six
+unchanged legacy mode passes from68025 remain applicable. No deadline or approval
+is relaxed. Exact-current CI and installed policy-profile qualification are next.
 
 Saved syscall views are merged in [PR150](https://github.com/phihos/asservat/pull/150),
 main `381820beabb16caceb3b378e5f007e094cd1dd15`. Its full tree matches qualified
