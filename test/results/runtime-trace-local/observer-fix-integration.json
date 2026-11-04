@@ -1,0 +1,43 @@
+{
+  "sourceHead": "a5d15db664c9aac57f1286d2752205ce644337cb",
+  "baseResourceCandidate": "87df6794064de4423d92745d826aab735dd36b78",
+  "twoTracePatchesUnchanged": true,
+  "rangeDiff": "1:  0eabaabf = 1:  73a64ee6 test: prepare installed Go runtime trace download qualification\n2:  678575cd = 2:  a5d15db6 docs: retain runtime trace local preparation evidence\n",
+  "affectedGo": {
+    "exit": 0,
+    "seconds": 4.519,
+    "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOFLAGS='-buildvcs=false -p=2' go test -race -count=1 -timeout=3m -run '^TestInstalled(ManualProfile|ProfileComparison|ApprovedRecordingFixtureShape|RecordingPassive)' ./test/integration"
+  },
+  "python": {
+    "combinedShellExit": 0,
+    "commands": [
+      "python3 scripts/test-regional-context-selection.py",
+      "python3 scripts/test-runtime-trace-selection.py"
+    ],
+    "explicitTerminalReports": [
+      "34 tests OK",
+      "3 tests OK"
+    ]
+  },
+  "scope": "Local additive integration only; actual installed trace remains unrun. The resource observer/staging fixes are inherited unchanged from the current candidate.",
+  "files": [
+    {
+      "file": "after-observer-fix-race.log.gz",
+      "source": "/home/phil/.cache/asservat-build/runtime-trace-native/integrated/after-observer-fix-race.log",
+      "sha256": "ddd55d8c7d518faa93561d3b3d0b988e66a175df2fd5a627a93cc10116d12a07",
+      "bytes": 53
+    },
+    {
+      "file": "after-observer-fix-selector.log.gz",
+      "source": "/home/phil/.cache/asservat-build/runtime-trace-native/integrated/after-observer-fix-selector.log",
+      "sha256": "de234c0e9d6ba319fd44c8daebdbba3434bf732d663b2d167d1ce7e2358d3f4f",
+      "bytes": 133
+    },
+    {
+      "file": "after-observer-fix-trace-selector.log.gz",
+      "source": "/home/phil/.cache/asservat-build/runtime-trace-native/integrated/after-observer-fix-trace-selector.log",
+      "sha256": "58976e1ebef02b28fad1bcf93e82831c9ac8cc4bf93fac3ea64e4eed88432c50",
+      "bytes": 101
+    }
+  ]
+}
