@@ -28,14 +28,32 @@ a normal workflow; this shape stresses an uncommon large input. (4)Reuses the
 existing framed comparison fixture and native suite. (5)0 production privileges,
 credentials or exposure. (6)0 product failure/fallback states. (7)0 product settings;
 one closed test variant. (8)Existing Docker/Kubernetes cgroups only. (9)0 runtime
-background cost; each of the existing two queries gets one bounded2s test-only
-probe including its cost, with unchanged40-unit funding. Separate generation
+background cost; each existing query gets one finite test-only probe including its cost, with
+unchanged40-unit funding. Initial SQL and individual SQL/API/exec calls have
+at most2s; a successful observation and100ms close polling keep the original
+worker cutoff (at most its remaining60s), rather than sharing an arbitrary2s
+aggregate. Failure diagnostics retain the2s total bound. Separate generation
 uses measured build-process resources; no graph construction occurs in the small
 workload/worker. (10)No migration or rollout change; default fixture mode remains.
 (11)A finite probe is smaller than a metric service; standalone parser RSS cannot
 measure the installed crypto/transport/runtime envelope. Native/cgroup/CPU/lifecycle
 results remain required before making the corresponding installed claim.
 
+
+Review of the initial resource candidate found that its successful observer
+incorrectly inherited the two-second lookup deadline. The fixture now derives
+the complete observation from the original caller/worker cutoff. Generated
+producer/observer artifacts stage in the existing private0700 harness directory
+and only six fixed files are collected into a unique results folder after Go
+terminates, including failed runs. Actual filesystem tests reproduce the old
+early source-tree write (RED) and pass with terminal collection (GREEN);34 Python
+checks and4.211s affected races pass. Integrated profile preflight passed4.448s
+fixture races; Python34 and affected repository gates also pass. Independent
+review found no blocker. Originals are retained in
+`test/results/profile-worker-containment-review-fix/`. No
+full observer-orchestration regression is claimed from these concrete SQL/exec
+ports; the installed sequence remains unrun. Initial CI41826790336 was cancelled
+as superseded before any heavy native dispatch.
 
 **Latest verified outcome:** the installed Go heap snapshot MCP workflow passed
 at `80593f9398ad9bf909afe9fd46a34752b3060ba1` in
