@@ -174,6 +174,58 @@ head; the current policy change has its own focused composed regression and will
 receive full Go CI plus one installed qualification. Another installed
 qualification remains required.
 
+**Post-policy-repair MCP resource pass; browser still failed:**
+[native41846328376](https://github.com/phihos/asservat/actions/runs/41846328376)
+ran `4552bfd0e6500842facf297d91de9a15d8dd1394` (Go exit1,
+666.969s); eligible PR CI41846243126 passed. Both native inputs matched the
+prepared ten-second pair and opened with pprof. The first MCP comparison returned
+success in10.502s. Its exact original worker/query/source/key joins closed, with
+20 units spent, both three-role children consumed, `nativeClosed/closed=true`
+and no active batch. The live probe measured276,090,880B (263.30MiB) peak under
+402,653,184B (384MiB), zero swap and zero memory max/high/OOM/OOM-kill events.
+CPU quota was50,000/100,000us;76 of119 periods were throttled, for3,971,457us.
+Whole-worker CPU usage through the probe was4,263,251us, including observer cost.
+These are one original container's cumulative counters through its snapshot,
+not analyzer-only cost or its future idle lifetime. Pod/container/image and
+probe-binary digests matched the original build.
+
+The second, React comparison failed at `until-request`: its original request was
+14:36:16.208050Z through14:36:20.887547Z (4.679s), with only3.330s for the native
+operation. Root spending reached40 units and both key children were consumed,
+but that result and its resource probe did not complete. No second-worker
+resource/exit/OOM claim follows. All4,123 source hashes match the frozen head;
+sources stayed unchanged, cleanup was empty and scratch removed. Originals and
+separate first-pass/second-failure evidence are retained in
+`test/results/profile-heavy-native-41846328376/`.
+
+The real browser identity path had two independent five-second return caps:
+refresh-scheduling metadata and the current settings observation. The focused
+repair separates them from request lifetime under
+[ADR-300](decisions/300-browser-evidence-request-lifetime.md). Every session SQL
+read still validates original five-second settings before and after I/O. Returned
+identity retains actual token/key/group/policy/session expiries; the request keeps
+its original selected twenty-second maximum, with shorter bounds and cancellation
+unchanged. Ordinary requests stay five seconds; callback creation keeps its
+original settings handoff. No SQL migration, cache, loop or extra read is added.
+
+Two independent RED stages prove both caps through the real identity service,
+browser-session application and current-request constructor over existing
+synthetic backing ports. Six seconds of injected-clock work succeeds only with
+fresh current settings; stale/revoked settings, shorter original bounds and
+changed identity still deny. Affected identity/browser/presentation races passed
+1.053s/49.886s/53.612s; independent review found no blocker. The real owned
+Keycloak/PostgreSQL/OpenBao/S3 identity suite then passed in11.472s on committed
+`0b1ebbeb`, with all3,969 source hashes independently matched, unchanged source
+and cleanup[]. This is provider/session component qualification, not an installed
+browser comparison. Integrated pre-push also passed441 console tests; the
+compiled Go TLS/session/operations and React browser gate passed35.109s with
+28 journeys and27 accessibility scans, using synthetic service facts. These
+originals and provider/unit evidence are retained in
+`test/results/browser-evidence-request-window-local/`. Test diagnostics now
+report observed current termination separately from the previous-state exit
+value, without adding an API read. The exact installed browser comparison
+remains pending.
+
 **Latest verified outcome:** the installed Go heap snapshot MCP workflow passed
 at `80593f9398ad9bf909afe9fd46a34752b3060ba1` in
 [native 41818585176](https://github.com/phihos/asservat/actions/runs/41818585176).

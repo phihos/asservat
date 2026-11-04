@@ -4,6 +4,14 @@
 
 Human sessions support a qualified external OIDC provider or the planned [local identity alternative](deployment-profiles.md#req-dep-002--local-identity-without-a-second-permission-system). External sessions use standard OIDC code/PKCE and bounded session refresh; local identity must preserve equivalent principal, assurance and revocation semantics and standard OAuth access for MCP/CLI. Synchronize complete verified external groups by replacement, including removals; stored profile data and session cookies cannot renew claim freshness. Local membership is read from authoritative local identity state with the same bounded freshness/effect checks. There is no mandatory directory-admin account or personal offline token for recurring team capture. IdP logout and external deprovisioning are distinct; login-only synchronization cannot guarantee immediate external revocation. Qualified back-channel logout may invalidate sessions; SCIM/security-event integrations remain optional. The accepted recurring execution model is [team policy automation](policy-automation.md).
 
+Browser and MCP evidence reads use the same existing bounded operation window.
+Browser session reads require fresh current settings and an unrevoked session;
+short-lived settings/scheduling observations do not renew or replace the real
+token, key, group, policy, session and original caller expiries. Every subsequent
+current-identity/final disclosure check still applies; ordinary browser requests
+remain shorter. [ADR-300](../docs/decisions/300-browser-evidence-request-lifetime.md)
+records this implementation correction and its qualification boundary.
+
 A native browser download holds no server-side refresh ownership ([ADR-224](../docs/decisions/224-remove-download-refresh-owners.md)). Read-only GET requests never refresh a session; an interrupted download resumes after the console's explicit refresh.
 
 Every user-facing operation MUST resolve a principal `(issuer, subject, clientID, identityType)` from validated credentials. Validate signature, issuer, audience, expiry/not-before and configured client binding. Never accept ID tokens as access tokens or trust client-supplied group membership or roles. Normalize `azp`/`client_id` with an issuer-specific mapping; reject ambiguous claims.
