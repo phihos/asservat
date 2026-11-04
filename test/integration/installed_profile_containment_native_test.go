@@ -55,6 +55,7 @@ type acceptedHeavyManifest struct {
 }
 type installedProfileContainmentFixture struct {
 	ResourceProbeSHA256 string
+	OutputDirectory     string // Private harness work directory, collected explicitly at terminal.
 	Manifest            acceptedHeavyManifest
 }
 
@@ -122,8 +123,11 @@ type installedComparisonResourceObserver func(index int, handle, operation strin
 
 func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, kubeconfig, root string, f *installedProfileContainmentFixture) installedComparisonResourceObserver {
 	t.Helper()
-	if f == nil || len(f.ResourceProbeSHA256) != 64 {
-		t.Fatal("accepted-heavy resource probe provenance missing")
+	if f == nil || len(f.ResourceProbeSHA256) != 64 || !filepath.IsAbs(f.OutputDirectory) {
+		t.Fatal("accepted-heavy resource probe provenance or private output directory missing")
+	}
+	if info, err := os.Stat(f.OutputDirectory); err != nil || !info.IsDir() {
+		t.Fatal("accepted-heavy private output directory unavailable", err)
 	}
 	return func(index int, handle, operation string, sources [2]installedProfileComparisonSource, complete bool) {
 		t.Helper()
@@ -133,17 +137,7 @@ func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxp
 			if failure != nil {
 				record["error"] = failure.Error()
 			}
-			kind := "complete"
-			if !complete {
-				kind = "failure"
-			}
-			raw, err := json.MarshalIndent(record, "", "  ")
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			path := filepath.Join("../results", fmt.Sprintf("profile-worker-containment-%d-%s.json", index, kind))
-			if err := os.WriteFile(path, append(raw, '\n'), 0600); err != nil {
+			if err := writeComparisonResourceRecord(f.OutputDirectory, index, complete, record); err != nil {
 				t.Error(err)
 			}
 			if complete && failure != nil {
@@ -158,7 +152,9 @@ func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxp
 		var rootSpent int64
 		var roleMasks json.RawMessage
 		read := func() error {
-			return admin.QueryRow(call, `SELECT q.query,w.intent_json,w.job_json,w.binding_json,coalesce(b.native_closed,false),coalesce(b.closed,false),q.active_batch IS NOT NULL,q.uncertain,
+			readCall, stopRead := context.WithTimeout(call, 2*time.Second)
+			defer stopRead()
+			return admin.QueryRow(readCall, `SELECT q.query,w.intent_json,w.job_json,w.binding_json,coalesce(b.native_closed,false),coalesce(b.closed,false),q.active_batch IS NOT NULL,q.uncertain,
  context_query_units(q.query->'Scope'),(SELECT count(*) FROM context_query_key_binding k WHERE k.query_id=q.id AND k.used_roles=7),
  (SELECT allocated FROM context_query_backing WHERE root_id=q.root_id),
  coalesce((SELECT jsonb_agg(jsonb_build_object('ordinal',source_ordinal,'used_roles',used_roles) ORDER BY source_ordinal) FROM context_query_key_binding WHERE query_id=q.id),'[]'::jsonb)
@@ -190,7 +186,10 @@ func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxp
 		record["nativeClosed"], record["closed"], record["active"], record["uncertain"] = nativeClosed, closed, active, uncertain
 		record["keyRoles"], record["sourcePodUIDs"] = roleMasks, [2]string{baseline.PodUID, q.Scope.PodUID}
 		if complete {
-			workerCall, stop := context.WithDeadline(call, q.WorkerUntil)
+			// SQL lookup has its own short timeout. The complete observation
+			// retains the original caller/worker interval across close polling,
+			// Pod reads and exec; no earlier SQL child can shorten it.
+			workerCall, stop := context.WithDeadline(ctx, q.WorkerUntil)
 			defer stop()
 			call = workerCall
 			for !nativeClosed || !closed || active {
@@ -207,7 +206,12 @@ func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxp
 			}
 			record["nativeClosed"], record["closed"], record["active"], record["uncertain"], record["keyRoles"] = nativeClosed, closed, active, uncertain, roleMasks
 		}
-		pod, err := api.CoreV1().Pods(worker.Binding.Namespace).Get(call, worker.Binding.Pod, meta.GetOptions{})
+		readPod := func() (*core.Pod, error) {
+			podCall, stopPod := context.WithTimeout(call, 2*time.Second)
+			defer stopPod()
+			return api.CoreV1().Pods(worker.Binding.Namespace).Get(podCall, worker.Binding.Pod, meta.GetOptions{})
+		}
+		pod, err := readPod()
 		if err != nil {
 			failure = err
 			return
@@ -224,7 +228,9 @@ func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxp
 			failure = errors.New("original worker cutoff passed before finite probe")
 			return
 		}
-		command := exec.CommandContext(call, "kubectl", "--kubeconfig", kubeconfig, "-n", worker.Binding.Namespace, "exec", worker.Binding.Pod, "-c", "acquisition", "--", "/worker-resource-probe")
+		execCall, stopExec := context.WithTimeout(call, 2*time.Second)
+		defer stopExec()
+		command := exec.CommandContext(execCall, "kubectl", "--kubeconfig", kubeconfig, "-n", worker.Binding.Namespace, "exec", worker.Binding.Pod, "-c", "acquisition", "--", "/worker-resource-probe")
 		command.WaitDelay = 250 * time.Millisecond
 		probeStarted := time.Now()
 		out, err := command.Output()
@@ -245,8 +251,8 @@ func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxp
 			failure = errors.New("actual cgroup bounds/finite probe mismatch")
 			return
 		}
-		current, err := api.CoreV1().Pods(worker.Binding.Namespace).Get(call, worker.Binding.Pod, meta.GetOptions{})
-		if err != nil || !comparisonResourcePodMatches(worker, current) || current.Status.ContainerStatuses[0].ContainerID != pod.Status.ContainerStatuses[0].ContainerID {
+		current, err := readPod()
+		if err != nil || call.Err() != nil || !time.Now().Before(q.WorkerUntil) || !comparisonResourcePodMatches(worker, current) || current.Status.ContainerStatuses[0].ContainerID != pod.Status.ContainerStatuses[0].ContainerID {
 			failure = errors.New("resource worker changed during finite exec")
 			return
 		}
@@ -255,6 +261,22 @@ func installedComparisonResources(t *testing.T, ctx context.Context, admin *pgxp
 		t.Logf("accepted-heavy whole worker: query=%s podUID=%s memoryPeak=%d/384MiB cpuUsageUS=%d quota=%d/%d throttledPeriods=%d (observer included, no analyzer-only baseline)", q.ID, pod.UID, observed.MemoryPeak, observed.CPUStat["usage_usec"], observed.CPUQuota.Value, observed.CPUPeriod, observed.CPUStat["nr_throttled"])
 	}
 }
+
+// The only observer artifacts are fixed names in the private harness directory.
+// The Python owner copies them to results after the test has terminated.
+func writeComparisonResourceRecord(directory string, index int, complete bool, record map[string]any) error {
+	kind := "complete"
+	if !complete {
+		kind = "failure"
+	}
+	raw, err := json.MarshalIndent(record, "", "  ")
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(directory, fmt.Sprintf("profile-worker-containment-%d-%s.json", index, kind))
+	return os.WriteFile(path, append(raw, '\n'), 0600)
+}
+
 func comparisonResourcePodMatches(worker value.AcquisitionWorker, pod *core.Pod) bool {
 	if pod == nil || string(pod.UID) != worker.Binding.PodUID || pod.Name != worker.Binding.Pod || pod.Namespace != worker.Binding.Namespace || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Name != "acquisition" || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != query.ProfileComparisonWorkerBytes || pod.Spec.Containers[0].Resources.Limits.Cpu().MilliValue() != 500 || len(pod.Status.ContainerStatuses) != 1 || pod.Status.ContainerStatuses[0].Name != "acquisition" || pod.Status.ContainerStatuses[0].ContainerID == "" || pod.Status.ContainerStatuses[0].ImageID == "" || pod.Spec.Containers[0].Image != worker.Intent.Profile.Image {
 		return false

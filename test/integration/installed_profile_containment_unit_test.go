@@ -155,3 +155,32 @@ func TestInstalledProfileComparisonAcceptedHeavyNativeHashPins(t *testing.T) {
 		t.Fatal("changed native bytes accepted")
 	}
 }
+
+func TestInstalledProfileComparisonResourceReportsStayInPrivateDirectory(t *testing.T) {
+	dir := t.TempDir()
+	for _, complete := range []bool{false, true} {
+		record := map[string]any{"complete": complete, "error": "synthetic terminal evidence"}
+		if err := writeComparisonResourceRecord(dir, 1, complete, record); err != nil {
+			t.Fatal(err)
+		}
+	}
+	files, err := os.ReadDir(dir)
+	if err != nil || len(files) != 2 {
+		t.Fatal("missing private terminal reports", files, err)
+	}
+	for _, name := range []string{"profile-worker-containment-1-complete.json", "profile-worker-containment-1-failure.json"} {
+		path := filepath.Join(dir, name)
+		raw, err := os.ReadFile(path)
+		var record map[string]any
+		if err != nil || json.Unmarshal(raw, &record) != nil || record["error"] != "synthetic terminal evidence" {
+			t.Fatal("private evidence not preserved", name, err)
+		}
+		info, err := os.Stat(path)
+		if err != nil || info.Mode().Perm() != 0600 {
+			t.Fatal("private report permissions changed", err)
+		}
+	}
+	if err := writeComparisonResourceRecord(filepath.Join(dir, "missing"), 0, false, map[string]any{}); !os.IsNotExist(err) {
+		t.Fatal("missing private output directory silently replaced", err)
+	}
+}

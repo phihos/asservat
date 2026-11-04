@@ -71,6 +71,10 @@ class RegionalContextSelection(unittest.TestCase):
             report={}
             with patch.object(fixture,"ROOT",root),patch.object(fixture.subprocess,"run",side_effect=compile_fake),patch.object(fixture.subprocess,"Popen",side_effect=generate_fake),patch.object(fixture.os,"wait4",return_value=(12345,0,SimpleNamespace(ru_maxrss=487412,ru_utime=2.0,ru_stime=0.2))):
                 metadata=fixture.prepare_profile_containment_fixture({"CGO_ENABLED":"0","GOMEMLIMIT":"must-not-leak"},root,image,report)
+            self.assertFalse(any((root/"test/results").iterdir()), "producer wrote generated artifacts before explicit terminal collection")
+            self.assertEqual(metadata["OutputDirectory"],str(root/"profile-containment"))
+            self.assertTrue((root/"profile-containment/profile-heavy-generation.log").is_file())
+            self.assertTrue((root/"profile-containment/profile-heavy-manifest.json").is_file())
             self.assertEqual(report["profileHeavyGeneration"]["peakRSSKiB"],487412)
             self.assertEqual(report["profileHeavyGeneration"]["exitCode"],0)
             self.assertFalse(report["profileHeavyGeneration"]["timedOut"])
@@ -83,6 +87,63 @@ class RegionalContextSelection(unittest.TestCase):
             with p.open("r+b") as f:f.write(b"changed")
             with self.assertRaisesRegex(RuntimeError,"hash/bound"):
                 fixture.validate_profile_heavy_manifest(image,metadata["Manifest"]["generator_binary_sha256"])
+
+    def test_failed_heavy_producer_retains_original_artifacts_for_terminal_collection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            results=root/"test/results"; results.mkdir(parents=True)
+            work=root/"private-run"; work.mkdir(mode=0o700)
+            image=work/"image"; image.mkdir()
+            def compile_fake(command,**kwargs):
+                Path(command[command.index("-o")+1]).write_bytes(b"synthetic generator binary")
+            def fail_fake(command,**kwargs):
+                kwargs["stdout"].write(b"synthetic producer terminal failure")
+                (image/"profile-heavy-manifest.json").write_bytes(b"partial producer manifest")
+                return SimpleNamespace(pid=12345,returncode=None)
+            report={}
+            with patch.object(fixture,"ROOT",root),patch.object(fixture.subprocess,"run",side_effect=compile_fake),patch.object(fixture.subprocess,"Popen",side_effect=fail_fake),patch.object(fixture.os,"wait4",return_value=(12345,256,SimpleNamespace(ru_maxrss=1,ru_utime=0.0,ru_stime=0.0))):
+                with self.assertRaisesRegex(RuntimeError,"separate producer failed"):
+                    fixture.prepare_profile_containment_fixture({"CGO_ENABLED":"0"},work,image,report)
+            self.assertEqual(report["profileHeavyGeneration"]["exitCode"],1)
+            self.assertFalse(any(results.iterdir()))
+            collected=fixture.collect_profile_containment_artifacts(work,results)
+            destination=Path(collected["directory"])
+            self.assertEqual((destination/"profile-heavy-generation.log").read_bytes(),b"synthetic producer terminal failure")
+            self.assertEqual((destination/"profile-heavy-manifest.json").read_bytes(),b"partial producer manifest")
+
+    def test_containment_terminal_collection_preserves_success_and_failure_before_cleanup(self):
+        for complete in (False, True):
+            with self.subTest(complete=complete), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory)
+                work=root/"private-run"; work.mkdir(mode=0o700)
+                artifacts=work/"profile-containment"; artifacts.mkdir(mode=0o700)
+                results=root/"results"; results.mkdir()
+                (artifacts/"profile-heavy-generation.log").write_bytes(b"trusted generator output")
+                (artifacts/"profile-heavy-manifest.json").write_text('{"synthetic":true}')
+                kind="complete" if complete else "failure"
+                name=f"profile-worker-containment-0-{kind}.json"
+                (artifacts/name).write_text(json.dumps({"resourceQualified":complete}))
+                (artifacts/"unrelated-private-file").write_text("must not be collected")
+                self.assertFalse(any(results.iterdir()))
+                report=fixture.collect_profile_containment_artifacts(work,results)
+                expected=["profile-heavy-generation.log","profile-heavy-manifest.json",name]
+                self.assertEqual(report["files"],expected)
+                destination=Path(report["directory"])
+                self.assertEqual(destination.parent,results)
+                for name in expected:
+                    self.assertEqual((destination/name).read_bytes(),(artifacts/name).read_bytes())
+                self.assertFalse((destination/"unrelated-private-file").exists())
+                # Collection survives the actual following private-work cleanup.
+                import shutil
+                shutil.rmtree(work)
+                self.assertEqual(json.loads((destination/f"profile-worker-containment-0-{kind}.json").read_text()),{"resourceQualified":complete})
+        source=inspect.getsource(fixture.main)
+        terminal=source.index('finally:\n            report["testExit"]')
+        collect=source.index("collect_profile_containment_artifacts(work",terminal)
+        cleanup=source.index('keep = keep_on_failure',terminal)
+        self.assertLess(terminal,collect)
+        self.assertLess(collect,cleanup)
+        self.assertIsNone(fixture.collect_profile_containment_artifacts(root/"absent",results))
 
     def test_heap_alias_uses_existing_focus_and_closed_variant(self):
         # Execute only the dispatcher against a fake Python executable: no

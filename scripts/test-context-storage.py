@@ -434,13 +434,15 @@ def validate_profile_heavy_manifest(directory, generator_sha):
 def prepare_profile_containment_fixture(build_env, work, image_dir, report):
     # Separate trusted producer: its graph/encryption-free native generation
     # must not be mistaken for384MiB worker/application memory consumption.
+    artifacts = work / "profile-containment"
+    artifacts.mkdir(mode=0o700)
     generator = work / "profile-heavy-generator.test"
     subprocess.run(["go","test","-c","-o",str(generator),"./internal/adapters/objectstore"],cwd=ROOT,env=build_env,check=True)
     with generator.open("rb") as content:
         generator_sha = hashlib.file_digest(content, "sha256").hexdigest()
     generate_env = dict(build_env, ASSERVAT_PROFILE_ACCEPTED_HEAVY_DIR=str(image_dir), GOMAXPROCS="2", GOGC="100")
     generate_env.pop("GOMEMLIMIT",None)
-    log = work / "profile-heavy-generation.log"
+    log = artifacts / "profile-heavy-generation.log"
     began = time.monotonic()
     with log.open("wb") as output:
         process = subprocess.Popen([str(generator),"-test.run","^TestProfileAcceptedHeavyNativeFixture$","-test.v"],cwd=ROOT,env=generate_env,stdout=output,stderr=subprocess.STDOUT)
@@ -458,7 +460,9 @@ def prepare_profile_containment_fixture(build_env, work, image_dir, report):
         process.returncode = os.waitstatus_to_exitcode(status)
     generation = {"binarySHA256":generator_sha,"elapsedSeconds":time.monotonic()-began,"peakRSSKiB":usage.ru_maxrss,"userCPUSeconds":usage.ru_utime,"systemCPUSeconds":usage.ru_stime,"exitCode":process.returncode,"timedOut":timed_out,"scope":"separate build producer outside workload/worker cgroups"}
     report["profileHeavyGeneration"] = generation
-    (ROOT/"test/results/profile-heavy-generation.log").write_bytes(log.read_bytes())
+    manifest_path = image_dir / "profile-heavy-manifest.json"
+    if manifest_path.is_file() and manifest_path.stat().st_size <= 16384:
+        shutil.copyfile(manifest_path, artifacts/"profile-heavy-manifest.json")
     if process.returncode != 0:
         raise RuntimeError("Accepted-heavy separate producer failed")
     manifest = validate_profile_heavy_manifest(image_dir,generator_sha)
@@ -468,12 +472,29 @@ def prepare_profile_containment_fixture(build_env, work, image_dir, report):
     subprocess.run(["go","build","-trimpath","-buildvcs=false","-o",str(probe),"./test/fixtures/worker-resource-probe/main.go"],cwd=ROOT,env=build_env,check=True)
     with probe.open("rb") as content:
         probe_sha = hashlib.file_digest(content,"sha256").hexdigest()
-    metadata = {"ResourceProbeSHA256":probe_sha,"Manifest":manifest}
+    metadata = {"ResourceProbeSHA256":probe_sha,"OutputDirectory":str(artifacts),"Manifest":manifest}
     report["profileContainment"] = metadata
     report["profileHeavyImageNativeBytes"] = sum(item["native_bytes"] for item in manifest["inputs"])
     report["profileResourceProbeBytes"] = probe.stat().st_size
-    (ROOT/"test/results/profile-heavy-manifest.json").write_text(json.dumps(manifest,indent=2)+"\n")
     return metadata
+
+
+def collect_profile_containment_artifacts(work, results):
+    """Collect only this run's fixed synthetic producer/observer files at terminal."""
+    artifacts = work / "profile-containment"
+    if not artifacts.is_dir():
+        return None
+    destination = results / ("profile-worker-containment-" + work.name)
+    destination.mkdir(mode=0o700)
+    names = ["profile-heavy-generation.log", "profile-heavy-manifest.json"]
+    names += [f"profile-worker-containment-{index}-{kind}.json" for index in range(2) for kind in ("complete", "failure")]
+    collected = []
+    for name in names:
+        source = artifacts / name
+        if source.is_file():
+            shutil.copyfile(source, destination / name)
+            collected.append(name)
+    return {"directory": str(destination), "files": collected, "scope": "explicit terminal collection from the private harness directory, including failed runs"}
 
 
 def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False):
@@ -979,6 +1000,14 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         finally:
             report["testExit"] = exit_code
             failures = []
+            try:
+                artifacts = collect_profile_containment_artifacts(work, ROOT/"test/results")
+                if artifacts is not None:
+                    report["profileContainmentArtifacts"] = artifacts
+            except OSError as exc:
+                report["profileContainmentArtifactError"] = type(exc).__name__
+                exit_code = 1
+                report["testExit"] = exit_code
             if native_paced:
                 try:
                     if not audit_started or len(audit_nodes) != 2:
