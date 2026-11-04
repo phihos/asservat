@@ -1,6 +1,6 @@
 # Custody migrations and query bindings
 
-`00001_custody.sql` is the initial storage-accounting facet described in [custody transactions](../docs/architecture/custody-transactions.md). It is not the complete hub schema. The current shared runtime adapter requires schema version 136; generated queries consume effective-retention columns and durable source checkpoints; runtime roles must not own schema objects or modify goose history. There is no destructive down migration that silently removes live charges or deletion records.
+`00001_custody.sql` is the initial storage-accounting facet described in [custody transactions](../docs/architecture/custody-transactions.md). It is not the complete hub schema. The current shared runtime adapter requires schema version 137; generated queries consume effective-retention columns and durable source checkpoints; runtime roles must not own schema objects or modify goose history. There is no destructive down migration that silently removes live charges or deletion records.
 
 Use `make sql-tools` for pinned sqlc v1.31.1 and goose v3.28.0, with sufficient build space. `make sql-check` regenerates bindings in a private temporary directory and compares them with `internal/adapters/postgres/custodydb`. Intentional query/schema changes use the pinned `sqlc generate`, then review generated code and run the real PostgreSQL test.
 

@@ -419,3 +419,10 @@ examples:
 - file: examples/mcp-profile-comparison-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: compare_profiles
+
+- file: examples/mcp-packet-summary-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: get_pcap_summary
+- file: examples/mcp-packet-summary-unreported-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: get_pcap_summary

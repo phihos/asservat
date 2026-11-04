@@ -76,6 +76,16 @@ Each network artifact records profile/projection and engine/compiler digests, li
 
 EXP-02/03 must qualify filter compilation, continuous peer updates, CNI/dual-stack/NAT/hostNetwork/loopback behavior, rings under stalls and HTTP secrecy/resource bounds before capability advertisement. Unsupported environments return specific unavailable results; no blanket packet coverage claim.
 
+The first saved `get_pcap_summary` runtime is the bounded Go metadata path in
+[ADR-303](../docs/decisions/303-saved-packet-summary.md): full authenticated saved
+PCAPNG, at most8MiB, fixed directional numeric endpoint/protocol groups, top100
+of at most16,384 aggregates, no filters, DNS, payload or comments. Packet counts
+mean records in the saved file rather than unique datagrams. `drops` is nullable;
+`drop_reporting` labels finite capture exclusions, snapshot output-limit exclusions
+or unavailable statistics. These reported counters never establish measured
+network loss. Missing statistics remain unknown and repeated cumulative statistics
+are not summed. Raw sources still require the separate reviewed/sandbox path.
+
 ### SC-NET-005
 
 Given an HTTP-header artifact is shared with an external agent, when it queries the approved projection, then only authorized bounded fields and coverage gaps are returned. The tool cannot expose raw packets, unapproved headers or records from another peer generation/case through pagination.

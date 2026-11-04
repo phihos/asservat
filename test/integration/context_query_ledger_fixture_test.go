@@ -2,6 +2,7 @@ package integration
 
 import (
 	"asservat.local/asservat/internal/adapters/diagnostics"
+	"asservat.local/asservat/internal/adapters/packets"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/capture"
@@ -128,9 +129,13 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	isProfile := len(profileSource) > 0 && profileSource[0]
 	isComparison := len(profileSource) > 1 && profileSource[1]
 	legacyTiming := len(profileSource) > 2 && profileSource[2]
+	isPacket := len(profileSource) > 3 && profileSource[3]
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 		queryLedgerQualification(t, f)
-		if isProfile {
+		if isPacket {
+			packetLedgerFunding(t, f)
+		}
+		if isProfile || isPacket {
 			q := f.qualification.ContextQuery
 			q.Profile.Worker.MemoryBytes, q.Profile.Worker.WorkerTransientBytes = value.ProfileSummaryWorkerBytes, value.ProfileSummaryWorkerBytes
 			q.RootQueries, q.PrincipalQueries, q.WorkloadQueries = 20, 20, 20
@@ -188,9 +193,9 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	for _, p := range pools[processingPools:] {
 		p.Close()
 	}
-	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming)
+	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket)
 	profile := syntheticWorkerProfile(f.input.InstallationID)
-	if isProfile {
+	if isProfile || isPacket {
 		profile.MemoryBytes = value.ProfileSummaryWorkerBytes
 		if isComparison {
 			profile.MemoryBytes = value.ProfileComparisonWorkerBytes
@@ -214,7 +219,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path, profile: isProfile}
+	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path, profile: isProfile, packet: isPacket}
 	query.policies, err = authapp.NewContextProjectionPolicies(raw, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -233,7 +238,11 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	var profileSQL *postgres.APIContextExecutions
 	var started execution.APIExecution
 	var refresh func() executionapp.APIExecutionCheck
-	if profileSource {
+	packetSource := len(legacyTiming) > 1 && legacyTiming[1]
+	if packetSource {
+		s, accepted, profileSQL = admitQueryLedgerPacket(t, f, root, enrollment)
+		started, refresh = startQueryLedgerProfile(t, f, s, accepted, profileSQL)
+	} else if profileSource {
 		s, accepted, profileSQL = admitQueryLedgerProfile(t, f, root, enrollment)
 		started, refresh = startQueryLedgerProfile(t, f, s, accepted, profileSQL)
 	} else {
@@ -246,7 +255,7 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	}
 	var copies artifact.Copies
 	var acquisition artifact.AcquisitionWindow
-	if profileSource {
+	if profileSource || packetSource {
 		producer, err := objectstore.NewArtifactProducer(bound, f.keys, unusedStreamingJournal{}, time.Now)
 		if err != nil {
 			t.Fatal(err)
@@ -256,16 +265,26 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 			t.Fatal(err)
 		}
 		var body bytes.Buffer
-		function := &pprof.Function{ID: 1, Name: "synthetic.work"}
-		location := &pprof.Location{ID: 1, Line: []pprof.Line{{Function: function}}}
-		native := &pprof.Profile{PeriodType: &pprof.ValueType{Type: "cpu", Unit: "nanoseconds"}, SampleType: []*pprof.ValueType{{Type: "cpu", Unit: "nanoseconds"}}, Function: []*pprof.Function{function}, Location: []*pprof.Location{location}, Sample: []*pprof.Sample{{Location: []*pprof.Location{location}, Value: []int64{7}}}}
-		if err = native.Write(&body); err != nil {
-			t.Fatal(err)
-		}
-		if err = diagnostics.CheckPprof(bytes.NewReader(body.Bytes())); err != nil {
-			t.Fatal("synthetic profile shape", err)
-		}
 		at := time.Now().UTC()
+		if packetSource {
+			// Explicit synthetic node payload; no privileged collector. Keep
+			// every packet/footer within the real started/completed interval.
+			time.Sleep(2 * time.Millisecond)
+			at = time.Now().UTC()
+			body.Write(syntheticFilteredRecording(t, started.StartedAt, recordingProgram, 0, syntheticRecordingTimes{Step: time.Microsecond, End: at}))
+		} else {
+			function := &pprof.Function{ID: 1, Name: "synthetic.work"}
+			location := &pprof.Location{ID: 1, Line: []pprof.Line{{Function: function}}}
+			native := &pprof.Profile{PeriodType: &pprof.ValueType{Type: "cpu", Unit: "nanoseconds"}, SampleType: []*pprof.ValueType{{Type: "cpu", Unit: "nanoseconds"}}, Function: []*pprof.Function{function}, Location: []*pprof.Location{location}, Sample: []*pprof.Sample{{Location: []*pprof.Location{location}, Value: []int64{7}}}}
+			if err = native.Write(&body); err != nil {
+				t.Fatal(err)
+			}
+			if err = diagnostics.CheckPprof(bytes.NewReader(body.Bytes())); err != nil {
+				t.Fatal("synthetic profile shape", err)
+			}
+			at = time.Now().UTC()
+		}
+
 		acquisition = artifact.AcquisitionWindow{StartedAt: started.StartedAt.UTC().Truncate(time.Microsecond), CompletedAt: at.Truncate(time.Microsecond)}
 		copies, err = prepared.Store(f.ctx, bytes.NewReader(body.Bytes()), started.StartedAt, at)
 		clear(body.Bytes())
@@ -306,7 +325,9 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profileSource {
+	if packetSource {
+		verifier.WithStreamCheck(artifact.PCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return packets.NewHeadersCheck() })
+	} else if profileSource {
 		verifier.WithStreamCheck(artifact.PprofArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck { return diagnostics.NewPprofCheck() })
 	}
 	guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
@@ -332,7 +353,7 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: check, ContextVerificationRecorder: check, ContextVerificationAuditor: ack, ContextCatalogPublisher: publish}, Authority: contextPublicationTestGate{check: func(ctx context.Context, v artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
 		return f.currentManagedPublication(ctx, s, v)
 	}}, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Now: time.Now}
-	if profileSource {
+	if profileSource || packetSource {
 		gatePool := f.fixturePool("api_publication_gate_runtime", "synthetic-api-publication-gate")
 		defer gatePool.Close()
 		gate, err := postgres.NewAPIContextPublicationGate(f.ctx, gatePool, s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
@@ -361,6 +382,7 @@ type querySQLPolicy struct {
 	root, installation, epoch string
 	path                      value.ContextProjectionPath
 	profile                   bool
+	packet                    bool
 }
 
 func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPolicy, error) {
@@ -371,7 +393,9 @@ func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPol
 	x := p.path
 	path := artifact.DownloadPath{ID: x.ID, TargetClusterID: x.TargetClusterID, StoreID: x.StoreID, StorageRegion: x.StorageRegion, AcquisitionClusterID: x.AcquisitionClusterID, AcquisitionRegion: x.AcquisitionRegion, ConnectorClusterID: x.ConnectorClusterID, ConnectorRegion: x.ConnectorRegion, HubClusterID: x.HubClusterID, HubRegion: x.HubRegion, WorkerConfiguration: x.WorkerConfiguration, HubConfiguration: x.HubConfiguration}
 	classes, evidenceTypes := []string{"metadata"}, []string{"context"}
-	if p.profile {
+	if p.packet {
+		classes, evidenceTypes = []string{"extract"}, []string{"packetCapture"}
+	} else if p.profile {
 		classes, evidenceTypes = []string{"extract"}, []string{"profile"}
 	}
 	clients := []privacy.DownloadClient{}

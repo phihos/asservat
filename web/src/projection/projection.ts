@@ -1,8 +1,8 @@
 import type { Session } from '../auth/session';
-import { validOutput_compare_profiles, validOutput_get_file_excerpt, validOutput_get_profile_summary, validOutput_get_query_result, validOutput_get_syscall_summary, validOutput_get_syscall_events } from '../generated/validate-projection';
-import { operations, type Operations, type Excerpt, type Summary, type Comparison, type SyscallSummary, type SyscallEvents } from './http';
+import { validOutput_get_pcap_summary, validOutput_compare_profiles, validOutput_get_file_excerpt, validOutput_get_profile_summary, validOutput_get_query_result, validOutput_get_syscall_summary, validOutput_get_syscall_events } from '../generated/validate-projection';
+import { operations, type Operations, type Excerpt, type Summary, type PacketSummary, type Comparison, type SyscallSummary, type SyscallEvents } from './http';
 
-export type State = { phase: 'idle' | 'loading' | 'pending' | 'result' | 'incompatible' | 'expired' | 'unavailable'; excerpt?: Excerpt; summary?: Summary; comparison?: Comparison; syscallSummary?: SyscallSummary; syscallEvents?: SyscallEvents; nextCursor?: string; warnings?: string[]; retryAt?: number; canCheck?: boolean };
+export type State = { phase: 'idle' | 'loading' | 'pending' | 'result' | 'incompatible' | 'expired' | 'unavailable'; excerpt?: Excerpt; summary?: Summary; packetSummary?: PacketSummary; comparison?: Comparison; syscallSummary?: SyscallSummary; syscallEvents?: SyscallEvents; nextCursor?: string; warnings?: string[]; retryAt?: number; canCheck?: boolean };
 export type ProfileSource = { caseID: string; artifactID: string; version: string };
 export type ComparisonSelection = { sample_type: string; normalization: 'none' | 'perSecond'; top_n: number };
 export type SyscallSelection = { view: 'summary' | 'events'; limit: number; names: string[]; errorsOnly: boolean };
@@ -42,7 +42,8 @@ export class ContextProjection {
   private pollTimer?: ReturnType<typeof setTimeout>;
   readonly snapshot = () => this.state;
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
-  constructor(private client: Operations = operations, private now: () => number = () => performance.now(), private kind: 'pod-status' | 'profile' | 'syscalls' | 'comparison' = 'pod-status') {}
+  constructor(private client: Operations = operations, private now: () => number = () => performance.now(), private kind: 'pod-status' | 'profile' | 'syscalls' | 'comparison' | 'packet' = 'pod-status') {}
+  static packet(client?: Operations, now?: () => number) { return new ContextProjection(client, now, 'packet'); }
   static profile(client?: Operations, now?: () => number) { return new ContextProjection(client, now, 'profile'); }
   static comparison(client?: Operations, now?: () => number) { return new ContextProjection(client, now, 'comparison'); }
   static syscalls(client?: Operations, now?: () => number) { return new ContextProjection(client, now, 'syscalls'); }
@@ -103,6 +104,7 @@ export class ContextProjection {
     if (this.state.phase === 'loading' || !this.target || !this.session || this.scope?.aborted) return;
     this.close();
     if (this.kind === 'syscalls' || this.kind === 'comparison') { this.clear('unavailable'); return; }
+    if (this.kind === 'packet' && !/^[0-9a-f]{64}$/.test(this.version ?? '')) { this.clear('unavailable'); return; }
     if (this.kind === 'profile') {
       if (!selection || !selection.sample_type || new TextEncoder().encode(selection.sample_type).length > 64 || /[\u0000-\u001f\u007f-\u009f]/u.test(selection.sample_type) || !Number.isInteger(selection.top_n) || selection.top_n < 1 || selection.top_n > 100 || !/^[0-9a-f]{64}$/.test(this.version ?? '')) { this.clear('unavailable'); return; }
       this.selection = { ...selection };
@@ -144,6 +146,8 @@ export class ContextProjection {
     try {
       const response = poll
         ? await this.client.call('get_query_result', { query_handle: this.handle! }, this.session.csrf_token, request.signal)
+        : this.kind === 'packet'
+          ? await this.client.call('get_pcap_summary', { ...this.target }, this.session.csrf_token, request.signal)
         : this.kind === 'comparison'
           ? await this.client.call('compare_profiles', { ...this.target, baseline_case_id: this.baseline!.caseID, baseline_artifact_id: this.baseline!.artifactID, ...this.comparisonSelection! }, this.session.csrf_token, request.signal)
           : this.kind === 'profile'
@@ -152,6 +156,7 @@ export class ContextProjection {
             ? await this.readSyscalls(request.signal)
           : await this.client.call('get_file_excerpt', { ...this.target, line_start: 1, max_lines: 14 }, this.session.csrf_token, request.signal);
       if (generation !== this.generation || scope.aborted || request.signal.aborted) return;
+      if (this.kind === 'packet') { this.acceptPacket(response, poll, started, generation, scope); return; }
       if (this.kind === 'comparison') { this.acceptComparison(response, poll, started, generation, scope); return; }
       if (this.kind === 'profile') { this.acceptProfile(response, poll, started, generation, scope); return; }
       if (this.kind === 'syscalls') { this.acceptSyscalls(response, poll, started, generation, scope); return; }
@@ -190,6 +195,40 @@ export class ContextProjection {
       if (generation === this.generation && this.state.phase === 'pending' && !scope.aborted && this.now() < this.cutoff) this.publish({ phase: 'pending', retryAt, canCheck: true });
     }, Math.max(0, retryAt - this.now()));
   }
+  private acceptPacket(response: unknown, poll: boolean, started: number, generation: number, scope: AbortSignal) {
+    if (!validOutput_get_pcap_summary(response) && !validOutput_get_query_result(response)) throw new Error('Invalid packet summary');
+    if (!(poll ? validOutput_get_query_result(response) : validOutput_get_pcap_summary(response)) || response.truncated || response.next_cursor !== null || response.status === 'error') throw new Error('Packet summary unavailable');
+    if (poll && (!('query_handle' in response.data) || response.data.query_handle !== this.handle || response.provenance.length !== 0)) throw new Error('Query replaced');
+    if (!this.acceptTiming(response.data, started)) return;
+    if (response.status === 'pending') {
+      if (response.data_class !== 'metadata' || response.provenance.length !== 0) throw new Error('Unexpected pending packet summary');
+      this.acceptPending(response.data, generation, scope); return;
+    }
+    if (response.data_class !== 'extract') throw new Error('Unexpected packet summary class');
+    let summary: unknown = response;
+    if (poll) {
+      if (!('result' in response.data) || response.data.tool_name !== 'get_pcap_summary') throw new Error('Unexpected packet summary tool');
+      summary = response.data.result;
+    }
+    if (!validOutput_get_pcap_summary(summary) || summary.status !== 'ok' || summary.data_class !== 'extract' || summary.truncated || summary.next_cursor !== null || summary.request_id !== response.request_id || summary.data.query_observed_at !== response.data.query_observed_at || summary.data.query_expires_at !== response.data.query_expires_at || summary.provenance.length !== 1 || summary.provenance[0].artifactID !== this.target?.artifact_id || summary.provenance[0].digest !== this.version) throw new Error('Packet summary association changed');
+    const data = summary.data;
+    if (data.capture_mode !== 'networkHeaders' || !Number.isSafeInteger(data.packets) || !Number.isSafeInteger(data.conversations_total) || data.conversations_total > data.packets || data.conversations.length !== Math.min(data.conversations_total, 100) || data.conversations_truncated !== (data.conversations_total > data.conversations.length) || (data.drops === null) !== (data.drop_reporting === 'unavailable') || data.drops !== null && !Number.isSafeInteger(data.drops)) throw new Error('Inconsistent packet counters');
+    let count = 0;
+    const seen = new Set<string>();
+    for (let i = 0; i < data.conversations.length; i++) {
+      const row = data.conversations[i];
+      const key = JSON.stringify([row.protocol, row.source, row.destination]);
+      if (!Number.isSafeInteger(row.packets) || row.packets > data.packets || !packetEndpoint(row.source, row.protocol) || !packetEndpoint(row.destination, row.protocol) || seen.has(key)) throw new Error('Invalid packet endpoints');
+      seen.add(key); count += row.packets;
+      if (i > 0) {
+        const previous = data.conversations[i - 1];
+        if (previous.packets < row.packets || previous.packets === row.packets && (previous.protocol > row.protocol || previous.protocol === row.protocol && (previous.source > row.source || previous.source === row.source && previous.destination >= row.destination))) throw new Error('Packet ranking changed');
+      }
+    }
+    if (count > data.packets || !data.conversations_truncated && count !== data.packets) throw new Error('Packet total changed');
+    this.publish({ phase: 'result', packetSummary: { ...data, conversations: data.conversations.map(row => ({ ...row })) }, warnings: [...summary.warnings] });
+  }
+
   private acceptProfile(response: unknown, poll: boolean, started: number, generation: number, scope: AbortSignal) {
     if (!validOutput_get_profile_summary(response) && !validOutput_get_query_result(response)) throw new Error('Invalid summary');
     if (!(poll ? validOutput_get_query_result(response) : validOutput_get_profile_summary(response)) || response.truncated || response.next_cursor !== null || response.status === 'error') throw new Error('Summary unavailable');
@@ -285,4 +324,18 @@ export class ContextProjection {
     }
   }
 
+}
+
+// Numeric canonical addresses only; URL's built-in IPv6 parser performs no I/O.
+function packetIP(value: string, v6: boolean) {
+  if (!v6) return /^(0|[1-9][0-9]{0,2})(\.(0|[1-9][0-9]{0,2})){3}$/.test(value) && value.split('.').every(part => Number(part) <= 255);
+  if (!/^[0-9a-f:]+$/.test(value) || !value.includes(':')) return false;
+  try { return new URL('http://[' + value + ']/').hostname === '[' + value + ']'; } catch { return false; }
+}
+function packetEndpoint(value: string, protocol: string) {
+  if (protocol === 'ICMPv4' || protocol === 'ICMPv6') return packetIP(value, protocol === 'ICMPv6');
+  const match = /^(\[[0-9a-f:]+\]|[0-9.]+):(0|[1-9][0-9]{0,4})$/.exec(value);
+  if (!match || Number(match[2]) > 65535) return false;
+  const ipv6 = match[1].startsWith('[');
+  return packetIP(ipv6 ? match[1].slice(1, -1) : match[1], ipv6);
 }

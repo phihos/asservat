@@ -41,6 +41,8 @@ func (s ContextProjectionScope) QueryUnits() int64 {
 	switch s.BeginTool() {
 	case "get_profile_summary":
 		return ProfileSummaryQueryUnits
+	case "get_pcap_summary":
+		return PacketSummaryQueryUnits
 	case "get_http_headers":
 		return HTTPHeaderQueryUnits
 	case "get_syscall_summary", "get_syscall_events":

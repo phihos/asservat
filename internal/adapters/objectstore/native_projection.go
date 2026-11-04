@@ -45,6 +45,7 @@ func (r *NativeContextReader) projectionReader() (*ContextProjectionReader, erro
 	reader.summarize = r.summarize
 	reader.syscalls = r.syscalls
 	reader.compare = r.compare
+	reader.packets = r.packets
 	return reader, nil
 }
 
@@ -70,5 +71,12 @@ func (r *NativeContextReader) ServeProfileSummaries(f evidence.ProfileSummarizer
 func (r *NativeContextReader) ServeSyscallProjections(f evidence.SyscallProjector) {
 	if r != nil {
 		r.syscalls = f
+	}
+}
+
+// ServePacketSummaries installs only a fixed metadata PCAPNG interpreter.
+func (r *NativeContextReader) ServePacketSummaries(f evidence.PacketSummarizer) {
+	if r != nil {
+		r.packets = f
 	}
 }

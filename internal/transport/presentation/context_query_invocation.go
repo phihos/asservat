@@ -87,9 +87,17 @@ func (i *contextQueryInvocation) CheckInput(ctx context.Context, in analysisapp.
 	if !i.current(ctx) || i.mac == nil {
 		return ErrOperationDelivery
 	}
+	if i.call.Tool != "get_pcap_summary" && in.Packet != (value.PacketSummaryRequest{}) {
+		return ErrOperationDelivery
+	}
 	var raw []byte
 	var err error
 	switch i.call.Tool {
+	case "get_pcap_summary":
+		if !in.Packet.Valid() || in.QueryID != "" || in.Comparison != (value.ProfileComparisonRequest{}) || in.Selection != (value.ContextExcerptSelection{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
+			return ErrOperationDelivery
+		}
+		raw, err = json.Marshal(PacketSummaryOperationInput{CaseID: in.Packet.CaseID, ArtifactID: in.Packet.ArtifactID})
 	case "get_file_excerpt":
 		if !in.Selection.Valid() || in.QueryID != "" || in.Comparison != (value.ProfileComparisonRequest{}) || in.Headers != (value.HTTPHeaderSelection{}) || in.Profile != (value.ProfileSummaryRequest{}) || in.Syscalls != (value.SyscallQueryRequest{}) {
 			return ErrOperationDelivery
@@ -176,6 +184,9 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 	if a.Syscalls.Valid() {
 		branches++
 	}
+	if d.Tool() == "get_pcap_summary" {
+		branches++
+	}
 	selected = branches == 1 && (a.Selection.Valid() || a.Selection == (value.LineSelection{})) && (a.Headers.Valid() || a.Headers == (value.HTTPHeaderWindow{})) && (a.Profile.Valid() || a.Profile == (value.ProfileSummarySelection{})) && (a.Syscalls.Valid() || a.Syscalls == (value.SyscallWindow{})) && (a.Comparison.Valid() || a.Comparison == (value.ProfileComparisonSelection{}))
 
 	if !authorization.UUID(a.ID) || !authorization.UUID(a.QueryID) || !selected {
@@ -199,6 +210,7 @@ func (i *contextQueryInvocation) bind(ctx context.Context, d *analysisapp.Contex
 		i.call.Tool == "get_file_excerpt" && (a.Selection != i.input.Selection.Selection || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Syscalls != (value.SyscallWindow{})) ||
 		i.call.Tool == "get_http_headers" && (a.Headers != i.input.Headers.Window() || a.Selection != (value.LineSelection{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Syscalls != (value.SyscallWindow{})) ||
 		i.call.Tool == "get_profile_summary" && (a.Profile != i.input.Profile.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Syscalls != (value.SyscallWindow{})) ||
+		i.call.Tool == "get_pcap_summary" && (a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{}) || a.Syscalls != (value.SyscallWindow{})) ||
 		syscallQueryOperation(i.call.Tool) && (a.Syscalls != i.input.Syscalls.Selection || a.Selection != (value.LineSelection{}) || a.Headers != (value.HTTPHeaderWindow{}) || a.Profile != (value.ProfileSummarySelection{})) ||
 		i.call.Tool == "get_query_result" && a.QueryID != i.input.QueryID {
 		return ErrOperationDelivery

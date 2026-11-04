@@ -26,6 +26,7 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
+	analysis "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/transport/presentation"
@@ -779,6 +780,16 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		formats := map[string]bool{}
 		for n, a := range evidence.Artifacts {
+			var packetMCP, packetBrowser *analysis.PacketSummary
+			if a.NativeFormat == artifact.PCAPNGFormat {
+				if a.DataClass != "metadata" || a.Kind != "packetCapture" || a.Target.PodUID != preview.Pods[0].UID || a.Target.ClusterID != cluster || a.Target.Namespace != namespace || a.Target.WorkloadName != workload {
+					t.Fatal("mixed packet source changed original metadata target")
+				}
+				source := installedPacketSummarySource{CaseID: progress.CaseID, ArtifactID: a.ID, Version: a.Digest, PodUID: preview.Pods[0].UID, Expires: a.Expires}
+				mcp := queryInstalledPacketSummary(t, ctx, identity, transport, origin, source, summaryCheck)
+				console := queryInstalledPacketSummaryBrowser(t, ctx, self, address, source, summaryCheck)
+				packetMCP, packetBrowser = &mcp, &console
+			}
 			native, extension := installedMixedDownload(t, ctx, transport, identity, origin, a.ID, "installed-mixed-download-"+strconv.Itoa(n), invoke, read, diagnose)
 			formats[extension] = true
 			if extension == ".pcapng" {
@@ -786,9 +797,10 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 				if err := os.WriteFile(path, native, 0600); err != nil {
 					t.Fatal(err)
 				}
-				if out, err := exec.CommandContext(ctx, "tshark", "-r", path, "-T", "fields", "-e", "tcp.port").Output(); err != nil || strings.TrimSpace(string(out)) == "" {
-					t.Fatal("mixed PCAPNG did not open in tshark with real traffic", err)
+				if packetMCP == nil || packetBrowser == nil {
+					t.Fatal("mixed packet source was not summarized before native download")
 				}
+				installedPacketSummaryTshark(t, ctx, path, native, *packetMCP, *packetBrowser)
 			} else if len(native) > 0 {
 				var first struct {
 					Identity struct {

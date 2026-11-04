@@ -55,7 +55,7 @@ func installedProfileBrowser(t *testing.T, ctx context.Context, browser *install
 	if len(cookies) == 0 {
 		t.Fatal("installed comparison original cookie missing")
 	}
-	if mode != "comparison" && mode != "heap" {
+	if mode != "comparison" && mode != "heap" && mode != "packet" {
 		t.Fatal("invalid profile browser mode")
 	}
 	nativeDirectory := t.TempDir()
@@ -65,6 +65,9 @@ func installedProfileBrowser(t *testing.T, ctx context.Context, browser *install
 		t.Fatal("invalid local browser session-restore selection")
 	}
 	input := map[string]any{"origin": browser.base, "proxy": proxy, "cookies": cookies, "caseID": source.CaseID, "artifactID": source.ArtifactID, "mode": mode, "nativeDestination": nativePath}
+	if mode == "packet" {
+		input["version"] = source.Version
+	}
 	if len(restoreDuringNative) == 1 && restoreDuringNative[0] {
 		input["restoreDuringNative"] = true
 	}
@@ -74,7 +77,11 @@ func installedProfileBrowser(t *testing.T, ctx context.Context, browser *install
 		t.Fatal("installed comparison private input bound")
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Minute) // Existing history driver ceiling; original parent still wins.
-	command := exec.CommandContext(call, "node", filepath.Join("..", "..", "web", "scripts", "installed-profile-comparison-browser.mjs"))
+	driver := "installed-profile-comparison-browser.mjs"
+	if mode == "packet" {
+		driver = "installed-packet-summary-browser.mjs"
+	}
+	command := exec.CommandContext(call, "node", filepath.Join("..", "..", "web", "scripts", driver))
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
 		if command.Process == nil {
@@ -158,7 +165,7 @@ func installedProfileBrowser(t *testing.T, ctx context.Context, browser *install
 	}
 	invoke := func(name string, args any) installedComparisonReply {
 		t.Helper()
-		if closed || name != "get_query_result" && (mode == "comparison" && name != "compare_profiles" || mode == "heap" && name != "get_profile_summary") {
+		if closed || name != "get_query_result" && (mode == "comparison" && name != "compare_profiles" || mode == "heap" && name != "get_profile_summary" || mode == "packet" && name != "get_pcap_summary") {
 			fail("unexpected operation")
 		}
 		encoded, err := json.Marshal(map[string]any{"kind": "call", "name": name, "input": args})

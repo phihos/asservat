@@ -49,7 +49,7 @@ func (s ProjectionSource) OutputClass() string {
 	if s.ReadOperation() == "" {
 		return ""
 	}
-	if s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
+	if s.NativeType == artifact.PCAPNGArtifact || s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
 		return "extract"
 	}
 	return s.DataClass

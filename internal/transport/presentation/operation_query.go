@@ -8,7 +8,7 @@ import (
 )
 
 func queryOperation(name string) bool {
-	return name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || name == "compare_profiles" || syscallQueryOperation(name) || name == "get_query_result"
+	return name == "get_file_excerpt" || name == "get_http_headers" || name == "get_profile_summary" || name == "get_pcap_summary" || name == "compare_profiles" || syscallQueryOperation(name) || name == "get_query_result"
 }
 
 func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
@@ -46,6 +46,13 @@ func normalizeQueryInput(name string, raw []byte) ([]byte, error) {
 		}{name, analysis.ProfileComparisonDisplayVersion, in.CaseID, in.ArtifactID, in.BaselineCaseID, in.BaselineArtifactID, selection.SampleType, selection.Normalization, selection.TopN})
 	}
 
+	if name == "get_pcap_summary" {
+		var in PacketSummaryOperationInput
+		if err := json.Unmarshal(raw, &in); err != nil {
+			return nil, err
+		}
+		return json.Marshal(struct{ Tool, DisplayVersion, CaseID, ArtifactID string }{name, analysis.PacketSummaryDisplayVersion, in.CaseID, in.ArtifactID})
+	}
 	if name == "get_profile_summary" {
 		var in ProfileSummaryOperationInput
 		if err := json.Unmarshal(raw, &in); err != nil {
@@ -123,4 +130,10 @@ type ProfileComparisonOperationInput struct {
 	SampleType         string `json:"sample_type"`
 	Normalization      string `json:"normalization"`
 	TopN               int    `json:"top_n"`
+}
+
+// PacketSummaryOperationInput selects one already saved metadata artifact.
+type PacketSummaryOperationInput struct {
+	CaseID     string `json:"case_id"`
+	ArtifactID string `json:"artifact_id"`
 }

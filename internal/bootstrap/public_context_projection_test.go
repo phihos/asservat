@@ -145,3 +145,21 @@ func TestPublicProfileComparisonRequiresInstalledTypedRoute(t *testing.T) {
 		t.Fatal("typed retained comparison missing", err)
 	}
 }
+
+func TestPublicPacketSummaryRequiresInstalledTypedRoute(t *testing.T) {
+	c, services := publicContextOperationFixture(t)
+	services.Projection = publicProjectionFixture(c)
+	without, err := NewPublicContextOperations(c, services)
+	if err != nil || presentation.BrowserOperationSupported(without, "get_pcap_summary") {
+		t.Fatal("packet summary enabled without typed protected route", err)
+	}
+	services.Projection.PacketRoutes = &publicProjectionPorts{}
+	c.CollectionEnabled = false
+	with, err := NewPublicContextOperations(c, services)
+	if err != nil || !presentation.BrowserOperationSupported(with, "get_pcap_summary") || !slices.Contains(with.ToolNames(), "get_pcap_summary") {
+		t.Fatal("complete saved packet composition unavailable", err)
+	}
+	if presentation.BrowserOperationSupported(with, "packet_query") || slices.Contains(with.ToolNames(), "request_capture") {
+		t.Fatal("metadata summary enabled raw query/acquisition")
+	}
+}

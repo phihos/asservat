@@ -8536,10 +8536,14 @@ components:
                   type: integer
                   minimum: 0
                   maximum: 1000000000000
+                  description: Retained packet records in the authenticated saved file; this is not a count of unique network datagrams.
                 drops:
-                  type: integer
+                  type:
+                  - integer
+                  - 'null'
                   minimum: 0
                   maximum: 1000000000000
+                  description: Producer-reported exclusions with the exact meaning given by drop_reporting; null means unavailable. This is not measured network loss.
                 conversations:
                   type: array
                   items:
@@ -8555,12 +8559,14 @@ components:
                         minLength: 1
                         maxLength: 128
                       protocol:
-                        type: string
-                        minLength: 1
-                        maxLength: 32
+                        enum:
+                        - TCP
+                        - UDP
+                        - ICMPv4
+                        - ICMPv6
                       packets:
                         type: integer
-                        minimum: 0
+                        minimum: 1
                         maximum: 1000000000000
                     required:
                     - source
@@ -8568,11 +8574,36 @@ components:
                     - protocol
                     - packets
                   maxItems: 100
+                  description: Top100 directional numeric endpoint/protocol aggregates, ordered by record count descending then protocol/source/destination; never DNS, comments or payload.
+                drop_reporting:
+                  enum:
+                  - captureExclusions
+                  - snapshotOutputLimit
+                  - unavailable
+                conversations_total:
+                  type: integer
+                  minimum: 0
+                  maximum: 16384
+                conversations_truncated:
+                  type: boolean
+                query_observed_at:
+                  type: string
+                  format: date-time
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                query_expires_at:
+                  type: string
+                  format: date-time
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - capture_mode
               - packets
               - drops
               - conversations
+              - drop_reporting
+              - conversations_total
+              - conversations_truncated
+              - query_observed_at
+              - query_expires_at
           required:
           - status
           - data
@@ -8592,9 +8623,19 @@ components:
                   type: integer
                   minimum: 1
                   maximum: 60
+                query_observed_at:
+                  type: string
+                  format: date-time
+                  description: Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock.
+                query_expires_at:
+                  type: string
+                  format: date-time
+                  description: Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
               required:
               - query_handle
               - retry_after_seconds
+              - query_observed_at
+              - query_expires_at
           required:
           - status
           - data
