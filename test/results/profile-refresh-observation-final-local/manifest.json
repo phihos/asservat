@@ -1,0 +1,101 @@
+{
+  "format": "asservat-profile-refresh-observation-final-local/v1",
+  "codeHead": "14aa7b2383bf8724bb27f1c371eb6d58f289e07c",
+  "command": "make pre-push profile-preflight go-architecture-check spec-check architecture-check design-check console-browser-check",
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=2",
+    "PATHPrefix": "spec-venv/bin:cache/bin"
+  },
+  "exit": 0,
+  "consoleBrowserGoSeconds": 69.992,
+  "journeys": 28,
+  "accessibilityScans": 27,
+  "files": [
+    {
+      "path": "gates.log.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-worker-containment/final-refresh-and-observation-gates.log",
+      "sourceBytes": 26232,
+      "sourceSha256": "6ba593447343a761adf55c14f0ed3e678190f8ea0283acbb4ae628603e884036",
+      "storedSha256": "dc38d02c682c158ebc9b43d4304fd4c7a66f25a45c8d7eec1fd4f0ed735cb2af"
+    },
+    {
+      "path": "outputs/console-browser/capture-review-mobile.png",
+      "source": "test/results/console-browser/capture-review-mobile.png",
+      "sourceBytes": 100771,
+      "sourceSha256": "97394c8896821c803603f416d95219036a7187c185b1c2c8b37c152ea36b282a",
+      "storedSha256": "97394c8896821c803603f416d95219036a7187c185b1c2c8b37c152ea36b282a"
+    },
+    {
+      "path": "outputs/console-browser/capture-review.png",
+      "source": "test/results/console-browser/capture-review.png",
+      "sourceBytes": 115229,
+      "sourceSha256": "f1b7f6eb747c1b993c8725f7811417f3aa0469f29759669f3f726ca25020613a",
+      "storedSha256": "f1b7f6eb747c1b993c8725f7811417f3aa0469f29759669f3f726ca25020613a"
+    },
+    {
+      "path": "outputs/console-browser/case-evidence-mobile.png",
+      "source": "test/results/console-browser/case-evidence-mobile.png",
+      "sourceBytes": 50851,
+      "sourceSha256": "41c41e7e0f64c1663bf6f0e3d30e0d17ca97f059ee6e2b9f74620f6ee52b95a5",
+      "storedSha256": "41c41e7e0f64c1663bf6f0e3d30e0d17ca97f059ee6e2b9f74620f6ee52b95a5"
+    },
+    {
+      "path": "outputs/console-browser/case-evidence.png",
+      "source": "test/results/console-browser/case-evidence.png",
+      "sourceBytes": 60415,
+      "sourceSha256": "7ff254870c9e127bfd007b46f46de28dd65c16a9d6ae884969e4c724478e021a",
+      "storedSha256": "7ff254870c9e127bfd007b46f46de28dd65c16a9d6ae884969e4c724478e021a"
+    },
+    {
+      "path": "outputs/console-browser/heap-summary-mobile.png",
+      "source": "test/results/console-browser/heap-summary-mobile.png",
+      "sourceBytes": 239539,
+      "sourceSha256": "a863cd0a43d26481184efc379e4166d6de0fe3c7fdc8a79e9b1da5bbdb92f9c0",
+      "storedSha256": "a863cd0a43d26481184efc379e4166d6de0fe3c7fdc8a79e9b1da5bbdb92f9c0"
+    },
+    {
+      "path": "outputs/console-browser/policy-budgets.png",
+      "source": "test/results/console-browser/policy-budgets.png",
+      "sourceBytes": 168266,
+      "sourceSha256": "cd4b60b2a20004b8f532967b258c905a2650ad2a008ef10feb963fc68263ad3b",
+      "storedSha256": "cd4b60b2a20004b8f532967b258c905a2650ad2a008ef10feb963fc68263ad3b"
+    },
+    {
+      "path": "outputs/console-browser/policy-manager.png",
+      "source": "test/results/console-browser/policy-manager.png",
+      "sourceBytes": 140675,
+      "sourceSha256": "dd0f102e470ab3c43eea048ed02bc0370d9d0f873ebe75978103cb92a6367ad4",
+      "storedSha256": "dd0f102e470ab3c43eea048ed02bc0370d9d0f873ebe75978103cb92a6367ad4"
+    },
+    {
+      "path": "outputs/console-browser/profile-summary-mobile.png",
+      "source": "test/results/console-browser/profile-summary-mobile.png",
+      "sourceBytes": 234715,
+      "sourceSha256": "2720801e2fee056bb1e6829db4ab8cf44ccc677b615a914bd401d3a411789cb9",
+      "storedSha256": "2720801e2fee056bb1e6829db4ab8cf44ccc677b615a914bd401d3a411789cb9"
+    },
+    {
+      "path": "outputs/console-browser/report.json",
+      "source": "test/results/console-browser/report.json",
+      "sourceBytes": 4138,
+      "sourceSha256": "9c5d4c92a0494c6f75bd986020094046dd9f5f58030c7fc166b1d21dcc597eb6",
+      "storedSha256": "9c5d4c92a0494c6f75bd986020094046dd9f5f58030c7fc166b1d21dcc597eb6"
+    },
+    {
+      "path": "outputs/console-browser/saved-syscall-events-mobile.png",
+      "source": "test/results/console-browser/saved-syscall-events-mobile.png",
+      "sourceBytes": 181605,
+      "sourceSha256": "10a3c91a23eef8365f1997b74f6e88e55567c26a8032a3439902537e9bd21f78",
+      "storedSha256": "10a3c91a23eef8365f1997b74f6e88e55567c26a8032a3439902537e9bd21f78"
+    },
+    {
+      "path": "outputs/console-native-restart/failed-native-ready.png",
+      "source": "test/results/console-native-restart/failed-native-ready.png",
+      "sourceBytes": 117364,
+      "sourceSha256": "bbff914e3207cbcb99c8ca3dcdc1556612da5525930058be9b40a42edd1725b6",
+      "storedSha256": "bbff914e3207cbcb99c8ca3dcdc1556612da5525930058be9b40a42edd1725b6"
+    }
+  ]
+}

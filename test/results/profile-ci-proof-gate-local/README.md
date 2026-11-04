@@ -1,0 +1,11 @@
+# CI frontend proof gate evidence
+
+CI run 41872117868 at 6effd250a4d8c114d6815da1a422dfee3bbec716 failed job 126721823311 (`test (0/10)`). The full original 57,739-byte job log is retained, including ANSI bytes. `TestInstalledProfileCaseRefreshProof` launched Node from a generic Go shard without frontend dependencies; generated `validate-auth.js` could not import `ajv`. The test failed in 0.29s, and its package reported 58.814s. This is a test-gate dependency defect, not an installed profile failure.
+
+The isolated exact-base reproduction without `web/node_modules` exited 1 (0.130s). The fix deletes only the unconditional Go-to-Node bridge and adds the unchanged proof script to the existing `npm run check` command. No test skip, dependency installation, lockfile change, production/API/harness change or relaxed assertion was introduced. Generic Go gates again run without frontend dependencies; the frontend gate owns this Node proof.
+
+The entire affected integration package passed `go test -race` with modules absent through completion and GOPROXY=off: exit 0, 50.213s. Afterwards, the existing locked modules were linked for `npm run check`, which exited 0: the unchanged proof accepted the original same-human/source refresh and rejected all eight changed/malformed observations; 39 frontend files and 441 tests passed. The 6.97s frontend log duration belongs to Vitest, not the entire command. Actual commands and exits are retained in the original handoff and logs; no gates were rerun to create this archive.
+
+The isolated signed fix is 5d5145a9596220bfa5050eea758491babfe0262e, cherry-picked by the root as 7a73f77b630ff44b2ba93493282aec70b11d9d32. The Git-derived inventory verifies identical fixed package/proof/lock bytes at both commits and unchanged proof assertions/helper/lock versus the CI base. The original handoff's compact prose is retained byte-for-byte. This archive is local gate evidence, not hosted CI success or installed qualification.
+
+All gzip files use level 9 and mtime 0. `archive-manifest.json` records original and stored SHA-256/byte lengths. Every entry was decompressed and compared with its original source or exact Git blob, and deterministic recompression was checked. No archive commit is created by this task; committed archive Git readback belongs to the root's later commit.

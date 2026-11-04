@@ -2,51 +2,57 @@
 
 ## Current shared profile candidate (2026-11-04)
 
-Published PR162 is frozen at `c6cfe2509d898c49529df49b118b0f97be9e8dc9`.
-Its genuine pull-request CI41863053175 required `ci-ok` check passed. Three
-fresh-VM native suites ran at that head; each independently matched all4,128
-submitted Go source hashes, kept sources unchanged, reported no cleanup failures
-and removed build scratch. Stale queued API views were superseded by uploaded
-terminal artifacts and fresh job/check readbacks.
+PR162 has a new integrated follow-up awaiting publication/qualification. The
+previous frozen `6effd250` runs completed with later-boundary failures; all4,132
+submitted source hashes, including registered browser helpers, matched Git in
+both native runs, with unchanged sources, clean cleanup and removed scratch.
 
-| Workflow | Actual outcome | Proven boundary and remaining gap |
+| Workflow/source | Verified result | Remaining boundary |
 | --- | --- | --- |
-| [Heavy comparison41863091784](../test/results/profile-heavy-native-41863091784/README.md) | Go/harness0,683.416s; final workflow success | Both MCP and React comparisons, exact source/key/SQL joins, positive original download-worker retirement and both live probes passed. Peaks228.07/240.00MiB under384MiB,500m throttling observed, zero swap/high/max/OOM events. One accepted shape, not all maxima or capture overhead. |
-| [Heap browser41863094043](../test/results/heap-browser-native-41863094043/README.md) | Go/harness1,554.984s | Actual React default inuse_space summary and10-unit/three-key/384MiB SQL proof passed before native preparation. An attachment assertion blocked native hash/pprof/repeat proof. |
-| [Runtime trace41863096785](../test/results/runtime-trace-native-41863096785/README.md) | Go/harness1,498.465s; final workflow failure | Trace capture, acquisition metadata and initial zero-query proof passed. Unsupported pprof summary returned503, blocking native download/offline trace parsing/repeat. |
+| [Heavy comparison at c6](../test/results/profile-heavy-native-41863091784/README.md) | Native41863091784 Go/harness0,683.416s; MCP/React/full SQL/key/source and both live probes pass. Peaks228.07/240.00MiB under384MiB,500m throttling observed, no swap/high/max/OOM. | One accepted shape, with exact c6 source/image attribution. |
+| [Heap browser at6eff](../test/results/heap-browser-native-41872233069/README.md) | Native41872233069 Go/harness1,589.462s. Actual summary/SQL and native link/URL/filename/body plus in-process SHA/size checks pass, as do same-human/source case-refresh checks. | Later close-state assertion expected expired while a real refresh cleared the view to idle. No independently retained raw native/pprof/repeat proof. |
+| [Runtime trace at6eff](../test/results/runtime-trace-native-41872236223/README.md) | Native41872236223 Go/harness1,525.298s. Capture, semantic pprof refusal, all zero-query guards, authenticated76,500B trace/hash and offline Go trace parsing to508B scheduler pprof pass. | Fresh Repeat preview fails storage readiness after4.530477s. |
 
-The local trace correction preserves the native-source refusal and adds a private
-proof of failure before summary admission. C20 returns an audited, content-free
-NotAvailable for denied/missing/unsupported/provider authority failures at that
-point; this deliberately includes service unavailability before admission.
-Unknown/nonclassified and attempted/post-admission failures retain transport
-errors. Audit, final current identity, original deadlines and cancellation remain
-mandatory. No SQL allowlist, parser, worker, resource or timeout changes. The
-composed regression reproduces the old503 with zero admissions; its matrix and
-1.054s/95.325s affected races pass. Independent review found no blockers. Exact
-commands/source hashes are in
-[trace-summary-refusal-local](../test/results/trace-summary-refusal-local/README.md).
+The heap close mismatch is reproduced through the real SessionGate resume path,
+HTTP refresh/case reads and an already-started native transfer, using synthetic
+service facts. A validated post-summary same-human refresh may leave an idle
+view only with cleared rows/status/alerts, no old Close view and an enabled
+Inspect control. No-refresh expiry still requires the exact expired state.
+The meaningful old-order RED exits1/20.798s; all three heap states plus comparison
+pass44.226s with original clock/session/minute bounds. No production behavior or
+new default client request is introduced. See
+[heap-browser-refresh-close-local](../test/results/heap-browser-refresh-close-local/README.md).
 
-The heap driver now distinguishes link/URL/filename/body/save assertion stages.
-It validates observed existing same-human session refreshes and their bounded
-same-case reloads while pinning original artifact digest, target and acquisition
-facts; initial/pre-query and comparison metadata reads remain strict. Focused
-React/Chromium races pass28.909s and independent review found no blockers. A
-private real-content probe transferred exact bytes but failed its later worker
-acknowledgement; that source is retained only as evidence and was not integrated.
-The original installed attachment cause remains unproven. Commands and both
-failed probe outcomes are in
-[heap-browser-boundary-local](../test/results/heap-browser-boundary-local/README.md).
+CI41872117868 failed because an unconditional Go test launched the JavaScript
+proof without Ajv installed in the Go-only job. The unchanged proof now runs in
+the existing frontend npm check, and the Go bridge is removed. All assertions
+remain. The full affected Go package passes50.213s without frontend modules;
+frontend checks pass441 tests plus the proof. No dependency, lockfile, skip or
+Go-job npm setup is added. See
+[profile-ci-proof-gate-local](../test/results/profile-ci-proof-gate-local/README.md).
 
-Integrated local pre-push/profile/Go architecture/specification/architecture/design
-gates pass441 console tests and5.750s fixture races. Exact source attribution is
-in [profile-native-followup-local](../test/results/profile-native-followup-local/README.md).
-These follow-ups still need final pushed-head CI and fresh focused heap/trace
-native runs. Heavy evidence stays attributed to the qualified c6 source. The separately prepared
-TLS follow-up is unpublished; credential work is paused. Full S-05 and the full
-specification goal remain active. Earlier checkpoints follow.
+Trace's early hint, one demand and32MiB funding are correct. Its final native
+source-guard probe failed without an exact original cutoff or underlying body
+error in the old log. The new private diagnostic preserves closed cutoff labels,
+exact original UTC end/remaining and deadline/cancel/body/transport categories.
+Actual authority/min/context/guard/API/cache/wait decisions remain unchanged;
+valid403 StatusError denial remains valid. This is attribution only, not a
+repeat-availability fix or retrospective proof of its cause. Actual HTTPS and
+original-cutoff regressions pass, including affected races2.289s/12.584s. See
+[trace-repeat-diagnostic-local](../test/results/trace-repeat-diagnostic-local/README.md).
 
+Independent reviews found no blockers. Complete local pre-push/profile/Go
+architecture/specification/architecture/design/browser gates pass:441 console
+tests,5.666s fixture races and69.992s full browser gate with28 journeys,
+27 accessibility scans, no external requests or CSP/runtime errors. Exact
+commands, source attribution and generated-output readbacks are in
+[profile-refresh-observation-final-local](../test/results/profile-refresh-observation-final-local/README.md).
 
+Final pushed-head CI and fresh heap/trace qualification remain required. Heavy
+proof stays attributed to c6; the follow-ups preserve comparison/worker/parser/
+resource behavior. TLS preparation is parked and unpublished; credential work
+has not started. Full S-05 and the complete specification goal remain active.
+Earlier checkpoints follow.
 
 ## Latest comparison qualification (2026-11-04)
 
