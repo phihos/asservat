@@ -34,8 +34,8 @@ func installedProfileRefusalSQLCheck(t *testing.T, ctx context.Context, admin *p
  AND g.kind='adHocCapture' AND g.data_class='raw' AND g.decision='approved'
  AND x.phase=$4 AND x.object_uid IS NOT NULL AND x.started_at IS NOT NULL AND x.completed_at>=x.started_at
  AND x.acquired_at IS NULL AND x.copies_json IS NULL AND x.copies_digest IS NULL
- AND x.binding_json->>'NativeType'='pprof'
- AND (x.binding_json->>'NativeBytes')::bigint=a.native_limit
+ AND (convert_from(x.binding_json,'UTF8')::jsonb->>'NativeType')='pprof'
+ AND (convert_from(x.binding_json,'UTF8')::jsonb->>'NativeBytes')::bigint=a.native_limit
  AND (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Profile,MaxBytes}')::bigint=a.native_limit
  AND (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Profile,Type}')='cpu'
  AND (convert_from(c.expectation_json,'UTF8')::jsonb#>>'{Profile,Mode}')='interval'
