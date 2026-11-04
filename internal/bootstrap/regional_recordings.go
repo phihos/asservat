@@ -87,15 +87,16 @@ type ConnectorRecordings struct {
 	after func(time.Duration) <-chan time.Time
 	wg    sync.WaitGroup
 
-	mu               sync.Mutex
-	profileEndpoints profileEndpointPlans
-	profiles         map[string]*heldProfile
-	held             map[string]*heldRecording // by capture ID
-	storing          int64
-	storeReleased    chan struct{}  // broadcast on store capacity or FIFO head change
-	storeWaiters     []*storeWaiter // bounded by the 64 one-use holders
-	peers            peerResolver
-	verifiers        int // running peer verifiers, at most maxPeerVerifiers
+	mu                   sync.Mutex
+	profileEndpoints     profileEndpointPlans
+	profileAuthorization ProfileAuthorizationReader
+	profiles             map[string]*heldProfile
+	held                 map[string]*heldRecording // by capture ID
+	storing              int64
+	storeReleased        chan struct{}  // broadcast on store capacity or FIFO head change
+	storeWaiters         []*storeWaiter // bounded by the 64 one-use holders
+	peers                peerResolver
+	verifiers            int // running peer verifiers, at most maxPeerVerifiers
 }
 
 func NewConnectorRecordings(nodes recordingNodes, pods podNodes, now func() time.Time, log func(string)) *ConnectorRecordings {
