@@ -225,13 +225,65 @@ func TestOwnerRuntimeReadinessAndShutdown(t *testing.T) {
 	if _, _, e := r.client.ReadinessRequest(); e == nil {
 		t.Fatal("client key survived shutdown")
 	}
-	conn, e := net.DialTimeout("tcp", listener.Addr().String(), 100*time.Millisecond)
+	// Inspect the socket Run owned: its numerical address may already belong to
+	// another parallel test after closure, so redialling is not a shutdown check.
+	if err := ownerRuntimeListenerAcceptError(listener.(*net.TCPListener)); !errors.Is(err, net.ErrClosed) {
+		t.Fatal("original listener survived shutdown", err)
+	}
+}
+
+// The deadline makes a surviving open listener fail within a bounded interval;
+// only ErrClosed proves this original listener has been closed.
+func ownerRuntimeListenerAcceptError(listener *net.TCPListener) error {
+	if err := listener.SetDeadline(time.Now().Add(100 * time.Millisecond)); err != nil && !errors.Is(err, net.ErrClosed) {
+		return err
+	}
+	conn, err := listener.Accept()
 	if conn != nil {
 		conn.Close()
 	}
-	if e == nil {
-		t.Fatal("listener survived shutdown")
-	}
+	return err
+}
+
+func TestOwnerRuntimeListenerClosureChecksOriginalSocket(t *testing.T) {
+	t.Run("open-is-not-closed", func(t *testing.T) {
+		listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer listener.Close()
+		err = ownerRuntimeListenerAcceptError(listener)
+		var timed net.Error
+		if errors.Is(err, net.ErrClosed) || !errors.As(err, &timed) || !timed.Timeout() {
+			t.Fatal("open listener was treated as closed or escaped the deadline", err)
+		}
+	})
+	t.Run("closed-with-address-reused", func(t *testing.T) {
+		original, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer original.Close()
+		address := original.Addr().String()
+		if err := original.Close(); err != nil {
+			t.Fatal(err)
+		}
+		replacement, err := net.Listen("tcp", address)
+		if err != nil {
+			t.Fatal("controlled address reuse", err)
+		}
+		defer replacement.Close()
+		// The old assertion would report survival even though this TCP connect
+		// reaches a different listener and the original socket is closed.
+		conn, err := net.DialTimeout("tcp", address, 100*time.Millisecond)
+		if err != nil {
+			t.Fatal("replacement listener unreachable", err)
+		}
+		conn.Close()
+		if err := ownerRuntimeListenerAcceptError(original); !errors.Is(err, net.ErrClosed) {
+			t.Fatal("original closed socket mistaken for its replacement", err)
+		}
+	})
 }
 
 func TestOwnerStartupRejectsChangedProofAndIdentity(t *testing.T) {

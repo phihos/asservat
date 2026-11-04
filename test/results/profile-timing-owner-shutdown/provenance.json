@@ -1,0 +1,18 @@
+{
+  "baseCommit": "c78b44b258eb5e434a815848ce8c81e8cb433545",
+  "failedCI": 41779435302,
+  "failingTest": "TestOwnerRuntimeReadinessAndShutdown",
+  "finding": "Numeric address redial can reach an unrelated listener after original closure. Controlled same-address rebind reproduces old false-positive assertion; CI address reuse itself is inferred. Original Run closes before joined return.",
+  "productionChanges": [],
+  "testChanges": [
+    "internal/bootstrap/owner_runtime_test.go"
+  ],
+  "redExit": 1,
+  "greenExit": 0,
+  "raceStressExit": 0,
+  "raceStressCount": 20,
+  "raceStressSeconds": 43.353,
+  "nativeEvidenceRetained": 41779461029,
+  "nativeQualifiedHead": "c78b44b258eb5e434a815848ce8c81e8cb433545",
+  "reuseScope": "No production source, schema, dependency, fixture workload, image build input, transport or installed workflow changed. Only the unit assertion/regression and retained logs differ; original native report/hash inventory is not rewritten. Final exact-head CI remains required."
+}
