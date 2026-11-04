@@ -1,0 +1,204 @@
+{
+  "format": "asservat-shared-profile-native-archive/v1",
+  "run": 41863094043,
+  "sourceHead": "c6cfe2509d898c49529df49b118b0f97be9e8dc9",
+  "suite": "heap",
+  "goExit": 1,
+  "goSeconds": 554.984,
+  "outerStatusAtArchive": {
+    "status": "in_progress",
+    "conclusion": null,
+    "updated_at": "2026-11-04T16:17:54Z",
+    "run_started_at": "2026-11-04T15:58:54Z",
+    "run_attempt": 1
+  },
+  "artifactCreatedAt": "2026-11-04T16:13:48Z",
+  "files": [
+    {
+      "path": "artifacts.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/artifacts.json",
+      "sourceBytes": 750,
+      "sourceSha256": "8f83d10b46d03edfec30b5e42c0ac59b216bcdc0f5c8242f964718e0a1d78f65",
+      "storedBytes": 455,
+      "storedSha256": "e7f59d73b6bff7878131247b007c2928e9268d5c1c40b4253bd523a27b2391ee",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "initial-run.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/initial-run.json",
+      "sourceBytes": 746,
+      "sourceSha256": "74732e0f3aec61a39c6fee35450ac6e21136bfea5c7710c042ed62ac4e8bed10",
+      "storedBytes": 305,
+      "storedSha256": "aceb6a64c493ac485ed170099e00f8683257974d9af2aa2e967a73fb33bf49f0",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "job-direct.stderr.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/job-direct.stderr",
+      "sourceBytes": 99,
+      "sourceSha256": "8b6407b2fdbca54bf3d53fb93e79a3560dbe59567fa5044cfee4bed1b5b6e467",
+      "storedBytes": 95,
+      "storedSha256": "0718a171587c7f36b5105650fc5d3776494bd72fa061117d0835859e55fbbbd5",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "jobs-api-final.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/jobs-api-final.json",
+      "sourceBytes": 6057,
+      "sourceSha256": "5e27fde57ae1a929f8c3459ee0620e97cf6a2b01476f612a5ec63746006f132c",
+      "storedBytes": 1115,
+      "storedSha256": "4a6a0c08e48fd4c416357c74fe00027db6dd05c5f74482b49b6f686a7bcae8ee",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "latest-run.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/latest-run.json",
+      "sourceBytes": 608,
+      "sourceSha256": "5985725ec48804065363208c8d0543977073deb204678356a809e20d303560ce",
+      "storedBytes": 293,
+      "storedSha256": "a7b0c7f886999ab4bdf8f10deb8ab50fbf8a8e6e2257f0b368236a9468a4182b",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "native-continuation-manual-heap-1/ci-native-continuation-manual-heap.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/native-continuation-manual-heap-1/ci-native-continuation-manual-heap.log",
+      "sourceBytes": 5365,
+      "sourceSha256": "503523ec5f8c5816ec92685881591c8b23c8b8c0511cabc3c023477403ca59ad",
+      "storedBytes": 1690,
+      "storedSha256": "7fdfb8858239d0da026b877b41532acdf68246cd7e457952a4115c1ada8b28e5",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "native-continuation-manual-heap-1/context-storage-environment.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/native-continuation-manual-heap-1/context-storage-environment.json",
+      "sourceBytes": 533419,
+      "sourceSha256": "eef9052bd41fed7c250f72856f9380c7d28aa955b99d76de31fbe8a71098e358",
+      "storedBytes": 200688,
+      "storedSha256": "ec09be0f10b3c4903f19243ceca26e956caf7d7a4865894da79a2ab9cd0dee21",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "native-continuation-manual-heap-1/context-storage-kubelet.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/native-continuation-manual-heap-1/context-storage-kubelet.log",
+      "sourceBytes": 32323,
+      "sourceSha256": "ba6fa8a4d9a8a9e0e207872ed887f47979bfe62c22630b12f8414a8619b206a6",
+      "storedBytes": 3659,
+      "storedSha256": "3a2b58a9e0a3152f1170dfd11796ec9e337c569940c455f35208069d2c356197",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "native-continuation-manual-heap-1/context-storage-postgres.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/native-continuation-manual-heap-1/context-storage-postgres.log",
+      "sourceBytes": 390526,
+      "sourceSha256": "68677ec2d572f65ac62ffb5239b9fa3e3d37fe83d3a4975d7e26b1a0610e6257",
+      "storedBytes": 21251,
+      "storedSha256": "1607494db92497b51b053753679a34031e164c8f85cc05580a09c73ddcc4c301",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "native-continuation-manual-heap-1/context-storage-timing.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/native-continuation-manual-heap-1/context-storage-timing.log",
+      "sourceBytes": 83044,
+      "sourceSha256": "8ac7018c62584d9763847a48b4b1820400755e67f62b06d90a69d1884f90dd31",
+      "storedBytes": 9731,
+      "storedSha256": "2a7a174311bced66be937edfe792814f993da4990bd9324cd9faef633a0868fd",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "native-continuation-manual-heap-1/context-storage.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/native-continuation-manual-heap-1/context-storage.log",
+      "sourceBytes": 77527,
+      "sourceSha256": "e293c2ee4bf8d17cad8612f6d1a6858d55cb1aaf4e876940abec4722210e1843",
+      "storedBytes": 9071,
+      "storedSha256": "811327b644e3993210653ba5781591de2eb67ba669132f4d779da97e47e3002d",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "run-api-at-archive.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/run-api-at-archive.json",
+      "sourceBytes": 12167,
+      "sourceSha256": "1fc7300cc7ba7ab8b785c4ae3deb5db251854f70a21632a483e1ccca92e5d22c",
+      "storedBytes": 1629,
+      "storedSha256": "0bf109551131b01acb06417facaa4c47c1a940c46643e7e308f183c4fc325c4d",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "run-api-final.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/run-api-final.json",
+      "sourceBytes": 12167,
+      "sourceSha256": "1fc7300cc7ba7ab8b785c4ae3deb5db251854f70a21632a483e1ccca92e5d22c",
+      "storedBytes": 1629,
+      "storedSha256": "0bf109551131b01acb06417facaa4c47c1a940c46643e7e308f183c4fc325c4d",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "run-api-terminal-readback.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/run-api-terminal-readback.json",
+      "sourceBytes": 12167,
+      "sourceSha256": "1fc7300cc7ba7ab8b785c4ae3deb5db251854f70a21632a483e1ccca92e5d22c",
+      "storedBytes": 1629,
+      "storedSha256": "0bf109551131b01acb06417facaa4c47c1a940c46643e7e308f183c4fc325c4d",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "verification.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/verification.json",
+      "sourceBytes": 3253,
+      "sourceSha256": "be1bbf46ca9f8c14c1f5eb45ab101e4dc3619b215de834e6db30d7889781914c",
+      "storedBytes": 1630,
+      "storedSha256": "029fb7477240f82301ebb54a06b6bbec8838a0e5522f922c2f9655d7a42b58b3",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "watch.log.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/watch.log",
+      "sourceBytes": 7812,
+      "sourceSha256": "91ffd8837105b7b730cedb17bc230acc12431768d72f088abb8a41e3415b433f",
+      "storedBytes": 339,
+      "storedSha256": "6991dbc726d0434bc4c9482d01954afeb76d3a6b89839556109bd7e27f6edb1f",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "workflow-at-archive.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/workflow-at-archive.json",
+      "sourceBytes": 4834,
+      "sourceSha256": "25f94465687cb9a4c043c3980c333b1425b9667314d32041f97c24da9f699a67",
+      "storedBytes": 889,
+      "storedSha256": "b55a8fb880d92e9a8e996e09bdc386a910e3925733f9a292500c8c8ef352818e",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "workflow-final.json.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/workflow-final.json",
+      "sourceBytes": 608,
+      "sourceSha256": "5985725ec48804065363208c8d0543977073deb204678356a809e20d303560ce",
+      "storedBytes": 293,
+      "storedSha256": "a7b0c7f886999ab4bdf8f10deb8ab50fbf8a8e6e2257f0b368236a9468a4182b",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "workflow-log-api-final.stderr.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/workflow-log-api-final.stderr",
+      "sourceBytes": 25,
+      "sourceSha256": "d2c8985c89b29a842ac4946d13bdbc297709f44f20bb968faf9682664b211db6",
+      "storedBytes": 45,
+      "storedSha256": "78c04f26d387077acccd2d2e3fff8dd829fd9365e76a586cc79f6d1c0ec2b042",
+      "encoding": "deterministic gzip level9 mtime0"
+    },
+    {
+      "path": "workflow-log-api.stderr.gz",
+      "source": "/home/phil/.cache/asservat-build/heap-browser-native-41863094043/workflow-log-api.stderr",
+      "sourceBytes": 25,
+      "sourceSha256": "d2c8985c89b29a842ac4946d13bdbc297709f44f20bb968faf9682664b211db6",
+      "storedBytes": 45,
+      "storedSha256": "78c04f26d387077acccd2d2e3fff8dd829fd9365e76a586cc79f6d1c0ec2b042",
+      "encoding": "deterministic gzip level9 mtime0"
+    }
+  ],
+  "excluded": [
+    "downloaded artifact/workflow ZIP duplicates",
+    "duplicate per-step workflow logs",
+    "binaries/private fixture files"
+  ],
+  "readback": "Every cache/source/stored SHA verified; native files byteidentical; compressedfiles inflate/recompress byteidentical; original source inventories4128/4128 match c6 Gitblobs."
+}
