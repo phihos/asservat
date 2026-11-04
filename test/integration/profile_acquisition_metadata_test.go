@@ -7,18 +7,19 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
-	"asservat.local/asservat/internal/domain/authorization"
-	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/fleet"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -197,13 +198,25 @@ func qualifyProfileAcquisitionAfterPublication(t *testing.T, f *capacitySQLFixtu
 	if err != nil || result.Phase != "Succeeded" {
 		t.Fatal("progress failed acquisition audit reconstruction", result, err)
 	}
-	target := s.a.Plan.Input.Target.Target()
-	history, err := progress.ListCaptureHistory(ctx, capture.HistoryQuery{RootID: s.a.RootID, Target: authorization.WorkloadScope(target.ClusterID, target.NamespaceUID, target.WorkloadUID), Origins: []capture.HistoryOrigin{capture.HistoryManual}, Limit: 20, Identity: request.Identity, Recovery: request.Recovery})
-	if err != nil || len(history.Entries) != 1 || history.Entries[0].CaptureID != e.CaptureUID || history.Entries[0].Phase != "Succeeded" {
-		t.Fatal("history failed acquisition audit reconstruction", history, err)
+	// This direct admission fixture does not publish encrypted capture-history
+	// parameters, so it cannot qualify list_capture_history visibility. Exercise
+	// the actual history-facts query using its normal read role and compare the
+	// exact shared input that historyEntries casts into progressFacts above.
+	var rootID, captureID pgtype.UUID
+	if rootID.Scan(s.a.RootID) != nil || captureID.Scan(e.CaptureUID) != nil {
+		t.Fatal("profile history-facts fixture identifiers")
+	}
+	queries := custodydb.New(progressPool)
+	history, err := queries.ReadCaptureHistoryFacts(ctx, custodydb.ReadCaptureHistoryFactsParams{RootID: rootID, Ids: []pgtype.UUID{captureID}})
+	if err != nil || len(history) != 1 {
+		t.Fatal("history acquisition facts unavailable", len(history), err)
+	}
+	current, err := queries.ReadContextProgressFacts(ctx, custodydb.ReadContextProgressFactsParams{RootID: rootID, ID: captureID})
+	if err != nil || !reflect.DeepEqual(custodydb.ReadContextProgressFactsRow(history[0]), current) {
+		t.Fatal("history facts differ from the validated progress audit reconstruction", err)
 	}
 	if _, err := f.admin.Exec(ctx, "UPDATE context_verification SET acquisition_started_at=NULL,acquisition_completed_at=NULL WHERE capture_id=$1", e.CaptureUID); err == nil && !probe.legacy {
 		t.Fatal("acknowledged acquisition window mutable")
 	}
-	t.Logf("actual verified profile acquisition: new/replay/immutable/catalog/progress/history; legacy unknown=%t; no native endpoint or process-attribution qualification", probe.legacy)
+	t.Logf("actual verified profile acquisition: new/replay/immutable/catalog/progress/history-facts parity; legacy unknown=%t; no history-parameter publication, native endpoint or process-attribution qualification", probe.legacy)
 }
