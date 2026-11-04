@@ -163,6 +163,20 @@ try {
   }
   await expect(page.getByText('Go endpoint profiles are collected on trigger and do not provide a pre-trigger recording. Requested duration describes the request. HTTP acquisition does not establish the precise sample interval or cumulative history.', { exact: true })).toBeVisible();
   await expect(page.getByText('Clock uncertainty and serving process attribution are unknown. Matching Pod identity does not prove the same process or restart. Times use UTC with up to microsecond precision.', { exact: true })).toBeVisible();
+  async function assertTimingMobile() {
+    await page.evaluate(() => document.fonts.ready);
+    for (const width of [375, 320]) {
+      await page.setViewportSize({ width, height: 740 });
+      const layout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth, timing: document.querySelector('table[aria-label="Profile collection timing"]').getBoundingClientRect().width }));
+      process.stderr.write('installed comparison timing mobile ' + JSON.stringify(layout) + '\n');
+      assert(layout.document <= layout.viewport, 'profile collection timing preserves page width after fonts load');
+      await expect(timing).toBeVisible();
+      await expect(timing.getByRole('row')).toHaveCount(profiles.length + 1);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+  }
+  stage = 'case-profile-timing-mobile';
+  await assertTimingMobile();
   stage = 'case-profile-region';
   const panel = page.getByRole('region', { name: 'Saved profile comparison', exact: true });
   await expect(panel).toHaveCount(1, { timeout: 30_000 }); // Two captures are in separate real cases.
@@ -198,6 +212,8 @@ try {
           row.function ?? 'Unresolved', row.baseline.toLocaleString('en-US'), row.incident.toLocaleString('en-US'), row.delta.toLocaleString('en-US'),
         ]);
       }
+      stage = 'result-profile-timing-mobile';
+      await assertTimingMobile();
       assert.deepEqual(errors, []);
       assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
       complete = true;

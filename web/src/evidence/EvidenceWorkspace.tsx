@@ -83,7 +83,7 @@ function ProfileCollectionTiming({ artifacts }: { artifacts: Artifact[] }) {
     <h2 id="profile-collection-timing">Profile collection timing</h2>
     <p>Go endpoint profiles are collected on trigger and do not provide a pre-trigger recording. Requested duration describes the request. HTTP acquisition does not establish the precise sample interval or cumulative history.</p>
     <p>Clock uncertainty and serving process attribution are unknown. Matching Pod identity does not prove the same process or restart. Times use UTC with up to microsecond precision.</p>
-    <table aria-label="Profile collection timing"><thead><tr><th scope="col">Profile</th><th scope="col">Requested collection</th><th scope="col">HTTP acquisition window (UTC)</th><th scope="col">Pod identity</th></tr></thead>
+    <table className="profile-summary" aria-label="Profile collection timing"><thead><tr><th scope="col">Profile</th><th scope="col">Requested collection</th><th scope="col">HTTP acquisition window (UTC)</th><th scope="col">Pod identity</th></tr></thead>
       <tbody>{profiles.map(artifact => {
         const acquisition = artifact.profile_acquisition;
         return <tr key={artifact.artifact_id}>
