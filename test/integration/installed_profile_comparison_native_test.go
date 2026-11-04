@@ -34,6 +34,7 @@ type installedProfileComparisonSource struct {
 	Retirement                  func()
 }
 type installedProfileCaptureContinuation struct {
+	NoQueries            func(captureID, artifactID string)
 	InitializeProcessing bool
 	Captured             func(http.RoundTripper, installedProfileComparisonSource)
 	Refused              func(captureID, grantID, reason string) time.Time

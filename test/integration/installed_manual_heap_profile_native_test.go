@@ -24,6 +24,11 @@ func installedHeapProfileVariant() bool {
 			panic("accepted-heavy fixture variant requires profile-comparison focus")
 		}
 		return false
+	case "trace":
+		if installedJourneyFocus() != "manual-profile" {
+			panic("trace fixture variant requires manual-profile focus")
+		}
+		return false
 	case "heap":
 		if installedJourneyFocus() != "manual-profile" {
 			panic("heap fixture variant requires manual-profile focus")

@@ -598,6 +598,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					var profileChecks []installedProfileCaptureContinuation
 					if installedJourneyFocus() == "manual-profile" {
 						profileChecks = []installedProfileCaptureContinuation{{InitializeProcessing: true, Refused: installedProfileRefusalSQLCheck(t, ctx, admin, p.RootID)}}
+						if installedRuntimeTraceVariant() {
+							profileChecks[0].NoQueries = installedRuntimeTraceNoQueries(t, ctx, admin, p.RootID)
+						}
 					}
 					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
 				}

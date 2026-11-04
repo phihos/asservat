@@ -401,7 +401,7 @@ def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False,
 
 def qualification_profile_variant(base):
     variant = base.get("ASSERVAT_PROFILE_VARIANT", "") or "cpu"
-    if variant not in ("cpu", "heap", "accepted-heavy") or (variant == "heap" and base.get("ASSERVAT_JOURNEY_FOCUS") != "manual-profile") or (variant == "accepted-heavy" and base.get("ASSERVAT_JOURNEY_FOCUS") != "profile-comparison"):
+    if variant not in ("cpu", "heap", "accepted-heavy", "trace") or (variant in ("heap", "trace") and base.get("ASSERVAT_JOURNEY_FOCUS") != "manual-profile") or (variant == "accepted-heavy" and base.get("ASSERVAT_JOURNEY_FOCUS") != "profile-comparison"):
         raise ValueError("Invalid installed profile fixture variant/focus")
     return variant
 

@@ -72,7 +72,7 @@ func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code str
 // The ordinary manual focuses qualify submission after preview expiry. The
 // comparison focus reuses that capture path twice to qualify saved analysis.
 func installedApprovedRecordingExpiryProof(focus string) bool {
-	return focus != "profile-comparison" && !(focus == "manual-profile" && installedHeapProfileVariant())
+	return focus != "profile-comparison" && !(focus == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant()))
 }
 
 // approvedRecordingArguments is the actual public request, validated offline
@@ -82,6 +82,9 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 		return manualArgumentsCaptureInput(cluster, namespace, workload, false)
 	}
 	if installedProfileFocus() {
+		if installedRuntimeTraceVariant() {
+			return manualRuntimeTraceArguments(cluster, namespace, workload)
+		}
 		if installedHeapProfileVariant() {
 			return manualHeapProfileArguments(cluster, namespace, workload)
 		}
@@ -392,6 +395,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal(err)
 		}
 		publishNamespaceCaptureProfile(t, ctx, regionalConfig, namespace, manualHeapProfileName, "v1", definition)
+	}
+	if installedProfileFocus() && installedRuntimeTraceVariant() {
+		definition, err := manualRuntimeTraceDefinition()
+		if err != nil {
+			t.Fatal(err)
+		}
+		publishNamespaceCaptureProfile(t, ctx, regionalConfig, namespace, manualRuntimeTraceName, "v1", definition)
 	}
 	var peerIPs []string
 	if installedJourneyFocus() == "manual-peers" {
@@ -807,11 +817,24 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-http" {
 		wantClass = "extract"
 	}
-	if installedProfileFocus() && (evidence.Artifacts[0].Kind != "profile" || evidence.Artifacts[0].NativeFormat != "pprof") {
+	wantProfileFormat := "pprof"
+	if installedProfileFocus() && installedRuntimeTraceVariant() {
+		wantProfileFormat = "go-trace"
+	}
+	if installedProfileFocus() && (evidence.Artifacts[0].Kind != "profile" || evidence.Artifacts[0].NativeFormat != wantProfileFormat) {
 		t.Fatal("published profile is mislabeled", evidence.Artifacts[0].Kind)
 	}
 	if evidence.Artifacts[0].DataClass != wantClass {
 		t.Fatal("case lists the recording with another data class", evidence.Artifacts[0].DataClass, wantClass)
+	}
+	if installedProfileFocus() && installedRuntimeTraceVariant() {
+		qualifyRuntimeTraceCase(t, evidence.Artifacts[0].Target, evidence.Artifacts[0].ProfileAcquisition, cluster, namespace, workload, preview.Pods[0].UID, preview.Pods[0].Name)
+		if len(profileCapture) != 1 || profileCapture[0].NoQueries == nil {
+			t.Fatal("trace query-absence SQL evidence missing")
+		}
+		profileCapture[0].NoQueries(receipt.CaptureID, evidence.Artifacts[0].ID)
+		qualifyRuntimeTraceSummaryDenied(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID)
+		profileCapture[0].NoQueries(receipt.CaptureID, evidence.Artifacts[0].ID)
 	}
 	var heapSummary query.ProfileSummary
 	if installedProfileFocus() && installedHeapProfileVariant() {
@@ -875,6 +898,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	nativeLimit := int64(artifact.RecordingNativeLimit)
 	if installedProfileFocus() {
 		nativeLimit = artifact.MaxPprofBytes
+		if installedRuntimeTraceVariant() {
+			nativeLimit = 32 << 20
+		}
 	}
 	if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil || *download.SizeBytes < 1 || *download.SizeBytes > nativeLimit {
 		diagnose()
@@ -896,6 +922,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	extension := ".pcapng"
 	if installedProfileFocus() {
 		extension = ".pb.gz"
+		if installedRuntimeTraceVariant() {
+			extension = ".trace"
+		}
 	}
 	if installedJourneyFocus() == "manual-syscall" || installedJourneyFocus() == "manual-arguments" {
 		extension = ".jsonl"
@@ -942,6 +971,12 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		return
 	}
 	if installedProfileFocus() {
+		if installedRuntimeTraceVariant() {
+			qualifyManualRuntimeTraceNative(t, ctx, native, receipt.CaptureID)
+			profileCapture[0].NoQueries(receipt.CaptureID, evidence.Artifacts[0].ID)
+			qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke, diagnose)
+			return
+		}
 		if installedHeapProfileVariant() {
 			qualifyManualHeapNative(t, ctx, native, receipt.CaptureID)
 			if err := installedProfileSummaryMatchesNative(heapSummary, native, "main.main"); err != nil {
