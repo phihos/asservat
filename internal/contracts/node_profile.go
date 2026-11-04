@@ -43,7 +43,8 @@ type NodeProfileCapture struct {
 	TLS                   NodeProfileTLS `json:"tls,omitzero"`
 	AuthorizationRequired bool           `json:"authorizationRequired,omitempty"`
 	// Authorization exists only in the authenticated poll delivery.
-	Authorization []byte `json:"authorization,omitempty"`
+	Authorization            []byte `json:"authorization,omitempty"`
+	AuthorizationUnavailable bool   `json:"authorizationUnavailable,omitempty"`
 }
 
 // NodeProfileTLS carries only bounded public trust for the already pinned

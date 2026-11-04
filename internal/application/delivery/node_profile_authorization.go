@@ -11,7 +11,8 @@ import (
 // contain Work alone; private material is never serialized by this value.
 type NodeWorkDelivery struct {
 	collector.Work
-	ProfileAuthorization []byte `json:"-"`
+	ProfileAuthorization            []byte `json:"-"`
+	ProfileAuthorizationUnavailable bool   `json:"-"`
 }
 
 type ProfileAuthorizationSource interface {
@@ -49,14 +50,17 @@ func (c *NodeChannel) ProfileAuthorization(ctx context.Context, peer NodePeer, e
 	}
 	bounded, cancel := context.WithDeadline(ctx, work.NotAfter)
 	defer cancel()
-	value, err := reader.ReadNodeProfileAuthorization(bounded, id, work)
-	if err != nil || !execution.ValidGoProfileAuthorization(value) || bounded.Err() != nil {
+	value, readErr := reader.ReadNodeProfileAuthorization(bounded, id, work)
+	if fresh, _, err := current(); err != nil {
 		clear(value)
-		return nil, ErrNodeUnavailable
-	}
-	if fresh, _, err := current(); err != nil || fresh != id {
+		return nil, err
+	} else if fresh != id {
 		clear(value)
 		return nil, ErrNodeDenied
+	}
+	if readErr != nil || !execution.ValidGoProfileAuthorization(value) || bounded.Err() != nil {
+		clear(value)
+		return nil, ErrNodeUnavailable
 	}
 	return value, nil
 }

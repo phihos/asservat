@@ -52,7 +52,11 @@ checks. Preview and policy compilation never read it. Public queued work and
 persistent state remain credential-free. The node must verify accepted TLS before
 sending Authorization. Old nodes lacking explicit support refuse, and delivery
 retains the existing 16-item/256 KiB bound using an ordered byte-bounded prefix.
-This is implementation preparation, not installed qualification.
+An unavailable private value refuses only that original profile through the
+existing zero-byte `ProfileUnavailable` result, with no acquisition or refund;
+other original work and cancellations continue. Whole-request cancellation and
+node process replacement still abort delivery. This is implementation preparation,
+not installed qualification.
 
 For Go, generate only the allowlisted `/debug/pprof/<type>` paths; CPU uses `/debug/pprof/profile`. Prefer binary `debug=0`; do not call `/cmdline` or remote `/symbol` as part of profiling. Missing/disabled endpoints yield `ProfileUnavailable`. After an admitted HTTP attempt, this is a terminal failed action with `reason_code: ProfileUnavailable`; a conflicting application-owned session similarly ends with `reason_code: ProfilerBusy`. Neither result publishes an artifact, retries acquisition or refunds the original admitted spend ([ADR-298](../docs/decisions/298-explicit-go-profile-refusals.md)). Asservat does not inject pprof into an existing binary or enable it through an unapproved application mutation.
 

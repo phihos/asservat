@@ -41,12 +41,12 @@ type runningProfile struct {
 	uncertainUntil    time.Time
 }
 
-func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work, authorization []byte) collector.Receipt {
+func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work, authorization []byte, authorizationUnavailable bool) collector.Receipt {
 	reply := collector.Decide(w, n.now())
 	if reply.Reason == collector.ReasonWorkUnknown || reply.Reason == collector.ReasonWorkExpired {
 		return reply
 	}
-	if w.Profile == nil || (w.Profile.AuthorizationRequired != (len(authorization) > 0)) || (len(authorization) > 0 && !execution.ValidGoProfileAuthorization(authorization)) || n.acquire == nil || n.upload == nil || ctx == nil || ctx.Err() != nil {
+	if w.Profile == nil || (w.Profile.AuthorizationRequired != (len(authorization) > 0 || authorizationUnavailable)) || (authorizationUnavailable && len(authorization) > 0) || (len(authorization) > 0 && !execution.ValidGoProfileAuthorization(authorization)) || (!authorizationUnavailable && n.acquire == nil) || n.upload == nil || ctx == nil || ctx.Err() != nil {
 		reply.Reason = collector.ReasonEngineUnavailable
 		return reply
 	}
@@ -74,8 +74,21 @@ func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work
 			delete(n.spent, capture)
 		}
 	}
-	_, busy := n.running[p.Request.Pin.UID]
 	_, replay := n.spent[p.CaptureID]
+	if authorizationUnavailable {
+		// This original item failed before any acquisition. Retain the same
+		// one-use identity and terminal upload; unrelated work and Stop keep
+		// their positions in the poll. No frozen/native slot is reserved.
+		if !replay && len(n.spent) < collector.MaxQueuedWork && now.Before(w.NotAfter) {
+			n.spent[p.CaptureID] = w.NotAfter
+			n.wg.Add(1)
+			go n.refuse(ctx, epoch, w, p, collector.ReasonProfileUnavailable)
+		}
+		n.budgetMu.Unlock()
+		reply.Reason = collector.ReasonProfileUnavailable
+		return reply
+	}
+	_, busy := n.running[p.Request.Pin.UID]
 	if busy || replay || len(n.running) >= collector.MaxQueuedWork || len(n.spent) >= collector.MaxQueuedWork || !now.Before(w.NotAfter) || n.budget().ReserveFrozen(p.Request.NativeLimit) != nil {
 		// A newly refused admitted attempt still returns a typed terminal
 		// outcome. Replayed work never creates another upload or runtime slot.

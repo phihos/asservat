@@ -468,7 +468,7 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 				if root == nil {
 					root = ctx
 				}
-				r = p.profiles.start(root, p.epoch, w, received.ProfileAuthorization)
+				r = p.profiles.start(root, p.epoch, w, received.ProfileAuthorization, received.ProfileAuthorizationUnavailable)
 			}
 			if w.Kind == collector.WorkCancelProfileCapture && p.profiles != nil {
 				r = p.profiles.stop(w)

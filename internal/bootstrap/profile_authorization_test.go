@@ -172,7 +172,7 @@ func TestNodeProfileAuthorizationDeliveryOwnsItsPrivateCopy(t *testing.T) {
 			return nil
 		}}
 	private := []byte("Bearer receive-only-sentinel")
-	if receipt := n.start(t.Context(), q.node.Epoch, work, private); receipt.Outcome != collector.OutcomeAccepted {
+	if receipt := n.start(t.Context(), q.node.Epoch, work, private, false); receipt.Outcome != collector.OutcomeAccepted {
 		t.Fatal("private work refused", receipt)
 	}
 	<-entered
@@ -182,7 +182,7 @@ func TestNodeProfileAuthorizationDeliveryOwnsItsPrivateCopy(t *testing.T) {
 	if calls.Load() != 1 || !bytes.Equal(acquired, make([]byte, len(acquired))) {
 		t.Fatal("private acquisition copy was retained after completion")
 	}
-	if receipt := n.start(t.Context(), q.node.Epoch, work, []byte("Bearer receive-only-sentinel")); receipt.Outcome == collector.OutcomeAccepted || calls.Load() != 1 {
+	if receipt := n.start(t.Context(), q.node.Epoch, work, []byte("Bearer receive-only-sentinel"), false); receipt.Outcome == collector.OutcomeAccepted || calls.Load() != 1 {
 		t.Fatal("private replay started another acquisition")
 	}
 }

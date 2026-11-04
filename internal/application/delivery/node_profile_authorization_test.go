@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"io"
 	"net/netip"
 	"testing"
@@ -26,7 +27,7 @@ func (privateProfileSink) DeliverProfile(context.Context, collector.Identity, co
 }
 
 func TestProfileAuthorizationCurrentProcessAndRetainedWorkAfterRead(t *testing.T) {
-	for _, mode := range []string{"current", "changed-epoch", "cancelled", "expired", "receipted"} {
+	for _, mode := range []string{"current", "changed-epoch", "cancelled", "expired", "receipted", "changed-epoch-with-refusal"} {
 		t.Run(mode, func(t *testing.T) {
 			ch, _, clock, _ := newChannel(t)
 			clock.t = time.Now().UTC().Truncate(time.Microsecond)
@@ -59,7 +60,7 @@ func TestProfileAuthorizationCurrentProcessAndRetainedWorkAfterRead(t *testing.T
 					t.Error("provider escaped original dispatch deadline")
 				}
 				switch mode {
-				case "changed-epoch":
+				case "changed-epoch", "changed-epoch-with-refusal":
 					ch.mu.Lock()
 					entry.id.Epoch = epochB
 					ch.mu.Unlock()
@@ -77,6 +78,9 @@ func TestProfileAuthorizationCurrentProcessAndRetainedWorkAfterRead(t *testing.T
 						t.Error(err)
 					}
 				}
+				if mode == "changed-epoch-with-refusal" {
+					return nil, ErrNodeUnavailable
+				}
 				value = []byte("Bearer synthetic-private-value")
 				return value, nil
 			}})
@@ -86,6 +90,9 @@ func TestProfileAuthorizationCurrentProcessAndRetainedWorkAfterRead(t *testing.T
 				t.Fatal("wrong sequence reached provider")
 			}
 			got, err := ch.ProfileAuthorization(ctx, peer, epochA, work)
+			if (mode == "changed-epoch" || mode == "changed-epoch-with-refusal") && !errors.Is(err, ErrNodeUnauthenticated) {
+				t.Fatal("final peer expiry masked as per-item refusal", err)
+			}
 			if mode == "current" {
 				if err != nil || len(got) == 0 || reads != 1 {
 					t.Fatal("current work refused", err, reads)

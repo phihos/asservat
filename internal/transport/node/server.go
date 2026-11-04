@@ -144,8 +144,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				clear(profile.Authorization)
 				profile.Authorization, err = h.channel.ProfileAuthorization(ctx, p, req.Epoch, work[i])
 				if err != nil {
-					w.WriteHeader(status(err))
-					return
+					if ctx.Err() != nil || errors.Is(err, delivery.ErrNodeUnauthenticated) {
+						w.WriteHeader(status(err))
+						return
+					}
+					clear(profile.Authorization)
+					profile.Authorization = nil
+					profile.AuthorizationUnavailable = true
 				}
 			}
 		}

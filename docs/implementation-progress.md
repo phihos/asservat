@@ -23,18 +23,27 @@ Secret, RBAC, API read, service, Job, connection or public credential field is
 added. Rotation uses the existing protected reinstall/restart path.
 
 Targeted component races, private-input/Helm checks and independent producer and
-consumer reviews passed at product checkpoint `c3fad4ff`. The next installed
-fixture uses the actual installer/private projection and original Restricted app,
-checks authenticated CPU/native/summary/history/Repeat and refuses wrong TLS and
-workload audiences. The initial pre-push run exposed a wire-layer import violation and missing
-local console dependencies. Local syntax validation fixed the import without
-changing the architecture rule; corrective contract races, architecture, vet,
-formatting and console checks passed. All other pre-push targets passed before
-that two-file correction. [Local originals](../test/results/named-profile-auth-local/README.md)
-retain failures and exact source scopes; CI and installed auth qualification
-remain pending. Heap React remains qualified at c2d4 and accepted-heavy comparison
-at c6; those scopes stay separate. Broader S-05 and the full specification remain
-open.
+consumer reviews passed. Initial pre-push failures (wire-layer behavior import
+and missing local console dependencies) were corrected without changing the
+architecture rule. Corrective contract races, architecture, vet, formatting and
+443 console checks passed; other pre-push targets passed before that two-file
+correction. [Local originals](../test/results/named-profile-auth-local/README.md)
+retain exact failures and source scopes. Genuine PR CI41923157902 passed all15
+jobs on published `46f3317b`; that is baseline evidence, not the later fix.
+
+Automated review then found that one failed private lookup aborted an entire
+poll, blocking unrelated work and cancellation. A real four-item mTLS regression
+reproduced zero delivered items. The corrected receive-only refusal keeps all
+original IDs/sequences, delivers unrelated work/Stop, and reuses one zero-byte
+`ProfileUnavailable` outcome without acquisition, frozen reservation or replay.
+Original request cancellation and a replaced node still abort the poll. Focused
+race checks and independent final review passed. Corrected-candidate vet,
+formatting, Go/design architecture, specification and design gates passed.
+Updated eligible CI and installed auth qualification remain pending. No installed auth VM has been dispatched. The actual installer
+fixture is ready for authenticated CPU/native/summary/history/Repeat, audience
+denial and the separately approved wrong TLS peer. Heap React remains qualified
+at c2d4 and accepted-heavy comparison at c6. Broader S-05 and the full specification
+remain open.
 
 ## Shared profile qualification history (2026-11-04)
 

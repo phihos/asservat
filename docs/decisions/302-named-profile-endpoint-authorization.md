@@ -38,3 +38,15 @@ verified application TLS peer. Missing/invalid input and unsupported nodes refus
 rotation uses the existing immutable-input reinstall/restart, with no independent
 credential expiry or refresh state machine. This is an engineering choice under
 the maintainer's standing proportionality guidance, not a new approval requirement.
+
+A failed private lookup is isolated to its original work item. The authenticated
+poll carries an explicit receive-only `authorizationUnavailable` bit, permitted
+only for an authorization-required TLS profile with no header material. Public
+retained Work is unchanged. The node preserves the original work ID/sequence,
+records its existing one-use spend and uploads one zero-byte `ProfileUnavailable`
+result without opening a profiling socket or reserving native/frozen bytes.
+Other work and cancellation keep their original positions. Request cancellation
+and a replaced/unauthenticated node still abort the complete poll. This fixes a
+reproduced four-item batch failure; truncating before the failed item would still
+block later cancellations. It adds zero privileges/settings/background tasks or
+product outcomes, and reuses the existing bounded failure-upload/receipt path.

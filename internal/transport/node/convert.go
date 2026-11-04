@@ -215,7 +215,7 @@ func digestHex(s string) ([32]byte, bool) {
 // with a WorkUnknown receipt instead of dropping the item. A payload that is
 // not exactly a valid packet capture is kept invalid for the same answer.
 func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
-	if w.ProfileCapture != nil && len(w.ProfileCapture.Authorization) != 0 {
+	if w.ProfileCapture != nil && (len(w.ProfileCapture.Authorization) != 0 || w.ProfileCapture.AuthorizationUnavailable) {
 		return collector.Work{}, false
 	}
 	if !text(w.ID, 36) || w.ID == "" || w.Sequence == 0 || !text(w.Kind, 32) || w.NotAfter.IsZero() {

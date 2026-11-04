@@ -54,7 +54,7 @@ func TestNodeProfilePreservesKnownUnavailableAndBusyWithoutRetry(t *testing.T) {
 					}
 					return nil
 				}}
-			if r := n.start(t.Context(), q.node.Epoch, w, nil); r.Outcome != collector.OutcomeAccepted {
+			if r := n.start(t.Context(), q.node.Epoch, w, nil, false); r.Outcome != collector.OutcomeAccepted {
 				t.Fatal(r)
 			}
 			n.wg.Wait()
@@ -68,7 +68,7 @@ func TestNodeProfilePreservesKnownUnavailableAndBusyWithoutRetry(t *testing.T) {
 			if !held.uncertainUntil.Equal(p.Request.Deadline) || usage.FrozenReserved != 0 {
 				t.Fatal("refusal changed original uncertain lifetime or leaked joined memory", held, usage)
 			}
-			if r := n.start(t.Context(), q.node.Epoch, w, nil); r.Outcome == collector.OutcomeAccepted {
+			if r := n.start(t.Context(), q.node.Epoch, w, nil, false); r.Outcome == collector.OutcomeAccepted {
 				t.Fatal("refused acquisition replayed")
 			}
 			n.wg.Wait()
@@ -108,11 +108,11 @@ func TestNodeProfileOwnsBudgetAndRejectsReplay(t *testing.T) {
 			uploaded <- b
 			return err
 		}}
-	if got := n.start(context.Background(), id, work, nil); got.Outcome != collector.OutcomeAccepted {
+	if got := n.start(context.Background(), id, work, nil, false); got.Outcome != collector.OutcomeAccepted {
 		t.Fatal(got)
 	}
 	<-entered
-	if got := n.start(context.Background(), id, work, nil); got.Outcome == collector.OutcomeAccepted {
+	if got := n.start(context.Background(), id, work, nil, false); got.Outcome == collector.OutcomeAccepted {
 		t.Fatal("replay acquired")
 	}
 	mu.Lock()
@@ -132,7 +132,7 @@ func TestNodeProfileOwnsBudgetAndRejectsReplay(t *testing.T) {
 	if held != 0 {
 		t.Fatal("joined buffer leaked", held)
 	}
-	if got := n.start(context.Background(), id, work, nil); got.Outcome == collector.OutcomeAccepted {
+	if got := n.start(context.Background(), id, work, nil, false); got.Outcome == collector.OutcomeAccepted {
 		t.Fatal("completed acquisition replayed")
 	}
 }
@@ -160,7 +160,7 @@ func TestNodeProfileCancelKeepsUncertainRuntimeSlotUntilOriginalDeadline(t *test
 			}
 			return nil
 		}}
-	if r := n.start(context.Background(), q.node.Epoch, w, nil); r.Outcome != collector.OutcomeAccepted {
+	if r := n.start(context.Background(), q.node.Epoch, w, nil, false); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	<-entered
@@ -180,7 +180,7 @@ func TestNodeProfileCancelKeepsUncertainRuntimeSlotUntilOriginalDeadline(t *test
 	second.CaptureID = "33333333-3333-4333-8333-333333333333"
 	w.Profile = &second
 	w.ID = second.CaptureID
-	if r := n.start(context.Background(), q.node.Epoch, w, nil); r.Reason != collector.ReasonCaptureBusy {
+	if r := n.start(context.Background(), q.node.Epoch, w, nil, false); r.Reason != collector.ReasonCaptureBusy {
 		t.Fatal("uncertain runtime was reused", r)
 	}
 	n.wg.Wait()
@@ -211,7 +211,7 @@ func TestNodeProfileStopCancelsBlockedUploadAndJoinsBeforeRelease(t *testing.T) 
 			<-join
 			return ctx.Err()
 		}}
-	if r := n.start(parent, q.node.Epoch, w, nil); r.Outcome != collector.OutcomeAccepted {
+	if r := n.start(parent, q.node.Epoch, w, nil, false); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	<-entered
