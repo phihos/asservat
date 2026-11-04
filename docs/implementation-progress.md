@@ -1,5 +1,39 @@
 # Sustained implementation progress
 
+## Current shared profile candidate (2026-11-04)
+
+Published PR162 is frozen at `c6cfe2509d898c49529df49b118b0f97be9e8dc9`.
+Its genuine pull-request CI41863053175 required `ci-ok` check passed. Three
+fresh-VM native suites ran at that head; each independently matched all4,128
+submitted Go source hashes, kept sources unchanged, reported no cleanup failures
+and removed build scratch. Stale queued API views were superseded by uploaded
+terminal artifacts and fresh job/check readbacks.
+
+| Workflow | Actual outcome | Proven boundary and remaining gap |
+| --- | --- | --- |
+| [Heavy comparison41863091784](../test/results/profile-heavy-native-41863091784/README.md) | Go/harness0,683.416s; final workflow success | Both MCP and React comparisons, exact source/key/SQL joins, positive original download-worker retirement and both live probes passed. Peaks228.07/240.00MiB under384MiB,500m throttling observed, zero swap/high/max/OOM events. One accepted shape, not all maxima or capture overhead. |
+| [Heap browser41863094043](../test/results/heap-browser-native-41863094043/README.md) | Go/harness1,554.984s | Actual React default inuse_space summary and10-unit/three-key/384MiB SQL proof passed before native preparation. An attachment assertion blocked native hash/pprof/repeat proof. |
+| [Runtime trace41863096785](../test/results/runtime-trace-native-41863096785/README.md) | Go/harness1,498.465s; final workflow failure | Trace capture, acquisition metadata and initial zero-query proof passed. Unsupported pprof summary returned503, blocking native download/offline trace parsing/repeat. |
+
+The local trace correction preserves the native-source refusal and adds a private
+proof of failure before summary admission. C20 returns an audited, content-free
+NotAvailable for denied/missing/unsupported/provider authority failures at that
+point; this deliberately includes service unavailability before admission.
+Unknown/nonclassified and attempted/post-admission failures retain transport
+errors. Audit, final current identity, original deadlines and cancellation remain
+mandatory. No SQL allowlist, parser, worker, resource or timeout changes. The
+composed regression reproduces the old503 with zero admissions; its matrix and
+1.054s/95.325s affected races pass. Independent review found no blockers. Exact
+commands/source hashes are in
+[trace-summary-refusal-local](../test/results/trace-summary-refusal-local/README.md).
+
+The heap attachment boundary remains under focused investigation. These follow-up
+changes are not yet pushed or installed-qualified. Final integration/review/CI and
+fresh focused heap/trace native runs remain required. The separately prepared
+TLS follow-up is unpublished; credential work is paused. Full S-05 and the full
+specification goal remain active. Earlier checkpoints follow.
+
+
 
 ## Latest comparison qualification (2026-11-04)
 
