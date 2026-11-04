@@ -69,6 +69,9 @@ func TestInstalledCapacityCurrentBoundedSanitizedProjection(t *testing.T) {
 		if strings.Count(q, "case when coalesce(public.capacity_root_configuration_valid(s.root_configuration),false)") != 3 || !strings.Contains(q, "\n then public.connector_digest") {
 			t.Fatal("missing/invalid roots reach the strict digest decoder")
 		}
+		if !strings.Contains(q, "p.fresh_until<=p.observed_at+interval '30 seconds'") {
+			t.Fatal("permission observation differs from migration74's current read contract")
+		}
 		return capacityCurrentGoodRow()
 	}, activityInstallation, activityInstallation, func(format string, args ...any) { fmt.Fprintf(&output, format+"\n", args...) })
 	text := output.String()
@@ -168,5 +171,23 @@ func TestInstalledCapacityCurrentProjectionWithRealPostgres(t *testing.T) {
 	text = output.String()
 	if strings.Contains(text, "unavailable") || strings.Contains(text, "private-fixture") || !strings.Contains(text, "source_present=true") || !strings.Contains(text, "root_configuration_valid=false root_ready=false") || !strings.Contains(text, "root_digest_matches=false") || !strings.Contains(text, "root_planned_remaining_ms=unknown") {
 		t.Fatal("actual SQL malformed-root projection failed", text)
+	}
+	// Check the effective migrated function, independently of the diagnostic's
+	// copied predicate; migration74 rewrites migration65's original five seconds.
+	var currentDefinition string
+	if err := admin.QueryRow(ctx, `SELECT pg_get_functiondef('public.read_capacity_audit_profiles(uuid,uuid,uuid,bytea,text,timestamptz,timestamptz)'::regprocedure)`).Scan(&currentDefinition); err != nil || !strings.Contains(currentDefinition, "p.fresh_until>p.observed_at+interval '30 seconds'") || strings.Contains(currentDefinition, "p.fresh_until>p.observed_at+interval '5 seconds'") {
+		t.Fatal("effective capacity audit permission contract changed")
+	}
+	observed := time.Now().UTC().Truncate(time.Microsecond).Add(-10 * time.Second)
+	for _, extra := range []time.Duration{0, time.Microsecond} {
+		permission, _ := json.Marshal(map[string]any{"id": root, "suspended": false, "observed_at": observed, "fresh_until": observed.Add(30*time.Second + extra), "lease_until": observed.Add(time.Hour)})
+		output.Reset()
+		installedCapacityCurrentDiagnostics(ctx, func(call context.Context, query string, args ...any) pgx.Row {
+			query = strings.Replace(query, "LEFT JOIN public.permission_stream p ON", "LEFT JOIN jsonb_populate_record(NULL::public.permission_stream,$4::jsonb) p ON", 1)
+			return admin.QueryRow(call, query, append(args, permission)...)
+		}, root, installation, func(format string, args ...any) { fmt.Fprintf(&output, format+"\n", args...) })
+		if strings.Contains(output.String(), "unavailable") || !strings.Contains(output.String(), fmt.Sprintf(" permission_current=%t ", extra == 0)) {
+			t.Fatal("actual SQL thirty-second permission boundary misreported", extra, output.String())
+		}
 	}
 }

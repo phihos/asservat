@@ -22,7 +22,7 @@ SELECT sampled.at, ARRAY[
  EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE oid=s.audit_reader_role AND rolname=$3),
  coalesce(s.installation_id=$2::uuid,false),
  coalesce(NOT t.suspended AND NOT t.recovery_blocked AND t.observed_at<=sampled.at AND t.fresh_until>sampled.at,false),
- coalesce(NOT p.suspended AND p.observed_at<=sampled.at AND p.fresh_until>sampled.at AND p.lease_until>sampled.at AND p.fresh_until<=p.observed_at+interval '5 seconds',false),
+ coalesce(NOT p.suspended AND p.observed_at<=sampled.at AND p.fresh_until>sampled.at AND p.lease_until>sampled.at AND p.fresh_until<=p.observed_at+interval '30 seconds',false),
  coalesce(NOT s.suspended AND s.observed_at<=sampled.at AND s.fresh_until>sampled.at AND s.accepted_revision>=1 AND s.accepted_snapshot IS NOT NULL,false),
  coalesce(public.capacity_root_configuration_valid(s.root_configuration),false),
  CASE WHEN coalesce(public.capacity_root_configuration_valid(s.root_configuration),false)
