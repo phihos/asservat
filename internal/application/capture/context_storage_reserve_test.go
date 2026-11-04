@@ -132,3 +132,39 @@ func TestContextStorageResponseReserveSkipsTailHint(t *testing.T) {
 		t.Fatal("tail lost fresh authoritative read", err, reads.Load())
 	}
 }
+
+// An upfront possible-profile hint may be longer than the classified ordinary
+// request. It must join at that request's existing reply reserve, not consume
+// its entire authority interval while waiting for the hint's longer context.
+func TestContextStorageResponseReserveJoinsLongerHint(t *testing.T) {
+	f, facts, _ := consumptionFixture(t)
+	var reads, demands atomic.Int32
+	joined := make(chan struct{})
+	f.svc.Refresh = consumptionRefreshFunc(func(context.Context, targets.Request) error { demands.Add(1); return nil })
+	f.svc.Storage = consumptionStorageFunc(func(ctx context.Context, target authorization.Target) (ContextStorageObservation, error) {
+		if reads.Add(1) == 1 {
+			defer close(joined)
+			<-ctx.Done()
+			return ContextStorageObservation{}, ctx.Err()
+		}
+		out, err := f.ContextStorage(ctx, target)
+		out.Binding.FreshUntil = f.now.Add(500 * time.Millisecond)
+		return out, err
+	})
+	candidate, cancelCandidate := context.WithTimeout(t.Context(), 8*time.Second)
+	defer cancelCandidate()
+	owner := f.svc.beginStorageWait(candidate, facts.target, f.now.Add(5*time.Second), f.store.Selection)
+	defer owner.close()
+	ordinary, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	started := time.Now()
+	_, err := f.svc.consumeStorage(ordinary, facts, f.intent(), owner)
+	if !errors.Is(err, value.ErrUnavailable) || ordinary.Err() != nil || time.Since(started) > 4600*time.Millisecond || reads.Load() != 2 || demands.Load() != 0 {
+		t.Fatal("ordinary reply reserve lost to candidate hint", err, ordinary.Err(), time.Since(started), reads.Load(), demands.Load())
+	}
+	select {
+	case <-joined:
+	default:
+		t.Fatal("classified hint not joined")
+	}
+}

@@ -65,3 +65,44 @@ Unit coverage exercises endpoint scope and ambiguity, frozen scope changes,
 profile modes/durations/forced GC, assessment and refusal of submission/policy
 execution. Helm checks cover installer projection and invalid configuration.
 These checks do not qualify installed profile acquisition or native downloads.
+
+## History-repeat readiness composition
+
+Native run 41879675203 demonstrated a normal budget mismatch: the capacity
+demand completed successfully in 4.5 seconds, 1.508 seconds after the repeat
+preview had stopped waiting. Its five-second inner request, including a
+one-second reply reserve, could not fit the existing source operation plus
+target, catalog and recorder metadata work. Increasing only that request to
+eight seconds still leaves the original target and recovery observations
+expired; a local advancing-clock regression reproduces both refusals.
+
+A single-profile history repeat therefore selects an eight-second composition
+budget at entry, inside the unchanged fifteen-second public preview request.
+Classification and non-profile paths retain five seconds. A possible-profile
+hint can begin before catalog classification, but an ordinary consumer cancels
+and joins that same hint at its original readiness cutoff, retaining the
+one-second reply reserve. Initial recovery and
+current target review precede the one non-authoritative readiness hint. After
+joining it, the existing complete recorder resolution is moved later and its
+fresh namespace/workload/Pod result must match the original request and pin.
+A warm unsupported mechanism retains the existing plan-only/dependency
+handling: history still refuses when its original qualified collector cannot
+be reproduced. After a long wait, expired hint facts cannot manufacture a
+plan-only preview and the repeat refuses. This avoids an extra recorder RPC
+solely for that fallback. Final eligibility, capability, retention and storage are independently read;
+no freshness is borrowed from a Pod observation. One additional current recovery
+read must retain the initial installation ID, issuer epoch and full revision,
+while keeping its own original five-second interval. An expired initial proof
+is never extended or relabelled as that new proof. History expiry, original
+caller/token/session/policy bounds, cancellation and final checks still win.
+
+Cost: three SQL reads in one additional bounded transaction per such repeat;
+zero extra Kubernetes reads, refresh demands, APIs, privileges, watches, caches,
+pools, background owners or configuration. Existing required recorder reads are
+reordered, not duplicated. At R repeats per second the added SQL load is
+3R queries/R transactions per second; concurrency and owner counts do not grow. The browser preview timer matches the already
+accepted fifteen-second server window; other capture operations keep ten
+seconds. The capacity worker's original five-second source operation and
+quotas are unchanged. This is a maintainer-authorized practical composition
+choice, not an extension of collection or disclosure authority. Installed repeat
+availability still requires qualification of the final integrated source.

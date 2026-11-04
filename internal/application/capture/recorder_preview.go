@@ -15,6 +15,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // RecorderPreviewResult is a reviewed packet/syscall plan (ADR-243). Only
@@ -30,6 +31,8 @@ type RecorderPreviewResult struct {
 	// (ADR-248): request_capture can accept it.
 	Recordable bool
 }
+
+const profileRepeatPreviewWindow = 8 * time.Second
 
 // PreviewComposition compiles a one-component builtin capture profile
 // composition for a currently authorized workload. It reads identity,
@@ -57,7 +60,18 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 	if intent.Composition == nil || !intent.Valid() {
 		return zero, previewFailure("composition/intent", value.ErrInvalid)
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// Allocate the possible history-profile composition budget up front. The
+	// ordinary classification phase and every non-profile path retain five
+	// seconds; no consumed observation or caller deadline is extended.
+	parent := ctx
+	var profileRepeatCtx context.Context
+	_, profileCapable := s.Recorders.(ProfileRecorders)
+	if profileCapable && original != nil && intent.RepeatedFrom != nil && intent.RepeatedFrom.Valid(s.Now()) && len(intent.Composition.Components) == 1 {
+		var finish context.CancelFunc
+		profileRepeatCtx, finish = context.WithTimeout(parent, profileRepeatPreviewWindow)
+		defer finish()
+	}
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
 	created := s.Now().UTC().Truncate(time.Microsecond)
 	i, err := source.ResolveIdentity(ctx)
@@ -78,6 +92,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		return zero, previewFailure("facts/target", value.ErrChanged)
 	}
 	var storageWait *contextStorageWait
+	var ordinaryStorageUntil time.Time
 	if original != nil && s.Recorders != nil && target.ExecutionClass == artifact.ContextAPIExecution && len(intent.Composition.Components) == 1 &&
 		original.ClusterID == target.Request.ClusterID && original.NamespaceUID == target.Request.Namespace.UID &&
 		original.WorkloadUID == target.Request.Workload.UID && (original.PodUID == "" || original.PodUID == target.Request.PodUID) {
@@ -89,7 +104,18 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		if intent.RepeatedFrom != nil {
 			until = identity.Earlier(until, intent.RepeatedFrom.ExpiresAt)
 		}
-		storageWait = s.beginStorageWait(ctx, target, until, value.ContextStorageSelection{})
+		ordinaryStorageUntil = until
+		hint := ctx
+		if profileRepeatCtx != nil {
+			// Initial recovery/target facts authorize only the current review.
+			// The hint grants no authority and retains neither observation for
+			// the final plan. Fresh facts are independently acquired below.
+			if !recovery.Valid(s.Now()) || !target.Valid(s.Now()) || ctx.Err() != nil {
+				return zero, previewFailure("recovery", value.ErrUnavailable)
+			}
+			hint, until = profileRepeatCtx, identity.Earlier(i.ValidUntil, intent.RepeatedFrom.ExpiresAt)
+		}
+		storageWait = s.beginStorageWait(hint, target, until, value.ContextStorageSelection{})
 		defer storageWait.close()
 	}
 	mark = time.Now()
@@ -113,7 +139,55 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 			return r, err
 		}
 	}
-	available, err := s.packetRecorderAvailable(ctx, intent, target)
+	var available bool
+	if profileRepeatCtx != nil && storageWait != nil && profileRecorderInput(intent) {
+		// Readiness is scheduling, not retained target/recovery authority.
+		// Join the same hint before the existing complete recorder resolution;
+		// its fresh Pod/namespace/workload facts must match the original pin.
+		ctx = profileRepeatCtx
+		select {
+		case <-storageWait.done:
+		case <-ctx.Done():
+			return zero, previewFailure("facts/readiness", ctx.Err())
+		}
+		if !intent.RepeatedFrom.Valid(s.Now()) {
+			return zero, previewFailure("history", value.ErrSettingsUnavailable)
+		}
+		if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil {
+			return zero, previewFailure("identity", err)
+		}
+		freshRecovery, e := s.currentRecovery(ctx)
+		if e != nil || freshRecovery.InstallationID != recovery.InstallationID || freshRecovery.IssuerEpoch != recovery.IssuerEpoch || freshRecovery.Revision != recovery.Revision {
+			return zero, previewFailure("recovery", value.ErrChanged)
+		}
+		recovery = freshRecovery
+		var finish context.CancelFunc
+		ctx, finish = context.WithDeadline(ctx, recovery.FreshUntil)
+		defer finish()
+		storageWait.until = identity.Earlier(storageWait.until, recovery.FreshUntil)
+		profiles, ok := s.Recorders.(ProfileRecorders)
+		if !ok {
+			return zero, previewFailure("recorder", value.ErrRecorderUnavailable)
+		}
+		mark = time.Now()
+		fresh, e := profiles.ResolveProfileRecorder(ctx, target.Request)
+		auditapp.MarkStep(ctx, "p-recorder", mark)
+		if e == nil && (ctx.Err() != nil || !fresh.Valid(s.Now()) || fresh.Request != target.Request || fresh.Pin != target.Pin) {
+			e = targets.ErrChanged
+		}
+		if e != nil && !errors.Is(e, targets.ErrUnsupported) {
+			return zero, previewFailure("recorder", e)
+		}
+		available = e == nil
+		if available {
+			target = fresh
+		}
+	} else {
+		if storageWait != nil {
+			storageWait.until = ordinaryStorageUntil
+		}
+		available, err = s.packetRecorderAvailable(ctx, intent, target)
+	}
 	if err != nil {
 		return zero, previewFailure("recorder", err)
 	}

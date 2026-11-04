@@ -308,6 +308,19 @@ qualification and its current limits are recorded in
 [implementation progress](../implementation-progress.md).
 
 
+A history-backed single-profile repeat allocates eight seconds at entry within
+the existing fifteen-second public preview window. Its one readiness hint is
+not target or recovery authority. Initial recovery and current review remain
+before it. The existing complete recorder resolution runs after readiness and
+must return the same pinned target; final capability, eligibility, retention
+and storage facts are independently read. One fresh recovery read must match
+the initial installation, issuer epoch and full revision. Each final proof
+retains its own original interval, and earlier request/history/policy ends and
+final checks still apply. This adds three SQL reads/one bounded transaction,
+zero Kubernetes reads or new background work. The browser selects the existing
+fifteen-second preview bound up front; other capture operations retain ten
+seconds. See [ADR-285](../decisions/285-profile-preview-plans.md).
+
 Stored previews omit catalog documents. When creating a new profile review with
 selected result access, the capture service reloads the exact referenced catalog
 version and verifies its source UID/definition against the original canonical
