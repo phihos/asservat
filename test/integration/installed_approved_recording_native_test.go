@@ -932,7 +932,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal(err)
 		}
 		qualifyInstalledSyscallProjections(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, artifact.SyscallArgumentsArtifact, preview.Pods[0].UID, native, evidence.Artifacts[0].Expires, manualArgumentsMarker, summaryCheck, retirement)
-		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
+		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke, diagnose)
 		qualifyManualRecorderStop(t, ctx, "arguments", manualArgumentsCaptureInput(cluster, namespace, workload, true), read, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
 			if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent installed argument Stop review", "idempotency_key": "approve-stop-" + grantID}, nil); code != "" {
@@ -947,7 +947,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			if err := installedProfileSummaryMatchesNative(heapSummary, native, "main.main"); err != nil {
 				t.Fatal("read-only heap summary differs from subsequently authorized native original", err)
 			}
-			qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
+			qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke, diagnose)
 			t.Log("installed heap snapshot: namespace profile, independent collection review with selected result access, original Pod, no forced GC, read-only inuse_space summary before separate authenticated native download; exact signed native total/bytes and null duration verified")
 			return
 		}
@@ -960,7 +960,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			profileCapture[0].Captured(transport, installedProfileComparisonSource{CaseID: progress.CaseID, ArtifactID: evidence.Artifacts[0].ID, Version: evidence.Artifacts[0].Digest, Native: native, Expires: evidence.Artifacts[0].Expires, Retirement: retirement})
 			return
 		}
-		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
+		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke, diagnose)
 		qualifyInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, native, evidence.Artifacts[0].Expires, summaryCheck)
 		if len(profileCapture) != 1 || profileCapture[0].Refused == nil {
 			t.Fatal("manual profile refusal SQL evidence is unavailable")
