@@ -79,6 +79,15 @@ under `test/results/heap-profile-native-41809198307/`. Diagnose the repeat-previ
 failure before another installed run; no physical heap/RSS, additional approval
 or positive worker-retirement/refund claim follows from these passed boundaries.
 
+Focused inspection found no deterministic repeat catalog/endpoint mismatch. The
+archived run lacks the owner-side fixed failure stage because the single-attempt
+history helper omitted the existing diagnostic callback on semantic errors. That
+test-only gap is corrected; affected fixture races pass6.429s. One further focused
+installed dispatch is diagnostic qualification, with unchanged production code,
+original observation/stage bounds and single-attempt behavior. It will either
+complete the workflow or preserve the missing phase evidence; no timeout increase
+or acquisition/preview retry is introduced.
+
 Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
 selection for a saved heap; frequency is unmeasured, and this is an existing
 first-release requirement. Metadata/default conventions and the existing
