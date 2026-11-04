@@ -1,0 +1,99 @@
+{
+  "format": "profile-auth-poll-isolation-provenance/v1",
+  "baseline": "46f3317be54db8b8f7e5c45af81bfa816e61c93b",
+  "fix": "f2536ccebcb97f74cda71faf5e5d06a92f769440",
+  "fix_parent_is_baseline": true,
+  "frozen_handoff_paths": 13,
+  "committed_git_blob_readback": [
+    {
+      "path": "internal/application/delivery/node_profile_authorization.go",
+      "sha256": "d21bc7c4ddb1544f7eb2f9f5c124cd6aeacc2b7235a3165b4d0eb71434835159",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/application/delivery/node_profile_authorization_test.go",
+      "sha256": "961ab28c12e70ef3a82ec3bcf6bdd05a47613a9a6df5d58d0ee04d0654f3a0a4",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/bootstrap/node.go",
+      "sha256": "78386a586058fa40fd36d9ad418d3961dada5385ba420a05bfc01d9edf9e19ee",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/bootstrap/node_profiles.go",
+      "sha256": "02481e611bb247e5f94d3024615dda36aa44299ccc98b9d735c8d71809cf83cd",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/bootstrap/node_profiles_test.go",
+      "sha256": "8c5c0599fb0578909169dba0a06b59e1c3e61bb2bf855b65e9c0612a6893cd98",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/bootstrap/profile_authorization_test.go",
+      "sha256": "0ba9c30c68251c0c10d5538754712490bfe13ee9f777c4f4799ad402001919b3",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/contracts/node_profile.go",
+      "sha256": "1b4273ba43575885773a9e823628e8d9db7d69bd269afde0c75c5cfdcccc6c46",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/transport/node/convert.go",
+      "sha256": "1bae9de60901613db4487e32520a70fcec8adb75870fab4da9d5c1a47e5cf843",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/transport/node/profile.go",
+      "sha256": "d200cf9a70df53a86084ed83c32539ceff2f9180e01c081df0bc99c64f924bbd",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/transport/node/profile_authorization.go",
+      "sha256": "956a060602f51ba1a07dc08752fce775fb0897d3bda5ce95511080f782ba9523",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/transport/node/profile_authorization_test.go",
+      "sha256": "0bde0f3f79de177142a277d5dd968edcb62761bba0eeb9cbb50162a798268b14",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/transport/node/server.go",
+      "sha256": "7618e1a922c4d103517a3ebd6766e055e67c126c042f9647b165defdd5252fc4",
+      "matches_frozen_handoff": true
+    },
+    {
+      "path": "internal/bootstrap/profile_authorization_refusal_test.go",
+      "sha256": "f9380bdc85de64bc1c49076354a943261696884c459264745aba1a72a73cc94d",
+      "matches_frozen_handoff": true
+    }
+  ],
+  "root_gate": {
+    "command": "make go-vet gofmt-check go-architecture-check architecture-check spec-check design-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "environment": {
+      "PATH_prefix": "/home/phil/.cache/asservat-build/spec-venv/bin:/home/phil/.cache/asservat-build/bin:",
+      "PATH_inherited": "not separately captured",
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOFLAGS": "-buildvcs=false -p=2"
+    },
+    "cwd": "/home/phil/Projekte/asservat-profile-endpoint-auth-native",
+    "actual_exit": 0,
+    "source": "frozen source later committedf253; exact13Gitblobcheck supplied byRoot and independently repeated",
+    "log": "profile-auth-item-refusal-final-gates.log"
+  },
+  "baseline_ci": {
+    "run": 41923157902,
+    "head": "46f3317be54db8b8f7e5c45af81bfa816e61c93b",
+    "event": "pull_request",
+    "conclusion": "success",
+    "scope": "baseline only; all15jobs/ci-ok success; no fixCI claim"
+  },
+  "review": "Source independently reviewed all13frozenpaths, no blockers, no reviewer edits/tests; root confirmed committed hashes",
+  "scope": "local real loopback mTLS with synthetic attestation/material provider and acquisition stub; actual node refusal/Stop/upload/receipts path, no installed authenticated endpoint or successor CI claim",
+  "all_runs_terminal": true,
+  "no_new_tests_or_product_edits_for_archive": true
+}

@@ -36,7 +36,9 @@ poll, blocking unrelated work and cancellation. A real four-item mTLS regression
 reproduced zero delivered items. The corrected receive-only refusal keeps all
 original IDs/sequences, delivers unrelated work/Stop, and reuses one zero-byte
 `ProfileUnavailable` outcome without acquisition, frozen reservation or replay.
-Original request cancellation and a replaced node still abort the poll. Focused
+Original request cancellation and a replaced node still abort the poll.
+[Regression and fix originals](../test/results/profile-auth-poll-isolation-local/README.md)
+retain the baseline CI and corrective evidence separately. Focused
 race checks and independent final review passed. Corrected-candidate vet,
 formatting, Go/design architecture, specification and design gates passed.
 Updated eligible CI and installed auth qualification remain pending. No installed auth VM has been dispatched. The actual installer
