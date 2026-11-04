@@ -3,6 +3,41 @@
 
 ## Current delivery workflow (2026-11-04)
 
+Explicit Go endpoint refusals ([ADR-298](decisions/298-explicit-go-profile-refusals.md))
+are merged in [PR158](https://github.com/phihos/asservat/pull/158), main
+`620a59eb1ab363fe2dbedeffae26b3fe5d2d5a51`. The entire merge tree equals qualified
+head `ef726a980fec6c4f1961a333278a7a2abd1b7137`, tree
+`0f2d94e1b5937e35ed3dc020d04e0f7ecfc677ef`. Exact CI41795269007 and installed
+[41795338953](https://github.com/phihos/asservat/actions/runs/41795338953) passed.
+Go exited0 in768.516s; the job took17m58s, within the original limits.
+
+The installed run passed CPU10 capture/publication/authenticated native download,
+immutable history/fresh repeat preview, read-only summary with the384MiB worker,
+ten query units and three consumed key roles, both independently approved
+`Failed/ProfilerBusy` and `Failed/ProfileUnavailable` outcomes, and live
+Running→Stop→Cancelled. Each refusal made one HTTP attempt, exposed no artifact,
+retained its admission/control debit and did not retry acquisition. The original
+application-owned CPU profiler survived the busy case through its cutoff. All4,112
+reported source hashes independently match the qualified commit, source stayed
+unchanged, cleanup was[] and build scratch was removed. The1,222-byte original
+(SHA256 `3d26fe8eea1f0e6d0e052fc27bf1ce49b8a6e558cac8daa0a5875cb06f56afa1`)
+reopens locally with pprof. Original artifacts, independent verification and merge
+read-back are in `test/results/profile-refusals-native-41795338953/`.
+
+This success contains no HTTP503 retry or failure snapshot; those paths retain
+separate local real-SDK/SQL proof and do not gain installed recovery qualification.
+The f2 collector run41789805115 is reused only for unchanged collector/product
+inputs, with its original inventory identity and explicit four-path test/preflight
+difference report. Earlier failed or provenance-limited runs remain separate.
+No physical refund, remote application Stop, continuous availability,
+maximum-input analysis, S-05 or whole-spec exit is implied.
+
+Next is the prepared heap snapshot workflow: editable `inuse_space` suggestion,
+read-only summary before separately authorized native download, no forced GC and
+native parity. Its isolated local gates/built-browser proof pass; installed heap
+qualification is still pending. The complete-spec goal remains active.
+
+
 Finite policy-triggered Go endpoint profiles (S-05 increment6, ADR-296) are merged
 in [PR154](https://github.com/phihos/asservat/pull/154), main
 `f003deb0f568e3dc9f88406bda8e8f9d243d183a`. Its entire tree equals qualified head
@@ -47,7 +82,9 @@ weakening approvals, budgets or deadlines. Their original reports remain in the
 corresponding result directories. Successful qualification above supersedes their
 pending outcomes; no failed run is relabeled as passed.
 
-**Retained frozen qualification:** [collector41789805115](https://github.com/phihos/asservat/actions/runs/41789805115)
+**Earlier checkpoint evidence (superseded by the final result above):**
+
+Retained frozen qualification: [collector41789805115](https://github.com/phihos/asservat/actions/runs/41789805115)
 passed on `f2f49124ee56795ab1bc6de42fa5a10455770a3f`; Go exited0 in83.253s.
 Both before/after inventories contain4,103 paths and independently match every
 committed blob (8,206 comparisons); source stayed unchanged. Observed collector

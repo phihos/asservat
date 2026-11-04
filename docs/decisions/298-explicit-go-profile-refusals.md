@@ -1,6 +1,7 @@
 # ADR-298: explicit Go endpoint refusals
 
-Status: implemented; local/service qualification passed, native qualification pending.
+Status: implemented; bounded collector and installed manual workflow qualified.
+Broader profile modes and full S-05 remain open.
 
 ## Observed problem and decision
 
@@ -154,3 +155,23 @@ failures remain archived. The final query and actual-SQL regression use the
 current thirty-second predicate. These fixes change test clients/diagnostics
 only. The bounded collector proof is reused with an explicit unchanged-input
 comparison; corrected installed qualification remains pending.
+
+
+## Final bounded qualification and delivery
+
+PR158 merged qualified head `ef726a98` as main `620a59eb`; fetched full trees
+are identical (`0f2d94e1b5937e35ed3dc020d04e0f7ecfc677ef`). Exact CI41795269007
+and installed41795338953 passed; Go0/768.516s, job17m58s. CPU download, ordinary
+summary, history/repeat, independently approved busy/unavailable failures and
+Running→Stop→Cancelled passed. Both refusals made one HTTP attempt, exposed no
+artifact and retained original spend; the application owner's profiler survived.
+All4,112 reported hashes match committed source, unchanged/cleanup[]/scratch
+removed. The1,222-byte original reopens locally with pprof. Original reports and
+read-back are retained in `test/results/profile-refusals-native-41795338953/`.
+
+The collector41789805115 proof retains its f2 identity; explicit unchanged-input
+comparison permits bounded reuse without relabeling historical inventories.
+No503 retry or failure snapshot occurred in the passing installed run, so those
+paths retain only their local SDK/SQL qualification. This final result supersedes
+earlier pending statements, without turning any failed run into a success.
+Continuous availability, broader modes, maximum-input analysis and S-05 remain open.
