@@ -1,0 +1,62 @@
+{
+  "sourceCommit": "ef726a980fec6c4f1961a333278a7a2abd1b7137",
+  "nativeRun": 41795338953,
+  "ciRun": 41795269007,
+  "workflowConclusion": "success",
+  "goExit": 0,
+  "goSeconds": 768.516,
+  "scope": "Bounded installed CPU acquisition/download/summary/repeat; independent busy and unavailable failures/no artifact/one HTTP/no acquisition retry/retained SQL control debit; Running Stop Cancelled. Neither numeric503 recovery nor failure snapshot occurred in this success, so they retain separate local SDK/SQL proof. No full S-05/spec, maximum-input worker containment, continuous availability or release qualification.",
+  "independentVerification": "verification.json.gz",
+  "files": {
+    "local-pprof.txt": {
+      "archive": "local-pprof.txt.gz",
+      "sha256": "23e6155670d05e5699569a7850ce675217f2570e08126adb7c2ee61193670ed1",
+      "bytes": 1054
+    },
+    "native-continuation-manual-profile-1/ci-native-continuation-manual-profile.log": {
+      "archive": "native-continuation-manual-profile-1__ci-native-continuation-manual-profile.log.gz",
+      "sha256": "24cc0ecf5cdc427bfa5b6b6eb4f6209674a8228c4d648b1a63a44077dff67d27",
+      "bytes": 5401
+    },
+    "native-continuation-manual-profile-1/context-storage-environment.json": {
+      "archive": "native-continuation-manual-profile-1__context-storage-environment.json.gz",
+      "sha256": "f054386e94e300dd0c5d607a3217830a1469c64ae82db73e3234b9a3e7852de6",
+      "bytes": 531320
+    },
+    "native-continuation-manual-profile-1/context-storage-timing.log": {
+      "archive": "native-continuation-manual-profile-1__context-storage-timing.log.gz",
+      "sha256": "8f57c0e3f84b5172c1ce6ea8178a6238bc6cde8582f942ac78d3c2bdd6e6afcb",
+      "bytes": 17102
+    },
+    "native-continuation-manual-profile-1/context-storage.log": {
+      "archive": "native-continuation-manual-profile-1__context-storage.log.gz",
+      "sha256": "109790444ab942e804f977eb6bd6ddbb3f56f01f05c2ca712635ea2c62c7b10c",
+      "bytes": 15977
+    },
+    "native-continuation-manual-profile-1/manual-profile-pprof.txt": {
+      "archive": "native-continuation-manual-profile-1__manual-profile-pprof.txt.gz",
+      "sha256": "61c456e955d4b7f31bb2dc3115d2fe94dc9c53ba424bf6577fa6f03b364af734",
+      "bytes": 1588
+    },
+    "native-continuation-manual-profile-1/manual-profile.pb.gz": {
+      "archive": "native-continuation-manual-profile-1__manual-profile.pb.gz.gz",
+      "sha256": "3d26fe8eea1f0e6d0e052fc27bf1ce49b8a6e558cac8daa0a5875cb06f56afa1",
+      "bytes": 1222
+    },
+    "verification.json": {
+      "archive": "verification.json.gz",
+      "sha256": "77d7fb1a532343920746b8e9c02a5c02646074760f66516ff4d5a4999458430f",
+      "bytes": 667
+    },
+    "workflow-job.log": {
+      "archive": "workflow-job.log.gz",
+      "sha256": "f47373f7cccb16f04c2f41486c9a10107294463af0743da3d81a20ffe7dd0521",
+      "bytes": 106327
+    },
+    "workflow.json": {
+      "archive": "workflow.json.gz",
+      "sha256": "b1fbee7511defd9e338c5d085af0da8a4e008cbde0ff6baaca2ae624179e2c32",
+      "bytes": 4823
+    }
+  }
+}

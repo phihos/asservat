@@ -264,5 +264,6 @@ remain distinct through node results, regional terminal completion and SQL/publi
 progress. Missing or disabled endpoints report `Failed` / `ProfileUnavailable`;
 application-owned conflicts report `Failed` / `ProfilerBusy`. These terminal
 outcomes create no evidence, replacement target, automatic retry or refund.
-Only the application owner may stop its profiler. Qualification is pending in
-[ADR-298](../decisions/298-explicit-go-profile-refusals.md).
+Only the application owner may stop its profiler. Bounded collector and installed
+manual qualification passed under
+[ADR-298](../decisions/298-explicit-go-profile-refusals.md); broader modes remain open.
