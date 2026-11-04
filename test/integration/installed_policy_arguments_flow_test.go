@@ -19,21 +19,42 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/transport/presentation"
+	"github.com/google/pprof/profile"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"mime"
+	"os/exec"
 )
 
 // This is an installed production-path qualification, never an authority
 // provider or alternate start route. Only its guarded native focus may call it.
 func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin, regionalConfig string, diagnose func()) {
+	qualifyInstalledFiniteRawPolicy(t, ctx, admin, root, identity, publicRoot, address, origin, regionalConfig, diagnose, false)
+}
+
+func qualifyInstalledPolicyProfile(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin, regionalConfig string, diagnose func()) {
+	qualifyInstalledFiniteRawPolicy(t, ctx, admin, root, identity, publicRoot, address, origin, regionalConfig, diagnose, true)
+}
+
+func qualifyInstalledFiniteRawPolicy(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin, regionalConfig string, diagnose func(), profileMode bool) {
 	t.Helper()
 	if st, err := os.Stat("/etc/asservat-disposable-host"); err != nil || !st.Mode().IsRegular() {
-		t.Fatal("policy arguments requires a fresh disposable runner")
+		t.Fatal("finite policy requires a fresh disposable runner")
 	}
 	f := installedPolicyTarget
 	if f == nil || identity == nil || identity.ReviewerSubject == "" {
-		t.Fatal("policy arguments lacks installed target or independent reviewer")
+		t.Fatal("finite policy lacks installed target or independent reviewer")
+	}
+	name, kind, prefix, nativeLimit := installedPolicyArgumentsName, "syscallTrace", "policy-arguments", int64(artifact.RecordingNativeLimit)
+	policySpec := installedPolicyArgumentsSpec(f.cluster, f.namespace, f.workload)
+	binding := installedPolicyArgumentsBinding(f.binding)
+	grantInput, rawInput := installedPolicyArgumentsGrantInput, installedPolicyArgumentsRawInput
+	if profileMode {
+		name, kind, prefix, nativeLimit = installedPolicyProfileName, "profile", "policy-profile", installedPolicyProfileLimit
+		policySpec = installedPolicyProfileSpec(f.cluster, f.namespace, f.workload)
+		binding = installedPolicyProfileBinding(f.binding)
+		grantInput, rawInput = installedPolicyProfileGrantInput, installedPolicyProfileRawInput
 	}
 	cert, err := x509.ParseCertificate(publicRoot)
 	if err != nil {
@@ -56,16 +77,16 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 		tokens := i.mcpTokenSource(origin)
 		s, err := c.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, tokens.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
 		if err != nil {
-			t.Fatal("policy arguments MCP", name, err)
+			t.Fatal("finite policy MCP", name, err)
 		}
 		t.Cleanup(func() { _ = s.Close() })
 		return s
 	}
-	requester := connect("policy-arguments-requester", identity)
+	requester := connect(prefix+"-requester", identity)
 	kc := *identity.kc
 	kc.username = "reviewer"
 	reviewer := &installedIdentity{kc: &kc, Issuer: identity.Issuer, RootPEM: identity.RootPEM, ReviewerSubject: identity.ReviewerSubject}
-	manager := connect("policy-arguments-manager", reviewer)
+	manager := connect(prefix+"-manager", reviewer)
 	browser := reviewer.consoleSession(t, ctx, cert, address, origin)
 	invoke := func(call context.Context, s *sdk.ClientSession, name string, args any) (installedJourneyEnvelope, string, error) {
 		raw, err := json.Marshal(args)
@@ -94,7 +115,7 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 			}
 		}
 		diagnose()
-		t.Fatal("installed policy arguments timed out", what)
+		t.Fatal("installed finite policy timed out", what)
 	}
 	readFailures := map[string]int{}
 	read := func(call context.Context, s *sdk.ClientSession, name string, args, out any) bool {
@@ -107,7 +128,7 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 			return false
 		}
 		if out != nil && json.Unmarshal(reply.Data, out) != nil {
-			t.Fatal("policy arguments response", name)
+			t.Fatal("finite policy response", name)
 		}
 		return true
 	}
@@ -116,10 +137,10 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 		reply, code, err := invoke(ctx, s, name, args)
 		if err != nil || reply.Status != "ok" || code != "" {
 			diagnose()
-			t.Fatal("policy arguments public operation", name, code, err)
+			t.Fatal("finite policy public operation", name, code, err)
 		}
 		if out != nil && json.Unmarshal(reply.Data, out) != nil {
-			t.Fatal("policy arguments public data", name)
+			t.Fatal("finite policy public data", name)
 		}
 	}
 	browserCall := func(name string, args, out any) {
@@ -143,27 +164,28 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 		}
 	}
 	started := time.Now()
-	definition, err := manualArgumentsProfileDefinition()
-	if err != nil {
-		t.Fatal(err)
+	if !profileMode {
+		definition, err := manualArgumentsProfileDefinition()
+		if err != nil {
+			t.Fatal(err)
+		}
+		publishNamespaceCaptureProfile(t, ctx, regionalConfig, f.namespace, manualArgumentsProfile, "v1", definition)
 	}
-	publishNamespaceCaptureProfile(t, ctx, regionalConfig, f.namespace, manualArgumentsProfile, "v1", definition)
-	binding := installedPolicyArgumentsBinding(f.binding)
 	body, _ := json.Marshal(binding)
 	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
-		t.Fatal("operator argument automation envelope", err)
+		t.Fatal("operator finite automation envelope", err)
 	}
-	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": installedPolicyArgumentsName}, "spec": installedPolicyArgumentsSpec(f.cluster, f.namespace, f.workload)}
+	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": name}, "spec": policySpec}
 	body, _ = json.Marshal(policy)
 	if err = f.hub.Post().AbsPath(f.base + "debugpolicies").Body(body).Do(ctx).Error(); err != nil {
-		t.Fatal("operator finite argument policy", err)
+		t.Fatal("operator finite raw policy", err)
 	}
 	var object struct {
 		Metadata struct {
 			UID string `json:"uid"`
 		} `json:"metadata"`
 	}
-	body, err = f.hub.Get().AbsPath(f.base + "debugpolicies/" + installedPolicyArgumentsName).DoRaw(ctx)
+	body, err = f.hub.Get().AbsPath(f.base + "debugpolicies/" + name).DoRaw(ctx)
 	if err != nil || json.Unmarshal(body, &object) != nil || object.Metadata.UID == "" {
 		t.Fatal("actual policy UID", err)
 	}
@@ -172,8 +194,8 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 		AcceptanceID string `json:"acceptance_id"`
 		State        string `json:"state"`
 	}
-	wait("independently audited argument policy acceptance", 2*time.Minute, func(call context.Context) bool {
-		return read(call, requester, "activate_policy", map[string]any{"policy_name": installedPolicyArgumentsName, "idempotency_key": "argument-policy-activate"}, &active) && active.State == "active"
+	wait("independently audited finite policy acceptance", 2*time.Minute, func(call context.Context) bool {
+		return read(call, requester, "activate_policy", map[string]any{"policy_name": name, "idempotency_key": "argument-policy-activate"}, &active) && active.State == "active"
 	})
 	if active.PolicyUID != object.Metadata.UID || active.AcceptanceID == "" {
 		t.Fatal("activation changed source identity", active)
@@ -183,6 +205,11 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 		Kind     string     `json:"kind"`
 		Phase    string     `json:"phase"`
 		NotAfter *time.Time `json:"not_after"`
+		Actions  []struct {
+			Kind     string                        `json:"kind"`
+			MaxBytes int64                         `json:"max_bytes"`
+			Profile  *installedPolicyProfileReview `json:"profile"`
+		} `json:"actions"`
 		Decision *struct {
 			By struct {
 				Subject string `json:"subject"`
@@ -204,9 +231,18 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 		} `json:"raw_access"`
 	}
 	var collection grantView
-	must(requester, "request_policy_grant", installedPolicyArgumentsGrantInput(active.PolicyUID), &collection)
+	must(requester, "request_policy_grant", grantInput(active.PolicyUID), &collection)
 	if collection.ID == "" || collection.Kind != "policy" || collection.Phase != "Pending" || collection.NotAfter == nil {
 		t.Fatal("finite policy review", collection)
+	}
+	if profileMode {
+		if len(collection.Actions) != 1 || collection.Actions[0].Kind != "profile" || collection.Actions[0].MaxBytes != nativeLimit || collection.Actions[0].Profile == nil {
+			t.Fatal("profile approval has no exact action review")
+		}
+		p := collection.Actions[0].Profile
+		if !installedPolicyProfileReviewMatches(*p, installedPolicyProfileExpectedBinding(t, policySpec)) {
+			t.Fatal("profile review lost stable definition/parameters or invented a concrete Pod endpoint", p)
+		}
 	}
 	originalUntil := *collection.NotAfter
 	browser.approvedRecordingStepUp(t, ctx, reviewer, collection.ID)
@@ -215,7 +251,7 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 	if collection.Phase != "Approved" || collection.Decision == nil || collection.Decision.By.Subject != identity.ReviewerSubject || collection.NotAfter == nil || !collection.NotAfter.Equal(originalUntil) || collection.RawAccess != nil {
 		t.Fatal("policy approval changed collection-only authority", collection)
 	}
-	must(requester, "activate_policy", map[string]any{"policy_name": installedPolicyArgumentsName, "grant_id": collection.ID, "idempotency_key": "argument-policy-attach"}, nil)
+	must(requester, "activate_policy", map[string]any{"policy_name": name, "grant_id": collection.ID, "idempotency_key": "argument-policy-attach"}, nil)
 	var podName, podUID string
 	pods, err := f.region.CoreV1().Pods(f.namespace).List(ctx, meta.ListOptions{LabelSelector: "app=" + f.workload})
 	if err != nil {
@@ -230,20 +266,22 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 	if podUID == "" {
 		t.Fatal("actual running policy target missing")
 	}
-	traffic, endTraffic := context.WithCancel(ctx)
-	trafficJoined := make(chan struct{})
-	go func() {
-		defer close(trafficJoined)
-		for traffic.Err() == nil {
-			call, stop := context.WithTimeout(traffic, 2*time.Second)
-			_, _ = f.region.CoreV1().RESTClient().Get().Namespace(f.namespace).Resource("pods").Name(podName+":8080").SubResource("proxy").Suffix("log").Param("line", "synthetic-approved-recording").DoRaw(call)
-			stop()
-			if installedJourneyPause(traffic, 100*time.Millisecond) != nil {
-				return
+	if !profileMode {
+		traffic, endTraffic := context.WithCancel(ctx)
+		trafficJoined := make(chan struct{})
+		go func() {
+			defer close(trafficJoined)
+			for traffic.Err() == nil {
+				call, stop := context.WithTimeout(traffic, 2*time.Second)
+				_, _ = f.region.CoreV1().RESTClient().Get().Namespace(f.namespace).Resource("pods").Name(podName+":8080").SubResource("proxy").Suffix("log").Param("line", "synthetic-approved-recording").DoRaw(call)
+				stop()
+				if installedJourneyPause(traffic, 100*time.Millisecond) != nil {
+					return
+				}
 			}
-		}
-	}()
-	defer func() { endTraffic(); <-trafficJoined }()
+		}()
+		defer func() { endTraffic(); <-trafficJoined }()
+	}
 	restart := func() {
 		t.Helper()
 		before, err := f.region.CoreV1().Pods(f.namespace).Get(ctx, podName, meta.GetOptions{})
@@ -285,13 +323,14 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 	if installedPublisherSettled != nil {
 		installedPublisherSettled(ctx)
 	}
+	triggeredAt := time.Now()
 	restart()
 	var captureID string
-	wait("one production argument occurrence", 2*time.Minute, func(call context.Context) bool {
+	wait("one production finite policy occurrence", 2*time.Minute, func(call context.Context) bool {
 		return admin.QueryRow(call, `SELECT coalesce(capture_id::text,'') FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND capture_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`, root, active.PolicyUID, podUID).Scan(&captureID) == nil && captureID != ""
 	})
 	var progress installedJourneyCaptureProgress
-	wait("verified raw argument publication", 2*time.Minute, func(call context.Context) bool {
+	wait("verified raw policy publication", 2*time.Minute, func(call context.Context) bool {
 		if !read(call, requester, "get_capture", map[string]any{"capture_id": captureID}, &progress) {
 			return false
 		}
@@ -305,10 +344,10 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 	var investigation presentation.ContextCaseData
 	must(requester, "get_case", map[string]any{"case_id": progress.CaseID}, &investigation)
 	if len(investigation.Artifacts) != 1 {
-		t.Fatal("argument case selection", len(investigation.Artifacts))
+		t.Fatal("policy case selection", len(investigation.Artifacts))
 	}
 	a := investigation.Artifacts[0]
-	if a.Kind != "syscallTrace" || a.DataClass != "raw" || a.Digest == "" || a.VerifiedNativeBytes == nil || *a.VerifiedNativeBytes <= 0 || *a.VerifiedNativeBytes > artifact.RecordingNativeLimit || a.Target.PodUID != podUID || a.Target.ClusterID != f.cluster {
+	if a.Kind != kind || a.DataClass != "raw" || a.Digest == "" || a.VerifiedNativeBytes == nil || *a.VerifiedNativeBytes <= 0 || *a.VerifiedNativeBytes > nativeLimit || a.Target.PodUID != podUID || a.Target.ClusterID != f.cluster {
 		t.Fatal("verified raw case metadata", a)
 	}
 	// The collection approval is deliberately not disclosure authority. A new
@@ -318,7 +357,7 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 		t.Fatal("collection-only raw prepare must require approval", denied.Status, code, err)
 	}
 	var raw grantView
-	request := installedPolicyArgumentsRawInput(progress.CaseID, a.Digest, *a.VerifiedNativeBytes)
+	request := rawInput(progress.CaseID, a.Digest, *a.VerifiedNativeBytes)
 	must(requester, "request_raw_access", request, &raw)
 	if raw.ID == "" || raw.Phase != "Pending" {
 		t.Fatal("standalone raw request", raw)
@@ -341,7 +380,7 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 	}
 	var download installedJourneyDownload
 	prepare := map[string]any{"artifact_id": a.ArtifactID, "idempotency_key": "policy-argument-download"}
-	wait("approved native argument download", 2*time.Minute, func(call context.Context) bool {
+	wait("approved native policy download", 2*time.Minute, func(call context.Context) bool {
 		name, args := "get_artifact_download", any(map[string]any{"download_id": download.DownloadID})
 		if download.DownloadID == "" || download.ContinuePreparation {
 			name, args = "prepare_artifact_download", prepare
@@ -352,27 +391,79 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 		t.Fatal("approved raw native download unavailable", download.State)
 	}
 	response := installedJourneyContent(t, ctx, &http.Client{Transport: transport, Timeout: 2 * time.Minute}, strings.TrimSuffix(origin, "/")+download.ContentPath, identity.downloadToken(), nil)
-	native, err := io.ReadAll(io.LimitReader(response.Body, artifact.RecordingNativeLimit+1))
+	native, err := io.ReadAll(io.LimitReader(response.Body, nativeLimit+1))
 	response.Body.Close()
 	digest := sha256.Sum256(native)
 	if err != nil || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
 		t.Fatal("raw native size/hash", response.StatusCode, len(native), err)
 	}
-	if err = os.WriteFile("../results/policy-arguments.jsonl", native, 0600); err != nil {
+	extension := ".jsonl"
+	if profileMode {
+		extension = ".pb.gz"
+	}
+	_, disposition, dispositionErr := mime.ParseMediaType(response.Header.Get("Content-Disposition"))
+	if dispositionErr != nil || disposition["filename"] != "artifact-"+a.ArtifactID+extension {
+		t.Fatal("policy native filename", dispositionErr)
+	}
+	nativeFile := "../results/" + prefix + extension
+	if err = os.WriteFile(nativeFile, native, 0600); err != nil {
 		t.Fatal(err)
 	}
 	var originalGrant string
-	if err = admin.QueryRow(ctx, `SELECT grant_id::text FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2`, root, captureID).Scan(&originalGrant); err != nil || originalGrant != collection.ID {
-		t.Fatal("argument observation changed the original collection grant", originalGrant, err)
+	if err = admin.QueryRow(ctx, `SELECT grant_id::text FROM policy_occurrence WHERE root_id=$1 AND capture_id=$2`, root, captureID).Scan(&originalGrant); err != nil || originalGrant != collection.ID {
+		t.Fatal("policy capture changed original grant", originalGrant, err)
 	}
-	original := installedArgumentsSQLSource(t, ctx, admin, root)(captureID)
-	footer, err := checkManualArgumentsNative(native, podUID, original)
-	if err != nil {
-		t.Fatal("policy argument original source/mechanism/counters", err)
+	var byteCredit, eventCredit int64
+	report := map[string]any{}
+	if profileMode {
+		p, err := profile.ParseData(native)
+		if err != nil || p.CheckValid() != nil || p.DurationNanos < 9_000_000_000 || p.TimeNanos < triggeredAt.Add(-time.Second).UnixNano() {
+			t.Fatal("policy CPU profile native parse", err)
+		}
+		found := false
+		for _, fn := range p.Function {
+			found = found || fn.Name == "main.burnCPU"
+		}
+		if !found || a.NativeFormat != "pprof" {
+			t.Fatal("policy profile lacks actual workload samples/native format")
+		}
+		command := exec.CommandContext(ctx, "go", "tool", "pprof", "-top", "-symbolize=none", nativeFile)
+		output, err := command.CombinedOutput()
+		if err != nil || !strings.Contains(string(output), "main.burnCPU") {
+			t.Fatal("policy native profile did not open with pprof", err)
+		}
+		if err = os.WriteFile("../results/"+prefix+"-pprof.txt", output, 0600); err != nil {
+			t.Fatal(err)
+		}
+		var observations int
+		if err = admin.QueryRow(ctx, `SELECT count(*) FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2`, root, captureID).Scan(&observations); err != nil || observations != 0 {
+			t.Fatal("profile invented observation session", observations, err)
+		}
+		report["nativePprofOpened"] = true
+		report["durationNanos"] = p.DurationNanos
+	} else {
+		var observationGrant string
+		if err = admin.QueryRow(ctx, `SELECT grant_id::text FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2`, root, captureID).Scan(&observationGrant); err != nil || observationGrant != collection.ID {
+			t.Fatal("argument observation changed original collection grant", observationGrant, err)
+		}
+		original := installedArgumentsSQLSource(t, ctx, admin, root)(captureID)
+		footer, err := checkManualArgumentsNative(native, podUID, original)
+		if err != nil {
+			t.Fatal("policy argument original source/mechanism/counters", err)
+		}
+		byteCredit, eventCredit = original.ByteCredit, original.EventCredit
+		report["source"], report["retainedEvents"] = original.Source, footer.Retained
 	}
 	must(requester, "get_grant", map[string]any{"grant_id": raw.ID}, &raw)
 	if raw.RawAccess == nil || raw.RawAccess.BytesUsed != int64(len(native)) || raw.RawAccess.OperationsUsed != 1 {
 		t.Fatal("standalone raw pool did not charge the exact single download", raw.RawAccess)
+	}
+	if profileMode {
+		var spentExecutions, spentBytes int64
+		if err = admin.QueryRow(ctx, `SELECT policy_executions_spent,policy_bytes_spent FROM access_grant WHERE root_id=$1 AND id=$2`, root, collection.ID).Scan(&spentExecutions, &spentBytes); err != nil || spentExecutions != 1 || spentBytes != nativeLimit {
+			t.Fatal("profile grant did not debit exactly one full native allowance", spentExecutions, spentBytes, err)
+		}
+		report["grantExecutionsSpent"], report["grantNativeBytesSpent"] = spentExecutions, spentBytes
 	}
 	var status struct {
 		Kind       string `json:"collection_kind"`
@@ -382,17 +473,19 @@ func qualifyInstalledPolicyArguments(t *testing.T, ctx context.Context, admin *p
 		Bytes      int64  `json:"observed_bytes_spent"`
 		Events     int64  `json:"observed_events_spent"`
 	}
-	must(requester, "get_policy_status", map[string]any{"policy_name": installedPolicyArgumentsName}, &status)
-	if status.Kind != "syscallTrace" || status.Grant != collection.ID || status.Executions != 1 || status.Output != artifact.RecordingNativeLimit || status.Bytes != original.ByteCredit || status.Events != original.EventCredit {
+	must(requester, "get_policy_status", map[string]any{"policy_name": name}, &status)
+	if status.Kind != kind || status.Grant != collection.ID || status.Executions != 1 || status.Output != nativeLimit || status.Bytes != byteCredit || status.Events != eventCredit {
 		t.Fatal("original shared policy reservations", status)
 	}
-	report := map[string]any{"policyUID": active.PolicyUID, "acceptanceID": active.AcceptanceID, "captureID": captureID, "caseID": progress.CaseID, "collectionGrantID": collection.ID, "rawGrantID": raw.ID, "artifactVersion": a.Digest, "nativeBytes": len(native), "nativeSHA256": hex.EncodeToString(digest[:]), "source": original.Source, "eventCredit": original.EventCredit, "byteCredit": original.ByteCredit, "retainedEvents": footer.Retained, "collectionOnlyDownloadDenied": true, "rawRequestReplaySameGrant": true, "independentReviewer": identity.ReviewerSubject, "elapsedSeconds": time.Since(started).Seconds(), "authority": "installed protected namespace profile, team policy approval, real restart, independent exact-artifact human raw approval; SQL reads verify results only"}
+	for key, value := range map[string]any{"policyUID": active.PolicyUID, "acceptanceID": active.AcceptanceID, "captureID": captureID, "caseID": progress.CaseID, "collectionGrantID": collection.ID, "rawGrantID": raw.ID, "artifactVersion": a.Digest, "nativeBytes": len(native), "nativeSHA256": hex.EncodeToString(digest[:]), "eventCredit": eventCredit, "byteCredit": byteCredit, "collectionOnlyDownloadDenied": true, "rawRequestReplaySameGrant": true, "independentReviewer": identity.ReviewerSubject, "elapsedSeconds": time.Since(started).Seconds(), "authority": "installed protected profile configuration, team policy approval, real restart, independent exact-artifact human raw approval; SQL reads verify results only"} {
+		report[key] = value
+	}
 	body, err = json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = os.WriteFile("../results/policy-arguments-report.json", append(body, '\n'), 0600); err != nil {
+	if err = os.WriteFile("../results/"+prefix+"-report.json", append(body, '\n'), 0600); err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("installed finite policy arguments: independent collection/raw approvals, %d native bytes SHA256=%x, %d retained writes; elapsed=%s", len(native), digest, footer.Retained, time.Since(started))
+	t.Logf("installed finite policy %s: independent collection/raw approvals, %d native bytes SHA256=%x; elapsed=%s", kind, len(native), digest, time.Since(started))
 }

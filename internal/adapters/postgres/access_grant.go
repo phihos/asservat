@@ -139,7 +139,7 @@ func grantFromRow(r custodydb.AccessGrant) (authorization.Grant, error) {
 	if bindErr != nil {
 		return authorization.Grant{}, authapp.ErrGrantUnavailable
 	}
-	if !g.Valid() {
+	if !g.Valid() || !authapp.PolicyProfileGrantScopeValid(g) {
 		return authorization.Grant{}, authapp.ErrGrantUnavailable
 	}
 	return g, nil

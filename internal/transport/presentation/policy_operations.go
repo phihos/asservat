@@ -320,7 +320,7 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 			}
 			data := policyStatusData{MaxGrantStarts: st.MaxGrantStarts, AttachedGrantID: st.AttachedGrantID, CollectedBytesSpent: st.CollectedBytesSpent, MaxCollectedBytes: st.MaxCollectedBytes, ObservedBytesSpent: st.ObservedBytesSpent, MaxObservedBytes: st.MaxObservedBytes, MaxObservedEvents: st.MaxObservedEvents, ObservedEventsSpent: st.ObservedEventsSpent, PolicyUID: st.PolicyUID, AcceptanceID: acceptance, State: policyState(st, s.now()), Generation: st.Generation, ExpiresAt: st.NotAfter.UTC(), Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, MaxExecutions: st.MaxExecutions, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
 			data.CollectionKind = "podStatus"
-			for _, kind := range []string{"packetCapture", "syscallTrace"} {
+			for _, kind := range []string{"packetCapture", "syscallTrace", "profile"} {
 				if slices.Contains(st.Authority.Actions, kind) {
 					data.CollectionKind = kind
 				}

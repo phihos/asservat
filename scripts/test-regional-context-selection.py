@@ -51,15 +51,24 @@ class RegionalContextSelection(unittest.TestCase):
         self.assertIn("[continuation-policy-recording]", suites)
         self.assertIn("ASSERVAT_JOURNEY_FOCUS=policy-recording", suites)
 
-    def test_policy_arguments_uses_guarded_focus_without_packet_tools(self):
+    def test_finite_raw_policies_use_guarded_focus_without_packet_tools(self):
         source = (Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
         guard = source.index("name: Disposable-host guard")
-        self.assertIn("matrix.suite == 'continuation-policy-arguments'", source[source.rfind("      - if:", 0, guard):guard])
         reader = source.index("name: tshark")
-        self.assertIn("matrix.suite != 'continuation-policy-arguments'", source[source.rfind("      - if:", 0, reader):reader])
         suites = Path(__file__).with_name("ci-native.sh").read_text()
-        self.assertIn("[continuation-policy-arguments]", suites)
-        self.assertIn("ASSERVAT_JOURNEY_FOCUS=policy-arguments", suites)
+        for focus in ("policy-arguments", "policy-profile"):
+            with self.subTest(focus=focus):
+                self.assertIn("matrix.suite == 'continuation-" + focus + "'", source[source.rfind("      - if:", 0, guard):guard])
+                self.assertIn("matrix.suite != 'continuation-" + focus + "'", source[source.rfind("      - if:", 0, reader):reader])
+                self.assertIn("[continuation-" + focus + "]", suites)
+                self.assertIn("ASSERVAT_JOURNEY_FOCUS=" + focus, suites)
+                with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}):
+                    self.assertEqual(fixture.qualification_cluster_count(3, installer_continuation=True), 2)
+                    self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
+                    with patch.object(fixture.Path, "is_file", return_value=False), patch.object(fixture, "run", side_effect=AssertionError("external setup before guard")) as external:
+                        with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):
+                            fixture.main(installer_continuation=True)
+                        external.assert_not_called()
 
     def test_history_browser_report_uses_actual_current_guard_expression(self):
         tree = ast.parse(inspect.getsource(fixture.main))

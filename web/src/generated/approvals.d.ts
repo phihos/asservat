@@ -158,11 +158,23 @@ export interface components {
                         source_name: string;
                         /** @enum {unknown} */
                         address_mode: "targetLoopback" | "podIP";
-                        port: number;
+                        port?: number;
                         /** @constant */
                         path_policy: "go-pprof/v1";
-                        endpoint_digest: string;
-                    };
+                        endpoint_digest?: string;
+                        /** @enum {unknown} */
+                        source_kind?: "templateBinding" | "administratorProfile";
+                        definition_digest?: string;
+                        declared_port_name?: string;
+                        minimum_port?: number;
+                        maximum_port?: number;
+                    } & (unknown | ({
+                        /** @constant */
+                        source_kind?: "templateBinding";
+                    } | {
+                        /** @constant */
+                        source_kind?: "administratorProfile";
+                    }));
                 } & ({
                     /** @constant */
                     kind?: "profile";
@@ -229,7 +241,7 @@ export interface components {
                     /** @description Conservative charged event units, including uncertain observations. */
                     observed_events_used?: number;
                 };
-            } & (unknown & unknown & unknown);
+            } & (unknown & unknown & unknown & unknown);
         } | {
             /** @constant */
             status: "pending";
@@ -410,11 +422,23 @@ export interface components {
                         source_name: string;
                         /** @enum {unknown} */
                         address_mode: "targetLoopback" | "podIP";
-                        port: number;
+                        port?: number;
                         /** @constant */
                         path_policy: "go-pprof/v1";
-                        endpoint_digest: string;
-                    };
+                        endpoint_digest?: string;
+                        /** @enum {unknown} */
+                        source_kind?: "templateBinding" | "administratorProfile";
+                        definition_digest?: string;
+                        declared_port_name?: string;
+                        minimum_port?: number;
+                        maximum_port?: number;
+                    } & (unknown | ({
+                        /** @constant */
+                        source_kind?: "templateBinding";
+                    } | {
+                        /** @constant */
+                        source_kind?: "administratorProfile";
+                    }));
                 } & ({
                     /** @constant */
                     kind?: "profile";
@@ -481,7 +505,7 @@ export interface components {
                     /** @description Conservative charged event units, including uncertain observations. */
                     observed_events_used?: number;
                 };
-            } & (unknown & unknown & unknown)) | {
+            } & (unknown & unknown & unknown & unknown)) | {
                 /** Format: uuid */
                 grant_id: string;
                 /** @enum {unknown} */

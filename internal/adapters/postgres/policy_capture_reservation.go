@@ -79,6 +79,9 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 	// Generic preflight eligibility does not authorize a different action.
 	// Bind the actual immutable plan before reserving either pool.
 	action := authorization.PolicyContextAction
+	if a.Plan.Input.Profile != nil {
+		action = "profile"
+	}
 	if a.Plan.Input.Recorder != nil || a.Plan.Input.Snapshot != nil {
 		action = "packetCapture"
 	}
@@ -105,6 +108,15 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 		output, required = recording.MaxBytes, policyRecordingNeedsGrant(recording)
 		arguments = recording.Kind == "syscallTrace" && recording.Profile == "arguments"
 		raw = arguments || recording.Filter != nil && planning.RawBytePredicate(recording.Filter.Expression)
+	}
+	if a.Plan.Input.Profile != nil {
+		profile, _, err := planning.ProfileForContext(a.Plan)
+		if err != nil {
+			return nil, value.ErrInvalid
+		}
+		// The acquired native ceiling is prepaid output. Go endpoints do not
+		// consume a packet/syscall observation session or observation budget.
+		output, required = profile.MaxBytes, true
 	}
 	if saved := a.Plan.Input.Snapshot; saved != nil {
 		if saved.PolicyUID != policy || saved.ExecutionDigest != record.Authority.ScopeDigest || (manual == nil && (saved.TriggerKind != "policy" || !saved.Request.T0.Equal(occurrence.CreatedAt.Time))) || (manual != nil && saved.TriggerKind != "recordingSave") {
@@ -145,6 +157,9 @@ func lockPolicyCaptureReservation(ctx context.Context, q *custodydb.Queries, tru
 			return nil, value.ErrDenied
 		}
 		if raw && (grant.Policy.Observation == nil || grant.Policy.Limits.MaxObservedBytes < 1 || arguments && grant.Policy.Limits.MaxObservedEvents < 1) {
+			return nil, value.ErrDenied
+		}
+		if a.Plan.Input.Profile != nil && !policyProfilePlanMatches(grant, a.Plan) {
 			return nil, value.ErrDenied
 		}
 		if grant.Policy.RecipeDigest != a.Plan.RecipeDigest || a.Plan.Input.Deadline.After(grant.PolicyNotAfter) {
@@ -262,7 +277,7 @@ func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, ro
 		return nil, value.ErrDenied
 	}
 	if !reservation.GrantID.Valid {
-		if policyRecordingNeedsGrant(accepted.Expectation.Recording) || accepted.Expectation.Snapshot != nil && accepted.Expectation.Snapshot.RequireApproval {
+		if accepted.Expectation.Profile != nil || policyRecordingNeedsGrant(accepted.Expectation.Recording) || accepted.Expectation.Snapshot != nil && accepted.Expectation.Snapshot.RequireApproval {
 			return nil, value.ErrDenied
 		}
 		return nil, ctx.Err()
@@ -283,6 +298,9 @@ func lockCurrentPolicyCaptureGrant(ctx context.Context, q *custodydb.Queries, ro
 		grant.Policy.RecipeDigest != accepted.Expectation.RecipeDigest ||
 		authorization.CheckPolicyGrantCurrent(grant, grant.Policy.Authority, grant.Policy.Workload(), now.Time) != nil ||
 		accepted.Deadline.After(grant.PolicyNotAfter) {
+		return nil, value.ErrDenied
+	}
+	if accepted.Expectation.Profile != nil && !policyProfileAcquisitionMatches(grant, accepted.Expectation.Profile, accepted.Expectation.RecipeDigest) {
 		return nil, value.ErrDenied
 	}
 	return &policyCaptureGrantState{reservation: reservation, grant: grant}, ctx.Err()

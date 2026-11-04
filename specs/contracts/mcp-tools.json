@@ -4401,6 +4401,31 @@
                                     "endpoint_digest": {
                                       "type": "string",
                                       "pattern": "^[a-f0-9]{64}$"
+                                    },
+                                    "source_kind": {
+                                      "enum": [
+                                        "templateBinding",
+                                        "administratorProfile"
+                                      ]
+                                    },
+                                    "definition_digest": {
+                                      "type": "string",
+                                      "pattern": "^[a-f0-9]{64}$"
+                                    },
+                                    "declared_port_name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 63
+                                    },
+                                    "minimum_port": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 65535
+                                    },
+                                    "maximum_port": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 65535
                                     }
                                   },
                                   "required": [
@@ -4413,9 +4438,111 @@
                                     "source_ref",
                                     "source_name",
                                     "address_mode",
-                                    "port",
-                                    "path_policy",
-                                    "endpoint_digest"
+                                    "path_policy"
+                                  ],
+                                  "oneOf": [
+                                    {
+                                      "required": [
+                                        "port",
+                                        "endpoint_digest"
+                                      ],
+                                      "not": {
+                                        "anyOf": [
+                                          {
+                                            "required": [
+                                              "source_kind"
+                                            ]
+                                          },
+                                          {
+                                            "required": [
+                                              "definition_digest"
+                                            ]
+                                          },
+                                          {
+                                            "required": [
+                                              "declared_port_name"
+                                            ]
+                                          },
+                                          {
+                                            "required": [
+                                              "minimum_port"
+                                            ]
+                                          },
+                                          {
+                                            "required": [
+                                              "maximum_port"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "required": [
+                                        "source_kind",
+                                        "definition_digest"
+                                      ],
+                                      "not": {
+                                        "anyOf": [
+                                          {
+                                            "required": [
+                                              "endpoint_digest"
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "oneOf": [
+                                        {
+                                          "properties": {
+                                            "source_kind": {
+                                              "const": "templateBinding"
+                                            }
+                                          },
+                                          "required": [
+                                            "declared_port_name",
+                                            "minimum_port",
+                                            "maximum_port"
+                                          ],
+                                          "not": {
+                                            "anyOf": [
+                                              {
+                                                "required": [
+                                                  "port"
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        {
+                                          "properties": {
+                                            "source_kind": {
+                                              "const": "administratorProfile"
+                                            }
+                                          },
+                                          "required": [
+                                            "port"
+                                          ],
+                                          "not": {
+                                            "anyOf": [
+                                              {
+                                                "required": [
+                                                  "declared_port_name"
+                                                ]
+                                              },
+                                              {
+                                                "required": [
+                                                  "minimum_port"
+                                                ]
+                                              },
+                                              {
+                                                "required": [
+                                                  "maximum_port"
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      ]
+                                    }
                                   ]
                                 }
                               },
@@ -4896,6 +5023,48 @@
                                     ]
                                   }
                                 ]
+                              }
+                            }
+                          },
+                          {
+                            "if": {
+                              "properties": {
+                                "kind": {
+                                  "const": "policy"
+                                }
+                              },
+                              "required": [
+                                "kind"
+                              ]
+                            },
+                            "then": {
+                              "properties": {
+                                "actions": {
+                                  "items": {
+                                    "properties": {
+                                      "profile": {
+                                        "required": [
+                                          "definition_digest"
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "else": {
+                              "properties": {
+                                "actions": {
+                                  "items": {
+                                    "properties": {
+                                      "profile": {
+                                        "required": [
+                                          "endpoint_digest"
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
                               }
                             }
                           }
@@ -9696,7 +9865,7 @@
     },
     {
       "name": "preview_capture",
-      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human’s selected result inspection/download; never an issued grant.",
+      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human\u2019s selected result inspection/download; never an issued grant.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -13055,7 +13224,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 512,
-            "description": "Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
+            "description": "Optional 1\u2013512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
           },
           "sharing": {
             "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
@@ -14214,7 +14383,7 @@
     },
     {
       "name": "cancel_artifact_download",
-      "description": "Stop this caller and client’s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
+      "description": "Stop this caller and client\u2019s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,
@@ -15108,7 +15277,8 @@
                         "enum": [
                           "podStatus",
                           "packetCapture",
-                          "syscallTrace"
+                          "syscallTrace",
+                          "profile"
                         ],
                         "description": "Accepted collection action; controls available approval commands, not acquisition authority."
                       },
@@ -17102,6 +17272,31 @@
                                 "endpoint_digest": {
                                   "type": "string",
                                   "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "source_kind": {
+                                  "enum": [
+                                    "templateBinding",
+                                    "administratorProfile"
+                                  ]
+                                },
+                                "definition_digest": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "declared_port_name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 63
+                                },
+                                "minimum_port": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 65535
+                                },
+                                "maximum_port": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 65535
                                 }
                               },
                               "required": [
@@ -17114,9 +17309,111 @@
                                 "source_ref",
                                 "source_name",
                                 "address_mode",
-                                "port",
-                                "path_policy",
-                                "endpoint_digest"
+                                "path_policy"
+                              ],
+                              "oneOf": [
+                                {
+                                  "required": [
+                                    "port",
+                                    "endpoint_digest"
+                                  ],
+                                  "not": {
+                                    "anyOf": [
+                                      {
+                                        "required": [
+                                          "source_kind"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "definition_digest"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "declared_port_name"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "minimum_port"
+                                        ]
+                                      },
+                                      {
+                                        "required": [
+                                          "maximum_port"
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "required": [
+                                    "source_kind",
+                                    "definition_digest"
+                                  ],
+                                  "not": {
+                                    "anyOf": [
+                                      {
+                                        "required": [
+                                          "endpoint_digest"
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "oneOf": [
+                                    {
+                                      "properties": {
+                                        "source_kind": {
+                                          "const": "templateBinding"
+                                        }
+                                      },
+                                      "required": [
+                                        "declared_port_name",
+                                        "minimum_port",
+                                        "maximum_port"
+                                      ],
+                                      "not": {
+                                        "anyOf": [
+                                          {
+                                            "required": [
+                                              "port"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "properties": {
+                                        "source_kind": {
+                                          "const": "administratorProfile"
+                                        }
+                                      },
+                                      "required": [
+                                        "port"
+                                      ],
+                                      "not": {
+                                        "anyOf": [
+                                          {
+                                            "required": [
+                                              "declared_port_name"
+                                            ]
+                                          },
+                                          {
+                                            "required": [
+                                              "minimum_port"
+                                            ]
+                                          },
+                                          {
+                                            "required": [
+                                              "maximum_port"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
                               ]
                             }
                           },
@@ -17597,6 +17894,48 @@
                                 ]
                               }
                             ]
+                          }
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "kind": {
+                              "const": "policy"
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ]
+                        },
+                        "then": {
+                          "properties": {
+                            "actions": {
+                              "items": {
+                                "properties": {
+                                  "profile": {
+                                    "required": [
+                                      "definition_digest"
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "else": {
+                          "properties": {
+                            "actions": {
+                              "items": {
+                                "properties": {
+                                  "profile": {
+                                    "required": [
+                                      "endpoint_digest"
+                                    ]
+                                  }
+                                }
+                              }
+                            }
                           }
                         }
                       }

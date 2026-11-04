@@ -162,6 +162,25 @@ remain unavailable for submission until acquisition is implemented and qualified
 
 ### Finite profile admission and custody
 
+[ADR-296](../docs/decisions/296-finite-policy-go-profiles.md) extends finite Go
+endpoint acquisition to accepted team policies. Recurring approval binds the
+protected public endpoint definition/digest, source kind and selected binding
+or administrator fixed port, together with exact profile type, mode, duration,
+timeout, forced-GC choice and native-byte limit. It contains no future Pod,
+route/IP, concrete endpoint digest or refreshed observation time. Each trigger
+resolves its actual pinned Pod and verifies its concrete endpoint against that
+stable scope. Ordinary replica replacement does not change collection intent;
+changing the protected definition or binding does.
+
+Policy profiles require independent raw `policyCollection`/`liveProfile`
+approval and atomically spend the existing execution/native-output pools.
+They do not acquire packet or syscall observation budgets. A collection grant
+alone cannot authorize inspection/download of the result; current human raw
+approval must independently cover the exact published artifact. All existing
+finite Go mode limits and prerequisites apply. Runtime trace remains trace
+format and cannot enter pprof analysis. This is an implementation contract;
+installed policy-profile qualification remains pending.
+
 A qualified manual Go endpoint acquisition is a distinct typed profile request,
 never a packet recorder. Persist the reviewed composition, expanded endpoint
 bindings, definition/endpoint digests, native byte ceiling and action timeout;

@@ -71,7 +71,7 @@ type policySourceAcceptedFixture struct {
 // debit. Protected source/target/identity, initial trust and independent review
 // remain explicit synthetic component facts. No collector or public enablement.
 func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario, protected ...policyRecorderProtectedCase) {
-	modes := []string{"packet-policy", "snapshot-policy-refuses-recorder", "packet-policy-observation-sql", "packet-policy-companion-sql", "argument-observation-sql", "argument-observation-companion"}
+	modes := []string{"packet-policy", "profile-policy", "snapshot-policy-refuses-recorder", "packet-policy-observation-sql", "packet-policy-companion-sql", "argument-observation-sql", "argument-observation-companion"}
 	if len(protected) > 0 {
 		modes = []string{"packet-policy-companion-sql"}
 	}
@@ -84,6 +84,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				beforeGraph = &sample
 			}
 			packetPolicy := mode != "snapshot-policy-refuses-recorder"
+			profilePolicy := mode == "profile-policy"
 			observationSQL := mode == "packet-policy-observation-sql"
 			companionSQL := mode == "packet-policy-companion-sql"
 			argumentSQL := mode == "argument-observation-sql"
@@ -117,6 +118,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				collectedBytes = protected[0].PolicyCollectedBytes
 			}
 			b.Automation = &authorization.AutomationEnvelope{AllowedActions: []string{authorization.PolicyContextAction, "packetCapture"}, MaxLifetimeSeconds: 3600, MaxExecutions: 10, MaxBytes: collectedBytes}
+			if profilePolicy {
+				b.Automation.AllowedActions = []string{"profile"}
+			}
 			if observed {
 				b.Automation.MaxObservedBytes = 1 << 30
 				if argumentSQL || argumentCompanion {
@@ -228,6 +232,11 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				authority.Actions = []string{"syscallTrace"}
 			}
 			authority.Executor = authorization.PolicyPrincipal(installation, authority.PolicyUID)
+			var endpoint *planvalue.PolicyProfileEndpoint
+			if profilePolicy {
+				authority.Actions = []string{"profile"}
+				compilePolicy, endpoint = policyProfileAdmissionCompiler(t, target.ClusterID)
+			}
 			spec := publicPolicySpec(t, authority)
 			var authored map[string]any
 			if json.Unmarshal(spec, &authored) != nil {
@@ -287,6 +296,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				authored["profileComposition"] = argumentPolicyCompositionWire()
 				compilePolicy = argumentPolicyCompiler(t, authority.ClusterID, authority.NamespaceUID)
 				filters = installedArgumentsCompiler{}
+			}
+			if profilePolicy {
+				authored["profileComposition"] = policyProfileAdmissionComposition()
 			}
 			spec, err = json.Marshal(authored)
 			if err != nil {
@@ -354,7 +366,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 				return
 			}
 			var grant string
-			if packetPolicy {
+			if profilePolicy {
+				// Exercise the mandatory grant refusal before attaching approval.
+			} else if packetPolicy {
 				grant = attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "recorder-positive", *compiled.Recorder)
 			} else {
 				grant = attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "snapshot-negative")
@@ -409,6 +423,9 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			// identity, plan, storage, grant and policy deadline above.
 			now = clock()
 			evidenceType := "packetCapture"
+			if profilePolicy {
+				evidenceType = "profile"
+			}
 			if argumentCompanion {
 				evidenceType = "syscallTrace"
 			}
@@ -423,7 +440,7 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if err != nil {
 				t.Fatal(err)
 			}
-			a, preview := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, !companionSQL && !argumentCompanion, clock())
+			a, preview := buildPolicyRecorderAdmissionFixture(t, a, compiled.Recorder.Composition, filters, !companionSQL && !argumentCompanion, clock(), endpoint)
 			requirePolicyRecorderAdmissionFixture(t, a, preview, clock())
 			previews, err := postgres.NewContextPreviews(ctx, hub, root)
 			if err != nil {
@@ -435,9 +452,18 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if _, err = reader.AcceptedPolicyAuthority(ctx, authority.PolicyUID); err != nil {
 				t.Fatal(err)
 			}
+			if profilePolicy {
+				qualifyPolicyProfileAdmissionRefusal(t, ctx, admin, admissions, ledger, s, authority, preview, a)
+				grant = attachOrdinaryPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "profile-positive", *compiled.Recorder)
+				qualifyPolicyProfileChangedDefinition(t, ctx, admin, hub, admissions, previews, ledger, s, authority, grant, compiled.Recorder, a)
+			}
 			output, err := admissions.AdmitReviewedContext(ctx, preview.ID, a)
 			if packetPolicy {
-				if err != nil || output.Expectation.Recording == nil || output.Expectation.Recording.MaxBytes != artifact.RecordingNativeLimit || output.Expectation.RecipeDigest != compiled.Recorder.RecipeDigest {
+				validNative := output.Expectation.Recording != nil && output.Expectation.Recording.MaxBytes == artifact.RecordingNativeLimit
+				if profilePolicy {
+					validNative = output.Expectation.Profile != nil && output.Expectation.Profile.MaxBytes == policyProfileAdmissionBytes && output.Expectation.Recording == nil
+				}
+				if err != nil || !validNative || output.Expectation.RecipeDigest != compiled.Recorder.RecipeDigest {
 					t.Fatal("real team recorder admission", err)
 				}
 				again, err := admissions.AdmitReviewedContext(ctx, preview.ID, a)
@@ -471,10 +497,51 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 			if packetPolicy {
 				wantBytes, wantExec, wantReservations = artifact.RecordingNativeLimit, 1, 1
 			}
+			if profilePolicy {
+				wantBytes = policyProfileAdmissionBytes
+				if charged.DataClass != "raw" || charged.Policy.Observation != nil || status.ObservedBytesSpent != 0 || charged.PolicySpend.ObservedBytes != 0 {
+					t.Fatal("finite profile acquired an observation contract")
+				}
+			}
 			if execs != 1 || bytes != wantBytes || grantExec != wantExec || grantBytes != wantBytes || reservations != wantReservations {
 				t.Fatal("action mismatch/replay changed prospective pools", execs, bytes, grantExec, grantBytes, reservations)
 			}
 			t.Logf("actual Tick accepted executions=%d; native output=%d grant executions=%d output=%d reservations=%d", execs, bytes, grantExec, grantBytes, reservations)
+			if profilePolicy {
+				refresh := func() {
+					s.batch.ObservedAt = clock()
+					s.batch.FreshUntil = s.batch.ObservedAt.Add(5 * time.Second)
+					if err := s.p.RefreshPermissions(ctx, s.batch); err != nil {
+						t.Fatal(err)
+					}
+					source.ObservedAt = clock()
+					source.FreshUntil = source.ObservedAt.Add(capture.PolicySourceInterval)
+					if err := sources.ObservePolicy(ctx, source); err != nil {
+						t.Fatal(err)
+					}
+				}
+				refresh()
+				observation.Pods[0].Restarts++
+				observation.ObservedAt = clock()
+				observation.FreshUntil = observation.ObservedAt.Add(5 * time.Second)
+				next, err := ledger.Tick(ctx, capture.PolicyTick{Policy: compiled, Authority: authority, Observation: observation})
+				if err != nil || len(next) != 1 {
+					t.Fatal("second real profile occurrence", next, err)
+				}
+				qualifyPolicyProfileExhaustedGrant(t, ctx, admin, hub, admissions, previews, s, a, compiled.Recorder, next[0].ID, grant)
+				intentPool := poolFor("capture_audit_runtime", "synthetic-capture-audit")
+				defer intentPool.Close()
+				intent, err := postgres.NewCaptureIntentAudits(ctx, intentPool, root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = (auditapp.CaptureIntentPublisher{Ledger: intent, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
+					t.Fatal("profile capture intent audit", err)
+				}
+				qualifyOriginalPolicyGrantAcquisition(t, ctx, admin, poolFor, s, authority, output, grant, func() string {
+					return attachOrdinaryPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, scope, "profile-replacement", *compiled.Recorder)
+				}, refresh)
+			}
 			if argumentCompanion {
 				qualifyArgumentObservationCompanion(t, ctx, admin, hub, poolFor, store, keys, s, admissions, current, authority, a, output, record.Record.ID, grant)
 			}
@@ -495,14 +562,29 @@ func qualifyPolicyRecorderAdmission(t *testing.T, ctx context.Context, admin *pg
 
 // Both the offline preflight and real fixture assemble the same marked plan,
 // passive preview and reviewed request identity. No production validator/export.
-func buildPolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, composition planvalue.ProfileComposition, filters planning.FilterCompiler, requireApproval bool, now time.Time) (capture.Admission, capture.ContextPreview) {
+func buildPolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, composition planvalue.ProfileComposition, filters planning.FilterCompiler, requireApproval bool, now time.Time, endpoint ...*planvalue.PolicyProfileEndpoint) (capture.Admission, capture.ContextPreview) {
 	t.Helper()
 	in := a.Plan.Input
-	reviewed, err := planning.CompileRecorder(planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: requireApproval}, filters, now)
+	input := planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: composition, Retention: in.Retention, Deadline: in.Deadline, NodeRecorder: true, RequireApproval: requireApproval}
+	if len(endpoint) == 1 && endpoint[0] != nil {
+		_, err := planning.CompileRecorder(input, filters, now)
+		var needed planning.EndpointResolutionNeeded
+		if !errors.As(err, &needed) {
+			t.Fatal("profile endpoint request", err)
+		}
+		input.Endpoints = []targets.ProfileEndpointResolution{{Request: needed.Request, SourceKind: targets.ProfileEndpointTemplateBinding, SourceName: endpoint[0].Definition.Source.Name, AddressMode: "targetLoopback", Port: 6060, DeclaredPortName: "diagnostics", PathPolicy: planvalue.GoEndpointPathPolicy, DefinitionDigest: endpoint[0].DefinitionDigest, EndpointDigest: artifact.Digest{2}, ResolvedAt: now}}
+	}
+	reviewed, err := planning.CompileRecorder(input, filters, now)
 	if err != nil {
 		t.Fatal("reviewed recorder fixture", err)
 	}
-	in.Recorder, err = planning.RecorderContextFromScope(composition, reviewed.CanonicalScope)
+	if len(input.Endpoints) != 0 {
+		in.Profile, err = planning.ProfileContextFromScope(composition, in.Target.Request, reviewed.CanonicalScope)
+		in.Recorder = nil
+		a.Registration.NativeLimit = policyProfileAdmissionBytes
+	} else {
+		in.Recorder, err = planning.RecorderContextFromScope(composition, reviewed.CanonicalScope)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -526,7 +608,7 @@ func requirePolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, p 
 		"root-key":                   authorization.UUID(a.RootID) && authorization.UUID(a.IdempotencyKey),
 		"frozen-plan":                planning.VerifyFrozenContextPlan(a.Plan),
 		"registration":               r.Validate() == nil,
-		"native-8MiB":                in.Recorder != nil && r.NativeLimit == artifact.RecordingNativeLimit,
+		"exact-native-limit":         in.Recorder != nil && r.NativeLimit == artifact.RecordingNativeLimit || in.Profile != nil && r.NativeLimit == policyProfileAdmissionBytes,
 		"storage-root":               a.Storage.RootID == a.RootID,
 		"storage-target":             a.Storage.Matches(target),
 		"storage-allocation":         a.Storage.AllocationID == r.AllocationID,
@@ -547,7 +629,7 @@ func requirePolicyRecorderAdmissionFixture(t testing.TB, a capture.Admission, p 
 		"actual-preview":             captureapp.ValidContextPreview(p) && p.Current(now),
 		"reviewed-request-digest":    a.SubmissionDigest == captureapp.ContextRequestDigest(p.ID),
 		"preview-scope":              p.ScopeDigest == a.Plan.ScopeDigest && bytes.Equal(p.CanonicalScope, a.Plan.CanonicalScope),
-		"marked-reviewed-entrypoint": in.Recorder != nil && planning.RecorderApprovedAcceptance(a.Plan.CanonicalScope) && authorization.UUID(p.ID),
+		"marked-reviewed-entrypoint": (in.Recorder != nil || in.Profile != nil) && planning.RecorderApprovedAcceptance(a.Plan.CanonicalScope) && authorization.UUID(p.ID),
 	}
 	var failed []string
 	for name, ok := range checks {

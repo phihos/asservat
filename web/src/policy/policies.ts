@@ -95,7 +95,7 @@ export class Policies {
   }
   requestGrant = async (name: string, choices: Omit<GrantInput<'request_policy_grant'>, 'policy_uid' | 'policy_name' | 'idempotency_key'>) => {
     const session = this.session, scope = this.scope, status = this.state.entries.find(e => e.name === name)?.status;
-    if (!session || !scope || scope.aborted || !status || (status.collection_kind !== 'packetCapture' && status.collection_kind !== 'syscallTrace')) return;
+    if (!session || !scope || scope.aborted || !status || (status.collection_kind !== 'packetCapture' && status.collection_kind !== 'syscallTrace' && status.collection_kind !== 'profile')) return;
     const input = this.requests.get(name) ?? { ...structuredClone(choices), policy_uid: status.policy_uid,policy_name:name, idempotency_key: this.newID() };
     this.requests.set(name, input);
     this.update(name, { busy: true, message: undefined, requestPending: true });

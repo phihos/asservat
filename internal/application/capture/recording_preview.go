@@ -154,20 +154,29 @@ func (s ContextInvestigation) previewRecording(ctx context.Context, source ident
 	if err != nil {
 		return zero, previewFailure("compile", err)
 	}
+	p.CanonicalScope, p.ScopeDigest = slices.Clone(plan.CanonicalScope), plan.ScopeDigest
+	p.AssessmentRulesDigest = compiler.RecorderAssessmentRulesFor(plan.Actions)
 	recordable := compiler.AcceptableRecorder(plan).Acceptable() || compiler.AcceptableProfile(plan).Acceptable()
 	if _, _, policy := authorization.PolicyExecutor(i.Principal); policy {
 		// requireRecordingApproval above already checked the package-private
 		// accepted settings provenance. This structural plan is not a permit:
 		// admission must retain the original reviewed policy grant, and start
 		// must obtain its committed observation receipt for the actual source.
-		_, _, acceptanceErr := compiler.RecordingFor(plan)
+		var acceptanceErr error
+		if profileRecorderInput(p.Intent) {
+			var accepted planning.ContextPlan
+			accepted, acceptanceErr = s.recordingPlan(ctx, p, f)
+			if acceptanceErr == nil {
+				_, _, acceptanceErr = compiler.ProfileForContext(accepted)
+			}
+		} else {
+			_, _, acceptanceErr = compiler.RecordingFor(plan)
+		}
 		recordable = acceptanceErr == nil
 	}
 	if !recordable {
 		return zero, errRecordingNotAcceptable
 	}
-	p.CanonicalScope, p.ScopeDigest = slices.Clone(plan.CanonicalScope), plan.ScopeDigest
-	p.AssessmentRulesDigest = compiler.RecorderAssessmentRulesFor(plan.Actions)
 	processingStarted := time.Now()
 	coverage, err := s.processingCoverage(ctx, p, f, recovery, i.ValidUntil)
 	auditapp.MarkStep(ctx, "p-processing", processingStarted)

@@ -5,6 +5,7 @@ import { Policies } from './policies';
 import { operations, type Input, type Operation, type Operations, type Output } from './http';
 import { validOutput_get_policy_status, validOutput_deactivate_policy, validOutput_activate_policy } from '../generated/validate-policy';
 import { validOutput_revoke_share, validOutput_stop_future_sharing } from '../generated/validate-sharing';
+import { validInput_request_policy_grant } from '../generated/validate-approvals';
 import type { Operations as GrantOperations, Output as GrantOutput } from '../approvals/http';
 import type { Operations as ShareOperations } from '../sharing/http';
 import { id, result, session } from '../capture/test-fixtures';
@@ -275,4 +276,47 @@ it('keeps cumulative argument events in both requested pools and displays their 
  fireEvent.click(screen.getByRole('button',{name:'Request policy approval'}));
  await screen.findByRole('link',{name:'View policy approval'});
  expect(calls[0]).toMatchObject({limits:{max_observed_events:3000},observation_limits:{max_observed_events:3000}});
+});
+
+it('decodes profile status and requests its explicit output budget without observation fields', async () => {
+  const reply = status('active');
+  if (reply.status !== 'ok') throw new Error('fixture');
+  Object.assign(reply.data, { collection_kind: 'profile', max_executions: 1, executions_spent: 0, max_collected_bytes: 16 << 20, collected_bytes_spent: 0,
+    // A broader delegated ceiling cannot introduce profile observation inputs.
+    max_observed_bytes: 64 << 20, max_observed_events: 6000 });
+  expect(validOutput_get_policy_status(reply)).toBe(true);
+  const calls: { path: string; input: unknown; headers: Headers }[] = [];
+  const fetcher = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    const path = String(url);
+    calls.push({ path, input: JSON.parse(String(init?.body)), headers: new Headers(init?.headers) });
+    const response = path.endsWith('/get_policy_status') ? reply : failure('NotAvailable', 'Approval service unavailable.');
+    return new Response(JSON.stringify(response), { headers: { 'Content-Type': 'application/json' } });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  let next = 70;
+  const controller = new Policies(undefined, () => id(next++)); controllers.push(controller);
+  render(<PolicyWorkspace session={session} scope={new AbortController().signal} controller={controller}/>);
+  fireEvent.change(screen.getByLabelText('Policy name'), { target: { value: 'regional-finite-go-profile' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Show policy' }));
+  await screen.findByText('No policy grant is attached.');
+  expect(screen.getByText('Go endpoint profile')).toBeTruthy();
+  expect((screen.getByLabelText('Maximum output (bytes)') as HTMLInputElement).value).toBe(String(16 << 20));
+  for (const label of ['Maximum observed input (bytes)', 'Maximum observed events', 'Maximum session (seconds)', 'Maximum input rate (bytes/second)', 'Maximum concurrent sessions']) {
+    expect(screen.queryByLabelText(label)).toBeNull();
+  }
+  expect(screen.queryByText(/grouped Save/)).toBeNull();
+  fireEvent.change(screen.getByLabelText('Maximum output (bytes)'), { target: { value: String(12 << 20) } });
+  fireEvent.click(screen.getByRole('button', { name: 'Request policy approval' }));
+  await screen.findByRole('button', { name: 'Retry approval request' });
+  const requests = () => calls.filter(call => call.path.endsWith('/request_policy_grant'));
+  expect(requests()).toHaveLength(1);
+  const expected = { policy_uid: 'policy-uid', policy_name: 'regional-finite-go-profile', idempotency_key: id(70), limits: { max_executions: 1, max_collected_bytes: 12 << 20, max_observed_bytes: 0 } };
+  expect(requests()[0].input).toEqual(expected);
+  expect(validInput_request_policy_grant(requests()[0].input)).toBe(true);
+  expect(requests()[0].headers.get('X-CSRF-Token')).toBe(session.csrf_token);
+  expect(requests()[0].headers.get('Idempotency-Key')).toBe(id(70));
+  expect(requests()[0].headers.get('Authorization')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry approval request' }));
+  await waitFor(() => expect(requests()).toHaveLength(2));
+  expect(requests()[1].input).toEqual(expected);
 });

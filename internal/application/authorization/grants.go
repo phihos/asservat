@@ -46,6 +46,10 @@ type GrantReviewProfile struct {
 	ForceGC                                                        bool
 	SourceRef, SourceName, AddressMode, PathPolicy, EndpointDigest string
 	Port                                                           uint16
+	// A recurring profile review pins a definition and binding, without
+	// inventing a future Pod's endpoint digest or declared numeric port.
+	SourceKind, DefinitionDigest, DeclaredPortName string `json:",omitempty"`
+	MinimumPort, MaximumPort                       uint16 `json:",omitzero"`
 }
 
 // GrantObservationLimits are the plan's REQ-AUT-006 limits.

@@ -88,6 +88,11 @@ func attachPolicyAccountingGrantMode(t *testing.T, ctx context.Context, admin *p
 			g.Reasons = []authorization.SensitiveReason{{ActionID: recorder[0].Action.ID, Code: "syscallArguments"}}
 		}
 		g.Policy.Limits.MaxBytes = 4 * artifact.RecordingNativeLimit
+		if recorder[0].ProfileEndpoint != nil {
+			g.DataClass = "raw"
+			g.Reasons = []authorization.SensitiveReason{{ActionID: recorder[0].Action.ID, Code: "policyCollection"}, {ActionID: recorder[0].Action.ID, Code: planvalue.ReasonLiveProfile}}
+			g.Policy.Limits.MaxExecutions, g.Policy.Limits.MaxBytes = 1, recorder[0].Action.MaxBytes
+		}
 		// Only the explicit SQL observation component case provisions this
 		// synthetic reviewed pool; ordinary recorder fixtures remain unchanged.
 		if observation && a.Limits.MaxObservedBytes > 0 {
@@ -162,7 +167,11 @@ func qualifyOriginalPolicyGrantAcquisition(t *testing.T, ctx context.Context, ad
 		t.Fatal(err)
 	}
 	status, err := statuses.Status(ctx, a.PolicyUID)
-	if err != nil || status.ActiveID == "" || status.ExecutionsSpent != 5 || status.CollectedBytesSpent != 4*artifact.MaxContextBytes || status.MaxCollectedBytes != a.Limits.MaxBytes || status.ObservedBytesSpent != 0 || status.MaxObservedBytes != a.Limits.MaxObservedBytes {
+	wantExecutions, wantTotalBytes, wantReserved := int64(5), int64(4*artifact.MaxContextBytes), int64(artifact.MaxContextBytes)
+	if c.Expectation.Profile != nil {
+		wantExecutions, wantTotalBytes, wantReserved = 2, c.Expectation.Profile.MaxBytes, c.Expectation.Profile.MaxBytes
+	}
+	if err != nil || status.ActiveID == "" || status.ExecutionsSpent != wantExecutions || status.CollectedBytesSpent != wantTotalBytes || status.MaxCollectedBytes != a.Limits.MaxBytes || status.ObservedBytesSpent != 0 || status.MaxObservedBytes != a.Limits.MaxObservedBytes {
 		t.Fatal("shared accepted budget status differs from actual charged pool", status, err)
 	}
 	reader, err := postgres.NewAPIContextExecutions(ctx, pool, s.a.RootID, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
@@ -224,7 +233,7 @@ func qualifyOriginalPolicyGrantAcquisition(t *testing.T, ctx context.Context, ad
 	}
 	var bound string
 	var bytes int64
-	if err = admin.QueryRow(ctx, `SELECT grant_id::text,reserved_bytes FROM policy_occurrence WHERE reserved_capture_id=$1`, c.CaptureID).Scan(&bound, &bytes); err != nil || bound != oldGrant || bytes != artifact.MaxContextBytes {
+	if err = admin.QueryRow(ctx, `SELECT grant_id::text,reserved_bytes FROM policy_occurrence WHERE reserved_capture_id=$1`, c.CaptureID).Scan(&bound, &bytes); err != nil || bound != oldGrant || bytes != wantReserved {
 		t.Fatal("original reservation changed after replacement/revocation", bound, bytes, err)
 	}
 	newer, err := grants.Grant(ctx, replacement)

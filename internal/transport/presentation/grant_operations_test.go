@@ -150,6 +150,51 @@ func TestProfileGrantReviewWire(t *testing.T) {
 	}
 }
 
+func TestPolicyProfileGrantReviewUsesDefinitionWithoutConcretePodEndpoint(t *testing.T) {
+	for _, kind := range []string{"templateBinding", "administratorProfile"} {
+		t.Run(kind, func(t *testing.T) {
+			base, f := operationFixture(t, true)
+			v := policyRequestWireView(f.i.VerifiedAt, f.i.Principal)
+			v.Grant.DataClass = "raw"
+			v.Grant.Policy.Authority.Actions = []string{"profile"}
+			p := &authapp.GrantReviewProfile{Runtime: "go", Type: "cpu", Mode: "interval", Source: "httpEndpoint", Duration: "10s", Timeout: "15s", SourceRef: "go-endpoint", SourceName: "go-pprof-loopback", AddressMode: "targetLoopback", PathPolicy: "go-pprof/v1", SourceKind: kind, DefinitionDigest: strings.Repeat("cd", 32)}
+			if kind == "templateBinding" {
+				p.DeclaredPortName, p.MinimumPort, p.MaximumPort = "pprof", 6000, 7000
+			} else {
+				p.Port = 6060
+			}
+			v.Review.Actions = []authapp.GrantReviewAction{{ActionID: "cpu", Kind: "profile", ExecutionMode: "onTrigger", MaxBytes: 16 << 20, Sensitive: []string{"liveProfile"}, Profile: p}}
+			uc := &grantUseCase{view: v, until: f.metadataUntil}
+			s, err := NewGrantOperations("https://console.invalid", base.config.Now, func() string { return "00000000-0000-4000-8000-000000000099" }, uc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reply, err := s.Call(t.Context(), f, "get_grant", []byte(`{"grant_id":"00000000-0000-4000-8000-0000000009a1"}`))
+			var out struct {
+				Data grantData `json:"data"`
+			}
+			if err != nil || json.Unmarshal(reply.Body, &out) != nil || len(out.Data.Actions) != 1 || out.Data.Actions[0].Profile == nil {
+				t.Fatal("policy profile review", err)
+			}
+			if err := s.contracts.ValidateOutput("request_policy_grant", reply.Body); err != nil {
+				t.Fatal("policy request and get-grant review contracts diverged", err)
+			}
+			got := out.Data.Actions[0].Profile
+			if got.DefinitionDigest != p.DefinitionDigest || got.SourceKind != kind || got.DeclaredPortName != p.DeclaredPortName || got.MinimumPort != p.MinimumPort || got.MaximumPort != p.MaximumPort || got.Port != p.Port || strings.Contains(string(reply.Body), `"endpoint_digest"`) || strings.Contains(string(reply.Body), `"pod_name"`) || strings.Contains(string(reply.Body), `"observation_limits"`) {
+				t.Fatal("policy review lost definition or fabricated concrete source", string(reply.Body))
+			}
+			if kind == "templateBinding" && strings.Contains(string(reply.Body), `"port":`) {
+				t.Fatal("named-port policy review invented concrete port")
+			}
+			// A mixed concrete endpoint cannot cross either public contract.
+			p.EndpointDigest = strings.Repeat("ab", 32)
+			if mixed, e := s.Call(t.Context(), f, "get_grant", []byte(`{"grant_id":"00000000-0000-4000-8000-0000000009a1"}`)); e == nil && strings.Contains(string(mixed.Body), `"status":"ok"`) {
+				t.Fatal("mixed policy/concrete endpoint review accepted")
+			}
+		})
+	}
+}
+
 func TestGrantReviewPreservesArgumentEventBudget(t *testing.T) {
 	base, f := operationFixture(t, true)
 	v := grantView(f.i.VerifiedAt)

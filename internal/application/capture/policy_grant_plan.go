@@ -3,6 +3,7 @@ package capture
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"reflect"
 	"slices"
 	"time"
@@ -85,7 +86,19 @@ func (s PolicyGrantPlans) PolicyGrantPlan(ctx context.Context, policy, name stri
 	}
 	dataClass := "extract"
 	arguments := compiled.Recorder.Arguments
-	if arguments != nil {
+	if action.Kind == "profile" {
+		endpoint := compiled.Recorder.ProfileEndpoint
+		if endpoint == nil || !endpoint.Valid() || arguments != nil || compiled.Recorder.Filter != nil || !slices.Contains(action.Sensitive, planning.ReasonLiveProfile) {
+			return zero, authapp.ErrGrantUnavailable
+		}
+		dataClass = "raw"
+		profile := &authapp.GrantReviewProfile{Runtime: action.ProfileRuntime, Type: action.ProfileType, Mode: action.ProfileMode, Source: action.ProfileSource, Duration: action.Duration, Timeout: action.Timeout, ForceGC: action.ForceGC,
+			SourceRef: endpoint.SourceRef, SourceName: endpoint.Definition.Source.Name, SourceKind: endpoint.SourceKind, AddressMode: endpoint.AddressMode, PathPolicy: endpoint.Definition.PathPolicy, DefinitionDigest: hex.EncodeToString(endpoint.DefinitionDigest[:]), Port: endpoint.Port}
+		if endpoint.Binding != nil {
+			profile.DeclaredPortName, profile.MinimumPort, profile.MaximumPort = endpoint.Binding.PortName, endpoint.Definition.MinimumPort, endpoint.Definition.MaximumPort
+		}
+		review.Actions[0].Profile = profile
+	} else if arguments != nil {
 		// A policy collection approval never grants a human result access.
 		// Even without buffers, the qualified definitions can read raw paths.
 		dataClass = "raw"

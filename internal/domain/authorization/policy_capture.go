@@ -54,7 +54,7 @@ func PolicyExecutorIdentity(a AcceptedPolicyAuthority, observed, until time.Time
 	return identity.Identity{Principal: a.Executor, Policy: PolicyIdentityRevision(a), Scopes: []string{"evidence:capture"}, VerifiedAt: observed, ValidUntil: until}
 }
 
-// PolicyContextEligibility is the shared context/packet capture eligibility of an
+// PolicyContextEligibility is the shared context/recorder capture eligibility of an
 // accepted policy's executor for one triggering Pod (ADR-228). Team authority
 // comes from EvaluatePolicy; the default evidence audience is computed exactly
 // as for a human capture, so neither the creator nor the executor is added.
@@ -65,7 +65,7 @@ func PolicyContextEligibility(i identity.Identity, a AcceptedPolicyAuthority, p 
 	}
 	// This is current metadata/preflight eligibility. The admission transaction
 	// separately matches its actual snapshot or recorder plan to accepted actions.
-	if !slices.Contains(a.Actions, PolicyContextAction) && !slices.Contains(a.Actions, "packetCapture") && !slices.Contains(a.Actions, "syscallTrace") {
+	if !slices.Contains(a.Actions, PolicyContextAction) && !slices.Contains(a.Actions, "packetCapture") && !slices.Contains(a.Actions, "syscallTrace") && !slices.Contains(a.Actions, "profile") {
 		return deny("OutsideDelegation")
 	}
 	r := EvaluatePolicy(a, p, PolicyUse{PolicyUID: a.PolicyUID, ScopeDigest: a.ScopeDigest, Target: target, Purpose: PolicyIncident}, now)

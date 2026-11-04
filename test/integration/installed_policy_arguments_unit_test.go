@@ -65,6 +65,12 @@ func TestInstalledPolicyArgumentsInputsCompile(t *testing.T) {
 
 func TestInstalledPolicyArgumentsProtectedInputSchemas(t *testing.T) {
 	const id = "11111111-1111-4111-8111-111111111111"
+	binding := installedPolicyArgumentsBinding(map[string]any{"subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.test", "id": "fixture-team"}}, "scope": map[string]any{"clusterID": id, "namespaceRef": map[string]any{"name": "payments", "uid": "namespace"}, "workloads": []any{map[string]any{"kind": "Deployment", "name": "api", "uid": "workload"}}}})
+	validateInstalledPolicyProtectedInputs(t, installedPolicyArgumentsSpec(id, "payments", "api"), binding)
+}
+
+func validateInstalledPolicyProtectedInputs(t *testing.T, authored, binding map[string]any) {
+	t.Helper()
 	compiler := jsonschema.NewCompiler()
 	compiler.AssertFormat()
 	files, err := filepath.Glob("../../internal/adapters/kubernetes/policy-schemas/*.json")
@@ -85,7 +91,7 @@ func TestInstalledPolicyArgumentsProtectedInputSchemas(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := json.Marshal(installedPolicyArgumentsSpec(id, "payments", "api"))
+	raw, _ := json.Marshal(authored)
 	var spec any
 	_ = json.Unmarshal(raw, &spec)
 	if err = schema.Validate(spec); err != nil {
@@ -96,7 +102,7 @@ func TestInstalledPolicyArgumentsProtectedInputSchemas(t *testing.T) {
 		document map[string]any
 	}{
 		{"debugpolicies.yaml", map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": installedPolicyArgumentsName}, "spec": spec}},
-		{"accessbindings.yaml", installedPolicyArgumentsBinding(map[string]any{"subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.example.test", "id": "fixture-team"}}, "scope": map[string]any{"clusterID": id, "namespaceRef": map[string]any{"name": "payments", "uid": "namespace"}, "workloads": []any{map[string]any{"kind": "Deployment", "name": "api", "uid": "workload"}}}})},
+		{"accessbindings.yaml", binding},
 	} {
 		raw, err := os.ReadFile("../../charts/asservat/crds/" + item.file)
 		var crd map[string]any

@@ -56,7 +56,13 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
           <td>{bytes(a.max_bytes)}</td>
         </tr>)}</tbody>
       </table>
-      {grant.actions.filter(a => a.profile).map(a => <p key={'endpoint-' + a.action_id}>Profile endpoint {a.profile!.source_name} ({a.profile!.source_ref}): {a.profile!.address_mode === 'targetLoopback' ? 'target Pod loopback' : 'target Pod IP'}, TCP port {a.profile!.port}, {a.profile!.path_policy}. The reviewed endpoint must match at execution.</p>)}
+      {grant.actions.filter(a => a.profile).map(a => {
+        const profile = a.profile!;
+        return <div key={'endpoint-' + a.action_id}>
+          <p>Profile endpoint {profile.source_name} ({profile.source_ref}): {profile.address_mode === 'targetLoopback' ? 'target Pod loopback' : 'target Pod IP'}, {profile.definition_digest && profile.source_kind === 'templateBinding' ? <>named TCP port {profile.declared_port_name}, allowed range {profile.minimum_port}–{profile.maximum_port}</> : <>TCP port {profile.port}</>}, {profile.path_policy}. {profile.definition_digest ? 'Every triggering Pod must match this reviewed endpoint definition.' : 'The reviewed endpoint must match at execution.'}</p>
+          {profile.definition_digest && <details><summary>Reviewed endpoint definition</summary><p>{profile.source_kind === 'templateBinding' ? 'Pod template binding' : 'Administrator endpoint profile'} · <span className="identifier">{profile.definition_digest}</span></p></details>}
+        </div>;
+      })}
       {grant.observation_limits && <p>Observation limits bound by this approval: {grant.observation_limits.max_session_seconds} s per session, {bytes(grant.observation_limits.max_observed_bytes)} in total, {bytes(grant.observation_limits.max_bytes_per_second)} per second, {grant.observation_limits.max_concurrent_sessions} concurrent session.{grant.observation_limits.max_observed_events !== undefined && <> {grant.observation_limits.max_observed_events} eligible entry and exit probes in total.</>}</p>}
       {grant.result_access && <p>Follow-up access for the requester only: {grant.result_access.operations.join(', ')} by clients {grant.result_access.client_ids.join(', ')}, at most {grant.result_access.max_artifacts} artifacts and {bytes(grant.result_access.max_bytes)} in total until {date(grant.result_access.not_after)} (used: {grant.result_access.artifacts_used} artifacts, {bytes(grant.result_access.bytes_used)}).</p>}
       {policy ? <>

@@ -20,94 +20,43 @@ import (
 func ResolveGoProfileEndpoint(in value.GoEndpointInput, now time.Time) (value.GoEndpointPlan, error) {
 	var out value.GoEndpointPlan
 	if !value.GoEndpointReference(in.SourceRef) || !in.Parameters.Valid() || in.NativeLimit < 1 || len(in.Bindings) > 16 || !in.Network.Valid(now) || !now.Before(in.Deadline) || !identity.Fresh(in.Catalog.ObservedAt, in.Catalog.FreshUntil, now, 5*time.Second) {
-		return out, value.ErrProfileEndpointInvalid
+		return value.GoEndpointPlan{}, value.ErrProfileEndpointInvalid
 	}
 	cap := execution.MaximumGoProfileBytes
 	if in.Parameters.Type == "runtimeTrace" {
 		cap = execution.MaximumGoTraceBytes
 	}
 	if in.NativeLimit > cap || len(in.Catalog.Templates)+len(in.Catalog.Profiles) > 128 {
-		return out, value.ErrProfileEndpointInvalid
+		return value.GoEndpointPlan{}, value.ErrProfileEndpointInvalid
 	}
 	if in.Network.HostNetwork {
-		return out, value.ErrProfileHostNetwork
+		return value.GoEndpointPlan{}, value.ErrProfileHostNetwork
 	}
-	names := map[string]bool{}
-	templates := map[string]value.GoEndpointDefinition{}
-	profiles := map[string]value.GoEndpointProfile{}
-	for _, d := range in.Catalog.Templates {
-		if !d.Valid() {
-			return out, value.ErrProfileEndpointInvalid
-		}
-		if !profileDefinitionApplicable(d, in) {
-			continue
-		}
-		if names[d.Source.Name] {
-			return out, value.ErrProfileEndpointAmbiguous
-		}
-		names[d.Source.Name], templates[d.Source.Name] = true, d
+	selected, err := selectProfileEndpoint(in.Catalog, in.Network.Target.Request.ClusterID, in.Network.Target.Request.Namespace.UID, in.SourceRef, in.Bindings)
+	if err != nil {
+		return value.GoEndpointPlan{}, err
 	}
-	for _, p := range in.Catalog.Profiles {
-		if !p.Definition.Valid() {
-			return out, value.ErrProfileEndpointInvalid
-		}
-		if !slices.Contains(p.Definition.AddressModes, p.AddressMode) || p.Port < p.Definition.MinimumPort || p.Port > p.Definition.MaximumPort {
-			return out, value.ErrProfileEndpointInvalid
-		}
-		if !profileDefinitionApplicable(p.Definition, in) {
-			continue
-		}
-		name := p.Definition.Source.Name
-		if names[name] {
-			return out, value.ErrProfileEndpointAmbiguous
-		}
-		names[name], profiles[name] = true, p
-	}
-	bindings := map[string]value.GoEndpointBinding{}
-	for _, b := range in.Bindings {
-		if !b.Valid() {
-			return out, value.ErrProfileEndpointInvalid
-		}
-		if _, found := bindings[b.Name]; found {
-			return out, value.ErrProfileEndpointAmbiguous
-		}
-		if _, found := profiles[b.Name]; found {
-			return out, value.ErrProfileEndpointAmbiguous
-		}
-		bindings[b.Name] = b
-	}
-	if b, found := bindings[in.SourceRef]; found {
-		d, present := templates[b.TemplateRef]
-		if !present {
-			return out, value.ErrProfileEndpointUnavailable
-		}
-		if !slices.Contains(d.AddressModes, b.AddressMode) {
-			return out, value.ErrProfileEndpointDenied
-		}
-		var port uint16
+	out.Definition, out.SourceKind, out.AddressMode, out.Port = selected.definition, selected.kind, selected.addressMode, selected.port
+	if selected.binding != nil {
 		matches := 0
 		for _, p := range in.Network.Ports {
-			if p.Name == b.PortName {
+			if p.Name == selected.binding.PortName {
 				matches++
 				if p.Protocol == "TCP" {
-					port = p.Port
+					out.Port = p.Port
 				}
 			}
 		}
 		if matches > 1 {
-			return out, value.ErrProfileEndpointAmbiguous
+			return value.GoEndpointPlan{}, value.ErrProfileEndpointAmbiguous
 		}
-		if matches == 0 || port == 0 {
-			return out, value.ErrProfileEndpointUnavailable
+		if matches == 0 || out.Port == 0 {
+			return value.GoEndpointPlan{}, value.ErrProfileEndpointUnavailable
 		}
-		if port < d.MinimumPort || port > d.MaximumPort {
-			return out, value.ErrProfileEndpointDenied
+		if out.Port < out.Definition.MinimumPort || out.Port > out.Definition.MaximumPort {
+			return value.GoEndpointPlan{}, value.ErrProfileEndpointDenied
 		}
-		out.Definition, out.SourceKind, out.AddressMode, out.Port, out.DeclaredPortName = d, "templateBinding", b.AddressMode, port, b.PortName
-	} else if p, found := profiles[in.SourceRef]; found {
-		out.Definition, out.SourceKind, out.AddressMode, out.Port = p.Definition, "administratorProfile", p.AddressMode, p.Port
-	} else {
-		return out, value.ErrProfileEndpointUnavailable
+		out.DeclaredPortName = selected.binding.PortName
 	}
 	// Only the selected applicable definition can expose a dependency/credential
 	// denial. Foreign catalog entries are indistinguishable from absent entries.
@@ -141,13 +90,9 @@ func ResolveGoProfileEndpoint(in value.GoEndpointInput, now time.Time) (value.Go
 	out.ValidUntil = identity.Earlier(in.Deadline, identity.Earlier(in.Catalog.FreshUntil, in.Network.Target.FreshUntil))
 	// Current observations/resource versions are provenance, not immutable
 	// endpoint scope. All resolved network and public policy facts are included.
-	definition := struct {
-		Format     string                     `json:"format"`
-		Definition value.GoEndpointDefinition `json:"definition"`
-	}{"asservat-go-profile-definition/v1", out.Definition}
-	_, definitionDigest, err := profileEndpointCanonical(definition)
+	definitionDigest, err := ProfileEndpointDefinitionDigest(out.Definition)
 	if err != nil {
-		return value.GoEndpointPlan{}, value.ErrProfileEndpointInvalid
+		return value.GoEndpointPlan{}, err
 	}
 	out.DefinitionDigest = definitionDigest
 	scope := struct {
@@ -161,11 +106,6 @@ func ResolveGoProfileEndpoint(in value.GoEndpointInput, now time.Time) (value.Go
 	}
 	out.EndpointDigest = digest
 	return out, nil
-}
-
-func profileDefinitionApplicable(d value.GoEndpointDefinition, in value.GoEndpointInput) bool {
-	r := in.Network.Target.Request
-	return d.Source.InCluster(r) && (d.ScopeNamespaceUID == "" || d.ScopeNamespaceUID == r.Namespace.UID)
 }
 
 func profileDefinitionInScope(d value.GoEndpointDefinition, in value.GoEndpointInput) error {
