@@ -1,0 +1,33 @@
+{
+  "qualifiedHead": "af33be569075eb413f6c48111b1d2c7261ad9fd9",
+  "mergedMain": "f003deb0f568e3dc9f88406bda8e8f9d243d183a",
+  "tree": "53da7ec3f0f7974d14b6bb056c753a90c73474a2",
+  "ciRun": 41771153795,
+  "nativeRun": 41771221394,
+  "workflowConclusion": "success",
+  "testExit": 0,
+  "goElapsedSeconds": 549.808,
+  "sourceFilesMatchedToCommittedBlobs": 4085,
+  "mismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "nativeFile": {
+    "bytes": 1162,
+    "sha256": "0901ff040546533458ced8c1d98063ee163556f822dc038c01c74890024eeba7",
+    "localPprofExit": 0,
+    "localBurnCPUPresent": true
+  },
+  "verifiedScope": [
+    "protected stable endpoint/policy acceptance and independent collection approval",
+    "real restart/CPU10 capture/encrypted publication",
+    "collection-only native download denial",
+    "independent exact-artifact raw approval/replay and authenticated native download",
+    "native size/hash/filename/pprof, original one16MiB debit, zero observation, correct profile status"
+  ],
+  "limits": [
+    "CPU10 only; longer and other modes not qualified natively by this run",
+    "no comprehensive native negative/kernel/CNI/multipart matrix",
+    "otherS05/fullspec capabilities remain incomplete"
+  ]
+}

@@ -1,6 +1,7 @@
 # ADR-296: finite policy-triggered Go endpoint profiles
 
-Status: implementation in progress; installed qualification pending.
+Status: implemented and qualified for the bounded CPU10 policy workflow in PR154;
+other native mode/negative qualification remains open.
 
 ## Context
 
@@ -93,3 +94,9 @@ collection approval, real restart, native profile publication, separate human
 raw approval and exact-byte native download opened by pprof. SQL readback is
 verification only, never an authority producer. Source inventory and terminal
 cleanup are required. No installed result or full S-05 completion is claimed yet.
+
+
+The successful qualification is native41771221394 on af33be56 (merged PR154,
+main f003deb0 with identical tree): Go0/549.808s, all4,085 source hashes matched,
+unchanged sources, empty cleanup failures and removed scratch. Its scoped results
+and remaining gaps are recorded in [implementation progress](../implementation-progress.md).

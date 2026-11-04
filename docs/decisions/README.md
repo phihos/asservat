@@ -2,8 +2,8 @@
 
 [ADR-296 — Finite policy-triggered Go profiles](296-finite-policy-go-profiles.md)
 extends the existing policy/grant path with stable endpoint-definition approval
-and independently pinned triggering Pods. Implementation and qualification are
-in progress.
+and independently pinned triggering Pods. The bounded CPU10 policy workflow is
+implemented and natively qualified; wider profile qualification remains open.
 
 [ADR-295 — Two-source approved profile comparison](295-two-source-profile-comparison.md)
 selects one regional worker, two independently authorized source identities and
