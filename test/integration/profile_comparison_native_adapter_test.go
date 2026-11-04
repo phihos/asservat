@@ -1,15 +1,31 @@
 package integration
 
 import (
+	"context"
+	"crypto/tls"
 	"reflect"
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/application/evidence"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/fleet"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// Run on its own pristine service fixture. The existing shared lifecycle
+// supplies controlled Pod/token/issuer facts, but audit, enrollment, certificate
+// activation, native claim/binding and all six key consumptions use real SQL.
+func TestSharedProfileComparisonLifecycleWithRealServices(t *testing.T) {
+	withCapacityProducerFixture(t, func(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+		t.Run("profile-comparison-native-key-authority", func(t *testing.T) {
+			withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifySharedProjectionLifecycle, true, true)
+		})
+	})
+}
 
 // Exercise the production SQL source constructor before the ledger fixture's
 // explicitly synthetic C14 worker and native-operation rows. Publication,

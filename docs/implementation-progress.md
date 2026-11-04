@@ -103,8 +103,35 @@ correctly exited1 after a late unit-test edit invalidated the source freeze;
 that report is retained and is not clean qualification. All writers must finish
 or acknowledge a freeze before external qualification.
 
+CI41749864086 passed on `18395236`. The instrumented native41749912523
+exited1 in610.482s. All4,069 hashes matched; sources were unchanged, cleanup
+was `[]` and scratch was removed. It reached actual worker enrollment,
+certificate activation, native claim and two committed key children, then
+refused the artifact read before either child fully consumed its roles. The
+first query returned HTTP503; React’s second query was not reached. The focused
+journey took118.27s versus363.18s previously, after omitting duplicate expiry
+waits. These are failed-run timings, not a product overhead measurement.
+
+The newly exposed dispatcher defect is concrete: `NativeKeyAuthority.Resolve`
+classifies projection authority through the legacy batch-only lookup. Paired
+requests use child UUIDs, so that lookup returns no row and rejects the request
+before the comparison resolver. The dispatcher now uses one
+primary-key presence lookup for legacy and paired projection children, retaining
+three purpose branches, ambiguity rejection and all current validation/spend
+checks. No lookup, schema, privilege, API, watch or setting is added. A fresh
+real-SQL regression first reproduced the first manifest-child denial (Go10.495s).
+After the fix, paired and legacy shared lifecycle fixtures pass12.717s/9.346s;
+both4,016-file inventories match independently, sources were unchanged and
+cleanup was `[]`. They exercise audited worker SQL enrollment/certificate
+activation, native claim/binding, production dispatch, role order4→5→7,
+replay/mismatched-request refusal and paid closure. Pod/token/issuer/join facts
+and the scoped key reference are controlled fixture inputs; these are not real
+key-backend unwrap or installed comparison qualification. Both fixture entry
+points also close narrow roles before their administrator pool. Original reports remain in
+`test/results/profile-comparison-native-41749912523/`.
+
 No complete comparison requirement, S-05 slice or supported release is claimed.
-Actual React success, the hosted runtime failure, maximum-input containment,
+Actual React success after the dispatch fix, maximum-input containment,
 broader native negative cases and the remaining specification remain open.
 
 ### Earlier checkpoints

@@ -777,6 +777,19 @@ func (q *Queries) ReadProjectionComparisonKeyChild(ctx context.Context, childID 
 	return i, err
 }
 
+const readProjectionKeyAuthority = `-- name: ReadProjectionKeyAuthority :one
+SELECT child_id FROM context_query_key_binding WHERE child_id=$1
+`
+
+// Presence only: legacy child_id=batch_id; comparison children have distinct
+// IDs. The selected resolver still verifies its complete immutable binding.
+func (q *Queries) ReadProjectionKeyAuthority(ctx context.Context, childID pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, readProjectionKeyAuthority, childID)
+	var child_id pgtype.UUID
+	err := row.Scan(&child_id)
+	return child_id, err
+}
+
 const readProjectionKeyBinding = `-- name: ReadProjectionKeyBinding :one
 SELECT batch_id, query_id, binding, used_roles, child_id, source_ordinal FROM context_query_key_binding WHERE batch_id=$1 AND source_ordinal IS NULL
 `

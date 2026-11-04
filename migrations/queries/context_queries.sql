@@ -70,6 +70,11 @@ INSERT INTO context_query_worker(query_id,worker_id,binding,proof) VALUES($1,$2,
 -- name: ReadProjectionKeyBinding :one
 SELECT * FROM context_query_key_binding WHERE batch_id=$1 AND source_ordinal IS NULL;
 
+-- name: ReadProjectionKeyAuthority :one
+-- Presence only: legacy child_id=batch_id; comparison children have distinct
+-- IDs. The selected resolver still verifies its complete immutable binding.
+SELECT child_id FROM context_query_key_binding WHERE child_id=$1;
+
 -- name: LockProjectionKeyBinding :one
 SELECT * FROM context_query_key_binding WHERE batch_id=$1 AND source_ordinal IS NULL FOR UPDATE;
 
