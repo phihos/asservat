@@ -1,0 +1,22 @@
+{
+  "sourceCommit": "ad8b3a42fb3a9f05379db6a4161226e53f120234",
+  "nativeRun": 41785030470,
+  "suite": "continuation-manual-profile",
+  "workflowConclusion": "failure",
+  "goExit": 1,
+  "goSeconds": 737.861,
+  "reportedSourceHashesIndependentlyMatchedCommittedBlobs": 4106,
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "scratchRemoved": true,
+  "nativeBytes": 1136,
+  "nativeSHA256": "56ea91b29fee85258aa85901c85373753ae85591669aa6b8cb70bc6aff679c92",
+  "passedAssertionsBeforeFailure": [
+    "original CPU10 capture/publication/raw download/local pprof",
+    "original immutable history repeat preview",
+    "read-only bounded CPU summary and exact worker/key/ten-unit proofs",
+    "independently approved ProfilerBusy: exact terminal/no result/one HTTP/original owner remains busy through cutoff/retained SQL control debit"
+  ],
+  "failure": "Third capture (missing-endpoint case) refused CapacityUnavailable before HTTP; exact fixture resource diagnosis pending. No missing-endpoint or complete Stop/workflow qualification claimed.",
+  "originalNativeArchivedAs": "manual-profile.pb.gz.gz"
+}

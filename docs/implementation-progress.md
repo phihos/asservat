@@ -78,8 +78,34 @@ are retained in `test/results/profile-refusals-local/`, `test/results/profile-re
 and `test/results/profile-refusals-schema/`; the first
 read-only proof's bytea/JSON query failure remains separately archived.
 
+First exact-head CI41784993617 passed at ad8b3a42. Collector41785026939
+completed successfully (Go84.052s), with real busy-owner/missing-endpoint assertions,
+but its historical report omitted source inventories and product image/binary
+hashes. That limited evidence is retained separately; no source-freeze or image
+hash proof is inferred. The test harness now records before/after source hashes,
+compiled binary SHA256, distinct Docker config IDs/Kind manifest references and
+already observed Pod image/container IDs. Source mutation fails qualification;
+original failure/cleanup results are preserved. Local inventory passes measured
+0.224s/0.208s over4,102 files; this adds zero Kubernetes/production calls.
+
+Manual41785030470 failed after737.861s. Original CPU capture/download/summary/repeat
+and independently approved busy refusal passed their assertions; the next missing
+attempt returned CapacityUnavailable before HTTP. All4,106 source hashes match
+ad8b3a42, unchanged source, cleanup[] and scratch removed. Original reports/native
+bytes remain in `test/results/profile-refusals-native-41785030470/`.
+
+The fixture funded79,429,632bytes/32objects for its old journey. Each retained
+16MiB profile needs35,291,136bytes/8objects, plus1,671,168bytes/4objects for immutable
+history. Two attempts already exhaust that byte budget for a third admission.
+The four intended independently approved captures/history now receive exactly
+147,849,216bytes (141MiB)/48objects upfront, with qualified root12records. The
+production composed preflight reproduces both old gaps and passes the new plan:
+4,032+2,688=6,720/10,000 system objects; pool/burst limits and ten-unit summary
+charge remain unchanged. This changes only explicit manual-profile fixture
+funding, never runtime quotas, conservative charges, refunds or deadlines.
+
 Collector-native and installed manual-profile refusal qualification remain
-pending. The existing synthetic workload has owner-only controls on its existing
+pending on the corrected, instrumented candidate. The existing synthetic workload has owner-only controls on its existing
 HTTP listener, exact Pod-UID checks and one-request counters. Two independent
 manual reviews precede the installed failures; the fixture waits the exact
 persisted start+15s original uncertainty cutoff before the next attempt. Existing

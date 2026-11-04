@@ -81,6 +81,10 @@ func profileResourcesNative(t *testing.T, ctx context.Context, k kubernetes.Inte
 	if err != nil || string(collectorPod.UID) != original.Identity.PodUID {
 		t.Fatal("resource collector identity", err)
 	}
+	observedImage, err := profilePodImage(collectorPod, "node")
+	if err != nil {
+		t.Fatal(err)
+	}
 	var memoryLimit int64
 	for _, c := range collectorPod.Spec.Containers {
 		if c.Name == "node" {
@@ -252,7 +256,7 @@ func profileResourcesNative(t *testing.T, ctx context.Context, k kubernetes.Inte
 		}
 	}
 	after, afterPeak := memory()
-	results["profileMaximumAcquisitionResources"] = map[string]any{"scope": "malformed input acquisition and parser refusal; no installed publication proof", "nativeBytesPerAttempt": artifact.MaxGoTraceBytes, "heldAttempts": 2, "heldReservationBytes": 2 * artifact.MaxGoTraceBytes, "baselineRSSBytes": baseline, "baselinePeakRSSBytes": baselinePeak, "blockedRSSBytes": rss, "peakRSSBytes": max(peak, afterPeak), "afterJoinRSSBytes": after, "installedMemoryLimitBytes": memoryLimit, "aggregateExcessRefused": true, "semanticPublicationEligible": false, "nodeEpoch": original.Identity.Epoch, "elapsedSeconds": time.Since(started).Seconds(), "cancelJoinSeconds": time.Since(stopped).Seconds(), "stopRequestedAt": stopped, "joinedReportObservedAt": joinedReport.ObservedAt, "originalUploadUntil": uploadUntil, "acceptedStopReceipts": len(acceptedStops)}
+	results["profileMaximumAcquisitionResources"] = map[string]any{"scope": "malformed input acquisition and parser refusal; no installed publication proof", "collectorImage": observedImage, "collectorPID": inspected.Info.Pid, "nativeBytesPerAttempt": artifact.MaxGoTraceBytes, "heldAttempts": 2, "heldReservationBytes": 2 * artifact.MaxGoTraceBytes, "baselineRSSBytes": baseline, "baselinePeakRSSBytes": baselinePeak, "blockedRSSBytes": rss, "peakRSSBytes": max(peak, afterPeak), "afterJoinRSSBytes": after, "installedMemoryLimitBytes": memoryLimit, "aggregateExcessRefused": true, "semanticPublicationEligible": false, "nodeEpoch": original.Identity.Epoch, "elapsedSeconds": time.Since(started).Seconds(), "cancelJoinSeconds": time.Since(stopped).Seconds(), "stopRequestedAt": stopped, "joinedReportObservedAt": joinedReport.ObservedAt, "originalUploadUntil": uploadUntil, "acceptedStopReceipts": len(acceptedStops)}
 }
 
 // An enqueued Stop and deadline cleanup are not interchangeable. Require exact

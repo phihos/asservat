@@ -83,6 +83,37 @@ def run(args, *, data=None, env=None, cwd=None):
     return subprocess.check_output(args, text=True, input=data, env=env, cwd=cwd, stderr=subprocess.PIPE).strip()
 
 
+def binary_inventory(path):
+    # Stream large native executables rather than retaining a second full copy.
+    with path.open("rb") as source:
+        digest = hashlib.file_digest(source, "sha256").hexdigest()
+    return {"bytes": path.stat().st_size, "sha256": digest}
+
+
+def source_hashes():
+    # Match the context harness's source inventory, scoped to this collector's
+    # build/test inputs. Generated results and external caches are excluded.
+    files = [ROOT / name for name in ("go.mod", "go.sum", "Makefile", "scripts/ci-native.sh",
+             "scripts/fetch-gadget.sh", "scripts/package-argument-gadget.py", "scripts/build-libpcap.sh",
+             ".github/workflows/native.yml", ".github/actions/setup/action.yml")]
+    files += list((ROOT / "scripts").glob("test-collector*.py"))
+    files += [ROOT / "experiments/syscall-argument-budget" / name for name in ("prepare.py", "pins.json", "program.patch", "budget.h")]
+    for directory, patterns in (("cmd", ("*.go",)), ("internal", ("*.go", "*.json")),
+                                ("migrations", ("*.go", "*.sql")), ("test/integration", ("*.go",)),
+                                ("test/fixtures", ("*.go", "*.sql")), ("charts/asservat", ("*",))):
+        for pattern in patterns:
+            files += list((ROOT / directory).rglob(pattern))
+    return {str(path.relative_to(ROOT)): binary_inventory(path)["sha256"] for path in sorted(set(files)) if path.is_file()}
+
+
+def docker_config_id(tag):
+    # Docker .Id identifies the image CONFIG, not its repository manifest.
+    image_id = run(["docker", "image", "inspect", "--format", "{{.Id}}", tag])
+    if not image_id.startswith("sha256:") or len(image_id) != 71 or any(c not in "0123456789abcdef" for c in image_id[7:]):
+        raise RuntimeError("invalid Docker image config ID")
+    return image_id
+
+
 def runner_facts():
     btf = Path("/sys/kernel/btf/vmlinux")
     cgroup = run(["stat", "-f", "-c", "%T", "/sys/fs/cgroup"])
@@ -190,6 +221,13 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
     kubeconfig = work / "kubeconfig"
     s3name = None
     try:
+        # New provenance I/O shares the existing owned-image cleanup even if a
+        # hash read or inspect fails, before any cluster or service is started.
+        binary = binary_inventory(image_dir / "asservat")
+        report["build"].update(binarySHA256=binary["sha256"], dockerConfigID=docker_config_id(tag))
+        if profile:
+            binary = binary_inventory(profile_dir / "profile-native")
+            report["profileBuild"] = {"binaryBytes": binary["bytes"], "binarySHA256": binary["sha256"], "dockerConfigID": docker_config_id(profile_tag)}
         s3name, s3url = seaweed(run_id)
         started = time.monotonic()
         # Without a CNI the node only becomes Ready once Cilium runs.
@@ -214,6 +252,7 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
                              "kubernetes": json.loads(run(["kubectl", "--kubeconfig", str(kubeconfig), "version", "-o", "json"]))["serverVersion"]["gitVersion"]}
         node = name + "-control-plane"
         image = loaded_digest(node, tag)
+        report["build"]["kindManifestRef"] = image
         network = json.loads(run(["docker", "network", "inspect", "kind"]))[0]
         gateway = next(c["Gateway"] for c in network["IPAM"]["Config"] if "." in c.get("Gateway", ""))
         roots, cert, key = certificates(work, gateway)
@@ -227,9 +266,12 @@ def packet(work, report, cni="", ring_disk=False, profile=False):
         manifests.write_text(rendered)
         run(["kubectl", "--kubeconfig", str(kubeconfig), "create", "namespace", "asservat-region"])
         run(["kubectl", "--kubeconfig", str(kubeconfig), "apply", "-f", str(manifests)])
+        profile_image = loaded_digest(node, profile_tag) if profile else ""
+        if profile:
+            report["profileBuild"]["kindManifestRef"] = profile_image
         fixture = {"kubeconfig": str(kubeconfig), "collectorNamespace": "asservat-collector", "daemonSet": "asservat-node", "serviceAccount": "asservat-node",
                    "installationID": INSTALLATION, "clusterID": CLUSTER, "listen": f"{gateway}:{PORT}", "serverCertificate": str(cert), "serverKey": str(key),
-                   "profileImage": loaded_digest(node, profile_tag) if profile else "", "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "ringDiskBytes": RING_DISK_BYTES if ring_disk else 0, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
+                   "profileImage": profile_image, "pause": fixtures[PAUSE], "busybox": fixtures[BUSYBOX], "s3": s3url, "cni": cni, "ringDiskBytes": RING_DISK_BYTES if ring_disk else 0, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
         (work / "fixture.json").write_text(json.dumps(fixture))
         started = time.monotonic()
         test = subprocess.run(["go", "test", "-tags", "libpcap", "-count=1", "-v", "-timeout", "12m", "-run", "^TestNodeCollectorWithRealKubernetes$", "./test/integration"],
@@ -338,16 +380,32 @@ def main():
         if sys.argv[1] == "argument-engine":
             argument_engine(work, report)
         else:
+            report["sourceHashes"] = source_hashes()
             packet(work, report, "cilium" if sys.argv[1] == "cilium" else "", ring_disk=sys.argv[1] == "ringdisk", profile=sys.argv[1] == "profile")
         report["result"] = "passed"
     except BaseException:
         report["result"] = "failed"
         raise
     finally:
+        unchanged = True
+        if sys.argv[1] != "argument-engine" and "sourceHashes" in report:
+            try:
+                report["sourceHashesAfter"] = source_hashes()
+                unchanged = report["sourceHashes"] == report["sourceHashesAfter"]
+            except OSError as error:
+                unchanged = False
+                report["sourceInventoryError"] = type(error).__name__
+            report["sourceUnchanged"] = unchanged
+            if not unchanged:
+                report["result"] = "failed"
         report["finished"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         (results / ("collector-" + sys.argv[1] + "-report.json")).write_text(json.dumps(report, indent=2) + "\n")
         print(json.dumps(report, indent=2), flush=True)
         shutil.rmtree(work, ignore_errors=True)
+        # Preserve a failing test's original exception/exit and cleanup report.
+        # Only an otherwise successful run needs a new provenance failure exit.
+        if not unchanged and sys.exc_info()[0] is None:
+            raise RuntimeError("collector source inventory changed or could not be read")
 
 
 if __name__ == "__main__":

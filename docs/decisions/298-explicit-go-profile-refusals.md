@@ -93,3 +93,14 @@ UTF-8 JSON decoding fixed the proof without changing the runtime outcome.
 Collector-native `collector-profile` and installed `continuation-manual-profile`
 qualification remain pending, under their existing time limits. No installed
 refusal/coexistence, broader profile matrix, S-05 or full-spec exit is claimed.
+
+Initial hosted checks: exact CI41784993617 passed at ad8b3a42. Collector41785026939
+passed its native assertions but lacked image/binary/source-inventory provenance;
+retain that limitation rather than inventing hashes. Report instrumentation now
+captures those facts without production changes or new Kubernetes requests.
+Manual41785030470 passed CPU/summary/repeat and busy preservation before the third
+admission correctly exhausted its original two-attempt regional funding. Four
+captures plus history require exactly141MiB/48objects and a12-record fixture
+root. Production composed preflight reproduced the old shortage and verifies
+6,720/10,000 system objects with unchanged ten-unit summary/per-action/runtime
+limits. Corrected whole-workflow qualification remains pending.

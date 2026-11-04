@@ -1,0 +1,14 @@
+{
+  "sourceCommit": "ad8b3a42fb3a9f05379db6a4161226e53f120234",
+  "nativeRun": 41785026939,
+  "workflowConclusion": "success",
+  "goExit": 0,
+  "goSeconds": 84.052,
+  "scope": "Collector-native assertions include application-owned profiler preservation, missing endpoint/no bytes/no retry and bounded acquisition resource/Stop checks; raw CPU/heap match reported hashes and reopened locally.",
+  "reportedSourceHashCount": 0,
+  "sourceInventoryComparedCount": 0,
+  "sourceUnchangedNotReported": true,
+  "productImageAndBinaryHashesNotReported": true,
+  "scratchRemovalNotPositivelyReported": true,
+  "qualificationLimit": "Exact workflow checkout is known, but missing source/binary/image provenance is not inferred from another VM. A separately instrumented collector rerun is required for the completed provenance record."
+}

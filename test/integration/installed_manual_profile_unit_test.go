@@ -80,8 +80,8 @@ func checkManualProfilePlan(t *testing.T, cluster string, input map[string]any) 
 
 func TestInstalledManualProfileFundsOneConservativeSummary(t *testing.T) {
 	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "manual-profile")
-	if got := nativeCapacityProfile(); got.Records != 10 {
-		t.Fatal("summary lacks its ten query units", got.Records)
+	if got := nativeCapacityProfile(); got.Records < 10 || got.Records >= 20 {
+		t.Fatal("manual fixture must fund one ten-unit summary, not two", got.Records)
 	}
 	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "approved-recording")
 	if got := nativeCapacityProfile(); got.Records != 8 {

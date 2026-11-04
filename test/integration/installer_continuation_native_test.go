@@ -993,12 +993,12 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
-	// One pprof summary costs ten conservative read-work units. The previous
-	// eight-unit fixture cannot fund it; this explicit operator fixture funds
-	// exactly one such query without reducing its admission charge.
+	// The manual profile journey reserves 48 evidence objects for four captures
+	// plus history, deriving 12 protocol records. Qualify those records upfront;
+	// its single pprof summary still charges ten conservative read-work units.
 	records := int64(8)
 	if installedJourneyFocus() == "manual-profile" {
-		records = 10
+		records = 12
 	}
 	if installedJourneyFocus() == "profile-comparison" {
 		records = installedProfileComparisonQueries * query.ProfileComparisonQueryUnits

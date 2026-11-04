@@ -28,6 +28,38 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+type nativeProfilePodImage struct {
+	PodUID        string `json:"podUID"`
+	ContainerName string `json:"containerName"`
+	SpecImage     string `json:"specImage"`
+	StatusImageID string `json:"statusImageID"`
+	ContainerID   string `json:"containerID"`
+}
+
+// Capture already observed Pod facts, never infer a runtime image from its
+// requested spec or equate a config ID with a repository manifest digest.
+func profilePodImage(pod *core.Pod, container string) (nativeProfilePodImage, error) {
+	var out nativeProfilePodImage
+	if pod == nil {
+		return out, fmt.Errorf("profile image observation lacks Pod")
+	}
+	out.PodUID, out.ContainerName = string(pod.UID), container
+	for _, c := range pod.Spec.Containers {
+		if c.Name == container {
+			out.SpecImage = c.Image
+		}
+	}
+	for _, c := range pod.Status.ContainerStatuses {
+		if c.Name == container {
+			out.StatusImageID, out.ContainerID = c.ImageID, c.ContainerID
+		}
+	}
+	if out.PodUID == "" || out.SpecImage == "" || out.StatusImageID == "" || out.ContainerID == "" {
+		return nativeProfilePodImage{}, fmt.Errorf("profile image observation incomplete")
+	}
+	return out, nil
+}
+
 type nativeProfileSink struct {
 	mu         sync.Mutex
 	results    map[string]collector.ProfileResult
@@ -96,6 +128,11 @@ func profileCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interf
 		}
 		return false
 	})
+	observedImage, err := profilePodImage(created, pod.Spec.Containers[0].Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results["profileWorkloadImage"] = observedImage
 	ns, err := k.CoreV1().Namespaces().Get(ctx, namespace, meta.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
