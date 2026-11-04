@@ -104,3 +104,41 @@ captures plus history require exactly141MiB/48objects and a12-record fixture
 root. Production composed preflight reproduced the old shortage and verifies
 6,720/10,000 system objects with unchanged ten-unit summary/per-action/runtime
 limits. Corrected whole-workflow qualification remains pending.
+
+
+## Instrumented native evidence and passive progress recovery
+
+On frozen `f2f49124`, collector41789805115 passed (Go0/83.253s).
+Both4,103-path source inventories independently match committed blobs. Actual
+Pod images match recorded manifests, distinct from Docker config IDs. CPU/heap
+originals match hashes and reopen with pprof; busy-owner preservation, missing
+endpoint/no output/no retry and cleanup assertions passed. Original reports and
+limits are retained in `test/results/profile-refusals-collector-41789805115/`.
+This is collector evidence with synthetic admission authority.
+
+Exact CI41789771763 passed. Installed41789808818 failed (Go1/745.941s) after
+CPU/native download/summary/repeat and independently approved busy preservation
+passed. A later `get_capture` received HTTP503. PostgreSQL rejected current
+capacity audit profiles before journal admission or backing/counter checks; a
+capacity-source acceptance failure preceded it by464ms. There is no evidence
+of exhausted audit records or a five-minute root lifetime. The logs do not
+identify which trust, permission, source or root predicate failed. All4,107
+source hashes match the frozen commit, sources unchanged, cleanup[] and scratch
+removed; originals remain in `test/results/profile-refusals-native-41789808818/`.
+Missing-endpoint/Stop installed qualification remains pending.
+
+The source observer retains its original bounded authority, then sleeps one
+second between serial observations. Returning a valid observation with less
+than a second left can leave a freshness gap before the next read completes;
+that mechanism is possible, not a proved attribution of this particular failure.
+Keep the current fail-closed behavior. A bounded passive status read can be
+repeated with fresh authorization without repeating acquisition. The fixture
+already allows four typed transient read failures with two-second pauses, but
+its transport-error path aborts before that budget. The next qualification
+candidate covers numeric HTTP503 only for passive `get_capture` within that same
+budget. It retains the original refusal progress deadline and reports retries.
+No mutation, preview, resolution, unknown network outcome or permission denial is
+replayed. A finite test-only SQL snapshot after a failure records safe current
+flags/timing and explicitly remains a later observation. This adds no production
+request, credential, fallback, setting or relaxed freshness requirement and does
+not establish continuous source availability.

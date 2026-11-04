@@ -133,8 +133,14 @@ production composed preflight reproduces both old gaps and passes the new plan:
 charge remain unchanged. This changes only explicit manual-profile fixture
 funding, never runtime quotas, conservative charges, refunds or deadlines.
 
-Collector-native and installed manual-profile refusal qualification remain
-pending on the corrected, instrumented candidate. The existing synthetic workload has owner-only controls on its existing
+Collector qualification passed as recorded above; complete installed manual-profile
+refusal qualification remains pending. The next test-client correction lets
+passive `get_capture` HTTP503 use the existing four-attempt/two-second typed
+transient-read budget, under the original refusal deadline. It does not replay
+acquisition, preview, resolution or Stop, alter freshness, or promise continuous
+availability. A bounded test-only failure snapshot distinguishes later current
+trust/permission/source/root flags without disclosing configuration. No new
+hosted dispatch follows until focused reproductions and review pass. The existing synthetic workload has owner-only controls on its existing
 HTTP listener, exact Pod-UID checks and one-request counters. Two independent
 manual reviews precede the installed failures; the fixture waits the exact
 persisted start+15s original uncertainty cutoff before the next attempt. Existing
