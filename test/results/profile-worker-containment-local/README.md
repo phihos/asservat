@@ -57,3 +57,10 @@ All gzip files use level 9, zero mtime and no filename header. Their decompresse
 bytes were read back against the cache originals. No binary, native payload,
 private fixture, allowed-signers file or credential is included. No new runtime
 checks or external qualification were run while preparing this archive.
+
+The final local `make pre-push profile-preflight` also passed at clean
+`02bbbaecad50d81c8c64a9b87b07c9bcfc0056b7`, after rebasing the two resource
+changes onto the heap readiness repair `80593f93`:441 console tests,4.694s
+capture races and4.469s integration fixture races. Its original log and exact
+invocation/exit are retained in the manifest. This adds local integration
+evidence; installed resource qualification remains unrun.

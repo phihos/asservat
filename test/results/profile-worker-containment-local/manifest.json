@@ -52,6 +52,16 @@
       "go_seconds": 6.254,
       "original_session": 13977,
       "provenance": "Root retained actual invocation/exit; log filename retained verbatim despite later rebases."
+    },
+    "post_repeat_fix_integrated_preflight": {
+      "source_head": "02bbbaecad50d81c8c64a9b87b07c9bcfc0056b7",
+      "runtime_base": "80593f9398ad9bf909afe9fd46a34752b3060ba1",
+      "command": "env PATH=/home/phil/.cache/asservat-build/spec-venv/bin:/home/phil/.cache/asservat-build/bin:<originalPATH> TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOFLAGS='-buildvcs=false -p=2' make pre-push profile-preflight",
+      "exit": 0,
+      "console_tests_passed": 441,
+      "capture_race_seconds": 4.694,
+      "last_integration_go_seconds": 4.469,
+      "scope": "Local pre-push/profile gate only. Includes root repeat-readiness repair; no external service or installed resource qualification."
     }
   },
   "artifacts": [
@@ -332,6 +342,15 @@
       "source_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
       "gzip_bytes": 22,
       "gzip_sha256": "89ed3b723e0e40d8957a2df55fcb04d57b6d95fa665c5fe67b098df7f29694ae",
+      "gzip_mtime": 0
+    },
+    {
+      "path": "checks/final-805-integrated-preflight.log.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-worker-containment/final-805-integrated-preflight.log",
+      "source_bytes": 15422,
+      "source_sha256": "48b85788154065afda557f4e01a071d133786fc565ffb913ed052dfa533e480c",
+      "gzip_bytes": 3333,
+      "gzip_sha256": "cec2eb290667511cb11489c52770f92275c23d6108a5a938c3f3d569e346441a",
       "gzip_mtime": 0
     }
   ],
