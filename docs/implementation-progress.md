@@ -23,13 +23,23 @@ requirements and is unfinished. [ADR303](decisions/303-saved-packet-summary.md)
 records fixed bounds and the distinction between saved records, reported
 exclusions and unknown network loss. No acquisition is implicit in a summary.
 
-Initial focused source/parser/service/C20 tests and real137 SQL-only Up/Down/Up
-checks are in progress with exact local logs. No integrated/global gate, full
-compiled-role service result, browser driver or installed packet-summary outcome
-is claimed yet. Independent review has already found and corrected producer/
-consumer mismatches before hosted qualification. Sources remain under coordinated
-ownership until every writer freezes. Broader S-05 and the full specification
-remain open.
+The integrated source is frozen at `6eee3964` after independent producer/consumer
+review and focused races. [Local originals](../test/results/saved-packet-summary-local/README.md)
+retain actual failures and source scopes. Initial pre-push exited2 solely because
+an old selector test expected heap to be the final browser case; the corrected
+selector checks every retained/new case and passed. Other pre-push targets passed,
+including481 console tests. Integrated packet preflight and the full built-console
+browser gate passed (83.053s, five selected fixtures including the new driver;
+existing28 journeys/27 accessibility scans). These browser facts use synthetic
+local authority, not an installed cluster.
+
+Two separate pristine real-service fixtures passed: compiled packet lifecycle
+Go9.166s and upgrade137 Go7.339s. Each reported4,137 source hashes that matched
+Git, unchanged sources and empty cleanup. Runtime/key SQL roles and managed
+publication are real; Job/Pod/issuer/join inputs remain synthetic. The next gates
+are eligible candidate CI and one installed manual-mixed packet summary/native
+PCAPNG journey. No installed packet-summary, maximum-shape/cgroup or raw-query
+qualification is claimed. Broader S-05 and the full specification remain open.
 
 ## Shared profile qualification history (2026-11-04)
 
