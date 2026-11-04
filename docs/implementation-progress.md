@@ -100,8 +100,35 @@ previously starved acquisition. History is separately charged1,671,168bytes and
 four object slots; it is not prepaid by capture admission. The proposed exact
 accepted-capture metadata guard retains current identity, recovery, retention,
 pool/allocation/control/quota and original deadlines, with an atomic verified
-association. Production changes await the managed regression; no new installed
-run or preview-timeout increase is made.
+association. The managed regression now proves the coupling: with the root
+current and only the workload binding expired, the old guard refuses history
+and rolls back all custody/quota/debit changes; refreshing that same binding
+permits the exact1,671,168B/four-slot charge. Earlier fixture setup and diagnostic
+assertion failures remain distinct from this desired-state RED.
+
+ADR-301 and schema136 implement accepted-history admission in the existing
+transaction. Only the existing custody capacity constraint becomes deferrable,
+initially immediate. History defers it, performs the same separately charged
+inserts, establishes a strict exact accepted-capture association, then explicitly
+flushes the constraint before final authority/deadline checks. Missing JSON,
+wrong scope/allocation and unassociated attempts cannot select this path.
+Current compiled pool, physical funding, root/control/quota/paused/overdue and
+all original dates remain enforced. No new rows, roles, GUCs, observations,
+retries or lifecycle handoffs are added; the history transaction adds two fixed
+SQL commands and bounded indexed association reads.
+
+At frozen58c1df31, managed SQL passed9.982s, upgrade/downgrade6.850s and history/
+native-length lifecycle9.799s in three separate owned fixtures. Exact135 function
+and trigger restoration, default/deferred/unassociated admission, malformed and
+mismatched association, expired/paused backing, insufficient quota, exact debit,
+idempotent replay and existing history eviction/prefix cleanup passed. All4,080
+submitted source hashes in each fixture matched Git; sources stayed unchanged
+and cleanup was empty. Root integrated pre-push and affected races passed at
+0ff891ee (capture2.415s/PostgreSQL1.191s). Originals, source identities and failed
+setup/RED scopes are retained in
+[accepted-history-capacity-local](../test/results/accepted-history-capacity-local/README.md).
+New final-candidate CI and fresh installed trace qualification remain required;
+no installed history/Repeat success is claimed yet.
 TLS is a private, locally checked follow-up; full S-05/specification completion
 remains open.
 Earlier checkpoints follow.
