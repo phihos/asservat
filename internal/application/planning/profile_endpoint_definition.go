@@ -117,9 +117,6 @@ func ResolveProfileEndpointDefinition(entries []ProfileEndpointEntry, r targets.
 	if err != nil {
 		return out, profileEndpointTargetError(err)
 	}
-	if s.definition.Credential != nil {
-		return out, targets.ErrUnsupported
-	}
 	d := s.definition
 	digest, err := ProfileEndpointDefinitionDigest(d)
 	if err != nil {
@@ -131,6 +128,12 @@ func ResolveProfileEndpointDefinition(entries []ProfileEndpointEntry, r targets.
 		t := d.TLS
 		out.TLS = targets.ProfileEndpointTLSDefinition{TrustClusterID: t.Trust.ClusterID, TrustNamespaceUID: t.Trust.NamespaceUID, TrustUID: t.Trust.ResourceUID, TrustName: t.Trust.Name, TrustDigest: t.Trust.Digest, ServerName: t.ServerName}
 	}
+	if c := d.Credential; c != nil {
+		out.Credential = &targets.ProfileEndpointCredentialDefinition{PolicyClusterID: c.Policy.ClusterID, PolicyNamespaceUID: c.Policy.NamespaceUID, PolicyUID: c.Policy.ResourceUID, PolicyName: c.Policy.Name, PolicyDigest: c.Policy.Digest}
+		for _, a := range c.Audiences {
+			out.Credential.Audiences = append(out.Credential.Audiences, targets.ProfileEndpointCredentialAudience{ClusterID: a.ClusterID, NamespaceUID: a.NamespaceUID, WorkloadKind: a.WorkloadKind, WorkloadUID: a.WorkloadUID})
+		}
+	}
 	if s.binding != nil {
 		out.Binding = &targets.ProfileEndpointBinding{Name: s.binding.Name, TemplateRef: s.binding.TemplateRef, AddressMode: s.binding.AddressMode, PortName: s.binding.PortName}
 	}
@@ -140,7 +143,7 @@ func ResolveProfileEndpointDefinition(entries []ProfileEndpointEntry, r targets.
 	return out.Clone(), nil
 }
 
-// PolicyProfileEndpointFromResolution checks the complete uncredentialed public
+// PolicyProfileEndpointFromResolution checks the complete public
 // definition against its digest before storing it in a target-independent scope.
 func PolicyProfileEndpointFromResolution(a targets.ProfileEndpointDefinitionResolution) (*value.PolicyProfileEndpoint, error) {
 	if !a.Answers(a.Request) {
@@ -150,6 +153,12 @@ func PolicyProfileEndpointFromResolution(a targets.ProfileEndpointDefinitionReso
 	if !a.TLS.IsZero() {
 		t := a.TLS
 		d.TLS = &value.GoEndpointTLS{Trust: value.GoEndpointSource{ClusterID: t.TrustClusterID, NamespaceUID: t.TrustNamespaceUID, ResourceUID: t.TrustUID, Name: t.TrustName, Digest: t.TrustDigest}, ServerName: t.ServerName}
+	}
+	if c := a.Credential; c != nil {
+		d.Credential = &value.GoEndpointCredential{Policy: value.GoEndpointSource{ClusterID: c.PolicyClusterID, NamespaceUID: c.PolicyNamespaceUID, ResourceUID: c.PolicyUID, Name: c.PolicyName, Digest: c.PolicyDigest}}
+		for _, a := range c.Audiences {
+			d.Credential.Audiences = append(d.Credential.Audiences, value.GoEndpointAudience{ClusterID: a.ClusterID, NamespaceUID: a.NamespaceUID, WorkloadKind: a.WorkloadKind, WorkloadUID: a.WorkloadUID})
+		}
 	}
 	digest, err := ProfileEndpointDefinitionDigest(d)
 	if err != nil || digest != a.DefinitionDigest {

@@ -20,6 +20,7 @@ import (
 	"asservat.local/asservat/internal/adapters/linux"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/collector"
@@ -143,7 +144,7 @@ func RunNode(ctx context.Context, podUID string) error {
 	facts := probeNode()
 	mechanisms := collector.Assess(facts)
 	if gadget.ProfileDialAvailable() && facts.HostProcesses == collector.Supported {
-		mechanisms = append(mechanisms, collector.Availability{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: true})
+		mechanisms = append(mechanisms, collector.Availability{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: true, ProfileAuthorization: true})
 	}
 	// The syscall recorder decodes x86_64 numbers only (ADR-273).
 	if runtime.GOARCH != "amd64" {
@@ -233,7 +234,7 @@ func nodeSleep(ctx context.Context, d time.Duration, kick <-chan struct{}) error
 
 type nodeChannel interface {
 	Enroll(context.Context, contracts.NodeEnrollRequest) (contracts.NodeEnrollResponse, error)
-	Poll(ctx context.Context, epoch string, after uint64) ([]collector.Work, error)
+	Poll(ctx context.Context, epoch string, after uint64) ([]delivery.NodeWorkDelivery, error)
 	Status(ctx context.Context, epoch string, r collector.Report) error
 	UploadCapture(ctx context.Context, epoch string, r collector.PacketResult, pcapng []byte) error
 	CloseIdle()
@@ -444,7 +445,12 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 			}
 			continue
 		}
-		for _, w := range work {
+
+		for _, received := range work {
+			w := received.Work
+			if ctx.Err() != nil {
+				break
+			}
 			if w.Sequence <= after {
 				continue
 			}
@@ -462,7 +468,7 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 				if root == nil {
 					root = ctx
 				}
-				r = p.profiles.start(root, p.epoch, w)
+				r = p.profiles.start(root, p.epoch, w, received.ProfileAuthorization, received.ProfileAuthorizationUnavailable)
 			}
 			if w.Kind == collector.WorkCancelProfileCapture && p.profiles != nil {
 				r = p.profiles.stop(w)
@@ -502,6 +508,9 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 		select {
 		case kick <- struct{}{}:
 		default:
+		}
+		for _, received := range work {
+			clear(received.ProfileAuthorization)
 		}
 	}
 }

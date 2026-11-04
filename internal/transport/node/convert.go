@@ -28,7 +28,7 @@ func WireStatus(epoch string, r collector.Report) contracts.NodeStatus {
 		Mechanisms: []contracts.NodeAdapter{}, Receipts: []contracts.NodeReceipt{},
 		Budget: contracts.NodeBudget{Ceilings: WireCeilings(r.Budget.Ceilings), RingReserved: r.Budget.RingReserved, FrozenReserved: r.Budget.FrozenReserved, UploadAvailable: r.Budget.UploadAvailable}}
 	for _, m := range r.Mechanisms {
-		a := contracts.NodeAdapter{Mechanism: string(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: string(m.Adapter), Hook: string(m.Hook), Reasons: []string{}, ProfileTLS: m.ProfileTLS}
+		a := contracts.NodeAdapter{Mechanism: string(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: string(m.Adapter), Hook: string(m.Hook), Reasons: []string{}, ProfileTLS: m.ProfileTLS, ProfileAuthorization: m.ProfileAuthorization}
 		for _, reason := range m.Reasons {
 			a.Reasons = append(a.Reasons, string(reason))
 		}
@@ -102,7 +102,10 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 		return collector.Report{}, false
 	}
 	for _, m := range s.Mechanisms {
-		a := collector.Availability{Mechanism: collector.Mechanism(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: collector.Adapter(m.Adapter), Hook: collector.Hook(m.Hook), Reasons: []collector.Reason{}, ProfileTLS: m.ProfileTLS}
+		a := collector.Availability{Mechanism: collector.Mechanism(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: collector.Adapter(m.Adapter), Hook: collector.Hook(m.Hook), Reasons: []collector.Reason{}, ProfileTLS: m.ProfileTLS, ProfileAuthorization: m.ProfileAuthorization}
+		if a.ProfileAuthorization && !a.ProfileTLS {
+			return collector.Report{}, false
+		}
 		if a.ProfileTLS && (a.Mechanism != collector.MechanismProfile || !a.Prerequisites || a.Adapter != collector.AdapterAvailable) {
 			return collector.Report{}, false
 		}
@@ -212,6 +215,9 @@ func digestHex(s string) ([32]byte, bool) {
 // with a WorkUnknown receipt instead of dropping the item. A payload that is
 // not exactly a valid packet capture is kept invalid for the same answer.
 func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
+	if w.ProfileCapture != nil && (len(w.ProfileCapture.Authorization) != 0 || w.ProfileCapture.AuthorizationUnavailable) {
+		return collector.Work{}, false
+	}
 	if !text(w.ID, 36) || w.ID == "" || w.Sequence == 0 || !text(w.Kind, 32) || w.NotAfter.IsZero() {
 		return collector.Work{}, false
 	}

@@ -987,7 +987,7 @@
         "profileEndpoints": {
           "type": "array",
           "maxItems": 64,
-          "description": "ADR-285: administrator Go profile endpoint templates (kind template: addressModes and a port range that maintainers bind to a declared Pod port) and profiles (kind profile: one addressMode and port). Fixed go-pprof/v1 paths; no URL, path, header or credential. Regional executor only.",
+          "description": "ADR-285: administrator Go profile endpoint templates (kind template: addressModes and a port range that maintainers bind to a declared Pod port) and profiles (kind profile: one addressMode and port). Fixed go-pprof/v1 paths; no URL, path or header values. Optional credential specifies only public exact workload audiences. Regional executor only.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -1059,6 +1059,20 @@
                 "maxLength": 253,
                 "pattern": "^[a-z0-9.:\\[\\]-]+$"
               },
+              "credential": {
+                "type": "object", "additionalProperties": false, "required": ["audiences"],
+                "description": "ADR-302: public exact workload audiences; private values belong only in profile-authorization.json in the existing evidenceSecret.",
+                "properties": {"audiences": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {
+                  "type": "object", "additionalProperties": false,
+                  "required": ["clusterID", "namespaceUID", "workloadKind", "workloadUID"],
+                  "properties": {
+                    "clusterID": {"type": "string", "format": "uuid"},
+                    "namespaceUID": {"type": "string", "format": "uuid"},
+                    "workloadKind": {"enum": ["Deployment", "StatefulSet", "Pod"]},
+                    "workloadUID": {"type": "string", "format": "uuid"}
+                  }
+                }}}
+              },
               "tls": {
                 "type": "object",
                 "additionalProperties": false,
@@ -1071,6 +1085,7 @@
               }
             },
             "allOf": [
+              {"if": {"required": ["credential"]}, "then": {"required": ["tls"]}},
               {
                 "if": {
                   "properties": {

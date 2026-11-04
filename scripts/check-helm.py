@@ -364,6 +364,27 @@ def check_cluster(directory):
     assert pod["containers"][0]["command"][-2] == "--profile-endpoints"
     assert json.loads(pod["containers"][0]["command"][-1]) == tls_endpoints
     assert next(r for r in docs if r["kind"] == "ClusterRole")["rules"] == role["rules"]
+    # ADR-302 public audiences use the existing private evidence input bundle.
+    credential = {"audiences": [{"clusterID": "00000000-0000-4000-8000-000000000001",
+                                "namespaceUID": "00000000-0000-4000-8000-000000000002",
+                                "workloadKind": "Deployment", "workloadUID": "00000000-0000-4000-8000-000000000003"}]}
+    auth_endpoints = [{**tls_endpoints[0], "credential": credential}]
+    executor["cluster"]["profileEndpoints"] = auth_endpoints
+    auth_docs = render(executor)
+    auth_pod = next(r for r in auth_docs if r["kind"] == "Job")["spec"]["template"]["spec"]
+    assert "--profile-authorization" in auth_pod["containers"][0]["command"]
+    assert json.loads(auth_pod["containers"][0]["command"][-1]) == auth_endpoints
+    auth_secret = [p["secret"] for p in auth_pod["volumes"][0]["projected"]["sources"] if "secret" in p]
+    assert len(auth_secret) == 2
+    assert auth_secret[-1]["name"] == executor["cluster"]["evidenceSecret"]
+    assert {"key": "profile-authorization.json", "path": "profile-authorization.json"} in auth_secret[-1]["items"]
+    assert next(r for r in auth_docs if r["kind"] == "ClusterRole")["rules"] == role["rules"]
+    for bad in [{"audiences": []}, {**credential, "authorization": "must-not-be-values"},
+                {"audiences": [{**credential["audiences"][0], "workloadKind": "ReplicaSet"}]}]:
+        executor["cluster"]["profileEndpoints"] = [{**tls_endpoints[0], "credential": bad}]
+        render(executor, ok=False)
+    executor["cluster"]["profileEndpoints"] = [{**endpoints[0], "credential": credential}]
+    render(executor, ok=False)
     for invalid in [{"serverName": "localhost"}, {"rootsPEM": "PUBLIC"},
                     {**tls, "insecureSkipVerify": True}, {**tls, "credential": "not-accepted"},
                     {**tls, "rootsPEM": "x" * 8193}, {**tls, "serverName": ""}]:

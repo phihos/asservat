@@ -181,8 +181,8 @@ func TestPolicyEndpointDefinitionSharesDigestAndRefusesUnqualifiedDependencies(t
 	}
 	addEndpointCredential(&in)
 	entries[0].Definition = in.Catalog.Templates[0]
-	if _, err = ResolveProfileEndpointDefinition(entries, r); !errors.Is(err, targets.ErrUnsupported) {
-		t.Fatal("credential definition silently projected", err)
+	if credentialAnswer, credentialErr := ResolveProfileEndpointDefinition(entries, r); credentialErr != nil || credentialAnswer.Credential == nil {
+		t.Fatal("public credential definition lost", credentialErr)
 	}
 	entries[0].Definition.Credential = nil
 	a, err = ResolveProfileEndpointDefinition(entries, r)

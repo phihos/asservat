@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-302 — Named profile endpoint authorization](302-named-profile-endpoint-authorization.md)
+adds public exact workload audiences and a separate fixed private file in the
+existing connector bundle, with transient authenticated poll delivery. Private
+implementation preparation; installed qualification pending.
+
 [ADR-299 — Named Go endpoint TLS](299-named-go-endpoint-tls.md)
 adds bounded explicit public roots over the existing target-netns socket, stable
 manual/policy trust metadata and connector-first capability rollout. Private

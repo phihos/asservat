@@ -15,7 +15,8 @@ download/local parsing and history/settings/Repeat at59812214; PR162 merged as
 3cc76be0 with the identical complete tree. Accepted-heavy comparisons passed at
 c6 with measured worker memory/CPU containment for that one input shape.
 
-These are named Linux/amd64 reference workflows. TLS/authenticated endpoints,
+These are named Linux/amd64 reference workflows. Named TLS CPU endpoints passed the original-app native/summary/Repeat and
+wrong-peer journey at abf25590 (installed41916430295); endpoint authorization,
 all-maxima analyzer qualification and broader S-05 remain open. See
 [the current evidence](../implementation-progress.md)
 for originals and limits. The initial mechanism and staged-test boundaries below
@@ -266,7 +267,7 @@ regional dispatch and node receipt check its digest/name against the admitted
 public definition. The node uses `tls.Client` over the existing gadget socket,
 explicit roots, HTTP/1.1 and the original operation deadline. TLS does not add a
 second dial, DNS, proxy, fallback or new credential channel. Authentication is
-still refused. The 8 KiB per-bundle, 64 KiB aggregate endpoint configuration and
+separately introduced by ADR-302; ADR-299 alone still refuses it. The 8 KiB per-bundle, 64 KiB aggregate endpoint configuration and
 256 KiB/16-item node poll bounds are unchanged or explicitly bounded, rather than
 increased to fit the new data.
 
@@ -375,3 +376,26 @@ The subsequent fresh preview passed without collecting another profile. The
 successful logs contain no detailed owner/demand phase markers; exact phase
 ordering/count evidence remains source inspection and synthetic tests. No
 installed heap browser click or maximum-shape resource claim follows.
+
+### Named endpoint authorization (ADR-302)
+
+Public `credential.audiences` names exact independently resolved workload roots;
+its policy source reuses the protected endpoint identity and public definition
+digest. Private material is absent from that digest. Recurring definition exchange
+carries public policy/audiences only and reconstructs exactly the same manual
+approval definition. It never carries header bytes.
+
+The regional installer validates a separate bounded private map against precisely
+the configured credentialed names and projects its fixed file from the existing
+immutable RegionalEvidence Secret. Existing input UID/resource-version checks
+cover it with zero extra API reads or Secret readers; no separate credential cache
+or refresh service exists. A reader validates public expected sources and loads the private map once at
+startup, then returns selected cloned bytes. It never rereads a replacement
+projection: rotation requires the existing guarded reinstall/restart. The held admitted-work owner
+checks exact node/work/epoch/original cutoff and workload audience before invoking
+the reader, then rechecks after blocking work. Only a receive-only transient poll
+envelope carries selected bytes; public collector.Work and pending queues remain
+credential-free. Node TLS verification precedes the fixed Authorization header.
+The original TLS/acquisition deadline is unchanged. Disabling removes the public
+credential configuration and private entry through the existing guarded restart;
+no separate rotation lifecycle or fallback is introduced.

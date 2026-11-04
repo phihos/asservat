@@ -15,20 +15,21 @@ import (
 // the connector from its protected configuration and the exact Pod; the node
 // still binds the local network namespace before connecting.
 type ProfileCapture struct {
-	CaptureID         string
-	ExpectationDigest artifact.Digest
-	DefinitionDigest  artifact.Digest
-	CollectorEpoch    string
-	Request           execution.GoProfileRequest
-	AddressMode       string
-	Address           netip.Addr
-	Port              uint16
-	Host              string
-	TLS               execution.GoProfileTLSMaterial
+	CaptureID             string
+	ExpectationDigest     artifact.Digest
+	DefinitionDigest      artifact.Digest
+	CollectorEpoch        string
+	Request               execution.GoProfileRequest
+	AddressMode           string
+	Address               netip.Addr
+	Port                  uint16
+	Host                  string
+	TLS                   execution.GoProfileTLSMaterial
+	AuthorizationRequired bool `json:",omitempty"`
 }
 
 func (p ProfileCapture) Valid() bool {
-	if !p.TLS.IsZero() && !p.TLS.Valid() {
+	if p.AuthorizationRequired && p.TLS.IsZero() || !p.TLS.IsZero() && !p.TLS.Valid() {
 		return false
 	}
 	if !authorization.UUID(p.CaptureID) || !authorization.UUID(p.CollectorEpoch) || p.ExpectationDigest == (artifact.Digest{}) || p.DefinitionDigest == (artifact.Digest{}) || p.Request.Validate(p.Request.NotBefore) != nil || p.Port == 0 || len(p.Host) == 0 || len(p.Host) > 253 || strings.ContainsAny(p.Host, "/\\?#@%\r\n\t ") || !p.Address.IsValid() || p.Address.Zone() != "" || p.Address.Is4In6() {

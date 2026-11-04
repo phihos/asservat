@@ -74,6 +74,8 @@ type RegionalInstallPlan struct {
 	// entries (ADR-285); only an executor uses them. They add no RBAC: the
 	// executor already reads the target Pod.
 	ProfileEndpoints []contracts.RegionalProfileEndpoint
+	// ProfileAuthorization is private material in the existing connector bundle.
+	ProfileAuthorization []byte
 	// Collector, when set, provisions the connector's ADR-246 node listener
 	// for the chart's collector DaemonSet in that (existing) namespace.
 	Collector *RegionalCollectorPlan
@@ -101,7 +103,7 @@ func (p RegionalInstallPlan) valid() bool {
 // executor offer, and a digest-pinned image for the executor's pins.
 func (p RegionalInstallPlan) executorValid() bool {
 	executor, err := p.Offer.RegionalExecutorOffered()
-	if err != nil || executor != (len(p.Evidence) > 0) || executor != (len(p.History) > 0) || p.Alertmanager != "" && (!executor || !AlertmanagerURL(p.Alertmanager)) || len(p.IdentityMappings) > 0 && (!executor || !IdentityMappingsValid(p.IdentityMappings)) || len(p.ProfileEndpoints) > 0 && (!executor || !ProfileEndpointsValid(p.ProfileEndpoints)) {
+	if err != nil || !ProfileAuthorizationValid(p.ProfileEndpoints, p.ProfileAuthorization) || executor != (len(p.Evidence) > 0) || executor != (len(p.History) > 0) || p.Alertmanager != "" && (!executor || !AlertmanagerURL(p.Alertmanager)) || len(p.IdentityMappings) > 0 && (!executor || !IdentityMappingsValid(p.IdentityMappings)) || len(p.ProfileEndpoints) > 0 && (!executor || !ProfileEndpointsValid(p.ProfileEndpoints)) {
 		return false
 	}
 	if !executor {
@@ -263,7 +265,7 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 		collector, out.Nodes = &c, &nodes
 	}
 	step = "deployment"
-	deployment, err := ensureRegional(call, api.AppsV1().Deployments(p.Namespace), RegionalWorkload(p.Offer, executor, collector != nil), marker)
+	deployment, err := ensureRegional(call, api.AppsV1().Deployments(p.Namespace), RegionalWorkload(p.Offer, executor, collector != nil, len(p.ProfileAuthorization) > 0), marker)
 	if err != nil {
 		return out, err
 	}
@@ -350,7 +352,11 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 	out.Secret = ref(secret.ObjectMeta)
 	if executor {
 		step = "evidence"
-		evidence, err := ensureRegional(call, api.CoreV1().Secrets(p.Namespace), &core.Secret{ObjectMeta: meta.ObjectMeta{Name: RegionalEvidence}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true), Data: map[string][]byte{"evidence-storage.json": p.Evidence, contracts.RegionalHistoryCredentialFile: p.History}}, marker)
+		privateInputs := map[string][]byte{"evidence-storage.json": p.Evidence, contracts.RegionalHistoryCredentialFile: p.History}
+		if len(p.ProfileAuthorization) > 0 {
+			privateInputs[contracts.RegionalProfileAuthorizationFile] = p.ProfileAuthorization
+		}
+		evidence, err := ensureRegional(call, api.CoreV1().Secrets(p.Namespace), &core.Secret{ObjectMeta: meta.ObjectMeta{Name: RegionalEvidence}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true), Data: privateInputs}, marker)
 		if err != nil {
 			return out, err
 		}
@@ -534,7 +540,7 @@ func regionalAPIRoots(ctx context.Context, api kubernetes.Interface, namespace s
 // security. It mounts no Secret; the credential is read through the API. The
 // executor mounts its evidence credential, a collector connector its node
 // listener's server certificate and key.
-func RegionalWorkload(o contracts.RegionalOffer, executor, collector bool) *apps.Deployment {
+func RegionalWorkload(o contracts.RegionalOffer, executor, collector bool, profileAuthorization ...bool) *apps.Deployment {
 	labels := map[string]string{"app.kubernetes.io/name": "asservat-connector"}
 	projection := []core.VolumeProjection{
 		{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: RegionalInputs}, Items: []core.KeyToPath{{Key: "regional.json", Path: "regional.json"}}, Optional: ptr.To(false)}},
@@ -545,6 +551,9 @@ func RegionalWorkload(o contracts.RegionalOffer, executor, collector bool) *apps
 	if executor {
 		// The executor's write-only evidence credential (ADR-196 decision 7).
 		projection = append(projection, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: RegionalEvidence}, Items: []core.KeyToPath{{Key: "evidence-storage.json", Path: "evidence-storage.json"}, {Key: contracts.RegionalHistoryCredentialFile, Path: contracts.RegionalHistoryCredentialFile}}, Optional: ptr.To(false)}})
+	}
+	if executor && len(profileAuthorization) > 0 && profileAuthorization[0] {
+		projection = append(projection, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: RegionalEvidence}, Items: []core.KeyToPath{{Key: contracts.RegionalProfileAuthorizationFile, Path: contracts.RegionalProfileAuthorizationFile}}, Optional: ptr.To(false)}})
 	}
 	if collector {
 		projection = append(projection, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: RegionalNodes},

@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"time"
 
+	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"
 )
@@ -105,19 +106,30 @@ func (c *Client) Enroll(ctx context.Context, r contracts.NodeEnrollRequest) (con
 	return out, nil
 }
 
-func (c *Client) Poll(ctx context.Context, epoch string, after uint64) ([]collector.Work, error) {
+func (c *Client) Poll(ctx context.Context, epoch string, after uint64) ([]delivery.NodeWorkDelivery, error) {
 	b, code, err := c.post(ctx, contracts.NodePollPath, collector.PollHold+15*time.Second, contracts.NodePollRequest{Format: contracts.NodePollFormat, Epoch: epoch, After: after})
 	if err != nil {
 		return nil, err
 	}
+	defer clear(b)
 	out, err := contracts.DecodeNodePollResponse(bytesReader(b))
 	if code != http.StatusOK || err != nil || out.Format != contracts.NodePollFormat || len(out.Work) > collector.MaxWorkPerPoll {
 		return nil, ErrUnavailable
 	}
-	work := make([]collector.Work, 0, len(out.Work))
+	defer func() {
+		for _, item := range out.Work {
+			if item.ProfileCapture != nil {
+				clear(item.ProfileCapture.Authorization)
+			}
+		}
+	}()
+	work := make([]delivery.NodeWorkDelivery, 0, len(out.Work))
 	for _, w := range out.Work {
-		item, ok := DomainWork(w)
+		item, ok := ReceivedWork(w)
 		if !ok {
+			for _, prior := range work {
+				clear(prior.ProfileAuthorization)
+			}
 			return nil, ErrUnavailable
 		}
 		work = append(work, item)

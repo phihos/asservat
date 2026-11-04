@@ -57,6 +57,7 @@ func write(w http.ResponseWriter, v any) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
+	defer clear(b)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
@@ -126,9 +127,36 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(status(err))
 			return
 		}
-		out := contracts.NodePollResponse{Format: contracts.NodePollFormat, Work: []contracts.NodeWork{}}
-		for _, item := range work {
-			out.Work = append(out.Work, WireWork(item))
+		out := pollPrefix(work)
+		if len(work) > 0 && len(out.Work) == 0 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		defer func() {
+			for _, item := range out.Work {
+				if item.ProfileCapture != nil {
+					clear(item.ProfileCapture.Authorization)
+				}
+			}
+		}()
+		for i := range out.Work {
+			if profile := out.Work[i].ProfileCapture; profile != nil && profile.AuthorizationRequired {
+				clear(profile.Authorization)
+				profile.Authorization, err = h.channel.ProfileAuthorization(ctx, p, req.Epoch, work[i])
+				if err != nil {
+					if ctx.Err() != nil || errors.Is(err, delivery.ErrNodeUnauthenticated) {
+						w.WriteHeader(status(err))
+						return
+					}
+					clear(profile.Authorization)
+					profile.Authorization = nil
+					profile.AuthorizationUnavailable = true
+				}
+			}
+		}
+		if ctx.Err() != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
 		}
 		write(w, out)
 	case contracts.NodeStatusPath:

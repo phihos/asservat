@@ -35,9 +35,21 @@ func burnCPU() {
 func main() {
 	var heavy *acceptedHeavy
 	var servingTLS *tls.Config
+	authorization := &profileWorkloadAuthorization{}
 	if len(os.Args) > 1 && os.Args[1] == "--tls" {
 		var err error
-		servingTLS, err = profileWorkloadTLS(os.Args[1:])
+		args := os.Args[1:]
+		if len(args) != 3 && len(args) != 5 {
+			log.Fatal("invalid synthetic profile TLS arguments")
+		}
+		if len(args) == 5 {
+			authorization, err = readProfileWorkloadAuthorization(args)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer clear(authorization.value)
+		}
+		servingTLS, err = profileWorkloadTLS(args[:3])
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -84,7 +96,7 @@ func main() {
 	})
 	workload := http.NewServeMux()
 	if servingTLS == nil {
-		workload.Handle("/", profiles)
+		workload.Handle("/", authorization.guard(profiles))
 	}
 	workload.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("synthetic profile workload\n")) })
 	// Test-owner controls exist only in this synthetic workload, on its existing
@@ -144,7 +156,9 @@ func main() {
 			OwnerRunning    bool  `json:"owner_running"`
 			RuntimeBusy     bool  `json:"runtime_busy"`
 			ProfileRequests int64 `json:"profile_requests"`
-		}{ownerRunning, busy, requests.Load()})
+			AuthRequests    int64 `json:"auth_requests"`
+			AuthDenied      int64 `json:"auth_denied"`
+		}{ownerRunning, busy, requests.Load(), authorization.requests.Load(), authorization.denied.Load()})
 	})
 	redirect := http.NewServeMux()
 	redirect.HandleFunc("/debug/pprof/profile", func(w http.ResponseWriter, r *http.Request) {
@@ -164,13 +178,13 @@ func main() {
 		_, _ = io.CopyN(w, zeroReader{}, size-int64(len(header)))
 	})
 	go func() {
-		log.Fatal((&http.Server{Addr: "127.0.0.1:6071", Handler: large, ReadHeaderTimeout: 5 * time.Second}).ListenAndServe())
+		log.Fatal((&http.Server{Addr: "127.0.0.1:6071", Handler: authorization.guard(large), ReadHeaderTimeout: 5 * time.Second}).ListenAndServe())
 	}()
 	go func() {
-		log.Fatal((&http.Server{Addr: "127.0.0.1:6070", Handler: redirect, ReadHeaderTimeout: 5 * time.Second}).ListenAndServe())
+		log.Fatal((&http.Server{Addr: "127.0.0.1:6070", Handler: authorization.guard(redirect), ReadHeaderTimeout: 5 * time.Second}).ListenAndServe())
 	}()
 	go func() {
-		server := &http.Server{Addr: "127.0.0.1:6060", Handler: profiles, ReadHeaderTimeout: 5 * time.Second, TLSConfig: servingTLS}
+		server := &http.Server{Addr: "127.0.0.1:6060", Handler: authorization.guard(profiles), ReadHeaderTimeout: 5 * time.Second, TLSConfig: servingTLS}
 		if servingTLS != nil {
 			log.Fatal(server.ListenAndServeTLS("", ""))
 		}
@@ -284,4 +298,55 @@ func profileWorkloadTLS(args []string) (*tls.Config, error) {
 		return nil, err
 	}
 	return &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}}, nil
+}
+
+// This private test-only value is loaded once. Neither errors nor fixture state
+// expose its bytes; HTTP authorization precedes every synthetic pprof handler.
+type profileWorkloadAuthorization struct {
+	value            []byte
+	requests, denied atomic.Int64
+}
+
+func readProfileWorkloadAuthorization(args []string) (*profileWorkloadAuthorization, error) {
+	refuse := func() (*profileWorkloadAuthorization, error) {
+		return nil, fmt.Errorf("invalid synthetic profile authorization input")
+	}
+	if len(args) != 5 || args[0] != "--tls" || args[3] != "--authorization" || args[4] == "" {
+		return refuse()
+	}
+	file, err := os.Open(args[4])
+	if err != nil {
+		return refuse()
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > 4096 {
+		return refuse()
+	}
+	value, err := io.ReadAll(io.LimitReader(file, 4097))
+	valid := err == nil && len(value) > 0 && len(value) <= 4096
+	for _, b := range value {
+		valid = valid && b >= 32 && b <= 126
+	}
+	if !valid {
+		clear(value)
+		return refuse()
+	}
+	return &profileWorkloadAuthorization{value: value}, nil
+}
+
+func (a *profileWorkloadAuthorization) guard(next http.Handler) http.Handler {
+	if len(a.value) == 0 {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a.requests.Add(1)
+		values := r.Header.Values("Authorization")
+		if r.TLS == nil || len(values) != 1 || values[0] != string(a.value) {
+			a.denied.Add(1)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

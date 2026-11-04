@@ -12,6 +12,8 @@
 {{- if and (not $executor) (ne ($c.alertmanager | default "") "") }}{{ fail "cluster.alertmanager requires an offer naming the regional executor" }}{{ end }}
 {{- if and (not $executor) ($c.identityMappings | default list) }}{{ fail "cluster.identityMappings requires an offer naming the regional executor" }}{{ end }}
 {{- if and (not $executor) ($c.profileEndpoints | default list) }}{{ fail "cluster.profileEndpoints requires an offer naming the regional executor" }}{{ end }}
+{{- $profileAuth := false }}
+{{- range $c.profileEndpoints }}{{- if .credential }}{{- $profileAuth = true }}{{- end }}{{- end }}
 {{- $name := printf "%s-cluster-installer" .Release.Name }}
 {{- $role := printf "%s-%s" .Release.Namespace $name }}
 # The release-scoped installer account: the connector guards' explicit trusted
@@ -190,7 +192,7 @@ spec:
         - name: installer
           image: {{ $c.image }}
           imagePullPolicy: IfNotPresent
-          command: [/asservat, installer-cluster, --in-cluster, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json, --namespace, {{ $c.namespace }}{{ if $executor }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json, --history-credential, /run/asservat/cluster/history-storage.json{{ end }}{{ if $c.alertmanager }}, --alertmanager, {{ $c.alertmanager | quote }}{{ end }}{{ if $c.identityMappings }}, --identity-mappings, {{ $c.identityMappings | toJson | quote }}{{ end }}{{ if $c.profileEndpoints }}, --profile-endpoints, {{ $c.profileEndpoints | toJson | quote }}{{ end }}{{ if .Values.collector.enabled }}, --collector-namespace, {{ .Values.collector.namespace }}, --collector-name, {{ printf "%s-node" .Release.Name }}{{ end }}]
+          command: [/asservat, installer-cluster, --in-cluster, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json, --namespace, {{ $c.namespace }}{{ if $executor }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json, --history-credential, /run/asservat/cluster/history-storage.json{{ end }}{{ if $c.alertmanager }}, --alertmanager, {{ $c.alertmanager | quote }}{{ end }}{{ if $c.identityMappings }}, --identity-mappings, {{ $c.identityMappings | toJson | quote }}{{ end }}{{ if $profileAuth }}, --profile-authorization, /run/asservat/cluster/profile-authorization.json{{ end }}{{ if $c.profileEndpoints }}, --profile-endpoints, {{ $c.profileEndpoints | toJson | quote }}{{ end }}{{ if .Values.collector.enabled }}, --collector-namespace, {{ .Values.collector.namespace }}, --collector-name, {{ printf "%s-node" .Release.Name }}{{ end }}]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -217,6 +219,6 @@ spec:
               {{- if $executor }}
               - secret:
                   name: {{ $c.evidenceSecret }}
-                  items: [{key: evidence-storage.json, path: evidence-storage.json}, {key: history-storage.json, path: history-storage.json}]
+                  items: [{key: evidence-storage.json, path: evidence-storage.json}, {key: history-storage.json, path: history-storage.json}{{ if $profileAuth }}, {key: profile-authorization.json, path: profile-authorization.json}{{ end }}]
               {{- end }}
 {{- end }}

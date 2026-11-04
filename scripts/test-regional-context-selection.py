@@ -21,6 +21,39 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_profile_auth_alias_is_closed_and_preserves_existing_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fake=Path(directory)/"python3"
+            fake.write_text('#!/usr/bin/python3\nimport json,os,sys\nprint(json.dumps({"args":sys.argv[1:],"focus":os.environ.get("ASSERVAT_JOURNEY_FOCUS"),"variant":os.environ.get("ASSERVAT_PROFILE_VARIANT"),"transport":os.environ.get("ASSERVAT_PROFILE_TRANSPORT"),"auth":os.environ.get("ASSERVAT_PROFILE_AUTH")}))\n')
+            fake.chmod(0o755)
+            env=dict(os.environ,PATH=directory+os.pathsep+os.environ["PATH"],ASSERVAT_PROFILE_VARIANT="heap",ASSERVAT_PROFILE_TRANSPORT="http",ASSERVAT_PROFILE_AUTH="typo")
+            result=subprocess.run([str(Path(__file__).with_name("ci-native.sh")),"continuation-manual-profile-auth"],env=env,capture_output=True,text=True,check=True)
+            selected=json.loads(result.stdout)
+            self.assertEqual(selected,{"args":["scripts/test-context-storage.py","--initial-bootstrap-chain","--runtime-provider-pair","--installer-continuation"],"focus":"manual-profile","variant":"cpu","transport":"tls","auth":"required"})
+            for suite in ("continuation-manual-profile","continuation-manual-profile-tls","continuation-manual-heap","continuation-manual-trace","continuation-profile-comparison","continuation-profile-comparison-heavy"):
+                with self.subTest(suite=suite):
+                    current=subprocess.run([str(Path(__file__).with_name("ci-native.sh")),suite],env=env,capture_output=True,text=True,check=True)
+                    self.assertEqual(json.loads(current.stdout)["auth"],"none")
+        for base in ({},{"ASSERVAT_PROFILE_AUTH":""},{"ASSERVAT_PROFILE_AUTH":"none"}):
+            self.assertEqual(fixture.qualification_profile_auth(base),"none")
+        accepted={"ASSERVAT_JOURNEY_FOCUS":"manual-profile","ASSERVAT_PROFILE_VARIANT":"cpu","ASSERVAT_PROFILE_TRANSPORT":"tls","ASSERVAT_PROFILE_AUTH":"required"}
+        self.assertEqual(fixture.qualification_profile_auth(accepted),"required")
+        invalid=[dict(accepted,ASSERVAT_PROFILE_AUTH="typo"),dict(accepted,ASSERVAT_PROFILE_TRANSPORT="http"),dict(accepted,ASSERVAT_PROFILE_VARIANT="heap"),dict(accepted,ASSERVAT_PROFILE_VARIANT="trace"),dict(accepted,ASSERVAT_JOURNEY_FOCUS="profile-comparison"),{"ASSERVAT_PROFILE_AUTH":"required"}]
+        for base in invalid:
+            with self.subTest(base=base):
+                with self.assertRaisesRegex(ValueError,"auth"):
+                    fixture.qualification_profile_auth(base)
+        for base in (dict(accepted,ASSERVAT_PROFILE_AUTH="typo"),dict(accepted,ASSERVAT_PROFILE_TRANSPORT="http")):
+            with self.subTest(base=base),patch.dict(os.environ,base,clear=True),patch.object(fixture,"run",side_effect=AssertionError("external setup")) as external:
+                with self.assertRaisesRegex(ValueError,"auth"):
+                    fixture.main(installer_continuation=True)
+                external.assert_not_called()
+        with patch.dict(os.environ,accepted,clear=True):
+            self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True),"18m")
+            self.assertEqual(fixture.qualification_cluster_count(3,installer_continuation=True),2)
+        workflow=(Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
+        self.assertIn("matrix.suite != 'continuation-manual-profile-auth'",workflow)
+
     def test_tls_transport_alias_is_closed_and_keeps_cpu_limits(self):
         with tempfile.TemporaryDirectory() as directory:
             fake=Path(directory)/"python3"

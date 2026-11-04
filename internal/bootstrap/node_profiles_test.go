@@ -41,7 +41,7 @@ func TestNodeProfilePreservesKnownUnavailableAndBusyWithoutRetry(t *testing.T) {
 			calls, uploads := 0, 0
 			var result collector.ProfileResult
 			n := &nodeProfiles{identity: func() collector.Identity { return q.node }, now: func() time.Time { return now }, budget: func() *collector.Budget { return budget }, budgetMu: &mu,
-				acquire: func(context.Context, collector.ProfileCapture, io.Writer) (execution.GoProfileOutcome, error) {
+				acquire: func(context.Context, collector.ProfileCapture, []byte, io.Writer) (execution.GoProfileOutcome, error) {
 					calls++
 					return execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: now, MayHaveStarted: true}, tc.failure
 				},
@@ -54,7 +54,7 @@ func TestNodeProfilePreservesKnownUnavailableAndBusyWithoutRetry(t *testing.T) {
 					}
 					return nil
 				}}
-			if r := n.start(t.Context(), q.node.Epoch, w); r.Outcome != collector.OutcomeAccepted {
+			if r := n.start(t.Context(), q.node.Epoch, w, nil, false); r.Outcome != collector.OutcomeAccepted {
 				t.Fatal(r)
 			}
 			n.wg.Wait()
@@ -68,7 +68,7 @@ func TestNodeProfilePreservesKnownUnavailableAndBusyWithoutRetry(t *testing.T) {
 			if !held.uncertainUntil.Equal(p.Request.Deadline) || usage.FrozenReserved != 0 {
 				t.Fatal("refusal changed original uncertain lifetime or leaked joined memory", held, usage)
 			}
-			if r := n.start(t.Context(), q.node.Epoch, w); r.Outcome == collector.OutcomeAccepted {
+			if r := n.start(t.Context(), q.node.Epoch, w, nil, false); r.Outcome == collector.OutcomeAccepted {
 				t.Fatal("refused acquisition replayed")
 			}
 			n.wg.Wait()
@@ -94,7 +94,7 @@ func TestNodeProfileOwnsBudgetAndRejectsReplay(t *testing.T) {
 	n := &nodeProfiles{identity: func() collector.Identity {
 		return collector.Identity{NodeUID: id, NodeName: "node", BootID: id, Epoch: id}
 	}, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu,
-		acquire: func(ctx context.Context, p collector.ProfileCapture, w io.Writer) (execution.GoProfileOutcome, error) {
+		acquire: func(ctx context.Context, p collector.ProfileCapture, _ []byte, w io.Writer) (execution.GoProfileOutcome, error) {
 			close(entered)
 			<-release
 			_, err := w.Write([]byte("native"))
@@ -108,11 +108,11 @@ func TestNodeProfileOwnsBudgetAndRejectsReplay(t *testing.T) {
 			uploaded <- b
 			return err
 		}}
-	if got := n.start(context.Background(), id, work); got.Outcome != collector.OutcomeAccepted {
+	if got := n.start(context.Background(), id, work, nil, false); got.Outcome != collector.OutcomeAccepted {
 		t.Fatal(got)
 	}
 	<-entered
-	if got := n.start(context.Background(), id, work); got.Outcome == collector.OutcomeAccepted {
+	if got := n.start(context.Background(), id, work, nil, false); got.Outcome == collector.OutcomeAccepted {
 		t.Fatal("replay acquired")
 	}
 	mu.Lock()
@@ -132,7 +132,7 @@ func TestNodeProfileOwnsBudgetAndRejectsReplay(t *testing.T) {
 	if held != 0 {
 		t.Fatal("joined buffer leaked", held)
 	}
-	if got := n.start(context.Background(), id, work); got.Outcome == collector.OutcomeAccepted {
+	if got := n.start(context.Background(), id, work, nil, false); got.Outcome == collector.OutcomeAccepted {
 		t.Fatal("completed acquisition replayed")
 	}
 }
@@ -149,7 +149,7 @@ func TestNodeProfileCancelKeepsUncertainRuntimeSlotUntilOriginalDeadline(t *test
 	var mu sync.Mutex
 	entered := make(chan struct{})
 	n := &nodeProfiles{identity: func() collector.Identity { return q.node }, now: func() time.Time { return now }, budget: func() *collector.Budget { return budget }, budgetMu: &mu,
-		acquire: func(ctx context.Context, _ collector.ProfileCapture, _ io.Writer) (execution.GoProfileOutcome, error) {
+		acquire: func(ctx context.Context, _ collector.ProfileCapture, _ []byte, _ io.Writer) (execution.GoProfileOutcome, error) {
 			close(entered)
 			<-ctx.Done()
 			return execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: now, MayHaveStarted: true}, ctx.Err()
@@ -160,7 +160,7 @@ func TestNodeProfileCancelKeepsUncertainRuntimeSlotUntilOriginalDeadline(t *test
 			}
 			return nil
 		}}
-	if r := n.start(context.Background(), q.node.Epoch, w); r.Outcome != collector.OutcomeAccepted {
+	if r := n.start(context.Background(), q.node.Epoch, w, nil, false); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	<-entered
@@ -180,7 +180,7 @@ func TestNodeProfileCancelKeepsUncertainRuntimeSlotUntilOriginalDeadline(t *test
 	second.CaptureID = "33333333-3333-4333-8333-333333333333"
 	w.Profile = &second
 	w.ID = second.CaptureID
-	if r := n.start(context.Background(), q.node.Epoch, w); r.Reason != collector.ReasonCaptureBusy {
+	if r := n.start(context.Background(), q.node.Epoch, w, nil, false); r.Reason != collector.ReasonCaptureBusy {
 		t.Fatal("uncertain runtime was reused", r)
 	}
 	n.wg.Wait()
@@ -200,7 +200,7 @@ func TestNodeProfileStopCancelsBlockedUploadAndJoinsBeforeRelease(t *testing.T) 
 	defer end()
 	defer close(join)
 	n := &nodeProfiles{identity: func() collector.Identity { return q.node }, now: time.Now, budget: func() *collector.Budget { return budget }, budgetMu: &mu,
-		acquire: func(ctx context.Context, _ collector.ProfileCapture, out io.Writer) (execution.GoProfileOutcome, error) {
+		acquire: func(ctx context.Context, _ collector.ProfileCapture, _ []byte, out io.Writer) (execution.GoProfileOutcome, error) {
 			_, err := out.Write([]byte("native"))
 			return execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: time.Now().UTC(), MayHaveStarted: true, ResponseComplete: err == nil, NativeBytes: 6}, err
 		},
@@ -211,7 +211,7 @@ func TestNodeProfileStopCancelsBlockedUploadAndJoinsBeforeRelease(t *testing.T) 
 			<-join
 			return ctx.Err()
 		}}
-	if r := n.start(parent, q.node.Epoch, w); r.Outcome != collector.OutcomeAccepted {
+	if r := n.start(parent, q.node.Epoch, w, nil, false); r.Outcome != collector.OutcomeAccepted {
 		t.Fatal(r)
 	}
 	<-entered

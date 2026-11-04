@@ -224,3 +224,112 @@ func TestProfileTLSFixtureRequiresExactFilesAndVerifiedPeer(t *testing.T) {
 		t.Fatal("unbounded TLS file accepted")
 	}
 }
+
+func TestProfileAuthorizationFixtureLoadsBoundedPrivateValueOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "authorization")
+	for _, value := range [][]byte{nil, []byte("Bearer private\n"), []byte("bad\tvalue"), {127}, {128}, []byte(strings.Repeat("x", 4097))} {
+		if err := os.WriteFile(path, value, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := readProfileWorkloadAuthorization([]string{"--tls", "cert", "key", "--authorization", path}); err == nil || got != nil {
+			t.Fatal("invalid private file accepted")
+		}
+	}
+	for _, value := range []string{"Bearer synthetic-private", strings.Repeat("x", 4096)} {
+		if err := os.WriteFile(path, []byte(value), 0600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := readProfileWorkloadAuthorization([]string{"--tls", "cert", "key", "--authorization", path})
+		if err != nil || string(got.value) != value {
+			t.Fatal("valid bounded authorization refused")
+		}
+		if err := os.WriteFile(path, []byte("replaced"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if string(got.value) != value {
+			t.Fatal("private value changed after file replacement")
+		}
+		clear(got.value)
+	}
+	for _, args := range [][]string{nil, {"--authorization", path}, {"--tls", "cert", "key"}, {"--tls", "cert", "key", "other", path}, {"--tls", "cert", "key", "--authorization", ""}, {"--tls", "cert", "key", "--authorization", path, "extra"}, {"--accepted-heavy", "cert", "key", "--authorization", path}, {"--tls", "cert", "key", "--authorization", path + "missing"}, {"--tls", "cert", "key", "--authorization", filepath.Dir(path)}} {
+		if got, err := readProfileWorkloadAuthorization(args); err == nil || got != nil {
+			t.Fatal("invalid auth mode accepted")
+		}
+	}
+}
+
+func TestProfileAuthorizationFixtureGuardsEveryProfileBeforeHandler(t *testing.T) {
+	const secret = "Bearer synthetic-private-value"
+	auth := &profileWorkloadAuthorization{value: []byte(secret)}
+	var handled atomic.Int32
+	guarded := auth.guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handled.Add(1)
+		_, _ = io.WriteString(w, "native fixture response")
+	}))
+	plain := httptest.NewServer(guarded)
+	defer plain.Close()
+	secure := httptest.NewTLSServer(guarded)
+	defer secure.Close()
+	for _, path := range []string{"/debug/pprof/", "/debug/pprof/profile", "/debug/pprof/heap", "/debug/pprof/trace", "/debug/pprof/goroutine"} {
+		for _, mode := range []string{"plaintext", "missing", "wrong", "duplicate", "current"} {
+			client, address := secure.Client(), secure.URL
+			if mode == "plaintext" {
+				client, address = plain.Client(), plain.URL
+			}
+			request, err := http.NewRequest(http.MethodGet, address+path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode != "missing" {
+				request.Header.Set("Authorization", secret)
+			}
+			if mode == "wrong" {
+				request.Header.Set("Authorization", secret+"-wrong")
+			}
+			if mode == "duplicate" {
+				request.Header.Add("Authorization", secret)
+			}
+			before := handled.Load()
+			response, err := client.Do(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := io.ReadAll(response.Body)
+			response.Body.Close()
+			if err != nil || strings.Contains(string(raw), secret) {
+				t.Fatal("private authorization in fixture response")
+			}
+			if mode == "current" {
+				if response.StatusCode != http.StatusOK || handled.Load() != before+1 || string(raw) != "native fixture response" {
+					t.Fatal("authorized TLS request did not reach handler")
+				}
+			} else if response.StatusCode != http.StatusUnauthorized || handled.Load() != before || len(raw) != 0 {
+				t.Fatal("refused request reached profile handler", path, mode)
+			}
+		}
+	}
+	if auth.requests.Load() != 25 || auth.denied.Load() != 20 || handled.Load() != 5 {
+		t.Fatal("fixture auth counters inconsistent", auth.requests.Load(), auth.denied.Load(), handled.Load())
+	}
+	// TLS rejection occurs before HTTP and therefore before the auth counters.
+	before := auth.requests.Load()
+	transport := secure.Client().Transport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{RootCAs: x509.NewCertPool(), ServerName: "wrong.fixture.invalid", MinVersion: tls.VersionTLS12}
+	defer transport.CloseIdleConnections()
+	request, _ := http.NewRequest(http.MethodGet, secure.URL+"/debug/pprof/profile", nil)
+	request.Header.Set("Authorization", secret)
+	if response, err := (&http.Client{Transport: transport, Timeout: time.Second}).Do(request); err == nil {
+		response.Body.Close()
+		t.Fatal("untrusted TLS peer reached HTTP")
+	}
+	if auth.requests.Load() != before {
+		t.Fatal("failed TLS handshake reached authorization guard")
+	}
+	// Legacy plain mode remains unguarded and records no auth attempts.
+	legacy := &profileWorkloadAuthorization{}
+	reply := httptest.NewRecorder()
+	legacy.guard(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })).ServeHTTP(reply, httptest.NewRequest(http.MethodGet, "/debug/pprof/heap", nil))
+	if reply.Code != http.StatusNoContent || legacy.requests.Load() != 0 || legacy.denied.Load() != 0 {
+		t.Fatal("legacy plain fixture behavior changed")
+	}
+}

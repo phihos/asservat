@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"asservat.local/asservat/internal/adapters/gadget"
+	"asservat.local/asservat/internal/application/delivery"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/transport/node"
 	"context"
@@ -21,10 +22,10 @@ type replayNodeChannel struct {
 	resets int
 }
 
-func (c *replayNodeChannel) Poll(_ context.Context, _ string, after uint64) ([]collector.Work, error) {
+func (c *replayNodeChannel) Poll(_ context.Context, _ string, after uint64) ([]delivery.NodeWorkDelivery, error) {
 	if after == 0 {
 		c.resets++
-		return []collector.Work{c.work}, nil
+		return []delivery.NodeWorkDelivery{{Work: c.work}}, nil
 	}
 	return nil, node.ErrUnauthenticated
 }

@@ -1031,6 +1031,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal("manual profile refusal SQL evidence is unavailable")
 		}
 		if installedTLSProfileTransport() {
+			if installedProfileAuthorization() {
+				qualifyManualProfileAuthorization(t, ctx, region, namespace, preview.Pods[0].Name, preview.Pods[0].UID, regionalConfig, cluster, workload, native, []any{preview, progress, evidence}, invoke)
+			}
 			qualifyManualProfileTLSWrongPeer(t, ctx, region, namespace, preview.Pods[0].Name, preview.Pods[0].UID, regionalConfig, cluster, workload, read, readContext, invoke, func(grantID string) {
 				browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
 				if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent wrong TLS peer qualification review", "idempotency_key": "approve-tls-refusal-" + grantID}, nil); code != "" {

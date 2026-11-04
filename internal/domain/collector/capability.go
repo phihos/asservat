@@ -196,7 +196,8 @@ type Availability struct {
 	Reasons       []Reason
 	// ProfileTLS distinguishes collectors that can decode TLS profile work
 	// from older HTTP-only collectors. It is valid only for available goProfile.
-	ProfileTLS bool
+	ProfileTLS           bool
+	ProfileAuthorization bool
 }
 
 // implemented lists recorders this build provides. Increment 4 (ADR-248)

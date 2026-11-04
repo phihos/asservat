@@ -1,31 +1,51 @@
 # Sustained implementation progress
 
-## Current named Go endpoint TLS candidate (2026-11-04)
+## Current named Go endpoint authorization candidate (2026-11-04)
 
-PR162 merged normally as `3cc76be0daba5480635e63478c648e114aefd105` after eligible
-PR CI41912312980 and the complete installed trace/history/settings/Repeat journey
-passed at reviewed `59812214`. Fresh main readback has the identical whole tree.
-[Trace41912395184](../test/results/runtime-trace-native-41912395184/README.md)
-exited Go/harness0 after528.276s: capture/publication, semantic summary refusal,
-SQL zero-query guards, authenticated94,394B native/local Go trace parsing,
-post-start history, settings and fresh Repeat4.371s passed. All4,139 submitted
-sources matched Git; source/scratch/cleanup checks passed. Heap React remains
-qualified at c2d4 and accepted-heavy comparison at c6; their scopes stay separate.
+PR163 merged normally as `c6efeffcc3b0f76126f692c9a60c57779f7de419` after
+required pull-request CI41916032445 passed all 15 jobs. Fresh main readback has
+the complete reviewed `abf25590` tree. [Installed TLS41916430295](../test/results/profile-tls-native-41916430295/README.md)
+exited Go/harness0 after 639.766s: the original Restricted app produced an
+authenticated 1,095 B native CPU profile, local pprof and read-only summary passed,
+and after-start history/settings/fresh Repeat 5.903s completed. A separately
+approved wrong-server-name attempt failed before HTTP, with zero pprof GET delta
+through its original slot cutoff, no artifact/fallback/retry and retained
+admission/control charge. This does not claim physical slot refund. All 4,149
+submitted sources matched Git; unchanged-source and terminal cleanup checks passed.
 
-The next TLS-only candidate preserves that complete parent and all33 reviewed
-TLS Go files. Explicit public roots/server name travel with the existing named
-endpoint and exact target-netns socket; old-node refusal, original deadlines and
-HTTP behavior remain. No credential delivery, fallback, extra connection,
-service, role or API read is added. Both independent reviews found no blockers.
-The final pre-push and focused TLS races passed at `4641475e`; rebasing onto the
-actual merge preserved the complete tested source tree. Exact commands, package
-coverage (including packages with no matched tests) and source readbacks are in
-[named-profile-tls-598-local](../test/results/named-profile-tls-598-local/README.md).
+The current private auth candidate preserves that merged source. Public endpoint
+policy pins exact workload-root audiences; the existing immutable regional input
+bundle supplies a private bounded header snapshot at startup. Final held-work
+poll delivery checks audience, original sequence/epoch/deadline and current
+cancellation, reserves a byte-bounded prefix within the existing 256 KiB poll cap,
+and sends the header only after verifying the existing TLS socket. No new
+Secret, RBAC, API read, service, Job, connection or public credential field is
+added. Rotation uses the existing protected reinstall/restart path.
 
-Earlier full browser evidence remains scoped to its original source in
-[named-profile-tls-c2d4-local](../test/results/named-profile-tls-c2d4-local/README.md).
-New candidate CI and installed TLS CPU/wrong-peer qualification remain pending.
-Endpoint credentials, broader S-05 and the full specification remain open.
+Targeted component races, private-input/Helm checks and independent producer and
+consumer reviews passed. Initial pre-push failures (wire-layer behavior import
+and missing local console dependencies) were corrected without changing the
+architecture rule. Corrective contract races, architecture, vet, formatting and
+443 console checks passed; other pre-push targets passed before that two-file
+correction. [Local originals](../test/results/named-profile-auth-local/README.md)
+retain exact failures and source scopes. Genuine PR CI41923157902 passed all15
+jobs on published `46f3317b`; that is baseline evidence, not the later fix.
+
+Automated review then found that one failed private lookup aborted an entire
+poll, blocking unrelated work and cancellation. A real four-item mTLS regression
+reproduced zero delivered items. The corrected receive-only refusal keeps all
+original IDs/sequences, delivers unrelated work/Stop, and reuses one zero-byte
+`ProfileUnavailable` outcome without acquisition, frozen reservation or replay.
+Original request cancellation and a replaced node still abort the poll.
+[Regression and fix originals](../test/results/profile-auth-poll-isolation-local/README.md)
+retain the baseline CI and corrective evidence separately. Focused
+race checks and independent final review passed. Corrected-candidate vet,
+formatting, Go/design architecture, specification and design gates passed.
+Updated eligible CI and installed auth qualification remain pending. No installed auth VM has been dispatched. The actual installer
+fixture is ready for authenticated CPU/native/summary/history/Repeat, audience
+denial and the separately approved wrong TLS peer. Heap React remains qualified
+at c2d4 and accepted-heavy comparison at c6. Broader S-05 and the full specification
+remain open.
 
 ## Shared profile qualification history (2026-11-04)
 
@@ -211,9 +231,9 @@ One shared final CI candidate and three separate fresh native runs are planned;
 these local results do not establish installed heap-browser or trace success.
 The full S-05 and specification goal remains active.
 
-## Current delivery workflow (2026-11-04)
+## Earlier accepted-heavy qualification workflow (2026-11-04)
 
-**Active outcome:** qualify one accepted-heavy two-source pprof comparison in the
+**Preparation outcome:** qualify one accepted-heavy two-source pprof comparison in the
 existing installed384MiB/500m worker. The test-only candidate prebuilds two
 synthetic profiles outside the measured worker (100,000 samples/functions/locations,
 1,048,576 references,16 values/sample,32,768 numeric labels and16MiB-minus56-byte

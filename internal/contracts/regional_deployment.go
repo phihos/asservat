@@ -117,21 +117,23 @@ type RegionalAPIContext struct {
 // RegionalProfileEndpoint is one administrator profile endpoint entry. A
 // template (kind template) names permitted address modes and a port range
 // that maintainers bind to a declared Pod port; a profile (kind profile) fixes
-// one address mode and port. Neither has a URL, path, header or credential:
+// one address mode and port. Neither has a URL, path or header value:
 // the path policy is the fixed go-pprof/v1 allowlist. Optional TLS carries only
 // explicit public certificate roots and a fixed verification name (ADR-299).
+// Optional Credential carries public audiences only (ADR-302).
 type RegionalProfileEndpoint struct {
-	Name           string                      `json:"name"`
-	Kind           string                      `json:"kind"`
-	Namespaces     []string                    `json:"namespaces,omitempty"`
-	AddressModes   []string                    `json:"addressModes,omitempty"`
-	MinPort        uint16                      `json:"minPort,omitempty"`
-	MaxPort        uint16                      `json:"maxPort,omitempty"`
-	AddressMode    string                      `json:"addressMode,omitempty"`
-	Port           uint16                      `json:"port,omitempty"`
-	LoopbackFamily string                      `json:"loopbackFamily,omitempty"`
-	Host           string                      `json:"host,omitempty"`
-	TLS            *RegionalProfileEndpointTLS `json:"tls,omitempty"`
+	Name           string                             `json:"name"`
+	Kind           string                             `json:"kind"`
+	Namespaces     []string                           `json:"namespaces,omitempty"`
+	AddressModes   []string                           `json:"addressModes,omitempty"`
+	MinPort        uint16                             `json:"minPort,omitempty"`
+	MaxPort        uint16                             `json:"maxPort,omitempty"`
+	AddressMode    string                             `json:"addressMode,omitempty"`
+	Port           uint16                             `json:"port,omitempty"`
+	LoopbackFamily string                             `json:"loopbackFamily,omitempty"`
+	Host           string                             `json:"host,omitempty"`
+	TLS            *RegionalProfileEndpointTLS        `json:"tls,omitempty"`
+	Credential     *RegionalProfileEndpointCredential `json:"credential,omitempty"`
 }
 
 // RegionalProfileEndpointTLS contains public trust material, never credentials.
@@ -188,4 +190,16 @@ type RegionalHubEndpoint struct {
 
 func DecodeRegionalDeployment(r io.Reader) (RegionalDeployment, error) {
 	return decodeClosedRPC[RegionalDeployment](r, RegionalDeploymentMaxBytes)
+}
+
+// RegionalProfileEndpointCredential is public policy, never header material.
+// Its implicit policy name is the containing endpoint name.
+type RegionalProfileEndpointCredential struct {
+	Audiences []RegionalProfileEndpointAudience `json:"audiences"`
+}
+type RegionalProfileEndpointAudience struct {
+	ClusterID    string `json:"clusterID"`
+	NamespaceUID string `json:"namespaceUID"`
+	WorkloadKind string `json:"workloadKind"`
+	WorkloadUID  string `json:"workloadUID"`
 }

@@ -28,17 +28,22 @@ type profileNodes interface {
 	EnqueueProfile(context.Context, collector.ProfileCapture, time.Time) (collector.Work, error)
 }
 type heldProfile struct {
-	expectation     artifact.ContextExpectation
-	digest          artifact.Digest
-	prepared        *objectstore.PreparedArtifact
-	node            collector.Identity
-	workID          string
-	queued, expires time.Time
-	storing         bool
-	stop            *collector.ProfileStop
-	stopStore       context.CancelFunc
-	mayHaveStarted  bool
-	outcome         evidence.RecordingCollection
+	authorizationPolicy   planning.GoEndpointSource
+	authorizationTarget   targets.Request
+	authorizationWork     collector.ProfileCapture
+	authorizationSequence uint64
+	authorizationUntil    time.Time
+	expectation           artifact.ContextExpectation
+	digest                artifact.Digest
+	prepared              *objectstore.PreparedArtifact
+	node                  collector.Identity
+	workID                string
+	queued, expires       time.Time
+	storing               bool
+	stop                  *collector.ProfileStop
+	stopStore             context.CancelFunc
+	mayHaveStarted        bool
+	outcome               evidence.RecordingCollection
 }
 
 // Profiles share the connector's existing64 holders and32MiB storage working
@@ -58,7 +63,7 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 		return time.Time{}, err
 	}
 	now := h.now()
-	if !now.Before(plan.ValidUntil) || plan.EndpointDigest != e.Profile.EndpointDigest || plan.DefinitionDigest != frozen.Endpoints[0].DefinitionDigest || !profileTLSMatches(plan) || plan.Definition.Credential != nil || plan.Pin.UID != pin.UID || plan.Pin.NamespaceUID != pin.NamespaceUID {
+	if !now.Before(plan.ValidUntil) || plan.EndpointDigest != e.Profile.EndpointDigest || plan.DefinitionDigest != frozen.Endpoints[0].DefinitionDigest || !profileTLSMatches(plan) || !profileCredentialMatches(plan, endpoint.Target) || plan.Pin.UID != pin.UID || plan.Pin.NamespaceUID != pin.NamespaceUID {
 		return time.Time{}, value.ErrDenied
 	}
 	nodes, ok := h.nodes.(profileNodes)
@@ -74,7 +79,7 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 		return time.Time{}, value.ErrUnavailable
 	}
 	node, ok := nodes.NodeByName(name)
-	if !ok || !node.RecorderAvailable(collector.MechanismProfile) || (!plan.TLSMaterial.IsZero() && !node.ProfileTLSAvailable()) ||
+	if !ok || !node.RecorderAvailable(collector.MechanismProfile) || (!plan.TLSMaterial.IsZero() && !node.ProfileTLSAvailable()) || (plan.Definition.Credential != nil && !node.ProfileAuthorizationAvailable()) ||
 		(plan.Pin.NodeName != "" && plan.Pin.NodeName != name) ||
 		(plan.NodeUID != "" && node.Identity.NodeUID != plan.NodeUID) ||
 		(plan.NodeBootID != "" && node.Identity.BootID != plan.NodeBootID) {
@@ -87,7 +92,7 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 	mechanismPin := plan.Pin
 	mechanismPin.NodeName = name
 	request := value.GoProfileRequest{Binding: e.Binding(), Pin: mechanismPin, NodeUID: node.Identity.NodeUID, NodeBootID: node.Identity.BootID, SourceRef: plan.SourceRef, EndpointDigest: plan.EndpointDigest, Parameters: plan.Parameters, NativeLimit: plan.NativeLimit, NotBefore: started, Deadline: deadline}
-	work := collector.ProfileCapture{CaptureID: e.CaptureUID, ExpectationDigest: evidence.ContextExpectationDigest(e), DefinitionDigest: plan.DefinitionDigest, CollectorEpoch: node.Identity.Epoch, Request: request, AddressMode: plan.AddressMode, Address: plan.RouteIP, Port: plan.Port, Host: plan.Definition.Host, TLS: plan.TLSMaterial}
+	work := collector.ProfileCapture{CaptureID: e.CaptureUID, ExpectationDigest: evidence.ContextExpectationDigest(e), DefinitionDigest: plan.DefinitionDigest, CollectorEpoch: node.Identity.Epoch, Request: request, AddressMode: plan.AddressMode, Address: plan.RouteIP, Port: plan.Port, Host: plan.Definition.Host, TLS: plan.TLSMaterial, AuthorizationRequired: plan.Definition.Credential != nil}
 	startBy := deadline.Add(-request.Parameters.Duration - 2*time.Second)
 	if until.Before(startBy) {
 		startBy = until
@@ -96,7 +101,7 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 	defer h.mu.Unlock()
 	now = h.now()
 	h.expireLocked(now)
-	if ctx.Err() != nil || !now.Before(startBy) || !now.Before(plan.ValidUntil) || !work.Valid() || len(h.held)+len(h.profiles) >= maxHeldRecordings || h.held[e.CaptureUID] != nil || h.profiles[e.CaptureUID] != nil {
+	if (work.AuthorizationRequired && h.profileAuthorization == nil) || ctx.Err() != nil || !now.Before(startBy) || !now.Before(plan.ValidUntil) || !work.Valid() || len(h.held)+len(h.profiles) >= maxHeldRecordings || h.held[e.CaptureUID] != nil || h.profiles[e.CaptureUID] != nil {
 		return time.Time{}, value.ErrUnavailable
 	}
 	w, err := nodes.EnqueueProfile(ctx, work, startBy)
@@ -108,6 +113,13 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 		h.profiles = map[string]*heldProfile{}
 	}
 	h.profiles[e.CaptureUID] = &heldProfile{expectation: e, digest: work.ExpectationDigest, prepared: p, node: node.Identity, workID: w.ID, queued: queued, expires: e.Registration.WriteUntil.Add(recordingRetain), outcome: evidence.RecordingCollection{State: evidence.RecordingPending}}
+	if credential := plan.Definition.Credential; credential != nil {
+		h.profiles[e.CaptureUID].authorizationPolicy = credential.Policy
+		h.profiles[e.CaptureUID].authorizationTarget = endpoint.Target
+		h.profiles[e.CaptureUID].authorizationWork = work
+		h.profiles[e.CaptureUID].authorizationSequence = w.Sequence
+		h.profiles[e.CaptureUID].authorizationUntil = w.NotAfter
+	}
 	return queued, nil
 }
 
@@ -118,6 +130,50 @@ func profileTLSMatches(plan planning.GoEndpointPlan) bool {
 		return plan.TLSMaterial.IsZero()
 	}
 	return plan.TLSMaterial.Valid() && plan.TLSMaterial.ServerName == plan.Definition.TLS.ServerName && plan.TLSMaterial.RootsDigest == plan.Definition.TLS.Trust.Digest
+}
+
+func profileCredentialMatches(plan planning.GoEndpointPlan, target targets.Request) bool {
+	if plan.Definition.Credential == nil {
+		return true
+	}
+	if plan.Definition.TLS == nil || !plan.Definition.Credential.Policy.Valid() {
+		return false
+	}
+	for _, audience := range plan.Definition.Credential.Audiences {
+		if audience.Matches(target) {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *ConnectorRecordings) ReadNodeProfileAuthorization(ctx context.Context, node collector.Identity, work collector.Work) ([]byte, error) {
+	if ctx == nil || ctx.Err() != nil || work.Profile == nil || !work.Profile.AuthorizationRequired {
+		return nil, value.ErrDenied
+	}
+	ctx, cancel := context.WithDeadline(ctx, work.NotAfter)
+	defer cancel()
+	h.mu.Lock()
+	held := h.profiles[work.Profile.CaptureID]
+	reader := h.profileAuthorization
+	matches := func() bool {
+		return held != nil && h.profiles[work.Profile.CaptureID] == held && reader != nil && held.node == node && held.workID == work.ID && held.authorizationSequence == work.Sequence && held.authorizationUntil.Equal(work.NotAfter) && held.authorizationWork == *work.Profile && held.digest == work.Profile.ExpectationDigest && held.expectation.Profile != nil && held.expectation.Profile.EndpointDigest == work.Profile.Request.EndpointDigest && held.authorizationPolicy.Valid() && held.authorizationTarget.ClusterID == held.expectation.Registration.Location.ClusterID && held.authorizationTarget.Namespace.UID == held.expectation.NamespaceUID && held.authorizationTarget.Workload.UID == held.expectation.WorkloadUID && held.authorizationTarget.PodUID == held.expectation.PodUID && held.outcome.State == evidence.RecordingPending && held.stop == nil && !held.storing && held.prepared != nil && h.now().Before(work.NotAfter) && h.now().Before(work.Profile.Request.Deadline) && ctx.Err() == nil
+	}
+	if !matches() {
+		h.mu.Unlock()
+		return nil, value.ErrDenied
+	}
+	policy := held.authorizationPolicy
+	h.mu.Unlock()
+	material, err := reader.ReadProfileAuthorization(ctx, policy)
+	h.mu.Lock()
+	ok := matches()
+	h.mu.Unlock()
+	if err != nil || !ok || !value.ValidGoProfileAuthorization(material) {
+		clear(material)
+		return nil, value.ErrUnavailable
+	}
+	return material, nil
 }
 
 func (h *ConnectorRecordings) DeliverProfile(ctx context.Context, node collector.Identity, r collector.ProfileResult, body io.Reader) error {

@@ -48,7 +48,32 @@ func (t ProfileEndpointTLSDefinition) Valid() bool {
 	return authorization.UUID(t.TrustClusterID) && (t.TrustNamespaceUID == "" || authorization.UUID(t.TrustNamespaceUID)) && authorization.UUID(t.TrustUID) && identity.Text(t.TrustName, 63) && t.TrustDigest != (artifact.Digest{}) && execution.ValidGoProfileServerName(t.ServerName)
 }
 
-// ProfileEndpointDefinitionResolution carries public uncredentialed definition
+// ProfileEndpointCredentialAudience names an exact independently resolved root.
+type ProfileEndpointCredentialAudience struct{ ClusterID, NamespaceUID, WorkloadKind, WorkloadUID string }
+
+func (a ProfileEndpointCredentialAudience) Valid() bool {
+	return authorization.UUID(a.ClusterID) && authorization.UUID(a.NamespaceUID) && authorization.UUID(a.WorkloadUID) && (a.WorkloadKind == "Deployment" || a.WorkloadKind == "StatefulSet" || a.WorkloadKind == "Pod")
+}
+
+type ProfileEndpointCredentialDefinition struct {
+	PolicyClusterID, PolicyNamespaceUID, PolicyUID, PolicyName string
+	PolicyDigest                                               artifact.Digest
+	Audiences                                                  []ProfileEndpointCredentialAudience
+}
+
+func (c *ProfileEndpointCredentialDefinition) Valid(cluster string) bool {
+	if c == nil || c.PolicyClusterID != cluster || !authorization.UUID(c.PolicyClusterID) || c.PolicyNamespaceUID != "" && !authorization.UUID(c.PolicyNamespaceUID) || !authorization.UUID(c.PolicyUID) || !identity.Text(c.PolicyName, 63) || c.PolicyDigest == (artifact.Digest{}) || len(c.Audiences) < 1 || len(c.Audiences) > 64 {
+		return false
+	}
+	for i, a := range c.Audiences {
+		if !a.Valid() || slices.Contains(c.Audiences[:i], a) {
+			return false
+		}
+	}
+	return true
+}
+
+// ProfileEndpointDefinitionResolution carries public definition
 // metadata. It contains no route, certificate bytes or freshness dates.
 type ProfileEndpointDefinitionResolution struct {
 	Request                                                    ProfileEndpointDefinitionRequest
@@ -60,12 +85,18 @@ type ProfileEndpointDefinitionResolution struct {
 	SourceKind, AddressMode                                    string
 	Binding                                                    *ProfileEndpointBinding `json:",omitempty"`
 	Port                                                       uint16
-	TLS                                                        ProfileEndpointTLSDefinition `json:",omitzero"`
+	TLS                                                        ProfileEndpointTLSDefinition         `json:",omitzero"`
+	Credential                                                 *ProfileEndpointCredentialDefinition `json:",omitempty"`
 }
 
 func (a ProfileEndpointDefinitionResolution) Clone() ProfileEndpointDefinitionResolution {
 	a.Request.Bindings = slices.Clone(a.Request.Bindings)
 	a.AddressModes = slices.Clone(a.AddressModes)
+	if a.Credential != nil {
+		c := *a.Credential
+		c.Audiences = slices.Clone(c.Audiences)
+		a.Credential = &c
+	}
 	if a.Binding != nil {
 		b := *a.Binding
 		a.Binding = &b
@@ -74,6 +105,9 @@ func (a ProfileEndpointDefinitionResolution) Clone() ProfileEndpointDefinitionRe
 }
 
 func (a ProfileEndpointDefinitionResolution) Answers(r ProfileEndpointDefinitionRequest) bool {
+	if a.Credential != nil && (a.TLS.IsZero() || !a.Credential.Valid(r.ClusterID)) {
+		return false
+	}
 	if !a.TLS.IsZero() && (!a.TLS.Valid() || a.TLS.TrustClusterID != r.ClusterID) {
 		return false
 	}

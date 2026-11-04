@@ -23,7 +23,7 @@ const MaxProfileEndpoints = 64
 // ProfileEndpointEntries validates and converts a cluster's administrator
 // profile endpoint configuration (ADR-285). Each entry's source identity is
 // derived from the cluster and its name, and its digest covers the entry's
-// canonical public definition; no Secret, URL or credential is involved.
+// canonical public definition; no Secret, URL or credential value is involved.
 func ProfileEndpointEntries(clusterID string, in []contracts.RegionalProfileEndpoint) ([]planner.ProfileEndpointEntry, error) {
 	if len(in) > MaxProfileEndpoints {
 		return nil, value.ErrInvalid
@@ -82,6 +82,13 @@ func ProfileEndpointEntries(clusterID string, in []contracts.RegionalProfileEndp
 			trust.Digest = digest
 			entry.Definition.TLS = &plan.GoEndpointTLS{Trust: trust, ServerName: material.ServerName}
 			entry.TLSMaterial = material
+		}
+		if e.Credential != nil {
+			credential := &plan.GoEndpointCredential{Policy: entry.Definition.Source}
+			for _, a := range e.Credential.Audiences {
+				credential.Audiences = append(credential.Audiences, plan.GoEndpointAudience{ClusterID: a.ClusterID, NamespaceUID: a.NamespaceUID, WorkloadKind: a.WorkloadKind, WorkloadUID: a.WorkloadUID})
+			}
+			entry.Definition.Credential = credential
 		}
 		if !entry.Definition.Valid() {
 			return nil, value.ErrInvalid
