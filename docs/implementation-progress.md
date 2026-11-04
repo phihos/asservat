@@ -19,7 +19,12 @@ passed441 console tests, integrated fixture races passed3.871s, and the actual
 built-console browser passed34.452s (28journeys/27accessibility scans;375/320px;
 no external requests or CSP/runtime errors). Browser data are synthetic; installed
 heap qualification remains pending. Original RED/green reports and screenshots
-are retained in `test/results/heap-profile-local/`.
+are retained in `test/results/heap-profile-local/`. Before native dispatch,
+automated review found ambient selector dependence in the existing fixture-shape
+test; broader reproduction found two related CPU tests. All three now pin their
+intended default. Affected races pass with ambient `heap` (3.902s) and an invalid
+value (3.905s); the intermediate failures remain archived. This is test isolation
+only, with unchanged product and installed fixture inputs.
 
 Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
 selection for a saved heap; frequency is unmeasured, and this is an existing

@@ -21,6 +21,7 @@ import (
 // Validate the actual public request and synthetic endpoint answer through the
 // planner before spending an installed run. This grants no runtime authority.
 func TestInstalledManualProfileRequestCompiles(t *testing.T) {
+	t.Setenv("ASSERVAT_PROFILE_VARIANT", "")
 	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "manual-profile")
 	const cluster = "00000000-0000-4000-8000-000000000001"
 	for name, input := range map[string]map[string]any{"complete": approvedRecordingArguments(cluster, "payments", "api"), "stop": manualProfileStopArguments(cluster, "payments", "api")} {

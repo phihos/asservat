@@ -1,0 +1,41 @@
+{
+  "reviewedHead": "99ff3e501357e004d792a898d976cd43a4151308",
+  "finding": "Baseline fixture-shape test inherited ASSERVAT_PROFILE_VARIANT. One-line isolation reproduced/fixed it; broader ambient testing found the same dependency in manual-CPU compilation and comparison preflight. All three now pin the intended default.",
+  "productionCodeChanged": false,
+  "finalAmbientHeapRace": {
+    "exit": 0,
+    "seconds": 3.902
+  },
+  "finalAmbientInvalidRace": {
+    "exit": 0,
+    "seconds": 3.905
+  },
+  "failureScope": "Initial shape RED exit1; misleadingly named all-green log is another FAIL after only the first test was fixed. Both are retained as failed evidence. Final logs cover all affected tests with heap and invalid ambient selectors.",
+  "files": {
+    "heap-profile-ambient-variant-red.log": {
+      "archive": "heap-profile-ambient-variant-red.log.gz",
+      "bytes": 4540,
+      "sha256": "a18689e810337e147068e5fb71e96b267a9cb2a3810f432faff52309f852fac1"
+    },
+    "heap-profile-ambient-heap-green.log": {
+      "archive": "heap-profile-ambient-heap-green.log.gz",
+      "bytes": 4440,
+      "sha256": "c9c9e837923100e90530741d815df3d2b13cfdf20cbbad5f0b2bfea7f0d6e823"
+    },
+    "heap-profile-ambient-all-green.log": {
+      "archive": "heap-profile-ambient-all-green.log.gz",
+      "bytes": 1715,
+      "sha256": "b7d6f6fd7103d13479ae81030c018984d05fa753ccb7b6c4f32aff33b2c08737"
+    },
+    "heap-profile-ambient-heap-final.log": {
+      "archive": "heap-profile-ambient-heap-final.log.gz",
+      "bytes": 53,
+      "sha256": "7fd1a5f525f7275107a275feb2aeaa59ec0b2181f9688ded365860abe20e18f6"
+    },
+    "heap-profile-ambient-typo-final.log": {
+      "archive": "heap-profile-ambient-typo-final.log.gz",
+      "bytes": 53,
+      "sha256": "9a793955a4710fc2808b74e15f21c96a07a0e67a7d64becfc1006f3a56fa4c5a"
+    }
+  }
+}

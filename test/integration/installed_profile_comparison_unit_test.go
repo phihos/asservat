@@ -17,6 +17,7 @@ import (
 )
 
 func TestInstalledProfileComparisonFocusPreflight(t *testing.T) {
+	t.Setenv("ASSERVAT_PROFILE_VARIANT", "")
 	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "profile-comparison")
 	if got := installedClusterCount(); got != 2 {
 		t.Fatalf("bootstrap consumer expects %d clusters; Python focus descriptor provides 2", got)
