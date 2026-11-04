@@ -86,7 +86,11 @@ test-only gap is corrected; affected fixture races pass6.429s. One further focus
 installed dispatch is diagnostic qualification, with unchanged production code,
 original observation/stage bounds and single-attempt behavior. It will either
 complete the workflow or preserve the missing phase evidence; no timeout increase
-or acquisition/preview retry is introduced.
+or acquisition/preview retry is introduced. Local integrated pre-push/profile gates
+passed (441 console tests; fixture races4.510s). A focused application composition
+regression also passes with fresh namespace catalog/endpoint resolution, source
+expiry preservation and changed/disabled/missing version refusals; these use
+synthetic dependency ports and do not diagnose the native failure.
 
 Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
 selection for a saved heap; frequency is unmeasured, and this is an existing
