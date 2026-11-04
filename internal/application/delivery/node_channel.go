@@ -364,7 +364,7 @@ func sameAssessment(a, b []collector.Availability) bool {
 		return false
 	}
 	for i := range a {
-		if a[i].Mechanism != b[i].Mechanism || a[i].Adapter != b[i].Adapter || a[i].Prerequisites != b[i].Prerequisites || a[i].Hook != b[i].Hook || len(a[i].Reasons) != len(b[i].Reasons) {
+		if a[i].Mechanism != b[i].Mechanism || a[i].Adapter != b[i].Adapter || a[i].Prerequisites != b[i].Prerequisites || a[i].Hook != b[i].Hook || a[i].ProfileTLS != b[i].ProfileTLS || len(a[i].Reasons) != len(b[i].Reasons) {
 			return false
 		}
 		for j := range a[i].Reasons {

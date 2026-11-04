@@ -24,9 +24,13 @@ type ProfileCapture struct {
 	Address           netip.Addr
 	Port              uint16
 	Host              string
+	TLS               execution.GoProfileTLSMaterial
 }
 
 func (p ProfileCapture) Valid() bool {
+	if !p.TLS.IsZero() && !p.TLS.Valid() {
+		return false
+	}
 	if !authorization.UUID(p.CaptureID) || !authorization.UUID(p.CollectorEpoch) || p.ExpectationDigest == (artifact.Digest{}) || p.DefinitionDigest == (artifact.Digest{}) || p.Request.Validate(p.Request.NotBefore) != nil || p.Port == 0 || len(p.Host) == 0 || len(p.Host) > 253 || strings.ContainsAny(p.Host, "/\\?#@%\r\n\t ") || !p.Address.IsValid() || p.Address.Zone() != "" || p.Address.Is4In6() {
 		return false
 	}

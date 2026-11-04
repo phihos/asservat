@@ -3,13 +3,17 @@ package bootstrap
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"io"
+	"net"
 	"sync"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/diagnostics"
 	"asservat.local/asservat/internal/adapters/gadget"
+	"asservat.local/asservat/internal/adapters/mtls"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"asservat.local/asservat/internal/domain/collector"
 	"asservat.local/asservat/internal/domain/execution"
@@ -210,7 +214,42 @@ func (m nodeProfileMechanism) DialGoProfile(ctx context.Context, r execution.GoP
 		return executionapp.GoProfileChannel{}, execution.ErrDenied
 	}
 	connection, err := gadget.DialProfile(ctx, r.Pin.UID, m.p.Address, m.p.Port)
+	if err == nil && !m.p.TLS.IsZero() {
+		connection, err = nodeProfileTLSConnection(ctx, connection, m.p.TLS)
+	}
 	return executionapp.GoProfileChannel{Connection: connection, Host: m.p.Host, ValidUntil: r.Deadline}, err
+}
+
+// Wrap exactly the socket opened in the pinned Pod's network namespace. The
+// HTTP collector still makes one request over that socket; no dialer, proxy,
+// system roots, client credential or plaintext retry is installed here.
+func nodeProfileTLSConnection(ctx context.Context, connection net.Conn, material execution.GoProfileTLSMaterial) (net.Conn, error) {
+	refuse := func() (net.Conn, error) {
+		if connection != nil {
+			_ = connection.Close()
+		}
+		return nil, execution.ErrProfileUnavailable
+	}
+	if ctx == nil || ctx.Err() != nil || connection == nil || !material.Valid() {
+		return refuse()
+	}
+	canonical, digest, err := mtls.CanonicalProfileRoots(material.RootsPEM)
+	if err != nil || canonical != material.RootsPEM || digest != material.RootsDigest {
+		return refuse()
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM([]byte(canonical)) {
+		return refuse()
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok || connection.SetDeadline(deadline) != nil {
+		return refuse()
+	}
+	secure := tls.Client(connection, &tls.Config{RootCAs: roots, ServerName: material.ServerName, MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}})
+	if err := secure.HandshakeContext(ctx); err != nil || ctx.Err() != nil {
+		return refuse()
+	}
+	return secure, nil
 }
 func (m nodeProfileMechanism) ObserveGoProfile(ctx context.Context, r execution.GoProfileRequest) (execution.GoProfileCurrent, error) {
 	id := m.identity()

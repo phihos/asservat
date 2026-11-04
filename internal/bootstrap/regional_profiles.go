@@ -58,7 +58,7 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 		return time.Time{}, err
 	}
 	now := h.now()
-	if !now.Before(plan.ValidUntil) || plan.EndpointDigest != e.Profile.EndpointDigest || plan.DefinitionDigest != frozen.Endpoints[0].DefinitionDigest || plan.Definition.TLS != nil || plan.Definition.Credential != nil || plan.Pin.UID != pin.UID || plan.Pin.NamespaceUID != pin.NamespaceUID {
+	if !now.Before(plan.ValidUntil) || plan.EndpointDigest != e.Profile.EndpointDigest || plan.DefinitionDigest != frozen.Endpoints[0].DefinitionDigest || !profileTLSMatches(plan) || plan.Definition.Credential != nil || plan.Pin.UID != pin.UID || plan.Pin.NamespaceUID != pin.NamespaceUID {
 		return time.Time{}, value.ErrDenied
 	}
 	nodes, ok := h.nodes.(profileNodes)
@@ -74,7 +74,7 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 		return time.Time{}, value.ErrUnavailable
 	}
 	node, ok := nodes.NodeByName(name)
-	if !ok || !node.RecorderAvailable(collector.MechanismProfile) ||
+	if !ok || !node.RecorderAvailable(collector.MechanismProfile) || (!plan.TLSMaterial.IsZero() && !node.ProfileTLSAvailable()) ||
 		(plan.Pin.NodeName != "" && plan.Pin.NodeName != name) ||
 		(plan.NodeUID != "" && node.Identity.NodeUID != plan.NodeUID) ||
 		(plan.NodeBootID != "" && node.Identity.BootID != plan.NodeBootID) {
@@ -87,7 +87,7 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 	mechanismPin := plan.Pin
 	mechanismPin.NodeName = name
 	request := value.GoProfileRequest{Binding: e.Binding(), Pin: mechanismPin, NodeUID: node.Identity.NodeUID, NodeBootID: node.Identity.BootID, SourceRef: plan.SourceRef, EndpointDigest: plan.EndpointDigest, Parameters: plan.Parameters, NativeLimit: plan.NativeLimit, NotBefore: started, Deadline: deadline}
-	work := collector.ProfileCapture{CaptureID: e.CaptureUID, ExpectationDigest: evidence.ContextExpectationDigest(e), DefinitionDigest: plan.DefinitionDigest, CollectorEpoch: node.Identity.Epoch, Request: request, AddressMode: plan.AddressMode, Address: plan.RouteIP, Port: plan.Port, Host: plan.Definition.Host}
+	work := collector.ProfileCapture{CaptureID: e.CaptureUID, ExpectationDigest: evidence.ContextExpectationDigest(e), DefinitionDigest: plan.DefinitionDigest, CollectorEpoch: node.Identity.Epoch, Request: request, AddressMode: plan.AddressMode, Address: plan.RouteIP, Port: plan.Port, Host: plan.Definition.Host, TLS: plan.TLSMaterial}
 	startBy := deadline.Add(-request.Parameters.Duration - 2*time.Second)
 	if until.Before(startBy) {
 		startBy = until
@@ -109,6 +109,15 @@ func (h *ConnectorRecordings) startProfile(ctx context.Context, p *objectstore.P
 	}
 	h.profiles[e.CaptureUID] = &heldProfile{expectation: e, digest: work.ExpectationDigest, prepared: p, node: node.Identity, workID: w.ID, queued: queued, expires: e.Registration.WriteUntil.Add(recordingRetain), outcome: evidence.RecordingCollection{State: evidence.RecordingPending}}
 	return queued, nil
+}
+
+// Public material is usable only with the same protected definition selected
+// for this admitted endpoint. It never enables credentials or another route.
+func profileTLSMatches(plan planning.GoEndpointPlan) bool {
+	if plan.Definition.TLS == nil {
+		return plan.TLSMaterial.IsZero()
+	}
+	return plan.TLSMaterial.Valid() && plan.TLSMaterial.ServerName == plan.Definition.TLS.ServerName && plan.TLSMaterial.RootsDigest == plan.Definition.TLS.Trust.Digest
 }
 
 func (h *ConnectorRecordings) DeliverProfile(ctx context.Context, node collector.Identity, r collector.ProfileResult, body io.Reader) error {

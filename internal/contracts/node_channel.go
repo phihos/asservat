@@ -40,8 +40,9 @@ const (
 	// At most1088 content-free source accounting rows plus existing facts.
 	// Enrollment and poll requests keep their existing64KiB bound.
 	NodeStatusMaxRequest = 512 << 10
-	// NodeMaxResponse bounds one poll answer: 16 items, each packet capture
-	// with at most 256 filter instructions (ADR-248).
+	// NodeMaxResponse bounds one poll answer: 16 items, including packet
+	// captures with at most 256 filter instructions and TLS profiles with
+	// at most 8KiB of canonical public roots each.
 	NodeMaxResponse    = 256 << 10
 	NodeMaxCertificate = 8 << 10
 
@@ -370,6 +371,7 @@ type NodeAdapter struct {
 	Adapter       string   `json:"adapter"`
 	Hook          string   `json:"hook"`
 	Reasons       []string `json:"reasons"`
+	ProfileTLS    bool     `json:"profileTLS,omitempty"`
 }
 
 type NodeBudget struct {

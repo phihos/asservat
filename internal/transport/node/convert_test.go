@@ -43,6 +43,51 @@ func TestStatusRoundTripsThroughTheClosedWire(t *testing.T) {
 	}
 }
 
+func TestStatusProfileTLSCapabilityIsExplicitAndClosed(t *testing.T) {
+	r := sampleReport()
+	r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable}}
+	legacy, err := json.Marshal(WireStatus("epoch", r))
+	if err != nil || bytes.Contains(legacy, []byte(`"profileTLS"`)) {
+		t.Fatal("HTTP-only report changed", err)
+	}
+	// A new collector advertises TLS independently of the pre-existing
+	// goProfile capability. Missing support remains an ordinary HTTP report.
+	current := bytes.Replace(legacy, []byte(`"mechanism":"goProfile"`), []byte(`"mechanism":"goProfile","profileTLS":true`), 1)
+	for _, raw := range [][]byte{legacy, current} {
+		wire, err := contracts.DecodeNodeStatus(bytes.NewReader(raw))
+		if err != nil {
+			t.Fatal("profile capability report", err)
+		}
+		back, ok := DomainStatus(wire)
+		if !ok {
+			t.Fatal("profile capability refused")
+		}
+		encoded, _ := json.Marshal(WireStatus("epoch", back))
+		if !bytes.Equal(raw, encoded) {
+			// Field order is intentionally not part of capability semantics.
+			var a, b any
+			_ = json.Unmarshal(raw, &a)
+			_ = json.Unmarshal(encoded, &b)
+			if !reflect.DeepEqual(a, b) {
+				t.Fatal("profile capability lost")
+			}
+		}
+	}
+	for _, raw := range [][]byte{
+		bytes.Replace(current, []byte(`"mechanism":"goProfile"`), []byte(`"mechanism":"packetCapture"`), 1),
+		bytes.Replace(current, []byte(`"prerequisites":true`), []byte(`"prerequisites":false`), 1),
+		bytes.Replace(current, []byte(`"adapter":"Available"`), []byte(`"adapter":"AdapterUnavailable"`), 1),
+	} {
+		wire, err := contracts.DecodeNodeStatus(bytes.NewReader(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := DomainStatus(wire); ok {
+			t.Fatal("TLS advertised by an unavailable or different recorder")
+		}
+	}
+}
+
 func TestDomainStatusRefusesOpenValues(t *testing.T) {
 	for name, edit := range map[string]func(*contracts.NodeStatus){
 		"format":          func(s *contracts.NodeStatus) { s.Format = "other" },

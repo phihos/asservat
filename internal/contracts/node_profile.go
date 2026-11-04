@@ -12,34 +12,43 @@ const (
 )
 
 type NodeProfileCapture struct {
-	CaptureID         string    `json:"captureID"`
-	ClusterID         string    `json:"clusterID"`
-	ArtifactID        string    `json:"artifactID"`
-	AttemptID         string    `json:"attemptID"`
-	Namespace         string    `json:"namespace"`
-	NamespaceUID      string    `json:"namespaceUID"`
-	PodName           string    `json:"podName"`
-	PodUID            string    `json:"podUID"`
-	ControllerUID     string    `json:"controllerUID,omitempty"`
-	NodeName          string    `json:"nodeName"`
-	NodeUID           string    `json:"nodeUID"`
-	BootID            string    `json:"bootID"`
-	CollectorEpoch    string    `json:"collectorEpoch"`
-	ExpectationDigest string    `json:"expectationDigest"`
-	EndpointDigest    string    `json:"endpointDigest"`
-	DefinitionDigest  string    `json:"definitionDigest"`
-	SourceRef         string    `json:"sourceRef"`
-	Type              string    `json:"type"`
-	Mode              string    `json:"mode"`
-	DurationMillis    int64     `json:"durationMillis"`
-	ForceGC           bool      `json:"forceGC"`
-	NativeLimit       int64     `json:"nativeLimit"`
-	NotBefore         time.Time `json:"notBefore"`
-	Deadline          time.Time `json:"deadline"`
-	AddressMode       string    `json:"addressMode"`
-	Address           string    `json:"address"`
-	Port              uint16    `json:"port"`
-	Host              string    `json:"host"`
+	CaptureID         string         `json:"captureID"`
+	ClusterID         string         `json:"clusterID"`
+	ArtifactID        string         `json:"artifactID"`
+	AttemptID         string         `json:"attemptID"`
+	Namespace         string         `json:"namespace"`
+	NamespaceUID      string         `json:"namespaceUID"`
+	PodName           string         `json:"podName"`
+	PodUID            string         `json:"podUID"`
+	ControllerUID     string         `json:"controllerUID,omitempty"`
+	NodeName          string         `json:"nodeName"`
+	NodeUID           string         `json:"nodeUID"`
+	BootID            string         `json:"bootID"`
+	CollectorEpoch    string         `json:"collectorEpoch"`
+	ExpectationDigest string         `json:"expectationDigest"`
+	EndpointDigest    string         `json:"endpointDigest"`
+	DefinitionDigest  string         `json:"definitionDigest"`
+	SourceRef         string         `json:"sourceRef"`
+	Type              string         `json:"type"`
+	Mode              string         `json:"mode"`
+	DurationMillis    int64          `json:"durationMillis"`
+	ForceGC           bool           `json:"forceGC"`
+	NativeLimit       int64          `json:"nativeLimit"`
+	NotBefore         time.Time      `json:"notBefore"`
+	Deadline          time.Time      `json:"deadline"`
+	AddressMode       string         `json:"addressMode"`
+	Address           string         `json:"address"`
+	Port              uint16         `json:"port"`
+	Host              string         `json:"host"`
+	TLS               NodeProfileTLS `json:"tls,omitzero"`
+}
+
+// NodeProfileTLS carries only bounded public trust for the already pinned
+// socket. An absent value retains the legacy HTTP wire encoding.
+type NodeProfileTLS struct {
+	RootsPEM    string `json:"rootsPEM"`
+	RootsDigest string `json:"rootsDigest"`
+	ServerName  string `json:"serverName"`
 }
 
 type NodeProfileResult struct {

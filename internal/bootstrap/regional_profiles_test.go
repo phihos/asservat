@@ -1,8 +1,10 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/adapters/mtls"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"net/netip"
@@ -26,10 +28,11 @@ type profileQueue struct {
 	node      collector.Identity
 	profiles  []collector.Work
 	available bool
+	tls       bool
 }
 
 func (q *profileQueue) NodeByName(name string) (delivery.NodeView, bool) {
-	return delivery.NodeView{Identity: q.node, Current: q.available, Report: &collector.Report{Mechanisms: []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable}}}}, name == q.node.NodeName
+	return delivery.NodeView{Identity: q.node, Current: q.available, Report: &collector.Report{Mechanisms: []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: q.tls}}}}, name == q.node.NodeName
 }
 func (q *profileQueue) EnqueueProfile(_ context.Context, p collector.ProfileCapture, until time.Time) (collector.Work, error) {
 	w := collector.Work{ID: "33333333-3333-4333-8333-333333333333", Sequence: 1, Kind: collector.WorkProfileCapture, Profile: &p, NotAfter: until}
@@ -214,6 +217,50 @@ func TestConnectorProfileRefusesChangedOrExpiredRouteAndSharedCapacity(t *testin
 			p := h.PrepareProfile(&objectstore.PreparedArtifact{}, e)
 			if _, err := p.StartProfile(context.Background(), r.plan.Pin, now, now.Add(time.Second), endpoint); err == nil || len(q.profiles) != 0 {
 				t.Fatal("invalid profile queued", change, err)
+			}
+		})
+	}
+}
+
+func TestConnectorProfileTLSBindsProtectedMaterialBeforeQueue(t *testing.T) {
+	_, _, roots := serverCertificate(t)
+	canonical, digest, err := mtls.CanonicalProfileRoots(roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	material := execution.GoProfileTLSMaterial{RootsPEM: canonical, RootsDigest: digest, ServerName: "asservat-connector-nodes"}
+	for _, mode := range []string{"current", "old-node", "wrong-name", "wrong-hash", "changed-material", "missing-material", "unapproved-material", "credentials"} {
+		t.Run(mode, func(t *testing.T) {
+			h, q, reader, e, endpoint, now := profileHolderFixture(t)
+			q.tls = true
+			reader.plan.TLSMaterial = material
+			reader.plan.Definition.TLS = &planning.GoEndpointTLS{Trust: planning.GoEndpointSource{Digest: material.RootsDigest}, ServerName: material.ServerName}
+			switch mode {
+			case "old-node":
+				q.tls = false
+			case "wrong-name":
+				reader.plan.TLSMaterial.ServerName = "changed.internal"
+			case "wrong-hash":
+				reader.plan.Definition.TLS.Trust.Digest[0] ^= 1
+			case "changed-material":
+				reader.plan.TLSMaterial.RootsPEM += "\n"
+				reader.plan.TLSMaterial.RootsDigest = artifact.Digest(sha256.Sum256([]byte(reader.plan.TLSMaterial.RootsPEM)))
+			case "missing-material":
+				reader.plan.TLSMaterial = execution.GoProfileTLSMaterial{}
+			case "unapproved-material":
+				reader.plan.Definition.TLS = nil
+			case "credentials":
+				reader.plan.Definition.Credential = &planning.GoEndpointCredential{}
+			}
+			_, err := h.PrepareProfile(&objectstore.PreparedArtifact{}, e).StartProfile(t.Context(), reader.plan.Pin, now, now.Add(time.Second), endpoint)
+			if mode != "current" {
+				if err == nil || len(q.profiles) != 0 {
+					t.Fatal("unapproved TLS work queued", mode, err)
+				}
+				return
+			}
+			if err != nil || len(q.profiles) != 1 || q.profiles[0].Profile.TLS != material {
+				t.Fatal("protected TLS material not queued", err)
 			}
 		})
 	}
