@@ -1,0 +1,73 @@
+{
+  "sourceCommit": "f2f49124ee56795ab1bc6de42fa5a10455770a3f",
+  "nativeRun": 41789808818,
+  "suite": "continuation-manual-profile",
+  "workflowConclusion": "failure",
+  "goExit": 1,
+  "goSeconds": 745.941,
+  "reportedSourceHashesIndependentlyMatchedCommittedBlobs": 4107,
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "scratchRemoved": true,
+  "nativeBytes": 948,
+  "nativeSHA256": "3b70c28ed68f683dbee10891030c39941fee0bc331096f4c6e63da7394df7c11",
+  "passedAssertionsBeforeFailure": [
+    "original CPU10 capture/publication/raw download/local pprof",
+    "immutable capture history and fresh repeat preview",
+    "ordinary read-only CPU summary with exact total,384MiB worker,ten query units,three consumed key roles and joined lifetime",
+    "independent ProfilerBusy approval: exact terminal/no artifact/one HTTP/original owner survives cutoff/retained SQL control debit"
+  ],
+  "failure": "get_capture tools/call transport503 at07:23:07; SQL read_capacity_audit_profiles raised current capacity audit profile unavailable. Missing-endpoint/Stop whole-workflow qualification not established. Exact invalid current state under investigation.",
+  "files": {
+    "ci-native-continuation-manual-profile.log": {
+      "archive": "ci-native-continuation-manual-profile.log.gz",
+      "bytes": 5401,
+      "sha256": "02d37710124ce8238ea463be9fd5e22466bafef32aabe4f3e68150b56bf79e5f"
+    },
+    "context-storage-environment.json": {
+      "archive": "context-storage-environment.json.gz",
+      "bytes": 530584,
+      "sha256": "1935d28fc8208013a9f8440d8cd60b2dc66ea037e7179bf7c22b745a2e22ac64"
+    },
+    "context-storage-kubelet.log": {
+      "archive": "context-storage-kubelet.log.gz",
+      "bytes": 26633,
+      "sha256": "be5a5c9215b9dbcd346434280db7216926d6f53d7644d31974a63c08bebc4e83"
+    },
+    "context-storage-postgres.log": {
+      "archive": "context-storage-postgres.log.gz",
+      "bytes": 450637,
+      "sha256": "5e60c5d3974e3b70834e40fac41627a4a5ebd3b6698f6dcb8d29da40acbd52ac"
+    },
+    "context-storage-timing.log": {
+      "archive": "context-storage-timing.log.gz",
+      "bytes": 173160,
+      "sha256": "ba4275c6ab9c80e1dd8b7894e88098eba65976f8f1ee039b44a85746e0c70ce4"
+    },
+    "context-storage.log": {
+      "archive": "context-storage.log.gz",
+      "bytes": 163332,
+      "sha256": "82cc5f8165e9d92b885ca31d6504e7c6a20c235cdd13dc8c10768f337e91c50a"
+    },
+    "manual-profile-pprof.txt": {
+      "archive": "manual-profile-pprof.txt.gz",
+      "bytes": 1123,
+      "sha256": "8fe6f6093ad0a1273d0e8d4198abaaf9ff7997f4cd71473357c140f5f3a27463"
+    },
+    "manual-profile.pb.gz": {
+      "archive": "manual-profile.pb.gz.gz",
+      "bytes": 948,
+      "sha256": "3b70c28ed68f683dbee10891030c39941fee0bc331096f4c6e63da7394df7c11"
+    },
+    "profile-refusals-manual-41789808818-failed.log": {
+      "archive": "profile-refusals-manual-41789808818-failed.log.gz",
+      "bytes": 15024,
+      "sha256": "bfa9b88384da4f92c5bb1e6c664d4e8eea8b105abc76d9da0055f9df6c8c362b"
+    },
+    "profile-refusals-manual-41789808818-workflow.json": {
+      "archive": "profile-refusals-manual-41789808818-workflow.json.gz",
+      "bytes": 4753,
+      "sha256": "98933e3c3675c6e1dc04b427a60f17e52807066ac58eab0e8359123048a54483"
+    }
+  }
+}

@@ -47,6 +47,35 @@ weakening approvals, budgets or deadlines. Their original reports remain in the
 corresponding result directories. Successful qualification above supersedes their
 pending outcomes; no failed run is relabeled as passed.
 
+**Frozen candidate qualification:** [collector41789805115](https://github.com/phihos/asservat/actions/runs/41789805115)
+passed on `f2f49124ee56795ab1bc6de42fa5a10455770a3f`; Go exited0 in83.253s.
+Both before/after inventories contain4,103 paths and independently match every
+committed blob (8,206 comparisons); source stayed unchanged. Observed collector
+and workload Pod images match their recorded Kind manifests, separately from
+Docker config IDs. Harness-measured binary hashes, Pod/container identities,
+original reports and independent verification are retained in
+`test/results/profile-refusals-collector-41789805115/`. Binaries were not downloaded
+for independent rehash; scratch removal has no independent report field.
+
+The real application profiler stayed busy through the original refusal cutoff;
+the missing endpoint produced one failed request without native output/retry.
+CPU855bytes/6samples and heap1,710bytes/7samples matched report hashes and reopened
+locally. Collector RSS peaked368.49MiB against640MiB with two128MiB reservations;
+a third was refused and two Stop receipts joined in0.950s. This resource input
+is malformed trace data, not maximum-valid-trace publication qualification.
+Cluster and both images were cleaned, with no remaining outer Kind/Docker rows.
+These collector checks use synthetic admission authority; they do not establish
+installed public approval/accounting. Exact CI41789771763 passed. Manual41789808818
+failed after745.941s: CPU capture/native download/summary/repeat and the approved
+busy-owner refusal passed, then a progress read returned transport503 at audit
+begin. PostgreSQL recorded `current capacity audit profile unavailable`; the
+particular current source/root/permission condition remains under investigation.
+All4,107 reported source hashes independently match the same frozen commit,
+sources unchanged, cleanup[] and scratch removed. Its original reports and
+948-byte native CPU file remain in `test/results/profile-refusals-native-41789808818/`.
+This run does not establish the missing-endpoint/Stop workflow. No full S-05/spec
+exit follows; no unexplained automatic retry was dispatched.
+
 **Active outcome:** explicit Go endpoint refusals under REQ-PRF-001/002 /
 SC-PRF-002 and [ADR-298](decisions/298-explicit-go-profile-refusals.md), prepared
 in `/home/phil/Projekte/asservat-profile-refusals`, branch
