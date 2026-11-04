@@ -149,7 +149,7 @@ func (r repeatBudgetIdentity) Resolve(ctx context.Context, _ string) (identity.I
 // shorten that source observation or become storage authority. The namespace
 // heap fixture follows the same shared Go-profile repeat path as runtimeTrace.
 func TestProfileRepeatMeasuredReadinessBudget(t *testing.T) {
-	for _, mode := range []string{"success", "target-old", "target-replaced", "recovery-old", "recovery-epoch", "recovery-uid", "recovery-generation", "recovery-digest", "labels-policy-old", "retention-old", "parent", "history", "unsupported-late", "unsupported-warm"} {
+	for _, mode := range []string{"success", "target-old", "target-replaced", "recovery-old", "recovery-epoch", "recovery-uid", "recovery-generation", "recovery-digest", "labels-policy-old", "retention-old", "parent", "history", "unsupported-late", "unsupported-warm", "late-catalog"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Parallel()
 			measuredProfileRepeat(t, mode)
@@ -174,7 +174,13 @@ func measuredProfileRepeat(t *testing.T, mode string) {
 	f.svc.Capabilities = p
 	f.svc.Retention = p
 	f.svc.Processing = p
-	f.svc.Profiles = repeatReadinessCatalog{storedProfileCatalog: x.catalog, delay: 1200 * time.Millisecond}
+	catalog := repeatReadinessCatalog{storedProfileCatalog: x.catalog, delay: 1200 * time.Millisecond}
+	if mode == "late-catalog" {
+		// Deliberately returns complete valid documents after the supplied
+		// classification context expires; the service must enforce its phase.
+		catalog.check = func(ctx context.Context) error { <-ctx.Done(); return nil }
+	}
+	f.svc.Profiles = catalog
 	reviews := &repeatReadinessReview{}
 	f.svc.Reviews = reviews
 	reader.settings.ExpiresAt = start.Add(time.Minute)
@@ -199,6 +205,9 @@ func measuredProfileRepeat(t *testing.T, mode string) {
 			t.Fatal("warm unsupported history dependency refusal changed", err, p.demands.Load())
 		}
 		return
+	}
+	if mode == "late-catalog" && (p.recoveries.Load() != 1 || p.recorderReads.Load() != 0) {
+		t.Fatal("expired classification advanced into final observations", p.recoveries.Load(), p.recorderReads.Load())
 	}
 	if mode != "success" {
 		if err == nil || result.Recorder != nil || len(x.f.seen) != 0 || len(x.grants.requests) != 0 {

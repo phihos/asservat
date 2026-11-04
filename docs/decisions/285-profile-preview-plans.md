@@ -100,7 +100,9 @@ Cost: three SQL reads in one additional bounded transaction per such repeat;
 zero extra Kubernetes reads, refresh demands, APIs, privileges, watches, caches,
 pools, background owners or configuration. Existing required recorder reads are
 reordered, not duplicated. At R repeats per second the added SQL load is
-3R queries/R transactions per second; concurrency and owner counts do not grow. The browser preview timer matches the already
+3R queries/R transactions per second. The existing 250 ms storage polling may
+continue three seconds longer, up to 12 additional logical storage reads per
+stalled repeat; concurrency and owner counts do not grow. The browser preview timer matches the already
 accepted fifteen-second server window; other capture operations keep ten
 seconds. The capacity worker's original five-second source operation and
 quotas are unchanged. This is a maintainer-authorized practical composition

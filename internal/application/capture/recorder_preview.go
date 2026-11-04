@@ -141,6 +141,9 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 	}
 	var available bool
 	if profileRepeatCtx != nil && storageWait != nil && profileRecorderInput(intent) {
+		if until, ok := ctx.Deadline(); ctx.Err() != nil || !ok || !time.Now().Before(until) {
+			return zero, previewFailure("profiles/current", value.ErrChanged)
+		}
 		// Readiness is scheduling, not retained target/recovery authority.
 		// Join the same hint before the existing complete recorder resolution;
 		// its fresh Pod/namespace/workload facts must match the original pin.
