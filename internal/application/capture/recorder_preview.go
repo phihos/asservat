@@ -78,7 +78,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		return zero, previewFailure("facts/target", value.ErrChanged)
 	}
 	var storageWait *contextStorageWait
-	if original != nil && len(intent.Composition.Components) == 1 &&
+	if original != nil && s.Recorders != nil && target.ExecutionClass == artifact.ContextAPIExecution && len(intent.Composition.Components) == 1 &&
 		original.ClusterID == target.Request.ClusterID && original.NamespaceUID == target.Request.Namespace.UID &&
 		original.WorkloadUID == target.Request.Workload.UID && (original.PodUID == "" || original.PodUID == target.Request.PodUID) {
 		// Reuse this repeat's one readiness owner while current catalog and

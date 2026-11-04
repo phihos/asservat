@@ -109,6 +109,37 @@ independent verification/native analysis are retained byte-for-byte in
 `test/results/heap-profile-native-41812996977/`. Complete installed heap workflow
 qualification remains pending while the actual demand path is investigated.
 
+The repeat repair starts the existing sole storage wait after fresh matching
+target resolution for a single-component API repeat with recorder wiring, before
+namespace catalog/recorder reads. It reuses that owner
+at authoritative consumption; direct previews and replacement-target refusals
+retain their order. Original observations, five-second stage, one-second reply
+reserve and single demand remain fixed. See ADR-213; installed repair proof is
+pending. A realistic staged application regression reproduced the original
+private readiness-tail refusal at4.036s and passed with overlap in3.309s. One
+review/demand and two fresh reads were observed; the authority clock/proofs remain
+synthetic and the independent blocking ports use real timers. Target/history
+bounds, catalog-error/cancellation joins and replacement refusals pass. Affected
+races returned0/13.122s and independent review found no blocker. Root tightened
+the gate to existing API execution and configured recorder wiring; final local
+integration and installed checks remain pending. Reports are retained in
+`test/results/heap-profile-local/profile-repeat-readiness-*`.
+
+Repeat repair complexity review: (1) two consecutive installed heap repeat
+failures; the second identifies expired storage/readiness-tail. (2) No accepted
+authority risk is reopened. (3) Repeat after inspection is a normal workflow.
+(4) Reuses the earlier Request hint pattern in ADR-213. (5)0 privileges,
+credentials or exposure added. (6)0 new failure/fallback states. (7)0 settings.
+(8) Existing SQL/regional producer only. (9) Matching supported repeats retain
+one hint/read and at most one demand, overlapping catalog/recorder work; a
+matching unsupported/changed repeat may add the existing decision review, same
+bounded hint and at most one demand before refusing. The existing worker can
+refresh that demand within the unchanged60s/root16 limits.0 new watches or workers; one existing goroutine per owned
+preview, joined on every return. (10)No migration; reverting restores previous
+ordering. (11)Moving the existing owner is smaller than new combined RPCs or
+longer authority bounds. Local timing/cleanup tests and installed proof remain
+required; this does not establish the worker's underlying refresh outcome.
+
 Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
 selection for a saved heap; frequency is unmeasured, and this is an existing
 first-release requirement. Metadata/default conventions and the existing
