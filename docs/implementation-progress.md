@@ -32,13 +32,24 @@ There is no claim of last-worker capacity refund. Reports are retained in
 `test/results/syscall-native-41712526480/` and
 `test/results/syscall-native-41712531115/`. Original failed reports remain below.
 
-The active outcome is two-source `compare_profiles` under REQ-PRF-005 /
-SC-PRF-005 (ADR-295). PR152 remains unmerged. Its integration worktree is
-`/home/phil/Projekte/asservat-profile-comparison`, branch
-`feature/profile-comparison`, based on main `d9e0bcd1`. Exact CI41744343580
-passed on the preceding candidate `b3507934`; the latest runtime/test changes
-still need exact-current CI and installed qualification.
+Two-source `compare_profiles` (REQ-PRF-005 / SC-PRF-005, ADR-295) is merged in
+PR152, main `ecd246631db3f3c94e8e9b1ebe86b7d7f1334ed2`. Its complete tree equals
+qualified head `79b7cbcc`. Exact CI41759053513 and native41759075604 passed.
+Native Go exited0 in677.993s: two real CPU captures/native downloads, cross-case
+read-only MCP comparison and installed React self-comparison, independent native
+calculations, all12 role consumptions, two joined batches/workers,40 total query
+units and exact384MiB physical/transient/terminal worker proofs. Rendered UI rows
+matched the actual response. Original download workers were positively retired;
+final query workers remained charged. All4,071 source hashes independently
+match, sources stayed unchanged, cleanup was `[]` and scratch was removed.
+Both downloaded originals also reopened locally with pprof. Original reports,
+files and provenance are in `test/results/profile-comparison-native-41759075604/`.
 
+This qualifies the bounded ordinary two-source workflow on the recorded native
+environment; maximum-input VM/cgroup containment, broader negative cases and
+other S-05 features remain open. The next related implementation is finite
+policy-triggered Go profiles, preserving reviewed endpoint-definition facts and
+resolving each triggering Pod independently.
 The implementation independently authorizes both immutable sources, aggregates
 complete cumulative function values before top-N ranking, and retains one paid
 owner through semantic/size refusals and joined closure. SQL133 atomically
@@ -153,8 +164,8 @@ in this local fixture are synthetic; it does not substitute for the remaining
 installed React qualification. No production UI or permission change is made.
 
 No complete comparison requirement, S-05 slice or supported release is claimed.
-Actual React success after the dispatch fix, maximum-input containment,
-broader native negative cases and the remaining specification remain open.
+Maximum-input containment, broader native negative cases and the remaining
+specification remain open; the installed React/MCP happy path is qualified above.
 
 ### Earlier checkpoints
 

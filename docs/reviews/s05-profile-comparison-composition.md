@@ -1,6 +1,7 @@
 # Profile comparison composition proposal
 
-Status: integrated candidate; service and installed qualification pending. Scope: REQ-PRF-005 /
+Status: merged in PR152; bounded SQL/native MCP and React workflow qualified,
+maximum-input and wider native negatives remain open. Scope: REQ-PRF-005 /
 SC-PRF-005, S-05 increment 8. ADR-295 governs the current implementation. The
 [component checkpoint](s05-profile-comparison-component.md) covers the prepared
 parser and authenticated two-reader adapter; it supplies no public authority.
