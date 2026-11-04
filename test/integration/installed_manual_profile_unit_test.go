@@ -28,7 +28,7 @@ func TestInstalledManualProfileRequestCompiles(t *testing.T) {
 	}
 }
 
-func checkManualProfilePlan(t *testing.T, cluster string, input map[string]any) {
+func checkManualProfilePlan(t *testing.T, cluster string, input map[string]any, resolved ...planvalue.CatalogProfile) planvalue.RecorderPlan {
 	t.Helper()
 	raw, err := json.Marshal(input)
 	if err != nil {
@@ -50,6 +50,7 @@ func checkManualProfilePlan(t *testing.T, cluster string, input map[string]any) 
 	if err != nil {
 		t.Fatal("profile composition conversion", err)
 	}
+	composition.Resolved = resolved
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	target := targets.PodResolution{ExecutionClass: artifact.ContextAPIExecution, Request: targets.Request{ClusterID: cluster, Namespace: configuration.NamespaceRef{Name: "payments", UID: "namespace"}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload"}, PodName: "api-a", PodUID: "pod"}, Pin: artifact.PinnedPod{Namespace: "payments", NamespaceUID: "namespace", Name: "api-a", UID: "pod", ControllerUID: "replicaset"}, PodResourceVersion: "1", WorkloadResourceVersion: "2", ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	retention, err := privacy.Resolve(privacy.PolicySet{Target: target.Target(), Revision: identity.Revision{UID: "policies", Generation: 1, Digest: artifact.Digest{1}}, Complete: true, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Policies: []privacy.Policy{{Revision: identity.Revision{UID: "baseline", Generation: 1, Digest: artifact.Digest{2}}, Baseline: true, PurposeRef: "diagnostics", DefaultSeconds: 600, MaximumSeconds: 3600, DeletionBudgetSeconds: 10}}}, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "profile", RequestedSeconds: 600, AnchorAt: now}, now)
@@ -76,6 +77,7 @@ func checkManualProfilePlan(t *testing.T, cluster string, input map[string]any) 
 	if _, err := compiler.ProfileContextFromScope(*composition, target.Request, plan.CanonicalScope); err != nil {
 		t.Fatal("profile plan cannot enter accepted context execution", err)
 	}
+	return plan
 }
 
 func TestInstalledManualProfileFundsOneConservativeSummary(t *testing.T) {

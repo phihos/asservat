@@ -26,8 +26,10 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	planvalue "asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/transport/presentation"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -70,7 +72,7 @@ func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code str
 // The ordinary manual focuses qualify submission after preview expiry. The
 // comparison focus reuses that capture path twice to qualify saved analysis.
 func installedApprovedRecordingExpiryProof(focus string) bool {
-	return focus != "profile-comparison"
+	return focus != "profile-comparison" && !(focus == "manual-profile" && installedHeapProfileVariant())
 }
 
 // approvedRecordingArguments is the actual public request, validated offline
@@ -80,6 +82,9 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 		return manualArgumentsCaptureInput(cluster, namespace, workload, false)
 	}
 	if installedProfileFocus() {
+		if installedHeapProfileVariant() {
+			return manualHeapProfileArguments(cluster, namespace, workload)
+		}
 		return manualProfileArguments(cluster, namespace, workload)
 	}
 	if installedJourneyFocus() == "manual-raw" {
@@ -380,6 +385,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedJourneyFocus() == "manual-http" {
 		// ADR-282: extract downloads use ordinary eligibility; no result_access.
 		publishManualHTTPProfile(t, ctx, regionalConfig, namespace)
+	}
+	if installedProfileFocus() && installedHeapProfileVariant() {
+		definition, err := manualHeapProfileDefinition()
+		if err != nil {
+			t.Fatal(err)
+		}
+		publishNamespaceCaptureProfile(t, ctx, regionalConfig, namespace, manualHeapProfileName, "v1", definition)
 	}
 	var peerIPs []string
 	if installedJourneyFocus() == "manual-peers" {
@@ -739,12 +751,14 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	var evidence struct {
 		Artifacts []struct {
-			ID           string    `json:"artifact_id"`
-			DataClass    string    `json:"data_class"`
-			Kind         string    `json:"kind"`
-			Digest       string    `json:"digest"`
-			NativeFormat string    `json:"native_format"`
-			Expires      time.Time `json:"expires_at"`
+			ID                 string                               `json:"artifact_id"`
+			DataClass          string                               `json:"data_class"`
+			Kind               string                               `json:"kind"`
+			Digest             string                               `json:"digest"`
+			NativeFormat       string                               `json:"native_format"`
+			Expires            time.Time                            `json:"expires_at"`
+			Target             presentation.ContextCaseTargetData   `json:"target"`
+			ProfileAcquisition *presentation.ProfileAcquisitionData `json:"profile_acquisition"`
 		} `json:"artifacts"`
 	}
 	read("get_case", map[string]string{"case_id": progress.CaseID}, &evidence)
@@ -798,6 +812,19 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if evidence.Artifacts[0].DataClass != wantClass {
 		t.Fatal("case lists the recording with another data class", evidence.Artifacts[0].DataClass, wantClass)
 	}
+	var heapSummary query.ProfileSummary
+	if installedProfileFocus() && installedHeapProfileVariant() {
+		row := evidence.Artifacts[0]
+		facts := row.ProfileAcquisition
+		if row.Target.ClusterID != cluster || row.Target.Namespace != namespace || row.Target.WorkloadName != workload || row.Target.PodUID != preview.Pods[0].UID || row.Target.PodName != preview.Pods[0].Name || facts == nil || facts.RequestedType != "heap" || facts.Mode != "snapshot" || facts.RequestedDurationMillis != nil || facts.ForceGC || facts.StartedAt == nil || facts.CompletedAt == nil || facts.CompletedAt.Before(*facts.StartedAt) || facts.ClockUncertaintyMillis != nil || facts.ProcessAttribution != "unknown" {
+			t.Fatal("heap acquisition lost the approved original target/snapshot parameters", row)
+		}
+		heapSummary = queryInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, row.ID, row.Digest, "inuse_space", row.Expires, summaryCheck)
+		if heapSummary.Unit != "bytes" || heapSummary.DurationSeconds != nil || heapSummary.Total <= 0 {
+			t.Fatal("heap snapshot summary invented duration or lost allocation bytes", heapSummary)
+		}
+		t.Log("heap phase: read-only summary completed with joined SQL worker/key proof; native preparation has not been issued")
+	}
 	if measurement != nil {
 		if err := finishRecording(); err != nil {
 			t.Fatal(err)
@@ -822,6 +849,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+	if installedProfileFocus() && installedHeapProfileVariant() {
+		t.Log("heap phase: separately authorized native preparation begins after the joined read-only summary")
 	}
 	prepareDownload()
 	downloadID, deadline := download.DownloadID, download.ExpiresAt
@@ -911,6 +941,15 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		return
 	}
 	if installedProfileFocus() {
+		if installedHeapProfileVariant() {
+			qualifyManualHeapNative(t, ctx, native, receipt.CaptureID)
+			if err := installedProfileSummaryMatchesNative(heapSummary, native, "main.main"); err != nil {
+				t.Fatal("read-only heap summary differs from subsequently authorized native original", err)
+			}
+			qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke)
+			t.Log("installed heap snapshot: namespace profile, independent raw approval, original Pod, no forced GC, read-only inuse_space summary before separate authenticated native download; exact signed native total/bytes and null duration verified")
+			return
+		}
 		qualifyManualProfileNative(t, ctx, native, receipt.CaptureID)
 		if installedJourneyFocus() == "profile-comparison" {
 			retirement, err := finishInstalledSyscallNativeDownload(downloadID, invoke, stoppedDownload)
