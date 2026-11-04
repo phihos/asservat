@@ -1,6 +1,40 @@
 # Sustained implementation progress
 
 
+## Latest comparison qualification (2026-11-04)
+
+[Native41855035000 attempt2](https://github.com/phihos/asservat/actions/runs/41855035000/attempts/2)
+ran frozen `02e62a8931f1041733988c26b3226859ff8de21a`. Both MCP and React
+accepted-heavy comparisons completed, including rendered-row parity, joined native
+reads and the two live resource probes. Peak whole-container memory was262.95MiB
+and230.84MiB under384MiB; both observed500m CPU throttling, zero swap and zero
+memory high/max/OOM events. Native operations took18.966s and18.554s inside the
+original nearly20s requests. These counters include the finite observer through
+its snapshot; they do not measure analyzer-only cost, future idle time, capture
+overhead or all parser maxima. Existing root spending reached40 units without
+extra approvals or native downloads. All4,123 source hashes matched Git, sources
+stayed unchanged, cleanup was empty and build scratch was removed.
+
+The complete test nevertheless exited1 after673.948s: its deferred first live
+Pod lookup ran after that worker's original cutoff and normal retirement had
+removed the Pod. Successful earlier live probes are retained separately from
+this failed final assertion. Attempt1 was an infrastructure ENOSPC failure before
+the test, followed by one failed-job retry; it provides no runtime result.
+Original artifacts and audits are in
+`test/results/profile-heavy-native-41855035000/`.
+
+The fixture correction captures exact original SQL/Pod/key/source evidence after
+each result, before the next comparison can retire that Pod, and defers terminal
+joins and positive retirement checks. It must preserve failure-path inspection,
+original deadlines and charges;404 is never accepted as positive live evidence.
+The scheduling regression reproduces the original late-read failure; focused
+races pass2.480s and35 harness selector checks pass. Missing original Jobs require
+stored positive SQL retirement immediately; surviving exact terminal Jobs remain
+charged. No shared syscall cohort or production code changes. Independent review
+and fresh installed qualification remain pending. PR CI for the previous frozen
+02e head passed; that does not validate the fixture correction.
+The full S-05 and specification goal remains active.
+
 ## Current delivery workflow (2026-11-04)
 
 **Active outcome:** qualify one accepted-heavy two-source pprof comparison in the
