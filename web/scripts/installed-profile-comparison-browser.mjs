@@ -203,6 +203,23 @@ try {
   assert.equal(compareRequests + pollRequests, 0, 'no automatic query on case load or selection');
   assert.equal(caseRequests, 1, 'timing uses the original case response');
   event({ kind: 'ready' });
+  async function assertRenderedResult(result) {
+    const table = panel.getByRole('table', { name: heap ? 'Profile function costs' : 'Profile comparison function costs', exact: true });
+    const rows = heap ? result.top : result.rows;
+    await expect(table).toBeVisible();
+    await expect(table.getByRole('row')).toHaveCount(rows.length + 1);
+    for (const [index, row] of rows.entries()) {
+      await expect(table.getByRole('row').nth(index + 1).getByRole('cell')).toHaveText(heap
+        ? [row.function ?? 'Unresolved', row.flat.toLocaleString('en-US'), row.cumulative.toLocaleString('en-US'), row.fraction === null ? 'Unavailable' : `${(row.fraction * 100).toFixed(2)}%`]
+        : [row.function ?? 'Unresolved', row.baseline.toLocaleString('en-US'), row.incident.toLocaleString('en-US'), row.delta.toLocaleString('en-US')]);
+    }
+    if (heap) {
+      await expect(panel.locator('dt:has-text("Unit") + dd')).toHaveText('bytes');
+      await expect(panel.locator('dt:has-text("Total") + dd')).toHaveText(result.total.toLocaleString('en-US'));
+      await expect(panel.locator('dt:has-text("Duration") + dd')).toHaveText('Unavailable');
+    }
+  }
+  let heapSummaryChecked = false;
   let handle;
   let terminal = false;
   let terminalComparison;
@@ -211,7 +228,7 @@ try {
   for (;;) {
     const next = await command();
     if (next.kind === 'download') {
-      assert(heap && terminal && !nativeCompleted, 'one native download after summary');
+      assert(heap && terminal && heapSummaryChecked && !nativeCompleted, 'one native download after rendered summary');
       stage = 'heap-native-prepare';
       let from = seen.length;
       await panel.locator('..').getByRole('button', { name: 'Download', exact: true }).click();
@@ -254,22 +271,22 @@ try {
       assert(terminal && compareRequests === 1 && pollRequests <= 4, 'exact original query count');
       assert.equal(caseRequests, 1, 'no extra timing metadata read');
       await expect(timing).toBeVisible();
-      if (!heap) await expect(panel.getByRole('table', { name: 'Profile acquisition details', exact: true })).toBeVisible();
-      const table = panel.getByRole('table', { name: heap ? 'Profile function costs' : 'Profile comparison function costs', exact: true });
-      await expect(table).toBeVisible();
-      await expect(table.getByRole('row')).toHaveCount((heap ? terminalComparison.top : terminalComparison.rows).length + 1);
-      for (const [index, row] of (heap ? terminalComparison.top : terminalComparison.rows).entries()) {
-        await expect(table.getByRole('row').nth(index + 1).getByRole('cell')).toHaveText([
-          ...(heap ? [row.function ?? 'Unresolved', row.flat.toLocaleString('en-US'), row.cumulative.toLocaleString('en-US'), row.fraction === null ? 'Unavailable' : `${(row.fraction * 100).toFixed(2)}%`] : [row.function ?? 'Unresolved', row.baseline.toLocaleString('en-US'), row.incident.toLocaleString('en-US'), row.delta.toLocaleString('en-US')]),
-        ]);
-      }
       if (heap) {
-        assert(nativeCompleted, 'native download before joined close');
-        await expect(panel.locator('dt:has-text("Unit") + dd')).toHaveText('bytes');
-        await expect(panel.locator('dt:has-text("Total") + dd')).toHaveText(terminalComparison.total.toLocaleString('en-US'));
-        await expect(panel.locator('dt:has-text("Duration") + dd')).toHaveText('Unavailable');
+        assert(heapSummaryChecked && nativeCompleted, 'rendered summary and native download before joined close');
+        const table = panel.getByRole('table', { name: 'Profile function costs', exact: true });
+        // A separately authorized download may outlast this original view.
+        // Accept clearing only with the actual expired state, never renew it.
+        if (await table.count() === 0) {
+          await expect(panel.getByRole('status')).toHaveText('This view has expired. Inspect again to request a fresh view.');
+          process.stderr.write('installed heap summary expired during native download; no additional query\n');
+        } else {
+          await expect(table).toBeVisible();
+        }
         await panel.getByRole('button', { name: 'Close view', exact: true }).click();
         await expect(table).toHaveCount(0);
+      } else {
+        await expect(panel.getByRole('table', { name: 'Profile acquisition details', exact: true })).toBeVisible();
+        await assertRenderedResult(terminalComparison);
       }
       stage = 'result-profile-timing-mobile';
       await assertTimingMobile();
@@ -311,6 +328,12 @@ try {
       assert.equal(response.reply.status, 'ok');
       terminalComparison = name === 'get_query_result' ? response.reply.data.result.data : response.reply.data;
       terminal = true;
+      if (heap) {
+        stage = 'heap-summary-rendered';
+        await assertRenderedResult(terminalComparison);
+        heapSummaryChecked = true;
+        process.stderr.write('installed heap summary rows/bytes/null duration checked before native download\n');
+      }
     }
   }
 } catch (error) {

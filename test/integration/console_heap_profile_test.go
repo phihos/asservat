@@ -28,6 +28,16 @@ import (
 // Real GoTLS/static React and the exact installed driver; source/profile,
 // session, query and download facts are deliberately synthetic. No SQL/KMS proof.
 func TestConsoleHeapProfileWithBuiltPackage(t *testing.T) {
+	for _, expireDuringNative := range []bool{false, true} {
+		name := "current-view"
+		if expireDuringNative {
+			name = "expires-during-native"
+		}
+		t.Run(name, func(t *testing.T) { testConsoleHeapProfileWithBuiltPackage(t, expireDuringNative) })
+	}
+}
+
+func testConsoleHeapProfileWithBuiltPackage(t *testing.T, expireDuringNative bool) {
 	if os.Getenv("ASSERVAT_CONSOLE_BROWSER_TEST") != "1" {
 		t.Skip("set ASSERVAT_CONSOLE_BROWSER_TEST=1 after building web/dist")
 	}
@@ -67,6 +77,10 @@ func TestConsoleHeapProfileWithBuiltPackage(t *testing.T) {
 	data["symbol_status"] = "complete"
 	observed := time.Now().UTC()
 	expires := observed.Add(time.Minute)
+	const shortView = 3 * time.Second
+	if expireDuringNative {
+		expires = observed.Add(shortView)
+	}
 	data["query_observed_at"], data["query_expires_at"] = observed, expires
 	result["provenance"] = []any{map[string]any{"artifactID": consoleCaptureID(81), "digest": "09" + strings.Repeat("00", 31)}}
 	comparison := &consoleSyntheticComparisonOperations{heap: true, origin: origin, wire: wire, result: result, cases: caseOps, t: t}
@@ -77,7 +91,7 @@ func TestConsoleHeapProfileWithBuiltPackage(t *testing.T) {
 	if err := pp.Write(&payload); err != nil {
 		t.Fatal(err)
 	}
-	downloads := &consoleHeapDownloads{consoleRestartDownloads: consoleRestartDownloads{created: time.Now().UTC()}, native: payload.Bytes()}
+	downloads := &consoleHeapDownloads{consoleRestartDownloads: consoleRestartDownloads{created: time.Now().UTC()}, native: payload.Bytes(), readyImmediately: expireDuringNative}
 	downloadOps, err := presentation.NewContextDownloadOperations(presentation.ContextDownloadOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: func() string { return consoleCaptureID(502) }}, downloads, downloads)
 	if err != nil {
 		t.Fatal(err)
@@ -90,6 +104,13 @@ func TestConsoleHeapProfileWithBuiltPackage(t *testing.T) {
 		if r.URL.Path == "/api/v1/session" || strings.HasPrefix(r.URL.Path, "/auth/") {
 			sessionHandler.ServeHTTP(w, r)
 		} else if strings.HasPrefix(r.URL.Path, "/api/v1/operations/") {
+			if expireDuringNative && r.URL.Path == "/api/v1/operations/get_profile_summary" {
+				comparison.mu.Lock()
+				observed = time.Now().UTC()
+				expires = observed.Add(shortView)
+				data["query_observed_at"], data["query_expires_at"] = observed, expires
+				comparison.mu.Unlock()
+			}
 			operations.ServeHTTP(w, r)
 		} else if strings.HasPrefix(r.URL.Path, browser.DownloadContentPrefix) {
 			cookie, e := r.Cookie(browser.SessionCookie)
@@ -108,6 +129,17 @@ func TestConsoleHeapProfileWithBuiltPackage(t *testing.T) {
 			downloads.mu.Lock()
 			downloads.nativeCalls++
 			downloads.mu.Unlock()
+			if expireDuringNative {
+				// Native transfer has its own lifetime. Hold its body beyond the
+				// summary's original interval without another query.
+				timer := time.NewTimer(shortView + time.Second)
+				defer timer.Stop()
+				select {
+				case <-timer.C:
+				case <-r.Context().Done():
+					return
+				}
+			}
 			w.Header().Set("Content-Disposition", `attachment; filename="artifact-`+consoleCaptureID(81)+`.pb.gz"`)
 			w.Header().Set("Content-Type", "application/octet-stream")
 			w.Header().Set("Content-Length", strconv.Itoa(len(downloads.native)))
@@ -155,9 +187,14 @@ func TestConsoleHeapProfileWithBuiltPackage(t *testing.T) {
 	defer cases.mu.Unlock()
 	downloads.mu.Lock()
 	defer downloads.mu.Unlock()
-	if events != 2 || comparison.starts != 1 || comparison.polls != 1 || cases.calls != 1 || downloads.stats.Accepted != 1 || len(downloads.stats.PrepareKeys) != 2 || downloads.stats.PrepareKeys[0] != downloads.stats.PrepareKeys[1] || downloads.nativeCalls != 1 {
+	wantPrepares := 2
+	if expireDuringNative {
+		wantPrepares = 1
+	}
+	if events != 2 || comparison.starts != 1 || comparison.polls != 1 || cases.calls != 1 || downloads.stats.Accepted != 1 || len(downloads.stats.PrepareKeys) != wantPrepares || wantPrepares == 2 && downloads.stats.PrepareKeys[0] != downloads.stats.PrepareKeys[1] || downloads.nativeCalls != 1 {
 		t.Fatal("extra synthetic acquisition/query/download", events, comparison.starts, comparison.polls, cases.calls, downloads.stats, downloads.nativeCalls)
 	}
+	t.Logf("summary interval=%s; native body hold=%t", expires.Sub(observed), expireDuringNative)
 	t.Log("Same installed heap driver/wrapper; real GoTLS/static React/Evidence HTTP/CSRF and one browser attachment; synthetic session/profile/summary/download service, no SQL/KMS/installed authority proof")
 }
 
@@ -178,8 +215,9 @@ func (s *consoleHeapOperations) Call(ctx context.Context, current identities.Cur
 
 type consoleHeapDownloads struct {
 	consoleRestartDownloads
-	native      []byte
-	nativeCalls int
+	native           []byte
+	nativeCalls      int
+	readyImmediately bool
 }
 
 func (s *consoleHeapDownloads) metadata(v evidence.ContextDownloadView) evidence.ContextDownloadView {
@@ -196,7 +234,7 @@ func (s *consoleHeapDownloads) PrepareContextDownload(ctx context.Context, c ide
 	s.mu.Lock()
 	first := len(s.stats.PrepareKeys) == 1
 	s.mu.Unlock()
-	if e == nil && first {
+	if e == nil && first && !s.readyImmediately {
 		v.Session.State = artifact.DownloadPreparing
 		v.Metadata = nil
 		v.ContinuePreparation = true
