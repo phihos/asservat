@@ -1,6 +1,6 @@
 # ADR-297: verified profile acquisition metadata in cases
 
-Status: implemented; local/service qualification passed, installed qualification pending.
+Status: implemented; final-candidate qualification pending.
 
 ## Context
 
@@ -101,3 +101,9 @@ activation also passed. Source hashes, actual exits and cleanup are recorded in
 `test/results/profile-timing-services/`, `test/results/profile-timing-schema/`
 and `test/results/profile-timing-local/`. The history fixture does not publish
 history parameters; no complete history-list or installed-profile claim follows.
+
+The first installed CPU10 policy workflow passed in native41777263417 at92353e88,
+including exact public/SQL timing, native download and unchanged-source/cleanup
+proof. CI caught a mobile table overflow; an existing wrapping class fixes it,
+with fonts-loaded375px/320px RED/GREEN and full browser qualification. Final-head
+CI/native remain pending; preserve the separate scope/date of each report.

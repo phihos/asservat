@@ -1,0 +1,17 @@
+{
+  "sourceCommit": "92353e882ee1f5b518ba04fb48c0397405b6994a",
+  "nativeRun": 41777263417,
+  "suite": "continuation-policy-profile",
+  "workflowConclusion": "success",
+  "goExit": 0,
+  "goSeconds": 675.579,
+  "sourceHashesMatchedCommittedBlobs": 4097,
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "scratchRemoved": true,
+  "nativeBytes": 1104,
+  "nativeSHA256": "e7b156aec3b32d58f0fe065e44dc0f8a61501de1b03df37a8706a77d25423a58",
+  "scope": "Installed CPU10 policy capture, native download, authenticated public HTTP acquisition window equals SQL UTC-microsecond pair; clock uncertainty/process attribution unknown. Predates mobile table-class/browser-driver fix; final candidate CI/native pending.",
+  "originalNativeArchivedAs": "policy-profile.pb.gz.gz",
+  "ciConsoleFailure": 41777258213
+}

@@ -80,8 +80,25 @@ Fresh owned Kubernetes/SQL/S3/OpenBao schema installation and original activatio
 passed146.799s with the actual compiled bundle/product Pod. All4,097 hashes match
 committed blobs, sources unchanged, cleanup failures[] and scratch removed; see
 `test/results/profile-timing-schema/`. Local gate/browser logs are in
-`test/results/profile-timing-local/`. Exact-head CI and fresh installed case timing
-remain pending. This does not establish measured clock offsets, serving-process
+`test/results/profile-timing-local/`.
+
+Fresh native41777263417 at head92353e88 passed (Go675.579s). Installed CPU10
+policy capture/publication, separate raw approval/native download and ordinary
+case metadata verified the authenticated UTC-microsecond pair, with clock and
+serving-process facts unknown. All4,097 hashes match committed blobs; source
+unchanged, cleanup failures[] and scratch removed. The1,104-byte native file
+matches SHA256`e7b156aec3b32d58f0fe065e44dc0f8a61501de1b03df37a8706a77d25423a58`
+and reopened locally with pprof. Original reports/native bytes are retained in
+`test/results/profile-timing-native-41777263417/`.
+
+CI41777258213 found narrow-viewport overflow in the collection timing table.
+A robust fonts-loaded browser regression reproduced375px viewport/379px page.
+The fix reuses existing table wrapping styles;375px and320px now stay within the
+viewport before and after comparison results. Full built-console browser gates
+passed33.230s; original CI/local RED/GREEN reports are retained in
+`test/results/profile-timing-mobile/`. That frontend fix postdates the first
+native run; exact final-candidate CI and fresh native qualification remain
+pending. This does not establish measured clock offsets, serving-process
 correlation, other/longer profile modes, S-05 or full-spec completion.
 
 Next after timing delivery: preserve the required `ProfileUnavailable` result
