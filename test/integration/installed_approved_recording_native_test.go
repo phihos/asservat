@@ -817,8 +817,8 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if installedProfileFocus() && installedHeapProfileVariant() {
 		row := evidence.Artifacts[0]
 		facts := row.ProfileAcquisition
-		if row.Target.ClusterID != cluster || row.Target.Namespace != namespace || row.Target.WorkloadName != workload || row.Target.PodUID != preview.Pods[0].UID || row.Target.PodName != preview.Pods[0].Name || facts == nil || facts.RequestedType != "heap" || facts.Mode != "snapshot" || facts.RequestedDurationMillis != nil || facts.ForceGC || facts.StartedAt == nil || facts.CompletedAt == nil || facts.CompletedAt.Before(*facts.StartedAt) || facts.ClockUncertaintyMillis != nil || facts.ProcessAttribution != "unknown" {
-			t.Fatal("heap acquisition lost the approved original target/snapshot parameters", row)
+		if row.Target.ClusterID != cluster || row.Target.Namespace != namespace || row.Target.WorkloadName != workload || row.Target.PodUID != preview.Pods[0].UID || (row.Target.PodName != "" && row.Target.PodName != preview.Pods[0].Name) || facts == nil || facts.RequestedType != "heap" || facts.Mode != "snapshot" || facts.RequestedDurationMillis != nil || facts.ForceGC || facts.StartedAt == nil || facts.CompletedAt == nil || facts.CompletedAt.Before(*facts.StartedAt) || facts.ClockUncertaintyMillis != nil || facts.ProcessAttribution != "unknown" {
+			t.Fatalf("heap acquisition lost the approved original target/snapshot parameters: target=%+v profile=%+v", row.Target, facts)
 		}
 		heapSummary = queryInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, row.ID, row.Digest, "inuse_space", row.Expires, summaryCheck)
 		if heapSummary.Unit != "bytes" || heapSummary.DurationSeconds != nil || heapSummary.Total <= 0 {

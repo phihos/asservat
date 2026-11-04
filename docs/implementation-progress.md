@@ -49,6 +49,21 @@ reported hashes independently matched to committed inputs, unchanged source and
 cleanup[]. These use synthetic current authority and do not establish installed
 heap success. Originals are in `test/results/heap-profile-review-services/`.
 
+Corrected approval candidate ce3078cf passed exact CI41805593151; native41805977672
+then passed independent review, capture/publication and raw pprof catalog lookup,
+but failed its new metadata assertion after508.561s. The fixture required optional
+`pod_name`, while the established recorder projection intentionally omits it.
+The original PodUID was present. All4,115 source hashes match ce3078cf, source
+unchanged, cleanup[] and scratch removed. Summary/download/repeat were not reached;
+no native file was downloaded. Originals and the canonical required-field check
+are retained in `test/results/heap-profile-native-41805977672/`.
+
+The fixture now retains the exact original PodUID check, permits an omitted
+optional display name and rejects a conflicting supplied name. Other profile
+metadata assertions remain; future failures print public target/acquisition
+facts rather than a pointer. No product/authority contract changes. Affected
+fixture races pass; complete installed heap qualification remains pending.
+
 Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
 selection for a saved heap; frequency is unmeasured, and this is an existing
 first-release requirement. Metadata/default conventions and the existing
