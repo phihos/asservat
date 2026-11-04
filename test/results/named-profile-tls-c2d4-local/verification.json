@@ -1,0 +1,315 @@
+{
+  "format": "asservat-private-tls-c2d4-integrated-local/v1",
+  "source": "fa692d496c606058493ab130c00f9ad79494da9d",
+  "base": "c2d4f74bb6cd393df5682159495c0bd606c4e61a",
+  "commands": {
+    "cwd": "/home/phil/Projekte/asservat-profile-tls-integrated",
+    "source": "fa692d496c606058493ab130c00f9ad79494da9d",
+    "initial": {
+      "command": "set -e; mkdir -p /home/phil/.cache/asservat-build/profile-tls-rebase-c2d4; export TMPDIR=/home/phil/.cache/asservat-build/tmp; export GOTMPDIR=/home/phil/.cache/asservat-build/tmp; export GOFLAGS='-buildvcs=false -p=2'; export PATH=/home/phil/.cache/asservat-build/spec-venv/bin:/home/phil/.cache/asservat-build/bin:$PATH; make pre-push profile-preflight console-browser-check > /home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/final-integrated-gates.log 2>&1",
+      "session": 64481,
+      "exit": 2,
+      "outcome": "Pre-push console-check failed solely missingyaml/node_modules. Otherpre-push constituents passed; later profile-preflight/browser commands in this invocation did not execute."
+    },
+    "remaining": {
+      "command": "set -e; export TMPDIR=/home/phil/.cache/asservat-build/tmp; export GOTMPDIR=/home/phil/.cache/asservat-build/tmp; export GOFLAGS='-buildvcs=false -p=2'; export PATH=/home/phil/.cache/asservat-build/spec-venv/bin:/home/phil/.cache/asservat-build/bin:$PATH; make console-install > /home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/dependency-setup.log 2>&1; make console-check profile-preflight console-browser-check > /home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/final-integrated-remaining-gates.log 2>&1",
+      "session": 55613,
+      "exit": 0,
+      "dependencySetupExit": 0,
+      "outcome": "Pinned npmciignore-scripts no-audit; strict remainingcheck chain passed. Console443tests/39files, profilepreflight integration6.167s, builtGoTLS/Reactbrowser70.316s/28journeys27a11y."
+    },
+    "provenance": "Exact shell text/environment and terminalexits supplied by executing root; archive agent did not rerun gates. PATH suffix is original inherited $PATH, not invented."
+  },
+  "sourceInventory": {
+    "reportedFiles": 5353,
+    "matchedGitBlobs": 5353,
+    "mismatches": [],
+    "sourceWriters": "Root held fa692d49 source writers frozen throughout gates; current alltracked inputs outside results independently match Git after gates. No continuous filesystem-monitoring claim."
+  },
+  "results": {
+    "initialPrePushExit": 2,
+    "dependencySetupExit": 0,
+    "strictRemainingExit": 0,
+    "consoleUnitTests": 443,
+    "consoleTestFiles": 39,
+    "profilePreflightIntegrationSeconds": 6.167,
+    "consoleBrowserSeconds": 70.316,
+    "browserJourneys": 28,
+    "accessibilityScans": 27,
+    "externalCSPOrRuntimeErrors": false,
+    "scope": "Actual builtReact/GoTLS/session/operations with synthetic identity/case/query facts. Not installed TLSCPU/wrongpeer orSQL/custody qualification."
+  },
+  "archive": [
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/final-integrated-gates.log",
+      "archive": "final-integrated-gates.log.gz",
+      "originalBytes": 11582,
+      "originalSHA256": "70de98c918670c5cece9e53336e9f224053918efb59565c502a28f2e97ff2938",
+      "gzipBytes": 2486,
+      "gzipSHA256": "aa9bcc211f6f35e994dde62a41329f41a92ade71fae8ea8478539fdcd73e91bd",
+      "gitBlob": "92ccdf902edbb050174b3ba8d037edc6979900f6",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/dependency-setup.log",
+      "archive": "dependency-setup.log.gz",
+      "originalBytes": 71,
+      "originalSHA256": "59fe981764dc54efa5a1c7a36acd4fd1dbb27e3f6a6d0807d3db94d22b50114b",
+      "gzipBytes": 86,
+      "gzipSHA256": "e0a00ee51ba8dd25c0adce42ae3b97bb71d0bcd8566a5c11d98a038c6a4d6612",
+      "gitBlob": "7f67eba427e8fedd3d3f8966d8970dabada19881",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/final-integrated-remaining-gates.log",
+      "archive": "final-integrated-remaining-gates.log.gz",
+      "originalBytes": 15004,
+      "originalSHA256": "2bd2c2084a39a9b96ca31fe33975ab3d35f43c67ad3e803693848d7068d1b986",
+      "gzipBytes": 3353,
+      "gzipSHA256": "df34c226d068eb0afb20f02a8745a330de5ad1a707c64a8b0351d20f6d56f0e4",
+      "gitBlob": "cbc041f2b39fc90273dd6fe9855d97991021fd75",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/handoff.json",
+      "archive": "handoff.json.gz",
+      "originalBytes": 2336,
+      "originalSHA256": "66227d9b37f45acf52a9812144936a409d61e24b206766acde6c63cf04f178bb",
+      "gzipBytes": 1151,
+      "gzipSHA256": "c2669915eecd40780515dddbd4dc013821c634ac8319d307c6a81598fbe47810",
+      "gitBlob": "099dc04efc96c2ed11a3a4edaaffb17aadaed254",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/provenance.json",
+      "archive": "provenance.json.gz",
+      "originalBytes": 24003,
+      "originalSHA256": "627d251e99d4391d231fdb4c0da116e3585fd001f0b84959ecac508f5bfeaec0",
+      "gzipBytes": 4218,
+      "gzipSHA256": "5f98f166a71b995eb6a86b9e043687461e164bad769bf5976cee3018ce3d183f",
+      "gitBlob": "d225d69467bf70f703cec2c7bb4c718ef8d0b8b6",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/signatures.json",
+      "archive": "signatures.json.gz",
+      "originalBytes": 1851,
+      "originalSHA256": "18bb37a1d9f2efeb8e380ede96d7eb19ddef77f82add4daf912243e123fecc8f",
+      "gzipBytes": 412,
+      "gzipSHA256": "88104f9715eb6c857f48ce050b923efbde815102de56f460bb49792e91a36830",
+      "gitBlob": "6efd9931d0d00bf0614c2260399d2a2e216e180e",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/final-gate-source-inventory.json",
+      "archive": "final-gate-source-inventory.json.gz",
+      "originalBytes": 1439467,
+      "originalSHA256": "c93fa9bc82abf626e0af3677e6eab7144ca366d208b1dd271f8cd53514183d5a",
+      "gzipBytes": 433476,
+      "gzipSHA256": "946e21829a6d72143e681026de9ea2f5e68a1a55fa280b324726541e16d60471",
+      "gitBlob": "4268d419c0664c1d654550c86e8709e38a6421db",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-c2d4/final-gate-commands.json",
+      "archive": "final-gate-commands.json.gz",
+      "originalBytes": 1872,
+      "originalSHA256": "d8036836f3072afa05e2f85006099ee7e494e5610b4f41e6b79f1f04e58296a9",
+      "gzipBytes": 719,
+      "gzipSHA256": "b4cb0c15e7819f94567a68f68e44bd48fdbd8759182f61b23ecd297803926d83",
+      "gitBlob": "8f007a7132387adaeca6ae323696afddc6d40bae",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-browser/capture-review-mobile.png",
+      "archive": "console/console-browser/capture-review-mobile.png.gz",
+      "originalBytes": 100771,
+      "originalSHA256": "97394c8896821c803603f416d95219036a7187c185b1c2c8b37c152ea36b282a",
+      "gzipBytes": 94350,
+      "gzipSHA256": "1dac79d36e19767e50a2fc30d7c07ea5a360a5249bb570f12d202cc43923b244",
+      "gitBlob": "51cbec2c15b80bab4b94c7d1a592d79cebb079b4",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-browser/capture-review.png",
+      "archive": "console/console-browser/capture-review.png.gz",
+      "originalBytes": 115229,
+      "originalSHA256": "f1b7f6eb747c1b993c8725f7811417f3aa0469f29759669f3f726ca25020613a",
+      "gzipBytes": 102852,
+      "gzipSHA256": "d2b12393c33ccd7653c9e37e9c66f726f160f47014bb74e6a24d561474b3c6b2",
+      "gitBlob": "c765fb3b0488db03cdc266ea8c83a14b54264382",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-browser/case-evidence-mobile.png",
+      "archive": "console/console-browser/case-evidence-mobile.png.gz",
+      "originalBytes": 50955,
+      "originalSHA256": "a32658f94860db7328709f72f76c097578de4efe744bec52e80fb9aefc3dfee6",
+      "gzipBytes": 47635,
+      "gzipSHA256": "b4cb6702e9b59957b2c568e524a64cd7367f11101a0c453d85932dac44816b37",
+      "gitBlob": "f26a2f563556ef22e7330073f4e70a644cd63d72",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-browser/case-evidence.png",
+      "archive": "console/console-browser/case-evidence.png.gz",
+      "originalBytes": 60583,
+      "originalSHA256": "7a84a088a03264d7bc329815a6b232102d8dcd60303a5d9be434cd475484ce8e",
+      "gzipBytes": 52853,
+      "gzipSHA256": "a9c2caa89c51e11800fb02e25e57b8dd0445748876096b964a30110d677136e2",
+      "gitBlob": "568f7df1d107342cea8cc348521005563caad8fb",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-browser/report.json",
+      "archive": "console/console-browser/report.json.gz",
+      "originalBytes": 4138,
+      "originalSHA256": "9c5d4c92a0494c6f75bd986020094046dd9f5f58030c7fc166b1d21dcc597eb6",
+      "gzipBytes": 1857,
+      "gzipSHA256": "572598f42f2a6a120272244188ee6d41cb492cf7d5329639811ce2357f78e767",
+      "gitBlob": "cb31892dae6cf1af2e1244aacfb419e8111b4fad",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-native-restart/failed-native-ready.png",
+      "archive": "console/console-native-restart/failed-native-ready.png.gz",
+      "originalBytes": 118009,
+      "originalSHA256": "1f672ed98f58e17d80f9b5e1cde491d78e0c3cff0791be9b11a9d2f7d9baa00c",
+      "gzipBytes": 107473,
+      "gzipSHA256": "1400dce6639aebd9a69ec2ea942152126842bda8638f5f5693a2e7d17f2b31ef",
+      "gitBlob": "db2c5be75166c499073c93749a99b910e28e65ef",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-browser/heap-summary-mobile.png",
+      "archive": "console/console-browser/heap-summary-mobile.png.gz",
+      "originalBytes": 239665,
+      "originalSHA256": "986c19b75837bea23dcef1ad8623fb43feab3cef0b473637f37db01ad030c3ad",
+      "gzipBytes": 221907,
+      "gzipSHA256": "aaf90ce5a955712f7a8729efd362952ec28b5631d5df81ae9c41fd95c6b14455",
+      "gitBlob": "f96983cf16402f3d15a3a99c999f1582b0acdc0f",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-browser/policy-budgets.png",
+      "archive": "console/console-browser/policy-budgets.png.gz",
+      "originalBytes": 168303,
+      "originalSHA256": "b3f05f6c16bbed04f8657756e3e92d5955f34ab75a214ad33a00d13b4f51aa1d",
+      "gzipBytes": 150791,
+      "gzipSHA256": "7648d2161cb0c1cc308bd196d39a89eb2e682d9324913d108774a3ebb482241c",
+      "gitBlob": "6ad5f34ae9ec8ad0cb92d910bea88ff0bac45346",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-browser/policy-manager.png",
+      "archive": "console/console-browser/policy-manager.png.gz",
+      "originalBytes": 140242,
+      "originalSHA256": "c66aa1a3ae1181d37c3c014f71aac6c8e18303ce601f883cdafb2a5d0cf89443",
+      "gzipBytes": 129181,
+      "gzipSHA256": "c33946dcda900d2cadec38f30c1cc0b2a91843c527b29702cb0ab7070973efdc",
+      "gitBlob": "f55a681e8a7e7325dda26051a9f76a3847b8e2eb",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-browser/profile-summary-mobile.png",
+      "archive": "console/console-browser/profile-summary-mobile.png.gz",
+      "originalBytes": 234831,
+      "originalSHA256": "8c2d8644f3ece7d78290dd9add784f7b64500e7d2fb755e2616f18e394b60eee",
+      "gzipBytes": 217641,
+      "gzipSHA256": "b8e700844ee8b8029a2352fb5db4f1d633239c9cb250d320d694a8c5253d193b",
+      "gitBlob": "8491daee8c844e012162451081ac575b56fb0aff",
+      "completeOriginalAndGitReadbackMatches": true
+    },
+    {
+      "source": "test/results/console-browser/saved-syscall-events-mobile.png",
+      "archive": "console/console-browser/saved-syscall-events-mobile.png.gz",
+      "originalBytes": 181655,
+      "originalSHA256": "ef991eb34a568d48ba0a13290ff816d54badeff155d26115b610ff02e5f42458",
+      "gzipBytes": 169993,
+      "gzipSHA256": "3a8a62ddf05dfe4fc6d01283d3378d1ae841760820628c2f1f61cdee6ba2a09b",
+      "gitBlob": "60a8d8220476b8ed758720b63fa88390a08d94c8",
+      "completeOriginalAndGitReadbackMatches": true
+    }
+  ],
+  "ownedConsoleOutputs": {
+    "tracked": [
+      "test/results/console-browser/capture-review-mobile.png",
+      "test/results/console-browser/capture-review.png",
+      "test/results/console-browser/case-evidence-mobile.png",
+      "test/results/console-browser/case-evidence.png",
+      "test/results/console-browser/report.json",
+      "test/results/console-native-restart/failed-native-ready.png"
+    ],
+    "untracked": [
+      "test/results/console-browser/heap-summary-mobile.png",
+      "test/results/console-browser/policy-budgets.png",
+      "test/results/console-browser/policy-manager.png",
+      "test/results/console-browser/profile-summary-mobile.png",
+      "test/results/console-browser/saved-syscall-events-mobile.png"
+    ],
+    "stateBeforeArchive": {
+      "test/results/console-browser/capture-review-mobile.png": " M",
+      "test/results/console-browser/capture-review.png": " M",
+      "test/results/console-browser/case-evidence-mobile.png": " M",
+      "test/results/console-browser/case-evidence.png": " M",
+      "test/results/console-browser/report.json": " M",
+      "test/results/console-native-restart/failed-native-ready.png": " M",
+      "test/results/console-browser/heap-summary-mobile.png": "??",
+      "test/results/console-browser/policy-budgets.png": "??",
+      "test/results/console-browser/policy-manager.png": "??",
+      "test/results/console-browser/profile-summary-mobile.png": "??",
+      "test/results/console-browser/saved-syscall-events-mobile.png": "??"
+    },
+    "restorePlan": "Only these6tracked files tosourceHEAD; only these5archiveduntracked files removed. Archive all originals first. Restore verification recorded separately.",
+    "restoration": {
+      "trackedReadbacks": [
+        {
+          "path": "test/results/console-browser/capture-review-mobile.png",
+          "restoredToSourceGitBlob": true,
+          "bytes": 100768,
+          "sha256": "a73463f92104b91d8624b8ed037f183fc462ddf017f948a957062dcf8747d454"
+        },
+        {
+          "path": "test/results/console-browser/capture-review.png",
+          "restoredToSourceGitBlob": true,
+          "bytes": 115263,
+          "sha256": "d52eab7333bcf3fb75fbb8017d3d89676d5b75b23ebe88b0fdf964a6ff2503fe"
+        },
+        {
+          "path": "test/results/console-browser/case-evidence-mobile.png",
+          "restoredToSourceGitBlob": true,
+          "bytes": 44573,
+          "sha256": "8b5b22a79f11ea10f95b7d08f7ad332bd94f797d9c1eea69df26d88cc4be58ed"
+        },
+        {
+          "path": "test/results/console-browser/case-evidence.png",
+          "restoredToSourceGitBlob": true,
+          "bytes": 54202,
+          "sha256": "1354acf2ad2a60ebce7e846555709430c94f1e7e619e100e590a0973d652f346"
+        },
+        {
+          "path": "test/results/console-browser/report.json",
+          "restoredToSourceGitBlob": true,
+          "bytes": 2344,
+          "sha256": "7eeea11483ee82faac36a2d81317ba92477db69dbcd1c128c90d6bb237bed9b9"
+        },
+        {
+          "path": "test/results/console-native-restart/failed-native-ready.png",
+          "restoredToSourceGitBlob": true,
+          "bytes": 111154,
+          "sha256": "ee217fc5a7e6e6849a187efce7b03d1d4bab9a8b032844dcbd81d3137a92dc81"
+        }
+      ],
+      "untrackedArchivedThenRemoved": [
+        "test/results/console-browser/heap-summary-mobile.png",
+        "test/results/console-browser/policy-budgets.png",
+        "test/results/console-browser/policy-manager.png",
+        "test/results/console-browser/profile-summary-mobile.png",
+        "test/results/console-browser/saved-syscall-events-mobile.png"
+      ],
+      "onlyOwnedPathsChanged": true
+    }
+  },
+  "compression": "gziplevel9, mtime0, emptyfilename; fulloriginal/decompressed/Gitblob readback ofall19archives matches.",
+  "limits": "Initialfullinvocation remainsfailed2; subsequentprofile/browser did not run in that invocation. Exactremainingchain0 completes local prerequisites afterdependencysetup without codechange. Parentheap/trace outcomes belong to a separate root native audit and none is added here; previous artifacts are untouched. TLS staysunpublished; no gate rerun/service fixture/push/PR/native operation by archive task."
+}

@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Prepared named Go endpoint TLS follow-up (2026-11-04)
+
+Private source `fa692d49` rebases exactly eight TLS preparation commits above
+`c2d4f74b`. All signatures and patch identities, 33 TLS Go blobs and complete
+base-tree inheritance were verified; independent review found no blocker.
+Publication and installed TLS qualification remain pending. Parent heap/trace
+qualification is recorded separately; no pending native outcome is inferred here.
+
+The first full local invocation exited2 at console-check because pinned
+dependencies were absent; other pre-push constituents passed and later targets
+in that invocation did not run. Pinned npm installation exited0, then the strict
+console-check/profile-preflight/full-browser chain exited0. Console passed443
+tests, profile-preflight integration6.167s and actual GoTLS/built-React browser
+70.316s with28journeys/27accessibility scans. All5,353 tracked inputs outside
+results matched Git after the frozen-source gates. Originals and exact source/
+command/output/restoration readbacks are in
+[named-profile-tls-c2d4-local](../test/results/named-profile-tls-c2d4-local/README.md).
+These synthetic-authority local gates do not establish installed TLS CPU or
+wrong-peer refusal. PR162 normal merge/full-tree readback precedes TLS
+publication; the full S-05 goal and credentialed endpoints remain open.
+
 ## Current shared profile candidate (2026-11-04)
 
 The published PR162 candidate `00fca3ee` incorporates the measured Repeat and
