@@ -133,10 +133,9 @@ func newOwnerLocalObservationReceiver(ctx context.Context, pin value.OwnerObserv
 	return &OwnerLocalObservationReceiver{root: root, cancel: cancel, pin: pin, binding: leaf.Binding, server: server, registry: registry, native: native, holder: holder, pending: pending, commonName: common, commonHost: net.JoinHostPort(common, port), exactName: exact, exactHost: net.JoinHostPort(exact, port), maximum: maximum, now: now}, nil
 }
 
-// This per-operation decorator always performs the real scoped read. It only
-// retains restrictive earlier cutoffs and exact first identity, never a cached
-// authority value. A shorter accepted source/recovery date reaches the next
-// native/SQL/stream call, including reads made inside the existing coordinator.
+// This per-operation decorator always performs the real scoped read. It retains
+// the original operation hard end and exact first identity, never cached current
+// authority. Each independent current observation keeps its own original dates.
 type ownerLocalObservationRegistry struct {
 	root     context.Context
 	pin      value.OwnerObservationPin
@@ -192,14 +191,13 @@ func (r *ownerLocalObservationRegistry) ReadOwnerRegistration(ctx context.Contex
 		r.closed = true
 		return zero, value.ErrUnavailable
 	}
-	r.end = identity.Earlier(r.end, v.FreshUntil)
 	v.Configuration.Configuration = v.Configuration.Configuration.Clone()
 	if r.first == nil {
 		first := v
 		first.Configuration.Configuration = first.Configuration.Configuration.Clone()
 		r.first = &first
 	}
-	// Preserve the actual observed dates; only restrict the returned cutoff.
+	// Preserve this observation's actual dates under the original operation end.
 	v.FreshUntil = identity.Earlier(v.FreshUntil, r.end)
 	if !v.Valid(r.now()) {
 		r.closed = true
@@ -400,14 +398,14 @@ func (h *OwnerLocalObservationReceiver) locate(w http.ResponseWriter, ctx contex
 	}
 	defer e.finishGET()
 	registration := &ownerLocalObservationRegistry{root: e.work, pin: h.pin, server: h.server, leaf: server, registry: h.registry, now: h.now, end: e.end}
-	first, err := registration.ReadOwnerRegistration(e.work, server)
+	_, err = registration.ReadOwnerRegistration(e.work, server)
 	if err != nil {
 		ownerOperationUnavailable(w)
 		return
 	}
 	request := value.OwnerObservationRequest{RootID: q.RootID, ID: q.RequestID, Challenge: q.Challenge, RequestedAt: q.RequestedAt, NotAfter: q.NotAfter}
 	// This context is owned through the native handle, not cancelled at GET exit.
-	nativeCall, cancelNative := context.WithDeadline(e.work, identity.Earlier(e.end, first.FreshUntil))
+	nativeCall, cancelNative := context.WithDeadline(e.work, e.end)
 	original, err := h.native.begin(nativeCall, request, h.binding, token, podUID)
 	if err != nil || original == nil {
 		cancelNative()
@@ -450,9 +448,9 @@ func (h *OwnerLocalObservationReceiver) locate(w http.ResponseWriter, ctx contex
 	}
 	response := contracts.ClusterObservationLocalLocator{Format: contracts.ClusterObservationLocalLocatorFormat, PodUID: podUID, Query: ownerLocalQueryWire(q)}
 	if found {
-		// Retain the newly narrowed original cutoff beyond GET completion.
+		// Retain the actual native/request/source bound beyond GET completion.
 		// A temporary lookup context would cancel the reserved stream on return;
-		// e.work alone would lose the shorter current SQL/native observation.
+		// consumed SQL freshness is checked independently by each later phase.
 		reservationCall, cancelReservation := context.WithDeadline(e.work, end)
 		reservation, err := h.holder.ReserveLocator(reservationCall, local, q)
 		if err != nil {
@@ -518,17 +516,19 @@ func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context
 		ownerOperationUnavailable(w)
 		return
 	}
-	current, stopCurrent := context.WithDeadline(pending.call, r.FreshUntil)
-	defer stopCurrent()
+	if !r.Valid(h.now()) {
+		ownerOperationUnavailable(w)
+		return
+	}
 	mark("registration", started)
 	started = time.Now()
-	end, err := pending.native.Claim(current, token, podUID)
+	end, err := pending.native.Claim(pending.call, token, podUID)
 	if err != nil {
 		h.refused("native-claim", err)
 		ownerOperationUnavailable(w)
 		return
 	}
-	call, stop := context.WithDeadline(current, end)
+	call, stop := context.WithDeadline(pending.call, end)
 	defer stop()
 	mark("native-claim", started)
 	started = time.Now()

@@ -9,7 +9,8 @@ import (
 )
 
 // Full existing HTTPS/frames path with synthetic authority, not installed
-// availability: the original three-second registry end survives claim failure.
+// availability: the failed native phase reports its actual original context,
+// independently of the consumed three-second POST registration observation.
 func TestDirectHolderOriginalCutoffFailureDiagnostic(t *testing.T) {
 	c, f, inputs, native, registry := directHolderFixture(t, "owner-final")
 	registry.until = time.Now().Add(3 * time.Second)
@@ -21,10 +22,10 @@ func TestDirectHolderOriginalCutoffFailureDiagnostic(t *testing.T) {
 		t.Fatal("missing original cutoff diagnostic", err)
 	}
 	label, until, left := d.ObservationDeadlineDiagnostic()
-	if label != "firstregistry" || !until.Equal(registry.until) || left <= 0 || left > 3*time.Second {
+	if label != "caller" || !until.Equal(native.last.facts.FreshUntil) || left <= 0 || left > 5*time.Second {
 		t.Fatal("lost original selected cutoff", label, until, left)
 	}
-	if !strings.Contains(regionalOutcome(err), "until-authority/firstregistry=") {
+	if !strings.Contains(regionalOutcome(err), "until-authority/caller=") {
 		t.Fatal("cutoff absent from existing failure diagnostic", regionalOutcome(err))
 	}
 	if inputs.tokens.Load() != 1 || f.get.Load() != 1 || f.post.Load() != 1 || native.opens.Load() != 1 || registry.reads.Load() != 5 || len(c.sockets) != 0 {

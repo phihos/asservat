@@ -187,11 +187,6 @@ type localRegistryCutoffFixture struct {
 
 func (r *localRegistryCutoffFixture) ReadOwnerRegistration(ctx context.Context, c value.OwnerCertificate) (value.OwnerRegistrationObservation, error) {
 	r.calls++
-	if r.calls > 1 {
-		if end, ok := ctx.Deadline(); !ok || end.After(r.until) {
-			r.t.Fatal("newly observed cap did not reach following SQL call")
-		}
-	}
 	v, err := r.OwnerCertificateRegistry.ReadOwnerRegistration(ctx, c)
 	if err == nil && v.FreshUntil.After(r.until) {
 		v.FreshUntil = r.until

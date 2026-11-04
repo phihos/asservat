@@ -207,8 +207,8 @@ func TestOwnerOperationRoutingShorterSQLDeadlineReachesNativeAndClaim(t *testing
 		n := calls.Add(1)
 		if n > 1 {
 			d, ok := ctx.Deadline()
-			if !ok || d.After(short) {
-				t.Error("earlier SQL cap not carried into next read")
+			if !ok || d.After(f.request.NotAfter) {
+				t.Error("current SQL read exceeded original request")
 			}
 		}
 		r, e := original.ReadOwnerRegistration(ctx, c)

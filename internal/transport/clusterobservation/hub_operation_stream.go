@@ -172,14 +172,18 @@ func (s *HubObservationOperationStream) ExchangeConnectorObservationOperation(ct
 	} else if request != s.request {
 		return zero, fleet.ErrUnavailable
 	}
-	fresh := identity.Earlier(readTime(probe.Owner.NativeUntil), readTime(probe.Owner.RegistrationUntil))
+	fresh := readTime(probe.Owner.NativeUntil)
+	registrationEnd := readTime(probe.Owner.RegistrationUntil)
+	if registrationEnd.IsZero() || !s.now().Before(registrationEnd) || registrationEnd.After(fresh) {
+		return zero, fleet.ErrUnavailable
+	}
 	if fresh.IsZero() || fresh.After(end) || !s.now().Before(fresh) {
 		return zero, fleet.ErrUnavailable
 	}
 	bounded, cancel := context.WithDeadline(call, identity.Earlier(end, fresh))
 	defer cancel()
-	// begin installed the caller deadline; narrowing the actual I/O deadlines
-	// also covers a shorter current proof returned inside that original call.
+	// SQL registration is fresh when sent and independently checked by the
+	// receiver. The actual socket retains only original native/request hard ends.
 	if s.control.SetReadDeadline(identity.Earlier(s.until, fresh)) != nil || s.control.SetWriteDeadline(identity.Earlier(s.until, fresh)) != nil {
 		return zero, fleet.ErrUnavailable
 	}

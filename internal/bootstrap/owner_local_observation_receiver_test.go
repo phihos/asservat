@@ -275,8 +275,8 @@ func TestLocalReceiverExplicitAbsenceDiffersFromClosedHolder(t *testing.T) {
 	}
 }
 
-// The original reservation must retain the earliest proof cutoff after GET
-// completes, without inheriting GET handler cancellation or the broader slot.
+// The reservation retains the original native/request bound after GET while
+// independent current SQL still restricts claim and final output.
 type localReceiverCutoffRegistry struct {
 	app.OwnerCertificateRegistry
 	until time.Time
@@ -299,8 +299,8 @@ func TestLocalReceiverReservationRetainsShorterOriginalProofBound(t *testing.T) 
 		t.Fatal("short original locator", status, err)
 	}
 	v, err := contracts.DecodeClusterObservationLocalLocator(body)
-	if err != nil || v.Locator == nil || !ownerOperationTime(v.Locator.FreshUntil).Equal(until) {
-		t.Fatal("locator lost original shorter proof", err)
+	if err != nil || v.Locator == nil || !ownerOperationTime(v.Locator.FreshUntil).Equal(request.NotAfter) {
+		t.Fatal("locator lost original native/request bound", err)
 	}
 	f.receiver.pending.mu.Lock()
 	e := f.receiver.pending.entries[ownerLocalObservationPendingKey{request.RootID, request.ID}]
@@ -311,8 +311,8 @@ func TestLocalReceiverReservationRetainsShorterOriginalProofBound(t *testing.T) 
 	e.mu.Lock()
 	reservation := e.reservation
 	e.mu.Unlock()
-	if reservation == nil || !reservation.Until().Equal(until) {
-		t.Fatal("reserved regional stream kept broader slot deadline")
+	if reservation == nil || !reservation.Until().Equal(request.NotAfter) {
+		t.Fatal("reserved regional stream lost original request deadline")
 	}
 	claim, err := contracts.EncodeClusterObservationLocalClaim(contracts.ClusterObservationLocalClaim{Format: contracts.ClusterObservationLocalClaimFormat, PodUID: observationForwardID(701), Request: wire.RequestWire(request), Locator: *v.Locator})
 	if err != nil {
