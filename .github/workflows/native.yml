@@ -112,17 +112,17 @@ jobs:
           fi
           tshark --version | head -1
           capinfos --version | head -1
-      # History and saved comparison drive real React on the installed image.
+      # History, saved comparison and heap inspection drive installed React.
       # Reuse console CI's pinned Playwright browser/cache; no new image.
-      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy')
+      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap'
         id: playwright
         run: echo "version=$(node -p "require('./web/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy')
+      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap'
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy')
+      - if: matrix.suite == 'continuation-approved-recording' || (matrix.suite == 'continuation-profile-comparison' || matrix.suite == 'continuation-profile-comparison-heavy') || matrix.suite == 'continuation-manual-heap'
         name: Installed React browser
         timeout-minutes: 3
         working-directory: web

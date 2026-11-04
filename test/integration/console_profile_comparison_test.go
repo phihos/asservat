@@ -116,7 +116,10 @@ func TestConsoleProfileComparisonWithBuiltPackage(t *testing.T) {
 // One already visible CPU source has known HTTP timing. A legacy Go trace
 // supplies the explicit unknown-window row without introducing another pprof
 // comparison choice, request or operation in the existing browser journey.
-type consoleSyntheticProfileTimingCases struct{ *consoleSyntheticCases }
+type consoleSyntheticProfileTimingCases struct {
+	*consoleSyntheticCases
+	heap bool
+}
 
 func (s *consoleSyntheticProfileTimingCases) GetContextCase(ctx context.Context, current identities.CurrentIdentity, id string) (catalog.ContextCase, error) {
 	view, err := s.consoleSyntheticCases.GetContextCase(ctx, current, id)
@@ -125,6 +128,9 @@ func (s *consoleSyntheticProfileTimingCases) GetContextCase(ctx context.Context,
 	}
 	start := time.Now().UTC().Truncate(time.Microsecond).Add(-11 * time.Second)
 	view.Artifacts[0].ProfileAcquisition = &artifact.ProfileAcquisitionMetadata{Type: "cpu", Mode: "interval", DurationMillis: 10000, Acquisition: &artifact.AcquisitionWindow{StartedAt: start, CompletedAt: start.Add(10*time.Second + 222*time.Millisecond)}}
+	if s.heap {
+		view.Artifacts[0].ProfileAcquisition.Type, view.Artifacts[0].ProfileAcquisition.Mode, view.Artifacts[0].ProfileAcquisition.DurationMillis = "heap", "snapshot", 0
+	}
 	legacy := view.Artifacts[0]
 	legacy.ArtifactID, legacy.CaptureID = consoleCaptureID(82), consoleCaptureID(9)
 	legacy.NativeType = artifact.GoTraceArtifact
@@ -140,12 +146,17 @@ type consoleSyntheticComparisonOperations struct {
 	wire          *contracts.InvestigationContracts
 	result        map[string]any
 	starts, polls int
+	heap          bool
 	cases         *presentation.ContextCaseOperations
 }
 
 func (s *consoleSyntheticComparisonOperations) PublicOrigin() string { return s.origin }
-func (*consoleSyntheticComparisonOperations) ToolNames() []string {
-	return []string{"get_case", "compare_profiles", "get_query_result"}
+func (s *consoleSyntheticComparisonOperations) ToolNames() []string {
+	tool := "compare_profiles"
+	if s.heap {
+		tool = "get_profile_summary"
+	}
+	return []string{"get_case", tool, "get_query_result"}
 }
 func (s *consoleSyntheticComparisonOperations) Tool(name string) (contracts.InvestigationTool, bool) {
 	return s.wire.Tool(name)
@@ -167,14 +178,18 @@ func (s *consoleSyntheticComparisonOperations) Call(ctx context.Context, current
 	for key, value := range s.result {
 		envelope[key] = value
 	}
-	if name == "compare_profiles" {
+	tool := "compare_profiles"
+	if s.heap {
+		tool = "get_profile_summary"
+	}
+	if name == tool {
 		s.starts++
 		envelope["status"], envelope["data_class"], envelope["provenance"] = "pending", "metadata", []any{}
 		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "retry_after_seconds": 1, "query_observed_at": data["query_observed_at"], "query_expires_at": data["query_expires_at"]}
 	} else {
 		s.polls++
 		envelope["provenance"] = []any{}
-		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "tool_name": "compare_profiles", "result": s.result, "query_observed_at": data["query_observed_at"], "query_expires_at": data["query_expires_at"]}
+		envelope["data"] = map[string]any{"query_handle": consoleCaptureID(90), "tool_name": tool, "result": s.result, "query_observed_at": data["query_observed_at"], "query_expires_at": data["query_expires_at"]}
 	}
 	body, err := json.Marshal(envelope)
 	if err == nil {

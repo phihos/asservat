@@ -565,6 +565,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             report["goVersion"] = run(["go", "version"])
             report["installedHistoryBrowserQualification"] = collector_qualification and focus == "approved-recording"
             report["installedProfileComparisonBrowserQualification"] = collector_qualification and focus == "profile-comparison"
+            report["installedHeapBrowserQualification"] = collector_qualification and focus == "manual-profile" and profile_variant == "heap"
             report["installedProfileVariant"] = profile_variant if collector_qualification and focus in ("manual-profile","profile-comparison") else None
             report["installedPolicyRecordingFocus"] = collector_qualification and focus == "policy-recording"
             report["installedPolicyArgumentsFocus"] = collector_qualification and focus == "policy-arguments"

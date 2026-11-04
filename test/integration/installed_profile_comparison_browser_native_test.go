@@ -4,7 +4,10 @@ package integration
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -14,6 +17,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
 )
 
 // installedProfileComparisonBrowser preserves qualifyInstalledProfileComparison's
@@ -23,6 +28,13 @@ import (
 // register its proof closure before the first call and retain the pending handle
 // and operation ID here, so a browser/render failure cannot bypass known cleanup.
 func installedProfileComparisonBrowser(t *testing.T, ctx context.Context, browser *installedBrowser, address string, source installedProfileComparisonSource, observed func(installedComparisonReply)) (func(string, any) installedComparisonReply, func()) {
+	call, _, close := installedProfileBrowser(t, ctx, browser, address, source, "comparison", observed)
+	return call, close
+}
+
+// Heap mode uses the same installed React/session transport and one existing
+// query. Native bytes stay in a Go-owned private directory, never stdout.
+func installedProfileBrowser(t *testing.T, ctx context.Context, browser *installedBrowser, address string, source installedProfileComparisonSource, mode string, observed func(installedComparisonReply)) (func(string, any) installedComparisonReply, func() ([]byte, installedJourneyDownload), func()) {
 	t.Helper()
 	origin, err := url.Parse(browser.base)
 	if err != nil || browser.client.Jar == nil || observed == nil {
@@ -43,8 +55,13 @@ func installedProfileComparisonBrowser(t *testing.T, ctx context.Context, browse
 	if len(cookies) == 0 {
 		t.Fatal("installed comparison original cookie missing")
 	}
+	if mode != "comparison" && mode != "heap" {
+		t.Fatal("invalid profile browser mode")
+	}
+	nativeDirectory := t.TempDir()
+	nativePath := filepath.Join(nativeDirectory, "heap-native.pb.gz")
 	proxy := installedHistoryBrowserTunnel(t, ctx, browser.base, address)
-	config, err := json.Marshal(map[string]any{"origin": browser.base, "proxy": proxy, "cookies": cookies, "caseID": source.CaseID, "artifactID": source.ArtifactID})
+	config, err := json.Marshal(map[string]any{"origin": browser.base, "proxy": proxy, "cookies": cookies, "caseID": source.CaseID, "artifactID": source.ArtifactID, "mode": mode, "nativeDestination": nativePath})
 	if err != nil || len(config) > 16<<10 {
 		clear(config)
 		t.Fatal("installed comparison private input bound")
@@ -105,6 +122,8 @@ func installedProfileComparisonBrowser(t *testing.T, ctx context.Context, browse
 	type event struct {
 		Kind      string          `json:"kind"`
 		Name      string          `json:"name"`
+		File      string          `json:"file"`
+		Filename  string          `json:"filename"`
 		Input     json.RawMessage `json:"input"`
 		Reply     json.RawMessage `json:"reply"`
 		Transport struct {
@@ -132,7 +151,7 @@ func installedProfileComparisonBrowser(t *testing.T, ctx context.Context, browse
 	}
 	invoke := func(name string, args any) installedComparisonReply {
 		t.Helper()
-		if closed || name != "compare_profiles" && name != "get_query_result" {
+		if closed || name != "get_query_result" && (mode == "comparison" && name != "compare_profiles" || mode == "heap" && name != "get_profile_summary") {
 			fail("unexpected operation")
 		}
 		encoded, err := json.Marshal(map[string]any{"kind": "call", "name": name, "input": args})
@@ -157,6 +176,68 @@ func installedProfileComparisonBrowser(t *testing.T, ctx context.Context, browse
 			fail("canonical request or reply")
 		}
 		return reply
+	}
+	download := func() ([]byte, installedJourneyDownload) {
+		t.Helper()
+		if closed || mode != "heap" {
+			fail("unexpected native download")
+		}
+		if _, err := in.Write([]byte("{\"kind\":\"download\"}\n")); err != nil {
+			fail("native command unavailable")
+		}
+		var original, key string
+		var deadline time.Time
+		var ready installedJourneyDownload
+		for {
+			e := read()
+			if e.Kind == "native" {
+				if ready.State != "Ready" || e.File != "heap-native.pb.gz" || e.Filename != "artifact-"+source.ArtifactID+".pb.gz" {
+					fail("native attachment association")
+				}
+				info, err := os.Lstat(nativePath)
+				if err != nil || !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > artifact.MaxPprofBytes {
+					fail("private native file bound")
+				}
+				f, err := os.Open(nativePath)
+				if err != nil {
+					fail("private native file unavailable")
+				}
+				native, readErr := io.ReadAll(io.LimitReader(f, artifact.MaxPprofBytes+1))
+				_ = f.Close()
+				digest := sha256.Sum256(native)
+				if readErr != nil || ready.SizeBytes == nil || int64(len(native)) != *ready.SizeBytes || hex.EncodeToString(digest[:]) != ready.SHA256 {
+					fail("native metadata/bytes mismatch")
+				}
+				return native, ready
+			}
+			if e.Kind != "operation" || e.Name != "prepare_artifact_download" && e.Name != "get_artifact_download" || !e.Transport.Post || !e.Transport.SameOrigin || !e.Transport.CSRF || !e.Transport.NoBearer || browser.wire.ValidateOutput(e.Name, e.Reply) != nil {
+				fail("native operation contract")
+			}
+			var reply installedComparisonReply
+			var args map[string]string
+			var current installedJourneyDownload
+			if json.Unmarshal(e.Reply, &reply) != nil || reply.Status != "ok" || json.Unmarshal(reply.Data, &current) != nil || json.Unmarshal(e.Input, &args) != nil || current.ArtifactID != source.ArtifactID {
+				fail("native operation association")
+			}
+			if e.Name == "prepare_artifact_download" {
+				if args["artifact_id"] != source.ArtifactID || args["idempotency_key"] == "" || key != "" && (key != args["idempotency_key"] || !ready.ContinuePreparation) {
+					fail("native preparation key changed")
+				}
+				key = args["idempotency_key"]
+			} else if original == "" || args["download_id"] != original {
+				fail("native status identity changed")
+			}
+			if original == "" {
+				original, deadline = current.DownloadID, current.ExpiresAt
+			}
+			if original == "" || current.DownloadID != original || deadline.IsZero() || !current.ExpiresAt.Equal(deadline) || deadline.After(source.Expires) || current.State != "Preparing" && current.State != "Ready" {
+				fail("native original identity/deadline/state")
+			}
+			if current.State == "Ready" && (current.ContentPath != "/api/v1/downloads/"+original+"/content" || current.SizeBytes == nil || *current.SizeBytes < 1 || *current.SizeBytes > artifact.MaxPprofBytes) {
+				fail("native ready metadata")
+			}
+			ready = current
+		}
 	}
 	finish := func() {
 		t.Helper()
@@ -190,5 +271,14 @@ func installedProfileComparisonBrowser(t *testing.T, ctx context.Context, browse
 		t.Logf("installed React comparison joined after rendered-row checks:\n%s", diagnostic.String())
 		cancel()
 	}
-	return invoke, finish
+	return invoke, download, finish
+}
+
+// The original independent review selects one client, never both; no second
+// raw approval or enlarged parent disclosure pool is introduced for heap UI.
+func installedProfileResultClient() string {
+	if installedProfileFocus() && installedHeapProfileVariant() {
+		return "console"
+	}
+	return "mcp"
 }
