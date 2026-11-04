@@ -19,7 +19,7 @@ type PolicyProfileEndpoint struct {
 }
 
 func (p *PolicyProfileEndpoint) Valid() bool {
-	if p == nil || !p.Definition.Valid() || p.Definition.Credential != nil || p.DefinitionDigest == (artifact.Digest{}) || !GoEndpointReference(p.SourceRef) || !slices.Contains(p.Definition.AddressModes, p.AddressMode) {
+	if p == nil || !p.Definition.Valid() || p.DefinitionDigest == (artifact.Digest{}) || !GoEndpointReference(p.SourceRef) || !slices.Contains(p.Definition.AddressModes, p.AddressMode) {
 		return false
 	}
 	switch p.SourceKind {
@@ -56,8 +56,17 @@ func (p *PolicyProfileEndpoint) Clone() *PolicyProfileEndpoint {
 // Matches checks stable reviewed facts against a separately resolved child.
 // The caller still checks acquisition parameters and the accepted workload/Pod.
 func (p *PolicyProfileEndpoint) Matches(r targets.ProfileEndpointResolution) bool {
-	if !p.Valid() || !r.Answers(r.Request) || r.DefinitionDigest != p.DefinitionDigest || r.SourceKind != p.SourceKind || r.SourceName != p.Definition.Source.Name || r.Request.SourceRef != p.SourceRef || r.AddressMode != p.AddressMode || r.PathPolicy != p.Definition.PathPolicy || r.TLS != (p.Definition.TLS != nil) || r.Credential || r.Request.Target.ClusterID != p.Definition.Source.ClusterID || p.Definition.ScopeNamespaceUID != "" && r.Request.Target.Namespace.UID != p.Definition.ScopeNamespaceUID {
+	if !p.Valid() || !r.Answers(r.Request) || r.DefinitionDigest != p.DefinitionDigest || r.SourceKind != p.SourceKind || r.SourceName != p.Definition.Source.Name || r.Request.SourceRef != p.SourceRef || r.AddressMode != p.AddressMode || r.PathPolicy != p.Definition.PathPolicy || r.TLS != (p.Definition.TLS != nil) || r.Credential != (p.Definition.Credential != nil) || r.Request.Target.ClusterID != p.Definition.Source.ClusterID || p.Definition.ScopeNamespaceUID != "" && r.Request.Target.Namespace.UID != p.Definition.ScopeNamespaceUID {
 		return false
+	}
+	if c := p.Definition.Credential; c != nil {
+		matches := false
+		for _, a := range c.Audiences {
+			matches = matches || a.Matches(r.Request.Target)
+		}
+		if !matches {
+			return false
+		}
 	}
 	if p.Binding == nil {
 		return r.Port == p.Port && r.DeclaredPortName == ""

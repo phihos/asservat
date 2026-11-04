@@ -34,9 +34,24 @@ material digest and server name; certificate bytes stay outside approval/SQL
 scopes. The existing exact target-netns socket performs TLS peer verification
 before HTTP, within the original deadline. No system roots, DNS lookup, insecure
 mode, cleartext fallback or acquisition retry is added. Credentials remain
-unsupported in this slice. The fixed 8 KiB public PEM cap and connector-first
+unsupported by ADR-299 alone. ADR-302 adds a separately qualified authorization
+path below. The fixed 8 KiB public PEM cap and connector-first
 `profileTLS` rollout are engineering choices; installed TLS qualification remains
 pending. Old nodes can continue HTTP but cannot start TLS captures.
+
+
+[ADR-302](../docs/decisions/302-named-profile-endpoint-authorization.md) keeps a
+credential policy's public identity and exact workload-root audiences in the
+protected named endpoint definition. The policy name is the endpoint name;
+manual and recurring approval pin the same definition/audience digest, never a
+header value or secret-payload digest. A fixed-purpose private file in the
+existing immutable connector-only input bundle supplies the selected header at
+final authenticated node-poll delivery after exact admitted-work and audience
+checks. Preview and policy compilation never read it. Public queued work and
+persistent state remain credential-free. The node must verify accepted TLS before
+sending Authorization. Old nodes lacking explicit support refuse, and delivery
+retains the existing 16-item/256 KiB bound using an ordered byte-bounded prefix.
+This is implementation preparation, not installed qualification.
 
 For Go, generate only the allowlisted `/debug/pprof/<type>` paths; CPU uses `/debug/pprof/profile`. Prefer binary `debug=0`; do not call `/cmdline` or remote `/symbol` as part of profiling. Missing/disabled endpoints yield `ProfileUnavailable`. After an admitted HTTP attempt, this is a terminal failed action with `reason_code: ProfileUnavailable`; a conflicting application-owned session similarly ends with `reason_code: ProfilerBusy`. Neither result publishes an artifact, retries acquisition or refunds the original admitted spend ([ADR-298](../docs/decisions/298-explicit-go-profile-refusals.md)). Asservat does not inject pprof into an existing binary or enable it through an unapproved application mutation.
 

@@ -113,3 +113,26 @@ require that review for metadata packet/syscall recordings as well. These are
 protected identity settings passed unchanged by the installer. Without step-up
 settings, no independent approval can be decided; an absent `approvals` value
 preserves the existing installation input.
+
+Named endpoint Authorization (ADR-302, implementation preparation; installed
+qualification pending) adds only public `credential.audiences` to
+`cluster.profileEndpoints`. Each audience pins cluster ID, namespace UID,
+workload kind (`Deployment`, `StatefulSet` or unowned `Pod`) and workload UID.
+TLS is mandatory. The policy/key name is implicitly the endpoint name; clients
+cannot choose another credential or file. Put the private map in the existing
+`cluster.evidenceSecret` key `profile-authorization.json`:
+
+```json
+{"format":"asservat-profile-authorization/v1","entries":[{"name":"go-pprof","authorization":"QmVhcmVyIHN5bnRoZXRpYy1leGFtcGxl"}]}
+```
+
+`authorization` is base64-encoded bytes of the complete header value (the example
+is synthetic), 1–4096 printable ASCII bytes. The map must contain exactly the
+configured credentialed endpoint names, at most 64 entries/384 KiB total. Never
+place values in Helm values, endpoint definitions or approval records. The CLI
+uses `installer-cluster --profile-authorization <private-file>`. Existing immutable
+bundle UID/version checks cover the file; changing material requires the same
+guarded reinstall/restart as other private installation inputs. Upgrade connectors
+before collectors, then use nodes reporting authorization support; old nodes
+continue unauthenticated HTTP/TLS-only work and refuse credentialed work. There is
+no automatic refresh, cleartext fallback, extra Secret or additional RBAC reader.

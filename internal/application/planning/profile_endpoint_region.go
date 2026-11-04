@@ -67,9 +67,6 @@ func ResolveProfileEndpointPlan(entries []ProfileEndpointEntry, network targets.
 	if err != nil {
 		return out, profileEndpointTargetError(err)
 	}
-	if plan.Definition.Credential != nil {
-		return out, targets.ErrUnsupported
-	}
 	for _, e := range entries {
 		if e.Definition.Source != plan.Definition.Source {
 			continue

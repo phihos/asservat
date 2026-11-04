@@ -150,6 +150,9 @@ cluster:
   # roots (8 KiB per entry; existing 64 KiB aggregate JSON cap still applies).
   # Upgrade connectors before collectors; TLS needs a profileTLS-capable node.
   # TLS installed qualification is pending; authentication stays unsupported.
+  # Optional credential: {audiences: [{clusterID, namespaceUID, workloadKind,
+  # workloadUID}]} requires TLS. Private header values go in the existing
+  # evidenceSecret's profile-authorization.json, never Helm values (ADR-302).
   profileEndpoints: []
   # - name: go-pprof-loopback
   #   kind: template

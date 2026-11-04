@@ -36,6 +36,7 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 	historyFile := flags.String("history-credential", "", "the separate history-prefix storage capability (required with the regional executor; never the evidence writer)")
 	alertmanager := flags.String("alertmanager", "", "optional in-cluster Alertmanager base URL for alert policies (ADR-231; regional executor only)")
 	mappingsJSON := flags.String("identity-mappings", "", "optional JSON array of identity mapping records for decision-time PermissionSources (ADR-245; regional executor only)")
+	authorizationFile := flags.String("profile-authorization", "", "private named endpoint Authorization map file (regional executor only)")
 	endpointsJSON := flags.String("profile-endpoints", "", "optional JSON array of administrator Go profile endpoint templates and profiles (ADR-285; regional executor only)")
 	collectorNamespace := flags.String("collector-namespace", "", "optional existing collector namespace whose DaemonSet this connector attests (ADR-246)")
 	collectorName := flags.String("collector-name", "", "the collector DaemonSet and service account name (with --collector-namespace)")
@@ -107,9 +108,18 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 		}
 		defer clear(history)
 	}
+	var profileAuthorization []byte
+	if *authorizationFile != "" {
+		// Bounded protected-file reader; no unbounded ReadFile for this map.
+		profileAuthorization, err = readInstallerProfileAuthorization(ctx, *authorizationFile)
+		if err != nil {
+			return mounts.ErrUnavailable
+		}
+		defer clear(profileAuthorization)
+	}
 	// The output includes the public join record of an installed executor
 	// (ADR-196 decision 2); it holds no credential.
-	installed, err := kube.InstallRegionalConnector(ctx, config, kube.RegionalInstallPlan{Offer: offer, Bootstrap: envelope, Namespace: *namespace, AccountAdministrator: *inCluster, Evidence: evidence, History: history, Alertmanager: *alertmanager, IdentityMappings: mappings, ProfileEndpoints: endpoints, Collector: collector})
+	installed, err := kube.InstallRegionalConnector(ctx, config, kube.RegionalInstallPlan{Offer: offer, Bootstrap: envelope, Namespace: *namespace, AccountAdministrator: *inCluster, Evidence: evidence, History: history, Alertmanager: *alertmanager, IdentityMappings: mappings, ProfileEndpoints: endpoints, ProfileAuthorization: profileAuthorization, Collector: collector})
 	if err != nil {
 		return err
 	}

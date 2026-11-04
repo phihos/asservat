@@ -17,7 +17,8 @@ import (
 
 type regionProfileDefinition struct {
 	countingLocal
-	tls bool
+	tls        bool
+	credential bool
 }
 
 func (p *regionProfileDefinition) ResolveProfileEndpointDefinition(_ context.Context, r targets.ProfileEndpointDefinitionRequest) (targets.ProfileEndpointDefinitionResolution, error) {
@@ -25,11 +26,14 @@ func (p *regionProfileDefinition) ResolveProfileEndpointDefinition(_ context.Con
 	if p.tls {
 		out.TLS = targets.ProfileEndpointTLSDefinition{TrustClusterID: r.ClusterID, TrustUID: r.ClusterID, TrustName: "go-pprof", TrustDigest: artifact.Digest{3}, ServerName: "localhost"}
 	}
+	if p.credential {
+		out.Credential = &targets.ProfileEndpointCredentialDefinition{PolicyClusterID: r.ClusterID, PolicyUID: r.ClusterID, PolicyName: "go-pprof", PolicyDigest: artifact.Digest{4}, Audiences: []targets.ProfileEndpointCredentialAudience{{ClusterID: r.ClusterID, NamespaceUID: r.ClusterID, WorkloadKind: "Deployment", WorkloadUID: r.ClusterID}}}
+	}
 	return out, nil
 }
 
 func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) {
-	for _, mode := range []string{"answer", "tls-answer", "old-region", "wrong-answer", "invalid-tls", "cancelled"} {
+	for _, mode := range []string{"answer", "tls-answer", "credential-answer", "old-region", "wrong-answer", "invalid-tls", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			w := workFixture()
 			cluster := w.Work.Target.ClusterID
@@ -50,7 +54,7 @@ func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) 
 			done := make(chan error, 1)
 			go func() {
 				answer, e := (Targets{Router: router, Now: time.Now}).ResolveProfileEndpointDefinition(ctx, r)
-				if e == nil && (!answer.Answers(r) || mode == "tls-answer" && (answer.TLS.TrustDigest != (artifact.Digest{3}) || answer.TLS.ServerName != "localhost" || answer.TLS.TrustUID != cluster)) {
+				if e == nil && (mode == "credential-answer" && (answer.Credential == nil || answer.Credential.PolicyDigest != (artifact.Digest{4})) || !answer.Answers(r) || mode == "tls-answer" && (answer.TLS.TrustDigest != (artifact.Digest{3}) || answer.TLS.ServerName != "localhost" || answer.TLS.TrustUID != cluster)) {
 					e = targets.ErrInvalid
 				}
 				done <- e
@@ -70,7 +74,7 @@ func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) 
 				t.Fatal(err)
 			}
 			defer stream.Close()
-			stream.targets = &regionProfileDefinition{tls: mode == "tls-answer"}
+			stream.targets = &regionProfileDefinition{tls: mode == "tls-answer" || mode == "credential-answer", credential: mode == "credential-answer"}
 			if mode == "old-region" {
 				stream.targets = &countingLocal{}
 			}
@@ -107,7 +111,7 @@ func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) 
 			}
 			job.result <- queryResult{until: receiver.ValidUntil, err: resultErr}
 			err = <-done
-			success := mode == "answer" || mode == "tls-answer"
+			success := mode == "answer" || mode == "tls-answer" || mode == "credential-answer"
 			if success && err != nil || !success && err == nil {
 				t.Fatal("definition result", mode, err)
 			}

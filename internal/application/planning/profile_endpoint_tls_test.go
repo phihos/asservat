@@ -66,8 +66,8 @@ func TestProfileEndpointTLSSelectedMaterialAndPublicPolicyIdentity(t *testing.T)
 	addEndpointCredential(&in)
 	e := entries[0]
 	e.Definition.Credential = in.Catalog.Templates[0].Credential
-	if _, err := ResolveProfileEndpointPlan([]ProfileEndpointEntry{e}, in.Network, r, now); err == nil {
-		t.Fatal("credentials enabled")
+	if _, err := ResolveProfileEndpointPlan([]ProfileEndpointEntry{e}, in.Network, r, now); err != nil {
+		t.Fatal("approved TLS credential policy unavailable", err)
 	}
 	e = entries[0]
 	e.Definition.TLS = nil

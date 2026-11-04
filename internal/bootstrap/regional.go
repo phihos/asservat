@@ -347,6 +347,14 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 			r.nodes.server.Channel.SetPacketSink(recordings)
 			r.nodes.server.Channel.SetProfileSink(recordings)
 			recordings.profileEndpoints = r.context.targets
+			authorization, authErr := newRegionalProfileAuthorizationReader(startup, in, c)
+			if authErr != nil {
+				return r, mounts.ErrUnavailable
+			}
+			if authorization != nil {
+				recordings.SetProfileAuthorizationReader(authorization)
+				r.closers = append(r.closers, authorization.close)
+			}
 			recordings.SetPeers(r.context.peers)
 			r.context.output.recordings = recordings
 		}
