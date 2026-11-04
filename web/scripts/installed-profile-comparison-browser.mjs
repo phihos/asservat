@@ -276,7 +276,10 @@ try {
         const table = panel.getByRole('table', { name: 'Profile function costs', exact: true });
         // A separately authorized download may outlast this original view.
         // Accept clearing only with the actual expired state, never renew it.
-        if (await table.count() === 0) {
+        const viewExpires = Date.parse(terminalComparison.query_expires_at);
+        assert(Number.isFinite(viewExpires), 'original summary expiry');
+        if (Date.now() >= viewExpires || await table.count() === 0) {
+          await expect(table).toHaveCount(0);
           await expect(panel.getByRole('status')).toHaveText('This view has expired. Inspect again to request a fresh view.');
           process.stderr.write('installed heap summary expired during native download; no additional query\n');
         } else {

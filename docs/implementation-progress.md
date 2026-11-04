@@ -28,11 +28,28 @@ each result, before the next comparison can retire that Pod, and defers terminal
 joins and positive retirement checks. It must preserve failure-path inspection,
 original deadlines and charges;404 is never accepted as positive live evidence.
 The scheduling regression reproduces the original late-read failure; focused
-races pass2.480s and35 harness selector checks pass. Missing original Jobs require
+races pass2.480s and34 harness selector checks pass. Missing original Jobs require
 stored positive SQL retirement immediately; surviving exact terminal Jobs remain
-charged. No shared syscall cohort or production code changes. Independent review
-and fresh installed qualification remain pending. PR CI for the previous frozen
+charged. No shared syscall cohort or production code changes. Independent review found no blocker; fresh installed qualification remains pending.
+Exact local commands and evidence are in `test/results/comparison-live-proof-local/`. PR CI for the previous frozen
 02e head passed; that does not validate the fixture correction.
+The same candidate now includes the prepared test-only native runtime-trace and
+heap React/native-download journeys. Trace uses a separate immutable5s/32MiB
+profile, rejects pprof summaries without creating query state, opens the native
+.trace offline and performs a fresh repeat review. Heap verifies the default
+inuse_space summary before one browser native download and independent pprof
+parity. Existing CPU/heap/heavy/trace variants, funding and18min Go/20min job
+limits remain unchanged. Local pre-push/profile checks pass441 console tests and
+5.749s affected fixture races; design/specification/architecture gates pass.
+The heap driver now validates rendered rows and metadata before native transfer;
+its3s-view/4s-transfer regression fails under the old ordering and both heap cases
+plus comparison pass24.071s after correction. Final review tightened the check:
+once original expiry elapses, rows must be cleared and the exact expired UI state
+is required; the focused final check passes24.037s. No extra query or extended
+lifetime is introduced. Independent final review found no blockers. Originals
+and exact source attribution are in `test/results/profile-combined-final-local/`.
+One shared final CI candidate and three separate fresh native runs are planned;
+these local results do not establish installed heap-browser or trace success.
 The full S-05 and specification goal remains active.
 
 ## Current delivery workflow (2026-11-04)
