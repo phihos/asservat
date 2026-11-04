@@ -10,8 +10,9 @@ synthetic profiles outside the measured worker (100,000 samples/functions/locati
 protobufs), serves exactly two fixed inputs through the existing endpoint, and
 probes the original query worker after each of the existing two comparisons.
 This is one accepted shape, not all simultaneous parser maxima or a complete
-resource/cancellation matrix. The production diagnostic now retains the earliest private authority source label;
-collection/analysis decisions, authority dates, RBAC, services and limits are unchanged.
+resource/cancellation matrix. The production policy adapter now separates its metadata-read timeout from the
+original source/caller lifetime; private diagnostics retain the earliest source
+label. RBAC, services, cache intervals, resource limits and job deadlines are unchanged.
 
 Local pre-push/profile gates passed441 console tests and4.469s fixture races
 after integration with the heap repair. The unchanged one-second encrypted
@@ -137,6 +138,41 @@ not presume that the large-input workflow has been repaired. No timeout is raise
  The
 prepared trace/browser follow-ups are consolidated into one unpublished test
 candidate to share one CI matrix; their installed results remain separate.
+
+**Third installed attempt identified the cutoff:**
+[native41841610822](https://github.com/phihos/asservat/actions/runs/41841610822)
+failed on `f7eaa6f41db402d648b712af3abf75d44016b8f0` (Go exit1,
+631.429s); eligible PR CI41841561234 passed. Both captures/native downloads and
+CPU pprof checks passed. The first comparison reached
+`until-authority/comparison/baseline/environment/policy`. Its authority was
+checked at14:05:43.759953903Z, native operation started at14:05:44.708001Z and
+expired at14:05:49.025030Z: only4.317s of operation budget. The original public
+request ended at14:06:03.581638Z and query/worker at14:06:19.287603Z. Both key
+children were spent; no comparison or cgroup measurement completed. All4,123
+source hashes match the frozen head, source remained unchanged, cleanup was empty
+and scratch removed. Originals are retained in
+`test/results/profile-heavy-native-41841610822/`.
+
+The metadata policy adapter created a five-second child for its read, then used
+that child's deadline to truncate the returned policy observation. The actual
+shared download-policy observation can remain valid for sixty seconds. This
+extra adapter cutoff, rather than an aged capacity SQL observation, explains the
+identified limiting component. The focused repair retains the five-second I/O
+limit and post-read cancellation checks, but clips returned source freshness to
+the original parent deadline. It changes no shared cache interval/headroom or
+original caller/source/action lifetime and adds no source read or runtime state.
+[ADR-214](decisions/214-bounded-download-policy-observation.md) records the
+correction. The composed shared-cache regression fails before the repair and
+passes afterward: original sixty-second policy, twenty-second caller, one-second
+caller and cancellation retain their own bounds; lookup I/O remains five seconds.
+Six seconds of injected-clock consumption stays valid only under the covering
+original cutoff. The underlying live read count stays one; no cache hit renews it.
+Affected C3/C18 races passed1.382s/1.114s, independent review found no blocker and
+integrated `make pre-push` exited0 (441 console tests). Unchanged parser, framing,
+transport and worker-resource preflight evidence remains attributed to the earlier
+head; the current policy change has its own focused composed regression and will
+receive full Go CI plus one installed qualification. Another installed
+qualification remains required.
 
 **Latest verified outcome:** the installed Go heap snapshot MCP workflow passed
 at `80593f9398ad9bf909afe9fd46a34752b3060ba1` in

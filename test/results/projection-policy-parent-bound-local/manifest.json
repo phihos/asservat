@@ -1,0 +1,73 @@
+{
+  "sourceFix": "cb4e22b8edd83d76d2d7c217b96303d8b8e26bd7",
+  "integratedFix": "2ad1408b",
+  "sourceHashes": {
+    "internal/application/authorization/projection_policy.go": "0b19d79935ca75d66961a6a887387dee811051295633a7ae064936acbef618a4",
+    "internal/application/authorization/projection_policy_test.go": "a29729034eb3af63e4006c08cdaa6ffac0f2b5442e054d60ed618f394d7d9dfb"
+  },
+  "rootChecks": [
+    {
+      "command": "make pre-push",
+      "exit": 0,
+      "cwd": "/home/phil/Projekte/asservat-profile-worker-containment",
+      "envOverrides": {
+        "PATHPrefix": "/home/phil/.cache/asservat-build/spec-venv/bin:/home/phil/.cache/asservat-build/bin",
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOFLAGS": "-buildvcs=false -p=2"
+      }
+    },
+    {
+      "command": "make spec-check architecture-check design-check",
+      "exit": 0,
+      "cwd": "/home/phil/Projekte/asservat-profile-worker-containment",
+      "envOverrides": {
+        "PATHPrefix": "/home/phil/.cache/asservat-build/spec-venv/bin:/home/phil/.cache/asservat-build/bin"
+      }
+    }
+  ],
+  "files": {
+    "projection-policy-parent-bound-proof.json": {
+      "archive": "projection-policy-parent-bound-proof.json.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/projection-policy-parent-bound-proof.json",
+      "bytes": 3504,
+      "sha256": "742135560240f6a177f345471b7f8d433e9dff1a7e811c361e261026b4e77cdf"
+    },
+    "projection-policy-parent-bound-red.log": {
+      "archive": "projection-policy-parent-bound-red.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/projection-policy-parent-bound-red.log",
+      "bytes": 798,
+      "sha256": "d451faeaf492c25cff7fc07286a0ca7f1be7cb06ada11d7342f2bb321898613d"
+    },
+    "projection-policy-parent-bound-green.log": {
+      "archive": "projection-policy-parent-bound-green.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/projection-policy-parent-bound-green.log",
+      "bytes": 71,
+      "sha256": "508867f412a09229003a6185c5dbfa977c97849aa6161b64d26e71adb09dd5e6"
+    },
+    "projection-policy-parent-bound-race.log": {
+      "archive": "projection-policy-parent-bound-race.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/projection-policy-parent-bound-race.log",
+      "bytes": 71,
+      "sha256": "7f3ddf2700ed87a266bf5ba739e2a725240f6da7092f5a212dc193d4ce85dc0b"
+    },
+    "projection-policy-parent-bound-consumer-race.log": {
+      "archive": "projection-policy-parent-bound-consumer-race.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/projection-policy-parent-bound-consumer-race.log",
+      "bytes": 66,
+      "sha256": "b4445ce154e4147664ef4d7cda7412b10a0b0e2d223dc4063a34f50bd1f42574"
+    },
+    "policy-parent-bound-final-prepush.log": {
+      "archive": "policy-parent-bound-final-prepush.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/profile-worker-containment/policy-parent-bound-final-prepush.log",
+      "bytes": 11515,
+      "sha256": "f738047eafc5e8670ba87a322c59fc2627479ff30aa2ac470219f0b458246079"
+    },
+    "policy-parent-bound-final-docs.log": {
+      "archive": "policy-parent-bound-final-docs.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/profile-worker-containment/policy-parent-bound-final-docs.log",
+      "bytes": 756,
+      "sha256": "74ab852d334e56bfe2b26708a11c8208a20e58e71eca94b9b0d192b3cda68380"
+    }
+  }
+}
