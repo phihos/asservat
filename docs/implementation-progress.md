@@ -102,8 +102,8 @@ is inferred. Heap acquisition/publication, original public facts, the joined
 384MiB/10-unit/three-key read-only summary before authorized native preparation,
 authenticated download and exact signed native parity all passed. The670-byte
 pprof opened locally; two samples totaled 3,769,583 `inuse_space` bytes, with unknown
-native duration. First history settings succeeded; the fresh repeat and second
-settings check did not. Go exited1 after584.311s. All4,116 reported hashes match
+native duration. First history settings succeeded; the fresh repeat failed and
+the second settings check was not reached. Go exited1 after584.311s. All4,116 reported hashes match
 02ab0d37, source unchanged, cleanup[] and scratch removed. Originals and final
 independent verification/native analysis are retained byte-for-byte in
 `test/results/heap-profile-native-41812996977/`. Complete installed heap workflow
@@ -120,9 +120,14 @@ private readiness-tail refusal at4.036s and passed with overlap in3.309s. One
 review/demand and two fresh reads were observed; the authority clock/proofs remain
 synthetic and the independent blocking ports use real timers. Target/history
 bounds, catalog-error/cancellation joins and replacement refusals pass. Affected
-races returned0/13.122s and independent review found no blocker. Root tightened
-the gate to existing API execution and configured recorder wiring; final local
-integration and installed checks remain pending. Reports are retained in
+races returned0/13.122s and independent review found no blocker. The early gate requires
+existing API execution and configured recorder wiring. Final integrated pre-push
+and profile gates passed441 console tests,4.703s capture application races and
+4.431s fixture races. Fresh SQL/S3 comparison and custody/summary/migration groups
+passed13.657s/17.220s. Each4,063-file inventory independently matches committed
+inputs, with unchanged source and cleanup[]. Installed checks remain pending.
+Service originals are retained in `test/results/heap-repeat-readiness-local/`.
+Application regression reports are retained in
 `test/results/heap-profile-local/profile-repeat-readiness-*`.
 
 Repeat repair complexity review: (1) two consecutive installed heap repeat
