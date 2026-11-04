@@ -1,0 +1,68 @@
+{
+  "format": "installed-profile-authorization-native/v1",
+  "native_run": 41926293863,
+  "native_head": "2bb27caf6a3948895c8b31425b3299e142146748",
+  "native_job": 126911601281,
+  "native_actual_go_exit": 0,
+  "native_actual_harness_exit": 0,
+  "native_go_seconds": 641.287,
+  "auth_job_wall_seconds": 963.0,
+  "wall_time_scope": "Observed job wall time, not billing; includes setup/build separate from Go elapsed",
+  "native_artifact_id": 13371355004,
+  "cached_original_zip": "/home/phil/.cache/asservat-build/profile-auth-native-41926293863/artifact-13371355004.zip",
+  "original_zip_sha256": "4eb4f5b516030087573752eb1a3308c51f39f9ba411164f5b26f6140eb9bd4d1",
+  "original_zip_matches_github_digest": true,
+  "archive_omits_duplicate_zip": true,
+  "original_private_fixtures_archived": false,
+  "source_audit": {
+    "git_blob_commit": "2bb27caf6a3948895c8b31425b3299e142146748",
+    "submitted_source_hashes": 4168,
+    "all_exact": true,
+    "sourceUnchangedDuringTest": true
+  },
+  "selected_tests": {
+    "run": 4,
+    "passed": 4,
+    "names": [
+      "TestInitialBootstrapChainWithRealServices",
+      "TestInitialBootstrapChainWithRealServices/installer-continuation",
+      "TestInitialBootstrapChainWithRealServices/installer-continuation/approved-recording",
+      "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+    ]
+  },
+  "cleanup": {
+    "failures": [],
+    "build_scratch_removed": true,
+    "post_job_kind": "No kind clusters found."
+  },
+  "offline_pprof": {
+    "command": "go tool pprof -raw /home/phil/.cache/asservat-build/profile-auth-native-41926293863/native-continuation-manual-profile-auth-1/manual-profile.pb.gz",
+    "cwd": "/home/phil/Projekte/asservat-profile-endpoint-auth-native",
+    "environment": {
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOFLAGS": "-buildvcs=false -p=2"
+    },
+    "actual_exit": 0,
+    "scope": "offline read of actual downloaded native profile; no acquisition or new gate"
+  },
+  "ci_run": 41926030097,
+  "normal_merge": {
+    "source": "2bb27caf6a3948895c8b31425b3299e142146748",
+    "merge": "b06b59c78cc778c036b6969f5fe84802e3d6bf37",
+    "freshOriginMain": "b06b59c78cc778c036b6969f5fe84802e3d6bf37",
+    "sourceTree": "91a7952f1703ee1b4e5c80e5001a5f10b073e8d4",
+    "mergeTree": "91a7952f1703ee1b4e5c80e5001a5f10b073e8d4",
+    "mainTree": "91a7952f1703ee1b4e5c80e5001a5f10b073e8d4",
+    "normalSquashMerge": true,
+    "readbackState": "MERGED"
+  },
+  "scope_limits": [
+    "one original Pod CPU10s accepted authenticated endpoint and wrong audience/wrong peer checks",
+    "read-only summary10units, three keys, one joined batch and exact native download",
+    "freshRepeat preview only, no repeated capture",
+    "No all-max-input/64header/4096header installed guarantee or performance overhead claim",
+    "HTTP busy/missing/Stop and local per-item failure isolation retain separately recorded source qualification",
+    "no private application key/token/bundle files archived"
+  ]
+}
