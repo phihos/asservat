@@ -397,8 +397,8 @@ loser. The selected Pod/process/leaf/configuration identities never change.
 Every existing current SQL check remains. Later phases consume independently
 fresh observations of the same complete immutable registration and accepted
 configuration. Their original timestamps are checked at use, never rewritten.
-The first SQL timestamp is an identity anchor after consumption, not cached
-current authority. Fixed expired current observations, changed configuration,
+The first SQL observation becomes an identity anchor after consumption; its
+timestamps are not cached current authority. Fixed expired current observations, changed configuration,
 retired peers, cancellation and expired discovery before positive selection all
 refuse. The older owner-mTLS routing-admission path remains conservative and
 unchanged; its shorter constructed native interval remains a hard bound.

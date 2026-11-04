@@ -61,12 +61,31 @@ demand succeeded0.770s after preview refusal. All4,136 submitted sources in each
 product run matched Git; unchanged-source, scratch-removal and cleanup checks
 passed. This is an incomplete installed trace workflow, so PR162 remains open.
 
-The next focused investigation is the discovery/initial-SQL deadline carried
-through both the direct owner client and actual receiving server. Preserve the
-original five-second observation request and native-proof intervals; reproduce
-the boundary before changing phase ownership. No further preview-timeout
-increase or native rerun is planned without that evidence. TLS is a private,
-locally checked follow-up; full S-05/specification completion remains open.
+The discovery/initial-SQL deadline coupling is reproduced and fixed locally in
+the complete existing v2 pipeline, including the actual direct client/receiver,
+numbered proofs and transport. The first real-TLS test failed1.022s with almost
+four seconds left on the original request; the independent numbered-proof test
+also exposed a later transport cutoff. The same paths now pass with current
+exact peer/configuration proofs owning their respective phases. The original
+five-second request and genuine native/source/workload/token/peer cutoffs remain;
+constructed proofs are never extended. Eight existing production files change,
+with zero added API/SQL reads, roles, protocol fields, retries or caches.
+
+Focused races passed bootstrap15.384s, mTLS8.128s and transport1.910s. Negative
+checks retain fixed-current expiry, cancellation/loser cleanup, shorter parents,
+native/source/workload expiry and older-producer hard bounds. Both independent
+reviews found no blockers. Integrated pre-push/profile gates passed; the final
+selected races passed15.389s/8.097s/1.911s after a test-only clock correction. The
+earlier compatibility failure came from using a whole-second frozen clock for
+a real one-second context deadline, leaving0–1s of actual time. The correction
+allocates the intended real second within the unchanged original request;
+30 repeated race runs passed and expiry negatives are unchanged. The initial
+batch exit1 and final selected-race exit0 remain distinct in
+[owner-observation-phase-local](../test/results/owner-observation-phase-local/README.md).
+New eligible PR CI and fresh installed trace qualification remain pending.
+No further preview-timeout increase is made.
+TLS is a private, locally checked follow-up; full S-05/specification completion
+remains open.
 Earlier checkpoints follow.
 
 ## Latest comparison qualification (2026-11-04)
