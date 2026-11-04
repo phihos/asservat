@@ -38,7 +38,28 @@ type installedProfileCaptureContinuation struct {
 	Captured             func(http.RoundTripper, installedProfileComparisonSource)
 	Refused              func(captureID, grantID, reason string) time.Time
 }
-type installedProfileComparisonCheck func([2]installedProfileComparisonSource) func(queryID, operationID string) func()
+type installedProfileComparisonCheck func([2]installedProfileComparisonSource) func(queryID, operationID string) func() func()
+
+// The live check must run before later normal demand can retire its exact Pod.
+// Only the original worker's terminal wait belongs to the two-worker cohort.
+type installedProfileComparisonProof struct {
+	capture  func(string, string) func() func()
+	terminal func() func()
+}
+
+func (p *installedProfileComparisonProof) observe(handle, operation string) {
+	if p.terminal == nil {
+		p.terminal = p.capture(handle, operation)
+	}
+}
+
+func (p *installedProfileComparisonProof) join(handle, operation string) func() {
+	p.observe(handle, operation)
+	if p.terminal == nil {
+		return nil
+	}
+	return p.terminal()
+}
 
 type installedComparisonReply struct{ installedJourneyEnvelope }
 
@@ -93,6 +114,7 @@ func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identi
 	defer proofs.flush(t)
 	for index, pair := range [2][2]installedProfileComparisonSource{sources, {sources[1], sources[1]}} {
 		verify := check(pair)
+		proof := &installedProfileComparisonProof{capture: verify}
 		call := mcpCall
 		if index == 0 {
 			denied := call("prepare_artifact_download", map[string]string{"artifact_id": pair[1].ArtifactID, "idempotency_key": "comparison-read-only-denied-" + pair[1].ArtifactID})
@@ -112,7 +134,7 @@ func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identi
 		}
 		// Retain early locators before browser response/render validation, so
 		// failures still attempt independent known query/key/worker inspection.
-		proofs.add(t, func() func() { return verify(handle, operation) })
+		proofs.add(t, func() func() { return proof.join(handle, operation) })
 		var finishBrowser func()
 		if index == 1 {
 			call, finishBrowser = installedProfileComparisonBrowser(t, ctx, browser, address, pair[1], func(reply installedComparisonReply) {
@@ -167,6 +189,7 @@ func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identi
 		if result.Status != "ok" {
 			t.Fatal("actual comparison did not succeed", string(result.Data))
 		}
+		proof.observe(handle, operation)
 		if handle != "" {
 			var nested struct {
 				Handle   string                   `json:"query_handle"`

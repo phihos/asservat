@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -11,13 +12,16 @@ import (
 	query "asservat.local/asservat/internal/domain/analysis"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"github.com/jackc/pgx/v5/pgxpool"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
 // Operator-only observations, never a runtime grant or source substitution.
+// The returned live check captures exact SQL/key/source/Pod evidence immediately;
+// its result defers only terminal inspection and later-demand retirement.
 func installedProfileComparisonSQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string) installedProfileComparisonCheck {
-	return func(sources [2]installedProfileComparisonSource) func(string, string) func() {
+	return func(sources [2]installedProfileComparisonSource) func(string, string) func() func() {
 		t.Helper()
 		snapshot := func() string {
 			t.Helper()
@@ -34,7 +38,7 @@ func installedProfileComparisonSQLCheck(t *testing.T, ctx context.Context, admin
 			return out
 		}
 		before := snapshot()
-		return func(handle, operation string) func() {
+		return func(handle, operation string) func() func() {
 			t.Helper()
 			if snapshot() != before {
 				t.Fatal("approved comparison created native downloads, approvals or raw grant use")
@@ -112,18 +116,32 @@ func installedProfileComparisonSQLCheck(t *testing.T, ctx context.Context, admin
 					if err != nil || children != 2 {
 						t.Fatal("comparison independent3-role children", children, err)
 					}
-					if err := installedProjectionWaitTerminal(ctx, api, observed); err != nil {
-						t.Fatal("comparison exact worker failed terminal observation", err)
+					retired := func(read context.Context) error {
+						var complete bool
+						if err := admin.QueryRow(read, `SELECT termination_json IS NOT NULL AND retired_proof_json IS NOT NULL AND abandoned_at IS NULL FROM download_worker WHERE root_id=$1 AND query_id=$2 AND id=$3`, root, id, worker).Scan(&complete); err != nil {
+							return err
+						}
+						if !complete {
+							return errors.New("comparison worker lacks positive stored retirement")
+						}
+						return nil
 					}
-					if snapshot() != before {
-						t.Fatal("comparison terminal inspection changed native/grant state")
-					}
-					t.Logf("installed comparison: query=%s source ordinals0/1, one joined batch, two independent3-role children, exact384MiB Pod/transient,20units, retained totals root=%d principal=%d workload=%d", id, rootSpent, principalSpent, workloadSpent)
-					return func() {
-						t.Helper()
-						var retired bool
-						if err := admin.QueryRow(ctx, `SELECT termination_json IS NOT NULL AND retired_proof_json IS NOT NULL AND abandoned_at IS NULL FROM download_worker WHERE root_id=$1 AND query_id=$2 AND id=$3`, root, id, worker).Scan(&retired); err != nil || !retired {
-							t.Fatal("later real demand did not positively retire comparison worker", err)
+					return func() func() {
+						if err := installedProjectionWaitTerminal(ctx, api, observed); err != nil {
+							t.Fatal("comparison exact worker failed terminal observation", err)
+						}
+						if err := installedProfileComparisonRetirementAfterTerminal(ctx, api, observed, retired); err != nil {
+							t.Fatal("comparison missing worker lacks exact positive retirement", err)
+						}
+						if snapshot() != before {
+							t.Fatal("comparison terminal inspection changed native/grant state")
+						}
+						t.Logf("installed comparison: query=%s source ordinals0/1, one joined batch, two independent3-role children, exact384MiB Pod/transient,20units, retained totals root=%d principal=%d workload=%d", id, rootSpent, principalSpent, workloadSpent)
+						return func() {
+							t.Helper()
+							if err := retired(ctx); err != nil {
+								t.Fatal("later real demand did not positively retire comparison worker", err)
+							}
 						}
 					}
 				}
@@ -142,6 +160,26 @@ func installedProfileComparisonSQLCheck(t *testing.T, ctx context.Context, admin
 			return nil
 		}
 	}
+}
+
+// Call only after installedProjectionWaitTerminal has positively observed the
+// original Job/Pod or their absence. That shared helper cannot by itself prove
+// retirement when both disappeared; require the exact stored SQL proof here.
+// A surviving original Job already supplied terminal proof and stays charged.
+func installedProfileComparisonRetirementAfterTerminal(ctx context.Context, api kubernetes.Interface, observed value.AcquisitionWorker, retired func(context.Context) error) error {
+	read, end := context.WithDeadline(ctx, observed.Intent.RunUntil.Add(30*time.Second))
+	defer end()
+	job, err := api.BatchV1().Jobs(observed.Binding.Namespace).Get(read, observed.Binding.Job, meta.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return retired(read)
+	}
+	if err != nil {
+		return err
+	}
+	if string(job.UID) != observed.Binding.JobUID {
+		return errors.New("comparison terminal Job identity changed")
+	}
+	return nil
 }
 
 // Operator-only content-free failure observations. No stored authority,
