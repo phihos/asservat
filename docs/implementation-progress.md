@@ -79,6 +79,35 @@ fixture shape, budgets and deadlines stay unchanged. Local originals are retaine
 in `test/results/profile-heavy-cli-fix-local/`. A fresh installed qualification
 remains pending.
 
+**Second installed heavy attempt:** [native 41834018171](https://github.com/phihos/asservat/actions/runs/41834018171)
+failed on `b5d42f9557897b40ca5d6506ffc3c9bd4946f373` (Go exit 1,
+627.902s). Eligible PR CI41833979360 passed. Both approved captures, authenticated
+native downloads and corrected local CPU pprof checks passed. The first comparison
+was admitted and polled pending once; the next poll failed with HTTP 503 and
+operation outcome unknown, so it was not replayed. The worker stopped at
+`native/conversation/read/approved`; the hub reported
+`until-authority/comparison/prepare/projection`. The original worker cutoff was
+still later than this failure.
+
+Both three-role key children were consumed, which establishes key opening, not
+complete payload reads or final authentication. No comparison or cgroup probe
+succeeded. A later fixture diagnostic prints the previous termination state's
+default exit value, so it supplies neither the current exit code nor an OOM
+counter. All 4,123 source hashes match the committed head, sources stayed
+unchanged, cleanup was empty and scratch was removed. Originals and audit are
+retained in `test/results/profile-heavy-native-41834018171/`.
+
+Before another installed run, reproduce the exact ten-second pair through the
+local comparer and isolate the approved storage-reader boundary. Both exact files pass the standalone comparer: valid20-row raw/per-second
+results in0.985s/1.154s, with process RSS237.2MiB/248.4MiB. The original ten-second
+durations and700,000/1,100,000 totals are retained. This excludes production
+storage/authority/framing/transport, so no installed resource claim follows;
+evidence is in `test/results/profile-heavy-exact-comparer-local/`. The worker's
+five-second S3/key HTTP request cap is a concrete code fact, not yet a demonstrated
+cause. Existing operation, worker and job deadlines remain unchanged. The
+prepared trace/browser follow-ups are consolidated into one unpublished test
+candidate to share one CI matrix; their installed results remain separate.
+
 **Latest verified outcome:** the installed Go heap snapshot MCP workflow passed
 at `80593f9398ad9bf909afe9fd46a34752b3060ba1` in
 [native 41818585176](https://github.com/phihos/asservat/actions/runs/41818585176).

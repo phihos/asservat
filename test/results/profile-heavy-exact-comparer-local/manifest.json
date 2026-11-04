@@ -1,0 +1,30 @@
+{
+  "sourceCommit": "b5d42f9557897b40ca5d6506ffc3c9bd4946f373",
+  "files": {
+    "native-heavy-exact-repro-build.log": {
+      "archive": "native-heavy-exact-repro-build.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native-heavy-exact-repro-none.log": {
+      "archive": "native-heavy-exact-repro-none.log.gz",
+      "bytes": 792,
+      "sha256": "922ee99291bb07ef99b37db853a507c9921a73620472fbf26db800cef1682390"
+    },
+    "native-heavy-exact-repro-perSecond.log": {
+      "archive": "native-heavy-exact-repro-perSecond.log.gz",
+      "bytes": 797,
+      "sha256": "f797f9cfca488f16b07dac5186b20ca1dd517bbe97fcb9c267174d312249fea0"
+    },
+    "native-heavy-exact-repro-resources.json": {
+      "archive": "native-heavy-exact-repro-resources.json.gz",
+      "bytes": 2469,
+      "sha256": "a86bdb80ada8f36238d99c3433e5b5ff03096c6b718cdd17dd14c5e4f6919868"
+    },
+    "native-heavy-exact-repro_test.go": {
+      "archive": "native-heavy-exact-repro_test.go.gz",
+      "bytes": 2173,
+      "sha256": "635990ddfe743eeee12198382d8412ccae072124c00cba13df4255706e20178a"
+    }
+  }
+}

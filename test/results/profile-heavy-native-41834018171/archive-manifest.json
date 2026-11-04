@@ -1,0 +1,164 @@
+{
+  "format": "profile-heavy-native-terminal-archive/v1",
+  "run_id": 41834018171,
+  "head": "b5d42f9557897b40ca5d6506ffc3c9bd4946f373",
+  "workflow_url": "https://github.com/phihos/asservat/actions/runs/41834018171",
+  "created_at_utc": "2026-11-04T13:23:59.275034+00:00",
+  "archive_preparation_head": "b5d42f9557897b40ca5d6506ffc3c9bd4946f373",
+  "scope": "Second installed heavy run failed at first comparison result polling. Both original synthetic native inputs retained once each without recompression; other originals and derived audit deterministically gzipped. No completed comparison or cgroup probe, no actual current termination code/reason. No rerun/source fix/archive commit.",
+  "artifacts": [
+    {
+      "path": "workflow.json.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/workflow.json",
+      "source_bytes": 4938,
+      "source_sha256": "ff97b97a5af0764649ea50412247c33c89e1020ab28130f4bf6bf1f79a0167ee",
+      "stored_bytes": 887,
+      "stored_sha256": "868d79989e6f56b778e19b9d6ea44cde40bd559df9652704477cbbd2de0e2859",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "artifacts.json.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/artifacts.json",
+      "source_bytes": 765,
+      "source_sha256": "c2a5c95bd4a658d8a2230d8a7789507f6671be6b2dbc4c817096c2710a0513e0",
+      "stored_bytes": 458,
+      "stored_sha256": "15aabe6c97b63b19e65e224874b026a9a1ff6d10746d7cad3f8951ef1c019d7e",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "workflow-job.log.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/workflow-job.log",
+      "source_bytes": 132935,
+      "source_sha256": "e4bf72d0b95f49131a0c0fde98e62b58f4dfa2bb3db3f8cefab1717ae989b1de",
+      "stored_bytes": 17799,
+      "stored_sha256": "620e0db32aa43830cd3e0fd3641add0fe2b87b2e667fc7a77f8d40000a500888",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "verification.json.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/verification.json",
+      "source_bytes": 17160,
+      "source_sha256": "b22500c7b6a36d9a083602eb394bca31dbc4c42000a8fca64664ab8b56a107b6",
+      "stored_bytes": 5306,
+      "stored_sha256": "ba97a953939f9ff357d5d9dae344b14e23653a48a0895dc86f5a550d390bcf8f",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/ci-native-continuation-profile-comparison-heavy.log.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/ci-native-continuation-profile-comparison-heavy.log",
+      "source_bytes": 3377,
+      "source_sha256": "5663d7ca6cb7fd2a3ee7b5182d02092d47517e2d6048357ea46336eb5cb8f822",
+      "stored_bytes": 1246,
+      "stored_sha256": "fc447a52f4427f98819d32e1015f86df11efc1799ebee0d4fde9c7e825ff833c",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/context-storage-environment.json.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/context-storage-environment.json",
+      "source_bytes": 535819,
+      "source_sha256": "baaf2d8afad59f0ed6433c4abb2b7adf59d90e2576831f43b9268944a3898dcd",
+      "stored_bytes": 201443,
+      "stored_sha256": "c8950d6579f0b3aa8d6e99688a7cc8e75bdd346f4af24d3d4eddd95d7325c0ba",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/context-storage-kubelet.log.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/context-storage-kubelet.log",
+      "source_bytes": 32190,
+      "source_sha256": "70c72b60061dde44cd5a51e65e9b0cf24b297b4b9c740bec6b1962dc2b173345",
+      "stored_bytes": 3411,
+      "stored_sha256": "967c6b3d0763414c52c5e4974a2d05fc2a802deecb8efe345f57dda5e43e0f75",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/context-storage-postgres.log.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/context-storage-postgres.log",
+      "source_bytes": 435856,
+      "source_sha256": "43922c09ce9f44ce37493ddc02c3031fd2c33c0e1a0b274f1bd6c226f0d01227",
+      "stored_bytes": 24177,
+      "stored_sha256": "b4645b0d8b1ce50a60c3f832bf3a144c856a182ba55998b733fda066d73fc83b",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/context-storage-timing.log.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/context-storage-timing.log",
+      "source_bytes": 161723,
+      "source_sha256": "bfe08123617815c9a1868595362a6177136912c10da7901e840cb0e2d92ff92d",
+      "stored_bytes": 19134,
+      "stored_sha256": "6b40961028175baafdca46dda79dbd1ea75882808c2ff85d732975088c21cd96",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/context-storage.log.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/context-storage.log",
+      "source_bytes": 152534,
+      "source_sha256": "0cd2ef2ce4b4d223603f10b37499e70f2ef56c86bec6c62d696e6100fb7b32fb",
+      "stored_bytes": 18413,
+      "stored_sha256": "636d64ee3cc02e8f1e1f36c6ae9b6bfc8d342eecc3968ffc61e622df8a8fea90",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/manual-profile-49ccf6e7-9934-428f-b036-0e74f9d6ab4e-pprof.txt.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/manual-profile-49ccf6e7-9934-428f-b036-0e74f9d6ab4e-pprof.txt",
+      "source_bytes": 2517,
+      "source_sha256": "f9df10c6183c46597e1a9939d798df70fad5d0a6fa762dcbef520929819a235e",
+      "stored_bytes": 1095,
+      "stored_sha256": "b8cccf1c5c07b348525c0403de164fcc00f0fa248ffbff7e32ebe3c57add0c62",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/manual-profile-49ccf6e7-9934-428f-b036-0e74f9d6ab4e.pb.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/manual-profile-49ccf6e7-9934-428f-b036-0e74f9d6ab4e.pb.gz",
+      "source_bytes": 9392922,
+      "source_sha256": "efd5dac937c228106a344b5bbd9b7340035f761a979bbca010b8fa6a676fae6f",
+      "stored_bytes": 9392922,
+      "stored_sha256": "efd5dac937c228106a344b5bbd9b7340035f761a979bbca010b8fa6a676fae6f",
+      "storage": "exact-original-native-gzip-no-recompression"
+    },
+    {
+      "path": "original/manual-profile-5c231a44-449e-4e10-aab9-a4c87ee2bae6-pprof.txt.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/manual-profile-5c231a44-449e-4e10-aab9-a4c87ee2bae6-pprof.txt",
+      "source_bytes": 2518,
+      "source_sha256": "912cba5467fe9472df4026dd6989e6eda34e0671d59cc148d7feea3cecec6fcd",
+      "stored_bytes": 1105,
+      "stored_sha256": "8d10a29aad6c2a3f8eb720d99a0f6f7a530cd1edcbabdf9e13d2eed1d9135a41",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/manual-profile-5c231a44-449e-4e10-aab9-a4c87ee2bae6.pb.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/manual-profile-5c231a44-449e-4e10-aab9-a4c87ee2bae6.pb.gz",
+      "source_bytes": 9394862,
+      "source_sha256": "853f5ed2f0a6afa8c64dcef9d0715e49b9435966406cde3b108f599a63084a9d",
+      "stored_bytes": 9394862,
+      "stored_sha256": "853f5ed2f0a6afa8c64dcef9d0715e49b9435966406cde3b108f599a63084a9d",
+      "storage": "exact-original-native-gzip-no-recompression"
+    },
+    {
+      "path": "original/profile-worker-containment-context-2d9urcz4/profile-heavy-generation.log.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/profile-worker-containment-context-2d9urcz4/profile-heavy-generation.log",
+      "source_bytes": 2361,
+      "source_sha256": "1c0c5d79a77f68af752e6940fe630130d180209512889953458e2ffe7bf14cbc",
+      "stored_bytes": 747,
+      "stored_sha256": "f3351b8015450f0291a0f3632a52108ae6e1d00f58c5e00be2cf04165ba9f43b",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/profile-worker-containment-context-2d9urcz4/profile-heavy-manifest.json.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/profile-worker-containment-context-2d9urcz4/profile-heavy-manifest.json",
+      "source_bytes": 1782,
+      "source_sha256": "6257166621f2b119b626a82720e565181af047fccf96f8037f82b1bd43882211",
+      "stored_bytes": 641,
+      "stored_sha256": "638d06a447ee8d7d82799050f433dcb4a2493baa929eaa0a8732d2c62653793b",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    },
+    {
+      "path": "original/profile-worker-containment-context-2d9urcz4/profile-worker-containment-0-failure.json.gz",
+      "source_cache_path": "/home/phil/.cache/asservat-build/profile-heavy-native-41834018171/native-continuation-profile-comparison-heavy-1/profile-worker-containment-context-2d9urcz4/profile-worker-containment-0-failure.json",
+      "source_bytes": 2902,
+      "source_sha256": "43d88594b5a7d1d5a781cdb5eccde1befb550d84600593f627904c684b537b8c",
+      "stored_bytes": 1125,
+      "stored_sha256": "0d5c0ebec140e8b7f027b140619703d188ffed76c6766846e2f16d3c3acbcb17",
+      "storage": "deterministic-gzip-mtime0-emptyfilename"
+    }
+  ]
+}
