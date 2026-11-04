@@ -26,7 +26,12 @@ Targeted component races, private-input/Helm checks and independent producer and
 consumer reviews passed at product checkpoint `c3fad4ff`. The next installed
 fixture uses the actual installer/private projection and original Restricted app,
 checks authenticated CPU/native/summary/history/Repeat and refuses wrong TLS and
-workload audiences. Its candidate gates, CI and installed auth qualification
+workload audiences. The initial pre-push run exposed a wire-layer import violation and missing
+local console dependencies. Local syntax validation fixed the import without
+changing the architecture rule; corrective contract races, architecture, vet,
+formatting and console checks passed. All other pre-push targets passed before
+that two-file correction. [Local originals](../test/results/named-profile-auth-local/README.md)
+retain failures and exact source scopes; CI and installed auth qualification
 remain pending. Heap React remains qualified at c2d4 and accepted-heavy comparison
 at c6; those scopes stay separate. Broader S-05 and the full specification remain
 open.
@@ -215,9 +220,9 @@ One shared final CI candidate and three separate fresh native runs are planned;
 these local results do not establish installed heap-browser or trace success.
 The full S-05 and specification goal remains active.
 
-## Current delivery workflow (2026-11-04)
+## Earlier accepted-heavy qualification workflow (2026-11-04)
 
-**Active outcome:** qualify one accepted-heavy two-source pprof comparison in the
+**Preparation outcome:** qualify one accepted-heavy two-source pprof comparison in the
 existing installed384MiB/500m worker. The test-only candidate prebuilds two
 synthetic profiles outside the measured worker (100,000 samples/functions/locations,
 1,048,576 references,16 values/sample,32,768 numeric labels and16MiB-minus56-byte
