@@ -164,6 +164,10 @@ func verificationRecord(c custodydb.ContextCapture, v custodydb.ContextVerificat
 		return audit.ContextVerification{}, err
 	}
 	r := audit.ContextVerification{RootID: uid(c.RootID), CaptureID: uid(c.ID), ArtifactID: e.Registration.Location.ArtifactID, AttemptID: e.Registration.Location.AttemptID, PermissionEpoch: uid(v.PermissionEpoch), PermissionSequence: v.PermissionSequence, ScopeDigest: e.PlanDigest, VerifiedAt: v.VerifiedAt.Time, WriteUntil: e.Registration.WriteUntil, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
+	r.Acquisition, err = verifiedAcquisition(e, v)
+	if err != nil {
+		return audit.ContextVerification{}, privacy.ErrConflict
+	}
 	if v.NativeBytes.Valid {
 		if v.NativeBytes.Int64 < 0 || v.NativeBytes.Int64 > e.Registration.NativeLimit {
 			return audit.ContextVerification{}, privacy.ErrConflict
@@ -196,10 +200,17 @@ func verificationRecord(c custodydb.ContextCapture, v custodydb.ContextVerificat
 	}
 	return r, nil
 }
-func (s *ContextPublications) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, nativeBytes int64) (audit.ContextVerification, error) {
+func (s *ContextPublications) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, verified artifact.ContextVerificationResult) (audit.ContextVerification, error) {
 	var out audit.ContextVerification
-	if e.Validate() != nil || c.Validate(e.Registration) != nil || a.RootID != s.root || nativeBytes < 0 || nativeBytes > e.Registration.NativeLimit {
+	nativeBytes := verified.NativeBytes
+	if e.Validate() != nil || c.Validate(e.Registration) != nil || a.RootID != s.root || nativeBytes < 0 || nativeBytes > e.Registration.NativeLimit || verified.Acquisition != nil && !acquisitionMatchesExpectation(e, verified.Acquisition) {
 		return out, artifact.ErrInvalid
+	}
+	// Own the observation before blocking on SQL; the caller cannot replace
+	// its pair during persistence and audit reconstruction.
+	if verified.Acquisition != nil {
+		window := *verified.Acquisition
+		verified.Acquisition = &window
 	}
 	topology, err := s.retention.observe(ctx, e.Registration.Location.ClusterID)
 	if err != nil {
@@ -234,12 +245,23 @@ func (s *ContextPublications) RecordContextVerification(ctx context.Context, e a
 		}
 		row, err := q.ReadContextVerification(ctx, custodydb.ReadContextVerificationParams{CaptureID: accepted.ID, RootID: accepted.RootID})
 		if errors.Is(err, pgx.ErrNoRows) {
-			row, err = q.InsertContextVerification(ctx, custodydb.InsertContextVerificationParams{NativeBytes: pgtype.Int8{Int64: nativeBytes, Valid: true}, CaptureID: accepted.ID, RootID: accepted.RootID, ExpectationDigest: digest(e), CopiesDigest: digest(c), IntentDigest: accepted.IntentDigest, AuthorityDigest: a.AuthorityDigest[:], PermissionEpoch: id(a.PermissionEpoch), PermissionSequence: a.PermissionSequence})
+			if e.Profile != nil && verified.Acquisition == nil {
+				return artifact.ErrInvalid
+			}
+			params := custodydb.InsertContextVerificationParams{NativeBytes: pgtype.Int8{Int64: nativeBytes, Valid: true}, CaptureID: accepted.ID, RootID: accepted.RootID, ExpectationDigest: digest(e), CopiesDigest: digest(c), IntentDigest: accepted.IntentDigest, AuthorityDigest: a.AuthorityDigest[:], PermissionEpoch: id(a.PermissionEpoch), PermissionSequence: a.PermissionSequence}
+			if verified.Acquisition != nil {
+				params.AcquisitionStartedAt, params.AcquisitionCompletedAt = ts(verified.Acquisition.StartedAt), ts(verified.Acquisition.CompletedAt)
+			}
+			row, err = q.InsertContextVerification(ctx, params)
 		}
 		if err != nil {
 			return err
 		}
 		if !bytes.Equal(row.CopiesDigest, digest(c)) || row.NativeBytes.Valid && row.NativeBytes.Int64 != nativeBytes {
+			return privacy.ErrConflict
+		}
+		window, err := verifiedAcquisition(e, row)
+		if err != nil || window != nil && !sameAcquisition(window, verified.Acquisition) {
 			return privacy.ErrConflict
 		}
 		out, err = currentVerificationRecord(ctx, q, accepted, row)
@@ -425,6 +447,13 @@ func (s *ContextPublications) ContextDownloadEvidence(ctx context.Context, artif
 			out.NativeBytes = &size
 		}
 		copy(out.Version[:], row.ContextVerification.CopiesDigest)
+		if e.Profile != nil {
+			window, err := verifiedAcquisition(e, row.ContextVerification)
+			if err != nil {
+				return err
+			}
+			out.ProfileAcquisition = &artifact.ProfileAcquisitionMetadata{Type: e.Profile.Type, Mode: e.Profile.Mode, DurationMillis: e.Profile.DurationMillis, ForceGC: e.Profile.ForceGC, Acquisition: window}
+		}
 		return nil
 	})
 	if err != nil {

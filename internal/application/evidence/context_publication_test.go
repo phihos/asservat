@@ -17,6 +17,7 @@ type publicationFixture struct {
 	calls        []string
 	failure      string
 	nativeBytes  int64
+	acquisition  *artifact.AcquisitionWindow
 	recordChange func(*audit.ContextVerification)
 	record       audit.ContextVerification
 	change       func(string, *publicationFixture)
@@ -39,16 +40,75 @@ func (f *publicationFixture) CheckContextPublication(context.Context, artifact.C
 	err := f.step("authority")
 	return artifact.PublicationAuthority{RootID: f.e.CaseID, CaptureID: f.e.CaptureUID, PermissionEpoch: f.e.OccurrenceID, PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, ExpectationDigest: ContextExpectationDigest(f.e), AuthorityDigest: artifact.Digest{2}, CheckedAt: f.now, ValidUntil: f.now.Add(time.Second)}, err
 }
-func (f *publicationFixture) VerifyContext(context.Context, artifact.ContextExpectation, artifact.Copies) (int64, error) {
-	return f.nativeBytes, f.step("verify")
+func (f *publicationFixture) VerifyContext(context.Context, artifact.ContextExpectation, artifact.Copies) (artifact.ContextVerificationResult, error) {
+	return artifact.ContextVerificationResult{NativeBytes: f.nativeBytes, Acquisition: f.acquisition.Clone()}, f.step("verify")
 }
-func (f *publicationFixture) RecordContextVerification(_ context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, nativeBytes int64) (audit.ContextVerification, error) {
+func (f *publicationFixture) RecordContextVerification(_ context.Context, e artifact.ContextExpectation, c artifact.Copies, a artifact.PublicationAuthority, verified artifact.ContextVerificationResult) (audit.ContextVerification, error) {
 	err := f.step("record")
+	nativeBytes := verified.NativeBytes
 	f.record = audit.ContextVerification{NativeBytes: &nativeBytes, RootID: a.RootID, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, AttemptID: e.Registration.Location.AttemptID, PermissionEpoch: a.PermissionEpoch, PermissionSequence: a.PermissionSequence, ScopeDigest: e.PlanDigest, ExpectationDigest: ContextExpectationDigest(e), CopiesDigest: ContextCopiesDigest(c), IntentDigest: artifact.Digest{3}, AuthorityDigest: a.AuthorityDigest, VerifiedAt: f.now, WriteUntil: e.Registration.WriteUntil, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
+	f.record.Acquisition = verified.Acquisition.Clone()
 	if f.recordChange != nil {
 		f.recordChange(&f.record)
 	}
 	return f.record, err
+}
+
+func TestProfilePublicationBindsVerifiedAcquisitionAndPreservesLegacyUnknown(t *testing.T) {
+	for _, mode := range []string{"complete", "missing", "reversed", "nanoseconds", "changed-record", "legacy-record", "non-profile"} {
+		t.Run(mode, func(t *testing.T) {
+			f, p := publicationTest(t)
+			f.e.NativeType, f.e.DataClass, f.e.ActionID = artifact.PprofArtifact, "raw", "a0123456789abcdef01234567"
+			f.e.Registration.NativeLimit = artifact.MaxPprofBytes
+			f.e.Profile = &artifact.GoProfileAcquisition{SourceRef: "synthetic", EndpointDigest: artifact.Digest{1}, Type: "cpu", Mode: "interval", DurationMillis: 1000}
+			f.acquisition = &artifact.AcquisitionWindow{StartedAt: f.now.Add(-time.Second), CompletedAt: f.now}
+			want := *f.acquisition
+			switch mode {
+			case "missing":
+				f.acquisition = nil
+			case "reversed":
+				f.acquisition.CompletedAt = f.acquisition.StartedAt.Add(-time.Microsecond)
+			case "nanoseconds":
+				f.acquisition.CompletedAt = f.acquisition.CompletedAt.Add(time.Nanosecond)
+			case "changed-record":
+				f.recordChange = func(r *audit.ContextVerification) {
+					r.Acquisition.CompletedAt = r.Acquisition.CompletedAt.Add(time.Microsecond)
+				}
+			case "legacy-record":
+				// The trusted recorder returns the immutable historical record. It
+				// does not backfill old NULL timing or replace its original audit.
+				f.recordChange = func(r *audit.ContextVerification) { r.Acquisition = nil }
+			case "non-profile":
+				f.e.NativeType, f.e.DataClass, f.e.ActionID, f.e.Profile = "", "metadata", "context", nil
+				f.e.Registration.NativeLimit = 4096
+			}
+			if err := f.e.Validate(); err != nil {
+				t.Fatal("invalid accepted fixture", err)
+			}
+			_, err := p.Publish(t.Context(), f.e.CaptureUID, f.copies)
+			if mode == "complete" || mode == "legacy-record" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if mode == "legacy-record" {
+					if f.record.Acquisition != nil {
+						t.Fatal("historical unknown timing changed")
+					}
+				} else if f.record.Acquisition == nil || !f.record.Acquisition.Equal(want) {
+					t.Fatal("authenticated window lost")
+				}
+			} else {
+				if !errors.Is(err, artifact.ErrIntegrity) {
+					t.Fatal("invalid acquisition accepted", err)
+				}
+				for _, call := range f.calls {
+					if call == "audit" || call == "publish" {
+						t.Fatal("invalid acquisition reached audit/publication", f.calls)
+					}
+				}
+			}
+		})
+	}
 }
 func (f *publicationFixture) WriteContextVerification(context.Context, audit.ContextVerification) (audit.Receipt, error) {
 	err := f.step("audit")

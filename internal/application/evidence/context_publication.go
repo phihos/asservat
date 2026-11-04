@@ -21,7 +21,10 @@ type ContextAcceptanceReader interface {
 	AcceptedContextForPublication(context.Context, string) (artifact.ContextExpectation, error)
 }
 type ContextVerificationRecorder interface {
-	RecordContextVerification(context.Context, artifact.ContextExpectation, artifact.Copies, artifact.PublicationAuthority, int64) (audit.ContextVerification, error)
+	// The trusted recorder requires timing for a new profile verdict and matches
+	// non-null existing timing. A historical null remains unknown on replay;
+	// it is never backfilled or used to rewrite an immutable audit record.
+	RecordContextVerification(context.Context, artifact.ContextExpectation, artifact.Copies, artifact.PublicationAuthority, artifact.ContextVerificationResult) (audit.ContextVerification, error)
 }
 type ContextVerificationAuditor interface {
 	AcknowledgeContextVerification(context.Context, audit.ContextVerification, audit.Receipt) error
@@ -88,13 +91,14 @@ func (p ContextPublisher) Publish(ctx context.Context, captureID string, copies 
 	if err != nil {
 		return out, err
 	}
-	nativeBytes, err := p.Verifier.VerifyContext(ctx, e, copies)
+	verified, err := p.Verifier.VerifyContext(ctx, e, copies)
 	if err != nil {
 		return out, err
 	}
-	if nativeBytes < 0 || nativeBytes > e.Registration.NativeLimit {
+	if !verified.Valid(e) {
 		return out, artifact.ErrIntegrity
 	}
+	verified = verified.Clone()
 	current, err := check()
 	if err != nil {
 		return out, err
@@ -102,11 +106,11 @@ func (p ContextPublisher) Publish(ctx context.Context, captureID string, copies 
 	if current.RootID != before.RootID {
 		return out, privacy.ErrConflict
 	}
-	record, err := p.Ledger.RecordContextVerification(ctx, e, copies, current, nativeBytes)
+	record, err := p.Ledger.RecordContextVerification(ctx, e, copies, current, verified)
 	if err != nil {
 		return out, err
 	}
-	if !record.Valid() || record.NativeBytes != nil && *record.NativeBytes != nativeBytes || record.RootID != current.RootID || record.CaptureID != captureID || record.ArtifactID != e.Registration.Location.ArtifactID || record.AttemptID != e.Registration.Location.AttemptID || record.ScopeDigest != e.PlanDigest || record.ExpectationDigest != ContextExpectationDigest(e) || record.CopiesDigest != ContextCopiesDigest(copies) || record.VerifiedAt.After(p.Now()) || !record.WriteUntil.Equal(e.Registration.WriteUntil) || !record.ExpiresAt.Equal(e.Registration.ExpiresAt) || !record.DeleteBy.Equal(e.Registration.DeleteBy) {
+	if !record.Valid() || record.NativeBytes != nil && *record.NativeBytes != verified.NativeBytes || record.Acquisition != nil && (verified.Acquisition == nil || !record.Acquisition.Equal(*verified.Acquisition)) || record.RootID != current.RootID || record.CaptureID != captureID || record.ArtifactID != e.Registration.Location.ArtifactID || record.AttemptID != e.Registration.Location.AttemptID || record.ScopeDigest != e.PlanDigest || record.ExpectationDigest != ContextExpectationDigest(e) || record.CopiesDigest != ContextCopiesDigest(copies) || record.VerifiedAt.After(p.Now()) || !record.WriteUntil.Equal(e.Registration.WriteUntil) || !record.ExpiresAt.Equal(e.Registration.ExpiresAt) || !record.DeleteBy.Equal(e.Registration.DeleteBy) {
 		return out, artifact.ErrIntegrity
 	}
 	receipt, err := p.Audit.WriteContextVerification(ctx, record)

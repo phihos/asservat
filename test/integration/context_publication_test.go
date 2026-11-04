@@ -202,7 +202,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 			verified, err := f.publisher.Verifier.VerifyContext(ctx, f.e, f.copies)
-			if err != nil || verified != f.nativeBytes {
+			if err != nil || verified.NativeBytes != f.nativeBytes {
 				t.Fatal("actual native length", verified, f.nativeBytes, err)
 			}
 			record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, verified)
@@ -231,7 +231,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				}
 				record.NativeBytes = nil
 			} else {
-				if _, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, verified+1); err == nil {
+				if _, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: verified.NativeBytes + 1}); err == nil {
 					t.Fatal("verification replay changed native length")
 				}
 				// Check immutability before audit acknowledgement as well.
@@ -468,12 +468,12 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err != nil {
 			t.Fatal(err)
 		}
-		record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
+		record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
 		if err != nil {
 			t.Fatal(err)
 		}
 		check("Finalizing", "VerificationAuditPending", true)
-		if _, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes); err != nil {
+		if _, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes}); err != nil {
 			t.Fatal(err)
 		}
 		check("Finalizing", "VerificationAuditPending", false)
@@ -507,7 +507,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 			if phase == "publication" {
-				record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
+				record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -523,7 +523,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 			if phase == "verification" {
-				_, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
+				_, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
 			} else {
 				_, err = f.publish.PublishContext(ctx, f.e, f.copies, a)
 			}
@@ -544,7 +544,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 			if phase == "publication" {
-				record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
+				record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -560,7 +560,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 			if phase == "verification" {
-				_, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
+				_, err = f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
 			} else {
 				_, err = f.publish.PublishContext(ctx, f.e, f.copies, a)
 			}
@@ -681,7 +681,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err != nil {
 			t.Fatal(err)
 		}
-		record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, f.nativeBytes)
+		record, err := f.verify.RecordContextVerification(ctx, f.e, f.copies, a, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -47,12 +47,20 @@ weakening approvals, budgets or deadlines. Their original reports remain in the
 corresponding result directories. Successful qualification above supersedes their
 pending outcomes; no failed run is relabeled as passed.
 
-**Next active outcome:** truthful case acquisition timing under REQ-PRF-004.
-Investigate retaining actual authenticated manifest times during existing
-publication and exposing them through existing catalog/timeline reads, preserving
-unknown legacy values and unknown process identity. Avoid reopening raw manifests
-or adding per-case key requests. This is next-task preparation, not implemented.
-The original complete-spec goal remains active.
+**Active outcome:** truthful case acquisition timing under REQ-PRF-004 / ADR-297.
+Implementation is in progress in `/home/phil/Projekte/asservat-profile-timing`,
+branch `feature/verified-case-timing`, based on merged mainc7c92de0. It returns authenticated
+profile manifest times only after existing complete verification, stores paired
+nullable UTC microsecond metadata in SQL134 and immutable verification audit,
+then reuses existing authorized catalog reads and a typed case collection table.
+Legacy times/clock uncertainty/process attribution stay unknown. No extra
+artifact/key/API read, worker or authority is planned. Domain/verifier, SQL and
+C16/UI implementation and independent cross-reviews are complete. Integrated
+profile race checks and spec/architecture gates passed (13,540 assertions); a
+duplicate browser YAML anchor found in review was corrected before freezing.
+Real-service, upgrade, built-browser and installed timing qualification remain
+pending; no result is claimed before those gates finish. The original complete-spec
+goal remains active.
 
 Saved syscall views are merged in [PR150](https://github.com/phihos/asservat/pull/150),
 main `381820beabb16caceb3b378e5f007e094cd1dd15`. Its full tree matches qualified

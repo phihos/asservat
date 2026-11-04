@@ -8,7 +8,7 @@ func TestContextVerifierCanInsertButNeverRewriteNativeLength(t *testing.T) {
 		if !ok {
 			t.Fatalf("missing publication duty %s", purpose)
 		}
-		insert := false
+		insert := map[string]bool{}
 		for _, g := range grants {
 			if g.object != "context_verification" {
 				continue
@@ -16,16 +16,18 @@ func TestContextVerifierCanInsertButNeverRewriteNativeLength(t *testing.T) {
 			if (g.privilege == "INSERT" || g.privilege == "UPDATE") && g.column == "" {
 				t.Fatalf("%s gained broad verification write: %+v", purpose, g)
 			}
-			if g.column != "native_bytes" {
+			if g.column != "native_bytes" && g.column != "acquisition_started_at" && g.column != "acquisition_completed_at" {
 				continue
 			}
 			if purpose != "context-verify" || g.kind != "table" || g.privilege != "INSERT" {
 				t.Fatalf("%s can change verified native length: %+v", purpose, g)
 			}
-			insert = true
+			insert[g.column] = true
 		}
-		if (purpose == "context-verify") != insert {
-			t.Fatalf("%s native-length insert=%v", purpose, insert)
+		for _, column := range []string{"native_bytes", "acquisition_started_at", "acquisition_completed_at"} {
+			if (purpose == "context-verify") != insert[column] {
+				t.Fatalf("%s %s insert=%v", purpose, column, insert[column])
+			}
 		}
 	}
 }

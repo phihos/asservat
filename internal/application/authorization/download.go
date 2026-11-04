@@ -21,6 +21,7 @@ type ContextDownloadEvidence struct {
 	// NativeBytes is verified publication metadata; nil means legacy unknown.
 	// It never substitutes the registration limit or ciphertext object length.
 	NativeBytes                                    *int64
+	ProfileAcquisition                             *artifact.ProfileAcquisitionMetadata
 	ExecutionDigest                                artifact.Digest
 	Namespace, WorkloadKind, WorkloadName, PodName string
 	PurposeRef                                     string

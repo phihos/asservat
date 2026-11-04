@@ -39,7 +39,7 @@ SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.sc
  a.copies_digest,a.effective_expires_at,a.effective_delete_by,
  v.capture_id AS verified_capture_id,v.root_id AS verified_root_id,v.verified_at,
  v.expectation_digest,v.copies_digest AS verified_copies_digest,v.intent_digest AS verified_intent_digest,
- v.native_bytes,v.authority_digest,v.permission_epoch,v.permission_sequence,v.audit_acknowledged_at,v.audit_digest,
+ v.native_bytes,v.acquisition_started_at,v.acquisition_completed_at,v.authority_digest,v.permission_epoch,v.permission_sequence,v.audit_acknowledged_at,v.audit_digest,
  cat.artifact_id AS catalog_artifact_id,cat.published_at,
  hp.state AS history_parameters_state,ha.state AS history_custody_state,hp.visible AS history_visible,hp.summary_expires_at AS history_summary_expires,ha.effective_expires_at AS history_settings_expires
 FROM context_capture c
@@ -70,6 +70,8 @@ type ReadContextProgressFactsRow struct {
 	VerifiedCopiesDigest   []byte
 	VerifiedIntentDigest   []byte
 	NativeBytes            pgtype.Int8
+	AcquisitionStartedAt   pgtype.Timestamptz
+	AcquisitionCompletedAt pgtype.Timestamptz
 	AuthorityDigest        []byte
 	PermissionEpoch        pgtype.UUID
 	PermissionSequence     pgtype.Int8
@@ -148,6 +150,8 @@ func (q *Queries) ReadContextProgressFacts(ctx context.Context, arg ReadContextP
 		&i.VerifiedCopiesDigest,
 		&i.VerifiedIntentDigest,
 		&i.NativeBytes,
+		&i.AcquisitionStartedAt,
+		&i.AcquisitionCompletedAt,
 		&i.AuthorityDigest,
 		&i.PermissionEpoch,
 		&i.PermissionSequence,

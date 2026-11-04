@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-297 — Verified profile acquisition metadata](297-verified-profile-acquisition-metadata.md)
+retains already authenticated acquisition windows for existing case metadata
+reads, with unknown legacy clocks/process identity and no additional key reads.
+Implementation and qualification are pending.
+
 [ADR-296 — Finite policy-triggered Go profiles](296-finite-policy-go-profiles.md)
 extends the existing policy/grant path with stable endpoint-definition approval
 and independently pinned triggering Pods. The bounded CPU10 policy workflow is

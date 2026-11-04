@@ -36,7 +36,7 @@ func qualifyPermissionPublicationAuditHistory(t *testing.T, ctx context.Context,
 				if err != nil {
 					t.Fatal(err)
 				}
-				record, err := f.verify.RecordContextVerification(ctx, f.expectation, f.copies, authority, f.nativeBytes)
+				record, err := f.verify.RecordContextVerification(ctx, f.expectation, f.copies, authority, artifact.ContextVerificationResult{NativeBytes: f.nativeBytes})
 				if err != nil {
 					t.Fatal(err)
 				}

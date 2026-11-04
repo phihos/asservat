@@ -350,6 +350,9 @@ func qualifyInstalledFiniteRawPolicy(t *testing.T, ctx context.Context, admin *p
 	if a.Kind != kind || a.DataClass != "raw" || a.Digest == "" || a.VerifiedNativeBytes == nil || *a.VerifiedNativeBytes <= 0 || *a.VerifiedNativeBytes > nativeLimit || a.Target.PodUID != podUID || a.Target.ClusterID != f.cluster {
 		t.Fatal("verified raw case metadata", a)
 	}
+	if profileMode {
+		qualifyInstalledProfileAcquisitionMetadata(t, ctx, admin, root, captureID, a)
+	}
 	// The collection approval is deliberately not disclosure authority. A new
 	// exact-artifact human approval must precede any successful download prepare.
 	denied, code, err := invoke(ctx, requester, "prepare_artifact_download", map[string]any{"artifact_id": a.ArtifactID, "idempotency_key": "policy-argument-download"})
@@ -439,6 +442,8 @@ func qualifyInstalledFiniteRawPolicy(t *testing.T, ctx context.Context, admin *p
 		if err = admin.QueryRow(ctx, `SELECT count(*) FROM policy_observation_session WHERE root_id=$1 AND capture_id=$2`, root, captureID).Scan(&observations); err != nil || observations != 0 {
 			t.Fatal("profile invented observation session", observations, err)
 		}
+		report["verifiedAcquisitionStartedAt"], report["verifiedAcquisitionCompletedAt"] = a.ProfileAcquisition.StartedAt, a.ProfileAcquisition.CompletedAt
+		report["httpAcquisitionWindow"], report["acquisitionClockUncertaintyUnknown"], report["servingProcessAttributionUnknown"] = true, true, true
 		report["nativePprofOpened"] = true
 		report["durationNanos"] = p.DurationNanos
 	} else {

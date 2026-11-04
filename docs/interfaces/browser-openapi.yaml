@@ -6894,6 +6894,146 @@ components:
                         - namespace_uid
                         - workload_uid
                         - pod_uid
+                      profile_acquisition:
+                        type: object
+                        additionalProperties: false
+                        description: Accepted request parameters and authenticated HTTP acquisition timing, not the sample interval or cumulative history. Legacy timing, clock uncertainty and serving-process attribution may be unknown.
+                        properties:
+                          requested_type:
+                            type: string
+                            enum:
+                            - cpu
+                            - heap
+                            - allocs
+                            - goroutine
+                            - block
+                            - mutex
+                            - threadcreate
+                            - runtimeTrace
+                          mode:
+                            type: string
+                            enum:
+                            - interval
+                            - snapshot
+                            - cumulative
+                            - delta
+                          requested_duration_ms:
+                            type:
+                            - integer
+                            - 'null'
+                            minimum: 1000
+                            maximum: 60000
+                            multipleOf: 1000
+                          force_gc:
+                            type: boolean
+                          execution_mode:
+                            const: onTrigger
+                          started_at: &profile_acq_timestamp
+                            type:
+                            - string
+                            - 'null'
+                            format: date-time
+                            pattern: ^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?Z$
+                          completed_at: *profile_acq_timestamp
+                          clock_uncertainty_ms: &profile_acq_null
+                            type: 'null'
+                          process_attribution:
+                            const: unknown
+                          window_kind:
+                            const: httpAcquisition
+                          timestamp_precision:
+                            const: microsecond
+                        required:
+                        - requested_type
+                        - mode
+                        - requested_duration_ms
+                        - force_gc
+                        - execution_mode
+                        - started_at
+                        - completed_at
+                        - clock_uncertainty_ms
+                        - process_attribution
+                        - window_kind
+                        - timestamp_precision
+                        allOf:
+                        - oneOf:
+                          - properties:
+                              requested_type:
+                                enum:
+                                - cpu
+                              mode:
+                                const: interval
+                              requested_duration_ms: &profile_acq_duration
+                                type: integer
+                                minimum: 1000
+                                maximum: 60000
+                                multipleOf: 1000
+                              force_gc:
+                                const: false
+                          - properties:
+                              requested_type:
+                                enum:
+                                - runtimeTrace
+                              mode:
+                                const: interval
+                              requested_duration_ms:
+                                type: integer
+                                minimum: 1000
+                                maximum: 15000
+                                multipleOf: 1000
+                              force_gc:
+                                const: false
+                          - properties:
+                              requested_type:
+                                enum:
+                                - heap
+                              mode:
+                                const: snapshot
+                              requested_duration_ms: *profile_acq_null
+                          - properties:
+                              requested_type:
+                                enum:
+                                - goroutine
+                              mode:
+                                const: snapshot
+                              requested_duration_ms: *profile_acq_null
+                              force_gc:
+                                const: false
+                          - properties:
+                              requested_type:
+                                enum:
+                                - allocs
+                                - block
+                                - mutex
+                                - threadcreate
+                              mode:
+                                const: cumulative
+                              requested_duration_ms: *profile_acq_null
+                              force_gc:
+                                const: false
+                          - properties:
+                              requested_type:
+                                enum:
+                                - heap
+                                - allocs
+                                - goroutine
+                                - block
+                                - mutex
+                                - threadcreate
+                              mode:
+                                const: delta
+                              requested_duration_ms: *profile_acq_duration
+                              force_gc:
+                                const: false
+                        - oneOf:
+                          - properties:
+                              started_at: *profile_acq_null
+                              completed_at: *profile_acq_null
+                          - properties:
+                              started_at:
+                                type: string
+                              completed_at:
+                                type: string
                     required:
                     - artifact_id
                     - digest
@@ -6902,6 +7042,22 @@ components:
                     - completeness
                     - expires_at
                     - handling_notice
+                    allOf:
+                    - if:
+                        required:
+                        - profile_acquisition
+                      then:
+                        properties:
+                          kind:
+                            const: profile
+                          data_class:
+                            const: raw
+                          native_format:
+                            enum:
+                            - pprof
+                            - go-trace
+                        required:
+                        - native_format
                   maxItems: 100
                 timeline:
                   type: array

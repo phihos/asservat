@@ -9,10 +9,10 @@ import (
 
 // ContextVerifier authenticates the full chain and checks the native projection.
 // Expected facts must come from accepted control state, never the upload itself.
-// The returned length is exact native bytes after complete verification, not
-// ciphertext size or the admitted maximum; errors return no usable length.
+// The result contains exact native bytes and optional verified profile HTTP
+// timing after complete verification. Errors return neither length nor timing.
 type ContextVerifier interface {
-	VerifyContext(context.Context, artifact.ContextExpectation, artifact.Copies) (int64, error)
+	VerifyContext(context.Context, artifact.ContextExpectation, artifact.Copies) (artifact.ContextVerificationResult, error)
 }
 
 type ContextCustodian struct {
