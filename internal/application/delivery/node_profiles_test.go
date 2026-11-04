@@ -131,7 +131,21 @@ func TestProfileTLSQueueRequiresCurrentExplicitCapability(t *testing.T) {
 	if err := ch.Report(peer, epochA, r); err != nil || len(*changes) != before+1 {
 		t.Fatal("TLS implementation observation not published", err, len(*changes), before)
 	}
-	w, err := ch.EnqueueProfile(t.Context(), p, now.Add(2*time.Second))
+	authenticated := p
+	authenticated.AuthorizationRequired = true
+	if _, err := ch.EnqueueProfile(t.Context(), authenticated, now.Add(2*time.Second)); !errors.Is(err, ErrNodeUnavailable) {
+		t.Fatal("TLS-only node received private auth work", err)
+	}
+	before = len(*changes)
+	clock.add(time.Second)
+	r.Sequence++
+	r.ObservedAt = clock.now()
+	r.Mechanisms = append([]collector.Availability(nil), r.Mechanisms...)
+	r.Mechanisms[0].ProfileAuthorization = true
+	if err := ch.Report(peer, epochA, r); err != nil || len(*changes) != before+1 || !ch.Nodes()[0].ProfileAuthorizationAvailable() {
+		t.Fatal("credential capability not published", err)
+	}
+	w, err := ch.EnqueueProfile(t.Context(), p, now.Add(3*time.Second))
 	if err != nil || w.Profile.TLS != material {
 		t.Fatal("current TLS collector refused", err)
 	}

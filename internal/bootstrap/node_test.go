@@ -32,8 +32,9 @@ const (
 )
 
 type testNodeAttester struct {
-	mu  sync.Mutex
-	pod string
+	mu      sync.Mutex
+	pod     string
+	nodeUID string
 }
 
 func (a *testNodeAttester) PrecheckNode([]byte) error { return nil }
@@ -44,7 +45,11 @@ func (a *testNodeAttester) AttestNode(_ context.Context, token []byte, boot stri
 	if string(token) != "synthetic.node.token" {
 		return collector.Identity{}, delivery.ErrNodeDenied
 	}
-	return collector.Identity{NodeName: "worker-1", NodeUID: "node-uid", PodName: "collector-1", PodUID: a.pod, BootID: boot, Runtime: "containerd://2.1.3"}, nil
+	nodeUID := a.nodeUID
+	if nodeUID == "" {
+		nodeUID = "node-uid"
+	}
+	return collector.Identity{NodeName: "worker-1", NodeUID: nodeUID, PodName: "collector-1", PodUID: a.pod, BootID: boot, Runtime: "containerd://2.1.3"}, nil
 }
 
 // serverCertificate is a synthetic connector server identity for 127.0.0.1.
@@ -144,7 +149,7 @@ func TestNodeChannelOverTLS(t *testing.T) {
 		t.Fatal("a report within the minimum spacing was accepted")
 	}
 	// Long poll: queued work wakes it; the node's receipt removes the item.
-	got := make(chan []collector.Work, 1)
+	got := make(chan []delivery.NodeWorkDelivery, 1)
 	go func() { w, _ := client.Poll(ctx, testNodeEpoch, 0); got <- w }()
 	time.Sleep(100 * time.Millisecond)
 	w, err := s.Channel.Enqueue("node-uid", collector.WorkArmSource, time.Now().Add(time.Minute))
@@ -158,7 +163,7 @@ func TestNodeChannelOverTLS(t *testing.T) {
 		}
 		time.Sleep(collector.StatusMinimumSpacing)
 		r.Sequence = 3
-		r.Receipts = []collector.Receipt{collector.Decide(work[0], time.Now())}
+		r.Receipts = []collector.Receipt{collector.Decide(work[0].Work, time.Now())}
 		if err := client.Status(ctx, testNodeEpoch, r); err != nil || s.Channel.Nodes()[0].Queued != 0 {
 			t.Fatalf("receipt: %v", err)
 		}
@@ -255,13 +260,17 @@ func (f *fakeNodeChannel) Enroll(context.Context, contracts.NodeEnrollRequest) (
 	f.enrolls++
 	return contracts.NodeEnrollResponse{NodeName: "worker-1", Certificate: []byte{1}}, nil
 }
-func (f *fakeNodeChannel) Poll(ctx context.Context, _ string, after uint64) ([]collector.Work, error) {
+func (f *fakeNodeChannel) Poll(ctx context.Context, _ string, after uint64) ([]delivery.NodeWorkDelivery, error) {
 	f.mu.Lock()
 	if len(f.pollWork) > 0 {
 		w := f.pollWork
 		f.pollWork = nil
 		f.mu.Unlock()
-		return w, nil
+		out := make([]delivery.NodeWorkDelivery, len(w))
+		for i := range w {
+			out[i].Work = w[i]
+		}
+		return out, nil
 	}
 	f.mu.Unlock()
 	<-ctx.Done()
@@ -426,7 +435,7 @@ type sequencedChannel struct {
 	afters []uint64
 }
 
-func (f *sequencedChannel) Poll(ctx context.Context, _ string, after uint64) ([]collector.Work, error) {
+func (f *sequencedChannel) Poll(ctx context.Context, _ string, after uint64) ([]delivery.NodeWorkDelivery, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.afters = append(f.afters, after)
@@ -434,10 +443,10 @@ func (f *sequencedChannel) Poll(ctx context.Context, _ string, after uint64) ([]
 		f.cancel()
 		return nil, node.ErrUnavailable
 	}
-	var out []collector.Work
+	var out []delivery.NodeWorkDelivery
 	for _, w := range f.queue {
 		if w.Sequence > after && len(out) < collector.MaxWorkPerPoll {
-			out = append(out, w)
+			out = append(out, delivery.NodeWorkDelivery{Work: w})
 		}
 	}
 	return out, nil

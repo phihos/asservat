@@ -21,6 +21,9 @@ func WireProfile(p collector.ProfileCapture) contracts.NodeProfileCapture {
 }
 
 func DomainProfile(p contracts.NodeProfileCapture) (collector.ProfileCapture, bool) {
+	if len(p.Authorization) > 0 {
+		return collector.ProfileCapture{}, false
+	}
 	expected, ok := digestHex(p.ExpectationDigest)
 	endpoint, ok2 := digestHex(p.EndpointDigest)
 	definition, ok3 := digestHex(p.DefinitionDigest)

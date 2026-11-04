@@ -25,7 +25,7 @@ type ProfileCapture struct {
 	Port                  uint16
 	Host                  string
 	TLS                   execution.GoProfileTLSMaterial
-	AuthorizationRequired bool
+	AuthorizationRequired bool `json:",omitempty"`
 }
 
 func (p ProfileCapture) Valid() bool {

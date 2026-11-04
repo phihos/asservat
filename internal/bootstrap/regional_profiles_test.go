@@ -29,10 +29,11 @@ type profileQueue struct {
 	profiles  []collector.Work
 	available bool
 	tls       bool
+	auth      bool
 }
 
 func (q *profileQueue) NodeByName(name string) (delivery.NodeView, bool) {
-	return delivery.NodeView{Identity: q.node, Current: q.available, Report: &collector.Report{Mechanisms: []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: q.tls}}}}, name == q.node.NodeName
+	return delivery.NodeView{Identity: q.node, Current: q.available, Report: &collector.Report{Mechanisms: []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: q.tls, ProfileAuthorization: q.auth}}}}, name == q.node.NodeName
 }
 func (q *profileQueue) EnqueueProfile(_ context.Context, p collector.ProfileCapture, until time.Time) (collector.Work, error) {
 	w := collector.Work{ID: "33333333-3333-4333-8333-333333333333", Sequence: 1, Kind: collector.WorkProfileCapture, Profile: &p, NotAfter: until}

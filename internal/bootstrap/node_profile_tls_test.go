@@ -22,15 +22,15 @@ import (
 )
 
 type profileTLSFixtureDialer struct {
-	connection net.Conn
-	material   execution.GoProfileTLSMaterial
-	calls      int
+	connection    net.Conn
+	material      execution.GoProfileTLSMaterial
+	calls         int
+	authorization []byte
 }
 
 func (d *profileTLSFixtureDialer) DialGoProfile(ctx context.Context, r execution.GoProfileRequest) (executionapp.GoProfileChannel, error) {
 	d.calls++
-	connection, err := nodeProfileTLSConnection(ctx, d.connection, d.material)
-	return executionapp.GoProfileChannel{Connection: connection, Host: "profile.internal", ValidUntil: r.Deadline}, err
+	return nodeProfileChannel(ctx, d.connection, collector.ProfileCapture{Request: r, Host: "profile.internal", TLS: d.material, AuthorizationRequired: len(d.authorization) > 0}, d.authorization)
 }
 
 func TestNodeProfileTLSCollectsOnlyOverExactVerifiedSocket(t *testing.T) {
@@ -40,12 +40,16 @@ func TestNodeProfileTLSCollectsOnlyOverExactVerifiedSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 	material := execution.GoProfileTLSMaterial{RootsPEM: canonical, RootsDigest: digest, ServerName: "asservat-connector-nodes"}
-	for _, mode := range []string{"verified", "wrong-name", "wrong-roots", "noncanonical", "bad-digest"} {
+	for _, mode := range []string{"verified", "verified-auth", "wrong-name", "wrong-name-auth", "wrong-roots", "noncanonical", "bad-digest"} {
 		t.Run(mode, func(t *testing.T) {
 			var requests atomic.Int32
+			var authorization []byte
+			if mode == "verified-auth" || mode == "wrong-name-auth" {
+				authorization = []byte("Bearer synthetic-ephemeral-fixture")
+			}
 			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				requests.Add(1)
-				if r.TLS == nil || r.TLS.ServerName != material.ServerName || r.ProtoMajor != 1 || r.URL.Path != "/debug/pprof/heap" || r.URL.RawQuery != "debug=0" || r.Header.Get("Authorization") != "" {
+				if r.TLS == nil || r.TLS.ServerName != material.ServerName || r.ProtoMajor != 1 || r.URL.Path != "/debug/pprof/heap" || r.URL.RawQuery != "debug=0" || r.Header.Get("Authorization") != string(authorization) {
 					t.Error("TLS acquisition route or credential changed")
 				}
 				w.Header().Set("Content-Type", execution.GoProfileMediaType)
@@ -63,7 +67,7 @@ func TestNodeProfileTLSCollectsOnlyOverExactVerifiedSocket(t *testing.T) {
 			defer raw.Close()
 			bad := material
 			switch mode {
-			case "wrong-name":
+			case "wrong-name", "wrong-name-auth":
 				bad.ServerName = "different.internal"
 			case "wrong-roots":
 				_, _, other := serverCertificate(t)
@@ -79,14 +83,14 @@ func TestNodeProfileTLSCollectsOnlyOverExactVerifiedSocket(t *testing.T) {
 			request := execution.GoProfileRequest{Binding: artifact.Binding{ClusterID: id, ArtifactID: id, AttemptID: id, MediaType: artifact.ProfileMediaType}, Pin: artifact.PinnedPod{Namespace: "app", NamespaceUID: id, Name: "app", UID: id, NodeName: "node"}, NodeUID: id, NodeBootID: id, SourceRef: "pprof", EndpointDigest: artifact.Digest{1}, Parameters: execution.GoProfileParameters{Type: "heap", Mode: "snapshot"}, NativeLimit: 16 << 20, NotBefore: now, Deadline: now.Add(4 * time.Second)}
 			p := collector.ProfileCapture{CollectorEpoch: id, Request: request}
 			guard := nodeProfileMechanism{p: p, identity: func() collector.Identity { return collector.Identity{Epoch: id, NodeUID: id, BootID: id} }, now: time.Now}
-			dialer := &profileTLSFixtureDialer{connection: raw, material: bad}
+			dialer := &profileTLSFixtureDialer{connection: raw, material: bad, authorization: authorization}
 			collector, err := diagnostics.NewGoProfileCollector(dialer, guard, time.Now)
 			if err != nil {
 				t.Fatal(err)
 			}
 			var native bytes.Buffer
 			outcome, err := collector.CollectGoProfileNative(ctx, request, &native)
-			if mode == "verified" {
+			if mode == "verified" || mode == "verified-auth" {
 				if err != nil || !outcome.ResponseComplete || native.String() != "native-profile" || requests.Load() != 1 {
 					t.Fatal("verified TLS profile", outcome, err, requests.Load())
 				}

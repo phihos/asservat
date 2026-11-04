@@ -366,12 +366,13 @@ type NodeEngine struct {
 }
 
 type NodeAdapter struct {
-	Mechanism     string   `json:"mechanism"`
-	Prerequisites bool     `json:"prerequisites"`
-	Adapter       string   `json:"adapter"`
-	Hook          string   `json:"hook"`
-	Reasons       []string `json:"reasons"`
-	ProfileTLS    bool     `json:"profileTLS,omitempty"`
+	Mechanism            string   `json:"mechanism"`
+	Prerequisites        bool     `json:"prerequisites"`
+	Adapter              string   `json:"adapter"`
+	Hook                 string   `json:"hook"`
+	Reasons              []string `json:"reasons"`
+	ProfileTLS           bool     `json:"profileTLS,omitempty"`
+	ProfileAuthorization bool     `json:"profileAuthorization,omitempty"`
 }
 
 type NodeBudget struct {

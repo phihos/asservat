@@ -19,7 +19,7 @@ import (
 	"asservat.local/asservat/internal/domain/execution"
 )
 
-type profileAcquirer func(context.Context, collector.ProfileCapture, io.Writer) (execution.GoProfileOutcome, error)
+type profileAcquirer func(context.Context, collector.ProfileCapture, []byte, io.Writer) (execution.GoProfileOutcome, error)
 type profileUploader func(context.Context, string, collector.ProfileResult, io.Reader) error
 
 type nodeProfiles struct {
@@ -41,12 +41,12 @@ type runningProfile struct {
 	uncertainUntil    time.Time
 }
 
-func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work) collector.Receipt {
+func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work, authorization []byte) collector.Receipt {
 	reply := collector.Decide(w, n.now())
 	if reply.Reason == collector.ReasonWorkUnknown || reply.Reason == collector.ReasonWorkExpired {
 		return reply
 	}
-	if w.Profile == nil || n.acquire == nil || n.upload == nil || ctx == nil || ctx.Err() != nil {
+	if w.Profile == nil || (w.Profile.AuthorizationRequired != (len(authorization) > 0)) || (len(authorization) > 0 && !execution.ValidGoProfileAuthorization(authorization)) || n.acquire == nil || n.upload == nil || ctx == nil || ctx.Err() != nil {
 		reply.Reason = collector.ReasonEngineUnavailable
 		return reply
 	}
@@ -93,12 +93,14 @@ func (n *nodeProfiles) start(ctx context.Context, epoch string, w collector.Work
 	n.spent[p.CaptureID] = w.NotAfter
 	n.wg.Add(1)
 	n.budgetMu.Unlock()
-	go n.run(ctx, action, cancel, epoch, w, p)
+	private := bytes.Clone(authorization)
+	go n.run(ctx, action, cancel, epoch, w, p, private)
 	reply.Outcome, reply.Reason = collector.OutcomeAccepted, ""
 	return reply
 }
 
-func (n *nodeProfiles) run(parent, action context.Context, cancel context.CancelFunc, epoch string, w collector.Work, p collector.ProfileCapture) {
+func (n *nodeProfiles) run(parent, action context.Context, cancel context.CancelFunc, epoch string, w collector.Work, p collector.ProfileCapture, authorization []byte) {
+	defer clear(authorization)
 	defer n.wg.Done()
 	defer cancel()
 	uncertain := false
@@ -115,7 +117,8 @@ func (n *nodeProfiles) run(parent, action context.Context, cancel context.Cancel
 		n.budget().ReleaseFrozen(p.Request.NativeLimit)
 	}()
 	buffer := &profileNativeBuffer{data: make([]byte, 0, p.Request.NativeLimit), ctx: action, limit: p.Request.NativeLimit}
-	outcome, err := n.acquire(action, p, buffer)
+	outcome, err := n.acquire(action, p, authorization, buffer)
+	clear(authorization)
 	uncertain = outcome.MayHaveStarted && (!outcome.ResponseComplete || err != nil)
 	result := collector.ProfileResult{WorkID: w.ID, CaptureID: p.CaptureID, ExpectationDigest: p.ExpectationDigest, EndpointDigest: p.Request.EndpointDigest, Outcome: outcome}
 	data := buffer.Bytes()
@@ -204,9 +207,10 @@ func (b *profileNativeBuffer) Write(p []byte) (int, error) {
 }
 
 type nodeProfileMechanism struct {
-	identity func() collector.Identity
-	p        collector.ProfileCapture
-	now      func() time.Time
+	identity      func() collector.Identity
+	p             collector.ProfileCapture
+	authorization []byte
+	now           func() time.Time
 }
 
 func (m nodeProfileMechanism) DialGoProfile(ctx context.Context, r execution.GoProfileRequest) (executionapp.GoProfileChannel, error) {
@@ -214,10 +218,29 @@ func (m nodeProfileMechanism) DialGoProfile(ctx context.Context, r execution.GoP
 		return executionapp.GoProfileChannel{}, execution.ErrDenied
 	}
 	connection, err := gadget.DialProfile(ctx, r.Pin.UID, m.p.Address, m.p.Port)
-	if err == nil && !m.p.TLS.IsZero() {
-		connection, err = nodeProfileTLSConnection(ctx, connection, m.p.TLS)
+	if err != nil {
+		return executionapp.GoProfileChannel{}, err
 	}
-	return executionapp.GoProfileChannel{Connection: connection, Host: m.p.Host, ValidUntil: r.Deadline}, err
+	return nodeProfileChannel(ctx, connection, m.p, m.authorization)
+}
+
+// nodeProfileChannel owns this one connected socket. Private material can only
+// reach the existing HTTP collector after explicit TLS verification succeeds.
+func nodeProfileChannel(ctx context.Context, connection net.Conn, p collector.ProfileCapture, authorization []byte) (executionapp.GoProfileChannel, error) {
+	if ctx == nil || ctx.Err() != nil || connection == nil || p.AuthorizationRequired != (len(authorization) > 0) || len(authorization) > 0 && (!execution.ValidGoProfileAuthorization(authorization) || p.TLS.IsZero()) {
+		if connection != nil {
+			_ = connection.Close()
+		}
+		return executionapp.GoProfileChannel{}, execution.ErrDenied
+	}
+	var err error
+	if !p.TLS.IsZero() {
+		connection, err = nodeProfileTLSConnection(ctx, connection, p.TLS)
+	}
+	if err != nil {
+		return executionapp.GoProfileChannel{}, err
+	}
+	return executionapp.GoProfileChannel{Connection: connection, Host: p.Host, Authorization: string(authorization), ValidUntil: p.Request.Deadline}, nil
 }
 
 // Wrap exactly the socket opened in the pinned Pod's network namespace. The
@@ -264,8 +287,8 @@ func (m nodeProfileMechanism) ObserveGoProfile(ctx context.Context, r execution.
 	return execution.GoProfileCurrent{CheckedAt: now, ValidUntil: until}, nil
 }
 func acquireNodeProfile(identity func() collector.Identity, now func() time.Time) profileAcquirer {
-	return func(ctx context.Context, p collector.ProfileCapture, destination io.Writer) (execution.GoProfileOutcome, error) {
-		mechanism := nodeProfileMechanism{identity, p, now}
+	return func(ctx context.Context, p collector.ProfileCapture, authorization []byte, destination io.Writer) (execution.GoProfileOutcome, error) {
+		mechanism := nodeProfileMechanism{identity: identity, p: p, authorization: authorization, now: now}
 		collector, err := diagnostics.NewGoProfileCollector(mechanism, mechanism, now)
 		if err != nil {
 			return execution.GoProfileOutcome{}, err

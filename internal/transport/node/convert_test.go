@@ -88,6 +88,36 @@ func TestStatusProfileTLSCapabilityIsExplicitAndClosed(t *testing.T) {
 	}
 }
 
+func TestStatusProfileAuthorizationRequiresExplicitAvailableTLS(t *testing.T) {
+	r := sampleReport()
+	r.Mechanisms = []collector.Availability{{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: true}}
+	legacy, _ := json.Marshal(WireStatus("epoch", r))
+	if bytes.Contains(legacy, []byte(`"profileAuthorization"`)) {
+		t.Fatal("old TLS report advertises credentials")
+	}
+	for _, mode := range []string{"current", "without-tls", "other-mechanism", "unavailable"} {
+		t.Run(mode, func(t *testing.T) {
+			wire := WireStatus("epoch", r)
+			wire.Mechanisms[0].ProfileAuthorization = true
+			switch mode {
+			case "without-tls":
+				wire.Mechanisms[0].ProfileTLS = false
+			case "other-mechanism":
+				wire.Mechanisms[0].Mechanism = "packetCapture"
+			case "unavailable":
+				wire.Mechanisms[0].Adapter = "AdapterUnavailable"
+			}
+			back, ok := DomainStatus(wire)
+			if (mode == "current") != ok {
+				t.Fatal("credential capability accepted invalid branch", mode)
+			}
+			if ok && !back.Mechanisms[0].ProfileAuthorization {
+				t.Fatal("credential capability dropped")
+			}
+		})
+	}
+}
+
 func TestDomainStatusRefusesOpenValues(t *testing.T) {
 	for name, edit := range map[string]func(*contracts.NodeStatus){
 		"format":          func(s *contracts.NodeStatus) { s.Format = "other" },
