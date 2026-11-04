@@ -432,6 +432,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		URI string `json:"navigation_uri"`
 	}
 	if code != "ApprovalRequired" || json.Unmarshal(pending.Data, &refused) != nil {
+		diagnose()
 		t.Fatal("initial request did not open real review", code)
 	}
 	reviewURL, err := url.Parse(refused.URI)

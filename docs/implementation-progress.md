@@ -26,12 +26,31 @@ intended default. Affected races pass with ambient `heap` (3.902s) and an invali
 value (3.905s); the intermediate failures remain archived. This is test isolation
 only, with unchanged product and installed fixture inputs.
 
+First exact-head CI41800239586 passed at0ad98bdb, but native41800356890 failed
+after484.608s. Namespace publication and approval-ready preview passed; the
+initial request returned `OutcomeUnknown` before review/acquisition/summary or
+native preparation. No pprof was produced. All4,114 reported source hashes match
+0ad98bdb, source unchanged, cleanup[] and scratch removed. Originals are retained
+in `test/results/heap-profile-native-41800356890/`.
+
+A local behavioral RED reproduces the same pre-review gap: persisted previews
+strip catalog documents; the result-access review reconstructs a Go profile
+without rehydrating its namespace definition. Builtin CPU definitions remain
+embedded, so earlier CPU proof does not cover this path. The narrowly scoped
+repair reloads/verifies the pinned catalog only when constructing a new profile
+review, preserving original endpoints, scope, result access and deadlines.
+No acquisition retry or fixture privilege is added; the corrected candidate and
+its installed qualification are pending.
+
 Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
 selection for a saved heap; frequency is unmeasured, and this is an existing
 first-release requirement. Metadata/default conventions and the existing
-namespace profile/query/download paths suffice. Production additions:0 API calls,
-permissions, credentials, watches, workers, dependencies, configuration or fallback
-states. Mounting makes0 queries. Test-only selection adds one closed heap variant
+namespace profile/query/download paths suffice. The approval repair adds one existing bounded regional catalog read only when
+opening a new namespace-profile review (one namespace GET plus one exact-version
+GET for the supported single action). Existing covering grants/builtins use0 new
+catalog requests. Permissions, credentials, watches, workers, dependencies,
+configuration and fallback states added:0. The extra definition is bounded by the
+existing catalog limit and the original request deadline. Mounting makes0 queries. Test-only selection adds one closed heap variant
 to the existing manual-profile harness; CPU/refusal/Stop checks remain in their
 original route. One heap plus history needs35.25MiB/12objects and one10-unit
 summary, within unchanged141MiB/48objects/root12 and6,720/10,000 system objects.
