@@ -62,3 +62,31 @@ func TestProfileResultDistinguishesFailedUnstartedFromSuccess(t *testing.T) {
 		t.Fatal("failed complete result accepted")
 	}
 }
+
+func TestProfileUnavailableReasonDoesNotAdmitPacketOrSyscallFailures(t *testing.T) {
+	p := profileFixture()
+	reason := Reason("ProfileUnavailable")
+	r := ProfileResult{WorkID: p.CaptureID, CaptureID: p.CaptureID, ExpectationDigest: p.ExpectationDigest, EndpointDigest: p.Request.EndpointDigest, Failure: reason, Outcome: execution.GoProfileOutcome{Format: artifact.PprofFormat, CompletedAt: p.Request.NotBefore}}
+	if !reason.Valid() || !r.Valid() {
+		t.Fatal("profile unavailable result rejected")
+	}
+	packet := PacketResult{WorkID: p.CaptureID, CaptureID: p.CaptureID, StartedAt: p.Request.NotBefore, EndedAt: p.Request.NotBefore, Retained: 1, Seen: 1, CapturedBytes: 64, Snaplen: 96, Failure: ReasonCaptureFailed}
+	for _, kind := range []string{"", artifact.SyscallRecordsArtifact, artifact.SyscallArgumentsArtifact} {
+		packet.NativeType = kind
+		if kind == artifact.SyscallArgumentsArtifact {
+			packet.Snaplen = 0
+		}
+		if !packet.Valid() {
+			t.Fatal("invalid non-profile fixture", kind)
+		}
+		packet.Failure = reason
+		if packet.Valid() {
+			t.Fatal("profile-only reason accepted by another native kind", kind)
+		}
+		packet.Failure = ReasonCaptureFailed
+	}
+	r.Outcome.ResponseComplete = true
+	if r.Valid() {
+		t.Fatal("failed profile supplied a complete result")
+	}
+}

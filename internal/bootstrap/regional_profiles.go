@@ -130,6 +130,8 @@ func (h *ConnectorRecordings) DeliverProfile(ctx context.Context, node collector
 		failure := "captureFailed"
 		if r.Failure == collector.ReasonCaptureBusy {
 			failure = evidence.RecordingProfilerBusy
+		} else if r.Failure == collector.ReasonProfileUnavailable {
+			failure = evidence.RecordingProfileUnavailable
 		}
 		held.prepared = nil
 		held.outcome = evidence.RecordingCollection{State: evidence.RecordingFailed, Acquired: held.queued, Failure: failure}

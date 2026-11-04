@@ -26,8 +26,8 @@ func TestInstalledProfileComparisonFocusPreflight(t *testing.T) {
 	}
 	checkManualProfilePlan(t, "00000000-0000-4000-8000-000000000001", approvedRecordingArguments("00000000-0000-4000-8000-000000000001", "payments", "api"))
 	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "manual-profile")
-	if !installedProfileFocus() || nativeCapacityProfile().Records != query.ProfileSummaryQueryUnits {
-		t.Fatal("original manual profile funding changed")
+	if !installedProfileFocus() || nativeCapacityProfile().Records != 12 || query.ProfileSummaryQueryUnits != 10 {
+		t.Fatal("manual four-capture funding or ten-unit summary charge changed")
 	}
 	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "approved-recording")
 	if installedProfileFocus() || nativeCapacityProfile().Records != 8 {

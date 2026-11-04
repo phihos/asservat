@@ -47,6 +47,117 @@ weakening approvals, budgets or deadlines. Their original reports remain in the
 corresponding result directories. Successful qualification above supersedes their
 pending outcomes; no failed run is relabeled as passed.
 
+**Retained frozen qualification:** [collector41789805115](https://github.com/phihos/asservat/actions/runs/41789805115)
+passed on `f2f49124ee56795ab1bc6de42fa5a10455770a3f`; Go exited0 in83.253s.
+Both before/after inventories contain4,103 paths and independently match every
+committed blob (8,206 comparisons); source stayed unchanged. Observed collector
+and workload Pod images match their recorded Kind manifests, separately from
+Docker config IDs. Harness-measured binary hashes, Pod/container identities,
+original reports and independent verification are retained in
+`test/results/profile-refusals-collector-41789805115/`. Binaries were not downloaded
+for independent rehash; scratch removal has no independent report field.
+
+The real application profiler stayed busy through the original refusal cutoff;
+the missing endpoint produced one failed request without native output/retry.
+CPU855bytes/6samples and heap1,710bytes/7samples matched report hashes and reopened
+locally. Collector RSS peaked368.49MiB against640MiB with two128MiB reservations;
+a third was refused and two Stop receipts joined in0.950s. This resource input
+is malformed trace data, not maximum-valid-trace publication qualification.
+Cluster and both images were cleaned, with no remaining outer Kind/Docker rows.
+These collector checks use synthetic admission authority; they do not establish
+installed public approval/accounting. Exact CI41789771763 passed. Manual41789808818
+failed after745.941s: CPU capture/native download/summary/repeat and the approved
+busy-owner refusal passed, then a progress read returned transport503 at audit
+begin. PostgreSQL recorded `current capacity audit profile unavailable`; the
+particular current source/root/permission condition remains under investigation.
+All4,107 reported source hashes independently match the same frozen commit,
+sources unchanged, cleanup[] and scratch removed. Its original reports and
+948-byte native CPU file remain in `test/results/profile-refusals-native-41789808818/`.
+This run does not establish the missing-endpoint/Stop workflow. No full S-05/spec
+exit follows; no unexplained automatic retry was dispatched.
+
+**Active outcome:** explicit Go endpoint refusals under REQ-PRF-001/002 /
+SC-PRF-002 and [ADR-298](decisions/298-explicit-go-profile-refusals.md), prepared
+in `/home/phil/Projekte/asservat-profile-refusals`, branch
+`feature/profile-refusals`, rebased onto main90c2593b. Known missing/disabled
+endpoint errors now remain ProfileUnavailable through node/regional delivery,
+SQL135 and Failed public progress. Busy/unavailable UI guidance is fixed safe
+text; arbitrary reasons are not echoed. Busy can include capacity or an earlier
+uncertain session, so the UI does not assert a live application profiler exists
+in every case. No new operation, enum restriction, credential, listener,
+configuration, acquisition retry, stop-profiler request or refund is introduced.
+
+SQL135 preserves the prior terminal guard/constraints while adding one outcome;
+retained new-phase rows refuse rollback. Cancellation after failure creates no
+stop work. Integrated profile races and pre-push passed (435 console tests;
+13,543 assertions); full public contract races passed7.414s. Actual SQL/S3
+endpoint-unavailable outcome passed4.168s and135→134→135 passed6.049s, with
+all4,052 reported hashes independently matched to committed source, unchanged
+content, cleanup[] and scratch removed. Fresh empty-schema/activation passed
+147.435s with all4,106 hashes verified and clean terminal cleanup. Those source
+checkpoints predate the upstream unit-only owner socket assertion fix; product
+inputs remain identical. Original reports retain their original source identity.
+
+Final local built-console checks passed33.162s (27journeys/26accessibility scans
+plus restart/comparison mobile drivers); focused failed-action decoding verifies
+no automatic request/retry/result link. Three independent read-only reviews found
+no blockers. Real SQL proofs use synthetic endpoint observations: they do not
+qualify real missing endpoints or application-owned profiler coexistence. Reports
+are retained in `test/results/profile-refusals-local/`, `test/results/profile-refusals-services/`
+and `test/results/profile-refusals-schema/`; the first
+read-only proof's bytea/JSON query failure remains separately archived.
+
+First exact-head CI41784993617 passed at ad8b3a42. Collector41785026939
+completed successfully (Go84.052s), with real busy-owner/missing-endpoint assertions,
+but its historical report omitted source inventories and product image/binary
+hashes. That limited evidence is retained separately; no source-freeze or image
+hash proof is inferred. The test harness now records before/after source hashes,
+compiled binary SHA256, distinct Docker config IDs/Kind manifest references and
+already observed Pod image/container IDs. Source mutation fails qualification;
+original failure/cleanup results are preserved. Local inventory passes measured
+0.224s/0.208s over4,102 files; this adds zero Kubernetes/production calls.
+
+Manual41785030470 failed after737.861s. Original CPU capture/download/summary/repeat
+and independently approved busy refusal passed their assertions; the next missing
+attempt returned CapacityUnavailable before HTTP. All4,106 source hashes match
+ad8b3a42, unchanged source, cleanup[] and scratch removed. Original reports/native
+bytes remain in `test/results/profile-refusals-native-41785030470/`.
+
+The fixture funded79,429,632bytes/32objects for its old journey. Each retained
+16MiB profile needs35,291,136bytes/8objects, plus1,671,168bytes/4objects for immutable
+history. Two attempts already exhaust that byte budget for a third admission.
+The four intended independently approved captures/history now receive exactly
+147,849,216bytes (141MiB)/48objects upfront, with qualified root12records. The
+production composed preflight reproduces both old gaps and passes the new plan:
+4,032+2,688=6,720/10,000 system objects; pool/burst limits and ten-unit summary
+charge remain unchanged. This changes only explicit manual-profile fixture
+funding, never runtime quotas, conservative charges, refunds or deadlines.
+
+Collector qualification passed as recorded above; complete installed manual-profile
+refusal qualification remains pending. The next test-client correction lets
+passive `get_capture` HTTP503 use the existing four-attempt/two-second typed
+transient-read budget, under the original refusal deadline. It does not replay
+acquisition, preview, resolution or Stop, alter freshness, or promise continuous
+availability. A bounded test-only failure snapshot distinguishes later current
+trust/permission/source/root flags without disclosing configuration. The final
+integrated races passed3.432s and `make pre-push` passed (435 console tests;
+13,545 assertions). Real SDK tests reproduce503 and check recovery, exhaustion,
+shared typed/transport budgets, other statuses, network errors, mutations and
+cancellation without widening retries. The diagnostic's real PostgreSQL checks
+passed1.099s with4,055 source hashes matched, unchanged source and cleanup[].
+An initial NULL-digest diagnostic failure and the later old-five-second predicate
+regression remain archived separately; effective30-second SQL semantics are now
+checked. Original logs are retained in `test/results/profile-refusals-passive-read/`
+and `test/results/profile-refusals-capacity-diagnostics/`. No production source,
+privilege, quota, deadline or freshness policy changed after the verified f2
+collector run; that bounded collector evidence is reused explicitly. The existing synthetic workload has owner-only controls on its existing
+HTTP listener, exact Pod-UID checks and one-request counters. Two independent
+manual reviews precede the installed failures; the fixture waits the exact
+persisted start+15s original uncertainty cutoff before the next attempt. Existing
+CPU summary/repeat, comparison and Stop workflows remain. Original18min Go/20min
+job limits are unchanged. No installed refusal result, S-05 or full-spec exit is
+claimed; the complete-spec goal remains active.
+
 **Merged delivery:** verified Go profile case timing under REQ-PRF-003/004 /
 ADR-297, [PR156](https://github.com/phihos/asservat/pull/156), head
 `08e6a2a3a9af1c80e635ec14ea0b43990411331f`, now main

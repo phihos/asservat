@@ -522,6 +522,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			waitInstalledPublisherSettled(t, c, api, desired.TargetNamespace, installation)
 		}
 		diagnose := func() {
+			installedCapacityCurrentDiagnostics(ctx, admin.QueryRow, p.RootID, installation, t.Logf)
 			installedSQLActivityDiagnostics(ctx, admin.Query, installation, t.Logf)
 			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker", contracts.PublisherName(installation))
 			c, end := context.WithTimeout(ctx, 20*time.Second)
@@ -585,7 +586,11 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 						}})
 					}
 				} else {
-					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID))
+					var profileChecks []installedProfileCaptureContinuation
+					if installedJourneyFocus() == "manual-profile" {
+						profileChecks = []installedProfileCaptureContinuation{{InitializeProcessing: true, Refused: installedProfileRefusalSQLCheck(t, ctx, admin, p.RootID)}}
+					}
+					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, installedProjectionSQLCheck(t, ctx, admin, api, p.RootID), installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
 				}
 			})
 			return
@@ -989,12 +994,12 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
-	// One pprof summary costs ten conservative read-work units. The previous
-	// eight-unit fixture cannot fund it; this explicit operator fixture funds
-	// exactly one such query without reducing its admission charge.
+	// The manual profile journey reserves 48 evidence objects for four captures
+	// plus history, deriving 12 protocol records. Qualify those records upfront;
+	// its single pprof summary still charges ten conservative read-work units.
 	records := int64(8)
 	if installedJourneyFocus() == "manual-profile" {
-		records = 10
+		records = 12
 	}
 	if installedJourneyFocus() == "profile-comparison" {
 		records = installedProfileComparisonQueries * query.ProfileComparisonQueryUnits

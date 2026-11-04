@@ -1,0 +1,28 @@
+{
+  "sourceCommit": "92ef4dda96479bdd70377fa70b054bc67e1dbe5c",
+  "scope": "Actual approved profile SQL terminal failure/replay/cancellation/unchanged reservations and native proof readback, plus135\u2192134\u2192135migration; synthetic missing-endpoint observation, no installed capture.",
+  "runs": [
+    {
+      "variant": "outcome",
+      "pattern": "^TestContextAdmissionWithRealServices$/^profile-approved-admission-stream-binding$/^endpoint-unavailable$",
+      "goExit": 0,
+      "harnessExit": 0,
+      "elapsedSeconds": 26.163490576000186,
+      "sourceHashesMatchedCommittedBlobs": 4052,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "scratchRemoved": true
+    },
+    {
+      "variant": "upgrade",
+      "pattern": "^TestCustodyUpgradeSchemaWithRealPostgres$",
+      "goExit": 0,
+      "harnessExit": 0,
+      "elapsedSeconds": 8.279213221976534,
+      "sourceHashesMatchedCommittedBlobs": 4052,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "scratchRemoved": true
+    }
+  ]
+}

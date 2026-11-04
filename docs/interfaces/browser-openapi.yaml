@@ -13017,6 +13017,7 @@ components:
                         type: string
                         minLength: 1
                         maxLength: 64
+                        description: "Bounded stable action reason. Failed Go profile acquisition reports ProfileUnavailable when the endpoint is unavailable or disabled, or ProfilerBusy for an existing conflicting profiling session that Asservat did not stop. Other existing reason strings retain their current meaning; a reason never authorizes retry or replacement."
                       action_instance_id:
                         type: string
                         format: uuid

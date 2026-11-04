@@ -157,6 +157,42 @@ func TestConnectorProfileQueuesOriginalDeadlineAndCollectsFailureOnce(t *testing
 	}
 }
 
+func TestConnectorProfilePreservesKnownRefusalsWithoutNativeStore(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		reason collector.Reason
+		want   string
+	}{
+		{"unavailable", collector.Reason("ProfileUnavailable"), "profileUnavailable"},
+		{"busy", collector.ReasonCaptureBusy, evidence.RecordingProfilerBusy},
+		{"generic", collector.ReasonCaptureFailed, "captureFailed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h, q, reader, e, endpoint, now := profileHolderFixture(t)
+			pin := reader.plan.Pin
+			pin.NodeName = ""
+			if _, err := h.PrepareProfile(&objectstore.PreparedArtifact{}, e).StartProfile(t.Context(), pin, now, now.Add(time.Second), endpoint); err != nil {
+				t.Fatal(err)
+			}
+			result := collector.ProfileResult{WorkID: q.profiles[0].ID, CaptureID: e.CaptureUID, ExpectationDigest: evidence.ContextExpectationDigest(e), EndpointDigest: e.Profile.EndpointDigest, Failure: tc.reason, Outcome: execution.GoProfileOutcome{Format: artifact.PprofFormat, StartedAt: now, CompletedAt: now, MayHaveStarted: true}}
+			if err := h.DeliverProfile(t.Context(), q.node, result, bytes.NewReader(nil)); err != nil {
+				t.Fatal("known refusal rejected", err)
+			}
+			out, err := h.Collect(fleet.APIContextWork{CaptureID: e.CaptureUID, AttemptID: e.Registration.Location.AttemptID, ExpectationDigest: result.ExpectationDigest})
+			if err != nil || out.State != evidence.RecordingFailed || out.Failure != tc.want || out.Completion != (artifact.ContextWriterCompletion{}) {
+				t.Fatal("refusal became generic or stored evidence", out, err)
+			}
+			held := h.profiles[e.CaptureUID]
+			if held.prepared != nil || held.storing || !held.mayHaveStarted || len(q.profiles) != 1 {
+				t.Fatal("failure renewed authority or retained a store", held)
+			}
+			if err := h.DeliverProfile(t.Context(), q.node, result, bytes.NewReader(nil)); err == nil {
+				t.Fatal("terminal refusal consumed twice")
+			}
+		})
+	}
+}
+
 func TestConnectorProfileRefusesChangedOrExpiredRouteAndSharedCapacity(t *testing.T) {
 	for _, change := range []string{"digest", "boot", "expiry", "capacity", "request"} {
 		t.Run(change, func(t *testing.T) {

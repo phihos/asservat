@@ -125,6 +125,7 @@ class CollectorPacketCleanup(unittest.TestCase):
         collector = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(collector)
         owned = "asservat-collector-" + RUN
+        config_id = "sha256:" + "1" * 64
         for artifacts in (False, True):
             with self.subTest(artifacts=artifacts), tempfile.TemporaryDirectory() as directory:
                 root, work = Path(directory, "root"), Path(directory, "work")
@@ -157,6 +158,9 @@ class CollectorPacketCleanup(unittest.TestCase):
                         output = json.dumps({"serverVersion": {"gitVersion": "synthetic"}})
                     elif args[:3] == ["docker", "network", "inspect"]:
                         output = json.dumps([{"IPAM": {"Config": [{"Gateway": "192.0.2.1"}]}}])
+                    elif args[:5] == ["docker", "image", "inspect", "--format", "{{.Id}}"]:
+                        self.assertEqual(args[-1], "asservat-collector:" + RUN)
+                        output = config_id
                     elif args[:3] == ["docker", "image", "inspect"]:
                         code = 1
                     elif (args[:2] in (["make", "libpcap"], ["docker", "build"], ["kind", "load"], ["helm", "template"], ["docker", "rm"], ["docker", "pull"], ["docker", "tag"])
@@ -186,6 +190,9 @@ class CollectorPacketCleanup(unittest.TestCase):
                 self.assertEqual(deleted, [owned], commands)
                 self.assertEqual(clusters, {"encrypted", "unrelated"})
                 self.assertTrue(report["cleanup"]["cluster"])
+                self.assertTrue(report["cleanup"]["image"])
+                self.assertEqual(report["build"]["dockerConfigID"], config_id)
+                self.assertEqual(report["build"]["kindManifestRef"], "synthetic@sha256:" + "0" * 64)
                 self.assertEqual(report["testExit"], 0)
                 for artifact in ("filtered", "unfiltered", "encrypted"):
                     output = root / "test/results" / ("collector-packet-" + artifact + ".pcapng")

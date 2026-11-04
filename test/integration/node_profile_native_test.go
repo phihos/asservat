@@ -28,10 +28,43 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+type nativeProfilePodImage struct {
+	PodUID        string `json:"podUID"`
+	ContainerName string `json:"containerName"`
+	SpecImage     string `json:"specImage"`
+	StatusImageID string `json:"statusImageID"`
+	ContainerID   string `json:"containerID"`
+}
+
+// Capture already observed Pod facts, never infer a runtime image from its
+// requested spec or equate a config ID with a repository manifest digest.
+func profilePodImage(pod *core.Pod, container string) (nativeProfilePodImage, error) {
+	var out nativeProfilePodImage
+	if pod == nil {
+		return out, fmt.Errorf("profile image observation lacks Pod")
+	}
+	out.PodUID, out.ContainerName = string(pod.UID), container
+	for _, c := range pod.Spec.Containers {
+		if c.Name == container {
+			out.SpecImage = c.Image
+		}
+	}
+	for _, c := range pod.Status.ContainerStatuses {
+		if c.Name == container {
+			out.StatusImageID, out.ContainerID = c.ImageID, c.ContainerID
+		}
+	}
+	if out.PodUID == "" || out.SpecImage == "" || out.StatusImageID == "" || out.ContainerID == "" {
+		return nativeProfilePodImage{}, fmt.Errorf("profile image observation incomplete")
+	}
+	return out, nil
+}
+
 type nativeProfileSink struct {
-	mu      sync.Mutex
-	results map[string]collector.ProfileResult
-	bodies  map[string][]byte
+	mu         sync.Mutex
+	results    map[string]collector.ProfileResult
+	bodies     map[string][]byte
+	deliveries map[string]int
 }
 
 func (s *nativeProfileSink) DeliverProfile(_ context.Context, _ collector.Identity, r collector.ProfileResult, body io.Reader) error {
@@ -43,7 +76,17 @@ func (s *nativeProfileSink) DeliverProfile(_ context.Context, _ collector.Identi
 	defer s.mu.Unlock()
 	s.results[r.CaptureID] = r
 	s.bodies[r.CaptureID] = b
+	if s.deliveries == nil {
+		s.deliveries = map[string]int{}
+	}
+	s.deliveries[r.CaptureID]++
 	return nil
+}
+
+func (s *nativeProfileSink) count(id string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.deliveries[id]
 }
 func (s *nativeProfileSink) get(id string) (collector.ProfileResult, []byte, bool) {
 	s.mu.Lock()
@@ -85,6 +128,11 @@ func profileCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interf
 		}
 		return false
 	})
+	observedImage, err := profilePodImage(created, pod.Spec.Containers[0].Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results["profileWorkloadImage"] = observedImage
 	ns, err := k.CoreV1().Namespaces().Get(ctx, namespace, meta.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -152,6 +200,62 @@ func profileCaptureNative(t *testing.T, ctx context.Context, k kubernetes.Interf
 	}
 	results["profileRedirectRefused"] = true
 	wait("uncertain redirect original deadline", 10*time.Second, func() bool { return !time.Now().Before(redirect.Request.Deadline) })
+	control := func(command string) profileWorkloadState {
+		t.Helper()
+		state, err := profileWorkloadControl(ctx, k, namespace, created.Name, string(created.UID), command)
+		if err != nil {
+			t.Fatal("original profile workload control", command, err)
+		}
+		return state
+	}
+	// The application owner controls its own profiler through fixture-only paths.
+	// Collector requests remain the same fixed approved /debug/pprof/profile GET.
+	ownerNeedsStop := true
+	defer func() {
+		if !ownerNeedsStop {
+			return
+		}
+		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := profileWorkloadControl(cleanup, k, namespace, created.Name, string(created.UID), "stop"); err != nil {
+			t.Error("profile fixture owner cleanup", err)
+		}
+	}()
+	before := control("start")
+	if !before.OwnerRunning || !before.RuntimeBusy {
+		t.Fatal("fixture owner did not hold actual runtime CPU profiler")
+	}
+	_, busy := enqueue("cpu", "interval", "targetLoopback", netip.MustParseAddr("127.0.0.1"), 6060, time.Second)
+	r, b = await(busy.CaptureID)
+	if r.Failure != collector.ReasonCaptureBusy || r.Outcome.ResponseComplete || r.Outcome.NativeBytes != 0 || len(b) != 0 {
+		t.Fatal("application-owned busy profile lost typed refusal or delivered native output", r)
+	}
+	// Keep the application's profiler running through the original uncertain
+	// lifetime. No stop or retry is inferred from the failure or HTTP cancellation.
+	wait("busy original deadline", 10*time.Second, func() bool { return !time.Now().Before(busy.Request.Deadline) })
+	after := control("state")
+	if !after.OwnerRunning || !after.RuntimeBusy || after.ProfileRequests != before.ProfileRequests+1 || sink.count(busy.CaptureID) != 1 {
+		t.Fatal("refusal stopped the application profiler or retried acquisition", before, after, sink.count(busy.CaptureID))
+	}
+	results["profileApplicationOwnedBusyPreserved"] = true
+	stopped := control("stop")
+	if stopped.OwnerRunning || stopped.RuntimeBusy {
+		t.Fatal("fixture owner did not stop its own profiler")
+	}
+	ownerNeedsStop = false
+	before = control("missing")
+	_, missing := enqueue("cpu", "interval", "targetLoopback", netip.MustParseAddr("127.0.0.1"), 6060, time.Second)
+	r, b = await(missing.CaptureID)
+	if r.Failure != collector.ReasonProfileUnavailable || r.Outcome.ResponseComplete || r.Outcome.NativeBytes != 0 || len(b) != 0 {
+		t.Fatal("missing endpoint lost typed unavailable or delivered native output", r)
+	}
+	wait("unavailable original deadline", 10*time.Second, func() bool { return !time.Now().Before(missing.Request.Deadline) })
+	after = control("state")
+	if after.OwnerRunning || after.RuntimeBusy || after.ProfileRequests != before.ProfileRequests+1 || sink.count(missing.CaptureID) != 1 {
+		t.Fatal("unavailable endpoint retried acquisition or invented a profiler", before, after, sink.count(missing.CaptureID))
+	}
+	results["profileUnavailableNoNativeOrRetry"] = true
+	control("normal")
 	w, cancelled := enqueue("cpu", "interval", "targetLoopback", netip.MustParseAddr("127.0.0.1"), 6060, 10*time.Second)
 	time.Sleep(2 * time.Second)
 	stop, end := context.WithTimeout(ctx, 5*time.Second)

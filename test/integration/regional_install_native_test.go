@@ -27,6 +27,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	capture "asservat.local/asservat/internal/domain/capture"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -888,26 +889,39 @@ func (b *regionalBudget) amount(bytes, objects int64) map[string]int64 {
 	return map[string]int64{"bytes": bytes, "objects": objects}
 }
 
+func installedRegionalContextReserve() (bytes, objects int64) {
+	bytes, objects = 8*1544192, 32
+	if installedRecordingFocus() {
+		bytes = 8 * (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
+	}
+	if installedJourneyFocus() == "manual-profile" {
+		// Fund four independently approved 16MiB captures (CPU, busy, missing,
+		// Stop), including each immutable history artifact. Multipart backing
+		// remains charged after successful/refused collection until cleanup.
+		profile := artifact.Registration{NativeLimit: 16 << 20}
+		stream := artifact.StreamingPlan{Registration: profile}
+		history := artifact.Registration{NativeLimit: capture.MaxHistoryParameters}
+		bytes = 4 * (profile.ReservedBytes() + stream.TemporaryBytes() + history.ReservedBytes())
+		objects = 4 * (4 + 1 + int64(stream.PartLimit()) + 4)
+	}
+	return bytes, objects
+}
+
 func (b *regionalBudget) addPolicy() {
 	b.t.Helper()
 	// The operator's regional budget: a policy for the joined cluster and its
 	// slot in the existing pool, with the pool's capacity raised to fit.
-	// Eight records/32 objects match the root profile (Records: 8): an
-	// ongoing source, its re-arms, Saves and incident snapshots all charge it.
-	reserveBytes := int64(8 * 1544192)
-	if installedRecordingFocus() {
-		// The operator reserves the actual packet ciphertext size, rather than
-		// the smaller pod-status bytes of the original journey.
-		reserveBytes = 8 * (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
-	}
+	// Ongoing sources, re-arms, Saves and incident snapshots share the default
+	// eight-record/32-object reserve. Manual profiles explicitly fund their
+	// four-capture journey and history before any admission takes place.
+	reserveBytes, reserveObjects := installedRegionalContextReserve()
 	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": b.policyName}, "spec": map[string]any{
 		"poolRef": "capacity", "scope": map[string]any{"clusterID": b.cluster, "namespaceSelector": map[string]any{"matchLabels": map[string]string{"team": "regional"}}},
 		"namespaceEnvelope": map[string]int64{"maxWorkloadAccounts": 1, "maxStoredBytes": 2147483648, "maxObjects": 2000},
-		// The context reserve fits the root's qualified protocol (Records: 8):
-		// records = min(bytes/1544192, objects/4, 512) = 8, which is also the
-		// workload's download sessions (MCP, browser, Stop). A larger reserve is
-		// refused at reservation as above the qualified protocol ceiling.
-		"workload": map[string]any{"protected": b.amount(1073741824, 1000), "hardLimit": b.amount(2147483648, 2000), "contextReserve": b.amount(reserveBytes, 32),
+		// records = min(bytes/1544192, objects/4, 512): normally 8, manual
+		// profile 12. Both fit their configured root's qualified record ceiling;
+		// enrollment refuses any reserve above that ceiling.
+		"workload": map[string]any{"protected": b.amount(1073741824, 1000), "hardLimit": b.amount(2147483648, 2000), "contextReserve": b.amount(reserveBytes, reserveObjects),
 			"dump":                   map[string]int64{"burst": 1, "minimumIntervalSeconds": 900, "maxStartsPerRollingHour": 2, "maxInputBytesPerRollingHour": 4294967296},
 			"maxConcurrentExpensive": 1, "maxQueuedExpensive": 1, "maxQueueAgeSeconds": 30, "upload": map[string]int64{"bytesPerSecond": 33554432, "burstBytes": 4194304}, "maxUploadRequestsPerSecond": 20, "maxSpoolBytes": 2147483648, "onFull": "RejectNewExpensive"},
 		"node": map[string]any{"maxConcurrentExpensive": 2, "maxQueuedExpensive": 10, "upload": map[string]int64{"bytesPerSecond": 67108864, "burstBytes": 8388608}, "maxSpoolBytes": 4294967296, "impactProfileRef": "standard-node", "unhealthySamples": 3, "sampleIntervalSeconds": 5, "recoveryHealthySeconds": 60}}}

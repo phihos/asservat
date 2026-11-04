@@ -58,13 +58,13 @@ const (
 	RecordingCancelled = "cancelled"
 )
 
-// Recording failures of a connector stop on frozen Kubernetes peers
-// (ADR-283 part 3). Like captureFailed they record no acquisition; the
-// committed start is not refunded.
+// Profile endpoint refusals and connector stops on frozen Kubernetes peers
+// record no acquisition. The committed start remains spent.
 const (
-	RecordingProfilerBusy = "profilerBusy"
-	RecordingPeersChanged = "peerMembershipChanged"
-	RecordingPeersStale   = "peerMembershipStale"
+	RecordingProfilerBusy       = "profilerBusy"
+	RecordingProfileUnavailable = "profileUnavailable"
+	RecordingPeersChanged       = "peerMembershipChanged"
+	RecordingPeersStale         = "peerMembershipStale"
 )
 
 // RecordingCollection is the region's answer to a collect: still recording,
@@ -110,7 +110,7 @@ func (c RecordingCollection) Valid(r artifact.Registration) bool {
 		}
 		return variants == 1 && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && c.Failure == ""
 	case RecordingFailed:
-		return c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && (c.Failure == "captureFailed" || c.Failure == "storeUnconfirmed" || c.Failure == RecordingProfilerBusy || c.Failure == RecordingPeersChanged || c.Failure == RecordingPeersStale)
+		return c.RecordingCancellation == nil && c.ProfileCancellation == nil && c.SnapshotCancellation == nil && c.SnapshotCoverage == nil && c.Completion == (artifact.ContextWriterCompletion{}) && (c.Failure == "captureFailed" || c.Failure == "storeUnconfirmed" || c.Failure == RecordingProfilerBusy || c.Failure == RecordingProfileUnavailable || c.Failure == RecordingPeersChanged || c.Failure == RecordingPeersStale)
 	}
 	return false
 }
