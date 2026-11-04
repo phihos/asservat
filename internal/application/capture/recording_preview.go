@@ -129,9 +129,15 @@ func (s ContextInvestigation) recordingPlan(ctx context.Context, p value.Context
 // facts (capability, retention for the recorder's evidence type, storage,
 // processing coverage), then the recorder plan with acceptance nodeRecorder.
 // A plan this release cannot record falls back to the ADR-243 refusal.
-func (s ContextInvestigation) previewRecording(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, i identity.Identity, recovery artifact.RecoveryProof, target targets.PodResolution, created time.Time) (RecorderPreviewResult, error) {
+func (s ContextInvestigation) previewRecording(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, i identity.Identity, recovery artifact.RecoveryProof, target targets.PodResolution, created time.Time, storageWait *contextStorageWait) (RecorderPreviewResult, error) {
 	var zero RecorderPreviewResult
-	f, err := s.facts(ctx, source, i.Principal, intent, target, created, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+	var f contextFacts
+	var err error
+	if storageWait == nil {
+		f, err = s.facts(ctx, source, i.Principal, intent, target, created, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
+	} else {
+		f, err = s.factsWithStorageWait(ctx, source, i.Principal, intent, target, created, storageWait)
+	}
 	if err != nil {
 		return zero, previewFailure("facts", err)
 	}

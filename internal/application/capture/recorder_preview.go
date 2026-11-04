@@ -77,6 +77,21 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 	if !target.Valid(s.Now()) {
 		return zero, previewFailure("facts/target", value.ErrChanged)
 	}
+	var storageWait *contextStorageWait
+	if original != nil && len(intent.Composition.Components) == 1 &&
+		original.ClusterID == target.Request.ClusterID && original.NamespaceUID == target.Request.Namespace.UID &&
+		original.WorkloadUID == target.Request.Workload.UID && (original.PodUID == "" || original.PodUID == target.Request.PodUID) {
+		// Reuse this repeat's one readiness owner while current catalog and
+		// recorder observations block. It grants no storage authority; final
+		// consumption joins it and reads the binding independently.
+		s.reviewTarget(ctx, source, i.Principal, target)
+		until := identity.Earlier(identity.Earlier(i.ValidUntil, recovery.FreshUntil), target.FreshUntil)
+		if intent.RepeatedFrom != nil {
+			until = identity.Earlier(until, intent.RepeatedFrom.ExpiresAt)
+		}
+		storageWait = s.beginStorageWait(ctx, target, until, value.ContextStorageSelection{})
+		defer storageWait.close()
+	}
 	mark = time.Now()
 	composition, err := s.withCatalogProfiles(ctx, intent.Composition, target)
 	auditapp.MarkStep(ctx, "p-profiles", mark)
@@ -103,7 +118,7 @@ func (s ContextInvestigation) previewComposition(ctx context.Context, source ide
 		return zero, previewFailure("recorder", err)
 	}
 	if available {
-		r, err := s.previewRecording(ctx, source, intent, i, recovery, target, created)
+		r, err := s.previewRecording(ctx, source, intent, i, recovery, target, created, storageWait)
 		if !errors.Is(err, errRecordingNotAcceptable) {
 			return r, err
 		}
