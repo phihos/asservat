@@ -70,7 +70,8 @@ source hashes and cleanup before claiming either workflow.
 The typed mapping and UI loss were reproduced with failing focused tests before
 fixing them. Integrated profile races and pre-push gates passed (435 console
 tests; 13,543 specification assertions), as did built-console browser checks
-(33.620s, 27 journeys/26 accessibility scans plus restart/comparison drivers).
+(initial33.620s; final33.162s after precise busy wording, 27 journeys/26
+accessibility scans plus restart/comparison drivers).
 Three independent read-only cross-reviews found no blocking defects.
 
 The focused real PostgreSQL/S3/OpenBao profile-admission outcome test passed
