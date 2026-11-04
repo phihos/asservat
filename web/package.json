@@ -6,7 +6,7 @@
   "scripts": {
     "generate": "node scripts/contracts.mjs --write",
     "contracts": "node scripts/contracts.mjs",
-    "check": "npm run contracts && node scripts/validator-test.mjs && tsc --noEmit && vitest run",
+    "check": "npm run contracts && node scripts/validator-test.mjs && node scripts/installed-profile-case-proof-test.mjs && tsc --noEmit && vitest run",
     "build": "npm run contracts && tsc --noEmit && vite build",
     "browser": "playwright test"
   },
