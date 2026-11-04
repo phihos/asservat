@@ -279,6 +279,24 @@ manual qualification passed under
 [ADR-298](../decisions/298-explicit-go-profile-refusals.md); broader modes remain open.
 
 
+## Refusing a summary before admission
+
+Under [ADR-291](../decisions/291-bounded-profile-summary.md), only a
+`get_profile_summary` authority-resolution failure proven to precede any query
+admission carries C-18's private pre-admission refusal marker. C-20 turns it into
+a content-free `NotAvailable`; denied, missing, unsupported and unavailable
+source/provider cases share that same response and unavailable/none audit
+outcome. REQ-PRF-005 and SC-PRF-003/005 therefore preserve native Go trace download
+without attempting a pprof worker. This includes provider failure at that exact
+pre-admission boundary, rather than misreporting it as an attempted query.
+
+Audit completion, final current identity and original cancellation/deadline still
+gate error delivery. Nonclassified and attempted/post-admission errors retain
+their existing transport failure and conservative effects. SQL native-source
+allowlists, ordinary rights, native parsers, funding and worker limits are
+unchanged. Component composition tests use synthetic publication/permission
+ports and do not establish installed trace qualification.
+
 ## Saved heap summary selection
 
 C-20 passes C-16’s existing saved acquisition type to its source-scoped summary

@@ -11,6 +11,22 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
+// profileSummaryPreAdmissionRefusal is created only when source authority
+// resolution failed before any query admission. It carries no source facts and
+// cannot be constructed by an adapter or public DTO.
+type profileSummaryPreAdmissionRefusal struct{ cause error }
+
+func (e *profileSummaryPreAdmissionRefusal) Error() string { return e.cause.Error() }
+func (e *profileSummaryPreAdmissionRefusal) Unwrap() error { return e.cause }
+
+// ProfileSummaryUnavailableBeforeAdmission identifies a proven zero-query
+// refusal, including an unavailable source/provider. Unknown/post-admission
+// errors retain their normal unavailable transport outcome.
+func ProfileSummaryUnavailableBeforeAdmission(err error) bool {
+	var refusal *profileSummaryPreAdmissionRefusal
+	return errors.As(err, &refusal)
+}
+
 // ProfileSummaries exposes the typed internal admission only when explicitly
 // composed with the typed source route; the protected runtime also requires
 // a funded worker profile before it installs that route.

@@ -529,6 +529,13 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
+		if installedJourneyFocus() == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant()) {
+			defer func() {
+				if t.Failed() {
+					diagnose()
+				}
+			}()
+		}
 		if installedJourneyFocus() == "policy-profile" {
 			t.Run("policy-profile", func(t *testing.T) {
 				qualifyInstalledPolicyProfile(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, f.Clusters[1].Config, diagnose)
