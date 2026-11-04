@@ -19,7 +19,14 @@ cleartext fallback, replay or second connection.
 Keep the 16-item/256 KiB poll ceiling. Measured maximum TLS work is 244027 bytes;
 sixteen 4096-byte values add at least 87424 base64 bytes. Return a byte-bounded
 ordered prefix through the existing poll/sequence mechanism, retaining original
-work/deadlines. Old nodes lack the optional authorization capability and refuse
+work/deadlines. The new private map is bounded at 384 KiB for at most 64 names
+and 4096 header bytes each: the maximum typed map is 355770 encoded bytes and
+retains at most 262144 header bytes. This replaces the earlier planning-only
+64 KiB private-map proposal; it does not raise the existing 64 KiB public
+endpoint-configuration or 256 KiB regional deployment bounds. Together with the
+two existing 32 KiB storage credentials, the Secret's decoded Data is bounded
+at 458752 bytes, below the imported Kubernetes 1048576-byte limit. No Secret
+aggregate limit or node wire cap changes. Old nodes lack the optional authorization capability and refuse
 before dispatch. Upgrade connectors before collectors because old connectors use
 closed report decoders. Existing HTTP/TLS-only behavior and encodings remain.
 
