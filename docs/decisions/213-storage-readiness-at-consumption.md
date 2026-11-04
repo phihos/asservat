@@ -410,3 +410,49 @@ canonical pre-push on that prior source exited 2 solely because this isolated
 worktree lacked the console yaml package; make -k still ran the remaining
 checks including Go vet. Final affected checks are recorded separately. No
 external fixture, installed run, push or authority qualification is claimed.
+
+
+## Earlier repeat-preview hint (2026-11-04)
+
+Installed heap run41812996977 reached the fresh repeat preview after successful
+heap capture, readonly summary and authenticated native download. It refused at
+`facts/storage/expired/readiness-tail` after5.181s. The original five-second
+preview stage had already resolved the target (<2s), loaded the namespace profile
+(<1s) and checked its recorder (<500ms) before starting the existing storage
+hint. The remaining hint/storage phase was <2s. These are bounded timing buckets,
+not exact durations. A later capacity snapshot was current; it does not establish
+the state at the failed read. Refresh method success does not prove that SQL
+inserted a demand or that the worker consumed it. The failure logs end before a
+possibly in-flight demand finishes, so absent demand reports prove neither an
+empty demand list nor a disabled lane.
+
+For a single-component composition repeat with configured recorders whose freshly
+resolved API-execution target matches its original
+workload and any explicit Pod pin, move the existing review and sole storage
+hint before catalog and recorder reads. Pass that same owner into ordinary
+facts consumption. Preserve the original five-second stage, observation
+deadlines, one-second response reserve, current eligibility and independent
+authoritative storage read. Every return cancels and joins the owner. A
+replacement target retains the ordinary eligibility check before its refusal
+and starts no early hint. Direct and multi-component previews retain their existing order.
+
+This overlaps existing work rather than extending authority. A matching repeat
+that later finds a changed or unsupported catalog may now perform the existing
+decision review, one bounded hint/read and possibly its single demand before
+refusal. Choosing that extra uncommon-path cost is an engineering tradeoff under
+the standing delivery authorization; it is smaller than adding combined
+regional RPCs, another wait, new configuration or a longer observation interval.
+The existing demand remains non-authoritative and subject to the same finite
+root/workload limits. Local ordering/timing and joined-cleanup regressions are
+required; installed qualification of this change is still pending.
+
+The staged application regression reproduces the old refusal at4.036s and
+completes after overlap in3.309s, with one review/demand and two independent
+fresh reads. The authority clock/proofs are synthetic and fixed; independent
+port delays use real timers. Catalog error/cancellation joins, original two-second
+target/history bounds and replacement refusals pass. The affected race group
+passes13.122s; independent review found no blocker. The early gate additionally
+requires the existing API execution class and recorder wiring, matching the
+existing acquisition boundary. These results do not prove real demand completion
+or installed availability. Original reports are retained under
+`test/results/heap-profile-local/profile-repeat-readiness-*`.

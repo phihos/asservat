@@ -3,6 +3,165 @@
 
 ## Current delivery workflow (2026-11-04)
 
+**Active outcome:** complete the existing Go heap snapshot inspection/download
+workflow under REQ-PRF-001/003/005. The browser now suggests editable
+`inuse_space` from saved heap acquisition metadata, preserving same-source edits
+and resetting on a new case/artifact/version; verified query results alone supply
+units. The focused `continuation-manual-heap` fixture publishes an immutable
+namespace profile (snapshot,16MiB,5s,no forced GC), obtains one ordinary read-only
+summary before authorized native preparation, then compares native type/unit,
+signed total, nullable duration and original target. Existing collection review
+and selected-result authority are reused.
+
+The isolated candidate is `/home/phil/Projekte/asservat-heap-profile-inspection`,
+branch `feature/heap-profile-inspection`, based on main71bf8d61. Local pre-push
+passed441 console tests, integrated fixture races passed3.871s, and the actual
+built-console browser passed34.452s (28journeys/27accessibility scans;375/320px;
+no external requests or CSP/runtime errors). Browser data are synthetic; installed
+heap qualification remains pending. Original RED/green reports and screenshots
+are retained in `test/results/heap-profile-local/`. Before native dispatch,
+automated review found ambient selector dependence in the existing fixture-shape
+test; broader reproduction found two related CPU tests. All three now pin their
+intended default. Affected races pass with ambient `heap` (3.902s) and an invalid
+value (3.905s); the intermediate failures remain archived. This is test isolation
+only, with unchanged product and installed fixture inputs.
+
+First exact-head CI41800239586 passed at0ad98bdb, but native41800356890 failed
+after484.608s. Namespace publication and approval-ready preview passed; the
+initial request returned `OutcomeUnknown` before review/acquisition/summary or
+native preparation. No pprof was produced. All4,114 reported source hashes match
+0ad98bdb, source unchanged, cleanup[] and scratch removed. Originals are retained
+in `test/results/heap-profile-native-41800356890/`.
+
+A local behavioral RED reproduces the same pre-review gap: persisted previews
+strip catalog documents; the result-access review reconstructs a Go profile
+without rehydrating its namespace definition. Builtin CPU definitions remain
+embedded, so earlier CPU proof does not cover this path. The narrowly scoped
+repair reloads/verifies the pinned catalog only when constructing a new profile
+review, preserving original endpoints, scope, result access and deadlines.
+No acquisition retry or fixture privilege is added; the corrected candidate and
+its installed qualification are pending. The repaired application path passes
+its persisted-preview behavioral regression and negative version/deadline cases;
+independent review found no blockers. Integrated pre-push/profile gates passed
+(441 console tests; fixture races4.482s). Fresh SQL/S3 comparison and
+custody/summary/migration component groups passed14.561s/19.486s, each with4,061
+reported hashes independently matched to committed inputs, unchanged source and
+cleanup[]. These use synthetic current authority and do not establish installed
+heap success. Originals are in `test/results/heap-profile-review-services/`.
+
+Corrected approval candidate ce3078cf passed exact CI41805593151; native41805977672
+then passed independent review, capture/publication and raw pprof catalog lookup,
+but failed its new metadata assertion after508.561s. The fixture required optional
+`pod_name`, while the established recorder projection intentionally omits it.
+The original PodUID was present. All4,115 source hashes match ce3078cf, source
+unchanged, cleanup[] and scratch removed. Summary/download/repeat were not reached;
+no native file was downloaded. Originals and the canonical required-field check
+are retained in `test/results/heap-profile-native-41805977672/`.
+
+The fixture now retains the exact original PodUID check, permits an omitted
+optional display name and rejects a conflicting supplied name. Other profile
+metadata assertions remain; future failures print public target/acquisition
+facts rather than a pointer. No product/authority contract changes. Affected
+fixture races pass; complete installed heap qualification remains pending.
+
+Native41809198307 on3607c38d reached heap capture/publication and validated the
+original PodUID and public snapshot facts. Its read-only `inuse_space` summary
+completed with the384MiB/10-unit/three-key joined SQL proof before authorized
+native preparation. The442-byte original pprof opened locally; its signed
+`inuse_space` total was8,653,482bytes across two samples, with unknown native
+duration. The compiled fixture's exact summary/native parity assertion passed
+before the fresh repeat preview failed with `NotAvailable` after5.786s. The first
+`get_capture_settings` succeeded; the second was not reached. Go exited1 after
+592.324s, so the complete installed workflow remains pending. All4,115 reported
+hashes match3607c38d; source unchanged, cleanup[] and scratch removed. Original
+logs, native bytes and final independent verification are retained byte-for-byte
+under `test/results/heap-profile-native-41809198307/`. Diagnose the repeat-preview
+failure before another installed run; no physical heap/RSS, additional approval
+or positive worker-retirement/refund claim follows from these passed boundaries.
+
+Focused inspection found no deterministic repeat catalog/endpoint mismatch. The
+archived run lacks the owner-side fixed failure stage because the single-attempt
+history helper omitted the existing diagnostic callback on semantic errors. That
+test-only gap is corrected; affected fixture races pass6.429s. One further focused
+installed dispatch is diagnostic qualification, with unchanged production code,
+original observation/stage bounds and single-attempt behavior. It will either
+complete the workflow or preserve the missing phase evidence; no timeout increase
+or acquisition/preview retry is introduced. Local integrated pre-push/profile gates
+passed (441 console tests; fixture races4.510s). A focused application composition
+regression also passes with fresh namespace catalog/endpoint resolution, source
+expiry preservation and changed/disabled/missing version refusals; these use
+synthetic dependency ports and do not diagnose the native failure.
+
+The diagnostic native run 41812996977 on02ab0d37 failed again at the fresh repeat
+preview after 5.181s. The owner now identifies the fixed stage as
+`facts/storage/expired/readiness-tail`; the underlying demand-refresh cause
+remains undetermined. A later administrator snapshot, explicitly distinct from
+the failed invocation, found current trust, permission, source and root state
+with about29s remaining observation validity. No timeout change or causal fix
+is inferred. Heap acquisition/publication, original public facts, the joined
+384MiB/10-unit/three-key read-only summary before authorized native preparation,
+authenticated download and exact signed native parity all passed. The670-byte
+pprof opened locally; two samples totaled 3,769,583 `inuse_space` bytes, with unknown
+native duration. First history settings succeeded; the fresh repeat failed and
+the second settings check was not reached. Go exited1 after584.311s. All4,116 reported hashes match
+02ab0d37, source unchanged, cleanup[] and scratch removed. Originals and final
+independent verification/native analysis are retained byte-for-byte in
+`test/results/heap-profile-native-41812996977/`. Complete installed heap workflow
+qualification remains pending while the actual demand path is investigated.
+
+The repeat repair starts the existing sole storage wait after fresh matching
+target resolution for a single-component API repeat with recorder wiring, before
+namespace catalog/recorder reads. It reuses that owner
+at authoritative consumption; direct previews and replacement-target refusals
+retain their order. Original observations, five-second stage, one-second reply
+reserve and single demand remain fixed. See ADR-213; installed repair proof is
+pending. A realistic staged application regression reproduced the original
+private readiness-tail refusal at4.036s and passed with overlap in3.309s. One
+review/demand and two fresh reads were observed; the authority clock/proofs remain
+synthetic and the independent blocking ports use real timers. Target/history
+bounds, catalog-error/cancellation joins and replacement refusals pass. Affected
+races returned0/13.122s and independent review found no blocker. The early gate requires
+existing API execution and configured recorder wiring. Final integrated pre-push
+and profile gates passed441 console tests,4.703s capture application races and
+4.431s fixture races. Fresh SQL/S3 comparison and custody/summary/migration groups
+passed13.657s/17.220s. Each4,063-file inventory independently matches committed
+inputs, with unchanged source and cleanup[]. Installed checks remain pending.
+Service originals are retained in `test/results/heap-repeat-readiness-local/`.
+Application regression reports are retained in
+`test/results/heap-profile-local/profile-repeat-readiness-*`.
+
+Repeat repair complexity review: (1) two consecutive installed heap repeat
+failures; the second identifies expired storage/readiness-tail. (2) No accepted
+authority risk is reopened. (3) Repeat after inspection is a normal workflow.
+(4) Reuses the earlier Request hint pattern in ADR-213. (5)0 privileges,
+credentials or exposure added. (6)0 new failure/fallback states. (7)0 settings.
+(8) Existing SQL/regional producer only. (9) Matching supported repeats retain
+one hint/read and at most one demand, overlapping catalog/recorder work; a
+matching unsupported/changed repeat may add the existing decision review, same
+bounded hint and at most one demand before refusing. The existing worker can
+refresh that demand within the unchanged60s/root16 limits.0 new watches or workers; one existing goroutine per owned
+preview, joined on every return. (10)No migration; reverting restores previous
+ordering. (11)Moving the existing owner is smaller than new combined RPCs or
+longer authority bounds. Local timing/cleanup tests and installed proof remain
+required; this does not establish the worker's underlying refresh outcome.
+
+Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
+selection for a saved heap; frequency is unmeasured, and this is an existing
+first-release requirement. Metadata/default conventions and the existing
+namespace profile/query/download paths suffice. The approval repair adds one existing bounded regional catalog read only when
+opening a new namespace-profile review (one namespace GET plus one exact-version
+GET for the supported single action). Existing covering grants/builtins use0 new
+catalog requests. Permissions, credentials, watches, workers, dependencies,
+configuration and fallback states added:0. The extra definition is bounded by the
+existing catalog limit and the original request deadline. Mounting makes0 queries. Test-only selection adds one closed heap variant
+to the existing manual-profile harness; CPU/refusal/Stop checks remain in their
+original route. One heap plus history needs35.25MiB/12objects and one10-unit
+summary, within unchanged141MiB/48objects/root12 and6,720/10,000 system objects.
+The384MiB worker and18min Go/20min job ceilings are unchanged. Source-scoped UI
+state is reversible; merely asking users to guess the counter preserves the
+reproduced failure. Full S-05 and complete-spec work remain active.
+
+
 Explicit Go endpoint refusals ([ADR-298](decisions/298-explicit-go-profile-refusals.md))
 are merged in [PR158](https://github.com/phihos/asservat/pull/158), main
 `620a59eb1ab363fe2dbedeffae26b3fe5d2d5a51`. The entire merge tree equals qualified
@@ -32,10 +191,6 @@ difference report. Earlier failed or provenance-limited runs remain separate.
 No physical refund, remote application Stop, continuous availability,
 maximum-input analysis, S-05 or whole-spec exit is implied.
 
-Next is the prepared heap snapshot workflow: editable `inuse_space` suggestion,
-read-only summary before separately authorized native download, no forced GC and
-native parity. Its isolated local gates/built-browser proof pass; installed heap
-qualification is still pending. The complete-spec goal remains active.
 
 
 Finite policy-triggered Go endpoint profiles (S-05 increment6, ADR-296) are merged

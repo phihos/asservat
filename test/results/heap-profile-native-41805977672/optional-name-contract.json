@@ -1,0 +1,13 @@
+{
+  "requiredTargetFields": [
+    "cluster_id",
+    "namespace_uid",
+    "workload_uid",
+    "pod_uid"
+  ],
+  "optionalDisplayField": "pod_name",
+  "schema": "specs/contracts/mcp-tools.json:get_case",
+  "producer": "internal/application/planning/context_scope.go:readRecorderScopeIdentity populates required PodUID but no PodName; presentation uses omitempty",
+  "correction": "Keep exact original PodUID check; allow omitted optional name; reject a conflicting nonempty name. Expand public target/acquisition facts on any later assertion failure. No production/authority/metadata contract change.",
+  "scope": "The previous workflow remains failed; new fixture gate is not installed qualification."
+}

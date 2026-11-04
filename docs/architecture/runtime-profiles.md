@@ -267,3 +267,23 @@ outcomes create no evidence, replacement target, automatic retry or refund.
 Only the application owner may stop its profiler. Bounded collector and installed
 manual qualification passed under
 [ADR-298](../decisions/298-explicit-go-profile-refusals.md); broader modes remain open.
+
+
+## Saved heap summary selection
+
+C-20 passes C-16’s existing saved acquisition type to its source-scoped summary
+form. Heap suggests editable `inuse_space`; legacy/CPU retains `cpu`. This adds
+no read, preview, authority or parser: C-18 still verifies the exact selected
+sample type and returns the authoritative unit/duration. The existing regional
+worker and native-download boundaries remain separate. The focused heap
+qualification and its current limits are recorded in
+[implementation progress](../implementation-progress.md).
+
+
+Stored previews omit catalog documents. When creating a new profile review with
+selected result access, the capture service reloads the exact referenced catalog
+version and verifies its source UID/definition against the original canonical
+scope before reconstructing the reviewed endpoint. The read retains the original
+request/preview deadlines and post-read cancellation checks. Existing covering
+grants return before this reconstruction; builtin profiles need no remote catalog
+read. Submission still performs its existing current-catalog and authority checks.

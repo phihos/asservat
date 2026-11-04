@@ -25,7 +25,7 @@ func manualProfileEndpoints() []contracts.RegionalProfileEndpoint {
 // Exercise the installed history-read + target + recorder composition without
 // starting another capture. Each operation gets one attempt, so retries cannot
 // conceal the preview deadline failure this qualification is intended to detect.
-func qualifyManualRecorderRepeatPreview(t *testing.T, captureID string, original installedApprovedRecordingPreview, invoke func(string, any) (installedJourneyEnvelope, string)) {
+func qualifyManualRecorderRepeatPreview(t *testing.T, captureID string, original installedApprovedRecordingPreview, invoke func(string, any) (installedJourneyEnvelope, string), diagnose func()) {
 	t.Helper()
 	type settings struct {
 		CaptureID       string         `json:"capture_id"`
@@ -39,11 +39,16 @@ func qualifyManualRecorderRepeatPreview(t *testing.T, captureID string, original
 		started := time.Now()
 		var reply installedJourneyEnvelope
 		var code string
+		var elapsed time.Duration
 		defer func() {
-			t.Logf("manual recorder history %s: single attempt elapsed=%s status=%s code=%s", name, time.Since(started), reply.Status, code)
+			t.Logf("manual recorder history %s: single attempt elapsed=%s status=%s code=%s", name, elapsed, reply.Status, code)
 		}()
 		reply, code = invoke(name, args)
+		elapsed = time.Since(started) // Exclude the failure-only diagnostic reads.
 		if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, out) != nil {
+			// Keep the original single attempt and capture the owner's fixed
+			// preview phase before the owned installed environment is removed.
+			diagnose()
 			t.Fatal("manual recorder history operation failed", name, reply.Status, code)
 		}
 	}

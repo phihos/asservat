@@ -14,6 +14,7 @@ import (
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // RecorderGrants is the C-03 approval service (ADR-249) as the capture
@@ -205,7 +206,28 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 			if p.Intent.Composition == nil {
 				return authorization.Grant{}, value.ErrUnavailable
 			}
-			profile, err := compiler.ProfileContextFromScope(*p.Intent.Composition, p.Target, p.CanonicalScope)
+			// Persisted previews omit catalog documents. Only a new review needs
+			// them to reconstruct its original endpoint; a covering grant above
+			// retains its existing path without this additional read.
+			composition := p.Intent.Composition
+			if composition.Resolved == nil {
+				catalogCtx, cancel := context.WithDeadline(ctx, p.Deadline)
+				defer cancel()
+				composition, err = s.withCatalogProfiles(catalogCtx, composition, targets.PodResolution{Request: p.Target})
+				if err != nil {
+					return authorization.Grant{}, err
+				}
+				if !p.Current(s.Now()) {
+					return authorization.Grant{}, value.ErrPreviewExpired
+				}
+				if catalogCtx.Err() != nil {
+					return authorization.Grant{}, value.ErrUnavailable
+				}
+			}
+			if err := compiler.CatalogProfilesCurrent(*composition, p.CanonicalScope); err != nil {
+				return authorization.Grant{}, s.requestChanged("approval/profiles")
+			}
+			profile, err := compiler.ProfileContextFromScope(*composition, p.Target, p.CanonicalScope)
 			if err != nil {
 				return authorization.Grant{}, value.ErrUnavailable
 			}

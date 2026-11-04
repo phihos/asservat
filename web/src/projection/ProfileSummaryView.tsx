@@ -3,11 +3,19 @@ import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import type { ContextProjection } from './projection';
 
-export function ProfileSummaryView({ controller, session, scope, caseID, artifactID, version }: { controller: ContextProjection; session: Session; scope: AbortSignal; caseID: string; artifactID: string; version: string }) {
+type ProfileSummaryProps = { controller: ContextProjection; session: Session; scope: AbortSignal; caseID: string; artifactID: string; version: string; requestedType?: string };
+
+export function ProfileSummaryView(props: ProfileSummaryProps) {
+  // An edit belongs to this immutable source. Metadata rerenders preserve it;
+  // selecting another source starts with that source's editable suggestion.
+  return <SourceProfileSummary key={JSON.stringify([props.caseID, props.artifactID, props.version])} {...props}/>;
+}
+
+function SourceProfileSummary({ controller, session, scope, caseID, artifactID, version, requestedType }: ProfileSummaryProps) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.snapshot);
   const attached = controller.isAttachedTo(session, scope, caseID, artifactID, version);
   const state = attached ? snapshot : { phase: 'idle' as const };
-  const [sampleType, setSampleType] = useState('cpu');
+  const [sampleType, setSampleType] = useState(() => requestedType === 'heap' ? 'inuse_space' : 'cpu');
   const [topN, setTopN] = useState('20');
   useEffect(() => controller.attach(session, scope, caseID, artifactID, version), [controller, session, scope, caseID, artifactID, version]);
   const busy = !attached || state.phase === 'loading' || state.phase === 'pending';

@@ -1,0 +1,119 @@
+{
+  "sourceCommit": "3607c38de34125db9dcb6322f0d02de5fcc005f6",
+  "nativeRun": 41809198307,
+  "ciRun": 41809142388,
+  "workflowConclusion": "failure",
+  "goExit": 1,
+  "goSeconds": 592.324,
+  "nativeJobSeconds": 917,
+  "reportedSourceHashesMatchedCommittedBlobs": 4115,
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "scratchRemoved": true,
+  "passedAssertionsBeforeFailure": [
+    "namespace heap CaptureProfile publication and independent review; original accepted capture continued under its original identity",
+    "heap snapshot acquisition/publication; original PodUID and public heap/snapshot/no-forced-GC acquisition facts",
+    "read-only native preparation denied before the approved summary",
+    "inuse_space/bytes summary with null duration; one exact 384 MiB worker, ten query units and one joined three-key batch",
+    "summary and joined SQL proof completed before the first authorized native preparation",
+    "authenticated original native download, byte/hash verification and local pprof opening without symbol lookup",
+    "compiled fixture exact signed summary total/unit/null-duration parity with the subsequently downloaded native profile",
+    "first get_capture_settings for the repeat returned status ok"
+  ],
+  "failure": "Fresh repeat preview_capture returned NotAvailable after5.786381273s. The fixture made one attempt and stopped before the second get_capture_settings or successful repeat verification. This is a failed overall qualification; the cause remains unresolved in the original artifacts.",
+  "notReached": [
+    "successful fresh repeat preview",
+    "second get_capture_settings and immutable-repeat comparison",
+    "final complete installed heap workflow success"
+  ],
+  "native": {
+    "bytes": 442,
+    "sha256": "962dd740774d3259fde471ca9f05436812859b9f829bafd12f152892e42c3a16",
+    "sampleCount": 2,
+    "sampleType": "inuse_space",
+    "unit": "bytes",
+    "signedTotal": 8653482,
+    "durationUnknown": true,
+    "localPprofTopExit": 0,
+    "localPprofRawExit": 0
+  },
+  "scopeLimits": [
+    "Heap 5s endpoint timeout and 16 MiB output cap are configured limits, not physical heap or RSS measurements.",
+    "No additional approval or positive worker-retirement/capacity-refund qualification is claimed.",
+    "The native-summary equality assertion precedes the failed repeat call in the exact compiled 3607c38d fixture."
+  ],
+  "files": {
+    "local-pprof-raw.txt": {
+      "archive": "local-pprof-raw.txt.gz",
+      "bytes": 711,
+      "sha256": "744bd85dd961d2d8c01e8c10b4d5332702ed24acc1bd15804eccdf520a9fef39"
+    },
+    "local-pprof.txt": {
+      "archive": "local-pprof.txt.gz",
+      "bytes": 332,
+      "sha256": "e6b9e9ac8460f660a5ce02058664269b039444761c9b3d1aca052f3a7227b55c"
+    },
+    "native-continuation-manual-heap-1/ci-native-continuation-manual-heap.log": {
+      "archive": "native-continuation-manual-heap-1__ci-native-continuation-manual-heap.log.gz",
+      "bytes": 5332,
+      "sha256": "a5cff6486f19af00a1b5386c3f84a3361a8631f6a267c07658c98469323e3e23"
+    },
+    "native-continuation-manual-heap-1/context-storage-environment.json": {
+      "archive": "native-continuation-manual-heap-1__context-storage-environment.json.gz",
+      "bytes": 531681,
+      "sha256": "15ef8daee53b42e4fa03842d7f7390c27601e401d7cbdd1d80a88fa41313f5d0"
+    },
+    "native-continuation-manual-heap-1/context-storage-kubelet.log": {
+      "archive": "native-continuation-manual-heap-1__context-storage-kubelet.log.gz",
+      "bytes": 33148,
+      "sha256": "1006825b120891d0c04dc68d67299bd7f85984fd75a34618f67716f65dbe4e3d"
+    },
+    "native-continuation-manual-heap-1/context-storage-postgres.log": {
+      "archive": "native-continuation-manual-heap-1__context-storage-postgres.log.gz",
+      "bytes": 396741,
+      "sha256": "1f9291f71c05fe729b7283bc6fda4a563f8c96d7a4752df61dce4e09e9f30674"
+    },
+    "native-continuation-manual-heap-1/context-storage-timing.log": {
+      "archive": "native-continuation-manual-heap-1__context-storage-timing.log.gz",
+      "bytes": 86471,
+      "sha256": "81a3a8813f155b7b352c769e6ae7a6034efd8f4b0ac736b1c360d819cda81437"
+    },
+    "native-continuation-manual-heap-1/context-storage.log": {
+      "archive": "native-continuation-manual-heap-1__context-storage.log.gz",
+      "bytes": 80873,
+      "sha256": "66873f2e789d1dead5e07dc50a62933a5687d9fc1f058a3e79bdef5373b58e2c"
+    },
+    "native-continuation-manual-heap-1/manual-heap-pprof.txt": {
+      "archive": "native-continuation-manual-heap-1__manual-heap-pprof.txt.gz",
+      "bytes": 332,
+      "sha256": "25612aea608454532d78cc5243130639ed1d7cf77dc5640575888ee2ac61b306"
+    },
+    "native-continuation-manual-heap-1/manual-heap.pb.gz": {
+      "archive": "native-continuation-manual-heap-1__manual-heap.pb.gz.gz",
+      "bytes": 442,
+      "sha256": "962dd740774d3259fde471ca9f05436812859b9f829bafd12f152892e42c3a16"
+    },
+    "verification.json": {
+      "archive": "verification.json.gz",
+      "bytes": 1048,
+      "sha256": "b3adacbd3c1cce268d3870d04d0b1216a146baec330e8bd3a17c7a3ba90b45cc"
+    },
+    "workflow-job.log": {
+      "archive": "workflow-job.log.gz",
+      "bytes": 121927,
+      "sha256": "a34f25ff121dd23752357faf8b7ee37191412cbf95523141d42037aee40f9a6f"
+    },
+    "workflow.json": {
+      "archive": "workflow.json.gz",
+      "bytes": 4817,
+      "sha256": "efcbe9b55b543c25d0647b8d9809db3f6f2dbbd25fba0f848bef6576339e1480"
+    }
+  },
+  "archiveValidation": {
+    "commands": "make PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python design-check spec-check",
+    "exit": 0,
+    "logArchive": "design-gates.log.gz",
+    "logSHA256": "ca440dcc4cbdd94484794864761458952bed4e30911f3848a401749316f38cd5",
+    "scope": "Documentation/contract validation only; no runtime rerun."
+  }
+}

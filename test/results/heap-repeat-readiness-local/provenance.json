@@ -1,0 +1,41 @@
+{
+  "sourceCommit": "d892057cef291e1d4222dc4f0a343bbc1c9ac75c",
+  "workflow": "Heap repeat readiness local preflight",
+  "groups": [
+    "profile-comparison-service-preflight",
+    "profile-service-preflight"
+  ],
+  "allReportedSourceHashesMatched": true,
+  "independentGitBlobComparisons": 8126,
+  "sourceUnchangedDuringBothFixtures": true,
+  "cleanupFailures": [],
+  "installedQualification": false,
+  "scope": "Local/component preflight and real owned SQL/S3 with synthetic authority/bootstrap/current ownership facts. No installed native, end-user or resource-containment qualification.",
+  "files": {
+    "profile-comparison-service-preflight.log": {
+      "archive": "profile-comparison-service-preflight.log.gz",
+      "bytes": 2232,
+      "sha256": "85612213706185b63e795b50cd0140e46c19a6a4ace97f7f8fbb0f74bc0d983f"
+    },
+    "profile-comparison-service-preflight-environment.json": {
+      "archive": "profile-comparison-service-preflight-environment.json.gz",
+      "bytes": 518710,
+      "sha256": "a09c350dcfd0808f11ddfffdd1e6b47915c6d1cb344ed7a7df938518a78be3d8"
+    },
+    "profile-service-preflight.log": {
+      "archive": "profile-service-preflight.log.gz",
+      "bytes": 57817,
+      "sha256": "b1fd72c6fd51f6fdd45fb99c5f398ccdc05c02640426314ba90f4075a2cbbc59"
+    },
+    "profile-service-preflight-environment.json": {
+      "archive": "profile-service-preflight-environment.json.gz",
+      "bytes": 568646,
+      "sha256": "f60d6a4f7f508b7b8e3d6f6e69eec19324098b46ae0ef7cfc12883248c81ff67"
+    },
+    "heap-repeat-readiness-final-preflight.log": {
+      "archive": "heap-repeat-readiness-final-preflight.log.gz",
+      "bytes": 15614,
+      "sha256": "6389ebc932bc062760f73d3e07a6319e5047774f2d602a7ca4bb58288599ffcc"
+    }
+  }
+}

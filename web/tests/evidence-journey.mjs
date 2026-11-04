@@ -186,13 +186,22 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     let summaryCalls = 0;
     const caseRoute = origin + '/api/v1/operations/get_case';
     const summaryRoute = origin + '/api/v1/operations/get_profile_summary';
+    const heapOperations = [];
+    const heapRequestListener = request => {
+      const path = new URL(request.url()).pathname;
+      if (path.startsWith('/api/v1/operations/')) heapOperations.push(path.slice('/api/v1/operations/'.length));
+    };
     await page.route(caseRoute, route => route.fulfill({ json: profileCase }));
     await page.route(summaryRoute, route => {
       summaryCalls++;
-      assert.deepEqual(route.request().postDataJSON(), { case_id: caseID, artifact_id: artifact.artifact_id, sample_type: 'cpu', top_n: 20 });
+      const heap = artifact.profile_acquisition?.requested_type === 'heap';
+      const sampleType = heap ? 'inuse_space' : 'cpu';
+      assert.equal(route.request().method(), 'POST');
+      assert.deepEqual(route.request().postDataJSON(), { case_id: caseID, artifact_id: artifact.artifact_id, sample_type: sampleType, top_n: 20 });
       assert(route.request().headers()['x-csrf-token']);
+      assert.equal(route.request().headers().authorization, undefined);
       const now = Date.now();
-      return route.fulfill({ json: { schema_version: 'mcp-result/v1', request_id: '00000000-0000-4000-8000-000000000091', status: 'ok', data_class: 'extract', truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [{ artifactID: artifact.artifact_id, digest: artifact.digest }], data: { sample_type: 'cpu', unit: 'nanoseconds', duration_seconds: 10, total: 100, symbol_status: 'partial', top: [{ function: '<img src="https://outside.invalid" onerror="alert(1)">' + 'x'.repeat(256), flat: 20, cumulative: 50, fraction: null }], query_observed_at: new Date(now).toISOString(), query_expires_at: new Date(now + 10000).toISOString() } } });
+      return route.fulfill({ json: { schema_version: 'mcp-result/v1', request_id: '00000000-0000-4000-8000-000000000091', status: 'ok', data_class: 'extract', truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [{ artifactID: artifact.artifact_id, digest: artifact.digest }], data: { sample_type: sampleType, unit: heap ? 'bytes' : 'nanoseconds', duration_seconds: heap ? null : 10, total: 100, symbol_status: 'partial', top: [{ function: '<img src="https://outside.invalid" onerror="alert(1)">' + 'x'.repeat(256), flat: 20, cumulative: 50, fraction: null }], query_observed_at: new Date(now).toISOString(), query_expires_at: new Date(now + 10000).toISOString() } } });
     });
     try {
       await page.reload();
@@ -216,7 +225,38 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
       await expect(page.getByRole('button', { name: 'Inspect saved profile', exact: true })).toHaveCount(0);
       assert.equal(summaryCalls, 1);
       checks.push('synthetic summary wire in actual built UI: explicit typed selection, no eager query, untrusted symbols rendered as text, nullable fraction, mobile reflow and close; Go trace has no pprof action');
+
+      artifact.native_format = 'pprof'; artifact.digest = '8'.repeat(64);
+      artifact.profile_acquisition = { requested_type: 'heap', mode: 'snapshot', requested_duration_ms: null, force_gc: false, execution_mode: 'onTrigger', started_at: null, completed_at: null, clock_uncertainty_ms: null, process_attribution: 'unknown', window_kind: 'httpAcquisition', timestamp_precision: 'microsecond' };
+      page.on('request', heapRequestListener);
+      await page.reload();
+      const heapView = page.getByRole('region', { name: 'Saved profile summary', exact: true });
+      await expect(heapView.getByLabel('Sample type', { exact: true })).toHaveValue('inuse_space');
+      await expect(heapView.getByText('Unit', { exact: true })).toHaveCount(0);
+      await expect(heapView.getByText('bytes', { exact: true })).toHaveCount(0);
+      await expect(heapView.getByRole('table')).toHaveCount(0);
+      assert.equal(summaryCalls, 1, 'heap metadata does not trigger a summary query');
+      assert.deepEqual(heapOperations, ['get_case'], 'only the ordinary case read precedes explicit heap inspection');
+      await heapView.getByRole('button', { name: 'Inspect saved profile', exact: true }).click();
+      await expect(heapView.getByRole('table', { name: 'Profile function costs', exact: true })).toBeVisible();
+      await expect(heapView.locator('dl.facts dd')).toHaveText(['inuse_space', 'bytes', '100', 'Unavailable', 'partial']);
+      await expect(heapView.locator('img')).toHaveCount(0);
+      assert.equal(summaryCalls, 2);
+      assert.deepEqual(heapOperations, ['get_case', 'get_profile_summary'], 'heap inspection makes one selected summary query without acquisition or probes');
+      await page.evaluate(() => document.fonts.ready);
+      for (const width of [375, 320]) {
+        await page.setViewportSize({ width, height: 740 });
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      }
+      await scan('heap-summary-mobile');
+      await page.screenshot({ path: output + '/heap-summary-mobile.png', fullPage: true });
+      await heapView.getByRole('button', { name: 'Close view', exact: true }).click();
+      await expect(heapView.getByRole('table')).toHaveCount(0);
+      assert.equal(summaryCalls, 2);
+      assert.deepEqual(nativeRequests, []); assert.deepEqual(browserDownloads, []);
+      checks.push('synthetic heap metadata in built React: editable inuse_space before the first query, no invented units, exact HTTP selection, decoded bytes and unknown duration, no acquisition/probe/download, mobile reflow and close');
     } finally {
+      page.off('request', heapRequestListener);
       await page.unroute(caseRoute); await page.unroute(summaryRoute);
       await page.setViewportSize({ width: 1440, height: 1080 }); await page.reload();
       await expect(page.getByRole('heading', { name: 'Pod status', exact: true })).toBeVisible();

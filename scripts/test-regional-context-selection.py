@@ -12,6 +12,7 @@ import io
 import json
 import tempfile
 import hashlib
+import subprocess
 
 spec = importlib.util.spec_from_file_location("context_fixture", Path(__file__).with_name("test-context-storage.py"))
 fixture = importlib.util.module_from_spec(spec)
@@ -19,6 +20,48 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_heap_alias_uses_existing_focus_and_closed_variant(self):
+        # Execute only the dispatcher against a fake Python executable: no
+        # harness, provider, image build or Kubernetes operation is started.
+        with tempfile.TemporaryDirectory() as directory:
+            fake = Path(directory) / "python3"
+            fake.write_text('#!/usr/bin/python3\nimport json,os,sys\nprint(json.dumps({"args":sys.argv[1:],"focus":os.environ.get("ASSERVAT_JOURNEY_FOCUS"),"variant":os.environ.get("ASSERVAT_PROFILE_VARIANT")}))\n')
+            fake.chmod(0o755)
+            env = dict(os.environ, PATH=directory+os.pathsep+os.environ["PATH"], ASSERVAT_PROFILE_VARIANT="heap")
+            for suite, variant in (("continuation-manual-profile", "cpu"), ("continuation-manual-heap", "heap")):
+                result = subprocess.run([str(Path(__file__).with_name("ci-native.sh")), suite], env=env, capture_output=True, text=True, check=True)
+                selected = json.loads(result.stdout)
+                self.assertEqual(selected, {"args": ["scripts/test-context-storage.py", "--initial-bootstrap-chain", "--runtime-provider-pair", "--installer-continuation"], "focus": "manual-profile", "variant": variant})
+                with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "manual-profile", "ASSERVAT_PROFILE_VARIANT": variant}):
+                    self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
+                    self.assertEqual(fixture.qualification_cluster_count(3, installer_continuation=True), 2)
+                    self.assertEqual(fixture.qualification_profile_variant(os.environ), variant)
+
+    def test_heap_variant_is_reported_and_unknown_values_refuse_before_setup(self):
+        for base in ({"ASSERVAT_PROFILE_VARIANT": "typo"}, {"ASSERVAT_PROFILE_VARIANT": "heap", "ASSERVAT_JOURNEY_FOCUS": "profile-comparison"}):
+            with self.subTest(base=base), patch.dict(os.environ, base, clear=True), patch.object(fixture, "run", side_effect=AssertionError("external setup")) as external:
+                with self.assertRaisesRegex(ValueError, "fixture variant"):
+                    fixture.main(installer_continuation=True)
+                external.assert_not_called()
+        base = {"ASSERVAT_PROFILE_VARIANT": "heap", "ASSERVAT_JOURNEY_FOCUS": "manual-profile"}
+        selected = fixture.qualification_environment(base, Path("fixture"), Path("work"), False, False, initial_bootstrap_chain=True, runtime_provider_pair=True, installer_continuation=True)
+        self.assertEqual(selected["ASSERVAT_PROFILE_VARIANT"], "heap")
+        self.assertEqual(fixture.qualification_profile_variant({}), "cpu")
+        self.assertIn('report["installedProfileVariant"] = profile_variant', inspect.getsource(fixture.main))
+        workflow = (Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
+        self.assertIn("matrix.suite != 'continuation-manual-heap'", workflow)
+        self.assertIn("timeout-minutes: 20", workflow)
+
+    def test_heap_summary_precedes_authorized_native_preparation(self):
+        source = (Path(__file__).resolve().parents[1]/"test/integration/installed_approved_recording_native_test.go").read_text()
+        joined = source.index('heap phase: read-only summary completed with joined SQL worker/key proof')
+        preparing = source.index('heap phase: separately authorized native preparation begins')
+        prepare_call = source.index('\n\tprepareDownload()', preparing)
+        self.assertLess(source.index('heapSummary = queryInstalledProfileSummary('), joined)
+        self.assertLess(joined, preparing)
+        self.assertLess(preparing, prepare_call)
+        self.assertLess(prepare_call, source.index('installedProfileSummaryMatchesNative(heapSummary, native'))
+
     def test_parent_recording_focus_returns_before_third_cluster(self):
         # Bind the actual parent control flow, not merely its inner journey's
         # return or the already-tested two-cluster fixture declaration.

@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -17,6 +18,17 @@ import (
 // One query through the installed public service, using a real OAuth session
 // without native-download scope. SQL inspection supplies no runtime authority.
 func qualifyInstalledProfileSummary(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version string, native []byte, expires time.Time, check installedProjectionCheck) {
+	t.Helper()
+	summary := queryInstalledProfileSummary(t, ctx, identity, transport, origin, caseID, artifactID, version, "cpu", expires, check)
+	if err := installedProfileSummaryMatchesNative(summary, native, "burn"); err != nil || summary.Total <= 0 {
+		t.Fatal("CPU summary differs from authenticated native samples", err)
+	}
+	t.Log("installed profile summary: ordinary read-only OAuth, native-download denial, exact CPU total, closed hotspots and original joined worker/key lifetime verified; no raw query or additional approval")
+}
+
+// Query and join before a separately authorized native download. The returned
+// aggregate supplies no raw authority; the downloaded original validates it.
+func queryInstalledProfileSummary(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version, sampleType string, expires time.Time, check installedProjectionCheck) query.ProfileSummary {
 	t.Helper()
 	if check == nil {
 		t.Fatal("profile summary requires independent SQL readback")
@@ -64,7 +76,7 @@ func qualifyInstalledProfileSummary(t *testing.T, ctx context.Context, identity 
 		t.Fatal("read-only profile session obtained native download")
 	}
 	verify("", "")
-	result := call("get_profile_summary", map[string]any{"case_id": caseID, "artifact_id": artifactID, "sample_type": "cpu", "top_n": 20})
+	result := call("get_profile_summary", map[string]any{"case_id": caseID, "artifact_id": artifactID, "sample_type": sampleType, "top_n": 20})
 	operation, handle := result.RequestID, ""
 	var observed, until time.Time
 	for poll := 0; result.Status == "pending"; poll++ {
@@ -118,43 +130,63 @@ func qualifyInstalledProfileSummary(t *testing.T, ctx context.Context, identity 
 		t.Fatal("profile summary changed original expiry")
 	}
 	var summary query.ProfileSummary
-	if json.Unmarshal(result.Data, &summary) != nil || !summary.Valid(query.ProfileSummarySelection{SampleType: "cpu", TopN: 20}) || summary.SampleType != "cpu" || len(summary.Top) == 0 || len(summary.Top) > 20 {
+	if json.Unmarshal(result.Data, &summary) != nil || !summary.Valid(query.ProfileSummarySelection{SampleType: sampleType, TopN: 20}) || len(summary.Top) == 0 {
 		t.Fatal("invalid closed summary")
+	}
+	if verify(handle, operation) == nil {
+		t.Fatal("profile query lacks exact joined worker/key readback")
+	}
+	return summary
+}
+
+func installedProfileSummaryMatchesNative(summary query.ProfileSummary, native []byte, workloadFunction string) error {
+	if !summary.Valid(query.ProfileSummarySelection{SampleType: summary.SampleType, TopN: 20}) {
+		return fmt.Errorf("invalid summary")
 	}
 	p, err := profile.ParseData(native)
 	if err != nil {
-		t.Fatal(err)
+		return err
+	}
+	if err := p.CheckValid(); err != nil {
+		return err
 	}
 	selected := -1
 	for n, s := range p.SampleType {
-		if s.Type == "cpu" {
+		if s.Type == summary.SampleType {
+			if selected >= 0 {
+				return fmt.Errorf("ambiguous native sample type")
+			}
 			selected = n
 			if summary.Unit != s.Unit {
-				t.Fatal("summary changed native unit")
+				return fmt.Errorf("summary changed native unit")
 			}
 		}
 	}
 	if selected < 0 {
-		t.Fatal("fixture profile lacks CPU samples")
+		return fmt.Errorf("fixture profile lacks selected samples")
+	}
+	if p.DurationNanos <= 0 {
+		if summary.DurationSeconds != nil {
+			return fmt.Errorf("summary invented a native duration")
+		}
+	} else if summary.DurationSeconds == nil || *summary.DurationSeconds != float64(p.DurationNanos)/float64(time.Second) {
+		return fmt.Errorf("summary changed native duration")
 	}
 	var total int64
 	for _, s := range p.Sample {
 		total += s.Value[selected]
 	}
-	if summary.Total != total || total <= 0 {
-		t.Fatal("summary total differs from authenticated native samples", summary.Total, total)
+	if summary.Total != total {
+		return fmt.Errorf("summary total %d differs from authenticated native samples %d", summary.Total, total)
 	}
-	found := false
+	found := workloadFunction == ""
 	for _, row := range summary.Top {
-		if row.Function != nil && strings.Contains(*row.Function, "burn") && row.Cumulative > 0 {
+		if row.Function != nil && strings.Contains(*row.Function, workloadFunction) && row.Cumulative > 0 {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatal("summary lacks the sampled fixture workload")
+		return fmt.Errorf("summary lacks the sampled fixture workload")
 	}
-	if verify(handle, operation) == nil {
-		t.Fatal("profile query lacks exact joined worker/key readback")
-	}
-	t.Log("installed profile summary: ordinary read-only OAuth, native-download denial, exact CPU total, closed hotspots and original joined worker/key lifetime verified; no raw query or additional approval")
+	return nil
 }

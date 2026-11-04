@@ -138,3 +138,22 @@ cancellation after blocking reads, refusal of raw cores/traces and other
 operations, source-specific client policy, unchanged metadata-share limits,
 original acknowledged invocation and result ownership. They provide no installed
 qualification or proof that the current worker can process every permitted shape.
+
+
+## Heap selection and qualification continuation
+
+The saved acquisition's requested type suggests an editable browser selection:
+heap starts with `inuse_space`, CPU/unknown with the existing `cpu`. Suggestions
+establish neither native semantics nor units. Case/artifact/version-scoped form
+state preserves edits across metadata refreshes and resets on source changes;
+opening a view starts no query. The existing authorized result establishes the
+selected native unit and nullable duration.
+
+The focused installed heap fixture reuses the immutable namespace profile and
+existing regional query/approval/native-download path. It selects snapshot,
+16MiB/5s and forced GC false, completes a read-only `inuse_space` summary before
+native preparation, then checks the separately authorized original's exact unit,
+signed total, nullable duration and target. The same fixture's CPU route retains
+its expiry, refusals and Stop proofs. Existing384MiB resources and funded query
+units remain unchanged. Local component/built-console checks pass; current native
+qualification and scope are in [implementation progress](../implementation-progress.md).
