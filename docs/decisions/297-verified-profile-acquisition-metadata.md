@@ -1,6 +1,6 @@
 # ADR-297: verified profile acquisition metadata in cases
 
-Status: implemented; final-candidate qualification pending.
+Status: implemented and merged; bounded installed CPU case timing qualified.
 
 ## Context
 
@@ -85,25 +85,30 @@ contracts.
 
 ## Validation
 
-Exercise complete-authentication success/failure, UTC microsecond normalization,
-immutable audit/replay and legacy byte compatibility, compiled SQL roles,
-upgrade/rollback refusal, already joined catalog/permission/retention reads,
-closed browser/MCP parity and actual case UI decoding. Verify unknown/reversed/
-partial windows, cumulative-history wording and process-attribution limits.
-Use frozen-source real SQL/S3 and repository gates before fresh installed case
-verification. No result, complete correlation, S-05 or full-spec exit is claimed.
+Focused races/fault tests verify complete authentication, semantic close, final
+cancellation, UTC-microsecond normalization, immutable/legacy audit bytes,
+cloning, closed browser/MCP parity and no additional verifier reads. Real SQL/S3
+checks cover new/legacy metadata, catalog/progress/history-facts parity, role
+columns and134→133→134/retained rollback refusal. The history fixture does not
+publish history parameters or qualify history-list visibility. Fresh empty-schema
+installation and original compiled activation Pod also pass. Reports are retained
+under `test/results/profile-timing-local/`, `test/results/profile-timing-services/`
+and `test/results/profile-timing-schema/`.
 
-Local qualification: integrated race/pre-push checks and built-console checks
-passed. Three separate real SQL/S3 fixtures verify new timing, immutable/legacy
-replay, catalog/progress/history-facts parity and migration134 round-trip/refusal.
-Fresh Kubernetes/SQL/S3/OpenBao empty-schema installation and original product-Pod
-activation also passed. Source hashes, actual exits and cleanup are recorded in
-`test/results/profile-timing-services/`, `test/results/profile-timing-schema/`
-and `test/results/profile-timing-local/`. The history fixture does not publish
-history parameters; no complete history-list or installed-profile claim follows.
+Final installed CPU10 policy workflow native41779461029 passed at c78b44b2
+(Go539.234s), including exact ordinary-case/SQL timing, native download, all4,097
+independently matched committed source hashes, unchanged source and clean
+terminal cleanup. The921-byte original reopened locally with pprof. Reports are
+in `test/results/profile-timing-native-41779461029/`. Fonts-loaded375px/320px
+before/after comparison checks and the full browser gate pass after reusing the
+existing table wrapping style; native41777263417 predates that UI fix.
 
-The first installed CPU10 policy workflow passed in native41777263417 at92353e88,
-including exact public/SQL timing, native download and unchanged-source/cleanup
-proof. CI caught a mobile table overflow; an existing wrapping class fixes it,
-with fonts-loaded375px/320px RED/GREEN and full browser qualification. Final-head
-CI/native remain pending; preserve the separate scope/date of each report.
+The later owner socket-shutdown unit assertion fix changes no product build
+input. Its explicit4,096-identical/one-test-file comparison retains the final
+native evidence without rewriting the original4,097-matching source inventory.
+Exact candidate08e6a2a3 CI41782145212 passed; PR156 merged normally to
+59e5f14f79fd83da3400133d3520a396eb694689 with identical full tree read-back.
+
+This qualifies bounded CPU HTTP acquisition metadata, not measured source-clock
+offset, precise sample history or serving-process identity. Other/longer native
+modes, broader correlation, S-05 and full-spec exits remain open.

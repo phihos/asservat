@@ -3,7 +3,8 @@
 [ADR-297 — Verified profile acquisition metadata](297-verified-profile-acquisition-metadata.md)
 retains already authenticated acquisition windows for existing case metadata
 reads, with unknown legacy clocks/process identity and no additional key reads.
-Implemented; final-candidate qualification is in progress.
+Bounded CPU case timing is merged and natively qualified; broader clock/process
+correlation remains open.
 
 [ADR-296 — Finite policy-triggered Go profiles](296-finite-policy-go-profiles.md)
 extends the existing policy/grant path with stable endpoint-definition approval

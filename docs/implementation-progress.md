@@ -47,65 +47,76 @@ weakening approvals, budgets or deadlines. Their original reports remain in the
 corresponding result directories. Successful qualification above supersedes their
 pending outcomes; no failed run is relabeled as passed.
 
-**Active outcome:** truthful case acquisition timing under REQ-PRF-003/004 /
-ADR-297, branch `feature/verified-case-timing` in
-`/home/phil/Projekte/asservat-profile-timing`, based on mainc7c92de0. The existing
-complete verifier now retains the authenticated HTTP acquisition window. SQL134
-stores an immutable nullable UTC-microsecond pair in the existing verification
-record and encrypted audit. Authorized catalog reads and closed browser/MCP
-schemas carry the accepted request parameters/window into the case timing table.
-Legacy timing, clock uncertainty and serving-process attribution remain unknown.
-Sealed/native bytes are unchanged; extra API/storage/key requests, workers,
-credentials and background tasks are0.
+**Merged delivery:** verified Go profile case timing under REQ-PRF-003/004 /
+ADR-297, [PR156](https://github.com/phihos/asservat/pull/156), head
+`08e6a2a3a9af1c80e635ec14ea0b43990411331f`, now main
+`59e5f14f79fd83da3400133d3520a396eb694689`. Exact CI41782145212 passed. Normal
+squash merge/read-back verified the identical full tree
+`701c6f4c703bd51b51f0b539a0cd1bb384ed051a`. This branch implements authenticated HTTP acquisition
+windows and accepted request parameters in ordinary case metadata, with explicit
+unknown legacy timing, clock uncertainty and serving-process attribution. SQL134
+retains a UTC-microsecond pair in the existing immutable verification/audit path.
+Sealed/native bytes are unchanged; additional API/storage/key requests, workers,
+credentials and background tasks: zero.
 
-Integrated profile races, `make pre-push` (431 console tests;13,540 assertions)
-and independent cross-reviews passed. Built React/Go TLS browser checks passed
-33.199s:27 journeys,26 accessibility scans, plus restart/comparison drivers. Known
-CPU and legacy NULL trace rows match the original case response with exactly one
-case read. The initial duplicate YAML anchor and browser all-tables selector
-failure were corrected; the latter's original report remains in
-`test/results/profile-timing-first-browser/`.
+Final installed CPU10 policy workflow
+[native41779461029](https://github.com/phihos/asservat/actions/runs/41779461029)
+passed at `c78b44b2`, Go exit0 in539.234s. It verified protected endpoint/policy
+acceptance, independent collection approval, real restart/capture, encrypted
+publication, collection-only download denial, separate exact-artifact raw
+approval/replay and authenticated native size/hash/filename/pprof. Ordinary
+get_case returned the exact stored authenticated HTTP window:
+05:41:41.037189Z–05:41:51.052029Z on2026-11-04. Clock uncertainty and serving
+process stayed unknown. One16MiB grant debit/oneexecution and zero observation
+credit were retained. The921-byte native download matches SHA256
+`4d7ffc3c20624a03ce45380fb28ebb7e8ed264ef620d4a8bf83c0cf749a1e722`
+and reopened locally with pprof.
 
-Three independent real PostgreSQL/S3/OpenBao fixtures passed: new timing8.887s,
-legacy NULL replay8.866s and schema134→133→134/rollback protection6.281s.
-New/replay/immutable audit, compiled/fixture column-role parity, catalog, progress
-and history-facts parity are verified. These direct-admission fixtures do not
-publish history parameters or qualify history-list visibility. All4,043 hashes
-match committed blobs; sources unchanged, cleanup failures[] and scratch removed.
-The original missing fixture INSERT grants and incorrectly broad history-list
-assertion failures remain archived, alongside successful service reports in
-`test/results/profile-timing-services/`.
+All4,097 native source hashes independently match committed c78b44b2 blobs;
+sources stayed unchanged, cleanup failures[] and scratch was removed. Original
+reports/native bytes and provenance are retained in
+`test/results/profile-timing-native-41779461029/`. The later candidate changes
+one independent unit test and its retained logs only. Runtime, schemas,
+dependencies, workloads, build inputs and installed journey are unchanged.
+4,096 reported hashes still match; the sole differing owner_runtime_test.go is
+excluded from the product by Go build selection. The explicit comparison is
+`unchanged-production-reuse.json`; the original report is never rewritten.
 
-Fresh owned Kubernetes/SQL/S3/OpenBao schema installation and original activation
-passed146.799s with the actual compiled bundle/product Pod. All4,097 hashes match
-committed blobs, sources unchanged, cleanup failures[] and scratch removed; see
-`test/results/profile-timing-schema/`. Local gate/browser logs are in
-`test/results/profile-timing-local/`.
+CI41779435302 caught a shutdown assertion that redialled a numerical address
+after closing its original socket. A controlled same-address rebind reproduces
+the false positive; actual CI address reuse is inferred. The corrected check
+requires net.ErrClosed from the original listener and still rejects an open
+listener within100ms. Readiness/key/join checks remain intact. Focused GREEN and
+20race repetitions passed43.353s. No production shutdown code changed. Original
+CI/RED/GREEN/stress evidence remains in
+`test/results/profile-timing-owner-shutdown/`.
 
-Fresh native41777263417 at head92353e88 passed (Go675.579s). Installed CPU10
-policy capture/publication, separate raw approval/native download and ordinary
-case metadata verified the authenticated UTC-microsecond pair, with clock and
-serving-process facts unknown. All4,097 hashes match committed blobs; source
-unchanged, cleanup failures[] and scratch removed. The1,104-byte native file
-matches SHA256`e7b156aec3b32d58f0fe065e44dc0f8a61501de1b03df37a8706a77d25423a58`
-and reopened locally with pprof. Original reports/native bytes are retained in
-`test/results/profile-timing-native-41777263417/`.
+Earlier local profile races/pre-push passed (431 console tests;13,540 assertions).
+Three isolated SQL/S3/OpenBao runs passed new timing8.887s, legacy NULL
+replay8.866s and134→133→134/retained rollback protection6.281s. All4,043 hashes
+match their committed source; cleanup was empty and scratch removed. Catalog,
+progress and history-facts parity passed; this direct fixture does not publish
+history parameters or qualify list visibility. Fresh empty-schema/activation
+passed146.799s with the actual compiled product Pod and all4,097 source hashes
+verified. Reports are retained in `profile-timing-services/` and
+`profile-timing-schema/` under test/results.
 
-CI41777258213 found narrow-viewport overflow in the collection timing table.
-A robust fonts-loaded browser regression reproduced375px viewport/379px page.
-The fix reuses existing table wrapping styles;375px and320px now stay within the
-viewport before and after comparison results. Full built-console browser gates
-passed33.230s; original CI/local RED/GREEN reports are retained in
-`test/results/profile-timing-mobile/`. That frontend fix postdates the first
-native run; exact final-candidate CI and fresh native qualification remain
-pending. This does not establish measured clock offsets, serving-process
-correlation, other/longer profile modes, S-05 or full-spec completion.
+Built React/Go TLS checks passed33.230s (27journeys/26accessibility scans plus
+restart/comparison drivers). Fonts-loaded375px/320px checks preserve page width
+before/after comparison results and match known/legacy timing from one case read.
+The original CI41777258213 mobile overflow was reproduced375px→379px and fixed
+using existing table wrapping, with no new CSS. Reports are in
+`test/results/profile-timing-mobile/`; earlier service-grant/history-scope/browser
+failures remain under their original result directories. First successful native
+41777263417 at92353e88 (Go675.579s) predates that mobile fix and is retained
+separately.
 
-Next after timing delivery: preserve the required `ProfileUnavailable` result
-through node/regional completion and public progress; qualify busy refusal without
-stopping an application-owned profiler. Existing acquisition mechanisms alone do
-not qualify this developer workflow. The original complete-spec goal remains
-active.
+This qualifies bounded CPU case acquisition metadata. Measured cross-clock
+correlation, serving-process identity, other/longer modes, maximum-shape worker
+containment, S-05 and full-spec completion remain open. The original complete-spec
+goal remains active. Next: preserve explicit ProfileUnavailable and qualify
+application-owned profiler coexistence, without retry, stop or refund; separate
+local implementation/qualification is prepared in feature/profile-refusals.
 
 Saved syscall views are merged in [PR150](https://github.com/phihos/asservat/pull/150),
 main `381820beabb16caceb3b378e5f007e094cd1dd15`. Its full tree matches qualified
