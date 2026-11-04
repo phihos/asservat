@@ -237,8 +237,18 @@ func comparisonProbeGenerate(t *testing.T, dir string) {
 	comparisonProbeWrite(t, filepath.Join(dir, "probe.json"), fixture)
 }
 
-func comparisonProbeNative(t *testing.T, dir, side string, seed uint64, heavy bool) comparisonProbeInput {
+func comparisonProbeNative(t *testing.T, dir, side string, seed uint64, heavy bool, requestedDuration ...time.Duration) comparisonProbeInput {
 	t.Helper()
+	duration := time.Second
+	if len(requestedDuration) > 1 {
+		t.Fatal("one native duration required")
+	}
+	if len(requestedDuration) == 1 {
+		duration = requestedDuration[0]
+	}
+	if duration <= 0 {
+		t.Fatal("positive native duration required")
+	}
 	const n = diagnostics.MaxSummaryFunctions
 	for _, limit := range []int{diagnostics.MaxSummaryLocations, diagnostics.MaxSummarySamples} {
 		if n != limit {
@@ -249,7 +259,7 @@ func comparisonProbeNative(t *testing.T, dir, side string, seed uint64, heavy bo
 		t.Fatal("probe shape requires reviewed cap alignment")
 	}
 	random := rand.New(rand.NewPCG(seed, seed+100))
-	p := &profile.Profile{SampleType: []*profile.ValueType{{Type: "cpu", Unit: "nanoseconds"}}, PeriodType: &profile.ValueType{Type: "cpu", Unit: "nanoseconds"}, Period: 10000000, DurationNanos: int64(time.Second)}
+	p := &profile.Profile{SampleType: []*profile.ValueType{{Type: "cpu", Unit: "nanoseconds"}}, PeriodType: &profile.ValueType{Type: "cpu", Unit: "nanoseconds"}, Period: 10000000, DurationNanos: int64(duration)}
 	if heavy {
 		for index := 1; index < 16; index++ {
 			p.SampleType = append(p.SampleType, &profile.ValueType{Type: fmt.Sprintf("counter-%02d", index), Unit: "count"})
