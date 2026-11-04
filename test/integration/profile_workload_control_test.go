@@ -19,6 +19,8 @@ type profileWorkloadState struct {
 	OwnerRunning    bool  `json:"owner_running"`
 	RuntimeBusy     bool  `json:"runtime_busy"`
 	ProfileRequests int64 `json:"profile_requests"`
+	AuthRequests    int64 `json:"auth_requests"`
+	AuthDenied      int64 `json:"auth_denied"`
 }
 
 func profileWorkloadControl(ctx context.Context, k kubernetes.Interface, namespace, podName, podUID, command string) (profileWorkloadState, error) {
@@ -61,9 +63,21 @@ func profileWorkloadControl(ctx context.Context, k kubernetes.Interface, namespa
 		OwnerRunning    *bool  `json:"owner_running"`
 		RuntimeBusy     *bool  `json:"runtime_busy"`
 		ProfileRequests *int64 `json:"profile_requests"`
+		AuthRequests    *int64 `json:"auth_requests"`
+		AuthDenied      *int64 `json:"auth_denied"`
 	}
 	if d.Decode(&out) != nil || d.Decode(new(any)) != io.EOF || out.OwnerRunning == nil || out.RuntimeBusy == nil || out.ProfileRequests == nil || *out.ProfileRequests < 0 {
 		return zero, errors.New("profile fixture state invalid")
 	}
-	return profileWorkloadState{OwnerRunning: *out.OwnerRunning, RuntimeBusy: *out.RuntimeBusy, ProfileRequests: *out.ProfileRequests}, nil
+	var authRequests, authDenied int64
+	if out.AuthRequests != nil {
+		authRequests = *out.AuthRequests
+	}
+	if out.AuthDenied != nil {
+		authDenied = *out.AuthDenied
+	}
+	if authRequests < 0 || authDenied < 0 {
+		return zero, errors.New("profile fixture auth counters invalid")
+	}
+	return profileWorkloadState{AuthRequests: authRequests, AuthDenied: authDenied, OwnerRunning: *out.OwnerRunning, RuntimeBusy: *out.RuntimeBusy, ProfileRequests: *out.ProfileRequests}, nil
 }

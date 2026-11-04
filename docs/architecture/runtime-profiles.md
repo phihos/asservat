@@ -15,7 +15,8 @@ download/local parsing and history/settings/Repeat at59812214; PR162 merged as
 3cc76be0 with the identical complete tree. Accepted-heavy comparisons passed at
 c6 with measured worker memory/CPU containment for that one input shape.
 
-These are named Linux/amd64 reference workflows. TLS/authenticated endpoints,
+These are named Linux/amd64 reference workflows. Named TLS CPU endpoints passed the original-app native/summary/Repeat and
+wrong-peer journey at abf25590 (installed41916430295); endpoint authorization,
 all-maxima analyzer qualification and broader S-05 remain open. See
 [the current evidence](../implementation-progress.md)
 for originals and limits. The initial mechanism and staged-test boundaries below

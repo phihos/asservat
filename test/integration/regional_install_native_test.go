@@ -140,7 +140,15 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 	if executor && (installedProfileFocus() || installedJourneyFocus() == "policy-profile") && index == 1 {
 		configured := manualProfileEndpoints()
 		if installedTLSProfileTransport() {
-			configured = manualTLSProfileEndpoints(manualProfileTLSFixture(t, f.ProfileTLSDirectory).Roots)
+			roots := manualProfileTLSFixture(t, f.ProfileTLSDirectory).Roots
+			configured = manualTLSProfileEndpoints(roots)
+			if installedProfileAuthorization() {
+				if existing == nil {
+					t.Fatal("authenticated profile requires original installed workload")
+				}
+				configured = manualAuthenticatedProfileEndpoints(roots, envelope.Binding.ClusterID, string(existing.workload.ns.UID), string(existing.workload.app.UID))
+				args = append(args, "--profile-authorization", writeManualProfileAuthorization(t, dir, configured))
+			}
 		}
 		endpoints, err := json.Marshal(configured)
 		if err != nil {
@@ -1032,10 +1040,17 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 		}
 		material := manualProfileTLSFixture(t, tlsDirectories[0])
 		defer clear(material.Key)
-		if _, err := region.CoreV1().Secrets(ns.Name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "profile-application-tls"}, Type: core.SecretTypeTLS, Immutable: ptr.To(true), Data: map[string][]byte{"tls.crt": material.Certificate, "tls.key": material.Key}}, meta.CreateOptions{}); err != nil {
+		appData := map[string][]byte{"tls.crt": material.Certificate, "tls.key": material.Key}
+		if installedProfileAuthorization() {
+			appData["authorization"] = []byte(manualProfileAuthorizationSentinel)
+		}
+		if _, err := region.CoreV1().Secrets(ns.Name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "profile-application-tls"}, Type: core.SecretTypeTLS, Immutable: ptr.To(true), Data: appData}, meta.CreateOptions{}); err != nil {
 			t.Fatal("synthetic app-only TLS Secret", err)
 		}
 		command = append(command, "--tls", "/run/profile-tls/tls.crt", "/run/profile-tls/tls.key")
+		if installedProfileAuthorization() {
+			command = append(command, "--authorization", "/run/profile-tls/authorization")
+		}
 		volumes = []core.Volume{{Name: "profile-tls", VolumeSource: core.VolumeSource{Secret: &core.SecretVolumeSource{SecretName: "profile-application-tls", DefaultMode: ptr.To(int32(0444))}}}}
 		volumeMounts = []core.VolumeMount{{Name: "profile-tls", MountPath: "/run/profile-tls", ReadOnly: true}}
 	}

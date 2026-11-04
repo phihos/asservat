@@ -36,8 +36,9 @@ before HTTP, within the original deadline. No system roots, DNS lookup, insecure
 mode, cleartext fallback or acquisition retry is added. Credentials remain
 unsupported by ADR-299 alone. ADR-302 adds a separately qualified authorization
 path below. The fixed 8 KiB public PEM cap and connector-first
-`profileTLS` rollout are engineering choices; installed TLS qualification remains
-pending. Old nodes can continue HTTP but cannot start TLS captures.
+`profileTLS` rollout are engineering choices. The reference TLS CPU and wrong-peer
+journey passed installed41916430295 at abf25590; authenticated endpoints remain
+pending installed qualification. Old nodes can continue HTTP but cannot start TLS captures.
 
 
 [ADR-302](../docs/decisions/302-named-profile-endpoint-authorization.md) keeps a
