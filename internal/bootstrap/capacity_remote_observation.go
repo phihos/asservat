@@ -38,6 +38,10 @@ type capacityRemoteObservation struct {
 
 // regionalOutcome is "ok" or the error's fixed step and closed cause.
 func regionalOutcome(err error) string {
+	return regionalOutcomeClass(err) + observationFailureDetail(err)
+}
+
+func regionalOutcomeClass(err error) string {
 	if err == nil {
 		return "ok"
 	}
@@ -108,9 +112,9 @@ func (s *capacityRemoteObservation) observe(ctx context.Context, r fleet.Cluster
 	}
 	if s.diagnose != "" {
 		s.mu.Lock()
-		if line := string(r.Purpose) + ": " + regionalOutcome(err); line != s.last {
+		if line := string(r.Purpose) + ": " + regionalOutcomeClass(err); line != s.last {
 			s.last = line
-			fmt.Fprintf(os.Stderr, "capacity %s observation %s after %s\n", s.diagnose, line, s.now().Sub(started).Round(10*time.Millisecond))
+			fmt.Fprintf(os.Stderr, "capacity %s observation %s after %s\n", s.diagnose, string(r.Purpose)+": "+regionalOutcome(err), s.now().Sub(started).Round(10*time.Millisecond))
 		}
 		s.mu.Unlock()
 	}

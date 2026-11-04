@@ -131,6 +131,7 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	if d, ok := ctx.Deadline(); ok {
 		end = identity.Earlier(end, d)
 	}
+	cutoff := observationCutoff{label: "caller", until: end}
 	call, cancel := context.WithDeadline(ctx, end)
 	defer cancel()
 	done := make(chan struct{})
@@ -151,6 +152,7 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	}
 	candidates.Owners = slices.Clone(candidates.Owners)
 	end = identity.Earlier(end, candidates.ValidUntil)
+	cutoff.narrow("candidates", candidates.ValidUntil)
 	sqlCall, stopSQL := context.WithDeadline(call, end)
 	defer stopSQL()
 	nativeCandidates := candidates
@@ -178,10 +180,11 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	}
 	routes.Addresses = addresses
 	end = identity.Earlier(end, routes.Groups.ValidUntil)
+	cutoff.narrow("route", routes.Groups.ValidUntil)
 	bounded, stopBounded := context.WithDeadline(sqlCall, end)
 	defer stopBounded()
 	mark = time.Now()
-	selected, err := c.locate(bounded, request.LocatorQuery(), routes)
+	selected, err := c.locate(bounded, request.LocatorQuery(), routes, cutoff)
 	auditapp.MarkStep(ctx, "o-locate", mark)
 	if err != nil || selected == nil {
 		if err == errHolderNoStandby {
@@ -209,6 +212,7 @@ type ownerLocalLocated struct {
 	native  app.OwnerNativeObservationOperation
 	cancel  context.CancelFunc
 	until   time.Time
+	cutoff  observationCutoff
 	initial value.OwnerObservationNativeFacts
 	first   value.OwnerRegistrationObservation
 	leaf    value.OwnerCertificate
@@ -240,7 +244,7 @@ type ownerLocalLookupResult struct {
 // Discovery starts at most two workers and uses a shared process-wide two
 // socket budget. Only an authenticated, explicitly absent reply permits that
 // worker to inspect another original Pod. Unknown outcomes are not absence.
-func (c *DirectHolderObservationClient) locate(ctx context.Context, q value.ClusterObservationLocatorQuery, routes kube.OwnerObservationDialCandidates) (*ownerLocalLocated, error) {
+func (c *DirectHolderObservationClient) locate(ctx context.Context, q value.ClusterObservationLocatorQuery, routes kube.OwnerObservationDialCandidates, cutoff observationCutoff) (*ownerLocalLocated, error) {
 	search, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var next atomic.Int32
@@ -256,7 +260,7 @@ func (c *DirectHolderObservationClient) locate(ctx context.Context, q value.Clus
 					return
 				}
 				g := routes.Groups.Groups[i]
-				selected, absent, err := c.lookup(ctx, search, q, routes.Groups.Candidates, g, routes.Addresses[g.PodUID][0])
+				selected, absent, err := c.lookup(ctx, search, q, routes.Groups.Candidates, g, routes.Addresses[g.PodUID][0], cutoff)
 				if absent && err == nil {
 					continue
 				}
@@ -393,7 +397,7 @@ func (c *DirectHolderObservationClient) current(ctx context.Context, connection 
 	r.Configuration.Configuration = r.Configuration.Configuration.Clone()
 	return r, nil
 }
-func (c *DirectHolderObservationClient) lookup(root, search context.Context, q value.ClusterObservationLocatorQuery, candidates value.APIContextOwnerCandidates, g value.OwnerObservationCandidateGroup, address string) (located *ownerLocalLocated, absent bool, failure error) {
+func (c *DirectHolderObservationClient) lookup(root, search context.Context, q value.ClusterObservationLocatorQuery, candidates value.APIContextOwnerCandidates, g value.OwnerObservationCandidateGroup, address string, cutoff observationCutoff) (located *ownerLocalLocated, absent bool, failure error) {
 	// Never retain provider text, tokens, object identities or nested remote
 	// errors. Only this local stage and a closed denied/unavailable cause reach
 	// the existing private diagnostic; the capacity port stays unavailable.
@@ -433,6 +437,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 	}
 	end, _ := search.Deadline()
 	end = identity.Earlier(end, identity.Earlier(q.NotAfter, first.FreshUntil))
+	cutoff.narrow("firstregistry", first.FreshUntil)
 	nativeRoot, cancelNative := context.WithDeadline(root, end)
 	cancelled := make(chan struct{})
 	stopSearch := context.AfterFunc(search, func() { cancelNative(); close(cancelled) })
@@ -442,7 +447,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 		}
 	})
 	defer detach()
-	selected := &ownerLocalLocated{cancel: cancelNative, until: end, first: first, leaf: leaf, address: address}
+	selected := &ownerLocalLocated{cancel: cancelNative, until: end, first: first, leaf: leaf, address: address, cutoff: cutoff}
 	retained := false
 	defer func() {
 		if !retained {
@@ -462,6 +467,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 	}
 	selected.initial = facts.Clone()
 	end = identity.Earlier(end, facts.FreshUntil)
+	cutoff.narrow("nativefacts", facts.FreshUntil)
 	currentCall, stopCurrent := context.WithDeadline(search, end)
 	defer stopCurrent()
 	stage = "registration-before-get"
@@ -470,6 +476,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 		return nil, false, err
 	}
 	end = identity.Earlier(end, current.FreshUntil)
+	cutoff.narrow("registry-current", current.FreshUntil)
 	tokenCall, stopToken := context.WithDeadline(currentCall, end)
 	defer stopToken()
 	stage = "token"
@@ -497,6 +504,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 		return nil, false, err
 	}
 	end = identity.Earlier(end, last.FreshUntil)
+	cutoff.narrow("registry-current", last.FreshUntil)
 	stage = "locator-reply"
 	reply, err := contracts.DecodeClusterObservationLocalLocator(data)
 	if err != nil || reply.PodUID != c.podUID || reply.Query != ownerLocalQueryWire(q) || tokenCall.Err() != nil || !c.now().Before(end) {
@@ -512,6 +520,8 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 	}
 	selected.locator = locator
 	selected.until = identity.Earlier(end, locator.Interval.FreshUntil)
+	cutoff.narrow("locator", locator.Interval.FreshUntil)
+	selected.cutoff = cutoff
 	// The original operation context survives joined locator transport cleanup.
 	// Losing search cancellation is detached only for a complete positive reply.
 	detach()
@@ -522,7 +532,15 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 	retained = true
 	return selected, false, nil
 }
-func (c *DirectHolderObservationClient) claim(ctx context.Context, request value.ClusterObservationRequest, s *ownerLocalLocated) (value.ClusterObservationResult, error) {
+func (c *DirectHolderObservationClient) claim(ctx context.Context, request value.ClusterObservationRequest, s *ownerLocalLocated) (result value.ClusterObservationResult, failure error) {
+	cutoff := s.cutoff
+	var finalRemaining time.Duration
+	finalAttempted := false
+	defer func() {
+		if failure != nil {
+			failure = &observationCutoffFailure{err: failure, cutoff: cutoff, finalRemaining: finalRemaining, finalAttempted: finalAttempted}
+		}
+	}()
 	var zero value.ClusterObservationResult
 	call, stop := context.WithDeadline(ctx, s.until)
 	defer stop()
@@ -553,6 +571,7 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 		return zero, &fixedStepError{"before", err}
 	}
 	end := identity.Earlier(s.until, before.FreshUntil)
+	cutoff.narrow("registry-current", before.FreshUntil)
 	bounded, stopBounded := context.WithDeadline(call, end)
 	defer stopBounded()
 	body, err := contracts.EncodeClusterObservationLocalClaim(contracts.ClusterObservationLocalClaim{Format: contracts.ClusterObservationLocalClaimFormat, PodUID: c.podUID, Request: wire.RequestWire(request), Locator: ownerOperationLocatorWire(s.locator)})
@@ -574,15 +593,19 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 		return zero, &fixedStepError{"after", err}
 	}
 	end = identity.Earlier(end, after.FreshUntil)
+	cutoff.narrow("registry-current", after.FreshUntil)
 	nativeCall, stopNative := context.WithDeadline(bounded, end)
 	defer stopNative()
 	mark = time.Now()
+	finalRemaining = end.Sub(c.now())
+	finalAttempted = true
 	final, err := s.native.Final(nativeCall)
 	auditapp.MarkStep(ctx, "c-final", mark)
 	if err != nil || !final.Valid(c.now()) || !final.Final || !ownerLocalSameFacts(s.initial, final) || !ownerLocalNativePeer(final, after, s.address) {
 		return zero, &fixedStepError{"native-final", errors.Join(value.ErrUnavailable, err)}
 	}
 	end = identity.Earlier(end, final.FreshUntil)
+	cutoff.narrow("nativefacts", final.FreshUntil)
 	finalCall, stopFinal := context.WithDeadline(nativeCall, end)
 	defer stopFinal()
 	mark = time.Now()
@@ -592,6 +615,7 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 		return zero, &fixedStepError{"current", err}
 	}
 	end = identity.Earlier(end, current.FreshUntil)
+	cutoff.narrow("registry-current", current.FreshUntil)
 	decoded, err := contracts.DecodeClusterObservationResult(data)
 	if err != nil {
 		return zero, err
@@ -600,7 +624,7 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 	if err != nil {
 		return zero, err
 	}
-	result, err := wire.ParseResult(decoded, request, digest, c.now())
+	result, err = wire.ParseResult(decoded, request, digest, c.now())
 	if err != nil {
 		return zero, err
 	}

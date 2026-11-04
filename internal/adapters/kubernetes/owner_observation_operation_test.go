@@ -46,6 +46,7 @@ type ownerOperationFixture struct {
 	podReadChange       func(int, *core.Pod)
 	changeDuringInitial bool
 	lastNamespaceExpiry bool
+	probeResponse       func(http.ResponseWriter, *http.Request) bool
 	namespaceReads      int
 }
 
@@ -160,6 +161,9 @@ func (f *ownerOperationFixture) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		if r.Method != http.MethodPut || r.URL.Query().Get("dryRun") != "All" || r.URL.Query().Get("fieldValidation") != "Strict" {
 			f.t.Error("unexpected effect")
+		}
+		if f.probeResponse != nil && f.probeResponse(w, r) {
+			return
 		}
 		if f.accept {
 			permissionReply(w, v.deploy)
