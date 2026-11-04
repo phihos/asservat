@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -245,6 +246,23 @@ func TestProfileComparisonPreservesOriginalFirstDeadlineAndShortensCutoffs(t *te
 	if err != nil || !out.Valid(f.now) || !out.ValidUntil.Equal(firstUntil) || !out.CheckedAt.Equal(start) || out.Baseline == nil || !out.Baseline.CheckedAt.Equal(start) || !out.Baseline.ValidUntil.Equal(firstUntil) || !out.AccessUntil.Equal(f.baseline.retention.ExpiresAt) || !out.DeleteBy.Equal(f.baseline.retention.DeleteBy) {
 		t.Fatal("original timing or restrictive recheck lost", err, out)
 	}
+	if out.Bound != "comparison/baseline/catalog" || out.Baseline.Bound != "catalog" {
+		t.Fatalf("lost original baseline expiry cause after wider recheck: pair=%q baseline=%q", out.Bound, out.Baseline.Bound)
+	}
+	// Both report-only labels remain absent from the complete authority/digest
+	// input, including the nested baseline; no public wire or approval changes.
+	encoded, err := json.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baselineCopy := *out.Baseline
+	reportCopy := out
+	reportCopy.Baseline = &baselineCopy
+	reportCopy.Bound, reportCopy.Baseline.Bound = "operator-only", "operator-only"
+	other, err := json.Marshal(reportCopy)
+	if err != nil || string(other) != string(encoded) {
+		t.Fatal("report bound entered authority encoding", err)
+	}
 	if f.baseline.counts["identity"] != 9 || f.baseline.counts["permissions"] != 4 || f.incident.counts["permissions"] != 2 || f.baseline.counts["retention"] != 4 || f.incident.counts["retention"] != 2 || f.baseline.counts["environment"] != 4 || f.incident.counts["environment"] != 2 {
 		t.Fatal("unexpected source calls", f.baseline.counts, f.incident.counts)
 	}
@@ -370,5 +388,40 @@ func TestProfileComparisonSameArtifactStillAuthorizesTwice(t *testing.T) {
 	out, err := s.CheckProjectionCurrent(t.Context(), f, pair)
 	if err != nil || !out.Valid(f.now) || f.baseline.counts["catalog"] != 3 || f.baseline.counts["permissions"] != 6 || f.baseline.counts["identity"] != 9 {
 		t.Fatal("same artifact skipped independent authorizations", err, f.baseline.counts)
+	}
+}
+
+func TestProfileComparisonNamesEarliestIncidentOrRecheckedBaseline(t *testing.T) {
+	for _, tc := range []struct {
+		name                string
+		incident            time.Duration
+		shortenBaseline     bool
+		want, baselineBound string
+	}{
+		{"incident-earlier", 2 * time.Second, false, "comparison/incident/environment/recovery", "request"},
+		{"original-baseline-wins-tie", 3 * time.Second, false, "comparison/baseline/catalog", "catalog"},
+		{"baseline-recheck-shorter", 2500 * time.Millisecond, true, "comparison/baseline/retention", "retention"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, s, pair := newComparisonAuthorizationFixture()
+			f.baseline.record.ValidUntil = f.now.Add(3 * time.Second)
+			f.incident.environment.Recovery.FreshUntil = f.now.Add(tc.incident)
+			f.incident.environment.ValidUntil = f.incident.environment.Recovery.FreshUntil
+			if tc.shortenBaseline {
+				f.incident.on = func(_ context.Context, step string, n int) {
+					if step == "environment" && n == 2 {
+						f.baseline.retention.ValidUntil = f.now.Add(time.Second)
+					}
+				}
+			}
+			out, err := s.CheckProjectionCurrent(t.Context(), f, pair)
+			if err != nil || !out.Valid(f.now) || out.Bound != tc.want || out.Baseline == nil || out.Baseline.Bound != tc.baselineBound {
+				baselineBound := ""
+				if out.Baseline != nil {
+					baselineBound = out.Baseline.Bound
+				}
+				t.Fatalf("earliest component lost: pair=%q baseline=%q error=%v", out.Bound, baselineBound, err)
+			}
+		})
 	}
 }
