@@ -660,7 +660,12 @@ func TestOperationCoordinatorPreservesOriginalSourceEnds(t *testing.T) {
 
 func TestOperationCoordinatorOldProducerShortNativeIsNeverUnclipped(t *testing.T) {
 	x := newOperationCoordinatorFixture(t, "current")
-	short := x.f.clock().Add(time.Second)
+	// The fixture clock is frozen at a whole second. Using clock()+1 as a
+	// real context deadline leaves 0–1 seconds and intermittently expires in
+	// the middle of this valid exchange. Allocate a full real second without
+	// extending the original five-second request or changing fixture authority.
+	short := identity.Earlier(time.Now().Add(time.Second), x.request.NotAfter)
+	t.Logf("old producer cutoff=%s original request=%s wall headroom=%s", short.Format(time.RFC3339Nano), x.request.NotAfter.Format(time.RFC3339Nano), time.Until(short))
 	x.probeHook = func(p *contracts.ClusterObservationOperationProbe) {
 		if p.Ordinal == 1 {
 			p.Owner.NativeUntil = short.Format(time.RFC3339Nano)
@@ -668,7 +673,10 @@ func TestOperationCoordinatorOldProducerShortNativeIsNeverUnclipped(t *testing.T
 		}
 	}
 	out, err := x.hub.ObserveClusterOperation(x.ctx, x.request, x.operation)
-	if err != nil || out.Interval.FreshUntil.After(short) || x.proofs != 4 || x.receipts != 1 {
-		t.Fatal("old producer native end was widened", err, out.Interval.FreshUntil)
+	if err != nil {
+		t.Fatal("old producer exchange refused", err, "wall remaining", time.Until(short))
+	}
+	if out.Interval.FreshUntil.After(short) || x.proofs != 4 || x.receipts != 1 {
+		t.Fatal("old producer native end was widened", out.Interval.FreshUntil, x.proofs, x.receipts)
 	}
 }
