@@ -3798,6 +3798,7 @@ components:
                   - podStatus
                   - packetCapture
                   - syscallTrace
+                  - profile
                   description: Accepted collection action; controls available approval
                     commands, not acquisition authority.
                 attached_grant_id:

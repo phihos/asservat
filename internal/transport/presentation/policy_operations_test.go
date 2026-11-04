@@ -3,12 +3,14 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 	"time"
 
 	app "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -134,6 +136,38 @@ func TestPolicyStatusReportsSharedAcceptedPoolsIndependentlyOfGrants(t *testing.
 		}
 		if expired && data["state"] != "expired" {
 			t.Fatal("budget metadata hid original expiry", data)
+		}
+	}
+}
+
+func TestPolicyProfileStatusReportsNativeCollectionAndOriginalSpend(t *testing.T) {
+	f := &policyOperationsFixture{scopes: []string{"evidence:read"}, status: value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", AttachedGrantID: "77777777-7777-4777-8777-777777777777", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, ExecutionsSpent: 1, MaxExecutions: 1, CollectedBytesSpent: 16 << 20, MaxCollectedBytes: 16 << 20, NotAfter: time.Now().Add(time.Hour), Authority: authorization.AcceptedPolicyAuthority{Actions: []string{"profile"}}}}
+	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tool, ok := s.Tool("get_policy_status"); !ok || !tool.MCP() || len(tool.Transports) != 0 && !slices.Contains(tool.Transports, "browser") {
+		t.Fatal("profile policy status lost its shared MCP/browser contract")
+	}
+	out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"regional-finite-go-profile"}`)
+	data := out["data"].(map[string]any)
+	if out["status"] != "ok" || data["collection_kind"] != "profile" || data["attached_grant_id"] != f.status.AttachedGrantID || data["executions_spent"] != float64(1) || data["collected_bytes_spent"] != float64(16<<20) || data["observed_bytes_spent"] != float64(0) || data["max_observed_bytes"] != float64(0) || data["observed_events_spent"] != nil {
+		t.Fatal("native profile status mislabeled collection or changed original pools", data)
+	}
+}
+
+func TestPolicyProfileStatusContractAcceptsProfileAndRefusesUnknownCollection(t *testing.T) {
+	f := &policyOperationsFixture{scopes: []string{"evidence:read"}, status: value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, MaxExecutions: 1, NotAfter: time.Now().Add(time.Hour)}}
+	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"regional-finite-go-profile"}`)
+	for _, kind := range []string{"podStatus", "packetCapture", "syscallTrace", "profile", "unknown"} {
+		out["data"].(map[string]any)["collection_kind"] = kind
+		raw, _ := json.Marshal(out)
+		if err := s.contracts.ValidateOutput("get_policy_status", raw); (err == nil) != (kind != "unknown") {
+			t.Fatal("incorrect closed collection kind", kind, err)
 		}
 	}
 }

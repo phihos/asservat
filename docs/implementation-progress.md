@@ -4,70 +4,66 @@
 ## Current delivery workflow (2026-11-04)
 
 **Active outcome:** finite policy-triggered Go endpoint profiles (S-05 increment6,
-ADR-296). Integration worktree `/home/phil/Projekte/asservat-policy-profiles`,
-branch `feature/policy-go-profiles`; base tree equals main `c52f7f57` after
-PR152/153. Scope: stable endpoint-definition approval, exact triggering-Pod child
-admission, existing finite Go acquisition, separate raw-result approval and native
-download. Implementation is underway; no new policy-profile service/native result
-is claimed. The original complete-spec goal remains active.
+ADR-296), [PR154](https://github.com/phihos/asservat/pull/154), still unmerged.
+Integration worktree `/home/phil/Projekte/asservat-policy-profiles`, branch
+`feature/policy-go-profiles`, pushed head `3143ebfc`; a reviewed public status/UI correction
+is ready for the next candidate. The original complete-spec goal remains active.
 
-Planning, grant/SQL and runtime/review changes have disjoint owners. Required
-next checks are focused compiler/review regressions, real atomic policy admission,
-repository gates, then one frozen-source fresh disposable-VM policy-profile
-workflow. No new service/lease/watch/credential/RBAC is planned; preserve existing
-manual and packet/syscall scope bytes and original deadlines.
+The implementation binds stable protected endpoint definitions and bindings,
+resolves each actual triggering Pod, requires raw policyCollection/liveProfile
+approval and atomically spends existing execution/native-output pools. It reuses
+existing finite Go acquisition, encrypted publication and native download, with
+separate exact-artifact human raw approval. No new service, lease, watch,
+credential, RBAC or migration. Fifteen finite mode/GC cases preserve manual/parent
+recipe and provenance parity; long modes retain their admitted action/write
+bounds, with100s remaining headroom required for CPU60 plus completion.
 
-Local integrated library preflight and integration races passed; `make pre-push`
-passed all checks (418 console tests, 69 packages / 434 dependency edges,
-13,535 spec assertions). `make console-browser-check` passed in33.151s, including
-27 journeys /26 accessibility scans, four restart boundaries and the existing
-profile-comparison driver. Identity/case facts there are synthetic. New focused
-compiler tests cover15 finite mode/GC combinations, exact manual/parent recipe
-and provenance parity, stable definition scopes, private query pairing and
-cancellation. The new real-SQL profile fixture is ready for execution but is not
-yet qualified. No installed policy-profile success is claimed. Local gate logs
-are retained in `test/results/policy-profile-service/`.
+Last full local gates passed: integrated library/integration races, `make pre-push`
+(418 console tests; 13,535 spec assertions;69 packages/434 edges), and built-console
+browser checks (33.151s;27 journeys/26 accessibility scans plus restart and profile
+comparison drivers). Full CI41765866339 at `eb27d1f1` and CI41768260497 at `3143ebfc`
+both passed. Those precede the current status/UI correction; final checks remain.
+Local gate logs are retained in `test/results/policy-profile-service/`.
 
-The first frozen real-SQL run at `68025dd3` failed only the new profile positive
-admission (Go52.756s); the six existing packet/syscall modes passed. All4,031
-reported source hashes match that committed tree, unchanged sources were true
-and cleanup failures were `[]`. Originals are retained in
-`test/results/policy-profile-admission-failed-68025/`. The protected optional
-all-recordings setting adds `recordingApproval` to the concrete child's sensitive
-reasons. The new literal action comparison treated that stricter descriptive
-marker as a changed profile and refused the already-required raw policy grant.
-The focused protected-true/edited4MiB reproduction failed before the fix and
-passed after normalizing only that marker in a cloned comparison value. The
-frozen child scope, required raw/liveProfile grant, all acquisition fields and
-other sensitive reasons remain checked. Independent review and repeated
-`make pre-push` passed. Fresh selected real-SQL qualification at `a164776e`
-passed (Go10.949s/harness0): one4MiB native allowance and execution, exact replay,
-zero observation spend/sessions, missing/changed-definition/exhausted admission
-rollback, and original-grant acquisition read after reattachment plus denial
-following original revocation. All4,031 source hashes independently match the
-committed blobs, sources stayed unchanged and cleanup was `[]`. Reports are in
-`test/results/policy-profile-admission-fixed-a164/`. This component uses compiled
-runtime SQL grants with synthetic protected endpoint/target/reviewer facts; it
-checks ReadAPIContextWork, not preparation/start or multipart streaming. The six
-unchanged legacy mode passes from68025 remain applicable. No deadline or approval
-is relaxed.
+Real SQL/S3 at `a164776e` passed in10.949s under compiled runtime SQL roles:
+one4MiB debit/execution, exact replay, zero observation spend/sessions,
+missing/changed-definition/exhausted rollback, and original-grant acquisition read
+after reattachment plus denial after original revocation. All4,031 source hashes
+match committed blobs; unchanged sources/cleanup passed. Its target/endpoint/
+reviewer facts are synthetic; it exercises ReadAPIContextWork, not preparation/
+start or multipart streaming. Reports: `test/results/policy-profile-admission-fixed-a164/`.
+The preceding failed service run exposed a real require-all compatibility defect;
+a focused red/green regression fixed only the descriptive recordingApproval
+marker comparison, preserving frozen child scope/raw grants/all acquisition fields.
+The six unchanged packet/syscall mode passes from68025 remain applicable.
 
-Full CI41765866339 passed on `eb27d1f1`. The first selected installed policy
-run41766118858 failed (Go480.443s) at a fixture assertion before collection
-approval or any capture. Actual protected endpoint lookup, policy acceptance and
-pending review succeeded; composition returned generated source binding
-`e182567ed4d9af482fdcdb399`, while the fixture expected its authored alias
-`api-local-pprof`. All4,085 source hashes independently match committed `eb27d1f1`,
-sources stayed unchanged, cleanup was `[]` and scratch was removed. Originals
-are retained in `test/results/policy-profile-native-41766118858/`.
+Native41766118858 at `eb27d1f1` failed before collection at a fixture assertion
+expecting an authored endpoint alias instead of its generated binding. The exact
+assertion reproduced locally (0.015s), then passed with production-compiler-derived
+expected bindings (race1.744s). Native41768304337 at `3143ebfc` then completed actual
+independent collection approval, real restart/CPU capture, encrypted publication,
+collection-only download denial, separate exact-artifact raw approval, native
+hash/filename/pprof checks, one16MiB grant debit and zero observation sessions.
+Its1,238-byte ten-second original also reopened locally with pprof. The run still
+failed (Go534.893s) at the final status assertion: public get_policy_status reports
+podStatus because its mapper/schema and console grant controls omit profile.
+This is not a successful whole-workflow qualification. Both installed reports
+independently match all4,085 committed source hashes, with unchanged sources,
+cleanup `[]` and scratch removed. Originals/provenance are retained in
+`test/results/policy-profile-native-41766118858/` and
+`test/results/policy-profile-native-41768304337/`.
 
-The same assertion reproduced locally (Go0.015s). The fixture now derives the
-expected generated binding from the original authored composition through the
-production compiler, independently of the returned review. Focused races passed
-in1.744s; the authored unscoped alias is refused, and the definition, parameters,
-named port and address mode remain checked. Independent review found no blocker.
-Only test files change; production and real-SQL qualification remain unchanged.
-The installed acquisition/publication/raw-approval/download result is pending.
+The status defect reproduced locally in the actual presenter and closed output
+schema; the browser decoder also rejected profile status. The correction adds
+profile classification and explicit console grant controls, preserving zero
+observation requests and packet/syscall defaults. Focused presentation races
+passed2.807s, policy/approval UI36 tests passed2.14s, and independent review found
+no blocker. Final `make pre-push` passed (419 console tests), and the built-console
+browser gate passed33.350s. Acquisition/authority/storage code is unchanged.
+
+**Next:** freeze/push the corrected candidate and obtain a green fresh installed
+workflow plus exact-current CI before merge. Broader native negatives, other
+profile features, S-05 and the complete specification remain open.
 
 Saved syscall views are merged in [PR150](https://github.com/phihos/asservat/pull/150),
 main `381820beabb16caceb3b378e5f007e094cd1dd15`. Its full tree matches qualified

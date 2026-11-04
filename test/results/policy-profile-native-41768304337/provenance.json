@@ -1,0 +1,27 @@
+{
+  "head": "3143ebfc584514271cbf816b2b6ac30bc625dd4d",
+  "workflowConclusion": "failure",
+  "testExit": 1,
+  "goElapsedSeconds": 534.893,
+  "sourceFilesMatchedToCommittedBlobs": 4085,
+  "mismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "failure": "final public policy status reports podStatus instead of profile",
+  "verifiedScope": [
+    "independent collection approval and actual same-Pod restart",
+    "real CPU capture/encrypted publication",
+    "collection-only download denial",
+    "separate exact-artifact raw approval and authenticated native download",
+    "native hash/filename/pprof validation",
+    "one16MiB grant debit; zero observation sessions and spend"
+  ],
+  "nativeFile": {
+    "bytes": 1238,
+    "sha256": "1178fe72e72f0ccfac9b4cb0d987ff3d90562560d85df520183fcdc743c77fc8",
+    "localPprofExit": 0,
+    "localBurnCPUPresent": true,
+    "localNativeDurationSeconds": 10
+  }
+}
