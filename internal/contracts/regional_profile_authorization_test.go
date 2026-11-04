@@ -24,6 +24,16 @@ func TestProfileAuthorizationPrivateMapClosedAndBounded(t *testing.T) {
 			t.Fatal("private value exposed in diagnostics")
 		}
 	}
+	// A single header can exceed its own limit while the whole map still fits.
+	oversized := a
+	oversized.Entries = []RegionalProfileAuthorizationEntry{{Name: "pprof", Authorization: bytes.Repeat([]byte{'x'}, 4097)}}
+	oversizedRaw, _ := json.Marshal(oversized)
+	if len(oversizedRaw) >= RegionalProfileAuthorizationMaxBytes {
+		t.Fatal("invalid oversized-header fixture")
+	}
+	if _, err := DecodeRegionalProfileAuthorization(bytes.NewReader(oversizedRaw)); err == nil {
+		t.Fatal("wire decoder admitted oversized selected header")
+	}
 	for _, raw := range []string{string(b) + `{}`, strings.Replace(string(b), `"format":`, `"unknown":1,"format":`, 1), `{"format":"wrong","entries":[]}`, `{"format":"asservat-profile-authorization/v1","entries":[{"name":"pprof","authorization":"DQo="}]}`, strings.Repeat(" ", RegionalProfileAuthorizationMaxBytes+1)} {
 		if _, err := DecodeRegionalProfileAuthorization(strings.NewReader(raw)); err == nil {
 			t.Fatal("invalid private map accepted")

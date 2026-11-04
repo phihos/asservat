@@ -1,9 +1,6 @@
 package contracts
 
-import (
-	"asservat.local/asservat/internal/domain/execution"
-	"io"
-)
+import "io"
 
 const RegionalProfileAuthorizationFile = "profile-authorization.json"
 const RegionalProfileAuthorizationFormat = "asservat-profile-authorization/v1"
@@ -27,7 +24,7 @@ func DecodeRegionalProfileAuthorization(r io.Reader) (RegionalProfileAuthorizati
 	}
 	seen := map[string]bool{}
 	for _, e := range out.Entries {
-		if !execution.ValidGoProfileAuthorization(e.Authorization) || e.Name == "" || len(e.Name) > 63 || seen[e.Name] {
+		if !validProfileAuthorizationWire(e.Authorization) || e.Name == "" || len(e.Name) > 63 || seen[e.Name] {
 			out.Clear()
 			return RegionalProfileAuthorization{}, ErrKeyRPC
 		}
@@ -51,4 +48,18 @@ func (RegionalProfileAuthorizationEntry) String() string {
 }
 func (RegionalProfileAuthorizationEntry) GoString() string {
 	return "protected profile authorization entry"
+}
+
+// Wire syntax is independent of execution policy. The domain separately
+// validates the same finite header grammar before material use.
+func validProfileAuthorizationWire(value []byte) bool {
+	if len(value) < 1 || len(value) > 4096 {
+		return false
+	}
+	for _, b := range value {
+		if b < 32 || b > 126 {
+			return false
+		}
+	}
+	return true
 }
