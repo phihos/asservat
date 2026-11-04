@@ -64,6 +64,21 @@ metadata assertions remain; future failures print public target/acquisition
 facts rather than a pointer. No product/authority contract changes. Affected
 fixture races pass; complete installed heap qualification remains pending.
 
+Native41809198307 on3607c38d reached heap capture/publication and validated the
+original PodUID and public snapshot facts. Its read-only `inuse_space` summary
+completed with the384MiB/10-unit/three-key joined SQL proof before authorized
+native preparation. The442-byte original pprof opened locally; its signed
+`inuse_space` total was8,653,482bytes across two samples, with unknown native
+duration. The compiled fixture's exact summary/native parity assertion passed
+before the fresh repeat preview failed with `NotAvailable` after5.786s. The first
+`get_capture_settings` succeeded; the second was not reached. Go exited1 after
+592.324s, so the complete installed workflow remains pending. All4,115 reported
+hashes match3607c38d; source unchanged, cleanup[] and scratch removed. Original
+logs, native bytes and final independent verification are retained byte-for-byte
+under `test/results/heap-profile-native-41809198307/`. Diagnose the repeat-preview
+failure before another installed run; no physical heap/RSS, additional approval
+or positive worker-retirement/refund claim follows from these passed boundaries.
+
 Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
 selection for a saved heap; frequency is unmeasured, and this is an existing
 first-release requirement. Metadata/default conventions and the existing
