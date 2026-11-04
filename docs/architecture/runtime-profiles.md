@@ -278,3 +278,12 @@ sample type and returns the authoritative unit/duration. The existing regional
 worker and native-download boundaries remain separate. The focused heap
 qualification and its current limits are recorded in
 [implementation progress](../implementation-progress.md).
+
+
+Stored previews omit catalog documents. When creating a new profile review with
+selected result access, the capture service reloads the exact referenced catalog
+version and verifies its source UID/definition against the original canonical
+scope before reconstructing the reviewed endpoint. The read retains the original
+request/preview deadlines and post-read cancellation checks. Existing covering
+grants return before this reconstruction; builtin profiles need no remote catalog
+read. Submission still performs its existing current-catalog and authority checks.

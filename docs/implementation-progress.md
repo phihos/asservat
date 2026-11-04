@@ -40,7 +40,14 @@ embedded, so earlier CPU proof does not cover this path. The narrowly scoped
 repair reloads/verifies the pinned catalog only when constructing a new profile
 review, preserving original endpoints, scope, result access and deadlines.
 No acquisition retry or fixture privilege is added; the corrected candidate and
-its installed qualification are pending.
+its installed qualification are pending. The repaired application path passes
+its persisted-preview behavioral regression and negative version/deadline cases;
+independent review found no blockers. Integrated pre-push/profile gates passed
+(441 console tests; fixture races4.482s). Fresh SQL/S3 comparison and
+custody/summary/migration component groups passed14.561s/19.486s, each with4,061
+reported hashes independently matched to committed inputs, unchanged source and
+cleanup[]. These use synthetic current authority and do not establish installed
+heap success. Originals are in `test/results/heap-profile-review-services/`.
 
 Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
 selection for a saved heap; frequency is unmeasured, and this is an existing
