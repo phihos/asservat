@@ -207,7 +207,8 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
       await scan('profile-summary-mobile');
       await page.screenshot({ path: output + '/profile-summary-mobile.png', fullPage: true });
       await page.getByRole('button', { name: 'Close view', exact: true }).click();
-      await expect(page.getByRole('table')).toHaveCount(0);
+      await expect(page.getByRole('table', { name: 'Profile function costs', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('table', { name: 'Profile collection timing', exact: true })).toBeVisible();
       assert.equal(summaryCalls, 1);
       artifact.native_format = 'go-trace';
       await page.reload();

@@ -1,0 +1,10 @@
+{
+  "sourceCommit": "968e535c0a6b8ea4b848faa449267abe3ed8e5a8",
+  "command": "scripts/test-custody.py --fleet --run '^TestVerifiedProfileAcquisitionWithRealPostgres$' --result-name profile-timing-verified-service",
+  "harnessExit": 1,
+  "goExit": 1,
+  "sourceHashesMatchedCommittedBlobs": 4043,
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "finding": "Fixture purpose role omitted the two INSERT columns; compiled production grants already include them."
+}

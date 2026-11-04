@@ -17,6 +17,8 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/console"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/catalog"
 	"asservat.local/asservat/internal/transport/browser"
 	"asservat.local/asservat/internal/transport/presentation"
 )
@@ -41,7 +43,7 @@ func TestConsoleProfileComparisonWithBuiltPackage(t *testing.T) {
 	}
 	sessions := &consoleSyntheticSessions{origin: origin, state: "ready", expiresAt: time.Now().Add(5 * time.Minute)}
 	sessionHandler := browser.SessionHandler{Origin: origin, Issuer: "https://identity.invalid", Sessions: sessions}
-	cases := &consoleSyntheticCases{state: "ready", profile: true, expiresAt: time.Now().Add(time.Hour)}
+	cases := &consoleSyntheticProfileTimingCases{consoleSyntheticCases: &consoleSyntheticCases{state: "ready", profile: true, expiresAt: time.Now().Add(time.Hour)}}
 	caseOps, err := presentation.NewContextCaseOperations(presentation.ContextCaseOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: func() string { return consoleCaptureID(501) }}, cases)
 	if err != nil {
 		t.Fatal(err)
@@ -109,6 +111,26 @@ func TestConsoleProfileComparisonWithBuiltPackage(t *testing.T) {
 	if events != 2 || comparison.starts != 1 || comparison.polls != 1 || cases.calls != 1 {
 		t.Fatal("installed driver made extra synthetic calls", events, comparison.starts, comparison.polls, cases.calls)
 	}
+}
+
+// One already visible CPU source has known HTTP timing. A legacy Go trace
+// supplies the explicit unknown-window row without introducing another pprof
+// comparison choice, request or operation in the existing browser journey.
+type consoleSyntheticProfileTimingCases struct{ *consoleSyntheticCases }
+
+func (s *consoleSyntheticProfileTimingCases) GetContextCase(ctx context.Context, current identities.CurrentIdentity, id string) (catalog.ContextCase, error) {
+	view, err := s.consoleSyntheticCases.GetContextCase(ctx, current, id)
+	if err != nil {
+		return view, err
+	}
+	start := time.Now().UTC().Truncate(time.Microsecond).Add(-11 * time.Second)
+	view.Artifacts[0].ProfileAcquisition = &artifact.ProfileAcquisitionMetadata{Type: "cpu", Mode: "interval", DurationMillis: 10000, Acquisition: &artifact.AcquisitionWindow{StartedAt: start, CompletedAt: start.Add(10*time.Second + 222*time.Millisecond)}}
+	legacy := view.Artifacts[0]
+	legacy.ArtifactID, legacy.CaptureID = consoleCaptureID(82), consoleCaptureID(9)
+	legacy.NativeType = artifact.GoTraceArtifact
+	legacy.ProfileAcquisition = &artifact.ProfileAcquisitionMetadata{Type: "runtimeTrace", Mode: "interval", DurationMillis: 1000}
+	view.Artifacts = append(view.Artifacts, legacy)
+	return view, nil
 }
 
 type consoleSyntheticComparisonOperations struct {

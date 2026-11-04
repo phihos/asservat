@@ -53,6 +53,14 @@ type profileAcquisitionPublicationProbe struct {
 func qualifyProfileAcquisitionBeforePublication(t *testing.T, f *capacitySQLFixture, s captureAdmissionScenario, publisher evidence.ContextPublisher, check *postgres.ContextPublications, e artifact.ContextExpectation, copies artifact.Copies, expected artifact.AcquisitionWindow, legacy bool) profileAcquisitionPublicationProbe {
 	t.Helper()
 	ctx := f.ctx
+	var purposeColumns bool
+	if err := f.admin.QueryRow(ctx, `SELECT bool_and(
+ has_column_privilege(purpose,'context_verification',col,'INSERT')=(purpose='context_verify_runtime')
+ AND NOT has_column_privilege(purpose,'context_verification',col,'UPDATE'))
+ FROM unnest(ARRAY['context_verify_runtime','context_verification_audit_runtime','context_publish_runtime','context_catalog_read_runtime','context_progress_read_runtime']) purpose
+ CROSS JOIN unnest(ARRAY['acquisition_started_at','acquisition_completed_at']) col`).Scan(&purposeColumns); err != nil || !purposeColumns {
+		t.Fatal("timing columns require verifier INSERT only, never audit/publish/catalog/progress writes", purposeColumns, err)
+	}
 	a, err := publisher.Authority.CheckContextPublication(ctx, e)
 	if err != nil {
 		t.Fatal(err)
