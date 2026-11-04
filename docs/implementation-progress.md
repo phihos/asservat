@@ -47,7 +47,7 @@ weakening approvals, budgets or deadlines. Their original reports remain in the
 corresponding result directories. Successful qualification above supersedes their
 pending outcomes; no failed run is relabeled as passed.
 
-**Frozen candidate qualification:** [collector41789805115](https://github.com/phihos/asservat/actions/runs/41789805115)
+**Retained frozen qualification:** [collector41789805115](https://github.com/phihos/asservat/actions/runs/41789805115)
 passed on `f2f49124ee56795ab1bc6de42fa5a10455770a3f`; Go exited0 in83.253s.
 Both before/after inventories contain4,103 paths and independently match every
 committed blob (8,206 comparisons); source stayed unchanged. Observed collector
@@ -139,8 +139,18 @@ passive `get_capture` HTTP503 use the existing four-attempt/two-second typed
 transient-read budget, under the original refusal deadline. It does not replay
 acquisition, preview, resolution or Stop, alter freshness, or promise continuous
 availability. A bounded test-only failure snapshot distinguishes later current
-trust/permission/source/root flags without disclosing configuration. No new
-hosted dispatch follows until focused reproductions and review pass. The existing synthetic workload has owner-only controls on its existing
+trust/permission/source/root flags without disclosing configuration. The final
+integrated races passed3.432s and `make pre-push` passed (435 console tests;
+13,545 assertions). Real SDK tests reproduce503 and check recovery, exhaustion,
+shared typed/transport budgets, other statuses, network errors, mutations and
+cancellation without widening retries. The diagnostic's real PostgreSQL checks
+passed1.099s with4,055 source hashes matched, unchanged source and cleanup[].
+An initial NULL-digest diagnostic failure and the later old-five-second predicate
+regression remain archived separately; effective30-second SQL semantics are now
+checked. Original logs are retained in `test/results/profile-refusals-passive-read/`
+and `test/results/profile-refusals-capacity-diagnostics/`. No production source,
+privilege, quota, deadline or freshness policy changed after the verified f2
+collector run; that bounded collector evidence is reused explicitly. The existing synthetic workload has owner-only controls on its existing
 HTTP listener, exact Pod-UID checks and one-request counters. Two independent
 manual reviews precede the installed failures; the fixture waits the exact
 persisted start+15s original uncertainty cutoff before the next attempt. Existing

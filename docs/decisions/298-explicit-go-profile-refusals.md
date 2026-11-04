@@ -127,11 +127,12 @@ source hashes match the frozen commit, sources unchanged, cleanup[] and scratch
 removed; originals remain in `test/results/profile-refusals-native-41789808818/`.
 Missing-endpoint/Stop installed qualification remains pending.
 
-The source observer retains its original bounded authority, then sleeps one
-second between serial observations. Returning a valid observation with less
-than a second left can leave a freshness gap before the next read completes;
-that mechanism is possible, not a proved attribution of this particular failure.
-Keep the current fail-closed behavior. A bounded passive status read can be
+The source observer retains a five-second returned receipt and sleeps one
+second between serial observations. Persisted source and permission freshness
+are separately bounded at thirty seconds by migrations73/74; expiry of that
+short receipt alone does not explain this SQL read failure. The successful
+receipt timestamps and failed SQL predicate were not recorded. Keep this
+uncertainty and the current fail-closed behavior explicit. A bounded passive status read can be
 repeated with fresh authorization without repeating acquisition. The fixture
 already allows four typed transient read failures with two-second pauses, but
 its transport-error path aborts before that budget. The next qualification
@@ -142,3 +143,14 @@ replayed. A finite test-only SQL snapshot after a failure records safe current
 flags/timing and explicitly remains a later observation. This adds no production
 request, credential, fallback, setting or relaxed freshness requirement and does
 not establish continuous source availability.
+
+
+The final local client reproduction and boundary races passed; integrated
+fixture races passed3.432s and pre-push passed435 console tests/13,545 assertions.
+Diagnostic SQL passed1.099s with4,055 reported hashes matched to its committed
+source, unchanged content and cleanup[]. The first NULL-state SQL query failed,
+and review then caught a historical five-second permission predicate; both
+failures remain archived. The final query and actual-SQL regression use the
+current thirty-second predicate. These fixes change test clients/diagnostics
+only. The bounded collector proof is reused with an explicit unchanged-input
+comparison; corrected installed qualification remains pending.
