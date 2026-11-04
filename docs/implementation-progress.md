@@ -92,6 +92,23 @@ regression also passes with fresh namespace catalog/endpoint resolution, source
 expiry preservation and changed/disabled/missing version refusals; these use
 synthetic dependency ports and do not diagnose the native failure.
 
+The diagnostic native run 41812996977 on02ab0d37 failed again at the fresh repeat
+preview after 5.181s. The owner now identifies the fixed stage as
+`facts/storage/expired/readiness-tail`; the underlying demand-refresh cause
+remains undetermined. A later administrator snapshot, explicitly distinct from
+the failed invocation, found current trust, permission, source and root state
+with about29s remaining observation validity. No timeout change or causal fix
+is inferred. Heap acquisition/publication, original public facts, the joined
+384MiB/10-unit/three-key read-only summary before authorized native preparation,
+authenticated download and exact signed native parity all passed. The670-byte
+pprof opened locally; two samples totaled 3,769,583 `inuse_space` bytes, with unknown
+native duration. First history settings succeeded; the fresh repeat and second
+settings check did not. Go exited1 after584.311s. All4,116 reported hashes match
+02ab0d37, source unchanged, cleanup[] and scratch removed. Originals and final
+independent verification/native analysis are retained byte-for-byte in
+`test/results/heap-profile-native-41812996977/`. Complete installed heap workflow
+qualification remains pending while the actual demand path is investigated.
+
 Complexity assessment: the hardcoded CPU default reproducibly sends an invalid
 selection for a saved heap; frequency is unmeasured, and this is an existing
 first-release requirement. Metadata/default conventions and the existing

@@ -1,0 +1,146 @@
+{
+  "passedAssertionsBeforeFailure": [
+    "namespace heap CaptureProfile publication, independent review and original approved capture",
+    "heap snapshot acquisition/publication; original PodUID and public heap/snapshot/no-forced-GC acquisition facts",
+    "read-only native preparation denied before the approved summary",
+    "inuse_space/bytes summary with null duration; one exact 384 MiB worker, ten query units and one joined three-key batch",
+    "summary and joined SQL proof completed before the first authorized native preparation",
+    "authenticated original native download, byte/hash verification and local pprof opening without symbol lookup",
+    "compiled fixture exact signed summary total/unit/null-duration parity with the subsequently downloaded native profile",
+    "first get_capture_settings for the repeat returned status ok"
+  ],
+  "notReached": [
+    "successful fresh repeat preview",
+    "second get_capture_settings and immutable-repeat comparison",
+    "final complete installed heap workflow success"
+  ],
+  "scopeLimits": [
+    "Heap 5s endpoint timeout and 16 MiB output cap are configured limits, not physical heap or RSS measurements.",
+    "No additional approval or positive worker-retirement/capacity-refund qualification is claimed.",
+    "The native-summary equality assertion precedes the failed repeat call in the exact compiled 02ab0d37 fixture."
+  ],
+  "sourceCommit": "02ab0d37794961dfa40b6c25bbf73315123ab050",
+  "nativeRun": 41812996977,
+  "workflowConclusion": "failure",
+  "goExit": 1,
+  "goSeconds": 584.311,
+  "nativeJobSeconds": 882.0,
+  "reportedSourceHashesMatchedCommittedBlobs": 4116,
+  "sourceUnchanged": true,
+  "cleanupFailures": [],
+  "scratchRemoved": true,
+  "failure": "Fresh repeat preview_capture returned NotAvailable after5.181092677s; the owner fixed stage is facts/storage/expired/readiness-tail. The underlying demand-refresh cause remains undetermined. No timeout change or causal fix is inferred from this stage. First get_capture_settings passed; the second was not reached. Overall installed workflow qualification failed.",
+  "fixedPreviewFailureStage": "facts/storage/expired/readiness-tail",
+  "failureStageAt": "2026-11-04T10:30:05.041973454Z",
+  "diagnosticSnapshot": {
+    "at": "2026-11-04T10:30:05.135417Z",
+    "scope": "Later administrator read, not state at the failed invocation.",
+    "acceptedRevision": 2,
+    "allReportedCurrentChecksPassed": true,
+    "trustRemainingMillis": 29323,
+    "permissionRemainingMillis": 29102,
+    "permissionLeaseRemainingMillis": 29102,
+    "sourceRemainingMillis": 29644,
+    "rootPlannedRemainingMillis": 86241053
+  },
+  "previewTimingBuckets": {
+    "target": "<2s",
+    "profiles": "<1s",
+    "recorder": "<500ms",
+    "storageHint": "read-error/<100ms",
+    "storageDemand": "<100ms",
+    "retention": "<100ms",
+    "awaitStorage": "<2s",
+    "storage": "<2s"
+  },
+  "native": {
+    "bytes": 670,
+    "sha256": "aec1d66f748993aa6ef27444cee3d0f33adf37708317ef4c5bc1926357a05840",
+    "sampleCount": 2,
+    "sampleType": "inuse_space",
+    "unit": "bytes",
+    "signedTotal": 3769583,
+    "durationUnknown": true,
+    "localPprofTopExit": 0,
+    "localPprofRawExit": 0
+  },
+  "files": {
+    "local-pprof-raw.txt": {
+      "archive": "local-pprof-raw.txt.gz",
+      "bytes": 1080,
+      "sha256": "5153efeae05d5456f11865fd8208bd42cc71d672a202a8850c3b54a769cb7ae2"
+    },
+    "local-pprof.txt": {
+      "archive": "local-pprof.txt.gz",
+      "bytes": 709,
+      "sha256": "2f9fcce47a49ada80aa1576e2e3b6dbc2a68052052a93b667518d4fa9a7445be"
+    },
+    "native-analysis.json": {
+      "archive": "native-analysis.json.gz",
+      "bytes": 198,
+      "sha256": "1f55e6131d62f8360203611eea04e51e3d9993e96589b8d2362f780adb0899bf"
+    },
+    "native-continuation-manual-heap-1/ci-native-continuation-manual-heap.log": {
+      "archive": "native-continuation-manual-heap-1__ci-native-continuation-manual-heap.log.gz",
+      "bytes": 5398,
+      "sha256": "6cd645ee99cc377eff41897d4f278870d2db0a5b8769a6df00b84185e392fa60"
+    },
+    "native-continuation-manual-heap-1/context-storage-environment.json": {
+      "archive": "native-continuation-manual-heap-1__context-storage-environment.json.gz",
+      "bytes": 531817,
+      "sha256": "4a40151f013e55fb338aa2a0ad5795ac790c339dcbf02075d7ddce6a7876721c"
+    },
+    "native-continuation-manual-heap-1/context-storage-kubelet.log": {
+      "archive": "native-continuation-manual-heap-1__context-storage-kubelet.log.gz",
+      "bytes": 33336,
+      "sha256": "df3fd28b90759e7adc17c478612235da864ee3f6314517e77d4efe4ccd41d497"
+    },
+    "native-continuation-manual-heap-1/context-storage-postgres.log": {
+      "archive": "native-continuation-manual-heap-1__context-storage-postgres.log.gz",
+      "bytes": 396849,
+      "sha256": "2993831702c1b9949ab1a7dcccbd7cdc83566ca9d111646b40ba07f780b55a22"
+    },
+    "native-continuation-manual-heap-1/context-storage-timing.log": {
+      "archive": "native-continuation-manual-heap-1__context-storage-timing.log.gz",
+      "bytes": 136702,
+      "sha256": "6b3664355ccb0ff19e3db5f9e3dd087e0646555b1ca8ca2f85cb3221887757c4"
+    },
+    "native-continuation-manual-heap-1/context-storage.log": {
+      "archive": "native-continuation-manual-heap-1__context-storage.log.gz",
+      "bytes": 128611,
+      "sha256": "e232e019a4c1ea5bdfe9f6fd38e20d22ad8dac2d3cb83629c2240993b89a43d6"
+    },
+    "native-continuation-manual-heap-1/manual-heap-pprof.txt": {
+      "archive": "native-continuation-manual-heap-1__manual-heap-pprof.txt.gz",
+      "bytes": 709,
+      "sha256": "9d1922f93be653ea99cfe96c6d05d36906f737d64f7eb3a5c90f7919160d982e"
+    },
+    "native-continuation-manual-heap-1/manual-heap.pb.gz": {
+      "archive": "native-continuation-manual-heap-1__manual-heap.pb.gz.gz",
+      "bytes": 670,
+      "sha256": "aec1d66f748993aa6ef27444cee3d0f33adf37708317ef4c5bc1926357a05840"
+    },
+    "verification.json": {
+      "archive": "verification.json.gz",
+      "bytes": 1100,
+      "sha256": "bbc8246e03a3ac0c8a7d0ac702a613f34da7192c0f7b2978a4cff754d8693e13"
+    },
+    "workflow-job.log": {
+      "archive": "workflow-job.log.gz",
+      "bytes": 121336,
+      "sha256": "5890ac00051e165e62bdf1686b539f36b14494691f4b336deebc2a37188256fc"
+    },
+    "workflow.json": {
+      "archive": "workflow.json.gz",
+      "bytes": 4817,
+      "sha256": "66cefca293a5d3632e457081067761c3849363cfd8a1b25b78af5f1eaebe9b36"
+    }
+  },
+  "archiveValidation": {
+    "commands": "make PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python design-check spec-check",
+    "exit": 0,
+    "logArchive": "design-gates.log.gz",
+    "logSHA256": "ca440dcc4cbdd94484794864761458952bed4e30911f3848a401749316f38cd5",
+    "scope": "Documentation/contract validation only; no runtime rerun."
+  }
+}
