@@ -36,6 +36,7 @@ type fixture struct {
 	NativeSQLStatistics bool
 	NativeTrafficHelper nativeTrafficHelper
 	ProfileContainment  *installedProfileContainmentFixture
+	ProfileTLSDirectory string // Private harness directory, app TLS key never enters product inputs.
 	// PostgresContainer names the owned PostgreSQL container (installed
 	// journey: lossless restart, ADR-226).
 	PostgresContainer string

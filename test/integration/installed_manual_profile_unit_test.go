@@ -67,7 +67,7 @@ func checkManualProfilePlan(t *testing.T, cluster string, input map[string]any, 
 	if !kube.ProfileEndpointsValid(manualProfileEndpoints()) {
 		t.Fatal("invalid installed endpoint template")
 	}
-	in.Endpoints = []targets.ProfileEndpointResolution{{Request: needed.Request, SourceKind: targets.ProfileEndpointTemplateBinding, SourceName: "go-pprof-loopback", AddressMode: "targetLoopback", Port: 6060, DeclaredPortName: "diagnostics", PathPolicy: "go-pprof/v1", DefinitionDigest: artifact.Digest{1}, EndpointDigest: artifact.Digest{2}, ResolvedAt: now}}
+	in.Endpoints = []targets.ProfileEndpointResolution{{Request: needed.Request, SourceKind: targets.ProfileEndpointTemplateBinding, SourceName: needed.Request.Bindings[0].TemplateRef, AddressMode: "targetLoopback", Port: 6060, DeclaredPortName: "diagnostics", PathPolicy: "go-pprof/v1", DefinitionDigest: artifact.Digest{1}, EndpointDigest: artifact.Digest{2}, ResolvedAt: now}}
 	plan, err := compiler.CompileRecorder(in, nil, now)
 	if err != nil {
 		t.Fatal("public profile request cannot compile through the actual planner", err)

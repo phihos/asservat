@@ -71,7 +71,7 @@ func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code str
 // The ordinary manual focuses qualify submission after preview expiry. The
 // comparison focus reuses that capture path twice to qualify saved analysis.
 func installedApprovedRecordingExpiryProof(focus string) bool {
-	return focus != "profile-comparison" && !(focus == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant()))
+	return focus != "profile-comparison" && !(focus == "manual-profile" && (installedHeapProfileVariant() || installedRuntimeTraceVariant() || installedTLSProfileTransport()))
 }
 
 // approvedRecordingArguments is the actual public request, validated offline
@@ -1029,6 +1029,16 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		qualifyInstalledProfileSummary(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, native, evidence.Artifacts[0].Expires, summaryCheck)
 		if len(profileCapture) != 1 || profileCapture[0].Refused == nil {
 			t.Fatal("manual profile refusal SQL evidence is unavailable")
+		}
+		if installedTLSProfileTransport() {
+			qualifyManualProfileTLSWrongPeer(t, ctx, region, namespace, preview.Pods[0].Name, preview.Pods[0].UID, regionalConfig, cluster, workload, read, readContext, invoke, func(grantID string) {
+				browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
+				if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent wrong TLS peer qualification review", "idempotency_key": "approve-tls-refusal-" + grantID}, nil); code != "" {
+					t.Fatal("TLS negative independent approval", code)
+				}
+			}, profileCapture[0].Refused)
+			t.Log("TLS CPU positive: encrypted publication, authenticated pprof, read-only summary and fresh repeat preview; CPU busy/missing/Stop branches are separate HTTP qualification")
+			return
 		}
 		qualifyManualProfileRefusals(t, ctx, region, namespace, preview.Pods[0].Name, preview.Pods[0].UID, manualProfileArguments(cluster, namespace, workload), read, readContext, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)

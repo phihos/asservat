@@ -399,6 +399,14 @@ def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False,
     return "14m" if runtime_provider_owner else ("12m" if helm_bootstrap else "30m")
 
 
+def qualification_profile_transport(base):
+    transport = base.get("ASSERVAT_PROFILE_TRANSPORT", "") or "http"
+    variant = base.get("ASSERVAT_PROFILE_VARIANT", "") or "cpu"
+    if transport not in ("http", "tls") or (transport == "tls" and (base.get("ASSERVAT_JOURNEY_FOCUS") != "manual-profile" or variant != "cpu")):
+        raise ValueError("Unknown or incompatible installed profile fixture transport")
+    return transport
+
+
 def qualification_profile_variant(base):
     variant = base.get("ASSERVAT_PROFILE_VARIANT", "") or "cpu"
     if variant not in ("cpu", "heap", "accepted-heavy", "trace") or (variant in ("heap", "trace") and base.get("ASSERVAT_JOURNEY_FOCUS") != "manual-profile") or (variant == "accepted-heavy" and base.get("ASSERVAT_JOURNEY_FOCUS") != "profile-comparison"):
@@ -499,6 +507,9 @@ def collect_profile_containment_artifacts(work, results):
 
 def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False):
     focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
+    profile_transport = qualification_profile_transport(os.environ)
+    if profile_transport == "tls" and not installer_continuation:
+        raise ValueError("TLS profile fixture transport requires the installed CPU continuation")
     profile_variant = qualification_profile_variant(os.environ)
     if profile_variant == "accepted-heavy" and not installer_continuation:
         raise ValueError("Accepted-heavy requires the installed comparison continuation")
@@ -566,6 +577,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             report["installedHistoryBrowserQualification"] = collector_qualification and focus == "approved-recording"
             report["installedProfileComparisonBrowserQualification"] = collector_qualification and focus == "profile-comparison"
             report["installedHeapBrowserQualification"] = collector_qualification and focus == "manual-profile" and profile_variant == "heap"
+            report["installedProfileTransport"] = profile_transport if collector_qualification and focus == "manual-profile" else None
             report["installedProfileVariant"] = profile_variant if collector_qualification and focus in ("manual-profile","profile-comparison") else None
             report["installedPolicyRecordingFocus"] = collector_qualification and focus == "policy-recording"
             report["installedPolicyArgumentsFocus"] = collector_qualification and focus == "policy-arguments"
@@ -715,6 +727,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     time.sleep(.25)
                 else: raise RuntimeError("fixture did not become ready")
             fixture = {"s3": "http://"+s3ip+":8333", "kms": "http://"+baoip+":8200", "postgres":dsn, "postgresContainer": pgname, "nativeProviders":native_providers, "clusters": []}
+            if profile_transport == "tls":
+                tls_directory = work/"profile-tls"
+                tls_directory.mkdir(mode=0o700)
+                fixture["ProfileTLSDirectory"] = str(tls_directory)
             if containment_fixture is not None:
                 fixture["ProfileContainment"] = containment_fixture
             if native_paced:

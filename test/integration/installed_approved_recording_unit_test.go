@@ -40,6 +40,7 @@ func TestInstalledApprovedRecordingPublicInput(t *testing.T) {
 // one hub plus one workload cluster for this fast focus. The real service
 // assertion stays strict; this test catches shape drift without starting Kind.
 func TestInstalledApprovedRecordingFixtureShape(t *testing.T) {
+	t.Setenv("ASSERVAT_PROFILE_TRANSPORT", "http")
 	t.Setenv("ASSERVAT_PROFILE_VARIANT", "")
 	for _, tc := range []struct {
 		focus    string
