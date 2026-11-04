@@ -45,8 +45,11 @@ type installedComparisonReply struct{ installedJourneyEnvelope }
 // Two actual captures have independent case/version/grant histories. The
 // comparison caller has ordinary read scope only; SQL readback supplies no
 // source, grant or runtime authority. Every unknown call ends without replay.
-func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, publicRoot []byte, address, origin string, sources [2]installedProfileComparisonSource, check installedProfileComparisonCheck) {
+func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, publicRoot []byte, address, origin string, sources [2]installedProfileComparisonSource, check installedProfileComparisonCheck, resources ...installedComparisonResourceObserver) {
 	t.Helper()
+	if len(resources) > 1 || installedAcceptedHeavyComparison() && (len(resources) != 1 || resources[0] == nil) {
+		t.Fatal("accepted-heavy comparison requires its exact resource observer")
+	}
 	if check == nil || sources[0].CaseID == sources[1].CaseID || sources[0].ArtifactID == sources[1].ArtifactID || sources[0].Retirement == nil || sources[1].Retirement == nil {
 		t.Fatal("comparison requires two independently captured cross-case profiles and original download proofs")
 	}
@@ -99,6 +102,14 @@ func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identi
 			verify("", "")
 		}
 		operation, handle := "", ""
+		resourceObserved := false
+		if len(resources) == 1 {
+			defer func() {
+				if !resourceObserved {
+					resources[0](index, handle, operation, pair, false)
+				}
+			}()
+		}
 		// Retain early locators before browser response/render validation, so
 		// failures still attempt independent known query/key/worker inspection.
 		proofs.add(t, func() func() { return verify(handle, operation) })
@@ -216,6 +227,10 @@ func qualifyInstalledProfileComparison(t *testing.T, ctx context.Context, identi
 		want, totals, durations, err := independentInstalledProfileComparison(pair[0].Native, pair[1].Native, selection.TopN)
 		if err != nil || !reflect.DeepEqual(content.Rows, want) || content.Baseline.Total != totals[0] || content.Incident.Total != totals[1] || content.Baseline.DurationSeconds == nil || content.Incident.DurationSeconds == nil || *content.Baseline.DurationSeconds != durations[0] || *content.Incident.DurationSeconds != durations[1] {
 			t.Fatal("comparison differs from independent complete native CPU aggregation", err)
+		}
+		if len(resources) == 1 {
+			resources[0](index, handle, operation, pair, true)
+			resourceObserved = true
 		}
 		if index == 1 {
 			for _, row := range content.Rows {

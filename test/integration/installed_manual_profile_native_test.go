@@ -283,8 +283,15 @@ func qualifyManualProfileNative(t *testing.T, ctx context.Context, native []byte
 	}
 	// Disable symbol lookup: all names must come from the native artifact.
 	out, err := exec.CommandContext(ctx, "go", "tool", "pprof", "-top", "-symbolize=none", path).CombinedOutput()
-	if err != nil || !strings.Contains(string(out), "main.burnCPU") {
+	wantFunction := "main.burnCPU"
+	if installedAcceptedHeavyComparison() {
+		wantFunction = "synthetic."
+	}
+	if err != nil || !strings.Contains(string(out), wantFunction) {
 		t.Fatalf("native pprof cannot open the synthetic CPU sample: %v\n%s", err, out)
+	}
+	if installedAcceptedHeavyComparison() {
+		t.Log("accepted-heavy synthetic pprof input opened locally; this is worker containment input, not sampled application CPU or overhead qualification")
 	}
 	if err := os.WriteFile(prefix+"-pprof.txt", out, 0600); err != nil {
 		t.Fatal(err)

@@ -579,9 +579,18 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					var sources []installedProfileComparisonSource
 					for index := 0; index < 2; index++ {
 						qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, nil, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, nil, nil, installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), installedProfileCaptureContinuation{InitializeProcessing: index == 0, Captured: func(transport http.RoundTripper, source installedProfileComparisonSource) {
+							if installedAcceptedHeavyComparison() {
+								if err := acceptedHeavySourceMatches(f.ProfileContainment, index, source.Native); err != nil {
+									t.Fatal("accepted-heavy original downloaded source", err)
+								}
+							}
 							sources = append(sources, source)
 							if len(sources) == 2 {
-								qualifyInstalledProfileComparison(t, ctx, identity, transport, publicRoot, publicAddress, origin, [2]installedProfileComparisonSource{sources[0], sources[1]}, installedProfileComparisonSQLCheck(t, ctx, admin, api, p.RootID))
+								var resourceObservers []installedComparisonResourceObserver
+								if installedAcceptedHeavyComparison() {
+									resourceObservers = []installedComparisonResourceObserver{installedComparisonResources(t, ctx, admin, api, f.Clusters[0].Config, p.RootID, f.ProfileContainment)}
+								}
+								qualifyInstalledProfileComparison(t, ctx, identity, transport, publicRoot, publicAddress, origin, [2]installedProfileComparisonSource{sources[0], sources[1]}, installedProfileComparisonSQLCheck(t, ctx, admin, api, p.RootID), resourceObservers...)
 							}
 						}})
 					}
