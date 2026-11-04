@@ -95,6 +95,14 @@ Given a trigger that starts a 10-second CPU recording, when the case timeline is
 
 `get_profile_summary` MUST provide selected sample type, units, duration, total, top-N flat/cumulative functions, and symbol/completeness warnings. `compare_profiles` MUST authorize both artifacts independently, require compatible profile/sample semantics or return a mismatch, and label raw deltas versus duration-normalized rates. Default top-N 20, maximum 100. Cursors, shares, grants, output ceilings and audit rules apply normally. Summary totals, flat and cumulative values retain their signs for delta profiles. The displayed fraction is flat divided by total only when all selected sample values are nonnegative and the total is positive; otherwise it is null, not a fabricated zero or an absolute-value normalization.
 
+The browser uses saved acquisition metadata to suggest an editable summary sample
+type: `inuse_space` for heap profiles, with the existing `cpu` default for CPU or
+unknown profile types. This initial selection does not establish native sample
+semantics or units; units come only from the verified query result. Metadata
+rerenders preserve the user's input for the same case/artifact/version, while
+switching immutable sources resets the suggestion. Opening the view makes no
+query or endpoint probe.
+
 Comparison MUST preserve baseline/incident identity, build changes, profiling configuration and normalization method. Do not claim statistical significance or a definitive regression from one short sample. A shared recipient cannot compare against an unshared baseline or learn its existence. Access to approved aggregates is extract access; arbitrary label/raw sample inspection needs the appropriate raw grant.
 
 [ADR-295](../docs/decisions/295-two-source-profile-comparison.md) fixes the

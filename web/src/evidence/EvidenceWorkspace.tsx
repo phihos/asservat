@@ -28,7 +28,7 @@ function SavedPodStatus({ session, scope, caseID, artifactID }: { session: Sessi
 }
 function SavedProfileSummary({ session, scope, caseID, artifact }: { session: Session; scope: AbortSignal; caseID: string; artifact: Artifact }) {
   const [controller] = useState(() => ContextProjection.profile());
-  return <ProfileSummaryView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest}/>;
+  return <ProfileSummaryView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id} version={artifact.digest} requestedType={artifact.profile_acquisition?.requested_type}/>;
 }
 function baselineCaseID(text: string): string | undefined {
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(text)) return text;

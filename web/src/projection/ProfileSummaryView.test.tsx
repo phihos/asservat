@@ -26,3 +26,28 @@ it('hides the previous result during the first render of a changed immutable sou
   const rendered = render(view(profileVersion)); fireEvent.click(screen.getByRole('button', { name: 'Inspect saved profile' })); await screen.findByRole('table');
   rendered.rerender(view('8'.repeat(64))); expect(observations).toEqual([false]); expect(client.calls).toHaveLength(1);
 });
+
+it.each([['heap', 'inuse_space'], ['cpu', 'cpu'], [undefined, 'cpu'], ['unknown-runtime-type', 'cpu']])('suggests %s acquisition sample type without querying', (requestedType, expected) => {
+  const client = new SyntheticProjection(); const controller = ContextProjection.profile(client);
+  render(<ProfileSummaryView controller={controller} session={session} scope={new AbortController().signal} caseID={id(2)} artifactID={id(3)} version={profileVersion} requestedType={requestedType}/>);
+  expect((screen.getByLabelText('Sample type') as HTMLInputElement).value).toBe(expected);
+  expect(client.calls).toHaveLength(0); expect(screen.queryByText('Unit')).toBeNull();
+});
+it('preserves a same-source edit and resets suggestions when the artifact, case or immutable version changes', () => {
+  const client = new SyntheticProjection(); const controller = ContextProjection.profile(client); const scope = new AbortController();
+  const view = (artifactID: string, version: string, requestedType?: string, caseID = id(2)) => <ProfileSummaryView controller={controller} session={session} scope={scope.signal} caseID={caseID} artifactID={artifactID} version={version} requestedType={requestedType}/>;
+  const rendered = render(view(id(3), profileVersion, 'cpu'));
+  const field = () => screen.getByLabelText('Sample type') as HTMLInputElement;
+  fireEvent.change(field(), { target: { value: 'alloc_space' } });
+  rendered.rerender(view(id(3), profileVersion, 'cpu')); expect(field().value).toBe('alloc_space');
+  // Metadata becoming available for an unchanged source must not overwrite an edit.
+  rendered.rerender(view(id(3), profileVersion, 'heap')); expect(field().value).toBe('alloc_space');
+  rendered.rerender(view(id(4), profileVersion, 'heap')); expect(field().value).toBe('inuse_space');
+  fireEvent.change(field(), { target: { value: 'inuse_objects' } });
+  rendered.rerender(view(id(4), profileVersion, 'heap')); expect(field().value).toBe('inuse_objects');
+  rendered.rerender(view(id(4), '8'.repeat(64), 'heap')); expect(field().value).toBe('inuse_space');
+  fireEvent.change(field(), { target: { value: 'alloc_objects' } });
+  rendered.rerender(view(id(4), '8'.repeat(64), 'heap', id(5))); expect(field().value).toBe('inuse_space');
+  rendered.rerender(view(id(3), profileVersion, 'cpu')); expect(field().value).toBe('cpu');
+  expect(client.calls).toHaveLength(0);
+});
