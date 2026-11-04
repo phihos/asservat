@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"reflect"
+	"slices"
 	"time"
 
 	authapp "asservat.local/asservat/internal/application/authorization"
@@ -51,5 +52,9 @@ func policyProfilePlanMatches(g authorization.Grant, plan planvalue.ContextPlan)
 	}
 	actual := child.Actions[0]
 	actual.EndpointDigest = "" // This digest includes the child's actual Pod/route.
+	// The protected require-all setting adds a review reason, not a different
+	// acquisition. Profiles already require the raw recurring grant above. Keep
+	// its frozen child scope intact and compare all collection-sensitive reasons.
+	actual.Sensitive = slices.DeleteFunc(slices.Clone(actual.Sensitive), func(code string) bool { return code == planvalue.ReasonRecordingApproval })
 	return reflect.DeepEqual(parent.Action, actual)
 }

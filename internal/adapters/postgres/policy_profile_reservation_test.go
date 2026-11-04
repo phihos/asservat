@@ -3,6 +3,7 @@ package postgres
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"slices"
 	"testing"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 
 // Real parent/child profile compilers and row decoding, with synthetic current
 // endpoint/identity/retention facts. SQL admission is qualified separately.
-func compiledPolicyProfileGrant(t *testing.T) (authorization.Grant, planning.ContextPlan) {
+func compiledPolicyProfileGrant(t *testing.T, requireAll ...bool) (authorization.Grant, planning.ContextPlan) {
 	t.Helper()
 	p := previewTestValue(t)
 	row := compiledProfileReplayRow(t)
@@ -31,6 +32,12 @@ func compiledPolicyProfileGrant(t *testing.T) (authorization.Grant, planning.Con
 	child, err := compiler.ProfileContextFor(expected.Profile)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(requireAll) == 1 && requireAll[0] {
+		child.RequireApproval = true
+		child.Composition.Components[0].Edits = []planning.ProfileEdit{{ActionID: "cpu", Field: "actionMaxBytes", Number: 4 << 20}}
+		child.Composition.MaxTotalBytes = 4 << 20
+		child.Endpoints[0].Request.NativeLimit = 4 << 20
 	}
 	r := child.Endpoints[0].Request
 	definition := planning.GoEndpointDefinition{Source: planning.GoEndpointSource{ClusterID: r.Target.ClusterID, ResourceUID: p.ID, Name: "go-pprof-loopback", Digest: artifact.Digest{17}}, Host: "localhost", PathPolicy: planning.GoEndpointPathPolicy, AddressModes: []string{"targetLoopback"}, MinimumPort: 6000, MaximumPort: 6999, LoopbackFamily: "ipv4"}
@@ -77,6 +84,43 @@ func compiledPolicyProfileGrant(t *testing.T) (authorization.Grant, planning.Con
 		t.Fatal("actual policy profile child compiler", err)
 	}
 	return g, plan
+}
+
+func TestPolicyProfileGrantMatchesProtectedRequireAllAndEditedNativeLimit(t *testing.T) {
+	g, plan := compiledPolicyProfileGrant(t, true)
+	child, err := compiler.ProfilePlanForContext(plan)
+	if err != nil || !slices.Contains(child.Actions[0].Sensitive, planning.ReasonRecordingApproval) || !plan.Input.Profile.RequireApproval {
+		t.Fatal("fixture lost protected require-all policy", err)
+	}
+	acquisition, _, err := compiler.ProfileForContext(plan)
+	if err != nil || acquisition.MaxBytes != 4<<20 || !policyProfileAcquisitionMatches(g, &acquisition, plan.RecipeDigest) {
+		t.Fatal("edited profile native reservation differs", err)
+	}
+	if !policyProfilePlanMatches(g, plan) {
+		t.Fatal("current protected require-all reason refused an otherwise exact recurring profile")
+	}
+	if !slices.Contains(child.Actions[0].Sensitive, planning.ReasonRecordingApproval) || !compiler.VerifyFrozenContextPlan(plan) {
+		t.Fatal("comparison changed the protected child action or frozen plan")
+	}
+	var scope map[string]json.RawMessage
+	if err := json.Unmarshal(g.Scope, &scope); err != nil {
+		t.Fatal(err)
+	}
+	var policy capture.RestartPolicy
+	if err := json.Unmarshal(scope["Policy"], &policy); err != nil {
+		t.Fatal(err)
+	}
+	policy.Recorder.Action.Sensitive = append(slices.Clone(policy.Recorder.Action.Sensitive), planning.ReasonRawPackets)
+	scope["Policy"], _ = json.Marshal(policy)
+	g.Scope, _ = json.Marshal(scope)
+	g.ExecutionDigest = sha256.Sum256(g.Scope)
+	g.Policy.Authority.ScopeDigest = g.ExecutionDigest
+	if _, err := authapp.PolicyProfileGrantRecorder(g); err != nil {
+		t.Fatal("mutated complete scope did not reach action comparison", err)
+	}
+	if policyProfilePlanMatches(g, plan) {
+		t.Fatal("unrelated collection-sensitive reason ignored")
+	}
 }
 
 func TestPolicyProfileGrantMatchesExactChildAndNativeReservation(t *testing.T) {

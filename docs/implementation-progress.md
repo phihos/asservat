@@ -28,6 +28,21 @@ cancellation. The new real-SQL profile fixture is ready for execution but is not
 yet qualified. No installed policy-profile success is claimed. Local gate logs
 are retained in `test/results/policy-profile-service/`.
 
+The first frozen real-SQL run at `68025dd3` failed only the new profile positive
+admission (Go52.756s); the six existing packet/syscall modes passed. All4,031
+reported source hashes match that committed tree, unchanged sources were true
+and cleanup failures were `[]`. Originals are retained in
+`test/results/policy-profile-admission-failed-68025/`. The protected optional
+all-recordings setting adds `recordingApproval` to the concrete child's sensitive
+reasons. The new literal action comparison treated that stricter descriptive
+marker as a changed profile and refused the already-required raw policy grant.
+The focused protected-true/edited4MiB reproduction failed before the fix and
+passed after normalizing only that marker in a cloned comparison value. The
+frozen child scope, required raw/liveProfile grant, all acquisition fields and
+other sensitive reasons remain checked. Independent review and repeated
+`make pre-push` passed; the fresh real-SQL rerun remains pending. No deadline or
+approval is relaxed.
+
 Saved syscall views are merged in [PR150](https://github.com/phihos/asservat/pull/150),
 main `381820beabb16caceb3b378e5f007e094cd1dd15`. Its full tree matches qualified
 head `c6682da6`. Exact-current CI41711981343 and Gitar passed with no open findings.

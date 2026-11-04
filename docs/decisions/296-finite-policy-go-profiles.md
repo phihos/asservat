@@ -44,7 +44,11 @@ provide this workflow without another execution engine.
    scope, then match the reviewed endpoint definition, action and recipe to the
    concrete child. A recipe digest alone does not bind protected endpoint
    configuration. Keep this check inside the existing authority/quota
-   transaction; it adds no external read under locks. Pin the original grant
+   transaction; it adds no external read under locks. Preserve the installation's
+   optional `recordingApproval` marker in the frozen child scope, but normalize
+   only that marker when comparing collection actions: the profile already
+   requires independent raw/liveProfile approval under either setting. No other
+   sensitive reason or acquisition field is ignored. Pin the original grant
    through later effects, including after another grant is attached. Failed
    admissions leave no capture/custody residue; uncertain starts stay spent.
 6. Reuse the existing ordinary API execution preparation, profile dispatch,
