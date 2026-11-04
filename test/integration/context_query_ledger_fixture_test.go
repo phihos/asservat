@@ -127,6 +127,7 @@ func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin
 func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects, qualify func(*testing.T, *queryLedgerFixture), profileSource ...bool) {
 	isProfile := len(profileSource) > 0 && profileSource[0]
 	isComparison := len(profileSource) > 1 && profileSource[1]
+	legacyTiming := len(profileSource) > 2 && profileSource[2]
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 		queryLedgerQualification(t, f)
 		if isProfile {
@@ -187,7 +188,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	for _, p := range pools[processingPools:] {
 		p.Close()
 	}
-	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile)
+	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming)
 	profile := syntheticWorkerProfile(f.input.InstallationID)
 	if isProfile {
 		profile.MemoryBytes = value.ProfileSummaryWorkerBytes
@@ -225,7 +226,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 
 // Produce and independently publish an actual managed context. No download
 // session, download policy or download authority supplies query admission.
-func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.RootConfiguration, enrollment app.Enrollment, profileSource bool) (captureAdmissionScenario, artifact.PublishedContext) {
+func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.RootConfiguration, enrollment app.Enrollment, profileSource bool, legacyTiming ...bool) (captureAdmissionScenario, artifact.PublishedContext) {
 	t.Helper()
 	var s captureAdmissionScenario
 	var accepted capture.Accepted
@@ -244,6 +245,7 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 		t.Fatal(err)
 	}
 	var copies artifact.Copies
+	var acquisition artifact.AcquisitionWindow
 	if profileSource {
 		producer, err := objectstore.NewArtifactProducer(bound, f.keys, unusedStreamingJournal{}, time.Now)
 		if err != nil {
@@ -264,6 +266,7 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 			t.Fatal("synthetic profile shape", err)
 		}
 		at := time.Now().UTC()
+		acquisition = artifact.AcquisitionWindow{StartedAt: started.StartedAt.UTC().Truncate(time.Microsecond), CompletedAt: at.Truncate(time.Microsecond)}
 		copies, err = prepared.Store(f.ctx, bytes.NewReader(body.Bytes()), started.StartedAt, at)
 		clear(body.Bytes())
 		if err != nil {
@@ -338,9 +341,16 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 		}
 		publisher.Authority = gate
 	}
+	var probe profileAcquisitionPublicationProbe
+	if profileSource {
+		probe = qualifyProfileAcquisitionBeforePublication(t, f, s, publisher, check, e, copies, acquisition, len(legacyTiming) > 0 && legacyTiming[0])
+	}
 	published, err := publisher.Publish(f.ctx, e.CaptureUID, copies)
 	if err != nil {
 		t.Fatal("managed independent query source publication", err)
+	}
+	if profileSource {
+		qualifyProfileAcquisitionAfterPublication(t, f, s, publisher, check, e, copies, probe)
 	}
 	return s, published
 }

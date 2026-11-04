@@ -82,19 +82,20 @@ func (s *Store) readSmall(ctx context.Context, o Object, limit int64) ([]byte, e
 }
 
 // VerifyContext runs with regional verifier credentials. Only verified native
-// length is returned, never payload or keys, and no result is published. Bootstrap
+// length and optional profile HTTP timing are returned, never payload or keys,
+// and no result is published. Bootstrap
 // must gate this role by current execution/audit authority; the hub never receives
 // an unwrap capability.
-func (v *ContextVerifier) VerifyContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies) (int64, error) {
+func (v *ContextVerifier) VerifyContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies) (artifact.ContextVerificationResult, error) {
 	if e.NativeType != artifact.PodStatusArtifact {
 		return v.verifyStream(ctx, e, c)
 	}
 	native, err := v.readContext(ctx, e, c, e.Registration.WriteUntil)
 	clear(native)
 	if err != nil {
-		return 0, err
+		return artifact.ContextVerificationResult{}, err
 	}
-	return int64(len(native)), nil
+	return artifact.ContextVerificationResult{NativeBytes: int64(len(native))}, nil
 }
 
 // verifyBound is the verification interval: 30 seconds, plus one second per
@@ -112,17 +113,17 @@ func verifyBound(r artifact.Registration) time.Duration {
 // exact commit and manifest against the independent expectation, then every
 // authenticated frame, the whole-file native/data/index hashes and the type's
 // streaming native check. No plaintext is retained beyond one bounded record.
-func (v *ContextVerifier) verifyStream(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies) (int64, error) {
+func (v *ContextVerifier) verifyStream(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies) (artifact.ContextVerificationResult, error) {
 	cutoff := e.Registration.WriteUntil
 	ctx, cancel := context.WithDeadline(ctx, minDeadline(cutoff, time.Now().Add(verifyBound(e.Registration))))
 	defer cancel()
 	reader, m, err := v.open(ctx, e, c, cutoff)
 	if err != nil {
-		return 0, err
+		return artifact.ContextVerificationResult{}, err
 	}
 	check, err := v.contracts.NativeCheck(e, m)
 	if err != nil {
-		return 0, readStage(ctx, "validate", err)
+		return artifact.ContextVerificationResult{}, readStage(ctx, "validate", err)
 	}
 	var extra StreamCheck
 	if factory := v.extra[e.NativeType]; factory != nil {
@@ -134,36 +135,43 @@ func (v *ContextVerifier) verifyStream(ctx context.Context, e artifact.ContextEx
 			if err == nil {
 				err = artifact.ErrInvalid
 			}
-			return 0, readStage(ctx, "validate", err)
+			return artifact.ContextVerificationResult{}, readStage(ctx, "validate", err)
 		}
 	} else if e.NativeType == artifact.SyscallArgumentsArtifact {
 		// Structural native validation cannot prove the historical source.
-		return 0, readStage(ctx, "validate", artifact.ErrInvalid)
+		return artifact.ContextVerificationResult{}, readStage(ctx, "validate", artifact.ErrInvalid)
 	}
 	if err = reader.Read(ctx, 0, m.Layout.NativeBytes, checkSink{check, extra}); err != nil {
 		if extra != nil {
 			_ = extra.Close()
 		}
-		return 0, readStage(ctx, "data-read", err)
+		return artifact.ContextVerificationResult{}, readStage(ctx, "data-read", err)
 	}
 	if err = check.Close(); err != nil {
 		if extra != nil {
 			_ = extra.Close()
 		}
-		return 0, readStage(ctx, "validate", err)
+		return artifact.ContextVerificationResult{}, readStage(ctx, "validate", err)
 	}
 	if extra != nil {
 		if err = extra.Close(); err != nil {
-			return 0, readStage(ctx, "validate", errors.Join(artifact.ErrIntegrity, err))
+			return artifact.ContextVerificationResult{}, readStage(ctx, "validate", errors.Join(artifact.ErrIntegrity, err))
 		}
 	}
 	if err = ctx.Err(); err != nil {
-		return 0, readStage(ctx, "cancelled", err)
+		return artifact.ContextVerificationResult{}, readStage(ctx, "cancelled", err)
 	}
 	if !time.Now().Before(cutoff) {
-		return 0, readStage(ctx, "cutoff", artifact.ErrInvalid)
+		return artifact.ContextVerificationResult{}, readStage(ctx, "cutoff", artifact.ErrInvalid)
 	}
-	return m.Layout.NativeBytes, nil
+	result := artifact.ContextVerificationResult{NativeBytes: m.Layout.NativeBytes}
+	if e.Profile != nil && (e.NativeType == artifact.PprofArtifact || e.NativeType == artifact.GoTraceArtifact) {
+		result.Acquisition = &artifact.AcquisitionWindow{StartedAt: m.StartedAt.UTC().Truncate(time.Microsecond), CompletedAt: m.CompletedAt.UTC().Truncate(time.Microsecond)}
+	}
+	if !result.Valid(e) {
+		return artifact.ContextVerificationResult{}, readStage(ctx, "validate", artifact.ErrIntegrity)
+	}
+	return result, nil
 }
 
 type checkSink struct {

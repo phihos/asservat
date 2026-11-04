@@ -245,3 +245,14 @@ separate child observation. Full hash-pinned grant scope is matched to that chil
 inside atomic admission. No new component, durable table, worker kind, listener,
 credential or ongoing observation lease is introduced. Actual implementation and
 qualification are tracked in [implementation progress](../implementation-progress.md).
+
+
+## Verified case acquisition metadata
+
+[ADR-297](../decisions/297-verified-profile-acquisition-metadata.md) passes the
+existing authenticated profile manifest interval through verification, immutable
+audit and the already joined catalog projection into C16 metadata. The interval
+is HTTP acquisition, with UTC microsecond display precision and unknown
+cross-source clock uncertainty/process attribution. It adds no object/key reads
+or raw authority to case lookup; legacy records remain unknown. Qualification is
+tracked in [implementation progress](../implementation-progress.md).

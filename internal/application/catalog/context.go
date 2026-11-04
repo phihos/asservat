@@ -167,7 +167,7 @@ func (s ContextCaseService) getContextCase(ctx context.Context, source identitie
 			until = identity.Earlier(until, at)
 		}
 		retained.ExpiresAt = resolved.ExpiresAt
-		records = append(records, authorizedContext{artifact: value.ContextCaseArtifact{Namespace: record.Namespace, WorkloadKind: record.WorkloadKind, WorkloadName: record.WorkloadName, PodName: record.PodName, NativeBytes: record.NativeBytes, ArtifactID: route.ArtifactID, CaptureID: route.CaptureID, Target: route.Target, Version: record.Version, ExpiresAt: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Shared: share != nil, EvidenceType: r.Input.EvidenceType, NativeType: record.NativeType, DataClass: record.DataClass}, retained: retained, permission: p.Revision, record: record, processing: processing, share: share})
+		records = append(records, authorizedContext{artifact: value.ContextCaseArtifact{Namespace: record.Namespace, WorkloadKind: record.WorkloadKind, WorkloadName: record.WorkloadName, PodName: record.PodName, NativeBytes: record.NativeBytes, ProfileAcquisition: cloneProfileAcquisition(record.ProfileAcquisition), ArtifactID: route.ArtifactID, CaptureID: route.CaptureID, Target: route.Target, Version: record.Version, ExpiresAt: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Shared: share != nil, EvidenceType: r.Input.EvidenceType, NativeType: record.NativeType, DataClass: record.DataClass}, retained: retained, permission: p.Revision, record: record, processing: processing, share: share})
 	}
 	if len(records) == 0 {
 		return zero, value.ErrUnavailable
@@ -257,4 +257,14 @@ func sameSet(a, b []string) bool {
 	slices.Sort(a)
 	slices.Sort(b)
 	return slices.Equal(a, b)
+}
+
+// The case owns its small metadata snapshot, independent of mutable adapter rows.
+func cloneProfileAcquisition(p *artifact.ProfileAcquisitionMetadata) *artifact.ProfileAcquisitionMetadata {
+	if p == nil {
+		return nil
+	}
+	out := *p
+	out.Acquisition = p.Acquisition.Clone()
+	return &out
 }

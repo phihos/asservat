@@ -55,11 +55,13 @@ try {
   const seen = [];
   let compareRequests = 0;
   let pollRequests = 0;
+  let caseRequests = 0;
   page.on('pageerror', () => errors.push('pageerror'));
   page.on('request', request => {
     const path = new URL(request.url()).pathname;
     if (path === '/api/v1/operations/compare_profiles') compareRequests++;
     if (path === '/api/v1/operations/get_query_result') pollRequests++;
+    if (path === '/api/v1/operations/get_case') caseRequests++;
     if (path.startsWith('/api/')) timeline.push(`+${Date.now() - started}ms request ${request.method()} ${path}`);
   });
   page.on('response', response => {
@@ -125,10 +127,56 @@ try {
   const caseFrom = seen.length;
   await page.goto(config.origin + '/cases/' + config.caseID);
   stage = 'case-response';
-  await observed('get_case', caseFrom);
+  const caseResponse = await observed('get_case', caseFrom);
   assert(caseDiagnostic?.schema && caseDiagnostic.status === 'ok' && caseDiagnostic.caseMatch && caseDiagnostic.relational && caseDiagnostic.access === 'ordinary' && caseDiagnostic.selectedPresent && caseDiagnostic.eligibleProfiles === 1, 'current ordinary profile case');
   stage = 'case-heading';
   await expect(page.getByRole('heading', { name: 'Evidence', exact: true })).toBeVisible();
+  stage = 'case-profile-timing';
+  const timing = page.getByRole('table', { name: 'Profile collection timing', exact: true });
+  await expect(timing).toBeVisible();
+  const profiles = caseResponse.reply.data.artifacts.filter(artifact => artifact.kind === 'profile');
+  await expect(timing.getByRole('row')).toHaveCount(profiles.length + 1);
+  for (const artifact of profiles) {
+    const row = timing.getByRole('rowheader', { name: artifact.artifact_id, exact: true }).locator('..');
+    await expect(row).toHaveCount(1);
+    const cells = row.getByRole('cell');
+    await expect(cells).toHaveCount(3);
+    const acquisition = artifact.profile_acquisition;
+    if (acquisition) {
+      await expect(cells.nth(0)).toContainText(`${acquisition.requested_type} · ${acquisition.mode}`);
+      await expect(cells.nth(0)).toContainText(acquisition.requested_duration_ms === null ? 'No requested interval' : `Requested duration: ${acquisition.requested_duration_ms / 1000} s`);
+      await expect(cells.nth(0)).toContainText(acquisition.force_gc ? 'Forced GC requested' : 'Forced GC not requested');
+    } else {
+      await expect(cells.nth(0)).toHaveText('Request parameters unavailable');
+    }
+    if (acquisition?.started_at !== null && acquisition?.started_at !== undefined) {
+      const times = cells.nth(1).locator('time');
+      await expect(times).toHaveCount(2);
+      await expect(times).toHaveText([acquisition.started_at, acquisition.completed_at]);
+      await expect(times.nth(0)).toHaveAttribute('datetime', acquisition.started_at);
+      await expect(times.nth(1)).toHaveAttribute('datetime', acquisition.completed_at);
+    } else {
+      await expect(cells.nth(1)).toHaveText('Unknown');
+      await expect(cells.nth(1).locator('time')).toHaveCount(0);
+    }
+    await expect(cells.nth(2)).toHaveText(artifact.target?.pod_uid ?? 'Unknown');
+  }
+  await expect(page.getByText('Go endpoint profiles are collected on trigger and do not provide a pre-trigger recording. Requested duration describes the request. HTTP acquisition does not establish the precise sample interval or cumulative history.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Clock uncertainty and serving process attribution are unknown. Matching Pod identity does not prove the same process or restart. Times use UTC with up to microsecond precision.', { exact: true })).toBeVisible();
+  async function assertTimingMobile() {
+    await page.evaluate(() => document.fonts.ready);
+    for (const width of [375, 320]) {
+      await page.setViewportSize({ width, height: 740 });
+      const layout = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth, timing: document.querySelector('table[aria-label="Profile collection timing"]').getBoundingClientRect().width }));
+      process.stderr.write('installed comparison timing mobile ' + JSON.stringify(layout) + '\n');
+      assert(layout.document <= layout.viewport, 'profile collection timing preserves page width after fonts load');
+      await expect(timing).toBeVisible();
+      await expect(timing.getByRole('row')).toHaveCount(profiles.length + 1);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+  }
+  stage = 'case-profile-timing-mobile';
+  await assertTimingMobile();
   stage = 'case-profile-region';
   const panel = page.getByRole('region', { name: 'Saved profile comparison', exact: true });
   await expect(panel).toHaveCount(1, { timeout: 30_000 }); // Two captures are in separate real cases.
@@ -143,6 +191,7 @@ try {
   stage = 'case-compare-enabled';
   await expect(panel.getByRole('button', { name: 'Compare profiles', exact: true })).toBeEnabled();
   assert.equal(compareRequests + pollRequests, 0, 'no automatic query on case load or selection');
+  assert.equal(caseRequests, 1, 'timing uses the original case response');
   event({ kind: 'ready' });
   let handle;
   let terminal = false;
@@ -152,6 +201,8 @@ try {
     const next = await command();
     if (next.kind === 'close') {
       assert(terminal && compareRequests === 1 && pollRequests <= 4, 'exact original query count');
+      assert.equal(caseRequests, 1, 'no extra timing metadata read');
+      await expect(timing).toBeVisible();
       await expect(panel.getByRole('table', { name: 'Profile acquisition details', exact: true })).toBeVisible();
       const table = panel.getByRole('table', { name: 'Profile comparison function costs', exact: true });
       await expect(table).toBeVisible();
@@ -161,6 +212,8 @@ try {
           row.function ?? 'Unresolved', row.baseline.toLocaleString('en-US'), row.incident.toLocaleString('en-US'), row.delta.toLocaleString('en-US'),
         ]);
       }
+      stage = 'result-profile-timing-mobile';
+      await assertTimingMobile();
       assert.deepEqual(errors, []);
       assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
       complete = true;

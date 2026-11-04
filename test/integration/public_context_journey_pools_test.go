@@ -237,13 +237,13 @@ func (p *publicJourneyPublication) AcceptedContextForPublication(ctx context.Con
 	}
 	return out, err
 }
-func (p *publicJourneyPublication) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, copies artifact.Copies, authority artifact.PublicationAuthority, nativeBytes int64) (audit.ContextVerification, error) {
+func (p *publicJourneyPublication) RecordContextVerification(ctx context.Context, e artifact.ContextExpectation, copies artifact.Copies, authority artifact.PublicationAuthority, verified artifact.ContextVerificationResult) (audit.ContextVerification, error) {
 	if p.step != 1 || p.pool == nil || p.verify == nil {
 		return audit.ContextVerification{}, privacy.ErrUnavailable
 	}
 	p.step = 2
 	defer p.Close()
-	out, err := p.verify.RecordContextVerification(ctx, e, copies, authority, nativeBytes)
+	out, err := p.verify.RecordContextVerification(ctx, e, copies, authority, verified)
 	p.note(ctx, err)
 	return out, err
 }

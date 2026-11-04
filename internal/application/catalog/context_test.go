@@ -294,3 +294,71 @@ func TestContextCasePreservesVerifiedOrUnknownNativeLength(t *testing.T) {
 		}
 	}
 }
+
+func TestProfileAcquisitionCaseUsesExistingAuthorizedReadAndOwnsSnapshot(t *testing.T) {
+	for _, known := range []bool{false, true} {
+		t.Run(fmt.Sprint(known), func(t *testing.T) {
+			f, s := newCaseFixture()
+			f.record.Retained.Input.EvidenceType = "profile"
+			f.record.NativeType, f.record.DataClass = artifact.PprofArtifact, "raw"
+			p := &artifact.ProfileAcquisitionMetadata{Type: "cpu", Mode: "interval", DurationMillis: 10000}
+			if known {
+				p.Acquisition = &artifact.AcquisitionWindow{StartedAt: f.now.Add(-11 * time.Second), CompletedAt: f.now.Add(-time.Second)}
+			}
+			f.record.ProfileAcquisition = p
+			got, err := s.GetContextCase(t.Context(), f, f.routes.CaseID)
+			if err != nil || len(got.Artifacts) != 1 {
+				t.Fatal(err)
+			}
+			actual := got.Artifacts[0].ProfileAcquisition
+			if actual == nil || actual == p || !reflect.DeepEqual(actual, p) {
+				t.Fatal("accepted metadata missing or aliased", actual)
+			}
+			if f.catalogReads != 1 || f.retentionReads != 1 {
+				t.Fatal("profile timing introduced another read", f.catalogReads, f.retentionReads)
+			}
+			p.Type = "private-mutated-input"
+			if actual.Type != "cpu" {
+				t.Fatal("case metadata aliases source")
+			}
+			if known {
+				p.Acquisition.StartedAt = f.now
+				if actual.Acquisition == p.Acquisition || !actual.Acquisition.StartedAt.Equal(f.now.Add(-11*time.Second)) {
+					t.Fatal("window aliases source")
+				}
+			} else if actual.Acquisition != nil {
+				t.Fatal("legacy timing invented")
+			}
+		})
+	}
+}
+
+func TestProfileAcquisitionCaseRefusesMalformedMetadataAndCurrentDenial(t *testing.T) {
+	for _, which := range []string{"partial", "reversed", "non-profile", "wrong-native", "invalid-parameters", "current-denial"} {
+		t.Run(which, func(t *testing.T) {
+			f, s := newCaseFixture()
+			f.record.Retained.Input.EvidenceType = "profile"
+			f.record.NativeType, f.record.DataClass = artifact.PprofArtifact, "raw"
+			p := &artifact.ProfileAcquisitionMetadata{Type: "heap", Mode: "snapshot", ForceGC: true, Acquisition: &artifact.AcquisitionWindow{StartedAt: f.now.Add(-time.Second), CompletedAt: f.now}}
+			f.record.ProfileAcquisition = p
+			switch which {
+			case "partial":
+				p.Acquisition.CompletedAt = time.Time{}
+			case "reversed":
+				p.Acquisition.CompletedAt = p.Acquisition.StartedAt.Add(-time.Microsecond)
+			case "non-profile":
+				f.record.Retained.Input.EvidenceType = "context"
+			case "wrong-native":
+				f.record.NativeType = artifact.GoTraceArtifact
+			case "invalid-parameters":
+				p.DurationMillis = 10000
+			case "current-denial":
+				f.afterRetention = func() { f.p.Denies = f.p.Allows }
+			}
+			got, err := s.GetContextCase(t.Context(), f, f.routes.CaseID)
+			if err != value.ErrUnavailable || len(got.Artifacts) != 0 {
+				t.Fatal("invalid or denied profile metadata escaped", err)
+			}
+		})
+	}
+}

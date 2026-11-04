@@ -223,6 +223,15 @@ func refuseRetainedProfileSummaryDowngrade(t *testing.T, f *queryLedgerFixture) 
 			stop, refusal = 130, "retained native-length verification prevents rollback"
 		}
 	}
+	if head >= 134 {
+		var retainedTiming bool
+		if err = f.base.admin.QueryRow(f.base.ctx, "SELECT EXISTS(SELECT 1 FROM context_verification WHERE acquisition_started_at IS NOT NULL)").Scan(&retainedTiming); err != nil {
+			t.Fatal("retained acquisition-window observation", err)
+		}
+		if retainedTiming {
+			stop, refusal = 134, "retained acquisition-window verification prevents rollback"
+		}
+	}
 	// Exclude only133's nullable route column so the snapshot compares the
 	// same immutable queries and spend across the supported schema prefix.
 	snapshot := func(ctx context.Context) (string, error) {
@@ -230,6 +239,13 @@ func refuseRetainedProfileSummaryDowngrade(t *testing.T, f *queryLedgerFixture) 
 		err := f.base.admin.QueryRow(ctx, `SELECT jsonb_build_object('queries',(SELECT jsonb_agg(to_jsonb(q)-'baseline_allocation_id' ORDER BY q.id) FROM context_query q WHERE q.root_id=$1),'backing',(SELECT to_jsonb(b) FROM context_query_backing b WHERE b.root_id=$1),'allocations',(SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id) FROM context_query_allocation a WHERE a.root_id=$1))`, f.base.input.PermissionRootID).Scan(&b)
 		if err != nil {
 			return "", err
+		}
+		if stop == 134 {
+			var verification []byte
+			if err = f.base.admin.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(v) ORDER BY capture_id) FROM context_verification v WHERE root_id=$1`, f.base.input.PermissionRootID).Scan(&verification); err != nil {
+				return "", err
+			}
+			return string(b) + "\n" + string(verification), nil
 		}
 		if stop == 130 {
 			var sizes []byte

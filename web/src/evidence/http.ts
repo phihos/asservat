@@ -59,6 +59,17 @@ export const operations: Operations = {
       if (!validators[`validOutput_${name}`](value)) throw new OperationFailure(502);
       const result = value as Output<N>;
       if (result.data_class !== 'metadata' || result.truncated || result.next_cursor !== null) throw new OperationFailure(502);
+      if (name === 'get_case' && result.status === 'ok') {
+        const details = result.data as CaseDetails;
+        for (const artifact of details.artifacts) {
+          const acquisition = artifact.profile_acquisition;
+          if (!acquisition) continue;
+          if (artifact.kind !== 'profile' || artifact.data_class !== 'raw' || artifact.native_format !== (acquisition.requested_type === 'runtimeTrace' ? 'go-trace' : 'pprof') || (acquisition.started_at === null) !== (acquisition.completed_at === null)) throw new OperationFailure(502);
+          // The closed schema supplies UTC timestamps with at most six decimal
+          // places. Compare padded fractions to retain sub-millisecond ordering.
+          if (acquisition.started_at !== null && acquisition.completed_at !== null && acquisitionTimeKey(acquisition.started_at) > acquisitionTimeKey(acquisition.completed_at)) throw new OperationFailure(502);
+        }
+      }
       return result;
     } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
   },
@@ -71,4 +82,8 @@ export function operationMessage(error: unknown): string {
   if (error instanceof OperationFailure && [401, 403, 404].includes(error.status)) return 'This request is unavailable or your access could not be checked. Check your access and try again.';
   if (error instanceof OperationFailure && error.status === 400) return 'This evidence request could not be accepted. Refresh the details and try again.';
   return 'The evidence service is unavailable. Your administrator can check whether evidence access and native downloads are enabled.';
+}
+
+function acquisitionTimeKey(value: string): string {
+  return value.slice(0, 19) + '.' + value.slice(20, -1).padEnd(6, '0');
 }

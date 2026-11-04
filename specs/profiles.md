@@ -73,6 +73,18 @@ Profiles MAY be captured periodically as low-frequency baselines through an expl
 
 Cases link profile intervals to metric/log/probe intervals using target identity and source-clock uncertainty. A profile from a different process restart is labeled a different instance. Baseline retention consumes the same budgets and follows the same sharing/expiry rules as incident evidence. No continuous cluster-wide profiling backend is a hard dependency.
 
+[ADR-297](../docs/decisions/297-verified-profile-acquisition-metadata.md) retains
+collector-observed Go endpoint acquisition times only after complete native and
+manifest verification, through existing verification audit/catalog metadata.
+Display windows use explicit UTC microsecond precision; the sealed originals
+remain unchanged. The window covers HTTP acquisition, not precise sampling or
+cumulative counter history. Legacy windows and clock uncertainty remain unknown.
+A preparation/queue/storage timestamp or workload-supplied pprof timestamp is
+never substituted for a verified acquisition window. Pod identity does not
+establish serving-process identity or restart continuity. Cases may show known
+different Pods without claiming known different server processes. No additional
+case-time artifact/key read or disclosure authority is introduced.
+
 ### SC-PRF-004
 
 Given a trigger that starts a 10-second CPU recording, when the case timeline is built, then the profile is marked post-trigger. A baseline from the prior container restart remains separate and cannot be silently treated as the same process.

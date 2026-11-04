@@ -76,6 +76,26 @@ function Handling({ artifact }: { artifact: Artifact }) {
     <dl className="facts"><dt>Access until</dt><dd>{date(notice.expiresAt)}</dd><dt>Managed deletion</dt><dd>{notice.deletionState === 'verified' ? 'Deletion verified' : notice.deletionState === 'restrictedPreservation' ? 'Restricted preservation applies' : notice.deletionState === 'overdue' ? 'Deletion overdue; administrator action is needed' : notice.deletionState === 'unknown' ? 'Deletion status is unavailable' : `By ${date(notice.deleteBy)}${notice.deletionState === 'inProgress' ? ' · in progress' : ''}`}</dd></dl>
   </>;
 }
+function ProfileCollectionTiming({ artifacts }: { artifacts: Artifact[] }) {
+  const profiles = artifacts.filter(artifact => artifact.kind === 'profile');
+  if (profiles.length === 0) return null;
+  return <section aria-labelledby="profile-collection-timing">
+    <h2 id="profile-collection-timing">Profile collection timing</h2>
+    <p>Go endpoint profiles are collected on trigger and do not provide a pre-trigger recording. Requested duration describes the request. HTTP acquisition does not establish the precise sample interval or cumulative history.</p>
+    <p>Clock uncertainty and serving process attribution are unknown. Matching Pod identity does not prove the same process or restart. Times use UTC with up to microsecond precision.</p>
+    <table className="profile-summary" aria-label="Profile collection timing"><thead><tr><th scope="col">Profile</th><th scope="col">Requested collection</th><th scope="col">HTTP acquisition window (UTC)</th><th scope="col">Pod identity</th></tr></thead>
+      <tbody>{profiles.map(artifact => {
+        const acquisition = artifact.profile_acquisition;
+        return <tr key={artifact.artifact_id}>
+          <th scope="row" className="identifier">{artifact.artifact_id}</th>
+          <td>{acquisition ? <>{acquisition.requested_type} · {acquisition.mode}<br/>{acquisition.requested_duration_ms === null ? 'No requested interval' : `Requested duration: ${acquisition.requested_duration_ms / 1000} s`}<br/>{acquisition.force_gc ? 'Forced GC requested' : 'Forced GC not requested'}</> : 'Request parameters unavailable'}</td>
+          <td>{acquisition?.started_at && acquisition.completed_at ? <>Started: <time dateTime={acquisition.started_at}>{acquisition.started_at}</time><br/>Completed: <time dateTime={acquisition.completed_at}>{acquisition.completed_at}</time></> : 'Unknown'}</td>
+          <td>{artifact.target?.pod_uid ?? 'Unknown'}</td>
+        </tr>;
+      })}</tbody>
+    </table>
+  </section>;
+}
 export default function EvidenceWorkspace({ session, scope, caseID, controller = evidenceController }: { session: Session; scope: AbortSignal; caseID: string; controller?: Evidence }) {
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -153,6 +173,7 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
         </div>}
       </section>}
     {state.details && <>
+      <ProfileCollectionTiming artifacts={state.details.artifacts}/>
       {state.details.timeline.length > 0 && <details className="retention-edit"><summary>Collection timeline</summary><ul>{state.details.timeline.map((event, index) => <li key={index}><time dateTime={event.time}>{date(event.time)}</time> — {event.summary}{event.clock_uncertainty_ms ? ` (clock uncertainty up to ${event.clock_uncertainty_ms} ms)` : ''}</li>)}</ul></details>}
       <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.refresh()}>Refresh evidence details</Button>
     </>}

@@ -1212,23 +1212,25 @@ type ContextStorageBinding struct {
 }
 
 type ContextVerification struct {
-	CaptureID           pgtype.UUID
-	RootID              pgtype.UUID
-	ExpectationDigest   []byte
-	CopiesDigest        []byte
-	IntentDigest        []byte
-	AuthorityDigest     []byte
-	PermissionEpoch     pgtype.UUID
-	PermissionSequence  int64
-	VerifiedAt          pgtype.Timestamptz
-	AuditAcknowledgedAt pgtype.Timestamptz
-	AuditDigest         []byte
-	AuditObjectKey      pgtype.Text
-	AuditObjectVersion  pgtype.Text
-	AuditObjectEtag     pgtype.Text
-	AuditObjectBytes    pgtype.Int8
-	AuditObjectSha256   []byte
-	NativeBytes         pgtype.Int8
+	CaptureID              pgtype.UUID
+	RootID                 pgtype.UUID
+	ExpectationDigest      []byte
+	CopiesDigest           []byte
+	IntentDigest           []byte
+	AuthorityDigest        []byte
+	PermissionEpoch        pgtype.UUID
+	PermissionSequence     int64
+	VerifiedAt             pgtype.Timestamptz
+	AuditAcknowledgedAt    pgtype.Timestamptz
+	AuditDigest            []byte
+	AuditObjectKey         pgtype.Text
+	AuditObjectVersion     pgtype.Text
+	AuditObjectEtag        pgtype.Text
+	AuditObjectBytes       pgtype.Int8
+	AuditObjectSha256      []byte
+	NativeBytes            pgtype.Int8
+	AcquisitionStartedAt   pgtype.Timestamptz
+	AcquisitionCompletedAt pgtype.Timestamptz
 }
 
 type ContextWriterCompletion struct {

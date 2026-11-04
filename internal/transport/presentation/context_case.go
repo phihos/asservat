@@ -84,17 +84,34 @@ type ContextCaseTargetData struct {
 	WorkloadName string `json:"workload_name,omitempty"`
 	PodName      string `json:"pod_name,omitempty"`
 }
+
+// ProfileAcquisitionData describes the endpoint HTTP fetch, not a sample-history
+// window or proof that two artifacts came from the same serving process.
+type ProfileAcquisitionData struct {
+	RequestedType           string     `json:"requested_type"`
+	Mode                    string     `json:"mode"`
+	RequestedDurationMillis *int64     `json:"requested_duration_ms"`
+	ForceGC                 bool       `json:"force_gc"`
+	ExecutionMode           string     `json:"execution_mode"`
+	StartedAt               *time.Time `json:"started_at"`
+	CompletedAt             *time.Time `json:"completed_at"`
+	ClockUncertaintyMillis  *int64     `json:"clock_uncertainty_ms"`
+	ProcessAttribution      string     `json:"process_attribution"`
+	WindowKind              string     `json:"window_kind"`
+	TimestampPrecision      string     `json:"timestamp_precision"`
+}
 type ContextCaseArtifactData struct {
-	VerifiedNativeBytes *int64                 `json:"verified_native_bytes,omitempty"`
-	Target              ContextCaseTargetData  `json:"target"`
-	NativeFormat        string                 `json:"native_format,omitempty"`
-	ArtifactID          string                 `json:"artifact_id"`
-	Digest              string                 `json:"digest"`
-	Kind                string                 `json:"kind"`
-	DataClass           string                 `json:"data_class"`
-	Completeness        string                 `json:"completeness"`
-	ExpiresAt           time.Time              `json:"expires_at"`
-	HandlingNotice      ArtifactHandlingNotice `json:"handling_notice"`
+	ProfileAcquisition  *ProfileAcquisitionData `json:"profile_acquisition,omitempty"`
+	VerifiedNativeBytes *int64                  `json:"verified_native_bytes,omitempty"`
+	Target              ContextCaseTargetData   `json:"target"`
+	NativeFormat        string                  `json:"native_format,omitempty"`
+	ArtifactID          string                  `json:"artifact_id"`
+	Digest              string                  `json:"digest"`
+	Kind                string                  `json:"kind"`
+	DataClass           string                  `json:"data_class"`
+	Completeness        string                  `json:"completeness"`
+	ExpiresAt           time.Time               `json:"expires_at"`
+	HandlingNotice      ArtifactHandlingNotice  `json:"handling_notice"`
 }
 type ContextCaseData struct {
 	Case      ContextCaseSummary        `json:"case"`
@@ -157,7 +174,7 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 			if typ, known := artifact.LookupNativeType(a.NativeType); known && typ.EvidenceType == a.EvidenceType && typ.AllowsClass(a.DataClass) {
 				nativeFormat = typ.Format
 			}
-			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{VerifiedNativeBytes: a.NativeBytes, Target: ContextCaseTargetData{ClusterID: a.Target.ClusterID, NamespaceUID: a.Target.NamespaceUID, WorkloadUID: a.Target.WorkloadUID, PodUID: a.Target.PodUID, Namespace: a.Namespace, WorkloadKind: a.WorkloadKind, WorkloadName: a.WorkloadName, PodName: a.PodName}, NativeFormat: nativeFormat, ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
+			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{ProfileAcquisition: profileAcquisitionData(a.ProfileAcquisition), VerifiedNativeBytes: a.NativeBytes, Target: ContextCaseTargetData{ClusterID: a.Target.ClusterID, NamespaceUID: a.Target.NamespaceUID, WorkloadUID: a.Target.WorkloadUID, PodUID: a.Target.PodUID, Namespace: a.Namespace, WorkloadKind: a.WorkloadKind, WorkloadName: a.WorkloadName, PodName: a.PodName}, NativeFormat: nativeFormat, ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: listedDataClass(a.DataClass), Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: listedMayContain(a.DataClass), ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
 		}
 		out.Data = data
 	}
@@ -198,4 +215,20 @@ func listedMayContain(c string) []string {
 		return []string{"personalIdentifiers"}
 	}
 	return []string{"personalIdentifiers", "networkAddresses", "paths"}
+}
+
+func profileAcquisitionData(p *artifact.ProfileAcquisitionMetadata) *ProfileAcquisitionData {
+	if p == nil {
+		return nil
+	}
+	out := &ProfileAcquisitionData{RequestedType: p.Type, Mode: p.Mode, ForceGC: p.ForceGC, ExecutionMode: "onTrigger", ProcessAttribution: "unknown", WindowKind: "httpAcquisition", TimestampPrecision: "microsecond"}
+	if p.DurationMillis != 0 {
+		duration := p.DurationMillis
+		out.RequestedDurationMillis = &duration
+	}
+	if p.Acquisition != nil {
+		start, end := p.Acquisition.StartedAt, p.Acquisition.CompletedAt
+		out.StartedAt, out.CompletedAt = &start, &end
+	}
+	return out
 }

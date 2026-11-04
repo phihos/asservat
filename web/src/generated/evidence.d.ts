@@ -68,7 +68,7 @@ export interface components {
                     /** Format: uuid */
                     cluster_id?: string;
                 };
-                artifacts: {
+                artifacts: ({
                     /** Format: uuid */
                     artifact_id: string;
                     /** @description Immutable verified artifact version. For the current pod-status artifact this is SHA-256 of the existing serialized verified ciphertext copy receipts, not the native file checksum. The prepared download supplies the native SHA-256 separately. */
@@ -95,7 +95,81 @@ export interface components {
                         workload_name?: string;
                         pod_name?: string;
                     };
-                }[];
+                    /** @description Accepted request parameters and authenticated HTTP acquisition timing, not the sample interval or cumulative history. Legacy timing, clock uncertainty and serving-process attribution may be unknown. */
+                    profile_acquisition?: {
+                        /** @enum {string} */
+                        requested_type: "cpu" | "heap" | "allocs" | "goroutine" | "block" | "mutex" | "threadcreate" | "runtimeTrace";
+                        /** @enum {string} */
+                        mode: "interval" | "snapshot" | "cumulative" | "delta";
+                        requested_duration_ms: number | null;
+                        force_gc: boolean;
+                        /** @constant */
+                        execution_mode: "onTrigger";
+                        /** Format: date-time */
+                        started_at: string | null;
+                        /** Format: date-time */
+                        completed_at: string | null;
+                        clock_uncertainty_ms: null;
+                        /** @constant */
+                        process_attribution: "unknown";
+                        /** @constant */
+                        window_kind: "httpAcquisition";
+                        /** @constant */
+                        timestamp_precision: "microsecond";
+                    } & (({
+                        /** @enum {unknown} */
+                        requested_type?: "cpu";
+                        /** @constant */
+                        mode?: "interval";
+                        requested_duration_ms?: number;
+                        /** @constant */
+                        force_gc?: false;
+                    } | {
+                        /** @enum {unknown} */
+                        requested_type?: "runtimeTrace";
+                        /** @constant */
+                        mode?: "interval";
+                        requested_duration_ms?: number;
+                        /** @constant */
+                        force_gc?: false;
+                    } | {
+                        /** @enum {unknown} */
+                        requested_type?: "heap";
+                        /** @constant */
+                        mode?: "snapshot";
+                        requested_duration_ms?: null;
+                    } | {
+                        /** @enum {unknown} */
+                        requested_type?: "goroutine";
+                        /** @constant */
+                        mode?: "snapshot";
+                        requested_duration_ms?: null;
+                        /** @constant */
+                        force_gc?: false;
+                    } | {
+                        /** @enum {unknown} */
+                        requested_type?: "allocs" | "block" | "mutex" | "threadcreate";
+                        /** @constant */
+                        mode?: "cumulative";
+                        requested_duration_ms?: null;
+                        /** @constant */
+                        force_gc?: false;
+                    } | {
+                        /** @enum {unknown} */
+                        requested_type?: "heap" | "allocs" | "goroutine" | "block" | "mutex" | "threadcreate";
+                        /** @constant */
+                        mode?: "delta";
+                        requested_duration_ms?: number;
+                        /** @constant */
+                        force_gc?: false;
+                    }) & ({
+                        started_at?: null;
+                        completed_at?: null;
+                    } | {
+                        started_at?: string;
+                        completed_at?: string;
+                    }));
+                } & unknown)[];
                 timeline: {
                     /** Format: date-time */
                     time: string;
