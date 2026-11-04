@@ -138,8 +138,8 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	}
 	var originalAcquisitionGuard, originalAcquisitionShape string
 	const acquisitionShape = `SELECT jsonb_build_object('columns',(SELECT jsonb_agg(to_jsonb(c) ORDER BY c.ordinal_position) FROM (SELECT column_name,ordinal_position,is_nullable,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='context_verification') c),'constraints',(SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY conname) FROM pg_constraint WHERE conrelid='context_verification'::regclass))::text`
-	if head == 134 || head == 135 {
-		if head == 135 {
+	if head >= 134 && head <= 136 {
+		if head >= 135 {
 			if _, e = p.DownTo(ctx, 133); e != nil {
 				t.Fatal("capture pre134 verification guard", e)
 			}
@@ -165,6 +165,13 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 			t.Fatal("restore previous schema before upgrade", e)
 		}
 	}
+	// At 136 capture the actual pre-135 refusal definitions, then restore
+	// the previous head before testing the production upgrader.
+	if head == 136 {
+		if _, e = p.DownTo(ctx, 134); e != nil {
+			t.Fatal("capture pre135 execution guard", e)
+		}
+	}
 	const profileDefinitions = `SELECT pg_get_functiondef('public.guard_custody_stream()'::regprocedure),pg_get_functiondef('public.project_context_processing()'::regprocedure),pg_get_functiondef('public.guard_context_execution()'::regprocedure)`
 	var originalStreamGuard, originalProcessingProjector, originalExecutionGuard string
 	if e = conn.QueryRow(ctx, profileDefinitions).Scan(&originalStreamGuard, &originalProcessingProjector, &originalExecutionGuard); e != nil {
@@ -172,8 +179,20 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	}
 	const refusalExecutionShape = `SELECT jsonb_agg(pg_get_constraintdef(oid) ORDER BY conname)::text FROM pg_constraint WHERE conrelid='context_execution'::regclass`
 	var originalRefusalExecutionShape string
-	if head == 135 {
+	if head == 135 || head == 136 {
 		if e = conn.QueryRow(ctx, refusalExecutionShape).Scan(&originalRefusalExecutionShape); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if head == 136 {
+		if _, e = p.UpTo(ctx, 135); e != nil {
+			t.Fatal("restore pre136 schema", e)
+		}
+	}
+	const historyAdmissionShape = `SELECT jsonb_build_object('function',pg_get_functiondef('public.require_capacity_new_admission()'::regprocedure),'triggers',(SELECT jsonb_agg(jsonb_build_array(tgrelid::regclass::text,pg_get_triggerdef(oid)) ORDER BY tgrelid::regclass::text) FROM pg_trigger WHERE tgname='zzz_capacity_new_admission'))::text`
+	var originalHistoryAdmission string
+	if head == 136 {
+		if e = conn.QueryRow(ctx, historyAdmissionShape).Scan(&originalHistoryAdmission); e != nil {
 			t.Fatal(e)
 		}
 	}
@@ -310,7 +329,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		t.Log("resource projection Down restored exact validators and unchanged trust; Up restored104; no old-decoder rollback qualification")
 	}
-	if head == 133 || head == 134 || head == 135 {
+	if head >= 133 && head <= 136 {
 		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
 		qualifySavedSyscallQueryFunctions(t, ctx, conn)
 		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
@@ -333,7 +352,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
 		t.Logf("comparison%d→132→%d: exact twelve existing function definitions, table/index/constraint shape and trust restored; closed pair/20 units/one batch", head, head)
 	}
-	if head == 134 || head == 135 {
+	if head >= 134 && head <= 136 {
 		qualifyProfileComparisonQueryFunctions(t, ctx, conn)
 		qualifySavedSyscallQueryFunctions(t, ctx, conn)
 		qualifyProfileSummaryQueryFunctions(t, ctx, conn)
@@ -355,7 +374,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		}
 		t.Logf("acquisition%d→133→%d: paired nullable timing, exact native-length guard/shape restored and trust unchanged; prior query parity retained", head, head)
 	}
-	if head == 135 {
+	if head == 135 || head == 136 {
 		if _, e = p.DownTo(ctx, 134); e != nil {
 			t.Fatal("empty profile refusal Down", e)
 		}
@@ -369,10 +388,34 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		if e = conn.QueryRow(ctx, `SELECT row_to_json(t)::text FROM fleet_trust t`).Scan(&trust); e != nil || trust != originalTrust {
 			t.Fatal("profile refusal Down changed trust/recovery", e)
 		}
-		if from, to, e = upgrade.Run(ctx); e != nil || from != 134 || to != 135 {
+		if from, to, e = upgrade.Run(ctx); e != nil || from != 134 || to != head {
 			t.Fatal("profile refusal Up after Down", from, to, e)
 		}
-		t.Log("profile refusal135→134→135: exact existing execution guard/constraints restored and trust unchanged")
+		t.Logf("profile refusal%d→134→%d: exact existing execution guard/constraints restored and trust unchanged", head, head)
+	}
+	if head == 136 {
+		var deferrable, deferred bool
+		if e = conn.QueryRow(ctx, `SELECT tgdeferrable,tginitdeferred FROM pg_trigger WHERE tgrelid='custody_attempt'::regclass AND tgname='zzz_capacity_new_admission'`).Scan(&deferrable, &deferred); e != nil || !deferrable || deferred {
+			t.Fatal("history constraint default timing", e)
+		}
+		if _, e = p.DownTo(ctx, 135); e != nil {
+			t.Fatal("history metadata Down", e)
+		}
+		var shape, trust string
+		var absent bool
+		if e = conn.QueryRow(ctx, historyAdmissionShape).Scan(&shape); e != nil || shape != originalHistoryAdmission {
+			t.Fatal("history Down changed previous guard/trigger definitions", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT to_regprocedure('public.capacity_accepted_history_until(uuid,uuid,timestamptz)') IS NULL`).Scan(&absent); e != nil || !absent {
+			t.Fatal("history Down retained purpose helper", e)
+		}
+		if e = conn.QueryRow(ctx, `SELECT row_to_json(t)::text FROM fleet_trust t`).Scan(&trust); e != nil || trust != originalTrust {
+			t.Fatal("history Down changed trust/recovery", e)
+		}
+		if from, to, e = upgrade.Run(ctx); e != nil || from != 135 || to != 136 {
+			t.Fatal("history Up after Down", from, to, e)
+		}
+		t.Log("accepted history136→135→136: exact old admission function/three triggers and trust retained; helper removed/restored; statement-immediate default")
 	}
 	if head == 132 {
 		qualifySavedSyscallQueryFunctions(t, ctx, conn)
