@@ -27,9 +27,22 @@ composed regression reproduces the old503 with zero admissions; its matrix and
 commands/source hashes are in
 [trace-summary-refusal-local](../test/results/trace-summary-refusal-local/README.md).
 
-The heap attachment boundary remains under focused investigation. These follow-up
-changes are not yet pushed or installed-qualified. Final integration/review/CI and
-fresh focused heap/trace native runs remain required. The separately prepared
+The heap driver now distinguishes link/URL/filename/body/save assertion stages.
+It validates observed existing same-human session refreshes and their bounded
+same-case reloads while pinning original artifact digest, target and acquisition
+facts; initial/pre-query and comparison metadata reads remain strict. Focused
+React/Chromium races pass28.909s and independent review found no blockers. A
+private real-content probe transferred exact bytes but failed its later worker
+acknowledgement; that source is retained only as evidence and was not integrated.
+The original installed attachment cause remains unproven. Commands and both
+failed probe outcomes are in
+[heap-browser-boundary-local](../test/results/heap-browser-boundary-local/README.md).
+
+Integrated local pre-push/profile/Go architecture/specification/architecture/design
+gates pass441 console tests and5.750s fixture races. Exact source attribution is
+in [profile-native-followup-local](../test/results/profile-native-followup-local/README.md).
+These follow-ups still need final pushed-head CI and fresh focused heap/trace
+native runs. Heavy evidence stays attributed to the qualified c6 source. The separately prepared
 TLS follow-up is unpublished; credential work is paused. Full S-05 and the full
 specification goal remain active. Earlier checkpoints follow.
 

@@ -1,0 +1,22 @@
+{
+  "format": "asservat-profile-native-followup-local/v1",
+  "codeHead": "a14194dd2711990a60bbcc75f928cf3286a52c80",
+  "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOFLAGS='-buildvcs=false -p=2' PATH=<spec-venv/bin:cache/bin:original> make pre-push profile-preflight go-architecture-check spec-check architecture-check design-check",
+  "exit": 0,
+  "files": [
+    {
+      "path": "final-heap-trace-fixes-gates.log.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-worker-containment/final-heap-trace-fixes-gates.log",
+      "sourceBytes": 16535,
+      "sourceSha256": "7494bb5f0e021514131581f9ff0d385c8b8f6ead51dc6d5d4177304b715f9d8f",
+      "storedSha256": "e16353d11e0dac924430dac15e400d182027b414ae35179a03db130795853088"
+    },
+    {
+      "path": "ci-41863053175-ci-ok-final.json.gz",
+      "source": "/home/phil/.cache/asservat-build/profile-worker-containment/ci-41863053175-ci-ok-final.json",
+      "sourceBytes": 4456,
+      "sourceSha256": "fa399d8b2169f35a38eeec43fe5d00e6b3e739e6ecb2fd1b1195342ad1be58be",
+      "storedSha256": "bb08abf31eac3c32e35778987c2ff2e1b3b3f92768e6875be411b25f08c9bc0c"
+    }
+  ]
+}
