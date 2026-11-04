@@ -50,7 +50,8 @@ func resolveBrowserCredential(ctx context.Context, resolver Resolver, token stri
 		if ctx.Err() != nil || !v.Identity.Valid(now()) || !v.Window.Valid(now()) || v.Window.Policy != v.Identity.Policy || v.Window.FreshUntil.After(v.Identity.ValidUntil) {
 			return value.Identity{}, CredentialWindow{}, value.ErrUnavailable
 		}
-		v.Identity.ValidUntil = value.Earlier(v.Identity.ValidUntil, v.Window.FreshUntil)
+		// This short window proves a current refresh schedule, not the
+		// lifetime of the independently verified token/policy identity.
 		return v.Identity, v.Window, nil
 	}
 	// Existing component resolvers remain compatible. A long-running refresh

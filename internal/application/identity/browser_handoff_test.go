@@ -115,13 +115,13 @@ func TestBrowserCallbackRechecksIdentityAfterSessionCreation(t *testing.T) {
 	}
 }
 
-func TestBrowserIdentityPreservesOriginalSettingsAndTokenDeadlines(t *testing.T) {
+func TestBrowserIdentityPreservesSessionAndTokenDeadlinesWithCurrentSettings(t *testing.T) {
 	for _, tokenFirst := range []bool{false, true} {
 		now, store, service, cookie := handoffFixture(t)
 		store.record.ExpiresAt = now.Add(time.Hour)
 		store.record.Observation.ObservedAt = now.Add(-4 * time.Second)
 		store.record.Observation.FreshUntil = now.Add(time.Second)
-		want := store.record.Observation.FreshUntil
+		want := service.Identities.(handoffIdentity).identity.ValidUntil
 		if tokenFirst {
 			i := service.Identities.(handoffIdentity)
 			i.identity.ValidUntil = now.Add(500 * time.Millisecond)
@@ -130,7 +130,11 @@ func TestBrowserIdentityPreservesOriginalSettingsAndTokenDeadlines(t *testing.T)
 		}
 		view, e := service.Resolve(context.Background(), cookie, false)
 		if e != nil || !view.Identity.ValidUntil.Equal(want) {
-			t.Fatal("identity handoff renewed a source deadline", e)
+			t.Fatal("identity handoff changed token/session authority", e)
+		}
+		*now = store.record.Observation.FreshUntil
+		if _, err := service.Resolve(t.Context(), cookie, false); err == nil {
+			t.Fatal("another session read reused expired settings")
 		}
 	}
 }
