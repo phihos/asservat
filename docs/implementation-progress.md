@@ -1,27 +1,33 @@
 # Sustained implementation progress
 
-## Prepared named Go endpoint TLS follow-up (2026-11-04)
+## Current named Go endpoint TLS candidate (2026-11-04)
 
-Private source `fa692d49` rebases exactly eight TLS preparation commits above
-`c2d4f74b`. All signatures and patch identities, 33 TLS Go blobs and complete
-base-tree inheritance were verified; independent review found no blocker.
-Publication and installed TLS qualification remain pending. Parent heap/trace
-qualification is recorded separately; no pending native outcome is inferred here.
+PR162 merged normally as `3cc76be0daba5480635e63478c648e114aefd105` after eligible
+PR CI41912312980 and the complete installed trace/history/settings/Repeat journey
+passed at reviewed `59812214`. Fresh main readback has the identical whole tree.
+[Trace41912395184](../test/results/runtime-trace-native-41912395184/README.md)
+exited Go/harness0 after528.276s: capture/publication, semantic summary refusal,
+SQL zero-query guards, authenticated94,394B native/local Go trace parsing,
+post-start history, settings and fresh Repeat4.371s passed. All4,139 submitted
+sources matched Git; source/scratch/cleanup checks passed. Heap React remains
+qualified at c2d4 and accepted-heavy comparison at c6; their scopes stay separate.
 
-The first full local invocation exited2 at console-check because pinned
-dependencies were absent; other pre-push constituents passed and later targets
-in that invocation did not run. Pinned npm installation exited0, then the strict
-console-check/profile-preflight/full-browser chain exited0. Console passed443
-tests, profile-preflight integration6.167s and actual GoTLS/built-React browser
-70.316s with28journeys/27accessibility scans. All5,353 tracked inputs outside
-results matched Git after the frozen-source gates. Originals and exact source/
-command/output/restoration readbacks are in
+The next TLS-only candidate preserves that complete parent and all33 reviewed
+TLS Go files. Explicit public roots/server name travel with the existing named
+endpoint and exact target-netns socket; old-node refusal, original deadlines and
+HTTP behavior remain. No credential delivery, fallback, extra connection,
+service, role or API read is added. Both independent reviews found no blockers.
+The final pre-push and focused TLS races passed at `4641475e`; rebasing onto the
+actual merge preserved the complete tested source tree. Exact commands, package
+coverage (including packages with no matched tests) and source readbacks are in
+[named-profile-tls-598-local](../test/results/named-profile-tls-598-local/README.md).
+
+Earlier full browser evidence remains scoped to its original source in
 [named-profile-tls-c2d4-local](../test/results/named-profile-tls-c2d4-local/README.md).
-These synthetic-authority local gates do not establish installed TLS CPU or
-wrong-peer refusal. PR162 normal merge/full-tree readback precedes TLS
-publication; the full S-05 goal and credentialed endpoints remain open.
+New candidate CI and installed TLS CPU/wrong-peer qualification remain pending.
+Endpoint credentials, broader S-05 and the full specification remain open.
 
-## Current shared profile candidate (2026-11-04)
+## Shared profile qualification history (2026-11-04)
 
 The published PR162 candidate `00fca3ee` incorporates the measured Repeat and
 owner-observation phase fixes. Required pull-request CI41900935231 passed every

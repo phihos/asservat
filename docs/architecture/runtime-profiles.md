@@ -9,9 +9,15 @@ summary, authenticated original, exact signed total and a fresh repeat preview.
 PR160 merged as `5b765322106c8b76e5c73a87577548856b6d609c` after eligible
 `pull_request` CI41821140504 passed; its full tree equals qualified `80593f93`.
 
-These are named Linux/amd64 reference workflows. Installed heap React
-interaction, maximum-input analyzer containment, runtime trace and broader S-05
-qualification remain open. See [the current evidence](../implementation-progress.md)
+Heap React inspection/native download/Repeat passed at c2d4 in native41891716697
+attempt2. Native41912395184 passed Go trace capture/publication, authenticated
+download/local parsing and history/settings/Repeat at59812214; PR162 merged as
+3cc76be0 with the identical complete tree. Accepted-heavy comparisons passed at
+c6 with measured worker memory/CPU containment for that one input shape.
+
+These are named Linux/amd64 reference workflows. TLS/authenticated endpoints,
+all-maxima analyzer qualification and broader S-05 remain open. See
+[the current evidence](../implementation-progress.md)
 for originals and limits. The initial mechanism and staged-test boundaries below
 describe which facts each layer supplies; component checks alone establish no
 installed authority.
