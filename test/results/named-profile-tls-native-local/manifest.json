@@ -1,0 +1,232 @@
+{
+  "archives": {
+    "/home/phil/.cache/asservat-build/profile-tls-native/affected-race.log": {
+      "archive": "affected-race.log.gz",
+      "byteExactReadback": true,
+      "bytes": 15339,
+      "gzipBytes": 2075,
+      "gzipSHA256": "6b5f4f57520c614efb85b5117b24995b0419bb47217c057cf97704134dc8ff1f",
+      "sha256": "6a55d7c05ce66e5fd865dcfe8b940e2a968c0f712843295a62fb2286bb1be4e0"
+    },
+    "/home/phil/.cache/asservat-build/profile-tls-native/app-component-race.log": {
+      "archive": "app-component-race.log.gz",
+      "byteExactReadback": true,
+      "bytes": 797,
+      "gzipBytes": 339,
+      "gzipSHA256": "63d7a40000d554e8b8b0336f07b3464f42978acddadf9caa58e72ae327c5fb14",
+      "sha256": "5d79b6274f52bdb7607108af4348594b310d0f4fb98af51b2d9210cf6e58d8b7"
+    },
+    "/home/phil/.cache/asservat-build/profile-tls-native/compile-capacity-2.log": {
+      "archive": "compile-capacity-2.log.gz",
+      "byteExactReadback": true,
+      "bytes": 53,
+      "gzipBytes": 66,
+      "gzipSHA256": "59bdc82c194993d06dffe2992cebabb34b64cef77e1c29e2c4e3d3108e86ecfd",
+      "sha256": "2f42ad4712d6fcd6cbcd87a4d9bab5ce143733e0082a3c2e9781606dc31c3a3d"
+    },
+    "/home/phil/.cache/asservat-build/profile-tls-native/compile-capacity.log": {
+      "archive": "compile-capacity.log.gz",
+      "byteExactReadback": true,
+      "bytes": 228,
+      "gzipBytes": 140,
+      "gzipSHA256": "4faf85d1853235c828b51e124d8dff07dffe4029f896be9fdda4b29e51229dc2",
+      "sha256": "d4a3e08c5cb991e64f95dff27a65c8073d03cffde757266b0128c5f070128605"
+    },
+    "/home/phil/.cache/asservat-build/profile-tls-native/final-tls-race.log": {
+      "archive": "final-tls-race.log.gz",
+      "byteExactReadback": true,
+      "bytes": 2847,
+      "gzipBytes": 719,
+      "gzipSHA256": "88af7f896aec291722420b239d9bde54320ab25288956d57c05b4e419d2b3749",
+      "sha256": "2e194e86899987de817cd1ceb7983a4b6dd56a4a2dc1fcbd906300dbe89cd61e"
+    },
+    "/home/phil/.cache/asservat-build/profile-tls-native/fixture-green.log": {
+      "archive": "fixture-green.log.gz",
+      "byteExactReadback": true,
+      "bytes": 1884,
+      "gzipBytes": 521,
+      "gzipSHA256": "ad93c6152d7ee2829b4b4e90b38c00453308a95ce1d15655f2b0734d26bee38c",
+      "sha256": "84c5a2f3f3b8d1b9f0edbaaa8d3d9a655380649b9c8e5a9a04d84023807dadad"
+    },
+    "/home/phil/.cache/asservat-build/profile-tls-native/handoff.json": {
+      "archive": "handoff.json.gz",
+      "byteExactReadback": true,
+      "bytes": 10448,
+      "gzipBytes": 4000,
+      "gzipSHA256": "296c8da13299c003d0787bb4eb55027c722325a6cc83b867a1b3c75b86019a13",
+      "sha256": "3754ec427d46838f839379dfe9f34a1b2f4b2a1ca63e0193eb2bcf25f52b413d"
+    },
+    "/home/phil/.cache/asservat-build/profile-tls-native/selector-green.log": {
+      "archive": "selector-green.log.gz",
+      "byteExactReadback": true,
+      "bytes": 98,
+      "gzipBytes": 51,
+      "gzipSHA256": "33d08ac6ad21b52ec077eec5381ec55226416aa79a9f7722978eda3d2e63759c",
+      "sha256": "459da0a026a55fed23299b4a2592012b03540ebbe8683119ba796989daef65fd"
+    },
+    "/home/phil/.cache/asservat-build/profile-tls-native/selector-red.log": {
+      "archive": "selector-red.log.gz",
+      "byteExactReadback": true,
+      "bytes": 1127,
+      "gzipBytes": 481,
+      "gzipSHA256": "9d82aafa84311cb7f574191361b797e03bbca6606756dfa76ced09c47daa42f2",
+      "sha256": "db048d2cc198800e37189ccd62c26d440806ac82085e80b2a686db9e8e6b674b"
+    },
+    "/home/phil/.cache/asservat-build/profile-tls-native/selectors-all.log": {
+      "archive": "selectors-all.log.gz",
+      "byteExactReadback": true,
+      "bytes": 134,
+      "gzipBytes": 55,
+      "gzipSHA256": "6f1fef56d912e1531aa29963811b65b4e24744d12603bbcdb6f50df3b9478d3e",
+      "sha256": "133b4c150e3703200b29fd77f51c9a78fbd934c21928fb2f322e05ac6fef7b47"
+    },
+    "/home/phil/.cache/asservat-build/profile-tls-native/selectors-final.log": {
+      "archive": "selectors-final.log.gz",
+      "byteExactReadback": true,
+      "bytes": 134,
+      "gzipBytes": 55,
+      "gzipSHA256": "9f925376ffb7c0db884367eb9556fd5b12bc3c0d37bc0f2c1d23516c8d087211",
+      "sha256": "52e09e0a3cc4b51b8d9930c60c21e737294ff9d57125f930e49c591134375033"
+    }
+  },
+  "checks": [
+    {
+      "command": "python3 scripts/test-regional-context-selection.py RegionalContextSelection.test_tls_transport_alias_is_closed_and_keeps_cpu_limits",
+      "exit": 1,
+      "log": "selector-red.log",
+      "phase": "RED",
+      "source": "base d0e3dff6 plus new selector test, no implementation; unknown suite alias is new capability gap, not a product runtime defect"
+    },
+    {
+      "command": "same focused Python selector command",
+      "exit": 0,
+      "log": "selector-green.log",
+      "phase": "GREEN selector"
+    },
+    {
+      "actual": "test-only secondary regional helper lacked fixture parameter; corrected by explicitly passing private TLS directory",
+      "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOFLAGS='-buildvcs=false -p=2' go test ./test/integration -run '^TestInstalledManualProfileActualPoolCapacity$' -count=1",
+      "exit": 1,
+      "log": "compile-capacity.log",
+      "phase": "compile setup failure"
+    },
+    {
+      "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOFLAGS='-buildvcs=false -p=2' go test ./test/integration -run '^TestInstalledManualProfileActualPoolCapacity$' -count=1",
+      "exit": 0,
+      "log": "compile-capacity-2.log",
+      "phase": "compile+existingcapacity"
+    },
+    {
+      "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOFLAGS='-buildvcs=false -p=2' go test ./test/integration -run '^TestInstalledManualProfileTLS' -count=1 -v",
+      "exit": 0,
+      "log": "fixture-green.log",
+      "phase": "newfixture",
+      "seconds": 0.491
+    },
+    {
+      "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOFLAGS='-buildvcs=false -p=2' go test -race ./test/fixtures/profile-native/main.go ./test/fixtures/profile-native/main_test.go -count=1 -v",
+      "exit": 0,
+      "log": "app-component-race.log",
+      "phase": "appcomponent",
+      "seconds": 1.029,
+      "source": "final main.go/main_test.go bytes; enclosing command sequence also ran first35Pythonselectors and exited0"
+    },
+    {
+      "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOFLAGS='-buildvcs=false -p=2' go test -race ./test/integration -run '^TestInstalled(ManualProfile|ApprovedRecordingFixtureShape|ProfileComparison|ProfileContainment)' -count=1 -v",
+      "exit": 0,
+      "log": "affected-race.log",
+      "phase": "affectedfixture",
+      "seconds": 4.681,
+      "source": "final runtime/helper assertions, before adding only public provenance t.Logf in newTLShelper"
+    },
+    {
+      "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOFLAGS='-buildvcs=false -p=2' go test -race ./test/integration -run '^TestInstalledManualProfileTLS' -count=1 -v",
+      "exit": 0,
+      "log": "final-tls-race.log",
+      "phase": "finalTLS",
+      "seconds": 2.037,
+      "source": "final c64 source bytes"
+    },
+    {
+      "command": "python3 scripts/test-regional-context-selection.py",
+      "exit": 0,
+      "log": "selectors-final.log",
+      "phase": "finalselectors",
+      "source": "final Python/harness bytes",
+      "tests": 35
+    },
+    {
+      "command": "git -c gpg.ssh.allowedSignersFile=/home/phil/.cache/asservat-build/profile-worker-containment/allowed-signers verify-commit HEAD",
+      "exit": 0,
+      "phase": "signature"
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0,
+      "phase": "whitespace"
+    }
+  ],
+  "exactChangedSourceFileHashes": {
+    ".github/workflows/native.yml": "20bb5954f710d8f0eb0ea45cedef6065146b3ec54e90d8d8956e573964f6e0c0",
+    "scripts/ci-native.sh": "489cf8c18db01dabf94d6a346550e15ed0a78e2905d8d25193308b285eb65a57",
+    "scripts/test-context-storage.py": "b4b3ae1758218fd14f88738226354c23001ed27fb5a21513f9197d0bbfc8fd5e",
+    "scripts/test-regional-context-selection.py": "6c36a6b20207423ba8cfb899e3d8279a35b68b66f8e6292f9bfb87a1ce809d06",
+    "test/fixtures/profile-native/main.go": "3c66dee5559ddd929247389c49a2499d0c4afbc1e3ff35fb4b24da791e1402cf",
+    "test/fixtures/profile-native/main_test.go": "0728d6fffc9e625857aed6e2222820ec22e3ea3107c7b773971c94deaef2f96c",
+    "test/integration/context_storage_test.go": "46ed72e0d3dc76628cff7427e8e70cbce44a0ecb0f9e72a08b2aa172139eef16",
+    "test/integration/installed_approved_recording_native_test.go": "e42fa62cfde28d6ad3ce2d2c44452184946fe9df91c8f72c70b1fb99937bd282",
+    "test/integration/installed_approved_recording_unit_test.go": "bcf63014174b4caeccde1d5cca06f8d3f4dac406425b99be371f9baa7a37dbae",
+    "test/integration/installed_manual_heap_profile_unit_test.go": "3124b64c018b37c16943cf95faa8c04b62e3e9096729460b4f85f5a7081b1307",
+    "test/integration/installed_manual_profile_unit_test.go": "c6d6f22a999e310ec64f3740fb7d2e186bc254d5d437ca614cc0d40a5b3363fa",
+    "test/integration/installed_manual_tls_profile_native_test.go": "4ff90559699ec592d230bcaab54a37230dd9a5b9518e30cbdcd8d46ea9875278",
+    "test/integration/installed_manual_tls_profile_unit_test.go": "5fac37d9bc50e83333be00c8896b7b45e3f249681ad3e34b156e917a94d3f8ae",
+    "test/integration/regional_install_native_test.go": "7dc0ce6a7d6606706cd355a4b67053df0885dcb58adcc40f66d6f6e4cd7ac648"
+  },
+  "exactChangedSourceFilesEqual": true,
+  "format": "asservat-named-profile-tls-native-local/v1",
+  "funding": {
+    "action_timeout_ms": 15000,
+    "burst_objects": 40000,
+    "capacity_objects": 100000,
+    "existing_regional_bytes": 147849216,
+    "existing_regional_objects": 48,
+    "failed_peer_attempts": 1,
+    "history_reservations": 2,
+    "needed_bytes": 73924608,
+    "needed_objects": 24,
+    "other_footprint_costs": "synthetic existing fixture inputs",
+    "per_action_native_limit": 16777216,
+    "production_compilers_used": true,
+    "query_units_per_summary": 10,
+    "refund_assumed": false,
+    "requested_interval_ms": 10000,
+    "root_query_units": 12,
+    "root_records": 12,
+    "successful_cpu_captures": 1,
+    "system_objects_ceiling": 10000,
+    "system_objects_compiled": 6720
+  },
+  "independentReview": {
+    "kind": "read-only, no tests rerun",
+    "result": "no blocking findings",
+    "reviewedCommit": "c64e5b1ff9bfa9a8ebc325e32067d6f09c02339d",
+    "reviewer": "independent source agent"
+  },
+  "integratedCoreAndProofParent": "71598376cb2fa282480caebd6475a7575c53f8e6",
+  "integratedFixtureCommit": "ff41e19263f87cb3cf635bc7130ecf3e810ffa8e",
+  "originalBase": "d0e3dff62a932aa784565dc2d1e4f03bfe024586",
+  "originalFixtureCommit": "c64e5b1ff9bfa9a8ebc325e32067d6f09c02339d",
+  "qualificationLimits": "TLS installed execution has NOT run; CPU preview-expiry/busy/missing/Stop and browser/trace/heap/heavy are not newly qualified underTLS",
+  "readback": {
+    "allByteExact": true,
+    "gzipArchives": 11,
+    "gzipFilenameAbsent": true,
+    "mtimeZero": true,
+    "originalHandoffs": 1,
+    "originalLogs": 10
+  },
+  "readmeSHA256": "9691153536ff15380b3248e7c55062e24eb2e27035b6a957618ed460dc206d28",
+  "scope": "local native-fixture preparation only; no installed qualification",
+  "stablePatchID": "007587cc316f91512676568cb68c4b74f120885d",
+  "stablePatchIDEqual": true
+}
