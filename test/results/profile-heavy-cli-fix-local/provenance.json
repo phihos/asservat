@@ -1,0 +1,53 @@
+{
+  "fixSourceCommit": "ba94b19c2b7867a24c17c377e12b92528755aa4e",
+  "integratedCodeCommit": "5eb754278e38aafd3946e877603a5800bdd8c81b",
+  "nativeRun": 41830591107,
+  "nativeSHA256": "853f5ed2f0a6afa8c64dcef9d0715e49b9435966406cde3b108f599a63084a9d",
+  "actualResults": {
+    "oldCLIExit": 0,
+    "oldAssertionPass": false,
+    "newCLIExit": 0,
+    "newAssertionPass": true,
+    "affectedRacesExit": 0,
+    "integratedProfilePreflightAndGofmtExit": 0,
+    "specArchitectureDesignExit": 0
+  },
+  "files": {
+    "native-cli-red-green.json": {
+      "archive": "native-cli-red-green.json.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/profile-heavy-pprof-fix/native-cli-red-green.json",
+      "bytes": 1854,
+      "sha256": "d37c0ac236f0cf393838d8d0b1ac0e76628d84ff44437a7e7ad40eccb7b7f119"
+    },
+    "red-native-cli.log": {
+      "archive": "red-native-cli.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/profile-heavy-pprof-fix/red-native-cli.log",
+      "bytes": 1346503,
+      "sha256": "f57a7678499c7ca1f699e137eabd92595b31052fa8eff410f8fc2011d5e29413"
+    },
+    "green-native-cli.log": {
+      "archive": "green-native-cli.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/profile-heavy-pprof-fix/green-native-cli.log",
+      "bytes": 2518,
+      "sha256": "912cba5467fe9472df4026dd6989e6eda34e0671d59cc148d7feea3cecec6fcd"
+    },
+    "affected-race.log": {
+      "archive": "affected-race.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/profile-heavy-pprof-fix/affected-race.log",
+      "bytes": 53,
+      "sha256": "222b924c8e77128111009f2a7f96704fec5949b95865784cdec50f0c0e6d46ab"
+    },
+    "heavy-cli-fix-integrated-profile.log": {
+      "archive": "heavy-cli-fix-integrated-profile.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/profile-worker-containment/heavy-cli-fix-integrated-profile.log",
+      "bytes": 3909,
+      "sha256": "847e41c4581bc2b2c86ebb22b1257cdbcab38e365652872ed518ad299e63df8a"
+    },
+    "heavy-cli-fix-docs.log": {
+      "archive": "heavy-cli-fix-docs.log.gz",
+      "cacheOriginal": "/home/phil/.cache/asservat-build/profile-worker-containment/heavy-cli-fix-docs.log",
+      "bytes": 756,
+      "sha256": "00038ecd9112d906b310c931e3624797ae247dc7b8bc15604961175a318197eb"
+    }
+  }
+}

@@ -55,6 +55,30 @@ full observer-orchestration regression is claimed from these concrete SQL/exec
 ports; the installed sequence remains unrun. Initial CI41826790336 was cancelled
 as superseded before any heavy native dispatch.
 
+**First installed heavy attempt:** [native 41830591107](https://github.com/phihos/asservat/actions/runs/41830591107)
+failed on `87df6794064de4423d92745d826aab735dd36b78` (Go exit 1,
+528.356s), while eligible PR CI41830439009 passed on the same head. The first
+approved capture reached authenticated native download. Its local `go tool pprof`
+command exited 0, but selected `counter-15`; the default node fraction dropped all
+100,000 small functions, so the fixture's expected `synthetic.` text was absent.
+This is a local CLI selection/assertion failure. The run reached no comparison
+or worker cgroup probe and establishes no installed resource result.
+
+All 4,123 reported source hashes independently match the committed head; source
+stayed unchanged, cleanup was empty and scratch was removed. The 9,394,862-byte
+native exactly matches the prepared baseline digest. Originals and audit are
+retained in `test/results/profile-heavy-native-41830591107/`.
+
+The focused fixture repair reproduces the old missing-function assertion against
+that exact file, then opens it with explicit CPU selection, top 20 functions,
+zero node fraction and compact labels. Output is 2,518 bytes rather than the
+1.35MB default comment banner. Both CLI commands exit 0; only the old fixture
+assertion fails. Independent review found no blocker, and affected fixture races
+passed in 3.864s. Default CPU/heap commands, native bytes, production analyzer,
+fixture shape, budgets and deadlines stay unchanged. Local originals are retained
+in `test/results/profile-heavy-cli-fix-local/`. A fresh installed qualification
+remains pending.
+
 **Latest verified outcome:** the installed Go heap snapshot MCP workflow passed
 at `80593f9398ad9bf909afe9fd46a34752b3060ba1` in
 [native 41818585176](https://github.com/phihos/asservat/actions/runs/41818585176).
