@@ -9,9 +9,15 @@ summary, authenticated original, exact signed total and a fresh repeat preview.
 PR160 merged as `5b765322106c8b76e5c73a87577548856b6d609c` after eligible
 `pull_request` CI41821140504 passed; its full tree equals qualified `80593f93`.
 
-These are named Linux/amd64 reference workflows. Installed heap React
-interaction, maximum-input analyzer containment, runtime trace and broader S-05
-qualification remain open. See [the current evidence](../implementation-progress.md)
+Heap React inspection/native download/Repeat passed at c2d4 in native41891716697
+attempt2. Native41912395184 passed Go trace capture/publication, authenticated
+download/local parsing and history/settings/Repeat at59812214; PR162 merged as
+3cc76be0 with the identical complete tree. Accepted-heavy comparisons passed at
+c6 with measured worker memory/CPU containment for that one input shape.
+
+These are named Linux/amd64 reference workflows. TLS/authenticated endpoints,
+all-maxima analyzer qualification and broader S-05 remain open. See
+[the current evidence](../implementation-progress.md)
 for originals and limits. The initial mechanism and staged-test boundaries below
 describe which facts each layer supplies; component checks alone establish no
 installed authority.
@@ -243,6 +249,34 @@ and runtime-domain reservation, current credential policy, qualified node/netns
 dialing and guard composition, then the existing encrypted custody/publication
 and authenticated native-download workflow. No public capability is enabled.
 
+
+## Named endpoint TLS preparation
+
+[ADR-299](../decisions/299-named-go-endpoint-tls.md) extends protected regional
+endpoint entries with `tls: {serverName, rootsPEM}`. The Kubernetes adapter parses
+all certificate blocks without ignored text or headers, canonicalizes the public
+bundle and retains its SHA-256 under the existing typed `GoEndpointTLS.Trust`
+source. The trust source reuses the protected endpoint identity; its material
+digest and exact server name enter both manual and stable recurring definitions.
+The target-independent regional query carries those public metadata fields only.
+
+A comparable `GoEndpointPlan.TLSMaterial` sidecar is excluded from canonical JSON
+and approval/SQL scope. The selected entry supplies it without another API read;
+regional dispatch and node receipt check its digest/name against the admitted
+public definition. The node uses `tls.Client` over the existing gadget socket,
+explicit roots, HTTP/1.1 and the original operation deadline. TLS does not add a
+second dial, DNS, proxy, fallback or new credential channel. Authentication is
+still refused. The 8 KiB per-bundle, 64 KiB aggregate endpoint configuration and
+256 KiB/16-item node poll bounds are unchanged or explicitly bounded, rather than
+increased to fit the new data.
+
+An optional `profileTLS` flag on the existing Go profile adapter report identifies
+TLS wrapper support. Generic `goProfile` availability alone cannot establish it;
+passive previews may succeed for an old node but actual TLS start/queue admission
+refuses. Upgrade connectors before collectors because the old connector decoder
+rejects unknown report fields. Old reports remain HTTP-only. No additional API,
+RBAC, watch, Job or persistent record is needed. Focused component validation is
+separate from installed TLS qualification, which remains pending.
 
 ## Finite policy endpoint scope
 

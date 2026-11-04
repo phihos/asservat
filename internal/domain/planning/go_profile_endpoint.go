@@ -166,10 +166,12 @@ type GoEndpointInput struct {
 // and the target network namespace. RouteIP alone must never authorize dialing.
 // The exact Pod/node/boot must be independently rechecked by a qualified dialer.
 type GoEndpointPlan struct {
-	SourceRef, SourceKind  string
-	Definition             GoEndpointDefinition
-	DefinitionDigest       artifact.Digest
-	EndpointDigest         artifact.Digest
+	SourceRef, SourceKind string
+	Definition            GoEndpointDefinition
+	DefinitionDigest      artifact.Digest
+	EndpointDigest        artifact.Digest
+	// Public material is supplied separately; the definition binds its digest.
+	TLSMaterial            execution.GoProfileTLSMaterial `json:"-"`
 	Target                 targets.Request
 	Pin                    artifact.PinnedPod
 	NodeUID, NodeBootID    string
@@ -190,29 +192,7 @@ func (p GoEndpointPlan) MatchesAcquisition(r execution.GoProfileRequest) bool {
 
 func endpointAddressMode(s string) bool { return s == "targetLoopback" || s == "podIP" }
 
-func validEndpointServerName(s string) bool {
-	if len(s) == 0 || len(s) > 253 {
-		return false
-	}
-	if ip, err := netip.ParseAddr(s); err == nil {
-		return ip.Zone() == "" && !ip.Is4In6() && !ip.IsUnspecified() && !ip.IsMulticast()
-	}
-	for _, label := range strings.Split(s, ".") {
-		if len(label) == 0 || len(label) > 63 {
-			return false
-		}
-		for i := 0; i < len(label); i++ {
-			c := label[i]
-			if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
-				continue
-			}
-			if c != '-' || i == 0 || i == len(label)-1 {
-				return false
-			}
-		}
-	}
-	return true
-}
+func validEndpointServerName(s string) bool { return execution.ValidGoProfileServerName(s) }
 
 // Parse only the fixed HTTP Host syntax. This pure value check neither resolves
 // DNS nor opens sockets; bare IPv6 is deliberately unavailable without brackets.

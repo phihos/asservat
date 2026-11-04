@@ -48,6 +48,7 @@ func TestInstalledManualProfileHeapNamespacePlanCompiles(t *testing.T) {
 }
 
 func TestInstalledManualProfileHeapSelectorPreservesCPUAndRefusesUnknown(t *testing.T) {
+	t.Setenv("ASSERVAT_PROFILE_TRANSPORT", "http")
 	t.Setenv("ASSERVAT_JOURNEY_FOCUS", "manual-profile")
 	for _, variant := range []string{"", "cpu", "heap"} {
 		t.Setenv("ASSERVAT_PROFILE_VARIANT", variant)

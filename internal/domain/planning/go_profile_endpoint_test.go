@@ -1,6 +1,8 @@
 package planning
 
 import (
+	"asservat.local/asservat/internal/domain/execution"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -164,5 +166,18 @@ func TestGoEndpointHostSyntax(t *testing.T) {
 				t.Fatalf("Host syntax %q accepted=%t want=%t", tc.host, d.Valid(), tc.valid)
 			}
 		})
+	}
+}
+
+func TestGoEndpointPlanMaterialDoesNotChangeCanonicalHTTPBytes(t *testing.T) {
+	plan := GoEndpointPlan{SourceRef: "legacy", Definition: endpointDefinitionFixture()}
+	legacy, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.TLSMaterial = execution.GoProfileTLSMaterial{RootsPEM: "public material sidecar", ServerName: "localhost"}
+	carried, err := json.Marshal(plan)
+	if err != nil || string(carried) != string(legacy) {
+		t.Fatal("public material entered endpoint plan/digest encoding", err)
 	}
 }

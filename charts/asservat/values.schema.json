@@ -1058,6 +1058,16 @@
                 "type": "string",
                 "maxLength": 253,
                 "pattern": "^[a-z0-9.:\\[\\]-]+$"
+              },
+              "tls": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["serverName", "rootsPEM"],
+                "description": "ADR-299: explicit public certificate roots, never credentials. The installer checks canonical certificate syntax and the 8 KiB byte cap. Connector-first rollout; TLS-capable collectors required.",
+                "properties": {
+                  "serverName": {"type": "string", "minLength": 1, "maxLength": 253},
+                  "rootsPEM": {"type": "string", "minLength": 1, "maxLength": 8192}
+                }
               }
             },
             "allOf": [

@@ -117,7 +117,7 @@ func ResolveProfileEndpointDefinition(entries []ProfileEndpointEntry, r targets.
 	if err != nil {
 		return out, profileEndpointTargetError(err)
 	}
-	if s.definition.TLS != nil || s.definition.Credential != nil {
+	if s.definition.Credential != nil {
 		return out, targets.ErrUnsupported
 	}
 	d := s.definition
@@ -127,6 +127,10 @@ func ResolveProfileEndpointDefinition(entries []ProfileEndpointEntry, r targets.
 	}
 	out = targets.ProfileEndpointDefinitionResolution{Request: r, SourceClusterID: d.Source.ClusterID, SourceNamespaceUID: d.Source.NamespaceUID, SourceUID: d.Source.ResourceUID, SourceName: d.Source.Name, SourceDigest: d.Source.Digest, DefinitionDigest: digest,
 		ScopeNamespaceUID: d.ScopeNamespaceUID, Host: d.Host, PathPolicy: d.PathPolicy, LoopbackFamily: d.LoopbackFamily, AddressModes: slices.Clone(d.AddressModes), MinimumPort: d.MinimumPort, MaximumPort: d.MaximumPort, SourceKind: s.kind, AddressMode: s.addressMode, Port: s.port}
+	if d.TLS != nil {
+		t := d.TLS
+		out.TLS = targets.ProfileEndpointTLSDefinition{TrustClusterID: t.Trust.ClusterID, TrustNamespaceUID: t.Trust.NamespaceUID, TrustUID: t.Trust.ResourceUID, TrustName: t.Trust.Name, TrustDigest: t.Trust.Digest, ServerName: t.ServerName}
+	}
 	if s.binding != nil {
 		out.Binding = &targets.ProfileEndpointBinding{Name: s.binding.Name, TemplateRef: s.binding.TemplateRef, AddressMode: s.binding.AddressMode, PortName: s.binding.PortName}
 	}
@@ -143,6 +147,10 @@ func PolicyProfileEndpointFromResolution(a targets.ProfileEndpointDefinitionReso
 		return nil, value.ErrInvalid
 	}
 	d := value.GoEndpointDefinition{ScopeNamespaceUID: a.ScopeNamespaceUID, Source: value.GoEndpointSource{ClusterID: a.SourceClusterID, NamespaceUID: a.SourceNamespaceUID, ResourceUID: a.SourceUID, Name: a.SourceName, Digest: a.SourceDigest}, Host: a.Host, PathPolicy: a.PathPolicy, LoopbackFamily: a.LoopbackFamily, AddressModes: slices.Clone(a.AddressModes), MinimumPort: a.MinimumPort, MaximumPort: a.MaximumPort}
+	if !a.TLS.IsZero() {
+		t := a.TLS
+		d.TLS = &value.GoEndpointTLS{Trust: value.GoEndpointSource{ClusterID: t.TrustClusterID, NamespaceUID: t.TrustNamespaceUID, ResourceUID: t.TrustUID, Name: t.TrustName, Digest: t.TrustDigest}, ServerName: t.ServerName}
+	}
 	digest, err := ProfileEndpointDefinitionDigest(d)
 	if err != nil || digest != a.DefinitionDigest {
 		return nil, value.ErrInvalid

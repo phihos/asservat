@@ -143,7 +143,7 @@ func RunNode(ctx context.Context, podUID string) error {
 	facts := probeNode()
 	mechanisms := collector.Assess(facts)
 	if gadget.ProfileDialAvailable() && facts.HostProcesses == collector.Supported {
-		mechanisms = append(mechanisms, collector.Availability{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable})
+		mechanisms = append(mechanisms, collector.Availability{Mechanism: collector.MechanismProfile, Prerequisites: true, Adapter: collector.AdapterAvailable, ProfileTLS: true})
 	}
 	// The syscall recorder decodes x86_64 numbers only (ADR-273).
 	if runtime.GOARCH != "amd64" {

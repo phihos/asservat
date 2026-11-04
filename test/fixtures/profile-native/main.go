@@ -4,6 +4,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,7 +34,14 @@ func burnCPU() {
 }
 func main() {
 	var heavy *acceptedHeavy
-	if len(os.Args) != 1 {
+	var servingTLS *tls.Config
+	if len(os.Args) > 1 && os.Args[1] == "--tls" {
+		var err error
+		servingTLS, err = profileWorkloadTLS(os.Args[1:])
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else if len(os.Args) != 1 {
 		if len(os.Args) != 2 || os.Args[1] != "--accepted-heavy" {
 			log.Fatal("unknown synthetic profile workload mode")
 		}
@@ -75,7 +83,9 @@ func main() {
 		httppprof.Profile(w, r)
 	})
 	workload := http.NewServeMux()
-	workload.Handle("/", profiles)
+	if servingTLS == nil {
+		workload.Handle("/", profiles)
+	}
 	workload.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("synthetic profile workload\n")) })
 	// Test-owner controls exist only in this synthetic workload, on its existing
 	// health listener. Product acquisition never calls these paths or stops a
@@ -160,7 +170,11 @@ func main() {
 		log.Fatal((&http.Server{Addr: "127.0.0.1:6070", Handler: redirect, ReadHeaderTimeout: 5 * time.Second}).ListenAndServe())
 	}()
 	go func() {
-		log.Fatal((&http.Server{Addr: "127.0.0.1:6060", Handler: profiles, ReadHeaderTimeout: 5 * time.Second}).ListenAndServe())
+		server := &http.Server{Addr: "127.0.0.1:6060", Handler: profiles, ReadHeaderTimeout: 5 * time.Second, TLSConfig: servingTLS}
+		if servingTLS != nil {
+			log.Fatal(server.ListenAndServeTLS("", ""))
+		}
+		log.Fatal(server.ListenAndServe())
 	}()
 	log.Fatal((&http.Server{Addr: ":8080", Handler: workload, ReadHeaderTimeout: 5 * time.Second}).ListenAndServe())
 }
@@ -232,4 +246,42 @@ func (h *acceptedHeavy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.FormatInt(h.sizes[ordinal], 10))
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = io.CopyN(w, io.NewSectionReader(h.files[ordinal], 0, h.sizes[ordinal]), h.sizes[ordinal])
+}
+
+// Test-owned application TLS material is mounted only in this synthetic Pod.
+// A malformed explicit mode never falls back to a plaintext profile listener.
+func profileWorkloadTLS(args []string) (*tls.Config, error) {
+	if len(args) != 3 || args[0] != "--tls" {
+		return nil, fmt.Errorf("invalid synthetic profile TLS arguments")
+	}
+	read := func(path string) ([]byte, error) {
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+		info, err := file.Stat()
+		if err != nil || !info.Mode().IsRegular() || info.Size() > 8<<10 {
+			return nil, fmt.Errorf("invalid bounded profile TLS file")
+		}
+		data, err := io.ReadAll(io.LimitReader(file, (8<<10)+1))
+		if err != nil || len(data) > 8<<10 {
+			return nil, fmt.Errorf("invalid bounded profile TLS material")
+		}
+		return data, nil
+	}
+	cert, err := read(args[1])
+	if err != nil {
+		return nil, err
+	}
+	key, err := read(args[2])
+	if err != nil {
+		return nil, err
+	}
+	defer clear(key)
+	pair, err := tls.X509KeyPair(cert, key)
+	if err != nil {
+		return nil, err
+	}
+	return &tls.Config{Certificates: []tls.Certificate{pair}, MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}}, nil
 }

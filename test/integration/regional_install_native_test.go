@@ -98,7 +98,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		// join. Discovery walks namespaces in name order, about 100 s per pass,
 		// so a namespace sorting before the system ones is enrolled early in its
 		// first pass instead of the second.
-		w := createRegionalWorkload(t, ctx, region, offer.Image, "apps-regional", index == 1 && installedJourneyFocus() == "native-paced")
+		w := createRegionalWorkload(t, ctx, region, offer.Image, "apps-regional", index == 1 && installedJourneyFocus() == "native-paced", f.ProfileTLSDirectory)
 		budget := newRegionalBudget(t, ctx, hub, namespace, issuer, envelope.Binding.ClusterID, index)
 		budget.addPolicy()
 		budget.addBinding(w)
@@ -138,7 +138,11 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		args = append(args, "--collector-namespace", "asservat-collector", "--collector-name", "asservat-node")
 	}
 	if executor && (installedProfileFocus() || installedJourneyFocus() == "policy-profile") && index == 1 {
-		endpoints, err := json.Marshal(manualProfileEndpoints())
+		configured := manualProfileEndpoints()
+		if installedTLSProfileTransport() {
+			configured = manualTLSProfileEndpoints(manualProfileTLSFixture(t, f.ProfileTLSDirectory).Roots)
+		}
+		endpoints, err := json.Marshal(configured)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -177,7 +181,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		qualifyRegionalExecutor(t, ctx, admin, region, offer, installed, peer)
 		qualifyRegionalJoin(t, ctx, hub, hubObserver, hubKubeconfig, namespace, installation, *installed.Join, index)
 		if offer.Capacity != nil {
-			qualifyRegionalCapacity(t, ctx, admin, hub, hubObserver, region, namespace, issuer, journey, installation, offer, installed, index, existing)
+			qualifyRegionalCapacity(t, ctx, admin, hub, hubObserver, region, namespace, issuer, journey, installation, offer, installed, index, existing, f.ProfileTLSDirectory)
 		}
 	}
 	if !installedRegionalInstallerChecks(index) {
@@ -642,7 +646,7 @@ func nodeInternalIP(t *testing.T, ctx context.Context, api kubernetes.Interface,
 // hub-worker enrolls that workload through v2 to ready_at with a fresh binding.
 // Workload cluster index n adds its own policy, binding and pool slot; the
 // pool then holds n revisions.
-func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation, index int, existing *regionalPrepared) {
+func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation, index int, existing *regionalPrepared, tlsDirectory string) {
 	t.Helper()
 	j := installed.Join
 	if j == nil || j.Capacity == nil || !slices.Equal(j.Capacity.Keys, slices.Sorted(slices.Values(offer.Capacity.Keys))) {
@@ -689,7 +693,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	if existing == nil {
 		budget = newRegionalBudget(t, ctx, hub, namespace, issuer, cluster, index)
 		budget.addPolicy()
-		w = createRegionalWorkload(t, ctx, region, offer.Image, "regional-apps", index == 1 && installedJourneyFocus() == "native-paced")
+		w = createRegionalWorkload(t, ctx, region, offer.Image, "regional-apps", index == 1 && installedJourneyFocus() == "native-paced", tlsDirectory)
 		budget.addBinding(w)
 		t.Log("operator added the regional budget policy, pool slot, workload and maintainer binding")
 	}
@@ -993,7 +997,7 @@ func regionalWorkloadResources(nativePaced bool) core.ResourceRequirements {
 	return out
 }
 
-func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes.Interface, image, name string, nativePaced bool) regionalWorkload {
+func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes.Interface, image, name string, nativePaced bool, tlsDirectories ...string) regionalWorkload {
 	t.Helper()
 	// The regional workload: a labeled namespace (the selector guard admits
 	// the administrator) and a Deployment with no replicas.
@@ -1013,6 +1017,8 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 		command = []string{"/provider-proxy", "signals"}
 	}
 	var ports []core.ContainerPort
+	var volumes []core.Volume
+	var volumeMounts []core.VolumeMount
 	if installedProfileFocus() || installedJourneyFocus() == "policy-profile" {
 		command = []string{"/profile-native"}
 		if installedAcceptedHeavyComparison() {
@@ -1020,12 +1026,26 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 		}
 		ports = []core.ContainerPort{{Name: "diagnostics", ContainerPort: 6060}}
 	}
+	if installedProfileFocus() && installedTLSProfileTransport() {
+		if len(tlsDirectories) != 1 {
+			t.Fatal("private TLS application fixture directory missing")
+		}
+		material := manualProfileTLSFixture(t, tlsDirectories[0])
+		defer clear(material.Key)
+		if _, err := region.CoreV1().Secrets(ns.Name).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "profile-application-tls"}, Type: core.SecretTypeTLS, Immutable: ptr.To(true), Data: map[string][]byte{"tls.crt": material.Certificate, "tls.key": material.Key}}, meta.CreateOptions{}); err != nil {
+			t.Fatal("synthetic app-only TLS Secret", err)
+		}
+		command = append(command, "--tls", "/run/profile-tls/tls.crt", "/run/profile-tls/tls.key")
+		volumes = []core.Volume{{Name: "profile-tls", VolumeSource: core.VolumeSource{Secret: &core.SecretVolumeSource{SecretName: "profile-application-tls", DefaultMode: ptr.To(int32(0444))}}}}
+		volumeMounts = []core.VolumeMount{{Name: "profile-tls", MountPath: "/run/profile-tls", ReadOnly: true}}
+	}
+
 	// One running replica the installed journey captures from: the product
 	// image's idle proxy under a restricted security context.
 	app, err := region.AppsV1().Deployments(ns.Name).Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "regional-app"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Selector: &meta.LabelSelector{MatchLabels: labels},
 		Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{AutomountServiceAccountToken: ptr.To(false), TerminationGracePeriodSeconds: ptr.To(int64(3)),
 			SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},
-			Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command, Ports: ports,
+			Volumes:         volumes, Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command, Ports: ports, VolumeMounts: volumeMounts,
 				Resources:       regionalWorkloadResources(nativePaced),
 				SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}}}}}, meta.CreateOptions{})
 	if err != nil {

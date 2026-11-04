@@ -22,6 +22,20 @@ func (c *NodeChannel) SetProfileSink(s ProfileSink) {
 	c.profileSink = s
 }
 
+// ProfileTLSAvailable requires an explicit current implementation capability;
+// the older goProfile advertisement establishes HTTP support only.
+func (v NodeView) ProfileTLSAvailable() bool {
+	if !v.RecorderAvailable(collector.MechanismProfile) {
+		return false
+	}
+	for _, m := range v.Report.Mechanisms {
+		if m.Mechanism == collector.MechanismProfile {
+			return m.ProfileTLS
+		}
+	}
+	return false
+}
+
 func (c *NodeChannel) EnqueueProfile(ctx context.Context, p collector.ProfileCapture, startBy time.Time) (collector.Work, error) {
 	if ctx == nil || ctx.Err() != nil || !p.Valid() {
 		return collector.Work{}, ErrNodeInvalid
@@ -34,7 +48,7 @@ func (c *NodeChannel) EnqueueProfile(ctx context.Context, p collector.ProfileCap
 	defer c.mu.Unlock()
 	now := c.now()
 	e := c.nodes[p.Request.NodeUID]
-	if e == nil || e.id.NodeName != p.Request.Pin.NodeName || e.id.Epoch != p.CollectorEpoch || e.id.BootID != p.Request.NodeBootID || !c.view(e, now).RecorderAvailable(collector.MechanismProfile) || !now.Before(startBy) || startBy.After(p.Request.Deadline.Add(-p.Request.Parameters.Duration-2*time.Second)) || ctx.Err() != nil {
+	if e == nil || e.id.NodeName != p.Request.Pin.NodeName || e.id.Epoch != p.CollectorEpoch || e.id.BootID != p.Request.NodeBootID || !c.view(e, now).RecorderAvailable(collector.MechanismProfile) || (!p.TLS.IsZero() && !c.view(e, now).ProfileTLSAvailable()) || !now.Before(startBy) || startBy.After(p.Request.Deadline.Add(-p.Request.Parameters.Duration-2*time.Second)) || ctx.Err() != nil {
 		return collector.Work{}, ErrNodeUnavailable
 	}
 	for id, pending := range e.captures {

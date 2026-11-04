@@ -21,6 +21,32 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_tls_transport_alias_is_closed_and_keeps_cpu_limits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fake=Path(directory)/"python3"
+            fake.write_text('#!/usr/bin/python3\nimport json,os,sys\nprint(json.dumps({"args":sys.argv[1:],"focus":os.environ.get("ASSERVAT_JOURNEY_FOCUS"),"variant":os.environ.get("ASSERVAT_PROFILE_VARIANT"),"transport":os.environ.get("ASSERVAT_PROFILE_TRANSPORT")}))\n')
+            fake.chmod(0o755)
+            env=dict(os.environ,PATH=directory+os.pathsep+os.environ["PATH"],ASSERVAT_PROFILE_VARIANT="heap",ASSERVAT_PROFILE_TRANSPORT="typo")
+            result=subprocess.run([str(Path(__file__).with_name("ci-native.sh")),"continuation-manual-profile-tls"],env=env,capture_output=True,text=True,check=True)
+            selected=json.loads(result.stdout)
+            self.assertEqual(selected,{"args":["scripts/test-context-storage.py","--initial-bootstrap-chain","--runtime-provider-pair","--installer-continuation"],"focus":"manual-profile","variant":"cpu","transport":"tls"})
+        for base in ({"ASSERVAT_PROFILE_TRANSPORT":"typo"},{"ASSERVAT_PROFILE_TRANSPORT":"tls","ASSERVAT_JOURNEY_FOCUS":"profile-comparison"},{"ASSERVAT_PROFILE_TRANSPORT":"tls","ASSERVAT_JOURNEY_FOCUS":"manual-profile","ASSERVAT_PROFILE_VARIANT":"heap"}):
+            with self.subTest(base=base),patch.dict(os.environ,base,clear=True),patch.object(fixture,"run",side_effect=AssertionError("external setup")) as external:
+                with self.assertRaisesRegex(ValueError,"transport"):
+                    fixture.main(installer_continuation=True)
+                external.assert_not_called()
+        with patch.dict(os.environ,{"ASSERVAT_PROFILE_TRANSPORT":"tls","ASSERVAT_JOURNEY_FOCUS":"manual-profile","ASSERVAT_PROFILE_VARIANT":"cpu"},clear=True),patch.object(fixture,"run",side_effect=AssertionError("external setup")) as external:
+            with self.assertRaisesRegex(ValueError,"transport"):
+                fixture.main(installer_continuation=False)
+            external.assert_not_called()
+        self.assertEqual(fixture.qualification_profile_transport({}),"http")
+        with patch.dict(os.environ,{"ASSERVAT_JOURNEY_FOCUS":"manual-profile","ASSERVAT_PROFILE_VARIANT":"cpu","ASSERVAT_PROFILE_TRANSPORT":"tls"},clear=True):
+            self.assertEqual(fixture.qualification_profile_transport(os.environ),"tls")
+            self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True),"18m")
+            self.assertEqual(fixture.qualification_cluster_count(3,installer_continuation=True),2)
+        workflow=(Path(__file__).resolve().parents[1]/".github/workflows/native.yml").read_text()
+        self.assertIn("matrix.suite != 'continuation-manual-profile-tls'",workflow)
+
     def test_accepted_heavy_alias_keeps_existing_focus_limits_and_pins_variant(self):
         with tempfile.TemporaryDirectory() as directory:
             fake=Path(directory)/"python3"

@@ -1,7 +1,9 @@
 package planning
 
 import (
+	"asservat.local/asservat/internal/domain/execution"
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"os"
@@ -51,96 +53,110 @@ func TestPolicyProfilesUseSameFiniteModesRecipesAndProvenanceAsManual(t *testing
 		{"mutex", "cumulative", "", "5s", false}, {"mutex", "delta", "1s", "6s", false},
 		{"threadcreate", "cumulative", "", "5s", false}, {"threadcreate", "delta", "1s", "6s", false},
 	} {
-		t.Run(tc.typ+"/"+tc.mode+"/"+tc.timeout, func(t *testing.T) {
-			raw, err := os.ReadFile("profiles/go-cpu-v1.json")
-			if err != nil {
-				t.Fatal(err)
+		for _, tlsEnabled := range []bool{false, true} {
+			name := "http"
+			if tlsEnabled {
+				name = "tls"
 			}
-			var doc map[string]any
-			if json.Unmarshal(raw, &doc) != nil {
-				t.Fatal("profile fixture")
-			}
-			doc["name"] = "finite-profile"
-			recipe := doc["definition"].(map[string]any)["recipe"].(map[string]any)
-			a := recipe["actions"].([]any)[0].(map[string]any)
-			p := a["parameters"].(map[string]any)
-			p["type"], p["mode"], p["forceGC"] = tc.typ, tc.mode, tc.gc
-			if tc.duration == "" {
-				delete(p, "duration")
-			} else {
-				p["duration"] = tc.duration
-			}
-			a["limits"].(map[string]any)["timeout"] = tc.timeout
-			recipe["maxDuration"] = "90s"
-			raw, _ = json.Marshal(doc)
-			c := cpuComposition()
-			c.MaxDuration = "90s"
-			ref := value.ProfileRef{Catalog: "namespace", Name: "finite-profile", Version: "v1"}
-			c.Components[0].Profile = ref
-			c.Resolved = []value.CatalogProfile{{Ref: ref, SourceClusterID: endpointID(1), SourceNamespaceUID: "namespace-payments-uid", SourceUID: "profile-uid", Document: raw, Enabled: true, Deprecated: true}}
-			_, err = CompilePolicyRecorder(c, nil)
-			var needed PolicyProfileEndpointNeeded
-			if !errors.As(err, &needed) || len(needed.Bindings) != 1 {
-				t.Fatal("no target-independent definition request", err)
-			}
-			in, now := recorderInput(t, c, "profile")
-			in.NodeRecorder = true
-			in.Deadline = now.Add(2 * time.Minute)
-			in.Target.ExecutionClass, in.Target.NodeUID, in.Target.NodeBootID, in.Target.Pin.NodeName = artifact.ContextAPIExecution, "", "", ""
-			base, _ := endpointInput()
-			d := base.Catalog.Templates[0]
-			d.Source.Name = needed.Bindings[0].TemplateRef
-			entries := []ProfileEndpointEntry{{Definition: d}}
-			query := targets.ProfileEndpointDefinitionRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace, SourceRef: needed.SourceRef, Bindings: needed.Bindings}
-			answer, err := ResolveProfileEndpointDefinition(entries, query)
-			if err != nil {
-				t.Fatal(err)
-			}
-			pin, err := PolicyProfileEndpointFromResolution(answer)
-			if err != nil {
-				t.Fatal(err)
-			}
-			parent, err := CompilePolicyRecorder(c, nil, pin)
-			if err != nil || !parent.Valid() {
-				t.Fatal("finite parent invalid", err)
-			}
-			_, err = CompileRecorder(in, nil, now)
-			var childNeed EndpointResolutionNeeded
-			if !errors.As(err, &childNeed) {
-				t.Fatal(err)
-			}
-			network := base.Network
-			network.Target = in.Target
-			childEndpoint, err := ResolveProfileEndpointRequest(entries, network, childNeed.Request, now)
-			if err != nil {
-				t.Fatal(err)
-			}
-			childEndpoint.ResolvedAt = now
-			in.Endpoints = []targets.ProfileEndpointResolution{childEndpoint}
-			child, err := CompileRecorder(in, nil, now)
-			if err != nil || !AcceptableProfile(child).Acceptable() {
-				t.Fatal("manual child invalid", err)
-			}
-			actual := child.Actions[0]
-			actual.EndpointDigest = ""
-			var scope recorderScope
-			if json.Unmarshal(child.CanonicalScope, &scope) != nil {
-				t.Fatal("child scope")
-			}
-			if !reflect.DeepEqual(actual, parent.Action) || parent.Profile != child.Profiles[0] || parent.RecipeDigest != child.RecipeDigest || !bytes.Equal(parent.Recipe, scope.Recipe) || !parent.ProfileEndpoint.Matches(childEndpoint) {
-				t.Fatal("parent/child identity differs")
-			}
-			for _, forbidden := range [][]byte{[]byte(`"PodUID"`), []byte(`"EndpointDigest"`), []byte(`"ResolvedAt"`), []byte(`"NodeBootID"`)} {
-				if bytes.Contains(parent.Scope, forbidden) {
-					t.Fatal("runtime identity in parent scope")
+			t.Run(name+"/"+tc.typ+"/"+tc.mode+"/"+tc.timeout, func(t *testing.T) {
+				raw, err := os.ReadFile("profiles/go-cpu-v1.json")
+				if err != nil {
+					t.Fatal(err)
 				}
-			}
-			changed := pin.Clone()
-			changed.Definition.Host = "changed.invalid"
-			if _, err = CompilePolicyRecorder(c, nil, changed); err == nil {
-				t.Fatal("modified definition retained old digest")
-			}
-		})
+				var doc map[string]any
+				if json.Unmarshal(raw, &doc) != nil {
+					t.Fatal("profile fixture")
+				}
+				doc["name"] = "finite-profile"
+				recipe := doc["definition"].(map[string]any)["recipe"].(map[string]any)
+				a := recipe["actions"].([]any)[0].(map[string]any)
+				p := a["parameters"].(map[string]any)
+				p["type"], p["mode"], p["forceGC"] = tc.typ, tc.mode, tc.gc
+				if tc.duration == "" {
+					delete(p, "duration")
+				} else {
+					p["duration"] = tc.duration
+				}
+				a["limits"].(map[string]any)["timeout"] = tc.timeout
+				recipe["maxDuration"] = "90s"
+				raw, _ = json.Marshal(doc)
+				c := cpuComposition()
+				c.MaxDuration = "90s"
+				ref := value.ProfileRef{Catalog: "namespace", Name: "finite-profile", Version: "v1"}
+				c.Components[0].Profile = ref
+				c.Resolved = []value.CatalogProfile{{Ref: ref, SourceClusterID: endpointID(1), SourceNamespaceUID: "namespace-payments-uid", SourceUID: "profile-uid", Document: raw, Enabled: true, Deprecated: true}}
+				_, err = CompilePolicyRecorder(c, nil)
+				var needed PolicyProfileEndpointNeeded
+				if !errors.As(err, &needed) || len(needed.Bindings) != 1 {
+					t.Fatal("no target-independent definition request", err)
+				}
+				in, now := recorderInput(t, c, "profile")
+				in.NodeRecorder = true
+				in.Deadline = now.Add(2 * time.Minute)
+				in.Target.ExecutionClass, in.Target.NodeUID, in.Target.NodeBootID, in.Target.Pin.NodeName = artifact.ContextAPIExecution, "", "", ""
+				base, _ := endpointInput()
+				d := base.Catalog.Templates[0]
+				d.Source.Name = needed.Bindings[0].TemplateRef
+				entries := []ProfileEndpointEntry{{Definition: d}}
+				if tlsEnabled {
+					material := execution.GoProfileTLSMaterial{RootsPEM: "public certificate fixture", ServerName: "pprof.example.invalid"}
+					material.RootsDigest = artifact.Digest(sha256.Sum256([]byte(material.RootsPEM)))
+					trust := d.Source
+					trust.Digest = material.RootsDigest
+					entries[0].Definition.TLS = &value.GoEndpointTLS{Trust: trust, ServerName: material.ServerName}
+					entries[0].TLSMaterial = material
+				}
+				query := targets.ProfileEndpointDefinitionRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace, SourceRef: needed.SourceRef, Bindings: needed.Bindings}
+				answer, err := ResolveProfileEndpointDefinition(entries, query)
+				if err != nil {
+					t.Fatal(err)
+				}
+				pin, err := PolicyProfileEndpointFromResolution(answer)
+				if err != nil {
+					t.Fatal(err)
+				}
+				parent, err := CompilePolicyRecorder(c, nil, pin)
+				if err != nil || !parent.Valid() {
+					t.Fatal("finite parent invalid", err)
+				}
+				_, err = CompileRecorder(in, nil, now)
+				var childNeed EndpointResolutionNeeded
+				if !errors.As(err, &childNeed) {
+					t.Fatal(err)
+				}
+				network := base.Network
+				network.Target = in.Target
+				childEndpoint, err := ResolveProfileEndpointRequest(entries, network, childNeed.Request, now)
+				if err != nil {
+					t.Fatal(err)
+				}
+				childEndpoint.ResolvedAt = now
+				in.Endpoints = []targets.ProfileEndpointResolution{childEndpoint}
+				child, err := CompileRecorder(in, nil, now)
+				if err != nil || !AcceptableProfile(child).Acceptable() {
+					t.Fatal("manual child invalid", err)
+				}
+				actual := child.Actions[0]
+				actual.EndpointDigest = ""
+				var scope recorderScope
+				if json.Unmarshal(child.CanonicalScope, &scope) != nil {
+					t.Fatal("child scope")
+				}
+				if !reflect.DeepEqual(actual, parent.Action) || parent.Profile != child.Profiles[0] || parent.RecipeDigest != child.RecipeDigest || !bytes.Equal(parent.Recipe, scope.Recipe) || !parent.ProfileEndpoint.Matches(childEndpoint) {
+					t.Fatal("parent/child identity differs")
+				}
+				for _, forbidden := range [][]byte{[]byte(`"PodUID"`), []byte(`"EndpointDigest"`), []byte(`"ResolvedAt"`), []byte(`"NodeBootID"`)} {
+					if bytes.Contains(parent.Scope, forbidden) {
+						t.Fatal("runtime identity in parent scope")
+					}
+				}
+				changed := pin.Clone()
+				changed.Definition.Host = "changed.invalid"
+				if _, err = CompilePolicyRecorder(c, nil, changed); err == nil {
+					t.Fatal("modified definition retained old digest")
+				}
+			})
+		}
 	}
 }
 
@@ -169,7 +185,16 @@ func TestPolicyEndpointDefinitionSharesDigestAndRefusesUnqualifiedDependencies(t
 		t.Fatal("credential definition silently projected", err)
 	}
 	entries[0].Definition.Credential = nil
-	if _, err = ResolveProfileEndpointDefinition(entries, r); !errors.Is(err, targets.ErrUnsupported) {
-		t.Fatal("TLS definition silently projected", err)
+	a, err = ResolveProfileEndpointDefinition(entries, r)
+	if err != nil || a.TLS.IsZero() {
+		t.Fatal("public TLS definition lost", err)
+	}
+	pin, err := PolicyProfileEndpointFromResolution(a)
+	if err != nil || !reflect.DeepEqual(pin.Definition.TLS, entries[0].Definition.TLS) {
+		t.Fatal("TLS public identity changed", err)
+	}
+	a.TLS.ServerName = "changed.invalid"
+	if _, err = PolicyProfileEndpointFromResolution(a); err == nil {
+		t.Fatal("changed TLS identity retained old digest")
 	}
 }

@@ -68,6 +68,11 @@ for package in packages:
                     # SHA-1 is only the RFC 4122 UUIDv5 row locator in profile_comparison_keys.go.
                     # Key use and authorization still require independently checked parents.
                     allowed |= {"crypto/sha256", "crypto/sha1"}
+                # The finite execution TLS value binds bounded PUBLIC root
+                # material to its SHA-256 identity. This pure comparison does
+                # not parse X.509, use keys, or permit network/storage/JSON I/O.
+                if package["ImportPath"] == module+"/internal/domain/execution":
+                    allowed |= {"crypto/sha256"}
                 if imported not in allowed:
                     raise ValueError(f"Domain import is not a pure value utility: {imported}")
             if source != "bootstrap" and components[source]["layer"] in {"domain", "application"} and "." in imported.split("/")[0]:

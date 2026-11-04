@@ -354,6 +354,21 @@ def check_cluster(directory):
     assert pod["containers"][0]["command"][-2] == "--profile-endpoints" and json.loads(pod["containers"][0]["command"][-1]) == endpoints
     role = next(r for r in rendered if r["kind"] == "ClusterRole")
     assert not any("secrets" in r["resources"] and "list" in r["verbs"] for r in role["rules"])
+    # ADR-299: public TLS configuration uses the same flag and no new RBAC.
+    # Rendering is not certificate validation or installed TLS qualification.
+    tls = {"serverName": "localhost", "rootsPEM": "PUBLIC-CERTIFICATE-FIXTURE"}
+    tls_endpoints = [{**endpoints[0], "tls": tls}]
+    executor["cluster"]["profileEndpoints"] = tls_endpoints
+    docs = render(executor)
+    pod = next(r for r in docs if r["kind"] == "Job")["spec"]["template"]["spec"]
+    assert pod["containers"][0]["command"][-2] == "--profile-endpoints"
+    assert json.loads(pod["containers"][0]["command"][-1]) == tls_endpoints
+    assert next(r for r in docs if r["kind"] == "ClusterRole")["rules"] == role["rules"]
+    for invalid in [{"serverName": "localhost"}, {"rootsPEM": "PUBLIC"},
+                    {**tls, "insecureSkipVerify": True}, {**tls, "credential": "not-accepted"},
+                    {**tls, "rootsPEM": "x" * 8193}, {**tls, "serverName": ""}]:
+        executor["cluster"]["profileEndpoints"] = [{**endpoints[0], "tls": invalid}]
+        render(executor, ok=False)
     executor["cluster"]["profileEndpoints"] = [{**endpoints[0], "url": "http://unapproved.invalid"}]
     render(executor, ok=False)
     executor["cluster"]["profileEndpoints"] = [{**endpoints[1], "minPort": 1}]

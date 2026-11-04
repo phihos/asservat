@@ -13,7 +13,11 @@ import (
 
 func WireProfile(p collector.ProfileCapture) contracts.NodeProfileCapture {
 	r := p.Request
-	return contracts.NodeProfileCapture{CaptureID: p.CaptureID, ClusterID: r.Binding.ClusterID, ArtifactID: r.Binding.ArtifactID, AttemptID: r.Binding.AttemptID, Namespace: r.Pin.Namespace, NamespaceUID: r.Pin.NamespaceUID, PodName: r.Pin.Name, PodUID: r.Pin.UID, ControllerUID: r.Pin.ControllerUID, NodeName: r.Pin.NodeName, NodeUID: r.NodeUID, BootID: r.NodeBootID, CollectorEpoch: p.CollectorEpoch, ExpectationDigest: hex.EncodeToString(p.ExpectationDigest[:]), EndpointDigest: hex.EncodeToString(r.EndpointDigest[:]), DefinitionDigest: hex.EncodeToString(p.DefinitionDigest[:]), SourceRef: r.SourceRef, Type: r.Parameters.Type, Mode: r.Parameters.Mode, DurationMillis: r.Parameters.Duration.Milliseconds(), ForceGC: r.Parameters.ForceGC, NativeLimit: r.NativeLimit, NotBefore: r.NotBefore, Deadline: r.Deadline, AddressMode: p.AddressMode, Address: p.Address.String(), Port: p.Port, Host: p.Host}
+	var material contracts.NodeProfileTLS
+	if !p.TLS.IsZero() {
+		material = contracts.NodeProfileTLS{RootsPEM: p.TLS.RootsPEM, RootsDigest: hex.EncodeToString(p.TLS.RootsDigest[:]), ServerName: p.TLS.ServerName}
+	}
+	return contracts.NodeProfileCapture{CaptureID: p.CaptureID, ClusterID: r.Binding.ClusterID, ArtifactID: r.Binding.ArtifactID, AttemptID: r.Binding.AttemptID, Namespace: r.Pin.Namespace, NamespaceUID: r.Pin.NamespaceUID, PodName: r.Pin.Name, PodUID: r.Pin.UID, ControllerUID: r.Pin.ControllerUID, NodeName: r.Pin.NodeName, NodeUID: r.NodeUID, BootID: r.NodeBootID, CollectorEpoch: p.CollectorEpoch, ExpectationDigest: hex.EncodeToString(p.ExpectationDigest[:]), EndpointDigest: hex.EncodeToString(r.EndpointDigest[:]), DefinitionDigest: hex.EncodeToString(p.DefinitionDigest[:]), SourceRef: r.SourceRef, Type: r.Parameters.Type, Mode: r.Parameters.Mode, DurationMillis: r.Parameters.Duration.Milliseconds(), ForceGC: r.Parameters.ForceGC, NativeLimit: r.NativeLimit, NotBefore: r.NotBefore, Deadline: r.Deadline, AddressMode: p.AddressMode, Address: p.Address.String(), Port: p.Port, Host: p.Host, TLS: material}
 }
 
 func DomainProfile(p contracts.NodeProfileCapture) (collector.ProfileCapture, bool) {
@@ -25,7 +29,15 @@ func DomainProfile(p contracts.NodeProfileCapture) (collector.ProfileCapture, bo
 		return collector.ProfileCapture{}, false
 	}
 	r := execution.GoProfileRequest{Binding: artifact.Binding{ClusterID: p.ClusterID, ArtifactID: p.ArtifactID, AttemptID: p.AttemptID, MediaType: artifact.ProfileMediaType}, Pin: artifact.PinnedPod{Namespace: p.Namespace, NamespaceUID: p.NamespaceUID, Name: p.PodName, UID: p.PodUID, ControllerUID: p.ControllerUID, NodeName: p.NodeName}, NodeUID: p.NodeUID, NodeBootID: p.BootID, SourceRef: p.SourceRef, EndpointDigest: artifact.Digest(endpoint), Parameters: execution.GoProfileParameters{Type: p.Type, Mode: p.Mode, Duration: time.Duration(p.DurationMillis) * time.Millisecond, ForceGC: p.ForceGC}, NativeLimit: p.NativeLimit, NotBefore: p.NotBefore, Deadline: p.Deadline}
-	out := collector.ProfileCapture{CaptureID: p.CaptureID, CollectorEpoch: p.CollectorEpoch, ExpectationDigest: artifact.Digest(expected), DefinitionDigest: artifact.Digest(definition), Request: r, AddressMode: p.AddressMode, Address: address, Port: p.Port, Host: p.Host}
+	var material execution.GoProfileTLSMaterial
+	if p.TLS != (contracts.NodeProfileTLS{}) {
+		digest, ok := digestHex(p.TLS.RootsDigest)
+		if !ok {
+			return collector.ProfileCapture{}, false
+		}
+		material = execution.GoProfileTLSMaterial{RootsPEM: p.TLS.RootsPEM, RootsDigest: artifact.Digest(digest), ServerName: p.TLS.ServerName}
+	}
+	out := collector.ProfileCapture{CaptureID: p.CaptureID, CollectorEpoch: p.CollectorEpoch, ExpectationDigest: artifact.Digest(expected), DefinitionDigest: artifact.Digest(definition), Request: r, AddressMode: p.AddressMode, Address: address, Port: p.Port, Host: p.Host, TLS: material}
 	return out, out.Valid()
 }
 

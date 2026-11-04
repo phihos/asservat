@@ -28,7 +28,7 @@ func WireStatus(epoch string, r collector.Report) contracts.NodeStatus {
 		Mechanisms: []contracts.NodeAdapter{}, Receipts: []contracts.NodeReceipt{},
 		Budget: contracts.NodeBudget{Ceilings: WireCeilings(r.Budget.Ceilings), RingReserved: r.Budget.RingReserved, FrozenReserved: r.Budget.FrozenReserved, UploadAvailable: r.Budget.UploadAvailable}}
 	for _, m := range r.Mechanisms {
-		a := contracts.NodeAdapter{Mechanism: string(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: string(m.Adapter), Hook: string(m.Hook), Reasons: []string{}}
+		a := contracts.NodeAdapter{Mechanism: string(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: string(m.Adapter), Hook: string(m.Hook), Reasons: []string{}, ProfileTLS: m.ProfileTLS}
 		for _, reason := range m.Reasons {
 			a.Reasons = append(a.Reasons, string(reason))
 		}
@@ -102,7 +102,10 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 		return collector.Report{}, false
 	}
 	for _, m := range s.Mechanisms {
-		a := collector.Availability{Mechanism: collector.Mechanism(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: collector.Adapter(m.Adapter), Hook: collector.Hook(m.Hook), Reasons: []collector.Reason{}}
+		a := collector.Availability{Mechanism: collector.Mechanism(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: collector.Adapter(m.Adapter), Hook: collector.Hook(m.Hook), Reasons: []collector.Reason{}, ProfileTLS: m.ProfileTLS}
+		if a.ProfileTLS && (a.Mechanism != collector.MechanismProfile || !a.Prerequisites || a.Adapter != collector.AdapterAvailable) {
+			return collector.Report{}, false
+		}
 		if (a.Mechanism != collector.MechanismProfile && a.Mechanism != collector.MechanismPacket && a.Mechanism != collector.MechanismSyscall) || (a.Adapter != collector.AdapterAvailable && a.Adapter != collector.AdapterUnavailable) ||
 			(a.Hook != collector.HookNone && a.Hook != collector.HookTCX && a.Hook != collector.HookTC) || len(m.Reasons) > 16 {
 			return collector.Report{}, false

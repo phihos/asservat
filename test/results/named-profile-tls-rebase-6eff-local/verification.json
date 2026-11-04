@@ -1,0 +1,149 @@
+{
+  "format": "asservat-private-tls-rebase-local-archive/v1",
+  "verifiedSource": "008be29ee5d31e1b86f1a72bba5636c99cd30f60",
+  "oldHead": "ed6156f936b19ef82bf345d5652a93102d7f5ffc",
+  "newBase": "6effd250a4d8c114d6815da1a422dfee3bbec716",
+  "scope": "Local private TLS rebase and focused validation only. No installed TLS, real SQL/KMS, browser, native collector or whole-goal qualification.",
+  "rebase": {
+    "signedCommits": 7,
+    "stablePatchIDsMatched": 7,
+    "internalGoBlobsMatched": 33,
+    "mergeConflicts": [],
+    "manualMergeEdits": [],
+    "inheritedTraceADRExact": true,
+    "inheritedTraceRefusalArchitectureSectionExact": true,
+    "sourceInventoryFunctionExact": true
+  },
+  "checks": [
+    {
+      "name": "regional",
+      "command": "/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/test-regional-context-selection.py",
+      "cwd": "/home/phil/Projekte/asservat-profile-tls-integrated",
+      "exit": 0,
+      "log": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/regional.log"
+    },
+    {
+      "name": "trace",
+      "command": "/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/test-runtime-trace-selection.py",
+      "cwd": "/home/phil/Projekte/asservat-profile-tls-integrated",
+      "exit": 0,
+      "log": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/trace.log"
+    },
+    {
+      "name": "heap",
+      "command": "/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/test-heap-browser-selection.py",
+      "cwd": "/home/phil/Projekte/asservat-profile-tls-integrated",
+      "exit": 0,
+      "log": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/heap.log"
+    },
+    {
+      "name": "focused-race",
+      "command": "TMPDIR=/home/phil/.cache/asservat-build/heap-browser-tmp ASSERVAT_PROFILE_TRANSPORT=http ASSERVAT_PROFILE_VARIANT=cpu go test -race ./internal/application/planning ./internal/adapters/kubernetes ./internal/bootstrap ./test/integration ./test/fixtures/profile-native -run '^Test(ProfileEndpoint|PolicyProfile|PolicyEndpoint|NodeProfileTLS|ConnectorProfile|InstalledManualProfile(TLS|Trace(Selector|NamespacePlan|Funding)|Heap|Request|Funds|Stop)|InstalledProfileComparisonFocus|InstalledApprovedRecordingFixtureShape|ProfileTLSFixture)' -count=1",
+      "cwd": "/home/phil/Projekte/asservat-profile-tls-integrated",
+      "exit": 1,
+      "log": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/focused-race.log",
+      "note": "Setup failure ONLY because synthetic app directory uses go:build ignore. Four product/integration packages passed. Corrected package and explicit-file invocations recorded separately; no source edit."
+    },
+    {
+      "name": "focused-race-corrected",
+      "command": "TMPDIR=/home/phil/.cache/asservat-build/heap-browser-tmp ASSERVAT_PROFILE_TRANSPORT=http ASSERVAT_PROFILE_VARIANT=cpu go test -race ./internal/application/planning ./internal/adapters/kubernetes ./internal/bootstrap ./test/integration -run '^Test(ProfileEndpoint|PolicyProfile|PolicyEndpoint|NodeProfileTLS|ConnectorProfile|InstalledManualProfile(TLS|Trace(Selector|NamespacePlan|Funding)|Heap|Request|Funds|Stop)|InstalledProfileComparisonFocus|InstalledApprovedRecordingFixtureShape)' -count=1",
+      "cwd": "/home/phil/Projekte/asservat-profile-tls-integrated",
+      "exit": 0,
+      "log": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/focused-race-corrected.log"
+    },
+    {
+      "name": "app-fixture-race",
+      "command": "TMPDIR=/home/phil/.cache/asservat-build/heap-browser-tmp go test -race ./test/fixtures/profile-native/main.go ./test/fixtures/profile-native/main_test.go -run '^TestProfileTLSFixture' -count=1",
+      "cwd": "/home/phil/Projekte/asservat-profile-tls-integrated",
+      "exit": 0,
+      "log": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/app-fixture-race.log"
+    }
+  ],
+  "independentReview": "syscall_sql reviewed exact 008be29 read-only; no blockers; no checks rerun by reviewer.",
+  "archive": [
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/handoff.json",
+      "archive": "handoff.json.gz",
+      "originalBytes": 4411,
+      "originalSHA256": "209723a6e381442157149b5ed9581c65cc537d76e228619486bbbdf786a453d0",
+      "gzipBytes": 1353,
+      "gzipSHA256": "c9b9a1ab8bba708d9e905309902cee5a99244b1e8520c07559bda00f373f9326",
+      "fullReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/provenance.json",
+      "archive": "provenance.json.gz",
+      "originalBytes": 14034,
+      "originalSHA256": "7984ece56a6eed3299c614a05fd2927fc2288b0b555f00f07eb8b6891fcced09",
+      "gzipBytes": 3543,
+      "gzipSHA256": "2149eabe5519c57ef73217f8a5ad81f8e3d2ea4cc6555437f025cd6583900b80",
+      "fullReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/signatures.json",
+      "archive": "signatures.json.gz",
+      "originalBytes": 1620,
+      "originalSHA256": "30108631ed994ea4195ba77d608748049a0be3943fa4735bc7f2221ab28e0b83",
+      "gzipBytes": 384,
+      "gzipSHA256": "b4e59237693a85582cd698206b1593ec1371535c364f03b01128e75df2aa826a",
+      "fullReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/focused-race.log",
+      "archive": "focused-race.log.gz",
+      "originalBytes": 557,
+      "originalSHA256": "9b6c12b5ab63d52416f193f701ed1e4a4c7067b71877c77cb97122415988502f",
+      "gzipBytes": 244,
+      "gzipSHA256": "fc7b0df8979fe31036e07fe7a525a65dc232a41f11c76edd05721a87032c3c80",
+      "fullReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/focused-race-corrected.log",
+      "archive": "focused-race-corrected.log.gz",
+      "originalBytes": 239,
+      "originalSHA256": "a40fd966c8a72c9cb04ba99da085318a1bb3e4a75df5f6b9b3a574d8a7a4ba64",
+      "gzipBytes": 128,
+      "gzipSHA256": "cdde828ab82109e4fccf5a10a4f1c35d4ed6d94b78b537bab3ba6f9bf9cd95b9",
+      "fullReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/app-fixture-race.log",
+      "archive": "app-fixture-race.log.gz",
+      "originalBytes": 35,
+      "originalSHA256": "981158ee5d19236658b9b441d224f84c8508011aadb7e0e7982a11610e074f5d",
+      "gzipBytes": 55,
+      "gzipSHA256": "77d27b3e8e4377346313dfa2ba04095b63907c25fbf97c8f1cc39aab75a614b0",
+      "fullReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/regional.log",
+      "archive": "regional.log.gz",
+      "originalBytes": 134,
+      "originalSHA256": "1e59361482b86fe1e6a15d10a3a5bfca00f73afbef878148208d080d7fbe0f11",
+      "gzipBytes": 55,
+      "gzipSHA256": "1a66cdc7eaab178ec532af609777b27232cfb7164fce0296f6b81267697505bc",
+      "fullReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/trace.log",
+      "archive": "trace.log.gz",
+      "originalBytes": 101,
+      "originalSHA256": "58976e1ebef02b28fad1bcf93e82831c9ac8cc4bf93fac3ea64e4eed88432c50",
+      "gzipBytes": 54,
+      "gzipSHA256": "5871136fb17f05751054de17e8dfe400b78c56c9bdba6552790968fc80187037",
+      "fullReadbackMatches": true
+    },
+    {
+      "source": "/home/phil/.cache/asservat-build/profile-tls-rebase-6eff/heap.log",
+      "archive": "heap.log.gz",
+      "originalBytes": 100,
+      "originalSHA256": "ff0d9d76afc3dbb79c6b38117df28de76fbde4ee2cb805be51be5cfb3e97579d",
+      "gzipBytes": 53,
+      "gzipSHA256": "543c720a29db33da598b96a40dc653502f6d0d577a732d4e6a3bc2a6cbf67788",
+      "fullReadbackMatches": true
+    }
+  ],
+  "compression": "gzip level9, empty filename, mtime0; every complete decompressed file compared byte-for-byte with the original cache file.",
+  "publication": "Unpublished preparation. Actual PR162 merge/readback and separate installed TLS qualification remain pending.",
+  "archiveOnly": "This proof adds only this results folder after source008be29. Earlier TLS validation archives remain unchanged."
+}

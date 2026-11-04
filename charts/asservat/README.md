@@ -38,6 +38,23 @@ For GitOps, use the same chart and checked-in nonsecret values. Give one adminis
 
 Unknown values are rejected to catch typos and avoid accepting ineffective security settings. Future runtime configuration will use existing Secret references. Never put passwords, tokens, client secrets, private keys or evidence in Helm values: Helm retains release state.
 
+## Named Go profile endpoint TLS
+
+`cluster.profileEndpoints` accepts an optional `tls` object with `serverName`
+and explicit public `rootsPEM`. The installer accepts only certificate PEM and
+caps each input/canonical bundle at 8 KiB; all endpoint entries together retain
+the existing 64 KiB JSON limit. The chart does not accept credentials, paths,
+headers, URLs or an insecure TLS switch. Use a reusable template rather than
+repeating large root bundles across per-application entries.
+
+Upgrade connectors before collectors: older connector report decoders reject the
+new optional `profileTLS` capability field. New connectors accept older nodes for
+HTTP and refuse TLS starts unless the selected node reports that capability.
+Passive preview alone does not establish node TLS support. TLS uses the existing
+exact target network-namespace connection and original deadline, with no system
+root or HTTP fallback. Installed TLS qualification is pending; this configuration
+contract does not qualify or enable collection. See [ADR-299](../../docs/decisions/299-named-go-endpoint-tls.md).
+
 ## Optional bootstrap
 
 Follow the [bootstrap operator flow](../../docs/installation/helm.md#optional-initial-bootstrap-checkpoint) for exact private file contracts, provider prerequisite recipe, one fresh Helm invocation and terminal-only `installer-resume`. Do not put secret bodies or dynamic UID/OID/digest bundles in values. With continuation enabled, one Pod runs produce, schema, prepare, retire and continue using separated credential mounts and one memory-only scratch volume. All five share the original 1,800-second Pod ceiling; phase and effect deadlines remain unchanged. The hook deletes itself only after success; failed/unknown hooks remain. Resume covers the final continuation as well as the earlier phases. Bootstrap-only completed replay can run without setup SQL/provider files; continuation still needs its documented input references. Private registry input remains a separate ongoing distribution dependency.

@@ -4,15 +4,21 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type disconnectedProfileWriter struct{ header http.Header }
@@ -146,5 +152,75 @@ func TestAcceptedHeavyRejectsMissingEmptyOrOversizedFiles(t *testing.T) {
 	if handler, err := openAcceptedHeavy([2]string{valid, filepath.Join(dir, "absent")}); err == nil {
 		handler.Close()
 		t.Fatal("accepted missing second input")
+	}
+}
+
+func TestProfileTLSFixtureRequiresExactFilesAndVerifiedPeer(t *testing.T) {
+	seed := httptest.NewTLSServer(http.NotFoundHandler())
+	defer seed.Close()
+	directory := t.TempDir()
+	certificate := filepath.Join(directory, "app.crt")
+	keyPath := filepath.Join(directory, "app.key")
+	pair := seed.TLS.Certificates[0]
+	key, err := x509.MarshalPKCS8PrivateKey(pair.PrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(certificate, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: pair.Certificate[0]}), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyPath, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: key}), 0600); err != nil {
+		t.Fatal(err)
+	}
+	clear(key)
+	config, err := profileWorkloadTLS([]string{"--tls", certificate, keyPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var requests atomic.Int32
+	app := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if r.TLS == nil || r.ProtoMajor != 1 {
+			t.Error("fixture served profile without HTTP1.1 TLS")
+		}
+		_, _ = io.WriteString(w, "native")
+	}))
+	app.TLS = config
+	app.StartTLS()
+	defer app.Close()
+	roots := x509.NewCertPool()
+	roots.AddCert(seed.Certificate())
+	for _, name := range []string{"127.0.0.1", "wrong.fixture.invalid"} {
+		transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, ServerName: name, MinVersion: tls.VersionTLS12}}
+		defer transport.CloseIdleConnections()
+		client := &http.Client{Transport: transport, Timeout: time.Second}
+		response, err := client.Get(app.URL + "/debug/pprof/profile?debug=0&seconds=10")
+		if name == "127.0.0.1" {
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := io.ReadAll(response.Body)
+			response.Body.Close()
+			if string(raw) != "native" {
+				t.Fatal("fixture TLS payload")
+			}
+		} else if err == nil {
+			response.Body.Close()
+			t.Fatal("wrong TLS identity reached HTTP")
+		}
+	}
+	if requests.Load() != 1 {
+		t.Fatal("failed peer handshake reached application handler", requests.Load())
+	}
+	for _, args := range [][]string{nil, {"--tls"}, {"--accepted-heavy", certificate, keyPath}, {"--tls", certificate, keyPath, "extra"}, {"--tls", certificate, "missing"}} {
+		if _, err := profileWorkloadTLS(args); err == nil {
+			t.Fatal("explicit invalid TLS mode fell back", args)
+		}
+	}
+	if err := os.WriteFile(certificate, []byte(strings.Repeat("x", 8193)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := profileWorkloadTLS([]string{"--tls", certificate, keyPath}); err == nil {
+		t.Fatal("unbounded TLS file accepted")
 	}
 }

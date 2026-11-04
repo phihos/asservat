@@ -19,6 +19,7 @@ import (
 // Definition.ScopeNamespaceUID is derived per request from Namespaces.
 type ProfileEndpointEntry struct {
 	Definition  value.GoEndpointDefinition
+	TLSMaterial execution.GoProfileTLSMaterial
 	Namespaces  []string
 	Profile     bool
 	AddressMode string
@@ -66,7 +67,27 @@ func ResolveProfileEndpointPlan(entries []ProfileEndpointEntry, network targets.
 	if err != nil {
 		return out, profileEndpointTargetError(err)
 	}
-	return plan, nil
+	if plan.Definition.Credential != nil {
+		return out, targets.ErrUnsupported
+	}
+	for _, e := range entries {
+		if e.Definition.Source != plan.Definition.Source {
+			continue
+		}
+		if plan.Definition.TLS == nil {
+			if !e.TLSMaterial.IsZero() {
+				return out, targets.ErrInvalid
+			}
+		} else {
+			t := plan.Definition.TLS
+			if !e.TLSMaterial.Valid() || e.TLSMaterial.RootsDigest != t.Trust.Digest || e.TLSMaterial.ServerName != t.ServerName {
+				return out, targets.ErrUnsupported
+			}
+			plan.TLSMaterial = e.TLSMaterial
+		}
+		return plan, nil
+	}
+	return out, targets.ErrInvalid
 }
 
 func profileEndpointTargetError(err error) error {
