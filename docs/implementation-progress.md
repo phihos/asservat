@@ -47,6 +47,46 @@ weakening approvals, budgets or deadlines. Their original reports remain in the
 corresponding result directories. Successful qualification above supersedes their
 pending outcomes; no failed run is relabeled as passed.
 
+**Active outcome:** explicit Go endpoint refusals under REQ-PRF-001/002 /
+SC-PRF-002 and [ADR-298](decisions/298-explicit-go-profile-refusals.md), prepared
+in `/home/phil/Projekte/asservat-profile-refusals`, branch
+`feature/profile-refusals`, rebased onto main90c2593b. Known missing/disabled
+endpoint errors now remain ProfileUnavailable through node/regional delivery,
+SQL135 and Failed public progress. Busy/unavailable UI guidance is fixed safe
+text; arbitrary reasons are not echoed. Busy can include capacity or an earlier
+uncertain session, so the UI does not assert a live application profiler exists
+in every case. No new operation, enum restriction, credential, listener,
+configuration, acquisition retry, stop-profiler request or refund is introduced.
+
+SQL135 preserves the prior terminal guard/constraints while adding one outcome;
+retained new-phase rows refuse rollback. Cancellation after failure creates no
+stop work. Integrated profile races and pre-push passed (435 console tests;
+13,543 assertions); full public contract races passed7.414s. Actual SQL/S3
+endpoint-unavailable outcome passed4.168s and135→134→135 passed6.049s, with
+all4,052 reported hashes independently matched to committed source, unchanged
+content, cleanup[] and scratch removed. Fresh empty-schema/activation passed
+147.435s with all4,106 hashes verified and clean terminal cleanup. Those source
+checkpoints predate the upstream unit-only owner socket assertion fix; product
+inputs remain identical. Original reports retain their original source identity.
+
+Final local built-console checks passed33.162s (27journeys/26accessibility scans
+plus restart/comparison mobile drivers); focused failed-action decoding verifies
+no automatic request/retry/result link. Three independent read-only reviews found
+no blockers. Real SQL proofs use synthetic endpoint observations: they do not
+qualify real missing endpoints or application-owned profiler coexistence. Reports
+are retained in `test/results/profile-refusals-local/`, `test/results/profile-refusals-services/`
+and `test/results/profile-refusals-schema/`; the first
+read-only proof's bytea/JSON query failure remains separately archived.
+
+Collector-native and installed manual-profile refusal qualification remain
+pending. The existing synthetic workload has owner-only controls on its existing
+HTTP listener, exact Pod-UID checks and one-request counters. Two independent
+manual reviews precede the installed failures; the fixture waits the exact
+persisted start+15s original uncertainty cutoff before the next attempt. Existing
+CPU summary/repeat, comparison and Stop workflows remain. Original18min Go/20min
+job limits are unchanged. No installed refusal result, S-05 or full-spec exit is
+claimed; the complete-spec goal remains active.
+
 **Merged delivery:** verified Go profile case timing under REQ-PRF-003/004 /
 ADR-297, [PR156](https://github.com/phihos/asservat/pull/156), head
 `08e6a2a3a9af1c80e635ec14ea0b43990411331f`, now main
