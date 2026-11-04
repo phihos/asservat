@@ -333,45 +333,35 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	tokens := identity.mcpTokenSource(origin)
 	client := sdk.NewClient(&sdk.Implementation{Name: "installed-approved-recording", Version: "1"}, nil)
-	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, tokens.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
+	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedRecordingHTTPStatus{installedJourneyBearer{transport, tokens.Token}}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer session.Close()
+	callOnce := func(call context.Context, name string, args any) (installedJourneyEnvelope, string, error) {
+		result, err := installedRecordingCallTool(call, session, name, args)
+		if err != nil {
+			return installedJourneyEnvelope{}, "", err
+		}
+		return installedJourneyReplyCode(wire, name, result)
+	}
 	invoke := func(name string, args any) (installedJourneyEnvelope, string) {
 		t.Helper()
-		call, end := context.WithTimeout(ctx, 45*time.Second)
-		defer end()
-		result, err := session.CallTool(call, &sdk.CallToolParams{Name: name, Arguments: args})
+		reply, code, err := callOnce(ctx, name, args)
 		if err != nil {
 			diagnose()
 			t.Fatal("approved recording MCP", name, err)
 		}
-		reply, code, err := installedJourneyReplyCode(wire, name, result)
-		if err != nil {
-			t.Fatal("approved recording wire", name, err)
-		}
 		return reply, code
 	}
-	read := func(name string, args, out any) {
+	readContext := func(call context.Context, name string, args, out any) {
 		t.Helper()
-		for attempt := 0; attempt < 4; attempt++ {
-			reply, code := invoke(name, args)
-			if code == "" && reply.Status == "ok" {
-				if err := json.Unmarshal(reply.Data, out); err != nil {
-					t.Fatal(name, err)
-				}
-				return
-			}
-			if !installedApprovedRecordingCanRetry(reply, code) || attempt == 3 {
-				diagnose()
-				t.Fatal("approved recording read", name, code)
-			}
-			if err := installedJourneyPause(ctx, 2*time.Second); err != nil {
-				t.Fatal(err)
-			}
+		if err := installedRecordingRead(call, name, args, out, callOnce, installedJourneyPause, t.Logf); err != nil {
+			diagnose()
+			t.Fatal("approved recording read", name, err)
 		}
 	}
+	read := func(name string, args, out any) { readContext(ctx, name, args, out) }
 	var preview installedApprovedRecordingPreview
 	arguments := approvedRecordingArguments(cluster, namespace, workload)
 	if measurement != nil {
@@ -935,7 +925,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if len(profileCapture) != 1 || profileCapture[0].Refused == nil {
 			t.Fatal("manual profile refusal SQL evidence is unavailable")
 		}
-		qualifyManualProfileRefusals(t, ctx, region, namespace, preview.Pods[0].Name, preview.Pods[0].UID, manualProfileArguments(cluster, namespace, workload), read, invoke, func(grantID string) {
+		qualifyManualProfileRefusals(t, ctx, region, namespace, preview.Pods[0].Name, preview.Pods[0].UID, manualProfileArguments(cluster, namespace, workload), read, readContext, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
 			if code := browserCall(browser, "decide_review", map[string]any{"grant_id": grantID, "decision": "approve", "reason": "independent installed profile refusal review", "idempotency_key": "approve-profile-refusal-" + grantID}, nil); code != "" {
 				t.Fatal("profile refusal independent approval", code)

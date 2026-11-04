@@ -14,7 +14,7 @@ import (
 // These are two independently reviewed captures of the original Pod, before
 // the separate Stop journey. Only this synthetic application's owner changes
 // its profiler/endpoint. Production preview and acquisition get no control URL.
-func qualifyManualProfileRefusals(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, pod, uid string, arguments map[string]any, read func(string, any, any), invoke func(string, any) (installedJourneyEnvelope, string), approve func(string), check func(string, string, string) time.Time) {
+func qualifyManualProfileRefusals(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, pod, uid string, arguments map[string]any, read func(string, any, any), readContext func(context.Context, string, any, any), invoke func(string, any) (installedJourneyEnvelope, string), approve func(string), check func(string, string, string) time.Time) {
 	t.Helper()
 	if check == nil {
 		t.Fatal("profile refusal evidence reader missing")
@@ -58,8 +58,10 @@ func qualifyManualProfileRefusals(t *testing.T, ctx context.Context, api kuberne
 		})
 		var progress installedJourneyCaptureProgress
 		until := time.Now().Add(30 * time.Second)
+		pollContext, cancelPoll := context.WithDeadline(ctx, until)
+		defer cancelPoll()
 		for {
-			read("get_capture", map[string]string{"capture_id": capture}, &progress)
+			readContext(pollContext, "get_capture", map[string]string{"capture_id": capture}, &progress)
 			if progress.CaptureID != capture {
 				t.Fatal("profile refusal progress replaced capture identity")
 			}
@@ -69,10 +71,11 @@ func qualifyManualProfileRefusals(t *testing.T, ctx context.Context, api kuberne
 			if progress.Phase != "Pending" && progress.Phase != "Running" || time.Now().After(until) {
 				t.Fatal("profile refusal did not reach expected terminal failure", scenario.reason, progress)
 			}
-			if err := installedJourneyPause(ctx, time.Second); err != nil {
+			if err := installedJourneyPause(pollContext, time.Second); err != nil {
 				t.Fatal(err)
 			}
 		}
+		cancelPoll()
 		if progress.CaseID != "" || len(progress.Actions) != 1 || progress.Actions[0].Phase != "Failed" || progress.Actions[0].ReasonCode != scenario.reason {
 			t.Fatal("profile refusal lost its exact public reason or exposed a result", scenario.reason, progress)
 		}
