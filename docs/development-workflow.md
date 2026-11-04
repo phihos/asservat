@@ -37,7 +37,11 @@ build another test framework or duplicate the production workflow with mocks.
    producer/publication and funded summary ledger against owned SQL/S3 fixtures.
    Run the full Go gate once per final candidate, locally or in exact-commit CI;
    do not repeat unchanged package evidence merely because another agent also
-   worked on the feature. Required checks and their assertions remain intact.
+   worked on the feature. For browser flows or installed-driver changes, run
+   `make console-browser-check`: reuse the exact driver against compiled React,
+   real metadata HTTP decoding and controlled local service facts before the
+   costly installed run. Component tests that inject a controller do not cover
+   that boundary. Required checks and their assertions remain intact.
 3. Before costly installed dispatch, inspect the automated review and resolve
    concrete findings. For migration changes, compile the DDL and exercise empty upgrade/rollback
    in owned PostgreSQL early. sqlc generation does not compile deferred PL/pgSQL

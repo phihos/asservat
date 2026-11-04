@@ -4,6 +4,7 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline';
 import { readInstalledHistoryResponse, parseInstalledHistoryText } from './installed-history-response.mjs';
+import { validOutput_get_case } from '../src/generated/validate-evidence.js';
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]();
 async function command() {
@@ -26,6 +27,9 @@ const browser = await chromium.launch({ headless: true, proxy: { server: config.
 const context = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'en-US', viewport: { width: 1440, height: 900 } });
 let stage = 'session';
 let complete = false;
+let page;
+let caseDiagnostic;
+const errors = [];
 const timeline = [];
 const started = Date.now();
 try {
@@ -40,15 +44,14 @@ try {
     window.fetch = async (input, init) => {
       const response = await original(input, init);
       const path = new URL(typeof input === 'string' ? input : input.url, location.href).pathname;
-      if (/^\/api\/v1\/operations\/(compare_profiles|get_query_result)$/.test(path) && response.status === 200) {
+      if (/^\/api\/v1\/operations\/(get_case|compare_profiles|get_query_result)$/.test(path) && response.status === 200) {
         const key = path + '\n' + (typeof init?.body === 'string' ? init.body : '');
-        response.clone().text().then(text => { if (text.length <= 24_576) replies.set(key, text); }, () => {});
+        response.clone().text().then(text => { if (text.length <= 32_768) replies.set(key, text); }, () => {});
       }
       return response;
     };
   });
-  const page = await context.newPage();
-  const errors = [];
+  page = await context.newPage();
   const seen = [];
   let compareRequests = 0;
   let pollRequests = 0;
@@ -75,6 +78,7 @@ try {
       const response = seen[index++];
       if (new URL(response.url()).pathname !== path) continue;
       let read = await readInstalledHistoryResponse(response);
+      let pageConsumed = false;
       if (read.requestFailed && read.readFailure.includes('ERR_ABORTED') && response.status() === 200) {
         const key = path + '\n' + (response.request().postData() ?? '');
         let text = null;
@@ -85,6 +89,25 @@ try {
         }
         if (text === null) continue; // Superseded before consumption, no replay.
         read = parseInstalledHistoryText(200, text);
+        pageConsumed = true;
+      }
+      if (name === 'get_case') {
+        const reply = read.reply;
+        const artifacts = Array.isArray(reply?.data?.artifacts) ? reply.data.artifacts : [];
+        const data = reply?.data;
+        caseDiagnostic = {
+          http: read.http, status: ['ok', 'error', 'pending'].includes(read.status) ? read.status : 'invalid',
+          body: read.body, pageConsumed, schema: validOutput_get_case(reply),
+          encodedBytes: reply ? Math.min(32_769, Buffer.byteLength(JSON.stringify(reply))) : 0,
+          code: reply?.status === 'error' ? (reply.data?.code === 'NotAvailable' ? 'NotAvailable' : 'other') : 'none',
+          caseMatch: data?.case?.case_id === config.caseID,
+          access: ['ordinary', 'shared'].includes(data?.case?.access) ? data.case.access : 'other',
+          artifactCount: Math.min(32, artifacts.length),
+          selectedPresent: artifacts.some(a => a.artifact_id === config.artifactID),
+          eligibleProfiles: Math.min(32, artifacts.filter(a => a.kind === 'profile' && a.native_format === 'pprof' && a.data_class === 'raw' && Date.parse(a.expires_at) > Date.now()).length),
+          relational: artifacts.length > 0 && new Set(artifacts.map(a => a.artifact_id)).size === artifacts.length && artifacts.every(a => Date.parse(a.expires_at) === Date.parse(a.handling_notice?.expiresAt) && Date.parse(a.handling_notice?.deleteBy) > Date.parse(a.expires_at)),
+        };
+        process.stderr.write('installed comparison case ' + JSON.stringify(caseDiagnostic) + '\n');
       }
       assert.equal(read.http, 200, 'operation HTTP result');
       assert.equal(read.body, 'complete', 'operation body completion');
@@ -98,15 +121,26 @@ try {
     }
     throw new Error('operation response unavailable');
   }
-  stage = 'case';
+  stage = 'case-navigation';
+  const caseFrom = seen.length;
   await page.goto(config.origin + '/cases/' + config.caseID);
+  stage = 'case-response';
+  await observed('get_case', caseFrom);
+  assert(caseDiagnostic?.schema && caseDiagnostic.status === 'ok' && caseDiagnostic.caseMatch && caseDiagnostic.relational && caseDiagnostic.access === 'ordinary' && caseDiagnostic.selectedPresent && caseDiagnostic.eligibleProfiles === 1, 'current ordinary profile case');
+  stage = 'case-heading';
   await expect(page.getByRole('heading', { name: 'Evidence', exact: true })).toBeVisible();
+  stage = 'case-profile-region';
   const panel = page.getByRole('region', { name: 'Saved profile comparison', exact: true });
   await expect(panel).toHaveCount(1, { timeout: 30_000 }); // Two captures are in separate real cases.
   await expect(panel).toBeVisible();
+  stage = 'case-private-state';
   assert.equal(await page.evaluate(() => document.cookie), '');
   assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
-  await panel.getByLabel('Baseline profile', { exact: true }).selectOption(config.artifactID);
+  stage = 'case-baseline-select';
+  const baseline = panel.getByRole('combobox', { name: 'Baseline profile', exact: true });
+  process.stderr.write('installed comparison baseline locator ' + JSON.stringify({ exactLabel: await panel.getByLabel('Baseline profile', { exact: true }).count(), combobox: await baseline.count() }) + '\n');
+  await baseline.selectOption(config.artifactID);
+  stage = 'case-compare-enabled';
   await expect(panel.getByRole('button', { name: 'Compare profiles', exact: true })).toBeEnabled();
   assert.equal(compareRequests + pollRequests, 0, 'no automatic query on case load or selection');
   event({ kind: 'ready' });
@@ -165,8 +199,15 @@ try {
       terminal = true;
     }
   }
-} catch {
-  process.stderr.write(`installed comparison failure stage=${stage}\n` + timeline.slice(-40).join('\n') + '\n');
+} catch (error) {
+  const category = error?.code === 'ERR_ASSERTION' ? 'assertion' : error?.matcherResult ? 'expectation' : error?.name === 'TimeoutError' ? 'timeout' : 'operation';
+  const dom = page && !page.isClosed() ? {
+    evidenceHeading: await page.getByRole('heading', { name: 'Evidence', exact: true }).count() > 0,
+    comparisonRegion: await page.getByRole('region', { name: 'Saved profile comparison', exact: true }).count() > 0,
+    alerts: Math.min(8, await page.getByRole('alert').count()), pageErrors: Math.min(8, errors.length),
+    refresh: await page.getByRole('button', { name: 'Check evidence access', exact: true }).count() > 0,
+  } : {};
+  process.stderr.write(`installed comparison failure stage=${stage} category=${category} dom=${JSON.stringify(dom)}\n` + timeline.slice(-40).join('\n') + '\n');
   process.exitCode = 1;
 } finally {
   await context.close();

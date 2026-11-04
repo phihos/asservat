@@ -24,7 +24,7 @@ console-build:
 	cd web && npm run build
 
 console-browser-check: console-build
-	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart)WithBuiltPackage$$' -v ./test/integration
+	ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="$(ASSERVAT_BUILD_TMP)" go test -count=1 -run '^TestConsole(Browser|NativeRestart|ProfileComparison)WithBuiltPackage$$' -v ./test/integration
 
 .PHONY: openapi-check
 openapi-check:

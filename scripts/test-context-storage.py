@@ -97,7 +97,7 @@ def source_hashes():
     files = [ROOT/"go.mod", ROOT/"go.sum", Path(__file__), ROOT/"scripts/fetch-gadget.sh", ROOT/"scripts/ci-native.sh", ROOT/".github/workflows/native.yml"]
     files += [ROOT/"scripts/package-argument-gadget.py"]
     files += [ROOT/"experiments/syscall-argument-budget"/name for name in ("prepare.py", "pins.json", "program.patch", "budget.h")]
-    files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs", ROOT/"web/scripts/installed-profile-comparison-browser.mjs"]
+    files += [ROOT/"web/package.json", ROOT/"web/package-lock.json", ROOT/"web/scripts/installed-history-browser.mjs", ROOT/"web/scripts/installed-history-response.mjs", ROOT/"web/scripts/installed-profile-comparison-browser.mjs", ROOT/"web/src/generated/validate-evidence.js"]
     files += list((ROOT/"cmd").rglob("*.go")) + list((ROOT/"internal").rglob("*.go")) + list((ROOT/"test/integration").rglob("*.go"))
     files += [ROOT/"scripts/helm_registry.py", ROOT/"scripts/native_kube_audit.py"] + list((ROOT/"charts/asservat").rglob("*"))
     files = [p for p in files if p.is_file()]

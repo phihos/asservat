@@ -26,6 +26,7 @@ type consoleSyntheticCases struct {
 	state     string
 	expiresAt time.Time
 	calls     int
+	profile   bool
 }
 
 func (s *consoleSyntheticCases) GetContextCase(ctx context.Context, current app.CurrentIdentity, id string) (catalog.ContextCase, error) {
@@ -44,7 +45,11 @@ func (s *consoleSyntheticCases) GetContextCase(ctx context.Context, current app.
 	if ctx.Err() != nil || !time.Now().Before(until) {
 		return catalog.ContextCase{}, catalog.ErrUnavailable
 	}
-	return catalog.ContextCase{CaseID: id, ObservedAt: started, ValidUntil: until, Artifacts: []catalog.ContextCaseArtifact{{ArtifactID: consoleCaptureID(81), CaptureID: consoleCaptureID(8), Target: authorization.Target{ClusterID: consoleCaptureID(1), NamespaceUID: "synthetic-namespace-uid", WorkloadUID: "synthetic-workload-uid", PodUID: "synthetic-pod-uid"}, Version: artifact.Digest{9}, ExpiresAt: s.expiresAt, DeleteBy: s.expiresAt.Add(5 * time.Minute)}}}, nil
+	out := catalog.ContextCase{CaseID: id, ObservedAt: started, ValidUntil: until, Artifacts: []catalog.ContextCaseArtifact{{ArtifactID: consoleCaptureID(81), CaptureID: consoleCaptureID(8), Target: authorization.Target{ClusterID: consoleCaptureID(1), NamespaceUID: "synthetic-namespace-uid", WorkloadUID: "synthetic-workload-uid", PodUID: "synthetic-pod-uid"}, Version: artifact.Digest{9}, ExpiresAt: s.expiresAt, DeleteBy: s.expiresAt.Add(5 * time.Minute)}}}
+	if s.profile {
+		out.Artifacts[0].EvidenceType, out.Artifacts[0].NativeType, out.Artifacts[0].DataClass = "profile", artifact.PprofArtifact, "raw"
+	}
+	return out, nil
 }
 func (s *consoleSyntheticCases) control(w http.ResponseWriter, r *http.Request, origin string) {
 	w.Header().Set("Cache-Control", "no-store, private")

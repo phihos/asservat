@@ -130,6 +130,28 @@ key-backend unwrap or installed comparison qualification. Both fixture entry
 points also close narrow roles before their administrator pool. Original reports remain in
 `test/results/profile-comparison-native-41749912523/`.
 
+CI41754221481 passed on `112c0185`. Native41754252503 exited1 in623.227s,
+but its first cross-case read-only MCP comparison completed: full native
+calculation, both three-role key children, public/native batch closure and
+exact384MiB worker/terminal proof passed with20 units. The second installed
+React query was not started: its driver failed during baseline selection after
+`get_case` returnedHTTP200. All4,069 source hashes match, sources were unchanged,
+cleanup was `[]` and scratch was removed. Reports are retained in
+`test/results/profile-comparison-native-41754252503/`.
+
+A local reproduction using the existing GoTLS/built-React console fixture and
+actual metadata decoder confirms valid ordinary profile metadata and a rendered
+comparison panel. The exact wrapping-label locator matches0 elements; the
+semantic baseline combobox matches1. The driver now selects by exact semantic
+combobox role/name. The same installed driver/wrapper passes the full local
+pending/poll/render/close path in3.77s (race package4.834s), and the existing
+console-browser check now selects this regression. That full check passes
+33.075s, including the earlier27 journeys/26 accessibility scans and native
+restart checks. Bounded case-response/DOM/assertion diagnostics retain no case
+body, cookies or function names. Identity, case/query services and source facts
+in this local fixture are synthetic; it does not substitute for the remaining
+installed React qualification. No production UI or permission change is made.
+
 No complete comparison requirement, S-05 slice or supported release is claimed.
 Actual React success after the dispatch fix, maximum-input containment,
 broader native negative cases and the remaining specification remain open.

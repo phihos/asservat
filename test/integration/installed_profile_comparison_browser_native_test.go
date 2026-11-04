@@ -187,6 +187,7 @@ func installedProfileComparisonBrowser(t *testing.T, ctx context.Context, browse
 		if err != nil {
 			fail("terminal process")
 		}
+		t.Logf("installed React comparison joined after rendered-row checks:\n%s", diagnostic.String())
 		cancel()
 	}
 	return invoke, finish
