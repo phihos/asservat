@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-299 — Named Go endpoint TLS](299-named-go-endpoint-tls.md)
+adds bounded explicit public roots over the existing target-netns socket, stable
+manual/policy trust metadata and connector-first capability rollout. Private
+implementation preparation only; installed TLS qualification remains pending.
+
 [ADR-298 — Explicit Go endpoint refusals](298-explicit-go-profile-refusals.md)
 preserves known missing-endpoint failures through progress and verifies
 application-owned profiler coexistence without retry, stop or refund.

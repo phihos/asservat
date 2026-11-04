@@ -26,6 +26,18 @@ Acquire through an administrator-approved endpoint profile or a qualified runtim
 
 The acquisition request originates on the exact target node. Under [ADR-287](../docs/decisions/287-go-profile-acquisition.md), the node uploads its bounded in-memory result directly over the existing authenticated mTLS channel to the accepted regional connector writer, which wraps and encrypts it before managed storage. The immutable target and process-bound attempt select the destination; no alternative destination or hub plaintext proxy is allowed. The node receives no evidence key credentials. Plaintext residency is bounded by the admitted node response limit and original acquisition/upload deadlines; regional encryption uses the existing shared frame-bounded working budget. Named endpoint profiles are administrator-managed entries under the local collection ceiling; they pin target/port/path policy, TLS trust and credential references. To avoid per-application setup tickets, an administrator may also publish a reusable endpoint template. A maintainer binds it in `EvidenceRecipe.spec.endpointBindings` with a local binding name, template reference, approved target address mode and declared pod port name. Profile `source.profileRef` resolves to that local binding or a fully configured administrator profile; duplicate/ambiguous names are rejected. Resolve a port name across the pod specification; reject ambiguous duplicate resolutions and enforce the template's allowed port range, fixed path policy and target identity. No free URL, hostname, credential or path override is accepted. Credentialed templates must explicitly scope the credential to permitted workload identities, so a maintainer cannot redirect a privileged credential to their own listener. Approval binds the resolved template digest and endpoint parameters. Autodetection may suggest a declared port/runtime, but never activates profiling or weakens these checks.
 
+[ADR-299](../docs/decisions/299-named-go-endpoint-tls.md) defines the TLS-only
+implementation boundary for named Go endpoints: protected regional entries may
+carry explicit public certificate roots and a fixed server name. Approval and
+recurring policy definitions bind the public trust source identity, canonical
+material digest and server name; certificate bytes stay outside approval/SQL
+scopes. The existing exact target-netns socket performs TLS peer verification
+before HTTP, within the original deadline. No system roots, DNS lookup, insecure
+mode, cleartext fallback or acquisition retry is added. Credentials remain
+unsupported in this slice. The fixed 8 KiB public PEM cap and connector-first
+`profileTLS` rollout are engineering choices; installed TLS qualification remains
+pending. Old nodes can continue HTTP but cannot start TLS captures.
+
 For Go, generate only the allowlisted `/debug/pprof/<type>` paths; CPU uses `/debug/pprof/profile`. Prefer binary `debug=0`; do not call `/cmdline` or remote `/symbol` as part of profiling. Missing/disabled endpoints yield `ProfileUnavailable`. After an admitted HTTP attempt, this is a terminal failed action with `reason_code: ProfileUnavailable`; a conflicting application-owned session similarly ends with `reason_code: ProfilerBusy`. Neither result publishes an artifact, retries acquisition or refunds the original admitted spend ([ADR-298](../docs/decisions/298-explicit-go-profile-refusals.md)). Asservat does not inject pprof into an existing binary or enable it through an unapproved application mutation.
 
 ### SC-PRF-001

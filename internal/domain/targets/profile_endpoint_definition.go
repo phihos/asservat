@@ -6,6 +6,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -36,9 +37,19 @@ func (r ProfileEndpointDefinitionRequest) Equal(o ProfileEndpointDefinitionReque
 	return r.ClusterID == o.ClusterID && r.Namespace == o.Namespace && r.SourceRef == o.SourceRef && slices.Equal(r.Bindings, o.Bindings)
 }
 
-// ProfileEndpointDefinitionResolution carries only the currently qualified
-// uncredentialed definition. A TLS/credential definition must be refused, not
-// projected without its dependencies. It contains no route or freshness dates.
+// ProfileEndpointTLSDefinition carries public trust identity, never certificate bytes.
+type ProfileEndpointTLSDefinition struct {
+	TrustClusterID, TrustNamespaceUID, TrustUID, TrustName, ServerName string
+	TrustDigest                                                        artifact.Digest
+}
+
+func (t ProfileEndpointTLSDefinition) IsZero() bool { return t == (ProfileEndpointTLSDefinition{}) }
+func (t ProfileEndpointTLSDefinition) Valid() bool {
+	return authorization.UUID(t.TrustClusterID) && (t.TrustNamespaceUID == "" || authorization.UUID(t.TrustNamespaceUID)) && authorization.UUID(t.TrustUID) && identity.Text(t.TrustName, 63) && t.TrustDigest != (artifact.Digest{}) && execution.ValidGoProfileServerName(t.ServerName)
+}
+
+// ProfileEndpointDefinitionResolution carries public uncredentialed definition
+// metadata. It contains no route, certificate bytes or freshness dates.
 type ProfileEndpointDefinitionResolution struct {
 	Request                                                    ProfileEndpointDefinitionRequest
 	SourceClusterID, SourceNamespaceUID, SourceUID, SourceName string
@@ -49,6 +60,7 @@ type ProfileEndpointDefinitionResolution struct {
 	SourceKind, AddressMode                                    string
 	Binding                                                    *ProfileEndpointBinding `json:",omitempty"`
 	Port                                                       uint16
+	TLS                                                        ProfileEndpointTLSDefinition `json:",omitzero"`
 }
 
 func (a ProfileEndpointDefinitionResolution) Clone() ProfileEndpointDefinitionResolution {
@@ -62,6 +74,9 @@ func (a ProfileEndpointDefinitionResolution) Clone() ProfileEndpointDefinitionRe
 }
 
 func (a ProfileEndpointDefinitionResolution) Answers(r ProfileEndpointDefinitionRequest) bool {
+	if !a.TLS.IsZero() && (!a.TLS.Valid() || a.TLS.TrustClusterID != r.ClusterID) {
+		return false
+	}
 	if !r.Valid() || !a.Request.Equal(r) || a.SourceClusterID != r.ClusterID || !authorization.UUID(a.SourceUID) || a.SourceNamespaceUID != "" && !authorization.UUID(a.SourceNamespaceUID) || !identity.Text(a.SourceName, 63) || a.SourceDigest == (artifact.Digest{}) || a.DefinitionDigest == (artifact.Digest{}) || a.ScopeNamespaceUID != "" && a.ScopeNamespaceUID != r.Namespace.UID || !identity.Text(a.Host, 253) || a.PathPolicy != "go-pprof/v1" || a.MinimumPort == 0 || a.MaximumPort < a.MinimumPort || len(a.AddressModes) < 1 || len(a.AddressModes) > 2 || !slices.Contains(a.AddressModes, a.AddressMode) {
 		return false
 	}

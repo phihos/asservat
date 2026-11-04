@@ -15,7 +15,7 @@ import (
 // AcceptableProfile is the finite Go endpoint subset. Samplers and
 // multi-action compositions retain their explicit unavailable boundary.
 func AcceptableProfile(p value.RecorderPlan) RecorderAcceptance {
-	if len(p.Actions) != 1 || len(p.Input.Endpoints) != 1 || p.Actions[0].Kind != "profile" || p.Actions[0].ProfileSource != "httpEndpoint" || p.Actions[0].ProfileRuntime != "go" || p.Approval == nil || p.Approval.DataClass != "raw" || p.Approval.ObservationLimits != nil || p.Input.Endpoints[0].TLS || p.Input.Endpoints[0].Credential {
+	if len(p.Actions) != 1 || len(p.Input.Endpoints) != 1 || p.Actions[0].Kind != "profile" || p.Actions[0].ProfileSource != "httpEndpoint" || p.Actions[0].ProfileRuntime != "go" || p.Approval == nil || p.Approval.DataClass != "raw" || p.Approval.ObservationLimits != nil || p.Input.Endpoints[0].Credential {
 		return RecorderAcceptance{"RecorderUnavailable", "profile_composition", "this release acquires one approved uncredentialed Go endpoint profile per capture"}
 	}
 	return RecorderAcceptance{}

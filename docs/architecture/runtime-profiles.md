@@ -244,6 +244,34 @@ dialing and guard composition, then the existing encrypted custody/publication
 and authenticated native-download workflow. No public capability is enabled.
 
 
+## Named endpoint TLS preparation
+
+[ADR-299](../decisions/299-named-go-endpoint-tls.md) extends protected regional
+endpoint entries with `tls: {serverName, rootsPEM}`. The Kubernetes adapter parses
+all certificate blocks without ignored text or headers, canonicalizes the public
+bundle and retains its SHA-256 under the existing typed `GoEndpointTLS.Trust`
+source. The trust source reuses the protected endpoint identity; its material
+digest and exact server name enter both manual and stable recurring definitions.
+The target-independent regional query carries those public metadata fields only.
+
+A comparable `GoEndpointPlan.TLSMaterial` sidecar is excluded from canonical JSON
+and approval/SQL scope. The selected entry supplies it without another API read;
+regional dispatch and node receipt check its digest/name against the admitted
+public definition. The node uses `tls.Client` over the existing gadget socket,
+explicit roots, HTTP/1.1 and the original operation deadline. TLS does not add a
+second dial, DNS, proxy, fallback or new credential channel. Authentication is
+still refused. The 8 KiB per-bundle, 64 KiB aggregate endpoint configuration and
+256 KiB/16-item node poll bounds are unchanged or explicitly bounded, rather than
+increased to fit the new data.
+
+An optional `profileTLS` flag on the existing Go profile adapter report identifies
+TLS wrapper support. Generic `goProfile` availability alone cannot establish it;
+passive previews may succeed for an old node but actual TLS start/queue admission
+refuses. Upgrade connectors before collectors because the old connector decoder
+rejects unknown report fields. Old reports remain HTTP-only. No additional API,
+RBAC, watch, Job or persistent record is needed. Focused component validation is
+separate from installed TLS qualification, which remains pending.
+
 ## Finite policy endpoint scope
 
 [ADR-296](../decisions/296-finite-policy-go-profiles.md) reuses C-03 policy

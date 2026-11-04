@@ -15,14 +15,21 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 )
 
-type regionProfileDefinition struct{ countingLocal }
+type regionProfileDefinition struct {
+	countingLocal
+	tls bool
+}
 
-func (*regionProfileDefinition) ResolveProfileEndpointDefinition(_ context.Context, r targets.ProfileEndpointDefinitionRequest) (targets.ProfileEndpointDefinitionResolution, error) {
-	return targets.ProfileEndpointDefinitionResolution{Request: r, SourceClusterID: r.ClusterID, SourceUID: r.ClusterID, SourceName: "go-pprof", SourceDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, Host: "localhost", PathPolicy: "go-pprof/v1", LoopbackFamily: "ipv4", AddressModes: []string{"targetLoopback"}, MinimumPort: 6000, MaximumPort: 6999, SourceKind: targets.ProfileEndpointTemplateBinding, AddressMode: "targetLoopback", Binding: &r.Bindings[0]}, nil
+func (p *regionProfileDefinition) ResolveProfileEndpointDefinition(_ context.Context, r targets.ProfileEndpointDefinitionRequest) (targets.ProfileEndpointDefinitionResolution, error) {
+	out := targets.ProfileEndpointDefinitionResolution{Request: r, SourceClusterID: r.ClusterID, SourceUID: r.ClusterID, SourceName: "go-pprof", SourceDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, Host: "localhost", PathPolicy: "go-pprof/v1", LoopbackFamily: "ipv4", AddressModes: []string{"targetLoopback"}, MinimumPort: 6000, MaximumPort: 6999, SourceKind: targets.ProfileEndpointTemplateBinding, AddressMode: "targetLoopback", Binding: &r.Bindings[0]}
+	if p.tls {
+		out.TLS = targets.ProfileEndpointTLSDefinition{TrustClusterID: r.ClusterID, TrustUID: r.ClusterID, TrustName: "go-pprof", TrustDigest: artifact.Digest{3}, ServerName: "localhost"}
+	}
+	return out, nil
 }
 
 func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) {
-	for _, mode := range []string{"answer", "old-region", "wrong-answer", "cancelled"} {
+	for _, mode := range []string{"answer", "tls-answer", "old-region", "wrong-answer", "invalid-tls", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			w := workFixture()
 			cluster := w.Work.Target.ClusterID
@@ -43,7 +50,7 @@ func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) 
 			done := make(chan error, 1)
 			go func() {
 				answer, e := (Targets{Router: router, Now: time.Now}).ResolveProfileEndpointDefinition(ctx, r)
-				if e == nil && !answer.Answers(r) {
+				if e == nil && (!answer.Answers(r) || mode == "tls-answer" && (answer.TLS.TrustDigest != (artifact.Digest{3}) || answer.TLS.ServerName != "localhost" || answer.TLS.TrustUID != cluster)) {
 					e = targets.ErrInvalid
 				}
 				done <- e
@@ -63,7 +70,7 @@ func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) 
 				t.Fatal(err)
 			}
 			defer stream.Close()
-			stream.targets = &regionProfileDefinition{}
+			stream.targets = &regionProfileDefinition{tls: mode == "tls-answer"}
 			if mode == "old-region" {
 				stream.targets = &countingLocal{}
 			}
@@ -92,12 +99,16 @@ func TestProfileEndpointDefinitionCrossesExistingRegionalExchange(t *testing.T) 
 			if mode == "wrong-answer" {
 				job.out.(*targets.ProfileEndpointDefinitionResolution).Request.Namespace.UID = "replacement"
 			}
+			if mode == "invalid-tls" {
+				job.out.(*targets.ProfileEndpointDefinitionResolution).TLS.ServerName = "localhost"
+			}
 			if mode == "cancelled" {
 				cancel()
 			}
 			job.result <- queryResult{until: receiver.ValidUntil, err: resultErr}
 			err = <-done
-			if mode == "answer" && err != nil || mode != "answer" && err == nil {
+			success := mode == "answer" || mode == "tls-answer"
+			if success && err != nil || !success && err == nil {
 				t.Fatal("definition result", mode, err)
 			}
 			if mode == "old-region" && !errors.Is(err, targets.ErrUnsupported) {

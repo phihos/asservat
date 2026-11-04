@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"slices"
 
+	"asservat.local/asservat/internal/adapters/mtls"
 	planner "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/execution"
 	plan "asservat.local/asservat/internal/domain/planning"
 	value "asservat.local/asservat/internal/domain/targets"
 )
@@ -66,6 +68,20 @@ func ProfileEndpointEntries(clusterID string, in []contracts.RegionalProfileEndp
 			entry.Definition.AddressModes, entry.Definition.MinimumPort, entry.Definition.MaximumPort = []string{e.AddressMode}, e.Port, e.Port
 		default:
 			return nil, value.ErrInvalid
+		}
+		if e.TLS != nil {
+			roots, digest, err := mtls.CanonicalProfileRoots(e.TLS.RootsPEM)
+			if err != nil {
+				return nil, value.ErrInvalid
+			}
+			material := execution.GoProfileTLSMaterial{RootsPEM: roots, RootsDigest: digest, ServerName: e.TLS.ServerName}
+			if !material.Valid() {
+				return nil, value.ErrInvalid
+			}
+			trust := entry.Definition.Source
+			trust.Digest = digest
+			entry.Definition.TLS = &plan.GoEndpointTLS{Trust: trust, ServerName: material.ServerName}
+			entry.TLSMaterial = material
 		}
 		if !entry.Definition.Valid() {
 			return nil, value.ErrInvalid

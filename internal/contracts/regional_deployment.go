@@ -118,18 +118,26 @@ type RegionalAPIContext struct {
 // template (kind template) names permitted address modes and a port range
 // that maintainers bind to a declared Pod port; a profile (kind profile) fixes
 // one address mode and port. Neither has a URL, path, header or credential:
-// the path policy is the fixed go-pprof/v1 allowlist.
+// the path policy is the fixed go-pprof/v1 allowlist. Optional TLS carries only
+// explicit public certificate roots and a fixed verification name (ADR-299).
 type RegionalProfileEndpoint struct {
-	Name           string   `json:"name"`
-	Kind           string   `json:"kind"`
-	Namespaces     []string `json:"namespaces,omitempty"`
-	AddressModes   []string `json:"addressModes,omitempty"`
-	MinPort        uint16   `json:"minPort,omitempty"`
-	MaxPort        uint16   `json:"maxPort,omitempty"`
-	AddressMode    string   `json:"addressMode,omitempty"`
-	Port           uint16   `json:"port,omitempty"`
-	LoopbackFamily string   `json:"loopbackFamily,omitempty"`
-	Host           string   `json:"host,omitempty"`
+	Name           string                      `json:"name"`
+	Kind           string                      `json:"kind"`
+	Namespaces     []string                    `json:"namespaces,omitempty"`
+	AddressModes   []string                    `json:"addressModes,omitempty"`
+	MinPort        uint16                      `json:"minPort,omitempty"`
+	MaxPort        uint16                      `json:"maxPort,omitempty"`
+	AddressMode    string                      `json:"addressMode,omitempty"`
+	Port           uint16                      `json:"port,omitempty"`
+	LoopbackFamily string                      `json:"loopbackFamily,omitempty"`
+	Host           string                      `json:"host,omitempty"`
+	TLS            *RegionalProfileEndpointTLS `json:"tls,omitempty"`
+}
+
+// RegionalProfileEndpointTLS contains public trust material, never credentials.
+type RegionalProfileEndpointTLS struct {
+	ServerName string `json:"serverName"`
+	RootsPEM   string `json:"rootsPEM"`
 }
 
 // RegionalIdentityMapping maps one issuer's principals to this cluster's

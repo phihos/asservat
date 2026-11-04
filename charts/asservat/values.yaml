@@ -145,8 +145,11 @@ cluster:
   # /debug/pprof allowlist; there is no URL, path, header or credential.
   # namespaces limits an entry to those namespace names (empty: all).
   # targetLoopback needs loopbackFamily. Previews resolve them without
-  # dialing; profiles are not acquired in this release. Regional executor
-  # only; changing them needs a connector reinstall.
+  # dialing. Regional executor only; changing them needs a connector reinstall.
+  # Optional tls: {serverName, rootsPEM} supplies explicit public certificate
+  # roots (8 KiB per entry; existing 64 KiB aggregate JSON cap still applies).
+  # Upgrade connectors before collectors; TLS needs a profileTLS-capable node.
+  # TLS installed qualification is pending; authentication stays unsupported.
   profileEndpoints: []
   # - name: go-pprof-loopback
   #   kind: template
