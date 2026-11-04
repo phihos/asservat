@@ -1,3 +1,11 @@
+-- name: DeferHistoryCapacityAdmission :exec
+-- sqlc 1.31.1 resolves a bare named SET CONSTRAINTS as a table reference.
+-- Fixed anonymous blocks preserve the exact server-side constraint operation
+-- without a fake schema object or an extra persistent SQL function.
+DO $$ BEGIN SET CONSTRAINTS public.zzz_capacity_new_admission DEFERRED; END $$;
+-- name: CheckHistoryCapacityAdmission :exec
+DO $$ BEGIN SET CONSTRAINTS public.zzz_capacity_new_admission IMMEDIATE; END $$;
+
 -- name: EnsureHistoryQuota :exec
 INSERT INTO capture_history_quota(root_id,selector_key) VALUES($1,$2) ON CONFLICT DO NOTHING;
 -- name: LockHistoryQuota :one

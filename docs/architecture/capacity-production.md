@@ -59,6 +59,19 @@ its current proof and returned receipt keep their original short bounds.
 An already projected duplicate spends no configuration credit and a newer
 persisted observation is retained.
 
+Saving the authored settings of an already accepted capture is separately
+charged metadata, rather than a new collection admission. Under
+[ADR-301](../decisions/301-accepted-history-metadata-capacity.md), schema 136
+checks its actual immutable history association and current root/pool/allocation/
+control funding without consuming the workload binding's live observation.
+The same history transaction charges storage and quotas and creates the four
+copy obligations. Only its custody capacity constraint is deferred until the
+history row exists, then explicitly checked before the final deadline/recovery
+checks. Unassociated attempts keep the ordinary live-workload guard, even if a
+caller defers that constraint. This adds two fixed SQL commands and indexed
+association reads, no refresh demand or Kubernetes calls. Installed qualification
+remains separate from local managed PostgreSQL checks.
+
 [ADR-213](../decisions/213-storage-readiness-at-consumption.md) carries the
 same owned readiness operation from its early hint into final storage
 selection. If a valid binding has lost the required one-second margin,
