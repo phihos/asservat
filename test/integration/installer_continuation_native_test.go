@@ -1015,8 +1015,9 @@ func installNativeCapacityObjects(t *testing.T, ctx context.Context, api kuberne
 		return map[string]int64{"bytes": bytes, "objects": objects}
 	}
 	upload := map[string]int64{"bytesPerSecond": 134217728, "burstBytes": 16777216}
+	systemObjects, burstObjects := installedCapacityObjectPartitions()
 	pool := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceStoragePool", "metadata": map[string]any{"name": "capacity"}, "spec": map[string]any{
-		"storageProfileRef": "dedicated", "capacity": amount(137438953472, 100000), "safetyHeadroom": amount(17179869184, 10000), "systemReserve": amount(8589934592, 10000), "sharedBurst": amount(42949672960, 40000),
+		"storageProfileRef": "dedicated", "capacity": amount(137438953472, 100000), "safetyHeadroom": amount(17179869184, 10000), "systemReserve": amount(8589934592, systemObjects), "sharedBurst": amount(42949672960, burstObjects),
 		"protectedAllocations": []any{map[string]any{"budgetPolicyRef": "applications", "workloadSlots": 4, "protectedPerWorkload": amount(17179869184, 10000)}},
 		"upload":               upload, "maxUploadRequestsPerSecond": 100, "capacityAssurance": "qualifiedReservedBackend"}}
 	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": "applications"}, "spec": map[string]any{

@@ -102,6 +102,20 @@ its corrected exclusive error check and the full diagnostics race package pass
 (14.419s). This changes only a test assertion; the frozen native candidate
 `ddddfd90` and production sources remain unchanged. Original red/green and CI
 logs are retained in `test/results/profile-comparison-service/`.
+The second frozen native run41740409366 exited1 in699.891s before either
+profile capture: the capacity root never became ready. All4,064 source hashes
+independently match `ddddfd90`; sources were unchanged, cleanup failures are
+`[]` and build scratch was removed. Raising the synthetic fixture from10 to40
+records/account also raised its capture/query history reservation:10,752
+capture/system objects plus8,960 query objects exceed its fixed10,000-object
+system reserve. Required bytes remain below8GiB. The fixture fix reallocates
+its existing100,000-object pool to20,000 system /30,000 shared-burst objects
+for this focus only. The preflight uses actual account/record/object inputs and
+production pool/root/query compilers, retaining synthetic other cost dimensions;
+it reproduces the original refusal and passes the corrected combined19,712-object
+reservation (focused race3.254s; vet and spec-check pass). No production capacity
+limit is relaxed. CI41742136578 passed on the preceding test-corrected `9ac44e0a`. Original reports are in
+`test/results/profile-comparison-native-41740409366/`.
 No comparison requirement or installed result is marked complete. The argument job's cold-start/teardown
 headroom also needs improvement before later installed campaigns. No timeout was
 raised. These saved-view fixtures do not complete arbitrary `syscall_query`,
