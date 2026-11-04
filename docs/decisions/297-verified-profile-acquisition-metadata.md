@@ -1,6 +1,6 @@
 # ADR-297: verified profile acquisition metadata in cases
 
-Status: implementation direction; qualification pending.
+Status: implemented; local/service qualification passed, installed qualification pending.
 
 ## Context
 
@@ -92,3 +92,12 @@ closed browser/MCP parity and actual case UI decoding. Verify unknown/reversed/
 partial windows, cumulative-history wording and process-attribution limits.
 Use frozen-source real SQL/S3 and repository gates before fresh installed case
 verification. No result, complete correlation, S-05 or full-spec exit is claimed.
+
+Local qualification: integrated race/pre-push checks and built-console checks
+passed. Three separate real SQL/S3 fixtures verify new timing, immutable/legacy
+replay, catalog/progress/history-facts parity and migration134 round-trip/refusal.
+Fresh Kubernetes/SQL/S3/OpenBao empty-schema installation and original product-Pod
+activation also passed. Source hashes, actual exits and cleanup are recorded in
+`test/results/profile-timing-services/`, `test/results/profile-timing-schema/`
+and `test/results/profile-timing-local/`. The history fixture does not publish
+history parameters; no complete history-list or installed-profile claim follows.

@@ -47,20 +47,48 @@ weakening approvals, budgets or deadlines. Their original reports remain in the
 corresponding result directories. Successful qualification above supersedes their
 pending outcomes; no failed run is relabeled as passed.
 
-**Active outcome:** truthful case acquisition timing under REQ-PRF-004 / ADR-297.
-Implementation is in progress in `/home/phil/Projekte/asservat-profile-timing`,
-branch `feature/verified-case-timing`, based on merged mainc7c92de0. It returns authenticated
-profile manifest times only after existing complete verification, stores paired
-nullable UTC microsecond metadata in SQL134 and immutable verification audit,
-then reuses existing authorized catalog reads and a typed case collection table.
-Legacy times/clock uncertainty/process attribution stay unknown. No extra
-artifact/key/API read, worker or authority is planned. Domain/verifier, SQL and
-C16/UI implementation and independent cross-reviews are complete. Integrated
-profile race checks and spec/architecture gates passed (13,540 assertions); a
-duplicate browser YAML anchor found in review was corrected before freezing.
-Real-service, upgrade, built-browser and installed timing qualification remain
-pending; no result is claimed before those gates finish. The original complete-spec
-goal remains active.
+**Active outcome:** truthful case acquisition timing under REQ-PRF-003/004 /
+ADR-297, branch `feature/verified-case-timing` in
+`/home/phil/Projekte/asservat-profile-timing`, based on mainc7c92de0. The existing
+complete verifier now retains the authenticated HTTP acquisition window. SQL134
+stores an immutable nullable UTC-microsecond pair in the existing verification
+record and encrypted audit. Authorized catalog reads and closed browser/MCP
+schemas carry the accepted request parameters/window into the case timing table.
+Legacy timing, clock uncertainty and serving-process attribution remain unknown.
+Sealed/native bytes are unchanged; extra API/storage/key requests, workers,
+credentials and background tasks are0.
+
+Integrated profile races, `make pre-push` (431 console tests;13,540 assertions)
+and independent cross-reviews passed. Built React/Go TLS browser checks passed
+33.199s:27 journeys,26 accessibility scans, plus restart/comparison drivers. Known
+CPU and legacy NULL trace rows match the original case response with exactly one
+case read. The initial duplicate YAML anchor and browser all-tables selector
+failure were corrected; the latter's original report remains in
+`test/results/profile-timing-first-browser/`.
+
+Three independent real PostgreSQL/S3/OpenBao fixtures passed: new timing8.887s,
+legacy NULL replay8.866s and schema134→133→134/rollback protection6.281s.
+New/replay/immutable audit, compiled/fixture column-role parity, catalog, progress
+and history-facts parity are verified. These direct-admission fixtures do not
+publish history parameters or qualify history-list visibility. All4,043 hashes
+match committed blobs; sources unchanged, cleanup failures[] and scratch removed.
+The original missing fixture INSERT grants and incorrectly broad history-list
+assertion failures remain archived, alongside successful service reports in
+`test/results/profile-timing-services/`.
+
+Fresh owned Kubernetes/SQL/S3/OpenBao schema installation and original activation
+passed146.799s with the actual compiled bundle/product Pod. All4,097 hashes match
+committed blobs, sources unchanged, cleanup failures[] and scratch removed; see
+`test/results/profile-timing-schema/`. Local gate/browser logs are in
+`test/results/profile-timing-local/`. Exact-head CI and fresh installed case timing
+remain pending. This does not establish measured clock offsets, serving-process
+correlation, other/longer profile modes, S-05 or full-spec completion.
+
+Next after timing delivery: preserve the required `ProfileUnavailable` result
+through node/regional completion and public progress; qualify busy refusal without
+stopping an application-owned profiler. Existing acquisition mechanisms alone do
+not qualify this developer workflow. The original complete-spec goal remains
+active.
 
 Saved syscall views are merged in [PR150](https://github.com/phihos/asservat/pull/150),
 main `381820beabb16caceb3b378e5f007e094cd1dd15`. Its full tree matches qualified

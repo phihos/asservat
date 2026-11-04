@@ -1,0 +1,39 @@
+{
+  "sourceCommit": "b3242bfb95d70fc22dc82136ab10f1705a643132",
+  "scope": "Real isolated PostgreSQL/S3/OpenBao publication and migration components, synthetic human/endpoint/process facts; history-facts parity, not history-parameter publication or installed capture.",
+  "runs": [
+    {
+      "variant": "verified",
+      "testPattern": "^TestVerifiedProfileAcquisitionWithRealPostgres$",
+      "harnessExit": 0,
+      "goExit": 0,
+      "elapsedSeconds": 11.181144094996853,
+      "sourceHashesMatchedGitBlobs": 4043,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "scratchRemoved": true
+    },
+    {
+      "variant": "legacy",
+      "testPattern": "^TestLegacyProfileAcquisitionWithRealPostgres$",
+      "harnessExit": 0,
+      "goExit": 0,
+      "elapsedSeconds": 11.130225595989032,
+      "sourceHashesMatchedGitBlobs": 4043,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "scratchRemoved": true
+    },
+    {
+      "variant": "upgrade",
+      "testPattern": "^TestCustodyUpgradeSchemaWithRealPostgres$",
+      "harnessExit": 0,
+      "goExit": 0,
+      "elapsedSeconds": 8.526888580003288,
+      "sourceHashesMatchedGitBlobs": 4043,
+      "sourceUnchanged": true,
+      "cleanupFailures": [],
+      "scratchRemoved": true
+    }
+  ]
+}
