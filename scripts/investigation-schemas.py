@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events"]
+NAMES = ["cancel_capture", "list_recordings", "preview_recording_save", "list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share", "stop_future_sharing", "preview_retention_change", "request_policy_grant", "request_raw_access", "get_grant", "list_reviews", "decide_review", "revoke_grant", "list_capture_profiles", "get_capture_profile", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query"]
 
 RECORDER_EDITS = ["packetPeers", "packetFilter", "packetBefore", "packetAfter", "packetRing", "syscallFilter", "syscallMode", "syscallBefore", "syscallAfter", "syscallRing", "syscallArguments", "syscallMaxEvents", "syscallRate", "actionMaxBytes", "actionTimeout", "actionExecutionMode", "profileDuration"]
 
@@ -210,7 +210,7 @@ def main():
                 data["properties"]["logical_path"] = {"const": "pod-status.txt"}
                 data["properties"]["lines"]["maxItems"] = 14
             else:
-                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events"]}
+                data["properties"]["tool_name"] = {"enum": ["get_file_excerpt", "get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query"]}
                 # The Go validator additionally applies the original output
                 # schema and relational request/timing checks to this object.
             output["allOf"] = [{"oneOf": branches}]
@@ -218,7 +218,7 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name in ("get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events"):
+        if name in ("get_http_headers", "get_profile_summary", "get_pcap_summary", "pcap_query", "compare_profiles", "get_syscall_summary", "get_syscall_events", "syscall_query"):
             # ADR-282/291: the whole canonical input and output. Each page is an
             # approved query: pending with its handle, the page served by
             # get_query_result. The cursor is the next record index bound to
@@ -245,8 +245,13 @@ def main():
                 output["properties"]["narrowing_hint"] = copy.deepcopy(common["properties"]["narrowing_hint"])
                 output["properties"]["next_cursor"] = {"type": "null"}
                 branches[0]["properties"]["provenance"] = {"type": "array", "minItems": 1, "maxItems": 1}
+            if name == "syscall_query":
+                output["properties"]["data_class"] = {"enum": ["metadata", "raw"]}
+                output["properties"]["truncated"] = {"type": "boolean"}
+                output["properties"]["narrowing_hint"] = copy.deepcopy(common["properties"]["narrowing_hint"])
+                branches[0]["properties"]["provenance"] = {"type": "array", "minItems": 1, "maxItems": 1}
             output["allOf"] = [{"oneOf": branches}]
-            if name == "pcap_query":
+            if name in ("pcap_query", "syscall_query"):
                 # A limited page needs the same useful hint as the canonical
                 # browser/MCP result; only its poll wrapper remains untruncated.
                 output["allOf"].extend(copy.deepcopy(common.get("allOf", [])))
@@ -266,7 +271,7 @@ def main():
             description.pop("enabledByDefault", None)
             branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
             if name == "request_raw_access":
-                description["inputSchema"]["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": True, "items": {"enum": ["download_artifact", "pcap_query"]}}
+                description["inputSchema"]["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": True, "items": {"enum": ["download_artifact", "pcap_query", "syscall_query"]}}
                 description["description"] = "Request independent approval for native download or bounded packet queries over exact existing raw artifacts. Reuse a covering approval; a download-only approval does not authorize a packet query."
             if name == "preview_recording_save":
                 # Protected recording-save reasons use the accepted opaque audit path.
@@ -326,7 +331,7 @@ def main():
             # ADR-305: download_artifact/pcap_query, at most four clients and sixteen
             # actions, a pool of at most 256 GiB; the plan must need review.
             access = copy.deepcopy(documents["investigation-access.schema.json"]["$defs"]["request"])
-            access["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": True, "items": {"enum": ["download_artifact", "pcap_query"]}}
+            access["properties"]["operations"] = {"type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": True, "items": {"enum": ["download_artifact", "pcap_query", "syscall_query"]}}
             access["properties"]["clientIDs"]["maxItems"] = 4
             access["properties"]["actionIds"]["maxItems"] = 16
             access["properties"]["actionIds"]["items"]["maxLength"] = 64

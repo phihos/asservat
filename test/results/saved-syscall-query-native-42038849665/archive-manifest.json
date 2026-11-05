@@ -1,0 +1,93 @@
+{
+  "format": "installed-syscall-query-cancelled/v1",
+  "source_commit": "973c9b135f7406dd768845dc7f8696c46129fdd3",
+  "workflow_conclusion": "cancelled",
+  "artifact_zip_bytes": 3699,
+  "artifact_zip_sha256": "a0dbc1948c0d76ebe0c58ede8276cdb0a602d27158d7ff51410c7f3b266dd02f",
+  "go_exit": null,
+  "harness_exit": null,
+  "source_inventory": null,
+  "cleanup_report": null,
+  "members": [
+    {
+      "member": "ci-native-continuation-manual-arguments.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42038849665/artifacts/ci-native-continuation-manual-arguments.log",
+      "original_bytes": 3312,
+      "original_sha256": "c58aaceaa69134d9e02196a56dcb621a117d98d675ae14191a789932097e6da8",
+      "gzip_bytes": 1202,
+      "gzip_sha256": "fefa04c7f08cc95e8e197f1aa484da3e9e016e0ba806aa9648d235c7ef0ea990"
+    },
+    {
+      "member": "context-storage-timing.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42038849665/artifacts/context-storage-timing.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "context-storage.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42038849665/artifacts/context-storage.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "manual-arguments.jsonl.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42038849665/artifacts/manual-arguments.jsonl",
+      "original_bytes": 33489,
+      "original_sha256": "0328566ff661df415ed2e0aa900e3d0491c0d3a5d5ab6fbd5a0940475b403030",
+      "gzip_bytes": 1906,
+      "gzip_sha256": "0919e5b9af58c92ee2199036d94d62cb99481d37595c904b1804e4f3463e6bbc"
+    },
+    {
+      "member": "terminal.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42038849665/terminal.json",
+      "original_bytes": 4888,
+      "original_sha256": "11393c3d3a90e8a8731ba624e4867f2d45d9edb7bc1e2f493075d575407d85d2",
+      "gzip_bytes": 887,
+      "gzip_sha256": "b35a3d0ccaf44fd4fffc29bd6bc10e438f1d8818c1ed9eaf7a1d78b878528986"
+    },
+    {
+      "member": "artifacts.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42038849665/artifacts.json",
+      "original_bytes": 749,
+      "original_sha256": "65c543d1fdccc99f105b9c53d01857daeefd5075201f3979fffb325e6028ae1d",
+      "gzip_bytes": 453,
+      "gzip_sha256": "e2f30aa5d6d3bcd3dc8887ba85ee8d7b37e902cf718fbd46cf337a181a29dd31"
+    },
+    {
+      "member": "workflow.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42038849665/workflow.log",
+      "original_bytes": 128007,
+      "original_sha256": "624bc44ccc849e1923b229be4e9ea91042705367978a8badfaade5c0fef342a1",
+      "gzip_bytes": 17953,
+      "gzip_sha256": "c352013b0fb27dcf24edef4bcf2113a0581ce07d52e707fc5f9f411636d8768c"
+    },
+    {
+      "member": "973c-ci-terminal.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/973c-ci-terminal.json",
+      "original_bytes": 22677,
+      "original_sha256": "aae768814a679ffce6c86c838ad8eb054c198f93f7d1590817b4daac939f8ffe",
+      "gzip_bytes": 1941,
+      "gzip_sha256": "b2c58660d62141d8ab292359e33765dbcec1e690784879e3e76ca6058e9f1695"
+    },
+    {
+      "member": "973c-ci-failed.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/973c-ci-failed.log",
+      "original_bytes": 74433,
+      "original_sha256": "af665bd1d3a7e9e1e535de67e5ce6b59df78e7adf35be349f60d5772160030ce",
+      "gzip_bytes": 12182,
+      "gzip_sha256": "ca13ee69f9c28633c73537b9a1c410e48b1e25ff8e3361cdad0f903c2c4e7b0c"
+    },
+    {
+      "member": "terminal-summary.txt.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-native-42038849665/terminal-summary.txt",
+      "original_bytes": 616,
+      "original_sha256": "a12a7d2d033ff1d5565c1a26b05cd5f2609c60bab079e3992c03b19f25d12ead",
+      "gzip_bytes": 404,
+      "gzip_sha256": "9dd7ee268218d634245c6323b8a58a133d5bb5ef1ccc50ee300b3a06a2ae09ae"
+    }
+  ]
+}

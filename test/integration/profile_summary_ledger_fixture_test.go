@@ -36,9 +36,13 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	t.Helper()
 	ctx, admin, poolFor := f.ctx, f.admin, f.fixturePool
 	raw := len(rawPacket) > 0 && rawPacket[0]
+	rawSyscall := len(rawPacket) > 1 && rawPacket[1]
 	evidenceType := "profile"
 	if raw {
 		evidenceType = "packetCapture"
+	}
+	if rawSyscall {
+		evidenceType = "syscallTrace"
 	}
 	s, publisher, _ := f.prepareManagedContext(t, root, enrollment, 60)
 	in := s.a.Plan.Input
@@ -56,7 +60,11 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	c := planvalue.ProfileComposition{Components: []planvalue.ProfileComponent{{ID: "cpu", Profile: planvalue.ProfileRef{Catalog: "builtin", Name: "go-cpu", Version: "v1"}, Edits: []planvalue.ProfileEdit{{ActionID: "cpu", Field: "actionMaxBytes", Number: 1 << 20}}}}, MaxTotalBytes: 16 << 20, MaxDuration: "30s"}
 	input := planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: c, Retention: in.Retention, Deadline: now.Add(time.Minute), NodeRecorder: true}
 	var reviewed planvalue.RecorderPlan
-	if raw {
+	if rawSyscall {
+		c = manualArgumentSQLComposition(t, in.Target)
+		input.Composition = c
+		reviewed, err = planning.CompileRecorder(input, installedArgumentsCompiler{}, now)
+	} else if raw {
 		c = rawPacketSummaryComposition(t, in.Target.Request)
 		input.Composition = c
 		reviewed, err = planning.CompileRecorder(input, recordingCompiler{}, now)
@@ -73,7 +81,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 		t.Fatal("reviewed source", err)
 	}
 
-	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
+	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesFor(reviewed.Actions), RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &c, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: reviewOf(in.Retention), Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: input.Deadline}
 	pools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
@@ -89,7 +97,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 		t.Fatal(err)
 	}
 	g := authorization.Grant{ID: custodyID(), RootID: p.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: p.ScopeDigest, Scope: p.CanonicalScope, Review: []byte(`{}`), DataClass: "raw", Reasons: []authorization.SensitiveReason{{ActionID: reviewed.Actions[0].ID, Code: planvalue.ReasonLiveProfile}}, Lifetime: time.Hour, Revision: 1}
-	if raw {
+	if raw || rawSyscall {
 		g.Reasons = reviewed.Approval.Reasons
 	}
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
@@ -98,7 +106,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 		t.Fatal("profile review", err)
 	}
 	in.Deadline = input.Deadline
-	if raw {
+	if raw || rawSyscall {
 		in.Recorder, err = planning.RecorderContextFromScope(c, reviewed.CanonicalScope)
 	} else {
 		in.Profile, err = planning.ProfileContextFromScope(c, in.Target.Request, reviewed.CanonicalScope)
@@ -113,7 +121,7 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	s.a.SubmissionDigest = captureapp.ContextRequestDigest(p.ID)
 	r := &s.a.Registration
 	r.NativeLimit = 1 << 20
-	if raw {
+	if raw || rawSyscall {
 		r.NativeLimit = artifact.RecordingNativeLimit
 	}
 	r.AnchorAt = in.Retention.AnchorAt
@@ -140,7 +148,11 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	if err != nil {
 		t.Fatal("approved profile admission", err)
 	}
-	if raw {
+	if rawSyscall {
+		if accepted.Expectation.NativeType != artifact.SyscallArgumentsArtifact || accepted.Expectation.Recording == nil || accepted.Expectation.Recording.Arguments == nil || accepted.Expectation.DataClass != "raw" {
+			t.Fatal("rawsyscall admitted with wrong shape")
+		}
+	} else if raw {
 		if accepted.Expectation.Recording == nil || accepted.Expectation.Recording.Profile != "rawPackets" || accepted.Expectation.NativeType != artifact.RawPCAPNGArtifact || accepted.Expectation.DataClass != "raw" {
 			t.Fatal("raw admitted with wrong shape")
 		}
@@ -216,7 +228,20 @@ func startQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, s captureAdmis
 	var original execution.APIExecution
 	var first bool
 	var err error
-	if accepted.Expectation.NativeType == artifact.RawPCAPNGArtifact {
+	if accepted.Expectation.NativeType == artifact.SyscallArgumentsArtifact {
+		source := targets.PacketSourceObservation{PodUID: accepted.Expectation.PodUID, NodeUID: custodyID(), BootID: custodyID(), CollectorPodUID: custodyID(), CollectorEpoch: custodyID(), ObservedAt: check.Plan.Input.Target.ObservedAt, FreshUntil: check.ValidUntil}
+		var permit collector.ArgumentObservationPermit
+		original, first, permit, err = execSQL.PrepareArgumentRecording(f.ctx, check, source)
+		if err == nil && (!permit.ValidFinite(time.Now()) || permit.ByteCredit <= 0 || permit.EventCredit <= 0) {
+			t.Fatal("raw syscall finite observation preparation")
+		}
+		if err == nil {
+			replay, again, prior, e := execSQL.PrepareArgumentRecording(f.ctx, check, source)
+			if e != nil || again || !reflect.DeepEqual(replay, original) || prior != permit {
+				t.Fatal("argument preparation replay changed original", e)
+			}
+		}
+	} else if accepted.Expectation.NativeType == artifact.RawPCAPNGArtifact {
 		// Raw acquisition uses the existing metered companion, as the production
 		// API executor does. Node/process observations remain explicit synthetic input.
 		source := targets.PacketSourceObservation{PodUID: accepted.Expectation.PodUID, NodeUID: custodyID(), BootID: custodyID(), CollectorPodUID: custodyID(), CollectorEpoch: custodyID(), ObservedAt: check.Plan.Input.Target.ObservedAt, FreshUntil: check.ValidUntil}

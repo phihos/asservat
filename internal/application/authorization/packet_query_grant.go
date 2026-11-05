@@ -21,6 +21,11 @@ func (s GrantService) PacketProjectionGrant(ctx context.Context, current identit
 	if ctx == nil || ctx.Err() != nil || !s.ready() || !scope.Valid() || scope.RootID != s.RootID || scope.NativeType != artifact.RawPCAPNGArtifact || !scope.PacketQuery.Valid() || !value.UUID(scope.RawGrantID) {
 		return zero, time.Time{}, value.ErrGrantScope
 	}
+	return s.rawProjectionGrant(ctx, current, scope, record, materialize, value.GrantPacketQueryOperation)
+}
+
+func (s GrantService) rawProjectionGrant(ctx context.Context, current identities.CurrentIdentity, scope analysis.ContextProjectionScope, record ContextProjectionEvidence, materialize bool, operation string) (analysis.ContextQueryGrant, time.Time, error) {
+	var zero analysis.ContextQueryGrant
 	i, err := s.human(ctx, current, "evidence:read", "evidence:raw")
 	if err != nil || i.Principal != scope.Principal {
 		return zero, time.Time{}, value.ErrGrantPrincipal
@@ -33,7 +38,7 @@ func (s GrantService) PacketProjectionGrant(ctx context.Context, current identit
 	if err != nil || g.RootID != s.RootID || ReviewDigest(g, g.Review) != g.ReviewDigest || g.Kind == value.GrantRawQuery && (!RawQueryScopeMatches(g) || g.RawQuery.CaseID != scope.CaseID) {
 		return zero, time.Time{}, value.ErrGrantScope
 	}
-	if !sameHuman(g.Requester, i.Principal) || g.Kind == value.GrantRawQuery && (g.Requester != i.Principal || !slices.Contains(g.RawQuery.Operations, value.GrantPacketQueryOperation)) || g.Kind == value.GrantAdHocCapture && (g.ResultAccess == nil || !slices.Contains(g.ResultAccess.Operations, value.GrantPacketQueryOperation)) {
+	if !sameHuman(g.Requester, i.Principal) || g.Kind == value.GrantRawQuery && (g.Requester != i.Principal || !slices.Contains(g.RawQuery.Operations, operation)) || g.Kind == value.GrantAdHocCapture && (g.ResultAccess == nil || !slices.Contains(g.ResultAccess.Operations, operation)) {
 		return zero, time.Time{}, value.ErrGrantScope
 	}
 	if err = value.CheckMaterialize(g, output, i.Principal.ClientID, true, s.Now()); err != nil {
@@ -48,10 +53,10 @@ func (s GrantService) PacketProjectionGrant(ctx context.Context, current identit
 	if err != nil || child.Output != output || child.ParentID != g.ID {
 		return zero, time.Time{}, value.ErrGrantScope
 	}
-	if err = value.CheckResultUse(g, child, i, value.GrantPacketQueryOperation, s.Now()); err != nil {
+	if err = value.CheckResultUse(g, child, i, operation, s.Now()); err != nil {
 		return zero, time.Time{}, err
 	}
-	if materialize && !value.PoolCovers(g, value.GrantUse{Operation: value.GrantPacketQueryOperation, Bytes: analysis.ContextResultBytes, Operations: 1}) {
+	if materialize && !value.PoolCovers(g, value.GrantUse{Operation: operation, Bytes: analysis.ContextResultBytes, Operations: 1}) {
 		return zero, time.Time{}, value.ErrGrantPoolExhausted
 	}
 	until := g.ExpiresAt

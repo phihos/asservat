@@ -143,7 +143,7 @@ func qualifyPacketReplayCannotRead(t *testing.T, ctx context.Context, admin, hub
 		if _, err = tx.Exec(ctx, `UPDATE access_grant SET bytes_spent=bytes_spent+24576,operations_spent=operations_spent+1 WHERE root_id=$1 AND id=$2`, q.Scope.RootID, q.Grant.ParentID); err != nil {
 			t.Fatal("replay purpose control debit", err)
 		}
-		if _, err = tx.Exec(ctx, `INSERT INTO access_grant_use(id,root_id,parent_id,child_id,operation,bytes,operations) VALUES($1,$2,$3,$4,'pcap_query',24576,1)`, batch.ID, q.Scope.RootID, q.Grant.ParentID, q.Grant.ChildID); err != nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO access_grant_use(id,root_id,parent_id,child_id,operation,bytes,operations) VALUES($1,$2,$3,$4,$5,24576,1)`, batch.ID, q.Scope.RootID, q.Grant.ParentID, q.Grant.ChildID, q.Scope.BeginTool()); err != nil {
 			t.Fatal("replay purpose control use", err)
 		}
 	}

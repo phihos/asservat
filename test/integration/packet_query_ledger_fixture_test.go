@@ -63,7 +63,15 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		return out
 	}
 	beforeAcquisition := acquisitionSnapshot()
-	qualifySharedProjectionLifecycle(t, f)
+	baselineQueries, baselineUnits := int64(0), int64(0)
+	if f.published.Expectation.NativeType != artifact.SyscallArgumentsArtifact {
+		qualifySharedProjectionLifecycle(t, f)
+		baselineQueries, baselineUnits = 1, 2
+	}
+	var beforeQueries, beforeUnits int64
+	if err := base.admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM context_query WHERE root_id=$1),(SELECT allocated FROM context_query_backing WHERE root_id=$1)`, root).Scan(&beforeQueries, &beforeUnits); err != nil || beforeQueries != baselineQueries || beforeUnits != baselineUnits {
+		t.Fatalf("exact pre-query baseline: queries=%d/%d units=%d/%d err=%v", beforeQueries, baselineQueries, beforeUnits, baselineUnits, err)
+	}
 
 	compiled := func(purpose string) *pgxpool.Pool {
 		t.Helper()
@@ -127,7 +135,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	policySource := packetQueryFixturePolicy{querySQLPolicy{root: root, installation: base.input.InstallationID, epoch: recovery.IssuerEpoch, path: f.profile.Path, packet: true}}
+	policySource := packetQueryFixturePolicy{querySQLPolicy{root: root, installation: base.input.InstallationID, epoch: recovery.IssuerEpoch, path: f.profile.Path, packet: f.published.Expectation.NativeType != artifact.SyscallArgumentsArtifact, syscall: f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact}}
 	queryPolicies, e := authapp.NewContextProjectionPolicies(policySource, time.Now)
 	if e != nil {
 		t.Fatal(e)
@@ -140,11 +148,16 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	scope.SourceProjectionDigest, scope.Selection = artifact.Digest{}, query.LineSelection{}
 	selection := query.PacketQuerySelection{Fields: []query.PacketQueryField{query.PacketIndex, query.PacketCapturedLength, query.PacketWireLength}, MaxPackets: 100, MaxScanBytes: 8 << 20}
 	selection.Program = packetQueryNonemptyProgram()
-	scope.PacketQuery, err = selection.Window()
-	if err != nil {
-		t.Fatal(err)
+	if expected.NativeType == artifact.SyscallArgumentsArtifact {
+		scope.DisplayVersion = query.SyscallQueryDisplayVersion
+		scope.Syscalls = query.SyscallWindow{View: query.SyscallQueryView, Limit: 100}
+	} else {
+		scope.PacketQuery, err = selection.Window()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	rawPacket := expected.NativeType == artifact.RawPCAPNGArtifact
+	rawPacket := expected.NativeType == artifact.RawPCAPNGArtifact || expected.NativeType == artifact.SyscallArgumentsArtifact
 	var grantStore *postgres.AccessGrants
 	if rawPacket {
 		grantStore, err = postgres.NewAccessGrants(ctx, compiled("hub-runtime"), root, s.recovery.guard)
@@ -153,7 +166,11 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		}
 		scope.RawGrantID = packetQueryManagedGrant(t, f, grantStore, scope.Principal, scope.Version, 2*query.ContextResultBytes, 2)
 		grantService := authapp.GrantService{RootID: root, InstallationID: base.input.InstallationID, Permissions: s.p, Store: grantStore, Recovery: s.recovery.reader, Now: time.Now, NewID: custodyID}
-		gate.PacketGrants = grantService
+		if expected.NativeType == artifact.SyscallArgumentsArtifact {
+			gate.SyscallGrants = grantService
+		} else {
+			gate.PacketGrants = grantService
+		}
 	}
 	policy := f.audit.Normal.Policy
 	journal, err := postgres.NewHealthyOperationJournal(ctx, compiled("hub-runtime"), policy, s.recovery.guard)
@@ -196,7 +213,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		who.VerifiedAt, who.ValidUntil = n, intent.RequestUntil
 		var a query.ContextProjectionAuthority
 		var e error
-		if tool == "pcap_query" && !(len(replay) > 0 && replay[0]) {
+		if tool == scope.BeginTool() && !(len(replay) > 0 && replay[0]) {
 			a, e = gate.ResolveProjectionCurrent(call, querySQLIdentity{who}, scope.Candidate())
 		} else {
 			a, e = gate.CheckProjectionCurrent(call, querySQLIdentity{who}, scope)
@@ -242,8 +259,16 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	publicRequest := packetQueryReplayRequest(scope, "packet-query-managed")
-	invocation := query.ContextQueryInvocationKey{Key: publicRequest.IdempotencyKey, RequestDigest: analysisapp.PacketQueryRequestDigest(publicRequest)}
+	var publicRequest query.PacketQueryRequest
+	var syscallRequest query.RawSyscallQueryRequest
+	invocation := query.ContextQueryInvocationKey{Key: "packet-query-managed"}
+	if expected.NativeType == artifact.SyscallArgumentsArtifact {
+		syscallRequest = rawSyscallQueryReplayRequest(scope, invocation.Key)
+		invocation.RequestDigest = analysisapp.RawSyscallQueryRequestDigest(syscallRequest)
+	} else {
+		publicRequest = packetQueryReplayRequest(scope, invocation.Key)
+		invocation.RequestDigest = analysisapp.PacketQueryRequestDigest(publicRequest)
+	}
 	q, err = query.NewContextQuery(custodyID(), intent.ID, custodyID(), initial.authority, plan, time.Now().UTC().Truncate(time.Microsecond), invocation)
 
 	if err != nil {
@@ -293,7 +318,11 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 		whoReplay.Scopes = append(whoReplay.Scopes, "evidence:raw")
 	}
 	whoReplay.VerifiedAt, whoReplay.ValidUntil = replayOwner.request.Call.StartedAt, replayOwner.request.Call.Until
-	qualifyPacketQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, publicRequest, querySQLIdentity{whoReplay}, ledger, gate, s.recovery.reader)
+	if expected.NativeType == artifact.SyscallArgumentsArtifact {
+		qualifyRawSyscallQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, syscallRequest, querySQLIdentity{whoReplay}, ledger, gate, s.recovery.reader)
+	} else {
+		qualifyPacketQueryReplayApplication(t, replayOwner.ctx, q, replayOwner.request, publicRequest, querySQLIdentity{whoReplay}, ledger, gate, s.recovery.reader)
+	}
 	assertPacketReplayDelta(t, beforeReplay, readPacketReplayState(t, ctx, base.admin, q), 1)
 	qualifyPacketReplayBindings(t, ctx, base.admin, compiled("hub-runtime"), ledger, q, replayOwner.request, replayOwner.authority, auditor, replayIntent)
 	finish(replayIntent, "none")
@@ -482,8 +511,8 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
  FROM context_query_batch b JOIN context_query q ON q.id=b.query_id JOIN download_worker w ON w.id=q.worker_id WHERE b.id=$3`, q.ID, q.WorkerID, lastBatch.ID, root).Scan(&downloads, &workersCount, &certificates, &keyRoles, &keyChildren, &queries, &allocated, &nativeClosed, &closed, &active, &audited, &claimed, &bound); err != nil {
 		t.Fatal("independent final state", err)
 	}
-	if downloads != 0 || workersCount != 1 || certificates != 1 || keyRoles != 7 || keyChildren != 1 || queries != 2 || allocated != 2+scope.QueryUnits() || !nativeClosed || !closed || active || !audited || !claimed || !bound {
-		t.Fatalf("unexpected paid final state: downloads=%d workers=%d certificates=%d roles=%d children=%d queries=%d allocated=%d nativeClosed=%t closed=%t active=%t audited=%t claimed=%t bound=%t", downloads, workersCount, certificates, keyRoles, keyChildren, queries, allocated, nativeClosed, closed, active, audited, claimed, bound)
+	if downloads != 0 || workersCount != 1 || certificates != 1 || keyRoles != 7 || keyChildren != 1 || queries != baselineQueries+1 || allocated != baselineUnits+scope.QueryUnits() || !nativeClosed || !closed || active || !audited || !claimed || !bound {
+		t.Fatalf("unexpected paid final state: downloads=%d workers=%d certificates=%d roles=%d children=%d queries=%d/%d allocated=%d/%d nativeClosed=%t closed=%t active=%t audited=%t claimed=%t bound=%t", downloads, workersCount, certificates, keyRoles, keyChildren, queries, baselineQueries+1, allocated, baselineUnits+scope.QueryUnits(), nativeClosed, closed, active, audited, claimed, bound)
 	}
 
 	var batches, roles, children int
@@ -550,7 +579,7 @@ func qualifyPacketQueryManagedLifecycle(t *testing.T, f *queryLedgerFixture) {
 	if err != nil || !stored.Equal(q) {
 		t.Fatal("lifecycle changed original query/deadlines", err)
 	}
-	t.Log("compiled packet-query lifecycle: existing summary retained; four query units/two page batches, same public key/deadlines, raw pages each24KiB/one operation, actual hub/key roles and six consumed roles; native+public close; Job/Pod/issuer/join inputs synthetic")
+	t.Log("compiled " + packetQueryFixtureOperation(f) + " lifecycle: packet sources retain existing summary; four query units/two page batches, same public key/deadlines, raw pages each24KiB/one operation, actual hub/key roles and six consumed roles; native+public close; Job/Pod/issuer/join inputs synthetic")
 }
 
 func packetQueryManagedGrant(t *testing.T, f *queryLedgerFixture, store *postgres.AccessGrants, actor identity.Principal, version artifact.Digest, maxBytes, ops int64) string {
@@ -563,12 +592,12 @@ func packetQueryManagedGrant(t *testing.T, f *queryLedgerFixture, store *postgre
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	output := value.VerifiedOutput{CaptureID: e.CaptureUID, ActionID: e.ActionID, ArtifactID: e.Registration.Location.ArtifactID, ExecutionDigest: e.PlanDigest, ArtifactDigest: version, Target: value.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}}
-	raw := value.RawQueryScope{CaseID: e.CaseID, Artifacts: []value.RawQueryArtifact{{Output: output, NativeBytes: 0, ExpiresAt: e.Registration.ExpiresAt}}, Operations: []string{value.GrantDownloadOperation, value.GrantPacketQueryOperation}, Reason: "Review existing synthetic packet source", MaxBytes: maxBytes, MaxOperations: ops, NotAfter: now.Add(time.Minute)}
+	raw := value.RawQueryScope{CaseID: e.CaseID, Artifacts: []value.RawQueryArtifact{{Output: output, NativeBytes: 0, ExpiresAt: e.Registration.ExpiresAt}}, Operations: []string{value.GrantDownloadOperation, packetQueryFixtureOperation(f)}, Reason: "Review existing synthetic packet source", MaxBytes: maxBytes, MaxOperations: ops, NotAfter: now.Add(time.Minute)}
 	// Derive immutable verified length from the already published verification row.
 	if err = f.base.admin.QueryRow(ctx, "SELECT native_bytes FROM context_verification WHERE root_id=$1 AND capture_id=$2", f.base.input.PermissionRootID, e.CaptureUID).Scan(&raw.Artifacts[0].NativeBytes); err != nil {
 		t.Fatal(err)
 	}
-	g := value.Grant{ID: custodyID(), RootID: f.base.input.PermissionRootID, Kind: value.GrantRawQuery, RawQuery: &raw, DataClass: "raw", Requester: actor, Lifetime: time.Minute, Revision: 1, Reasons: []value.SensitiveReason{{ActionID: value.GrantPacketQueryOperation, Code: "rawDisclosure"}}}
+	g := value.Grant{ID: custodyID(), RootID: f.base.input.PermissionRootID, Kind: value.GrantRawQuery, RawQuery: &raw, DataClass: "raw", Requester: actor, Lifetime: time.Minute, Revision: 1, Reasons: []value.SensitiveReason{{ActionID: packetQueryFixtureOperation(f), Code: "rawDisclosure"}}}
 	g.Scope, g.ExecutionDigest = authapp.RawQueryScopeBytes(raw)
 	g.Review = []byte(`{"fixture":"exact accepted saved packet"}`)
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
@@ -587,7 +616,7 @@ func packetQueryManagedGrant(t *testing.T, f *queryLedgerFixture, store *postgre
 func assertPacketQueryUses(t *testing.T, f *queryLedgerFixture, parent string, wantBytes, wantOps int64) {
 	t.Helper()
 	var usedBytes, usedOps, count, rows int64
-	err := f.base.admin.QueryRow(f.base.ctx, `SELECT g.bytes_spent,g.operations_spent,(SELECT count(*) FROM access_grant_use u WHERE u.root_id=g.root_id AND u.parent_id=g.id AND u.operation='pcap_query'),(SELECT count(*) FROM context_query_batch b JOIN context_query q ON q.id=b.query_id JOIN access_grant_use u ON u.id=b.id AND u.root_id=q.root_id WHERE u.parent_id=g.id AND u.child_id::text=q.query#>>'{Grant,ChildID}' AND u.operation='pcap_query' AND u.bytes=24576 AND u.operations=1) FROM access_grant g WHERE root_id=$1 AND id=$2`, f.base.input.PermissionRootID, parent).Scan(&usedBytes, &usedOps, &count, &rows)
+	err := f.base.admin.QueryRow(f.base.ctx, `SELECT g.bytes_spent,g.operations_spent,(SELECT count(*) FROM access_grant_use u WHERE u.root_id=g.root_id AND u.parent_id=g.id AND u.operation=$3),(SELECT count(*) FROM context_query_batch b JOIN context_query q ON q.id=b.query_id JOIN access_grant_use u ON u.id=b.id AND u.root_id=q.root_id WHERE u.parent_id=g.id AND u.child_id::text=q.query#>>'{Grant,ChildID}' AND u.operation=$3 AND u.bytes=24576 AND u.operations=1) FROM access_grant g WHERE root_id=$1 AND id=$2`, f.base.input.PermissionRootID, parent, packetQueryFixtureOperation(f)).Scan(&usedBytes, &usedOps, &count, &rows)
 	if err != nil || usedBytes != wantBytes || usedOps != wantOps || count != wantOps || rows != count {
 		t.Fatalf("per actual batch debit bytes=%d/%d operations=%d/%d uses=%d joinedbatches=%d err=%v", usedBytes, wantBytes, usedOps, wantOps, count, rows, err)
 	}
@@ -600,11 +629,15 @@ func refuseRetainedPacketQueryDowngrade(t *testing.T, f *queryLedgerFixture) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = provider.DownTo(f.base.ctx, 138); err == nil {
+	target, expectedHead := int64(138), int64(139)
+	if f.published.Expectation.NativeType == artifact.SyscallArgumentsArtifact {
+		target, expectedHead = 139, 140
+	}
+	if _, err = provider.DownTo(f.base.ctx, target); err == nil {
 		t.Fatal("retained packet query/grant/use downgraded")
 	}
 	var head int64
-	if err = f.base.admin.QueryRow(f.base.ctx, "SELECT max(version_id) FROM goose_db_version WHERE is_applied").Scan(&head); err != nil || head != 139 {
+	if err = f.base.admin.QueryRow(f.base.ctx, "SELECT max(version_id) FROM goose_db_version WHERE is_applied").Scan(&head); err != nil || head != expectedHead {
 		t.Fatal("refused downgrade changed head", head, err)
 	}
 	t.Log("retained139 packet query/grant/use prevents138 rollback, no spend refund")
@@ -624,7 +657,7 @@ func packetQueryBatchRollback(t *testing.T, f *queryLedgerFixture, pool *pgxpool
 	if _, err = tx.Exec(ctx, `UPDATE access_grant SET bytes_spent=bytes_spent+24576,operations_spent=operations_spent+1 WHERE root_id=$1 AND id=$2`, q.Scope.RootID, q.Grant.ParentID); err != nil {
 		t.Fatal("rollback setup charge", err)
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO access_grant_use(id,root_id,parent_id,child_id,operation,bytes,operations) VALUES($1,$2,$3,$4,'pcap_query',24576,1)`, batchID, q.Scope.RootID, q.Grant.ParentID, q.Grant.ChildID); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO access_grant_use(id,root_id,parent_id,child_id,operation,bytes,operations) VALUES($1,$2,$3,$4,$5,24576,1)`, batchID, q.Scope.RootID, q.Grant.ParentID, q.Grant.ChildID, packetQueryFixtureOperation(f)); err != nil {
 		t.Fatal("rollback setup use", err)
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)

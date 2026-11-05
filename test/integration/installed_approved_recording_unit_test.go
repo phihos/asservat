@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -116,6 +117,53 @@ func TestInstalledApprovedRecordingRejectsPlanOnlyBeforeApproval(t *testing.T) {
 			var p installedApprovedRecordingPreview
 			if json.Unmarshal([]byte(raw), &p) != nil || p.readyForApproval(now) != tc.want {
 				t.Fatal("unrecordable preview passed the initial approval guard", tc.name)
+			}
+		})
+	}
+}
+
+// The installed qualification must consume the actual advisory choices instead
+// of silently authoring an operation that the production preview never offered.
+func TestInstalledApprovedRecordingDecodesResultAccessChoices(t *testing.T) {
+	input := []byte(`{"result_access_actions":[{"action_id":"arguments","operations":["download_artifact","syscall_query"]}]}`)
+	var preview installedApprovedRecordingPreview
+	if err := json.Unmarshal(input, &preview); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(preview)
+	if err != nil || !bytes.Contains(raw, []byte(`"result_access_actions":[{"action_id":"arguments","operations":["download_artifact","syscall_query"]}]`)) {
+		t.Fatal("installed helper discarded actual preview operations", err)
+	}
+}
+
+func TestInstalledApprovedRecordingRequiresOfferedArgumentsChoice(t *testing.T) {
+	want := []string{"download_artifact", "syscall_query"}
+	for _, tc := range []struct {
+		name, choices string
+		want          bool
+	}{
+		{"offered", `[{"action_id":"arguments","operations":["download_artifact","syscall_query"]}]`, true},
+		{"missing", `[]`, false},
+		{"different-action", `[{"action_id":"other","operations":["download_artifact","syscall_query"]}]`, false},
+		{"download-only", `[{"action_id":"arguments","operations":["download_artifact"]}]`, false},
+		{"packet-choice", `[{"action_id":"arguments","operations":["download_artifact","pcap_query"]}]`, false},
+		{"extra-operation", `[{"action_id":"arguments","operations":["download_artifact","pcap_query","syscall_query"]}]`, false},
+		{"duplicate", `[{"action_id":"arguments","operations":["download_artifact","syscall_query"]},{"action_id":"arguments","operations":["download_artifact","syscall_query"]}]`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var preview installedApprovedRecordingPreview
+			if err := json.Unmarshal([]byte(`{"result_access_actions":`+tc.choices+`}`), &preview); err != nil {
+				t.Fatal(err)
+			}
+			operations, ok := preview.resultAccessOperations("arguments", want)
+			if ok != tc.want || ok && !slices.Equal(operations, want) {
+				t.Fatal("submitted unoffered arguments operations", operations, ok)
+			}
+			if ok {
+				operations[0] = "changed"
+				if preview.ResultAccessActions[0].Operations[0] != "download_artifact" || want[0] != "download_artifact" {
+					t.Fatal("submission mutated original preview choice")
+				}
 			}
 		})
 	}

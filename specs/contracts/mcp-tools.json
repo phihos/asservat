@@ -4992,11 +4992,12 @@
                               "operations": {
                                 "type": "array",
                                 "minItems": 1,
-                                "maxItems": 2,
+                                "maxItems": 3,
                                 "items": {
                                   "enum": [
                                     "download_artifact",
-                                    "pcap_query"
+                                    "pcap_query",
+                                    "syscall_query"
                                   ]
                                 },
                                 "uniqueItems": true
@@ -5646,11 +5647,12 @@
                                 "items": {
                                   "enum": [
                                     "download_artifact",
-                                    "pcap_query"
+                                    "pcap_query",
+                                    "syscall_query"
                                   ]
                                 },
                                 "minItems": 1,
-                                "maxItems": 2,
+                                "maxItems": 3,
                                 "uniqueItems": true
                               },
                               "max_bytes": {
@@ -6808,11 +6810,12 @@
                                       "items": {
                                         "enum": [
                                           "download_artifact",
-                                          "pcap_query"
+                                          "pcap_query",
+                                          "syscall_query"
                                         ]
                                       },
                                       "minItems": 1,
-                                      "maxItems": 2,
+                                      "maxItems": 3,
                                       "uniqueItems": true
                                     },
                                     "max_bytes": {
@@ -11081,7 +11084,8 @@
                               "items": {
                                 "enum": [
                                   "download_artifact",
-                                  "pcap_query"
+                                  "pcap_query",
+                                  "syscall_query"
                                 ]
                               }
                             }
@@ -13531,7 +13535,7 @@
     },
     {
       "name": "syscall_query",
-      "description": "Query bounded recorded syscall arguments in an offline sandbox. Requires raw scope, current artifact rights and a cumulative syscall_query grant. Untrusted evidence; no execution, dereference or live acquisition.",
+      "description": "Query bounded recorded syscall arguments from one saved artifact in the regional Go worker. Requires raw scope, current artifact rights and exact syscall_query approval. Names/errors are display selectors; no execution, dereference or acquisition. Retry an uncertain Begin with the same idempotency key and input.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -13562,7 +13566,8 @@
           },
           "grant_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Every raw argument query requires the exact current syscall_query grant. Omission permits the ordinary approval remedy before admission; it never authorizes a read."
           },
           "syscall_names": {
             "type": "array",
@@ -13577,12 +13582,17 @@
           },
           "errors_only": {
             "type": "boolean"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         },
         "required": [
           "case_id",
           "artifact_id",
-          "grant_id"
+          "idempotency_key"
         ]
       },
       "outputSchema": {
@@ -13629,11 +13639,23 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 60
+                      },
+                      "query_observed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                      },
+                      "query_expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
                       }
                     },
                     "required": [
                       "query_handle",
-                      "retry_after_seconds"
+                      "retry_after_seconds",
+                      "query_observed_at",
+                      "query_expires_at"
                     ]
                   }
                 },
@@ -18205,11 +18227,12 @@
                           "operations": {
                             "type": "array",
                             "minItems": 1,
-                            "maxItems": 2,
+                            "maxItems": 3,
                             "items": {
                               "enum": [
                                 "download_artifact",
-                                "pcap_query"
+                                "pcap_query",
+                                "syscall_query"
                               ]
                             },
                             "uniqueItems": true

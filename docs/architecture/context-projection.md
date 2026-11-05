@@ -30,6 +30,35 @@ metadata/argument saved-view native fixtures. The argument Go test passed while
 its outer job was cancelled at the wall-clock limit. Exact reports, supported
 scope and remaining timing/qualification gaps are in implementation progress.
 
+### Saved raw syscall queries
+
+[ADR-306](../decisions/306-bounded-saved-syscall-queries.md) adds a separate
+`approved-syscall-query/v1` display and typed raw visitor for protected saved
+argument originals. C-03 checks current ordinary/retained rights and an exact
+`syscall_query` human/client grant; metadata views, download grants and raw
+shares cannot supply it. C-18 binds normalized selection and original keyed
+invocation before the existing four-unit/two-batch admission. Each actual read
+uses the existing atomic 24 KiB/one-operation grant use and three scoped key
+roles. Same-key repeat registers only its bounded audited control call before
+current permission checks and returns the original pending handle/deadline;
+that replay call cannot fund a new read.
+
+C-14 uses the canonical argument decoder and raw event callback through the
+existing encrypted outer reader and worker command. A logical page stop still
+validates complete authenticated EOF. C-24 owns whole-event pages and native
+encoded values; metadata projection types remain argument-free. C-20 checks
+the distinct raw result union, source provenance, current authority and original
+query times for direct and nested results. Its 20 KiB private ceiling reserves
+4096 bytes within each 24 KiB public envelope. Root/SQL/audit control carries
+bounded selectors and identities, never argument values or event rows.
+
+The console uses the same approval request/status routes and exact selected
+grant before the explicit query. Source, grant, session or view-scope changes
+clear transient rows; unknown Begin can retry only its frozen key/selection.
+No new acquisition, service, library, Job, volume or fallback is added. Component
+implementation exists; real-service/resource and installed native parity are
+pending. This does not qualify general live memory or arbitrary execution.
+
 ## Fixed raw packet summary candidate
 
 [ADR-304](../decisions/304-transient-raw-packet-summary.md) extends the existing

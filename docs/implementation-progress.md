@@ -1,5 +1,226 @@
 # Sustained implementation progress
 
+## Exhausted-worker lifecycle correction reaches frozen local checkpoint (2026-11-05)
+
+ADR-307 adds natural completion only after the authenticated sole generation-one
+projection batch, final joined acknowledgement and joined local shutdown.
+Concurrent independent credential failure remains failure; original deadline
+expiry retains its classification. Multi-batch/download/uncertain behavior and
+all original limits remain. Lifecycle/realTLS and supervision RED/GREEN controls
+pass; independent review is clear.
+
+Early cleanup reuses exact public/native-closed query/worker/batch facts, fresh
+worker-locked confirmation and existing positive Kubernetes termination,
+UID-bound deletion/absence and persisted retirement before physical reuse.
+Logical spend is unchanged. No schema/table/role/timer/watch is added; the existing
+runtime role gains one pure batch-count helper EXECUTE. Existing foreground
+cleanup may perform additional early attempts, at most one rotating attempt per
+demand with the existing bounded object walk and caller limit.
+
+The real compiled-role baseline reproduces the missing early selection after
+joined closure (Go8.227s, unchanged sources, provider0, cleanup[]); before-join
+negatives pass. After a fixture-only accounting-table spelling correction,
+frozen-source single-batch retirement and actual successor admission pass
+(Go11.567s); a separate pristine two-batch control passes (Go9.247s) and retains
+its charge. Both finish with testExit0, unchanged sources and cleanup[]. Root
+and independent review match all4,231 Git input hashes per final run. Physical,
+issuer, transport and crypto proofs remain synthetic where declared by the SQL
+fixtures; these results do not establish installed Kubernetes retirement.
+
+On signed `5c4fc02e`, make pre-push exits0, including561 console tests/49 files;
+the full compiled console-browser gate exits0 across8 top-level fixtures in
+118.349s. [Original local evidence](../test/results/saved-syscall-query-worker-lifecycle-local/README.md)
+retains baseline failures, the fixture error, final source maps, reviews and gate
+logs. No installed capacity saving or full20-minute syscall workflow pass is
+asserted; fresh final-candidate CI and installed Repeat/Stop/cleanup remain.
+
+## Syscall authoring gaps closed locally; observed cancellation scoped (2026-11-05)
+
+CI42044734677 passes all15 jobs on signed `dacedd43`. Native42044789919 is
+cancelled at20 minutes; its230,508B ZIP matches the server digest. All five
+fixed-view assertions and both raw MCP/actual React queries retain native
+parity/accounting/key/worker checks. Repeat preview returns ok in4.430s. The next
+history read fails263ms after cancellation was reported, so it does not establish
+an independent product defect. Initial4,291 source hashes match Git; Go/test
+exits and final-source/cleanup evidence remain absent. [Originals](../test/results/saved-syscall-query-native-42044789919/README.md)
+preserve the explicitly running/incomplete checkpoint. Stop is unqualified.
+
+The actual preview producer/browser controls had omitted combined syscall-query
+access and displayed download-only approval wording. Producer/DTO/UI regressions
+reproduce those gaps; exact compiled choices and server-derived selected-operation
+unions now preserve mixed packet/syscall/profile-download scope and frozen
+approval receipts. Targeted three-package races,91 React tests and TypeScript
+pass. A fresh build and actual compiled-plan/C20/GoTLS/builtReact authoring race
+passes query-only and combined cases in6.257s. Its authority/approval storage are
+synthetic; no collection/read occurs. [Local originals](../test/results/saved-syscall-query-approval-authoring-local/README.md)
+bind13 final owned sources and preserve meaningful REDs separately from fixture
+setup failures. Independent reviews are clear; installed qualification remains.
+
+Runtime analysis identifies exhausted single-batch workers reconnecting until
+RunUntil. A bounded natural-completion/positive-retirement correction now passes local
+lifecycle/service tests; original dates, paid budgets, expiry/view/Repeat/Stop checks and
+multi-batch behavior remain requirements. No time saving or full pass is claimed.
+
+## Cancellation fixture and interrupted-run diagnostics corrected locally (2026-11-05)
+
+The storage cancellation fixture now derives its short caller from half the
+response reserve, restoring its intended no-hint authoritative-read setup.
+The unchanged fixture reproduces29 failures in50 race runs; the correction
+passes50/50, and the full capture package races pass42.847s. All original
+cancellation/deadline/join/no-effect assertions remain; production is unchanged.
+
+The interrupted native run lost small output because both log files were
+buffered and the environment report was only written after cleanup. The harness
+now writes received lines without buffering and atomically checkpoints setup/
+running source facts with null exits and incomplete cleanup. Actual terminal
+cleanup still supplies the final verdict. A real child/process-group termination
+regression reproduces buffered loss and passes after the correction;38 existing
+selection/regression tests pass with ResourceWarnings treated as errors. A
+separate child-exit control preserves exact output and nonzero status.
+
+These changes do not explain the installed runtime overrun, extend20 minutes,
+assert cleanup after a kill, or establish Repeat/Stop success. Original failed
+and cancelled evidence remains. Required local pre-push checks and independent
+review pass; [local originals](../test/results/saved-syscall-query-cancellation-local/README.md)
+retain all results. One observable installed campaign remains required before
+merging PR171.
+
+## Corrected candidate CI failure and installed cancellation retained (2026-11-05)
+
+Signed `973c9b13` reached terminal CI42038828377 failure and native42038849665
+outer cancellation at20 minutes. CI's sole failing test is the storage-margin
+cancellation fixture: its one-second parent now permits a hint under750ms, so
+its claimed first authoritative read was actually a hint. Focused reproduction
+and explicit short-parent correction are in progress; no production change is
+inferred. C20 races passed538.558s; the aggregate CI result is failure.
+
+The installed artifact ZIP3,699B matches the server digest. Its four originals
+contain a complete50-record native JSONL (48 events), setup output and empty
+Go/timing logs. No terminal Go/harness exit, source inventory or cleanup report
+was emitted. Recording bytes do not establish query/Repeat/Stop completion.
+[Cancellation originals](../test/results/saved-syscall-query-native-42038849665/README.md)
+retain full API/workflow metadata and separate CI failure. The harness's loss of
+partial diagnostics is being resolved before another hosted attempt. PR171 is
+open; no full workflow, S-05 or project completion follows.
+
+## Repeat readiness scheduling correction passes local boundaries (2026-11-05)
+
+The shared response reserve is reduced from1s to750ms, giving readiness250ms
+more within the original request/source deadlines. No API, watch, role, state
+or configuration is added; the existing250ms cadence permits at most one extra
+storage read. The1s binding freshness margin, one joined hint/demand and final
+protected read remain. Current ADR-213/285 wording records this scheduling choice.
+
+The same five-second publication boundary fails under the former reserve and
+passes with750ms; original-source expiry and changed-selection controls refuse.
+Affected capture races pass25.794s. Existing C20 audit/schema/serialization races
+pass7.622s: a3,570-byte successful response takes3.130ms after injected preview
+completion, leaving743.154ms. Its providers are in-memory; this is not installed
+success-tail latency. The initial expired-assessment and test compile failures
+are retained with [local originals](../test/results/saved-syscall-query-readiness-local/README.md).
+Required `make pre-push` passes, including552 console tests.
+
+The separate history test correction and first failed native campaign are
+committed as signed `ab2198ae`. Independent review found no blockers; the corrected candidate's
+full CI/installed workflow remains required. No later Repeat or Stop pass follows.
+
+## Installed raw syscall queries pass; Repeat preview remains failing (2026-11-05)
+
+Candidate `6fe419ad` completed all five fixed views and new raw MCP/actual React
+query/nativeJSONL parity, exact18-unit/shared-grant/key accounting and original
+worker joins. Native42030863610 nevertheless failed later in the existing
+Repeat preview at `facts/storage/expired/readiness-tail` (Go/harness1,
+884.527s). It read history successfully; fresh capacity publication finished
+31.675ms after the preview's readiness refusal. Exact original cutoff dates
+are unlogged; later current snapshots are not failure-time proof. Stop was not
+reached. [Originals and scope](../test/results/saved-syscall-query-native-42030863610/README.md)
+retain4,291 exact Git hashes, unchanged sources, clean teardown and native data.
+
+CI separately exposed a pre-existing synthetic history transport close race.
+The test-only correction retains real final ACK validation, joined cleanup
+and original4.5s/5s bounds; production transport files remain byte-identical.
+The installed Repeat failure is being reproduced at its storage-readiness
+boundary before another candidate or hosted attempt. PR171 remains open and
+the full specification goal remains active.
+
+## Installed syscall argument-query fixture prepared on merged main (2026-11-05)
+
+The candidate is rebased onto main through PR169/170. Runtime/native Go files
+match the reviewed checkpoint exactly; newer packet documentation, evidence
+and builder prefetch remain. The native argument fixture retains all five
+fixed views, Repeat and Stop and adds MCP/actual React queries against the same
+native JSONL, with18 originally prepaid units and the same combined review.
+A rolling two-slot test queue retains all original worker ends and immediate
+live SQL/key checks; its advancing-clock model is not a measured speedup.
+
+Review reproduced the fixture's missing console `evidence:raw` scope for
+arguments; the corrected actual scope producer and four controls pass. Helper
+races,36 selectors and independent reviews pass. Full integration unit races
+pass54.345s with external fixtures skipped. [Preflight originals](../test/results/saved-syscall-query-native-preflight-local/README.md)
+retain exact hashes, setup failures, native oracle/replay tests and pending
+installed SQL proof scope. New SQL readbacks, same-original installed argument
+parity and a complete20-minute workflow pass remain required.
+
+## Saved syscall queries pass service, upgrade and resource checks (2026-11-05)
+
+On signed `0cf27e86`, the real SQL lifecycle passes9 tests/13.810s and pristine
+upgrade140 passes497 tests/8.928s; both preserve4,226 exact Git hashes,
+unchanged sources and cleanup[]. Exact C3/C18 replay, current grants, two paid
+allocations,48KiB/two operations, six one-use key roles and joined SQL closure
+pass. These paid loops use synthetic crypto/join proofs; actual parser/decrypt
+execution is separate. Actual PostgreSQL JSONB sizing passes20 cases with a
+35,750-byte maximal binding under the unchanged48KiB bound.
+[Originals, two failed fixtures and corrections](../test/results/saved-syscall-query-services-local/README.md)
+retain all scopes and actual failures. No product authority was relaxed.
+
+Four separate [encrypted-reader resource cases](../test/results/saved-syscall-query-resource-local/README.md)
+pass against1,821 exact compiled inputs plus a recorded overlay. Two legitimate
+near8MiB raw originals authenticate complete EOF despite page stops; cancellation
+and source error yield no page and join. The largest observed cgroup peak is
+57,393,152B under256MiB/no swap, with no OOM/max events.500m CPU remains
+configuration-only evidence. Root independently verifies inputs, actual limits,
+outcomes and exact-name/matching-label container cleanup. The earlier wrong
+cleanup-label readback is retained alongside the corrected observation.
+
+[Component/console originals](../test/results/saved-syscall-query-local/README.md)
+retain552 console tests, production build, actual React/GoTLS two-case race
+pass, C20 raw/refusal/maximum-page checks and independent reviews. The broad
+Go gate's obsolete bootstrap expectation was corrected; full bootstrap passes
+110.580s, and the separate canonical Kubernetes gate passes all691 exact
+tests in18 serial groups with no skips. These
+checks do not establish installed argument-query/native JSONL parity. That
+workflow and full S-05 remain pending; the packet PR is independently in flight.
+
+## Saved syscall argument queries reach built React; service proof pending (2026-11-05)
+
+The isolated candidate implements ADR-306's saved raw syscall query through
+canonical/browser schemas, C3 exact approval, C18 keyed invocation, migration140,
+the canonical raw decoder, encrypted regional reader, audited C20 and console.
+It reads only existing argument originals; metadata views remain argument-free.
+Four configured units/two batches and 24 KiB/one operation per actual raw read
+reuse the existing ledger and shared disclosure pool. Same-key replay retains
+original identity/deadlines and its audited control call cannot fund a read.
+
+The actual collection-grant producer regression reproduces the former two-op
+cap, then passes a three-op parent and exact-source packet/syscall children;
+duplicates/unsupported operations fail before storage. Independent C20/schema/UI
+review found no blockers. Missing approval has a no-effect review remedy;
+wrong source/version/type and malformed paid pages are refused with joined
+closure. Focused affected races and internal vet pass. Full console checks pass
+552 tests in 49 files and production assets build. The actual built React/GoTLS
+query fixture passes both subcases with race detection in 11.927s: Pending
+review→Approved, explicit Begin/poll with fixed expiry, current response clocks,
+fresh-key next page, recorded zero/empty/fault/truncation and close. Query and
+authority replies in this browser fixture are synthetic. Maximal C20 structured
+output is 20,349 bytes private, 21,223 direct and 21,890 nested; this does not
+qualify a maximal native source or process resources.
+
+Real-service JSONB sizing/lifecycle/replay, migration140 rollback, resource
+measurements and installed argument MCP/React/native parity remain pending.
+The current packet PR169 candidate and hosted qualification are separate. No
+complete S-05 or project exit is asserted.
+
+
 ## Saved-packet queries merged with complete installed parity (2026-11-05)
 
 PR169 merged normally as `b47507a1`; fresh main and installed-tested `b3049371`

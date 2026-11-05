@@ -54,6 +54,10 @@ type RawPacketQuerySelectionReader interface {
 	ResolveRawPacketQuery(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (RawQuerySelection, error)
 }
 
+type RawSyscallQuerySelectionReader interface {
+	ResolveRawSyscallQuery(context.Context, identities.CurrentIdentity, string, []artifact.Digest) (RawQuerySelection, error)
+}
+
 type RawQueryRequestInput struct {
 	CaseID          string
 	ArtifactDigests []artifact.Digest
@@ -107,9 +111,12 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	scopes := []string{"evidence:download"}
-	if !slices.Contains(in.Operations, value.GrantDownloadOperation) {
-		scopes = []string{"evidence:read", "evidence:raw"}
+	scopes := []string{"evidence:read"}
+	if slices.Contains(in.Operations, value.GrantDownloadOperation) {
+		scopes = append(scopes, "evidence:download")
+	}
+	if slices.Contains(in.Operations, value.GrantPacketQueryOperation) || slices.Contains(in.Operations, value.GrantSyscallQueryOperation) {
+		scopes = append(scopes, "evidence:raw")
 	}
 	i, err := s.human(ctx, current, scopes...)
 	if err != nil {
@@ -135,7 +142,13 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 		return zero, false, ErrGrantUnavailable
 	}
 	var selected RawQuerySelection
-	if !slices.Contains(in.Operations, value.GrantDownloadOperation) {
+	if slices.Contains(in.Operations, value.GrantSyscallQueryOperation) {
+		selector, ok := s.RawSelections.(RawSyscallQuerySelectionReader)
+		if !ok {
+			return zero, false, ErrGrantUnavailable
+		}
+		selected, err = selector.ResolveRawSyscallQuery(ctx, current, in.CaseID, in.ArtifactDigests)
+	} else if slices.Contains(in.Operations, value.GrantPacketQueryOperation) {
 		selector, ok := s.RawSelections.(RawPacketQuerySelectionReader)
 		if !ok {
 			return zero, false, ErrGrantUnavailable
@@ -146,6 +159,11 @@ func (s GrantService) RequestRaw(ctx context.Context, current identities.Current
 	}
 	if err != nil || !s.Now().Before(selected.ValidUntil) || len(selected.Artifacts) != len(in.ArtifactDigests) || len(selected.Review) != len(selected.Artifacts) {
 		return zero, false, ErrGrantUnavailable
+	}
+	for _, entry := range selected.Review {
+		if slices.Contains(in.Operations, value.GrantSyscallQueryOperation) && entry.NativeType != artifact.SyscallArgumentsArtifact || slices.Contains(in.Operations, value.GrantPacketQueryOperation) && entry.NativeType != artifact.RawPCAPNGArtifact {
+			return zero, false, ErrGrantUnavailable
+		}
 	}
 	artifacts := slices.Clone(selected.Artifacts)
 	slices.SortFunc(artifacts, func(a, b value.RawQueryArtifact) int {
@@ -261,7 +279,7 @@ func (s GrantService) coveringRawSelection(ctx context.Context, i identity.Ident
 	// preserving the exact requested byte pool (including any retry allowance).
 	operation := value.GrantDownloadOperation
 	if !slices.Contains(selection.Operations, operation) {
-		operation = value.GrantPacketQueryOperation
+		operation = selection.Operations[0]
 	}
 	use := value.GrantUse{Operation: operation, Bytes: selection.MaxBytes, Operations: int64(len(selection.Artifacts))}
 	candidates, err := s.RawStore.RawQueryCandidates(ctx, rawDownloadScope(s.RootID, i.Principal, first), use)
@@ -323,6 +341,9 @@ func (s GrantService) coveringRawSelection(ctx context.Context, i identity.Ident
 func (s GrantService) rawQueryEligibility(ctx context.Context, i identity.Identity, g value.Grant, op value.Operation) (value.Result, error) {
 	if g.RawQuery != nil && op == value.DownloadApproved && !slices.Contains(g.RawQuery.Operations, value.GrantDownloadOperation) {
 		op = value.ReadPacketQuery
+		if slices.Contains(g.RawQuery.Operations, value.GrantSyscallQueryOperation) {
+			op = value.ReadSyscallQuery
+		}
 	}
 	if !g.Valid() || !RawQueryScopeMatches(g) || ReviewDigest(g, g.Review) != g.ReviewDigest {
 		return value.Result{}, value.ErrGrantInvalid

@@ -45,10 +45,11 @@ type syscallProjectionReply struct {
 	NativeType    string
 	View          query.SyscallView
 	Version       artifact.Digest
-	Summary       *query.SyscallSummaryPage `json:",omitempty"`
-	Events        *query.SyscallEventPage   `json:",omitempty"`
-	InvalidCursor bool                      `json:",omitempty"`
-	TooLarge      bool                      `json:",omitempty"`
+	Summary       *query.SyscallSummaryPage  `json:",omitempty"`
+	Events        *query.SyscallEventPage    `json:",omitempty"`
+	Query         *query.SyscallArgumentPage `json:",omitempty"`
+	InvalidCursor bool                       `json:",omitempty"`
+	TooLarge      bool                       `json:",omitempty"`
 }
 
 type profileComparisonReply struct {
@@ -117,8 +118,8 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 		return b, nil
 	}
 	if scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact {
-		reply := syscallProjectionReply{NativeType: scope.NativeType, View: scope.Syscalls.View, Version: scope.Version, Summary: r.SyscallSummary, Events: r.SyscallEvents, InvalidCursor: r.InvalidCursor, TooLarge: r.TooLarge}
-		if reply.Summary != nil && reply.Summary.Rows == nil || reply.Events != nil && reply.Events.Events == nil {
+		reply := syscallProjectionReply{NativeType: scope.NativeType, View: scope.Syscalls.View, Version: scope.Version, Summary: r.SyscallSummary, Events: r.SyscallEvents, Query: r.SyscallQuery, InvalidCursor: r.InvalidCursor, TooLarge: r.TooLarge}
+		if reply.Summary != nil && reply.Summary.Rows == nil || reply.Events != nil && reply.Events.Events == nil || reply.Query != nil && reply.Query.Events == nil {
 			return nil, contracts.ErrNativeProtocol
 		}
 		b, e := json.Marshal(reply)
@@ -194,9 +195,9 @@ func decodeProjectionResult(b []byte, scope query.ContextProjectionScope) (query
 	case artifact.SyscallRecordsArtifact, artifact.SyscallArgumentsArtifact:
 		var reply syscallProjectionReply
 		err := nativeDecodeBounded(b, &reply, query.ContextResultBytes)
-		r.SyscallSummary, r.SyscallEvents = reply.Summary, reply.Events
+		r.SyscallSummary, r.SyscallEvents, r.SyscallQuery = reply.Summary, reply.Events, reply.Query
 		r.InvalidCursor, r.TooLarge = reply.InvalidCursor, reply.TooLarge
-		if err != nil || reply.NativeType != scope.NativeType || reply.View != scope.Syscalls.View || reply.Version != scope.Version || reply.Summary != nil && reply.Summary.Rows == nil || reply.Events != nil && reply.Events.Events == nil {
+		if err != nil || reply.NativeType != scope.NativeType || reply.View != scope.Syscalls.View || reply.Version != scope.Version || reply.Summary != nil && reply.Summary.Rows == nil || reply.Events != nil && reply.Events.Events == nil || reply.Query != nil && reply.Query.Events == nil {
 			r.Clear()
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol
 		}

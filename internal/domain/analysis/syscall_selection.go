@@ -17,6 +17,7 @@ type SyscallView string
 const (
 	SyscallSummaryView SyscallView = "summary"
 	SyscallEventsView  SyscallView = "events"
+	SyscallQueryView   SyscallView = "raw"
 	SyscallPageRecords             = 100
 	SyscallMaxRecords              = 1_000_000 // portable recorder ceiling (REQ-SYS-002)
 )
@@ -24,6 +25,7 @@ const (
 const (
 	SyscallSummaryDisplayVersion = "approved-syscall-summary/v1"
 	SyscallEventsDisplayVersion  = "approved-syscall-events/v1"
+	SyscallQueryDisplayVersion   = "approved-syscall-query/v1"
 )
 
 func (v SyscallView) DisplayVersion() string {
@@ -32,6 +34,8 @@ func (v SyscallView) DisplayVersion() string {
 		return SyscallSummaryDisplayVersion
 	case SyscallEventsView:
 		return SyscallEventsDisplayVersion
+	case SyscallQueryView:
+		return SyscallQueryDisplayVersion
 	}
 	return ""
 }
@@ -58,7 +62,7 @@ func (s SyscallSelection) selectionValid() bool {
 	if s.Start == 0 && s.Binding != "" || s.Start > 0 && !lowerHex(s.Binding, 32) {
 		return false
 	}
-	if s.View != SyscallSummaryView && s.View != SyscallEventsView || s.View == SyscallSummaryView && (len(s.Names) > 0 || s.ErrorsOnly) {
+	if s.View != SyscallSummaryView && s.View != SyscallEventsView && s.View != SyscallQueryView || s.View == SyscallSummaryView && (len(s.Names) > 0 || s.ErrorsOnly) {
 		return false
 	}
 	for i, n := range s.Names {

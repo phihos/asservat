@@ -17,7 +17,10 @@ func TestInstalledSyscallProjectionsFundEveryPaidQuery(t *testing.T) {
 		t.Setenv("ASSERVAT_JOURNEY_FOCUS", focus)
 		profile := nativeCapacityProfile()
 		want := int64(installedSyscallProjectionQueries * query.SyscallProjectionQueryUnits)
-		if installedSyscallProjectionQueries != 5 || query.SyscallProjectionQueryUnits != 2 || profile.Records != want || want != 10 {
+		if focus == "manual-arguments" {
+			want = installedArgumentQueryUnits
+		}
+		if installedSyscallProjectionQueries != 5 || query.SyscallProjectionQueryUnits != 2 || profile.Records != want || focus == "manual-syscall" && want != 10 || focus == "manual-arguments" && want != 18 {
 			t.Fatal("installed syscall producer does not fund five conservative source reads", focus, profile.Records, want)
 		}
 	}

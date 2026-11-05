@@ -110,18 +110,27 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						t.Log("installed profile summary: exact 384 MiB installed Pod limit and transient declaration, ten query units, one consumed three-key batch")
 					}
 					if intent.Query.Scope.NativeType == artifactvalue.SyscallRecordsArtifact || intent.Query.Scope.NativeType == artifactvalue.SyscallArgumentsArtifact {
-						if batches != 1 || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes || intent.Query.Plan.Profile.Worker.MemoryBytes != query.ProfileComparisonWorkerBytes {
+						rawQuery := intent.Query.Scope.NativeType == artifactvalue.SyscallArgumentsArtifact && intent.Query.Scope.DisplayVersion == query.SyscallQueryDisplayVersion
+						wantUnits := query.SyscallProjectionQueryUnits
+						wantBatches := int64(1)
+						if rawQuery {
+							wantUnits, wantBatches = query.SyscallQueryQueryUnits, 2
+							if intent.Query.Scope.Syscalls.View != query.SyscallQueryView || intent.Query.Scope.SourceFormat != artifactvalue.SyscallArgumentsFormat {
+								t.Fatal("raw syscall query lost exact native format/view")
+							}
+						}
+						if batches != 1 || intent.Query.Scope.ReadBatches() != wantBatches || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes || intent.Query.Plan.Profile.Worker.MemoryBytes != query.ProfileComparisonWorkerBytes {
 							t.Fatal("syscall view did not retain its one-batch installed resource reservation")
 						}
 						var units int
-						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != query.SyscallProjectionQueryUnits {
+						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != wantUnits {
 							t.Fatal("syscall projection source charge", units, err)
 						}
 						pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(limit, observed.Binding.Pod, meta.GetOptions{})
 						if err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != intent.Query.Plan.Profile.Worker.MemoryBytes {
 							t.Fatal("syscall projection actual worker memory limit", err)
 						}
-						t.Log("installed syscall view: exact 384 MiB installed Pod limit and transient declaration, two query units, one consumed three-key batch")
+						t.Logf("installed syscall view: exact 384 MiB installed Pod limit and transient declaration, %d query units/%d configured read batches, one consumed three-key batch", wantUnits, wantBatches)
 					}
 					observed.Intent = intent.Worker
 					if !observed.Valid() {
@@ -132,7 +141,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 					// deadline kill) before their demand cleanup; no fixture
 					// mutation releases its slot.
 					waitTerminal := func() {
-						if err := installedProjectionWaitTerminal(ctx, api, observed); err != nil {
+						if err := installedProjectionWaitTerminal(ctx, api, observed, intent.Query.Scope.ReadBatches() == 1); err != nil {
 							t.Fatal("approved query worker did not terminate", err)
 						}
 					}
@@ -150,7 +159,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						if err != nil || !retired {
 							t.Fatal("native preparation did not retain positive query-worker retirement", err)
 						}
-						t.Log("installed query worker: original lifetime ended, exact Job/Pod terminated, product demand cleanup retained positive retirement before Stop")
+						t.Log("installed query worker: exact original Job/Pod terminated, unchanged RunUntil retained; product demand cleanup recorded positive retirement before Stop")
 					}
 				}
 				if installedJourneyPause(limit, 100*time.Millisecond) != nil {
@@ -263,14 +272,19 @@ func installedApprovedProjection(t *testing.T, ctx context.Context, identity *in
 
 // This fixture wait observes exact admitted objects only. Product cleanup still
 // constructs and persists its own termination and deletion proofs afterward.
-func installedProjectionWaitTerminal(ctx context.Context, api kubernetes.Interface, w value.AcquisitionWorker) error {
+func installedProjectionWaitTerminal(ctx context.Context, api kubernetes.Interface, w value.AcquisitionWorker, exhaustedSingleBatch ...bool) error {
 	if ctx == nil || api == nil || !w.Valid() {
 		return errors.New("invalid approved worker observation")
 	}
 	wait, end := context.WithDeadline(ctx, w.Intent.RunUntil.Add(30*time.Second))
 	defer end()
-	if err := installedJourneyPause(wait, time.Until(w.Intent.RunUntil)); err != nil {
-		return err
+	early := len(exhaustedSingleBatch) == 1 && exhaustedSingleBatch[0]
+	// Only a known joined single-batch query can end naturally early. All
+	// other callers keep one original-lifetime wait and the existing API cost.
+	if !early {
+		if err := installedJourneyPause(wait, time.Until(w.Intent.RunUntil)); err != nil {
+			return err
+		}
 	}
 	for wait.Err() == nil {
 		job, err := api.BatchV1().Jobs(w.Binding.Namespace).Get(wait, w.Binding.Job, meta.GetOptions{})
@@ -295,7 +309,7 @@ func installedProjectionWaitTerminal(ctx context.Context, api kubernetes.Interfa
 		if jobGone && podGone {
 			return nil
 		}
-		if !jobGone && installedProjectionWorkerTerminal(w, job, pod, time.Now()) {
+		if !jobGone && installedProjectionWorkerTerminal(w, job, pod, time.Now(), early) {
 			return nil
 		}
 		if err := installedJourneyPause(wait, 250*time.Millisecond); err != nil {
@@ -305,11 +319,13 @@ func installedProjectionWaitTerminal(ctx context.Context, api kubernetes.Interfa
 	return wait.Err()
 }
 
+// An exhausted single-batch scope may finish before its original maximum.
 // A nil Pod means NotFound: the Job controller removed it (native90:
 // activeDeadlineSeconds). Only the exact Job's accounted terminal record, as
 // product termination requires, makes that absence terminal.
-func installedProjectionWorkerTerminal(w value.AcquisitionWorker, job *batch.Job, pod *core.Pod, now time.Time) bool {
-	if job == nil || now.Before(w.Intent.RunUntil) || job.Namespace != w.Binding.Namespace || job.Name != w.Binding.Job || string(job.UID) != w.Binding.JobUID {
+func installedProjectionWorkerTerminal(w value.AcquisitionWorker, job *batch.Job, pod *core.Pod, now time.Time, exhaustedSingleBatch ...bool) bool {
+	early := len(exhaustedSingleBatch) == 1 && exhaustedSingleBatch[0]
+	if job == nil || now.Before(w.Intent.RunUntil) && !early || job.Namespace != w.Binding.Namespace || job.Name != w.Binding.Job || string(job.UID) != w.Binding.JobUID {
 		return false
 	}
 	if pod == nil {

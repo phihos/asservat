@@ -1,0 +1,570 @@
+{
+  "name": "syscall_query",
+  "description": "Query bounded recorded syscall arguments from one saved artifact in the regional Go worker. Requires raw scope, current artifact rights and exact syscall_query approval. Names/errors are display selectors; no execution, dereference or acquisition. Retry an uncertain Begin with the same idempotency key and input.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "case_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "artifact_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "cursor": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "grant_id": {
+        "type": "string",
+        "format": "uuid",
+        "description": "Every raw argument query requires the exact current syscall_query grant. Omission permits the ordinary approval remedy before admission; it never authorizes a read."
+      },
+      "syscall_names": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "minItems": 1,
+        "maxItems": 64,
+        "uniqueItems": true
+      },
+      "errors_only": {
+        "type": "boolean"
+      },
+      "idempotency_key": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "required": [
+      "case_id",
+      "artifact_id",
+      "idempotency_key"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "enum": [
+          "metadata",
+          "raw"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "type": "boolean"
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string",
+            "pattern": "^[0-9]{1,7}:[0-9a-f]{32}$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "narrowing_hint": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/d0"
+        },
+        "maxItems": 1,
+        "minItems": 0,
+        "uniqueItems": true
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d1"
+              },
+              "data_class": {
+                "const": "raw"
+              },
+              "provenance": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "pending"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "query_handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  },
+                  "query_observed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+                  },
+                  "query_expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                  }
+                },
+                "required": [
+                  "query_handle",
+                  "retry_after_seconds",
+                  "query_observed_at",
+                  "query_expires_at"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      },
+      {
+        "if": {
+          "properties": {
+            "truncated": {
+              "const": true
+            }
+          },
+          "required": [
+            "truncated"
+          ]
+        },
+        "then": {
+          "properties": {
+            "narrowing_hint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        }
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifactID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "artifactID",
+          "digest"
+        ]
+      },
+      "d2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "identity": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "process_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "thread_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "pod_uid": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              }
+            },
+            "required": [
+              "process_ref",
+              "thread_ref",
+              "pod_uid"
+            ]
+          },
+          "syscall": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "abi": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "duration_ns": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "outcome": {
+            "enum": [
+              "success",
+              "error",
+              "unfinished",
+              "unmatched",
+              "unknown"
+            ]
+          },
+          "errno": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096,
+                  "pattern": "^(decimal:(0|[1-9][0-9]{0,19}|-[1-9][0-9]{0,18})|base64:([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?|unavailable:fault)$",
+                  "description": "Verbatim recorded decimal scalar, canonical base64 bytes or unavailable:fault. A successful empty buffer is base64:. Current native verification imposes stricter ABI and recorded-byte limits; this schema ceiling authorizes no new acquisition."
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "value",
+                "truncated"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 6
+          }
+        },
+        "required": [
+          "identity",
+          "syscall",
+          "abi",
+          "timestamp",
+          "outcome",
+          "arguments"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "outcome": {
+                  "const": "error"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "errno"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "outcome": {
+                  "enum": [
+                    "unfinished",
+                    "unmatched",
+                    "unknown"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "errno"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "duration_ns"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "syscallQuery"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d2"
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "coverage": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "dropped_events": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unmatched_events": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "truncated": {
+                "description": "Whether acquisition output was truncated, when independently known; null means the retained source does not establish it. Pagination does not imply acquisition truncation.",
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "gaps": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "minItems": 0,
+                "maxItems": 16
+              },
+              "record_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "unfinished_events": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "unknown_events": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              }
+            },
+            "required": [
+              "dropped_events",
+              "unmatched_events",
+              "truncated",
+              "gaps",
+              "record_count",
+              "unfinished_events",
+              "unknown_events"
+            ]
+          },
+          "query_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server time of this prepared query snapshot. This observation does not renew query or request authority. Together with query_expires_at it bounds managed-view lifetime independently of the client wall clock."
+          },
+          "query_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+          }
+        },
+        "required": [
+          "kind",
+          "events",
+          "coverage",
+          "query_observed_at",
+          "query_expires_at"
+        ]
+      }
+    }
+  }
+}

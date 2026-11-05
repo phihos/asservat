@@ -45,7 +45,9 @@ func qualifySharedProjectionLifecycle(t *testing.T, f *queryLedgerFixture) {
 	qualifySharedProjectionLifecycleClient(t, f, "", 0)
 }
 
-func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture, client string, priorQueries int64) {
+type sharedProjectionCleanupCheck func(string, *queryLedgerFixture, *postgres.ProjectionWorkers, query.ContextQuery, value.AcquisitionWorker)
+
+func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture, client string, priorQueries int64, cleanupChecks ...sharedProjectionCleanupCheck) {
 	t.Helper()
 	ctx, base, s := f.base.ctx, f.base, f.scenario
 	root, profile := base.input.PermissionRootID, f.workerProfile
@@ -385,9 +387,15 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	if err = ledger.CompleteReadBatch(poll.ctx, start.Batch, querySQLClosed{start.Batch}); err == nil {
 		t.Fatal("private closure without outcome acknowledgement released batch")
 	}
+	for _, check := range cleanupChecks {
+		check("native-open", f, workers, q, jobs.worker)
+	}
 	// This SQL qualifier supplies the positive transport-join input explicitly.
 	if err = operations.CompleteProjectionNative(poll.ctx, lease); err != nil {
 		t.Fatal("record positive private native close", err)
+	}
+	for _, check := range cleanupChecks {
+		check("native-closed", f, workers, q, jobs.worker)
 	}
 	finish(pollIntent)
 	if err = ledger.CompleteReadBatch(ctx, start.Batch, querySQLClosed{start.Batch}); err != nil {
@@ -416,6 +424,9 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	stored, err := ledger.LookupQuery(ctx, scope.Principal, q.ID)
 	if err != nil || !stored.Equal(q) {
 		t.Fatal("lifecycle changed original query/deadlines", err)
+	}
+	for _, check := range cleanupChecks {
+		check("joined", f, workers, q, jobs.worker)
 	}
 	t.Logf("compiled shared query lifecycle through production NativeKeyAuthority: one read-only query/worker, independent enrollment, one signing attempt, %d independently spent key roles, native+public batch closed, no download session; initial_ms=%d poll_ms=%d; Job/Pod/proof/issuer/join inputs synthetic, no native installed or latency qualification", 3*len(keyIDs), initialElapsed.Milliseconds(), time.Since(pollIntent.CreatedAt).Milliseconds())
 }

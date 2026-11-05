@@ -2,7 +2,6 @@ package syscalls
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
@@ -29,6 +28,7 @@ type argumentsCheck struct {
 	// source. It never fabricates or replaces original publication source proof.
 	projection bool
 	visit      func(event) error
+	visitRaw   func(artifact.RawArgumentEvent) error
 }
 
 // NewArgumentCheck consumes independently resolved immutable source facts. The
@@ -204,46 +204,25 @@ func (c *argumentsCheck) record(b []byte) error {
 					break
 				}
 			}
-			if scalar >= 0 {
-				if a.Truncated || !strings.HasPrefix(a.Value, "decimal:") {
-					return artifact.ErrIntegrity
-				}
-				text := strings.TrimPrefix(a.Value, "decimal:")
-				if def.SignedMask&(1<<scalar) != 0 {
-					n, err := strconv.ParseInt(text, 10, 64)
-					if err != nil || strconv.FormatInt(n, 10) != text || ((a.Name == "fd" || a.Name == "dirfd") && n != int64(int32(n))) {
-						return artifact.ErrIntegrity
-					}
-				} else {
-					n, err := strconv.ParseUint(text, 10, 64)
-					if err != nil || strconv.FormatUint(n, 10) != text || ((a.Name == "flags" || a.Name == "mode") && n != uint64(uint32(n))) {
-						return artifact.ErrIntegrity
-					}
-				}
-			} else if a.Name == def.MemoryName && def.Lengths[1] != 0 {
-				if a.Value == "unavailable:fault" {
-					if a.Truncated {
-						return artifact.ErrIntegrity
-					}
-					continue
-				}
-				if !strings.HasPrefix(a.Value, "base64:") {
-					return artifact.ErrIntegrity
-				}
-				encoded := strings.TrimPrefix(a.Value, "base64:")
-				raw, err := base64.StdEncoding.Strict().DecodeString(encoded)
-				if err != nil || len(raw) > 128 || base64.StdEncoding.EncodeToString(raw) != encoded {
-					clear(raw)
-					return artifact.ErrIntegrity
-				}
-				clear(raw)
-			} else {
+			if !a.WellFormed() {
 				return artifact.ErrIntegrity
 			}
+			if scalar < 0 && (a.Name != def.MemoryName || def.Lengths[1] == 0) {
+				return artifact.ErrIntegrity
+			}
+
 		}
 		c.events++
 		if c.events > uint64(c.e.Recording.Syscalls.MaxEvents) {
 			return artifact.ErrLimit
+		}
+		if c.visitRaw != nil {
+			if !e.Valid(c.e.PodUID, c.from, c.until) {
+				return artifact.ErrInvalid
+			}
+			if err := c.visitRaw(e); err != nil {
+				return err
+			}
 		}
 		if c.visit != nil {
 			metadata := event{Identity: identity{ProcessRef: e.Identity.ProcessRef, ThreadRef: e.Identity.ThreadRef, PodUID: e.Identity.PodUID}, Syscall: e.Syscall, ABI: e.ABI, Timestamp: e.Timestamp, DurationNS: e.DurationNS, Outcome: e.Outcome, Errno: e.Errno}

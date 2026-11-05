@@ -3,6 +3,7 @@ package integration
 import (
 	"asservat.local/asservat/internal/adapters/diagnostics"
 	"asservat.local/asservat/internal/adapters/packets"
+	"asservat.local/asservat/internal/adapters/syscalls"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/capture"
@@ -131,12 +132,13 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	legacyTiming := len(profileSource) > 2 && profileSource[2]
 	isPacket := len(profileSource) > 3 && profileSource[3]
 	rawPacket := len(profileSource) > 4 && profileSource[4]
+	rawSyscall := len(profileSource) > 5 && profileSource[5]
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) {
 		queryLedgerQualification(t, f)
-		if isPacket {
+		if isPacket || rawSyscall {
 			packetLedgerFunding(t, f)
 		}
-		if isProfile || isPacket {
+		if isProfile || isPacket || rawSyscall {
 			q := f.qualification.ContextQuery
 			q.Profile.Worker.MemoryBytes, q.Profile.Worker.WorkerTransientBytes = value.ProfileSummaryWorkerBytes, value.ProfileSummaryWorkerBytes
 			q.RootQueries, q.PrincipalQueries, q.WorkloadQueries = 20, 20, 20
@@ -194,9 +196,9 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	for _, p := range pools[processingPools:] {
 		p.Close()
 	}
-	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket, rawPacket)
+	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled, isProfile, legacyTiming, isPacket, rawPacket, rawSyscall)
 	profile := syntheticWorkerProfile(f.input.InstallationID)
-	if isProfile || isPacket {
+	if isProfile || isPacket || rawSyscall {
 		profile.MemoryBytes = value.ProfileSummaryWorkerBytes
 		if isComparison {
 			profile.MemoryBytes = value.ProfileComparisonWorkerBytes
@@ -220,7 +222,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path, profile: isProfile, packet: isPacket}
+	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path, profile: isProfile, packet: isPacket, syscall: rawSyscall}
 	query.policies, err = authapp.NewContextProjectionPolicies(raw, time.Now)
 	if err != nil {
 		t.Fatal(err)
@@ -241,7 +243,11 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	var refresh func() executionapp.APIExecutionCheck
 	packetSource := len(legacyTiming) > 1 && legacyTiming[1]
 	rawPacket := len(legacyTiming) > 2 && legacyTiming[2]
-	if packetSource {
+	rawSyscall := len(legacyTiming) > 3 && legacyTiming[3]
+	if rawSyscall {
+		s, accepted, profileSQL = admitQueryLedgerProfile(t, f, root, enrollment, false, true)
+		started, refresh = startQueryLedgerProfile(t, f, s, accepted, profileSQL)
+	} else if packetSource {
 		if rawPacket {
 			s, accepted, profileSQL = admitQueryLedgerProfile(t, f, root, enrollment, true)
 		} else {
@@ -261,7 +267,7 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	}
 	var copies artifact.Copies
 	var acquisition artifact.AcquisitionWindow
-	if profileSource || packetSource {
+	if profileSource || packetSource || rawSyscall {
 		producer, err := objectstore.NewArtifactProducer(bound, f.keys, unusedStreamingJournal{}, time.Now)
 		if err != nil {
 			t.Fatal(err)
@@ -272,7 +278,12 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 		}
 		var body bytes.Buffer
 		at := time.Now().UTC()
-		if packetSource {
+		if rawSyscall {
+			time.Sleep(2 * time.Millisecond)
+			at = time.Now().UTC().Truncate(time.Microsecond)
+			original := installedArgumentsSQLSource(t, f.ctx, f.admin, s.a.RootID)(e.CaptureUID)
+			body.Write(syscallQuerySyntheticNative(t, e, original, started.StartedAt, at))
+		} else if packetSource {
 			// Explicit synthetic node payload; no privileged collector. Keep
 			// every packet/footer within the real started/completed interval.
 			time.Sleep(2 * time.Millisecond)
@@ -335,7 +346,16 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rawPacket {
+	if rawSyscall {
+		original := installedArgumentsSQLSource(t, f.ctx, f.admin, s.a.RootID)(e.CaptureUID)
+		verifier.WithStreamCheck(artifact.SyscallArgumentsArtifact, func(expected artifact.ContextExpectation) objectstore.StreamCheck {
+			check, err := syscalls.NewArgumentCheck(expected, original.Source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return check
+		})
+	} else if rawPacket {
 		verifier.WithStreamCheck(artifact.RawPCAPNGArtifact, func(artifact.ContextExpectation) objectstore.StreamCheck {
 			return packets.NewRawCheck(packets.RawLimits{Snaplen: 96, TCP: manualRawTCPCap})
 		})
@@ -367,7 +387,7 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 	publisher := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: check, ContextVerificationRecorder: check, ContextVerificationAuditor: ack, ContextCatalogPublisher: publish}, Authority: contextPublicationTestGate{check: func(ctx context.Context, v artifact.ContextExpectation) (artifact.PublicationAuthority, error) {
 		return f.currentManagedPublication(ctx, s, v)
 	}}, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Now: time.Now}
-	if profileSource || packetSource {
+	if profileSource || packetSource || rawSyscall {
 		gatePool := f.fixturePool("api_publication_gate_runtime", "synthetic-api-publication-gate")
 		defer gatePool.Close()
 		gate, err := postgres.NewAPIContextPublicationGate(f.ctx, gatePool, s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
@@ -397,6 +417,7 @@ type querySQLPolicy struct {
 	path                      value.ContextProjectionPath
 	profile                   bool
 	packet                    bool
+	syscall                   bool
 }
 
 func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPolicy, error) {
@@ -407,7 +428,9 @@ func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPol
 	x := p.path
 	path := artifact.DownloadPath{ID: x.ID, TargetClusterID: x.TargetClusterID, StoreID: x.StoreID, StorageRegion: x.StorageRegion, AcquisitionClusterID: x.AcquisitionClusterID, AcquisitionRegion: x.AcquisitionRegion, ConnectorClusterID: x.ConnectorClusterID, ConnectorRegion: x.ConnectorRegion, HubClusterID: x.HubClusterID, HubRegion: x.HubRegion, WorkerConfiguration: x.WorkerConfiguration, HubConfiguration: x.HubConfiguration}
 	classes, evidenceTypes := []string{"metadata"}, []string{"context"}
-	if p.packet {
+	if p.syscall {
+		classes, evidenceTypes = []string{"extract"}, []string{"syscallTrace"}
+	} else if p.packet {
 		classes, evidenceTypes = []string{"extract"}, []string{"packetCapture"}
 	} else if p.profile {
 		classes, evidenceTypes = []string{"extract"}, []string{"profile"}

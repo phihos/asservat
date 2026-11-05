@@ -24,9 +24,10 @@ class SyntheticApprovals implements Operations {
   calls: { name: Operation; input: unknown }[] = [];
   decision?: Output<'decide_review'>;
   detail: Data<'get_grant'> = grant;
+  rows?: Data<'list_reviews'>['approvals'];
   async call<N extends Operation>(name: N, input: Input<N>): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input) });
-    if (name === 'list_reviews') return result((input as Input<'list_reviews'>).view === 'pending' ? { approvals: [row] } : { approvals: [] }) as Output<N>;
+    if (name === 'list_reviews') return result((input as Input<'list_reviews'>).view === 'pending' ? { approvals: this.rows ?? [row] } : { approvals: [] }) as Output<N>;
     if (name === 'get_grant') return result(this.detail) as Output<N>;
     if (name === 'decide_review') return (this.decision ?? result({ grant_id: id(41), phase: 'Approved', revision: 2, not_after: iso(3_600_000) })) as Output<N>;
     return result({ grant_id: id(41), phase: 'Revoked', revision: 2 }) as Output<N>;
@@ -326,4 +327,40 @@ it('keeps a64-artifact review with maximal escaped identifiers inside the256KiB 
     await expect(approvalOperations.call('get_grant', { grant_id: raw.grant_id }, 'csrf', new AbortController().signal)).rejects.toThrow();
   } finally { vi.unstubAllGlobals(); }
   expect(validOutput_get_grant(result({ ...raw, raw_access: { ...raw.raw_access, max_operations: 10001 } }))).toBe(false);
+});
+
+it.each([false, true])('reviews saved argument query approval and shared page limits (download=%s)', async download => {
+  const client = new SyntheticApprovals(); const detail = rawGrant(1);
+  detail.raw_access.operations = download ? ['download_artifact', 'syscall_query'] : ['syscall_query']; client.detail = detail;
+  expect(validOutput_get_grant(result(detail))).toBe(true);
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={detail.grant_id}/>);
+  expect(await screen.findByRole('heading', { name: 'Inspect existing raw evidence' })).toBeTruthy();
+  expect(screen.getByText(download ? /Saved syscall argument queries and whole-file downloads/ : /Saved syscall argument queries over/)).toBeTruthy();
+  expect(screen.getByText(/Each paid query page reserves 24 KiB and one operation/)).toBeTruthy();
+  expect(screen.getByText(/10000 selected operations/)).toBeTruthy();
+  expect(screen.queryByText(/Saved packet queries/)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Continue approved capture' })).toBeNull();
+});
+it('explains argument acquisition and the three-operation follow-up parent without raw internal labels', async () => {
+  const client = new SyntheticApprovals(); const detail = structuredClone(grant);
+  detail.reasons = [{ action_id: 'a1', code: 'syscallArguments' }];
+  detail.actions.push({ ...detail.actions[0], action_id: 'calls', kind: 'syscallTrace', sensitive: ['syscallArguments'] });
+  detail.result_access = { action_ids: ['a1', 'calls'], operations: ['download_artifact', 'pcap_query', 'syscall_query'], client_ids: ['console', 'mcp'], max_artifacts: 3, max_bytes: 100000, max_operations: 10, not_after: iso(3600000), artifacts_used: 0, bytes_used: 0, operations_used: 0 };
+  client.detail = detail;
+  expect(validOutput_get_grant(result(detail))).toBe(true);
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={detail.grant_id}/>);
+  expect(await screen.findByText(/approved scalar values and bounded reads of user memory/)).toBeTruthy();
+  expect(screen.getByText(/Saved syscall argument queries/)).toBeTruthy();
+  expect(screen.getByText(/Each paid query page reserves 24 KiB and one operation from that same follow-up pool/)).toBeTruthy();
+  expect(screen.queryByText(/syscallArguments|syscall_query/)).toBeNull();
+});
+it('labels the saved syscall query inbox as inspection rather than a native download', async () => {
+  const client = new SyntheticApprovals(); const raw = rawGrant(1);
+  raw.raw_access.operations = ['syscall_query'];
+  const { artifacts: _artifacts, ...summary } = raw.raw_access;
+  client.rows = [{ ...raw, raw_access: summary }];
+  expect(validOutput_list_reviews(result({ approvals: client.rows }))).toBe(true);
+  render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client}/>);
+  expect(await screen.findByRole('link', { name: 'Inspect 1 existing artifacts' })).toBeTruthy();
+  expect(screen.queryByRole('link', { name: /Download 1/ })).toBeNull();
 });

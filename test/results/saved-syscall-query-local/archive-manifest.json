@@ -1,0 +1,462 @@
+{
+  "format": "saved-syscall-query-proof-originals/v1",
+  "scope": "Named precheckpoint/component/unit/browser checks at recorded handoff hashes, not one immutable final-source campaign. Initial setup failures and broad Go gate failure retained; remaining canonical Kubernetes groups and corrected full bootstrap gate tracked separately.",
+  "members": [
+    {
+      "member": "ui-approval-journey.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/ui-approval-journey.log",
+      "original_bytes": 861,
+      "original_sha256": "6a8da7d5e26ac153e4c13394647afc9c0937480827951eab107f85cf0795c5a7",
+      "gzip_bytes": 421,
+      "gzip_sha256": "7b85ee6c2e6c1bca7b99834031cd2d543440d9e825663da6a71de1ea9eb57391"
+    },
+    {
+      "member": "ui-approval-journey-second.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/ui-approval-journey-second.log",
+      "original_bytes": 31743,
+      "original_sha256": "3bf0f69e09bf2a8beffbb0b1f28b6fb5dcae0199abfa8229fecc314259923c46",
+      "gzip_bytes": 3378,
+      "gzip_sha256": "43b2cb28c87eb70cd522a491693b6719633557e39fbfa0be08856a8d12a13a3a"
+    },
+    {
+      "member": "ui-approval-journey-third.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/ui-approval-journey-third.log",
+      "original_bytes": 449,
+      "original_sha256": "894540b06023668a9c5571c3c68d6a0702499659152cea8ec72a2d95a0ac8022",
+      "gzip_bytes": 285,
+      "gzip_sha256": "bb1445bfcca6c79d267234e868a1b7a1523d52030d6e232ee28876e36e87dcf7"
+    },
+    {
+      "member": "ui-approval-typecheck.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/ui-approval-typecheck.log",
+      "original_bytes": 73,
+      "original_sha256": "dda1c53e63a88b57ac5508cbb4468d46bd187466b0e12cbe04e24affa3dd3970",
+      "gzip_bytes": 79,
+      "gzip_sha256": "0c7a1babb7b91df1ddc1e49a1e19c5480fe53865babd6bb18753c0769a0ae67f"
+    },
+    {
+      "member": "full-console-check.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/full-console-check.log",
+      "original_bytes": 1558,
+      "original_sha256": "e17c309ef16ef811cba673f8c63a6c9e50b6daac397d545f6dcf3dcbff348ba4",
+      "gzip_bytes": 731,
+      "gzip_sha256": "f3022bddab5a6ddf1f181c5605db4ec35bed1fe22e09292cdcd39fb6390dc37d"
+    },
+    {
+      "member": "full-console-build.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/full-console-build.log",
+      "original_bytes": 1101,
+      "original_sha256": "5641cd3cbea56994f3046af387b94ac85e3435eae66458cd4ba34bb4d8518662",
+      "gzip_bytes": 593,
+      "gzip_sha256": "85a5208d2c1abf64a99bca90147bfbdc9665bda6155bc1fbd0ecd6c9e407e303"
+    },
+    {
+      "member": "c20-refusals-race.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/c20-refusals-race.log",
+      "original_bytes": 360,
+      "original_sha256": "437838753dbd1d8461a38610b32151a7b1b86f65f69346b93bd4ed019ee78ae8",
+      "gzip_bytes": 191,
+      "gzip_sha256": "16cfcff32359651db882b97a26c03411172ce60357bb753a4e718cc3834df2ae"
+    },
+    {
+      "member": "c20-refusals-race-second.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/c20-refusals-race-second.log",
+      "original_bytes": 69,
+      "original_sha256": "03d9bf3478df8d50392b27e0a7c5fe9bc52792541f25da84844e1cec2eeccdee",
+      "gzip_bytes": 81,
+      "gzip_sha256": "13a86145e6e1fb6c63f21483242d8f378af1f88f755d3117c296eb52ffcc4851"
+    },
+    {
+      "member": "focused-all-raw-race.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/focused-all-raw-race.log",
+      "original_bytes": 983,
+      "original_sha256": "d72532b3129c52cfd0127708e485372668d9f40fe205dcf9d44712ea2d2d194f",
+      "gzip_bytes": 262,
+      "gzip_sha256": "b4d75a0af9e13e44197e23aa2dd23bdba459b0161826100ec375df04c0b986a6"
+    },
+    {
+      "member": "internal-vet.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/internal-vet.log",
+      "original_bytes": 0,
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_bytes": 20,
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "member": "spec-architecture-current.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/spec-architecture-current.log",
+      "original_bytes": 122,
+      "original_sha256": "cf2001ebb550d1af6922d4a661876ff610d23b23a2cc96753a1d1a0648b83519",
+      "gzip_bytes": 133,
+      "gzip_sha256": "fa49ca8088aadab7716c68cbb47dcb3ed37bdc00210cff2de0590b680c2dde42"
+    },
+    {
+      "member": "spec-architecture-second.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/spec-architecture-second.log",
+      "original_bytes": 999,
+      "original_sha256": "1ac6496471859127701221ac4c02f71e38b2f9cbc2ddbfed06a3d15ed5fdd19f",
+      "gzip_bytes": 581,
+      "gzip_sha256": "b7c6de17bee6f42ab40bc3119e178d42ef3d9198024adabfddbabe7b3f040f4c"
+    },
+    {
+      "member": "go-architecture-third.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/go-architecture-third.log",
+      "original_bytes": 113,
+      "original_sha256": "76389632e0c348aea0b130cd710631f18ec1182a0f9546e274f491dd3d4f89ab",
+      "gzip_bytes": 119,
+      "gzip_sha256": "81d494dcff80b0177dac0e9ec61e516e61891de66a76b780e7513065af6efeb7"
+    },
+    {
+      "member": "final-precheckpoint-gates.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/final-precheckpoint-gates.log",
+      "original_bytes": 203,
+      "original_sha256": "45e0ce7e38cf82f5c7504cfd693a735b9681eab3926a83ba35c4f0c032e47bfb",
+      "gzip_bytes": 184,
+      "gzip_sha256": "d39fcaafef698e8b1223ad871b10dce4f50ecdf881530446ef432e47ec9b7261"
+    },
+    {
+      "member": "final-precheckpoint-gates-second.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/final-precheckpoint-gates-second.log",
+      "original_bytes": 936,
+      "original_sha256": "f3df8318711567d69e1a3196a160c53e5aa5a5fa4256c180377ebc69d1d41082",
+      "gzip_bytes": 545,
+      "gzip_sha256": "3bf9d8bd2068a7897f944353bd347b86e1d783573adad99d564ba95f0d04f285"
+    },
+    {
+      "member": "full-go-check.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/full-go-check.log",
+      "original_bytes": 20427,
+      "original_sha256": "229605a33d6b38b402da0132c2e31b1ecde6e3b79411e6ea5ae3919ea7842b77",
+      "gzip_bytes": 3101,
+      "gzip_sha256": "4c7434c22784c623037a00b74343303e0b7cc0c52f2141e7b55a36034dcf9851"
+    },
+    {
+      "member": "bootstrap-route-regression.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/bootstrap-route-regression.log",
+      "original_bytes": 56,
+      "original_sha256": "66e739fa927343d2c6fe610c92f63fcfc98d2413b030483b0511394db14c65ab",
+      "gzip_bytes": 68,
+      "gzip_sha256": "d5ad3db9862c4cdff0f739096c092213daf8584b72056f106ab7c86f49c8aebd"
+    },
+    {
+      "member": "saved-syscall-query-browser-handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-browser-handoff.json",
+      "original_bytes": 6349,
+      "original_sha256": "fa42a730f2ba2706b7ceb0ceb8a5cbfac9617949a8e2e037a3867c2737240b89",
+      "gzip_bytes": 2662,
+      "gzip_sha256": "013de710296b75218130c3d4e24840055d71cfddce798d65b9f1759176e9f592"
+    },
+    {
+      "member": "saved-syscall-query-c20-ui-independent-review.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-c20-ui-independent-review.json",
+      "original_bytes": 5755,
+      "original_sha256": "7bf381513cc28b7f1e4e33299d96bfad8076d4f26bed77d2e5cd7cafad81a025",
+      "gzip_bytes": 2214,
+      "gzip_sha256": "813bda459cac6854cca8201d6511c54f38a9d29b18cf439536b6ed321fb68885"
+    },
+    {
+      "member": "saved-syscall-query-canonical-independent-review.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-canonical-independent-review.json",
+      "original_bytes": 3082,
+      "original_sha256": "195638ca39ee12193e9cf5079eeffd4a4582e66f611e2e2d38e58f995b4faedc",
+      "gzip_bytes": 1657,
+      "gzip_sha256": "6e5e613011a76a0c3969db9ba440638e34f167234af431e00ef22064a93a93ef"
+    },
+    {
+      "member": "saved-syscall-query-dispatch-red-source.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-dispatch-red-source.json",
+      "original_bytes": 472,
+      "original_sha256": "4e0106015b0022737f0c4e676161218c6e7c2eadcbb7eb2a11e89e99b69769e2",
+      "gzip_bytes": 357,
+      "gzip_sha256": "c2e184f3a3c3bcc49a88b573f617ffe3c9f2ee14544b1f6c697adc6c61bead20"
+    },
+    {
+      "member": "saved-syscall-query-old-two-operation-cap-overlay.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-old-two-operation-cap-overlay.json",
+      "original_bytes": 198,
+      "original_sha256": "42c36056f8b34555d27cbd88613c6e07f5e2a0cc072ee3d4334eba742722d550",
+      "gzip_bytes": 154,
+      "gzip_sha256": "be00cd9cc2459c6f6113d3cb1246ba7a678450780b498081af3e804afd7cd25f"
+    },
+    {
+      "member": "saved-syscall-query-parser-handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-parser-handoff.json",
+      "original_bytes": 10000,
+      "original_sha256": "432377537354f9e1f6787849fcf39da17224753ea54faa4db616d0b7de3b3d38",
+      "gzip_bytes": 4058,
+      "gzip_sha256": "c265397c2c5d8989c0f686f2b94d3895cf74f762bc3c835a178a70d1fb85607b"
+    },
+    {
+      "member": "saved-syscall-query-parser-owned-freeze.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-parser-owned-freeze.json",
+      "original_bytes": 3794,
+      "original_sha256": "75ba5a3db3eda125e74810399a4e4239593e22bd5c4018ea06a33a8adecb30dc",
+      "gzip_bytes": 1311,
+      "gzip_sha256": "f1424991cc764932cbcbae4f4599cfbd705e89133e440925c7629d979713ca05"
+    },
+    {
+      "member": "saved-syscall-query-previous-dispatch-overlay.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-previous-dispatch-overlay.json",
+      "original_bytes": 212,
+      "original_sha256": "3865b73d0021e8c95e2d46793f12790738f4171558f6f5fb6ab7fa778d418fb5",
+      "gzip_bytes": 163,
+      "gzip_sha256": "45a2330e63fb4d1eff47d0f323bf75ff51dbdc931d03e9d38a71cacaecdcb7af"
+    },
+    {
+      "member": "saved-syscall-query-source-final-handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-source-final-handoff.json",
+      "original_bytes": 3913,
+      "original_sha256": "be40862097e64eb8e68dacc925de31dd60c505667e928f713e61da81b16a1cde",
+      "gzip_bytes": 1764,
+      "gzip_sha256": "45dc853075d1e4285dd5f48b431c825732fba1ca1ec9905694e994a34e04f3a4"
+    },
+    {
+      "member": "saved-syscall-query-source-handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-source-handoff.json",
+      "original_bytes": 9797,
+      "original_sha256": "bdfae233e0466f1fc015f5002a8c2e263057de2bf12fb3ddf4e7c62c0c72048a",
+      "gzip_bytes": 3425,
+      "gzip_sha256": "e1ad14003b032b3f37eaecd544230d1ac1b88e141da340c4c86c660d9cbd90d2"
+    },
+    {
+      "member": "saved-syscall-query-source-replay-handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-source-replay-handoff.json",
+      "original_bytes": 3211,
+      "original_sha256": "e086c06657bfbb8dbae3c2806db5fee7c67d1131de2ffba25c0eadd0b324de35",
+      "gzip_bytes": 1457,
+      "gzip_sha256": "438501ac39b19f451b69640035482f6dbe1cb3ccd67979b7aebe9788ba84d5f6"
+    },
+    {
+      "member": "saved-syscall-query-three-operation-producer-handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-three-operation-producer-handoff.json",
+      "original_bytes": 4612,
+      "original_sha256": "98534b7cd0e44624566080b0c39b7389ea9afe94eb12034d93a924daffdeaf64",
+      "gzip_bytes": 2056,
+      "gzip_sha256": "52fc6e4e8e7cfe2babf91d8088c38829813a9ab44c1a132ee2eb159bb7a7dfa2"
+    },
+    {
+      "member": "saved-syscall-query-three-operation-source.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-three-operation-source.json",
+      "original_bytes": 539,
+      "original_sha256": "4583e31334b06c701bb08c41901bb1d8bd6ae08f779ba2a3baf3188a689e35b2",
+      "gzip_bytes": 361,
+      "gzip_sha256": "28fa4ebacef8944b879a11aa7c68b057248df5d4689d1bcb4dfba8b1cf5eadfa"
+    },
+    {
+      "member": "saved-syscall-query-ui-handoff.json.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-ui-handoff.json",
+      "original_bytes": 3357,
+      "original_sha256": "e8e1f072d6bb63fcdf204bdfffef539fd986b5122abbb1f09da29d39b0e2cc0b",
+      "gzip_bytes": 1488,
+      "gzip_sha256": "030092ba643020fd8c93346863f06f94ed8322b22420f7e1932c3c8a34364d53"
+    },
+    {
+      "member": "referenced-logs/saved-syscall-query-browser-first.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-browser-first.log",
+      "original_bytes": 2407,
+      "original_sha256": "58b5d2bffb470a4356a2cb0a19d7f64fd02b451afa279c03c5a81b8a5a197378",
+      "gzip_bytes": 550,
+      "gzip_sha256": "f901500ccb7bb90886c819530d5759bea7a1c3173c1938a7f125591f8356c1a5"
+    },
+    {
+      "member": "referenced-logs/saved-syscall-query-browser-second.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-browser-second.log",
+      "original_bytes": 4707,
+      "original_sha256": "9b07a3cc641265a19974b00601b3475423845e1fcaa3b926f647a561d1e0874f",
+      "gzip_bytes": 614,
+      "gzip_sha256": "16f71b7486c9b0397869fb4054290875b2563d46ff19d3f93ebe1ce427d26e83"
+    },
+    {
+      "member": "referenced-logs/saved-syscall-query-browser-third.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-browser-third.log",
+      "original_bytes": 1594,
+      "original_sha256": "e77e9f01f2a03ffbe5d727289c1353454dd5737b6c820e2724c85b03cd6d8cf5",
+      "gzip_bytes": 492,
+      "gzip_sha256": "fe19489d8d4e4e1868a6972bcb23521c42e80300c34f45e9a74ef3c056d5280e"
+    },
+    {
+      "member": "referenced-logs/saved-syscall-query-browser-final-race.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-browser-final-race.log",
+      "original_bytes": 1596,
+      "original_sha256": "228d90531679d7cb3b0e1223b2e4aaa44b7c740a4a9f903a9cdb6b952658d6a6",
+      "gzip_bytes": 496,
+      "gzip_sha256": "a60df0c95e1de233c8eb02892db6da20fa40cef8336e5d7dfb89e1c87805e981"
+    },
+    {
+      "member": "referenced-logs/saved-syscall-query-parser-final-closed-race.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-parser-final-closed-race.log",
+      "original_bytes": 317,
+      "original_sha256": "65c1266c53ff7b100a2f3717d5bff43028cbb171cfaeeca5eac7a6019e44966c",
+      "gzip_bytes": 141,
+      "gzip_sha256": "1fe9e8bbd758fb8d4caee6c5f17e859039e470de6872ab8fc1606f89664c5b73"
+    },
+    {
+      "member": "referenced-logs/syscall-catalog-red.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-catalog-red.log",
+      "original_bytes": 1149,
+      "original_sha256": "57f4ec18972d856962752446c056bc80612b82c0b5431949b714331071db3168",
+      "gzip_bytes": 257,
+      "gzip_sha256": "8033ebed6b7c1d5091fddd735e7aea0b12cd3e36b5a8d3223c29276d6ceb2b4d"
+    },
+    {
+      "member": "referenced-logs/syscall-catalog-green.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-catalog-green.log",
+      "original_bytes": 65,
+      "original_sha256": "fb1e4ab3ea02c2047cb1e9ddf4ac3a5f529a1d1fb78a349363c2317b94430550",
+      "gzip_bytes": 75,
+      "gzip_sha256": "dd428db1e72632a350cf69b51d10f9d11f41046b5f95efc00d06e3818c9c2826"
+    },
+    {
+      "member": "referenced-logs/syscall-admission-red.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-admission-red.log",
+      "original_bytes": 236,
+      "original_sha256": "c822b7304945bdbcf313467e99b8ccb8ab63b71b2cde95842db67cabd66f80f9",
+      "gzip_bytes": 192,
+      "gzip_sha256": "7a0603cee8195c47ecb10edb89ee53839ff92fc8019586698a99f9e4653903f9"
+    },
+    {
+      "member": "referenced-logs/syscall-admission-green.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-admission-green.log",
+      "original_bytes": 66,
+      "original_sha256": "40dc26046a60d98bd0e9a56631745db6c02f57ebdc3cf219f2752022954c49ae",
+      "gzip_bytes": 76,
+      "gzip_sha256": "718fbdaed14acf64afc5b4d5812e7487bd62ab1ce941159cbad471a45349f875"
+    },
+    {
+      "member": "referenced-logs/syscall-composition-green.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-composition-green.log",
+      "original_bytes": 419,
+      "original_sha256": "c6e449ac4d8456f0b298178f21f74e7187cd541746204eae0f150c0e0d9ae1e9",
+      "gzip_bytes": 232,
+      "gzip_sha256": "67b56057fd2df09ce3e164feb4466cac351a27de3fca69a7c2950ddbd88aea09"
+    },
+    {
+      "member": "referenced-logs/syscall-composition-final-green.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-composition-final-green.log",
+      "original_bytes": 264,
+      "original_sha256": "ff059212f00c8f1026781ee7db49b6e6114d8b20a222e75060ffc4335e4f6066",
+      "gzip_bytes": 120,
+      "gzip_sha256": "fe2e4d70df4a9778bf2ebe536da040a930842343fd78eb6f1aeee35dceed8e98"
+    },
+    {
+      "member": "referenced-logs/syscall-owned-race.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-owned-race.log",
+      "original_bytes": 430,
+      "original_sha256": "890ea8f7fa1dfb76cab8aab0e2f61e041a54af516874969f909c50218836f86e",
+      "gzip_bytes": 251,
+      "gzip_sha256": "25caf8d12183b375671f9e1ee6d2b5f6327dd6266f7729d6deb5988974566a4f"
+    },
+    {
+      "member": "referenced-logs/syscall-authorization-final-race.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-authorization-final-race.log",
+      "original_bytes": 71,
+      "original_sha256": "443f0fcf14247b04c999dcbda609168e36a6f4247c8517606aa9916d6ff69654",
+      "gzip_bytes": 79,
+      "gzip_sha256": "b80f0976c59696c21d0491054bfd0b6cdc49f064185ca91a5b7199422449162c"
+    },
+    {
+      "member": "referenced-logs/syscall-bootstrap-race.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-bootstrap-race.log",
+      "original_bytes": 9536,
+      "original_sha256": "3e7cccd66459d329e7289c64ae01016dcb25f34a9798d2e00445d8da8ccbc078",
+      "gzip_bytes": 1287,
+      "gzip_sha256": "b586b4d7ab4462d60f3cf6bf18cb2402af14f1d11a40ca9c4fe9692c1d0f3451"
+    },
+    {
+      "member": "referenced-logs/syscall-final-focused-race.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-final-focused-race.log",
+      "original_bytes": 202,
+      "original_sha256": "d25f39a69977fbd7cfd4c92676c5920552383bb004bb04942fbe788bc54f7895",
+      "gzip_bytes": 108,
+      "gzip_sha256": "459373b45462a647cd6f9e25c7551f6c043c241756d95f70f7ca49fcaaef1098"
+    },
+    {
+      "member": "referenced-logs/saved-syscall-query-source-replay-red.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-source-replay-red.log",
+      "original_bytes": 254,
+      "original_sha256": "658508a3794bd1ccd79864a71474a9185b4a3fc7f105ef13d594c93414b73748",
+      "gzip_bytes": 208,
+      "gzip_sha256": "dc3c5026952c958914efc57fb66682fa7c788f580dce3393d22fb76cc3f6b9de"
+    },
+    {
+      "member": "referenced-logs/saved-syscall-query-source-replay-final-green.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-source-replay-final-green.log",
+      "original_bytes": 66,
+      "original_sha256": "cf747ea2a5295f2ea75578c84cb590f58c87a910aff58a529aeb33777ddc9ca3",
+      "gzip_bytes": 76,
+      "gzip_sha256": "585f999734838caff017ef814b0b7d73e2a9cc8200c80e80991a2a315bd72aee"
+    },
+    {
+      "member": "referenced-logs/saved-syscall-query-replay-composition-compile.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query-replay-composition-compile.log",
+      "original_bytes": 71,
+      "original_sha256": "49f2dae6360b9aa3605aea3fbd0688463f3e130bcf9a63a54612f79de9775471",
+      "gzip_bytes": 82,
+      "gzip_sha256": "0a0207477d9ef8fd112c6ac2c2048f00e4b1afead8368cfd943437da43f33ceb"
+    },
+    {
+      "member": "referenced-logs/syscall-ui-dependency-setup.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-ui-dependency-setup.log",
+      "original_bytes": 71,
+      "original_sha256": "59fe981764dc54efa5a1c7a36acd4fd1dbb27e3f6a6d0807d3db94d22b50114b",
+      "gzip_bytes": 86,
+      "gzip_sha256": "e0a00ee51ba8dd25c0adce42ae3b97bb71d0bcd8566a5c11d98a038c6a4d6612"
+    },
+    {
+      "member": "referenced-logs/syscall-ui-final-tsc.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-ui-final-tsc.log",
+      "original_bytes": 73,
+      "original_sha256": "dda1c53e63a88b57ac5508cbb4468d46bd187466b0e12cbe04e24affa3dd3970",
+      "gzip_bytes": 79,
+      "gzip_sha256": "0c7a1babb7b91df1ddc1e49a1e19c5480fe53865babd6bb18753c0769a0ae67f"
+    },
+    {
+      "member": "referenced-logs/syscall-ui-final-green.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-ui-final-green.log",
+      "original_bytes": 370,
+      "original_sha256": "8e3d531d6bb360887114ae3b755c0c624a99ddbafafed191e3cf7990c895aff0",
+      "gzip_bytes": 255,
+      "gzip_sha256": "a82e52fdd3fffe6e9269663f419e98521d32efa2694f8a2db21c340c23fd76f5"
+    },
+    {
+      "member": "referenced-logs/syscall-ui-first.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-ui-first.log",
+      "original_bytes": 7805,
+      "original_sha256": "316baa5c38760d44247b0e8586e2c1c42602e6c411b2dba07445c44d9bfe0a4c",
+      "gzip_bytes": 1910,
+      "gzip_sha256": "c6c5ea28ea3309c62e4c95ebd979b231a68a31e873a09c55ab70afeb6cb0dba4"
+    },
+    {
+      "member": "referenced-logs/syscall-ui-green.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/syscall-ui-green.log",
+      "original_bytes": 7805,
+      "original_sha256": "62fc73825299d8cb6fb803352f174583dfb3eae5d6c9cd298293c5b63269e91b",
+      "gzip_bytes": 1910,
+      "gzip_sha256": "e8c944b3edc41b575054ce811cc04ba0a99c6aae6139d4ff8bb85d4489e7be55"
+    },
+    {
+      "member": "bootstrap-full-race-final.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/bootstrap-full-race-final.log",
+      "original_bytes": 57,
+      "original_sha256": "f2df5068dfa6279ef0c03c06d0729a5a42105fc014d7bc7604ec86c7884b9165",
+      "gzip_bytes": 69,
+      "gzip_sha256": "b489c3b45978eab1f86e24b4d03c2f20d15874c0c8948b0c160eaa117b74ce20"
+    },
+    {
+      "member": "proof-publication-gates.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/proof-publication-gates.log",
+      "original_bytes": 605,
+      "original_sha256": "0c45b990897d5f9c8dde0af9391281d8350e5d96011d365b066fbf5604285ca3",
+      "gzip_bytes": 395,
+      "gzip_sha256": "e891717379dc67638661935bee46deb76901ef91c9d9273b4f8fabd9bfe2badb"
+    },
+    {
+      "member": "kubernetes-complete-groups-final.log.gz",
+      "original_path": "/home/phil/.cache/asservat-build/saved-syscall-query/kubernetes-complete-groups-final.log",
+      "original_bytes": 3684704,
+      "original_sha256": "71ae62dd15fdd2adb641ae0d5e7bae873b89ac09bcd8410251123b3a19669a6c",
+      "gzip_bytes": 250356,
+      "gzip_sha256": "b21003ad356521d0cf37b5d4860361e3bde5cb832fff5238f76c8013fe1e1149"
+    }
+  ]
+}

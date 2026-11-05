@@ -407,7 +407,9 @@ func (s *ContextQueries) AdmitQueryPoll(ctx context.Context, q value.ContextQuer
 // normalized Begin input to its immutable query. It charges one existing control
 // on first insertion, not a poll, read, worker, query unit or grant use.
 func (s *ContextQueries) RegisterQueryReplayCall(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority) error {
-	if q.Scope.DisplayVersion != value.PacketQueryDisplayVersion || !q.Scope.PacketQuery.Valid() || !q.InvocationKey.Valid() || r.Call.Tool != q.Scope.BeginTool() {
+	supported := q.Scope.DisplayVersion == value.PacketQueryDisplayVersion && q.Scope.PacketQuery.Valid() ||
+		q.Scope.DisplayVersion == value.SyscallQueryDisplayVersion && q.Scope.NativeType == artifact.SyscallArgumentsArtifact && q.Scope.SourceFormat == artifact.SyscallArgumentsFormat && q.Scope.Syscalls.View == value.SyscallQueryView
+	if !supported || !q.Scope.Valid() || !q.InvocationKey.Valid() || r.Call.Tool != q.Scope.BeginTool() {
 		return value.ErrUnavailable
 	}
 	return s.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, _ custodydb.ContextQueryBacking, _ custodydb.ContextQueryAllocation) error {

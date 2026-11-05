@@ -128,6 +128,12 @@ func (l workerNativeLoop) Run(parent context.Context) error {
 		if err != nil || closeErr != nil || outcome.State != contracts.NativeJoined {
 			return workerNativeStep("conversation", err)
 		}
+		if outcome.ExhaustedProjection && l.target.Parent().Purpose == value.AcquisitionProjection {
+			if ctx.Err() != nil || !l.now().Before(l.target.RunUntil) {
+				return artifact.ErrDownloadExpired
+			}
+			return nil
+		}
 		if err := l.wait(ctx, contracts.NativeIdleRetry); err != nil {
 			return err
 		}
@@ -138,6 +144,10 @@ func (l workerNativeLoop) Run(parent context.Context) error {
 // Both child lifetimes are joined even if the initiating context is already
 // cancelled. Native work starts only after credential readiness; readiness is
 // not reported as a successful download. A failed child cancels the other.
+// The private credentials callback must preserve WorkerCredentialSupervisor's
+// origin contract: context.Canceled comes only from its supplied context, never
+// directly from an independently failed provider operation. The actual callback
+// uses that supervisor with waitWorker; this is not a generic provider hook.
 func runWorkerNativePair(ctx context.Context, ready <-chan value.KeyPeer, credentials, work func(context.Context) error) error {
 	if ctx == nil || ready == nil || credentials == nil || work == nil {
 		return artifact.ErrInvalid
@@ -172,7 +182,13 @@ func runWorkerNativePair(ctx context.Context, ready <-chan value.KeyPeer, creden
 		<-workDone
 	case err = <-workDone:
 		cancel()
-		<-credentialDone
+		credentialErr := <-credentialDone
+		// The native loop returns nil only for a positively joined exhausted
+		// projection. Its original parent must still be live, and credentials
+		// must have joined cancellation rather than stopped successfully early.
+		if err == nil && errors.Is(credentialErr, context.Canceled) && ctx.Err() == nil {
+			return nil
+		}
 	case <-ctx.Done():
 		err = ctx.Err()
 		cancel()
@@ -242,6 +258,7 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 		reader.ServeProfileSummaries(diagnostics.SummarizePprof)
 		reader.ServeProfileComparisons(diagnostics.ComparePprof)
 		reader.ServeSyscallProjections(syscalls.ProjectSyscalls)
+		reader.ServeSyscallQueries(syscalls.QuerySyscallArguments)
 		reader.ServePacketSummaries(packets.SummarizePCAPNG)
 		reader.ServePacketQueries(packets.QueryPCAPNG)
 		result, err = evidence.NewRegionalApprovedResult(ctx, input.Target, reader, time.Now)

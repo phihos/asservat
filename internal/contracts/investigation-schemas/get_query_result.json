@@ -114,7 +114,8 @@
                       "pcap_query",
                       "compare_profiles",
                       "get_syscall_summary",
-                      "get_syscall_events"
+                      "get_syscall_events",
+                      "syscall_query"
                     ]
                   },
                   "result": {

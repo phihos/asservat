@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
@@ -244,5 +246,198 @@ func TestNativeReadReportCarriesOnlyStepsAndClosedOutcome(t *testing.T) {
 	want := "native read: unwrap-1@<100ms unwrap-2@<250ms, joined\nnative read: unwrap-1@>=3s, stopped at read\n"
 	if out.String() != want {
 		t.Fatalf("got %q", out.String())
+	}
+}
+
+func TestWorkerNativeExhaustedProjectionDoesNotReopen(t *testing.T) {
+	for _, mode := range []string{"exhausted", "two-batch", "download", "uncertain", "close-failed", "cancelled"} {
+		t.Run(mode, func(t *testing.T) {
+			now := time.Now().UTC()
+			const id = "11111111-1111-4111-8111-111111111111"
+			target := value.WorkerCredentialTarget{InstallationID: id, QueryID: id, WorkerID: id, PodUID: id, CreatedAt: now, RunUntil: now.Add(time.Minute)}
+			if mode == "download" {
+				target.QueryID, target.SessionID = "", id
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			tokens := &nativeTokenFixture{}
+			stream := &nativeStreamFixture{ctx: ctx}
+			opens, runs, waits := 0, 0, 0
+			loop := workerNativeLoop{target: target, token: tokens, now: func() time.Time { return now }, nonce: workerNativeNonce,
+				open: func(call context.Context, h contracts.NativeHello) (contracts.NativeStream, error) {
+					d, ok := call.Deadline()
+					if !ok || !d.Equal(target.RunUntil) {
+						t.Fatal("original worker interval changed")
+					}
+					opens++
+					if opens > 1 {
+						return nil, io.ErrUnexpectedEOF
+					}
+					return stream, nil
+				},
+				run: func(context.Context, contracts.NativeStream, contracts.NativeHello) (contracts.NativeConversationResult, error) {
+					runs++
+					out := contracts.NativeConversationResult{State: contracts.NativeJoined, ExhaustedProjection: mode != "two-batch"}
+					if mode == "uncertain" {
+						out.State = contracts.NativeUncertain
+						return out, io.ErrUnexpectedEOF
+					}
+					if mode == "close-failed" {
+						stream.closeError = io.ErrClosedPipe
+					}
+					if mode == "cancelled" {
+						cancel()
+					}
+					return out, nil
+				},
+				wait: func(context.Context, time.Duration) error { waits++; return nil },
+			}
+			err := loop.Run(ctx)
+			if mode == "exhausted" {
+				if err != nil || opens != 1 || runs != 1 || waits != 0 {
+					t.Fatal("exhausted projection reopened or refused natural completion", err, opens, runs, waits)
+				}
+			} else {
+				if err == nil {
+					t.Fatal("nonexhausted or uncertain work exited successfully")
+				}
+				if mode == "two-batch" || mode == "download" {
+					if opens != 2 || waits != 1 {
+						t.Fatal("continuing native worker stopped", opens, waits)
+					}
+				} else if opens != 1 {
+					t.Fatal("failed/cancelled work reconnected", opens)
+				}
+			}
+			if stream.closed != 1 {
+				t.Fatal("native stream not joined/closed", stream.closed)
+			}
+			for _, token := range tokens.values {
+				for _, b := range token {
+					if b != 0 {
+						t.Fatal("projected token retained")
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestWorkerNativeNaturalCompletionJoinsCredentials(t *testing.T) {
+	ready := make(chan value.KeyPeer, 1)
+	workStarted, credentialCleanup, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- runWorkerNativePair(t.Context(), ready, func(ctx context.Context) error {
+			ready <- value.KeyPeer{}
+			<-workStarted
+			<-ctx.Done()
+			close(credentialCleanup)
+			<-release
+			return ctx.Err()
+		}, func(context.Context) error { close(workStarted); return nil })
+	}()
+	<-credentialCleanup
+	select {
+	case <-done:
+		t.Fatal("natural completion omitted credential join")
+	default:
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal("exhausted native work did not complete naturally", err)
+	}
+}
+
+func TestWorkerNativeExhaustionDispositionCannotCrossJSON(t *testing.T) {
+	local := contracts.NativeConversationResult{State: contracts.NativeJoined, ExhaustedProjection: true}
+	raw, err := json.Marshal(local)
+	if err != nil || strings.Contains(string(raw), "Exhausted") {
+		t.Fatal("process disposition entered serialized data", err)
+	}
+	var decoded contracts.NativeConversationResult
+	if err = json.Unmarshal([]byte(`{"State":"Joined","ExhaustedProjection":true,"exhausted_projection":true}`), &decoded); err != nil || decoded.ExhaustedProjection {
+		t.Fatal("wire data supplied process exhaustion", err)
+	}
+}
+
+func TestWorkerNativeNaturalCompletionRejectsPrematureCredentialsAndParentCancellation(t *testing.T) {
+	for _, mode := range []string{"credentials", "credential-failure", "parent"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			ready := make(chan value.KeyPeer, 1)
+			started := make(chan struct{})
+			var joined atomic.Bool
+			err := runWorkerNativePair(ctx, ready, func(ctx context.Context) error {
+				ready <- value.KeyPeer{}
+				<-started
+				if mode == "credentials" {
+					return nil
+				}
+				if mode == "credential-failure" {
+					return artifact.ErrDownloadExpired
+				}
+				<-ctx.Done()
+				joined.Store(true)
+				return ctx.Err()
+			}, func(ctx context.Context) error {
+				close(started)
+				if mode == "parent" {
+					cancel()
+					return nil
+				}
+				if mode == "credential-failure" {
+					joined.Store(true)
+					return nil
+				}
+				<-ctx.Done()
+				joined.Store(true)
+				return ctx.Err()
+			})
+			if err == nil || !joined.Load() {
+				t.Fatal("premature lifetime became success or child was not joined", err)
+			}
+		})
+	}
+}
+
+type nativeIndependentEnrollmentCancellation struct {
+	calls, peers, closed int
+	live                 bool
+}
+
+func (f *nativeIndependentEnrollmentCancellation) Enroll(ctx context.Context) error {
+	f.calls++
+	f.live = f.live && ctx.Err() == nil
+	return context.Canceled
+}
+func (f *nativeIndependentEnrollmentCancellation) Peer() (value.KeyPeer, error) {
+	f.peers++
+	return value.KeyPeer{}, artifact.ErrDownloadExpired
+}
+func (f *nativeIndependentEnrollmentCancellation) Close() { f.closed++ }
+
+// Exercise the actual production credential supervisor, not a callback that
+// forwards provider cancellation directly into the private native pair.
+func TestWorkerNativeCredentialSupervisorDoesNotForwardIndependentCancellation(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	const id = "11111111-1111-4111-8111-111111111111"
+	target := value.WorkerCredentialTarget{InstallationID: id, QueryID: id, WorkerID: id, PodUID: id, CreatedAt: now, RunUntil: now.Add(time.Minute)}
+	client := &nativeIndependentEnrollmentCancellation{live: true}
+	ready := make(chan value.KeyPeer, 1)
+	supervisor := evidence.WorkerCredentialSupervisor{Client: client, Target: target, Now: func() time.Time { return now }, IdentityReady: ready, Jitter: func() time.Duration { return 0 }, Wait: func(ctx context.Context, d time.Duration) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if d <= 0 {
+			t.Fatal("unbounded credential wait")
+		}
+		now = now.Add(d)
+		return nil
+	}}
+	err := supervisor.Run(t.Context())
+	if err == nil || errors.Is(err, context.Canceled) || t.Context().Err() != nil || !client.live || client.calls < 2 || client.calls > 8 || client.peers != 0 || client.closed != 1 || len(ready) != 0 || !now.Before(target.RunUntil) {
+		t.Fatal("independent enrollment cancellation escaped as owning cancellation or established credentials", err, client.calls, client.peers, client.closed, len(ready))
 	}
 }

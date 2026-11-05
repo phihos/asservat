@@ -145,10 +145,32 @@ func (q *Queries) ConfirmDownloadWorkerTermination(ctx context.Context, arg Conf
 }
 
 const expiredQueryAcquisitionWorkers = `-- name: ExpiredQueryAcquisitionWorkers :many
-SELECT id, session_id, root_id, installation_id, allocation_id, principal_key, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json, query_id, query_allocation_id, abandoned_at, baseline_query_allocation_id FROM download_worker
-WHERE root_id=$1 AND installation_id=$2 AND query_id IS NOT NULL
- AND retired_proof_json IS NULL AND abandoned_at IS NULL AND run_until<=clock_timestamp()
-ORDER BY run_until,id LIMIT 16
+SELECT w.id, w.session_id, w.root_id, w.installation_id, w.allocation_id, w.principal_key, w.generation, w.intent_json, w.run_until, w.audit_receipt_json, w.claimed_at, w.job_json, w.binding_json, w.termination_json, w.retired_proof_json, w.query_id, w.query_allocation_id, w.abandoned_at, w.baseline_query_allocation_id FROM download_worker w
+WHERE w.root_id=$1 AND w.installation_id=$2 AND w.query_id IS NOT NULL
+ AND w.retired_proof_json IS NULL AND w.abandoned_at IS NULL
+ AND (w.run_until<=clock_timestamp() OR EXISTS (
+ SELECT 1 FROM context_query q
+ JOIN context_query_batch b ON b.query_id=q.id AND b.generation=1
+ JOIN context_query_worker cw ON cw.query_id=q.id
+ WHERE q.id=w.query_id AND q.root_id=w.root_id AND q.worker_id=w.id
+ AND w.claimed_at IS NOT NULL AND w.binding_json IS NOT NULL
+ AND q.query=(convert_from(w.intent_json,'UTF8')::jsonb)->'Query'
+ AND context_query_read_batches(q.query->'Scope')=1
+ AND q.generation=1 AND q.active_batch IS NULL AND NOT q.uncertain
+ AND b.claim_id=b.id AND b.closed AND b.native_closed
+ AND b.batch->'Worker'=cw.binding
+ AND cw.binding->>'WorkerID'=w.id::text
+ AND cw.binding->>'PodUID'=(convert_from(w.binding_json,'UTF8')::jsonb)->>'PodUID'
+ AND b.native_authority->'Scope'=q.query->'Scope'
+ AND b.native_operation->'Reference'->>'QueryID'=q.id::text
+ AND b.native_operation->'Reference'->>'WorkerID'=w.id::text
+ AND b.native_operation->'Reference'->>'OperationID'=b.id::text
+ AND b.native_operation->'Reference'->>'Fence'=b.generation::text
+ AND b.native_operation->>'ParentID'=b.id::text
+ AND b.native_operation->>'Generation'=b.generation::text
+ AND b.native_operation->>'WorkerPodUID'=cw.binding->>'PodUID'
+))
+ORDER BY w.run_until,w.id LIMIT 16
 `
 
 type ExpiredQueryAcquisitionWorkersParams struct {
@@ -330,6 +352,46 @@ func (q *Queries) LockDownloadWorker(ctx context.Context, arg LockDownloadWorker
 		&i.BaselineQueryAllocationID,
 	)
 	return i, err
+}
+
+const queryAcquisitionWorkerExhausted = `-- name: QueryAcquisitionWorkerExhausted :one
+SELECT EXISTS (
+ SELECT 1 FROM context_query q
+ JOIN context_query_batch b ON b.query_id=q.id AND b.generation=1
+ JOIN context_query_worker cw ON cw.query_id=q.id
+ WHERE q.id=w.query_id AND q.root_id=w.root_id AND q.worker_id=w.id
+ AND w.claimed_at IS NOT NULL AND w.binding_json IS NOT NULL
+ AND q.query=(convert_from(w.intent_json,'UTF8')::jsonb)->'Query'
+ AND context_query_read_batches(q.query->'Scope')=1
+ AND q.generation=1 AND q.active_batch IS NULL AND NOT q.uncertain
+ AND b.claim_id=b.id AND b.closed AND b.native_closed
+ AND b.batch->'Worker'=cw.binding
+ AND cw.binding->>'WorkerID'=w.id::text
+ AND cw.binding->>'PodUID'=(convert_from(w.binding_json,'UTF8')::jsonb)->>'PodUID'
+ AND b.native_authority->'Scope'=q.query->'Scope'
+ AND b.native_operation->'Reference'->>'QueryID'=q.id::text
+ AND b.native_operation->'Reference'->>'WorkerID'=w.id::text
+ AND b.native_operation->'Reference'->>'OperationID'=b.id::text
+ AND b.native_operation->'Reference'->>'Fence'=b.generation::text
+ AND b.native_operation->>'ParentID'=b.id::text
+ AND b.native_operation->>'Generation'=b.generation::text
+ AND b.native_operation->>'WorkerPodUID'=cw.binding->>'PodUID'
+) AS exhausted FROM download_worker w
+WHERE w.root_id=$1 AND w.id=$2 AND w.query_id IS NOT NULL
+`
+
+type QueryAcquisitionWorkerExhaustedParams struct {
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+// Fresh confirmation under the caller's existing exact worker-row lock.
+// Logical exhaustion is not physical termination and never frees a slot.
+func (q *Queries) QueryAcquisitionWorkerExhausted(ctx context.Context, arg QueryAcquisitionWorkerExhaustedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, queryAcquisitionWorkerExhausted, arg.RootID, arg.ID)
+	var exhausted bool
+	err := row.Scan(&exhausted)
+	return exhausted, err
 }
 
 const readQueryAcquisitionWorker = `-- name: ReadQueryAcquisitionWorker :one

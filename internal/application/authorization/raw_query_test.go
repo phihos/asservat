@@ -204,7 +204,7 @@ func TestRawQueryReusesCoveringGrantAndRejectsUnsupportedOperations(t *testing.T
 	if err != nil || !replay || got.ID != g.ID || len(f.store.rows) != 1 || *reads != 2 {
 		t.Fatal("covering grant not reused", replay, err)
 	}
-	in.Operations = []string{"syscall_query"}
+	in.Operations = []string{"read_memory"}
 	if _, _, err = f.svc.RequestRaw(t.Context(), grantIdentity{f.requester, &f.now}, in); !errors.Is(err, ErrRawQueryOperationUnsupported) {
 		t.Fatal("unimplemented operation", err)
 	}

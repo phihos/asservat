@@ -10,9 +10,9 @@ const count = (value: number) => new Intl.NumberFormat().format(value);
 
 // This form retains only metadata and one immutable request after submission.
 // An uncertain reply is retried with the same identity, selection and key.
-export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArtifactID, purpose = 'download', onGrant, client = operations, newID = () => crypto.randomUUID() }: { session: Session; scope: AbortSignal; caseID: string; artifacts: Artifact[]; prefilledArtifactID?: string; purpose?: 'download' | 'packet-query'; onGrant?: (grantID: string) => void; client?: Operations; newID?: () => string }) {
+export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArtifactID, purpose = 'download', onGrant, client = operations, newID = () => crypto.randomUUID() }: { session: Session; scope: AbortSignal; caseID: string; artifacts: Artifact[]; prefilledArtifactID?: string; purpose?: 'download' | 'packet-query' | 'syscall-query'; onGrant?: (grantID: string) => void; client?: Operations; newID?: () => string }) {
   const titleID = useId();
-  const [allowed, setAllowed] = useState<'download' | 'query' | 'both'>(purpose === 'packet-query' ? 'query' : 'download');
+  const [allowed, setAllowed] = useState<'download' | 'query' | 'both'>(purpose !== 'download' ? 'query' : 'download');
   const query = allowed !== 'download';
   const downloads = allowed !== 'query';
   const defaultBudget = (items: Artifact[], mode = allowed) => Math.max(1, (mode !== 'query' ? items.reduce((n, a) => n + (a.verified_native_bytes ?? 0), 0) : 0) + (mode !== 'download' ? 49152 * items.length : 0));
@@ -38,12 +38,15 @@ export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArt
     if (purpose === 'download') heading.current?.focus();
   }, [prefilledArtifactID, artifacts]);
   useEffect(() => () => active.current?.abort(), [scope]);
-  const raw = artifacts.filter(a => a.data_class === 'raw' && (purpose !== 'packet-query' || a.kind === 'packetCapture' && a.native_format === 'pcapng-raw'));
+  const queryKind = (a: Artifact) => a.kind === 'packetCapture' && a.native_format === 'pcapng-raw' ? 'packet' : a.kind === 'syscallTrace' && a.native_format === 'asservat-syscall-arguments/v1' ? 'syscall' : undefined;
+  const raw = artifacts.filter(a => a.data_class === 'raw' && (purpose === 'download' || queryKind(a) === (purpose === 'packet-query' ? 'packet' : 'syscall')));
   if (raw.length === 0) return null;
   const eligible = (a: Artifact) => a.verified_native_bytes !== undefined && a.target !== undefined && Date.parse(a.expires_at) > Date.now();
   const chosen = raw.filter(a => selected.includes(a.artifact_id));
   const total = chosen.reduce((n, a) => n + (a.verified_native_bytes ?? 0), 0);
-  const queryEligible = chosen.length > 0 && chosen.every(a => a.kind === 'packetCapture' && a.native_format === 'pcapng-raw');
+  const chosenKind = chosen.length ? queryKind(chosen[0]) : undefined;
+  const queryEligible = chosenKind !== undefined && chosen.every(a => queryKind(a) === chosenKind);
+  const queryLabel = chosenKind === 'syscall' || purpose === 'syscall-query' ? 'syscall argument' : 'packet';
   const minimum = downloads ? Math.max(1, total) : 24576;
   const maximum = downloads ? maximumBytes : 1073741824;
   const invalid = !chosen.length || chosen.length > 64 || chosen.some(a => !eligible(a)) || query && !queryEligible || !reason.trim() || !Number.isSafeInteger(maxBytes) || maxBytes < minimum || maxBytes > maximum || !Number.isInteger(seconds) || seconds < 1 || seconds > 28800;
@@ -52,14 +55,15 @@ export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArt
     const next = checked ? [...selected, artifact.artifact_id] : selected.filter(id => id !== artifact.artifact_id);
     setSelected(next);
     const items = raw.filter(a => next.includes(a.artifact_id));
-    const mode = items.some(a => a.kind !== 'packetCapture' || a.native_format !== 'pcapng-raw') ? 'download' : allowed;
+    const kind = items.length ? queryKind(items[0]) : undefined;
+    const mode = kind === undefined || items.some(a => queryKind(a) !== kind) ? 'download' : allowed;
     setAllowed(mode); setMaxBytes(defaultBudget(items, mode));
   };
   const submit = async () => {
     if (busy || scope.aborted) return;
     if (!request.current) {
       if (invalid) return;
-      request.current = { case_id: caseID, artifact_digests: chosen.map(a => a.digest).sort(), operations: [...(downloads ? ['download_artifact' as const] : []), ...(query ? ['pcap_query' as const] : [])], reason: reason.trim(), max_bytes: maxBytes, expires_in_seconds: seconds, idempotency_key: newID() };
+      request.current = { case_id: caseID, artifact_digests: chosen.map(a => a.digest).sort(), operations: [...(downloads ? ['download_artifact' as const] : []), ...(query ? [chosenKind === 'syscall' ? 'syscall_query' as const : 'pcap_query' as const] : [])], reason: reason.trim(), max_bytes: maxBytes, expires_in_seconds: seconds, idempotency_key: newID() };
     }
     const controller = new AbortController(); active.current = controller;
     const abort = () => controller.abort(); scope.addEventListener('abort', abort, { once: true });
@@ -93,12 +97,12 @@ export function RawAccessPanel({ session, scope, caseID, artifacts, prefilledArt
     finally { scope.removeEventListener('abort', abort); if (!controller.signal.aborted) setBusy(false); }
   };
   return <section className="review-section" aria-labelledby={titleID}>
-    <h2 id={titleID} ref={heading} tabIndex={-1}>{query ? 'Request saved packet query approval' : 'Request raw download approval'}</h2>
-    <p>{query ? 'Use existing covering approval when available. This request covers queries of the selected saved raw packets; it starts no collection.' : 'Use Download above when you already have covering approval. This request asks an independent reviewer for whole-file downloads of existing evidence; it starts no collection.'}</p>
+    <h2 id={titleID} ref={heading} tabIndex={-1}>{query ? `Request saved ${queryLabel} query approval` : 'Request raw download approval'}</h2>
+    <p>{query ? `Use existing covering approval when available. This request covers queries of the selected saved ${queryLabel} evidence; it starts no collection.` : 'Use Download above when you already have covering approval. This request asks an independent reviewer for whole-file downloads of existing evidence; it starts no collection.'}</p>
     <fieldset disabled={locked || !!reply}><legend>Select existing raw artifacts (up to 64)</legend>
       {raw.map(a => <label key={a.artifact_id}><input type="checkbox" checked={selected.includes(a.artifact_id)} disabled={!selected.includes(a.artifact_id) && (!eligible(a) || selected.length >= 64)} onChange={e => select(a, e.target.checked)}/>{a.kind} {a.artifact_id} — {a.verified_native_bytes === undefined ? 'verified size unavailable' : `${count(a.verified_native_bytes)} bytes`}{a.target && <> · {a.target.workload_name ?? a.target.workload_uid} in {a.target.namespace ?? a.target.namespace_uid}, Pod {a.target.pod_name ?? a.target.pod_uid}, cluster {a.target.cluster_id}</>}{!eligible(a) && ' (not selectable)'}</label>)}
       <p>Selected native size: {count(total)} bytes.</p>
-      {queryEligible && <label>Allowed operations<select value={allowed} onChange={e => { const next = e.target.value as typeof allowed; setAllowed(next); setMaxBytes(defaultBudget(chosen, next)); }}>{purpose === 'download' && <option value="download">Whole-file downloads</option>}<option value="query">Saved packet queries</option><option value="both">Downloads and saved packet queries</option></select></label>}
+      {queryEligible && <label>Allowed operations<select value={allowed} onChange={e => { const next = e.target.value as typeof allowed; setAllowed(next); setMaxBytes(defaultBudget(chosen, next)); }}>{purpose === 'download' && <option value="download">Whole-file downloads</option>}<option value="query">Saved {queryLabel} queries</option><option value="both">Downloads and saved {queryLabel} queries</option></select></label>}
       <label>{query ? 'Reason for raw access' : 'Reason for raw download'}<textarea maxLength={512} value={reason} onChange={e => setReason(e.target.value)}/></label>
       <label>{query ? 'Total disclosure byte budget' : 'Total download byte budget'}<input type="number" min={minimum} max={maximum} step={1} value={maxBytes} onChange={e => setMaxBytes(Number(e.target.value))}/></label>
       <label>Approval period in seconds<input type="number" min={1} max={28800} step={1} value={seconds} onChange={e => setSeconds(Number(e.target.value))}/></label>

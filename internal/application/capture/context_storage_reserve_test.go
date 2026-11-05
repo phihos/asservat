@@ -168,3 +168,82 @@ func TestContextStorageResponseReserveJoinsLongerHint(t *testing.T) {
 		t.Fatal("classified hint not joined")
 	}
 }
+
+// The original five-second request and source facts stay fixed. A separately
+// published binding becomes current 125 ms after the old four-second readiness
+// cutoff. Advance only the test clock at the joined hint's actual cutoff, so
+// scheduler delays cannot make the old reserve accidentally observe publication.
+func TestContextStorageResponseReservePublicationBoundary(t *testing.T) {
+	for _, mode := range []string{"fresh", "source-expired", "selection-changed"} {
+		t.Run(mode, func(t *testing.T) {
+			f, facts, _ := consumptionFixture(t)
+			origin := f.now
+			originalEnd := origin.Add(5 * time.Second)
+			if mode == "source-expired" {
+				facts.target.FreshUntil = origin.Add(4100 * time.Millisecond)
+			}
+			sourceEnds := []time.Time{facts.target.FreshUntil, facts.eligibility.ValidUntil, facts.eligibility.VerifiedIdentity.ValidUntil, facts.capability.FreshUntil, facts.retention.ValidUntil, facts.retention.Proof.ValidUntil}
+			var clock atomic.Int64
+			clock.Store(origin.UnixNano())
+			f.svc.Now = func() time.Time { return time.Unix(0, clock.Load()).UTC() }
+			expired := f.store
+			expired.Binding.ObservedAt, expired.Binding.FreshUntil = origin.Add(-31*time.Second), origin.Add(-time.Second)
+			fresh := f.store
+			published := originalEnd.Add(-time.Second).Add(125 * time.Millisecond)
+			fresh.Binding.ObservedAt, fresh.Binding.FreshUntil = published, published.Add(30*time.Second)
+			if mode == "selection-changed" {
+				fresh.Selection.AllocationRevision++
+			}
+			var hints, finals, demands atomic.Int32
+			var finalDeadline time.Time
+			f.svc.Refresh = consumptionRefreshFunc(func(context.Context, targets.Request) error { demands.Add(1); return nil })
+			f.svc.Storage = consumptionStorageFunc(func(call context.Context, _ authorization.Target) (ContextStorageObservation, error) {
+				end, _ := call.Deadline()
+				if end.Before(originalEnd) && hints.Add(1) <= 2 {
+					if hints.Load() == 1 {
+						return expired, value.ErrStorageBindingExpired
+					}
+					<-call.Done()
+					// An earlier source bound cancels the hint before its scheduling end.
+					if facts.target.FreshUntil.Before(end) {
+						end = facts.target.FreshUntil
+					}
+					clock.Store(end.UnixNano())
+					return ContextStorageObservation{}, call.Err()
+				}
+				finals.Add(1)
+				finalDeadline = end
+				if f.svc.Now().Before(published) {
+					return expired, value.ErrStorageBindingExpired
+				}
+				return fresh, nil
+			})
+			ctx, cancel := context.WithDeadline(t.Context(), originalEnd)
+			defer cancel()
+			owner := f.svc.beginStorageWait(ctx, facts.target, originalEnd, f.store.Selection)
+			defer owner.close()
+			out, err := f.svc.consumeStorage(ctx, facts, f.intent(), owner)
+			if mode == "fresh" {
+				if err != nil || out.Selection != f.store.Selection || !finalDeadline.Equal(originalEnd) || finals.Load() != 1 {
+					t.Fatal("independent publication missed unchanged request", err, finals.Load())
+				}
+			} else if !errors.Is(err, value.ErrChanged) && !(mode == "source-expired" && errors.Is(err, context.DeadlineExceeded)) {
+				t.Fatal("expired facts or changed selection accepted", mode, err)
+			}
+			end, _ := ctx.Deadline()
+			afterEnds := []time.Time{facts.target.FreshUntil, facts.eligibility.ValidUntil, facts.eligibility.VerifiedIdentity.ValidUntil, facts.capability.FreshUntil, facts.retention.ValidUntil, facts.retention.Proof.ValidUntil}
+			for i := range sourceEnds {
+				if !sourceEnds[i].Equal(afterEnds[i]) {
+					t.Fatal("source end changed", i)
+				}
+			}
+			if !end.Equal(originalEnd) || !owner.until.Equal(originalEnd) || ctx.Err() != nil || hints.Load() != 2 || demands.Load() != 1 {
+				t.Fatal("request/demand ownership changed", ctx.Err(), hints.Load(), demands.Load())
+			}
+			if mode == "source-expired" && finals.Load() != 0 {
+				t.Fatal("read after original source expiry", finals.Load())
+			}
+			t.Logf("mode=%s request5s unchanged; one hint/demand; publication oldcutoff+125ms; final tail=%s", mode, time.Until(originalEnd).Round(time.Millisecond))
+		})
+	}
+}

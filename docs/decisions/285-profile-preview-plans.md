@@ -81,7 +81,7 @@ budget at entry, inside the unchanged fifteen-second public preview request.
 Classification and non-profile paths retain five seconds. A possible-profile
 hint can begin before catalog classification, but an ordinary consumer cancels
 and joins that same hint at its original readiness cutoff, retaining the
-one-second reply reserve. Initial recovery and
+750 ms reply reserve (the scheduling adjustment in ADR-213). Initial recovery and
 current target review precede the one non-authoritative readiness hint. After
 joining it, the existing complete recorder resolution is moved later and its
 fresh namespace/workload/Pod result must match the original request and pin.

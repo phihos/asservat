@@ -112,7 +112,7 @@ func (s *AccessGrants) requestRawQueryGrant(ctx context.Context, in app.StoredGr
 	return out, replay, nil
 }
 func (s *AccessGrants) RawQueryCandidates(ctx context.Context, scope artifact.DownloadScope, use value.GrantUse) ([]value.Grant, error) {
-	if s == nil || ctx == nil || ctx.Err() != nil || !scope.Valid() || scope.RootID != s.root || scope.Principal.Kind != identity.Human || (use != (value.GrantUse{}) && use.Operation != value.GrantDownloadOperation && use.Operation != value.GrantPacketQueryOperation) || use.Bytes < 0 || use.Operations < 0 {
+	if s == nil || ctx == nil || ctx.Err() != nil || !scope.Valid() || scope.RootID != s.root || scope.Principal.Kind != identity.Human || (use != (value.GrantUse{}) && use.Operation != value.GrantDownloadOperation && use.Operation != value.GrantPacketQueryOperation && use.Operation != value.GrantSyscallQueryOperation) || use.Bytes < 0 || use.Operations < 0 {
 		return nil, value.ErrGrantInvalid
 	}
 	// This is index selection only; domain membership checks compare the full

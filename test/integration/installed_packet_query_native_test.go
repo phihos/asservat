@@ -209,12 +209,17 @@ func queryInstalledPacketQueryWithCall(t *testing.T, ctx context.Context, source
 type installedPacketTerminalPipeline struct {
 	pending          []func()
 	admitted, joined int
+	limit            int // zero retains the original four-query packet fixture; arguments funds seven.
 }
 
 func (p *installedPacketTerminalPipeline) add(t *testing.T, wait func()) {
 	t.Helper()
-	if wait == nil || len(p.pending) >= 2 || p.admitted >= 4 {
-		t.Fatal("raw fixture exceeded two original query workers/four funded queries")
+	maximum := p.limit
+	if maximum == 0 {
+		maximum = 4
+	}
+	if maximum != 4 && maximum != 7 || wait == nil || len(p.pending) >= 2 || p.admitted >= maximum {
+		t.Fatal("raw fixture exceeded two original query workers or its originally funded query count")
 	}
 	p.pending = append(p.pending, wait)
 	p.admitted++

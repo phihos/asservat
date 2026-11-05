@@ -423,9 +423,10 @@ func TestRecorderResultAccessActionsUseCompiledRawOutputOnly(t *testing.T) {
 		{ID: "http", Kind: "packetCapture", PacketProfile: "httpHeaders"},
 		{ID: "profile", Kind: "profile"},
 		{ID: "syscall", Kind: "syscallTrace", SyscallMode: "arguments"},
+		{ID: "syscall-metadata", Kind: "syscallTrace", SyscallMode: "metadata"},
 	}}
 	got := recorderResultAccessActions(plan)
-	if len(got) != 3 || got[0].ActionID != "raw" || !slices.Equal(got[0].Operations, []string{"download_artifact", "pcap_query"}) || got[1].ActionID != "profile" || !slices.Equal(got[1].Operations, []string{"download_artifact"}) || got[2].ActionID != "syscall" {
+	if len(got) != 3 || got[0].ActionID != "raw" || !slices.Equal(got[0].Operations, []string{"download_artifact", "pcap_query"}) || got[1].ActionID != "profile" || !slices.Equal(got[1].Operations, []string{"download_artifact"}) || got[2].ActionID != "syscall" || !slices.Equal(got[2].Operations, []string{"download_artifact", "syscall_query"}) {
 		t.Fatal(got)
 	}
 	plan.Approval = nil

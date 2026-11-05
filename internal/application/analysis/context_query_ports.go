@@ -56,6 +56,7 @@ type ContextQueryInput struct {
 	Profile     value.ProfileSummaryRequest
 	Comparison  value.ProfileComparisonRequest
 	Syscalls    value.SyscallQueryRequest
+	RawSyscalls value.RawSyscallQueryRequest
 	QueryID     string
 }
 

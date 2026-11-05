@@ -760,7 +760,7 @@ export interface components {
                 /** @description Advisory follow-up access choices for this exact reviewed raw plan. Current authority, retained source and selected operations are checked again on submission. Absence grants no access. */
                 result_access_actions?: {
                     action_id: string;
-                    operations: ("download_artifact" | "pcap_query")[];
+                    operations: ("download_artifact" | "pcap_query" | "syscall_query")[];
                 }[];
             } & unknown;
         } | {

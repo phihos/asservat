@@ -117,3 +117,15 @@ func TestWorkerRuntimeBlockedObserverCannotDelayExpiry(t *testing.T) {
 		t.Fatal("observer blocked credential shutdown")
 	}
 }
+
+// Cancellation can arrive after an existing renewal wait returned and before
+// the next enrollment attempt. It is not expiry of the original worker bound.
+func TestWorkerRuntimeOwningCancellationAtRenewalBoundary(t *testing.T) {
+	s, f := runtimeFixture(t, time.Hour)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	s.Wait = func(context.Context, time.Duration) error { cancel(); return nil }
+	if err := s.Run(ctx); !errors.Is(err, context.Canceled) || f.closed != 1 || f.calls != 1 || !s.Now().Before(s.Target.RunUntil) {
+		t.Fatal("owning cancellation reclassified as expiry or failed join", err, f.calls, f.closed)
+	}
+}

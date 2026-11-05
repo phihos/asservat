@@ -426,12 +426,12 @@ it('retains selected result access unchanged through uncertain submission and ap
   const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
   client.responder = () => recording;
   await controller.previewComposition(recording.data.profile_composition!.authored);
-  const access = { actionIds: [recording.data.capture_assessment.actions[0].actionID], operations: ['download_artifact' as const, 'pcap_query' as const], maxArtifacts: 1, maxBytes: 8 * 1024 * 1024 + 49152, maxOperations: 10, notAfter: new Date(Date.now() + 3600000).toISOString() };
+  const access = { actionIds: [recording.data.capture_assessment.actions[0].actionID], operations: ['download_artifact' as const, 'pcap_query' as const, 'syscall_query' as const], maxArtifacts: 1, maxBytes: 8 * 1024 * 1024 + 49152, maxOperations: 10, notAfter: new Date(Date.now() + 3600000).toISOString() };
   client.responder = () => { throw new Error('lost response'); };
   await controller.submit(access);
-  access.maxBytes = 1; access.actionIds[0] = 'changed';
+  access.maxBytes = 1; access.actionIds[0] = 'changed'; access.operations.reverse(); access.maxOperations = 1; access.notAfter = new Date(0).toISOString();
   const first = client.calls.filter(c => c.name === 'request_capture')[0].input;
-  expect(first).toMatchObject({ result_access: { maxBytes: 8 * 1024 * 1024 + 49152, actionIds: [recording.data.capture_assessment.actions[0].actionID] } });
+  expect(first).toMatchObject({ result_access: { maxBytes: 8 * 1024 * 1024 + 49152, operations: ['download_artifact', 'pcap_query', 'syscall_query'], maxOperations: 10, actionIds: [recording.data.capture_assessment.actions[0].actionID] } });
   scope.abort(); controller.attach(session, new AbortController().signal);
   client.responder = () => approvalPendingResult();
   await controller.retrySubmission();

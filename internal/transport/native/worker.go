@@ -128,6 +128,9 @@ func RunWorkerConversation(ctx context.Context, s Stream, h contracts.NativeHell
 	err := runWorker(ctx, s, h, target, key, result, &disposition)
 	if err == nil {
 		disposition.State = contracts.NativeJoined
+	} else {
+		// A failed stream close/join cannot publish process exhaustion.
+		disposition.ExhaustedProjection = false
 	}
 	return disposition, err
 }
@@ -138,7 +141,11 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 	if ctx == nil || s == nil || result == nil || !target.Valid() || key == (artifact.Digest{}) || h.Reference.InstallationID != target.InstallationID || value.AcquisitionParentFor(h.Reference.SessionID, h.Reference.QueryID) != target.Parent() || h.Reference.WorkerID != target.WorkerID || h.Reference.OperationID != "" || h.Reference.Fence != 0 || len(h.WorkerLeaf) != 0 {
 		return contracts.ErrNativeProtocol
 	}
-	defer s.Close()
+	defer func() {
+		if closeErr := s.Close(); err == nil {
+			err = closeErr
+		}
+	}()
 	first, stop := context.WithTimeout(ctx, 5*time.Second)
 	f, e := s.Receive(first)
 	stop()
@@ -194,7 +201,9 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 	joined := false
 	defer func() {
 		cancel()
-		s.Close()
+		if closeErr := s.Close(); err == nil {
+			err = closeErr
+		}
 		if !joined {
 			r := <-received
 			clear(r.frame.Payload)
@@ -248,7 +257,13 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e != nil {
 			return e
 		}
-		return exactAck(f, contracts.NativeDoneFrame, c, "joined", 0)
+		if e = exactAck(f, contracts.NativeDoneFrame, c, "joined", 0); e != nil {
+			return e
+		}
+		// This is local process disposition, never a wire or SQL proof. A
+		// two-batch scope retains its second slot even after its first ACK.
+		disposition.ExhaustedProjection = approvedScope.ReadBatches() == 1 && o.Generation == 1
+		return nil
 	case value.NativePrepare:
 		m, e := result.Prepare(work, o, source)
 		if e != nil {

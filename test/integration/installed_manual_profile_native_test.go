@@ -37,14 +37,11 @@ func qualifyManualRecorderRepeatPreview(t *testing.T, captureID string, original
 	read := func(name string, args, out any) {
 		t.Helper()
 		started := time.Now()
-		var reply installedJourneyEnvelope
-		var code string
-		var elapsed time.Duration
-		defer func() {
-			t.Logf("manual recorder history %s: single attempt elapsed=%s status=%s code=%s", name, elapsed, reply.Status, code)
-		}()
-		reply, code = invoke(name, args)
-		elapsed = time.Since(started) // Exclude the failure-only diagnostic reads.
+		reply, code := invoke(name, args)
+		elapsed := time.Since(started) // Exclude the failure-only diagnostic reads.
+		// Failure diagnostics may outlive the runner's remaining budget. Retain
+		// this original reply before entering them, without retrying the call.
+		t.Logf("manual recorder history %s: single attempt elapsed=%s status=%s code=%s", name, elapsed, reply.Status, code)
 		if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, out) != nil {
 			// Keep the original single attempt and capture the owner's fixed
 			// preview phase before the owned installed environment is removed.
