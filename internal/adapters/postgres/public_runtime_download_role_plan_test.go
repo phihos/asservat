@@ -149,3 +149,24 @@ func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 		}
 	}
 }
+
+func TestProjectionCleanupRuntimeGetsPureBatchClassifier(t *testing.T) {
+	for _, purpose := range []string{"download-worker", "key-acquisition"} {
+		count := 0
+		for _, g := range publicRuntimeProjectionGrants(purpose) {
+			if g.kind == "function" && g.object == "context_query_read_batches(jsonb)" {
+				if g.privilege != "EXECUTE" || g.column != "" {
+					t.Fatal("scope classifier gained effect authority", g)
+				}
+				count++
+			}
+		}
+		want := 0
+		if purpose == "download-worker" {
+			want = 1
+		}
+		if count != want {
+			t.Fatal("batch classifier widened another role", purpose, count, want)
+		}
+	}
+}

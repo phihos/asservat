@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"io"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -488,5 +489,126 @@ func TestNativeApprovedProjectionWorkerNamesReadStep(t *testing.T) {
 	var s interface{ FixedStep() string }
 	if !errors.As(out.err, &s) || s.FixedStep() != "read/approved/commit-get/cancelled" {
 		t.Fatal("worker read stop lost its inner step", out.err)
+	}
+}
+
+type exhaustionProjectionReader struct {
+	projection query.ProjectionResult
+	calls      atomic.Int32
+}
+
+func (r *exhaustionProjectionReader) ReadApprovedContext(context.Context, evidence.NativeContextSource, value.NativeOperation, query.ContextProjectionScope, time.Time) (query.ProjectionResult, error) {
+	r.calls.Add(1)
+	return r.projection, nil
+}
+
+type exhaustionProjectionStream struct {
+	native.Stream
+	mode string
+}
+
+func (s exhaustionProjectionStream) Receive(ctx context.Context) (contracts.NativeFrame, error) {
+	f, e := s.Stream.Receive(ctx)
+	if e == nil && f.Kind == contracts.NativeDoneFrame && s.mode == "lost-final" {
+		clear(f.Payload)
+		return contracts.NativeFrame{}, io.ErrUnexpectedEOF
+	}
+	return f, e
+}
+func (s exhaustionProjectionStream) Close() error {
+	e := s.Stream.Close()
+	if s.mode == "close-failed" {
+		return io.ErrClosedPipe
+	}
+	return e
+}
+
+// Real H2/mTLS and exact protocol joins, with synthetic admitted scope, reader
+// and SQL-completion ports. No worker-lifetime or authority interval is changed.
+func TestNativeExhaustionRequiresExactSingleBatchJoinedACK(t *testing.T) {
+	for _, mode := range []string{"single-batch", "two-batch-raw", "lost-final", "close-failed", "cancelled"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newProjectionProtocolFixture(t)
+			e, s := &f.source.Expectation, &f.scope
+			e.NativeType, e.DataClass, e.ActionID = artifact.PprofArtifact, "raw", "a0123456789abcdef01234567"
+			e.Profile = &artifact.GoProfileAcquisition{SourceRef: "go", EndpointDigest: artifact.Digest{1}, Type: "heap", Mode: "snapshot"}
+			e.Registration.NativeLimit = artifact.MaxPprofBytes
+			s.NativeType, s.SourceFormat, s.DisplayVersion, s.SourceProjectionDigest = artifact.PprofArtifact, artifact.PprofFormat, query.ProfileSummaryDisplayVersion, artifact.Digest{}
+			s.Selection = query.LineSelection{}
+			s.Profile = query.ProfileSummarySelection{SampleType: "alloc_space", TopN: 20}
+			projection := query.ProjectionResult{Summary: &query.ProfileSummary{SampleType: "alloc_space", Unit: "bytes", SymbolStatus: "missing", Top: []query.ProfileHotspot{}}}
+			if mode == "two-batch-raw" {
+				e.NativeType, e.DataClass, e.Profile = artifact.SyscallArgumentsArtifact, "raw", nil
+				e.Registration.NativeLimit = artifact.RecordingNativeLimit
+				e.Recording = &artifact.Recording{Kind: "syscallTrace", Profile: "arguments", Composition: []byte("{}"), DurationMillis: 1000, MaxBytes: artifact.RecordingNativeLimit, Syscalls: &artifact.RecordingSyscalls{Names: []string{"write"}, MaxEvents: 100, MaxEventsPerSecond: 100, MaxTrackedThreads: 16}, Arguments: &artifact.RecordingArguments{ProgramDigest: artifact.Digest{1}, DefinitionDigest: artifact.Digest{2}, AccountingRule: artifact.Digest{3}, MaxProbeBytes: 256, MaxBytesPerEvent: 128, MaxBytesPerSecond: 1024}}
+				s.NativeType, s.SourceFormat, s.DisplayVersion = artifact.SyscallArgumentsArtifact, artifact.SyscallArgumentsFormat, query.SyscallQueryDisplayVersion
+				s.Profile = query.ProfileSummarySelection{}
+				selection, err := query.NormalizeSyscallSelection(s.CaseID, s.ArtifactID, query.SyscallQueryView, "", 20, nil, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				s.Syscalls, s.RawGrantID = selection.Window(), nativeID
+				projection = query.ProjectionResult{SyscallQuery: &query.SyscallArgumentPage{Version: s.Version, Events: []artifact.RawArgumentEvent{}}}
+			}
+			if !s.Valid() || !f.source.Valid(s.Version) || !projection.Valid(*s) {
+				t.Fatal("invalid exhaustion fixture", e.Validate(), s.Valid(), projection.Valid(*s))
+			}
+			reader := &exhaustionProjectionReader{projection: projection}
+			result, err := evidence.NewRegionalApprovedResult(f.ctx, f.target, reader, time.Now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { result.Close(); _ = result.Wait(context.Background()) })
+			entered, release := make(chan struct{}), make(chan struct{})
+			var completed atomic.Int32
+			op, client := f.operation(t, func(ctx context.Context, _ value.NativeLease) error {
+				completed.Add(1)
+				close(entered)
+				select {
+				case <-release:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			})
+			stream, err := client.Open(f.ctx, f.hello)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(f.ctx)
+			defer cancel()
+			done := make(chan projectionProtocolOutcome, 1)
+			go func() {
+				out, err := native.RunWorkerConversation(ctx, exhaustionProjectionStream{stream, mode}, f.hello, f.target, artifact.Digest{1}, result)
+				done <- projectionProtocolOutcome{out, err}
+			}()
+			if _, err := op.Projection(f.ctx); err != nil {
+				t.Fatal(err)
+			}
+			acked := make(chan error, 1)
+			go func() { acked <- op.AcknowledgeProjection(f.ctx) }()
+			<-entered
+			select {
+			case out := <-done:
+				t.Fatal("worker published exhaustion before joined ACK", out)
+			default:
+			}
+			if mode == "cancelled" {
+				cancel()
+			}
+			close(release)
+			ackErr := <-acked
+			out := projectionProtocolReceive(t, f.ctx, done)
+			if mode == "lost-final" || mode == "close-failed" || mode == "cancelled" {
+				if out.err == nil || out.state.State != contracts.NativeUncertain || out.state.ExhaustedProjection {
+					t.Fatal("unjoined projection marked exhausted", out)
+				}
+			} else if ackErr != nil || out.err != nil || out.state.State != contracts.NativeJoined || out.state.ExhaustedProjection != (s.ReadBatches() == 1) {
+				t.Fatal("joined exhaustion does not match immutable scope", out, ackErr, s.ReadBatches())
+			}
+			if reader.calls.Load() != 1 || completed.Load() != 1 {
+				t.Fatal("projection effect or completion repeated", reader.calls.Load(), completed.Load())
+			}
+		})
 	}
 }

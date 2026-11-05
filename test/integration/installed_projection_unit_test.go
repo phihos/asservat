@@ -63,6 +63,31 @@ func TestInstalledProjectionWorkerRequiresOriginalLifetimeAndPositiveTermination
 	if installedProjectionWorkerTerminal(w, nil, pod, now) || installedProjectionWorkerTerminal(w, job, nil, now) {
 		t.Fatal("absence substituted for positive termination")
 	}
+	// The proof opt-in is supplied only after exact single-batch native/public
+	// closure. A still-live original maximum never substitutes for termination.
+	early := w
+	early.Intent.RunUntil = now.Add(time.Minute)
+	if !installedProjectionWorkerTerminal(early, job, pod, now, true) || installedProjectionWorkerTerminal(early, job, pod, now) {
+		t.Fatal("single-batch natural termination ignored or broadened legacy path")
+	}
+	for _, mode := range []string{"running", "replacement-job", "replacement-pod", "no-termination", "missing-job"} {
+		j, p := job.DeepCopy(), pod.DeepCopy()
+		switch mode {
+		case "running":
+			p.Status.Phase = core.PodRunning
+		case "replacement-job":
+			j.UID = "replacement"
+		case "replacement-pod":
+			p.UID = "replacement"
+		case "no-termination":
+			p.Status.ContainerStatuses[0].State.Terminated = nil
+		case "missing-job":
+			j = nil
+		}
+		if installedProjectionWorkerTerminal(early, j, p, now, true) {
+			t.Fatal("early completion omitted positive original proof", mode)
+		}
+	}
 	// native90: activeDeadlineSeconds killed the worker and the Job controller
 	// deleted its Pod. Only the exact Job's accounted terminal record counts.
 	killed := job.DeepCopy()

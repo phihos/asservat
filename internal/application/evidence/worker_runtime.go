@@ -32,8 +32,11 @@ func (s WorkerCredentialSupervisor) enroll(ctx context.Context, until time.Time)
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	for attempt := 0; attempt < 8; attempt++ {
-		if ctx.Err() != nil || !s.Now().Before(until) {
+		if !s.Now().Before(until) {
 			return artifact.ErrDownloadExpired
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 		if err := s.Client.Enroll(ctx); err == nil {
 			p, e := s.Client.Peer()
@@ -77,8 +80,11 @@ func (s WorkerCredentialSupervisor) Run(ctx context.Context) error {
 		return err
 	}
 	for {
-		if ctx.Err() != nil || !s.Now().Before(s.Target.RunUntil) {
+		if !s.Now().Before(s.Target.RunUntil) {
 			return artifact.ErrDownloadExpired
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 		p, err := s.Client.Peer()
 		if err != nil || !p.Valid(s.Now()) {

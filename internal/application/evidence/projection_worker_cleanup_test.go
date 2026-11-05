@@ -173,3 +173,49 @@ func TestProjectionCleanupRotatesAfterUncertainCandidate(t *testing.T) {
 		t.Fatal("uncertain candidate starved later cleanup", f.calls)
 	}
 }
+
+func TestProjectionCleanupEarlyBoundSingleBatchKeepsPositiveProofOrder(t *testing.T) {
+	for _, mode := range []string{"joined-single", "unbound", "unclaimed", "two-batch", "still-running", "confirm-failed", "delete-failed"} {
+		t.Run(mode, func(t *testing.T) {
+			f, service, ctx := newProjectionCleanupFixture(t)
+			state := &f.rows[0].State
+			q := &state.Intent.Query
+			if mode != "two-batch" {
+				q.Scope.NativeType, q.Scope.SourceFormat, q.Scope.DisplayVersion, q.Scope.SourceProjectionDigest = artifact.PCAPNGArtifact, artifact.PCAPNGFormat, query.PacketSummaryDisplayVersion, artifact.Digest{}
+				q.Scope.Selection = query.LineSelection{}
+				q.Plan.Profile.Worker.MemoryBytes, q.Plan.Profile.Worker.WorkerTransientBytes = query.PacketSummaryWorkerBytes, query.PacketSummaryWorkerBytes
+				state.Intent.Worker.Profile.MemoryBytes = query.PacketSummaryWorkerBytes
+				state.Worker.Intent = state.Intent.Worker
+			}
+			if !state.Intent.Valid() || !state.Worker.Valid() {
+				t.Fatal("invalid early cleanup fixture")
+			}
+			f.now = state.Intent.Worker.RunUntil.Add(-time.Second)
+			f.term = value.AcquisitionWorkerTermination{Worker: state.Worker, TerminationDigest: artifact.Digest{1}, ObservedAt: f.now, FreshUntil: f.now.Add(time.Second)}
+			want := []string{"list", "observe", "persist", "delete-and-prove", "retire"}
+			switch mode {
+			case "unbound":
+				state.Worker = value.AcquisitionWorker{}
+				want = want[:1]
+			case "unclaimed":
+				state.Claimed = false
+				want = want[:1]
+			case "two-batch":
+				want = want[:1]
+			case "still-running":
+				f.fail = "observe"
+				want = want[:2]
+			case "confirm-failed":
+				f.fail = "persist"
+				want = want[:3]
+			case "delete-failed":
+				f.fail = "delete-and-prove"
+				want = want[:4]
+			}
+			service.CleanupProjectionWorkers(ctx)
+			if !reflect.DeepEqual(f.calls, want) {
+				t.Fatal("early cleanup skipped or repeated positive proof", f.calls, want)
+			}
+		})
+	}
+}

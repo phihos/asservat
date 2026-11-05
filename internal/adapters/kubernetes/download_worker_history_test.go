@@ -3,17 +3,22 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
+	"encoding/pem"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 )
 
 func TestWorkerCleanupUsesAdmittedHistoricalTemplate(t *testing.T) {
@@ -163,4 +168,95 @@ func historicalWorkerFixture(t *testing.T) (value.DownloadWorker, *batch.Job, co
 		t.Fatal("historical cleanup fixture is still current")
 	}
 	return w, job, pod, jraw, praw
+}
+
+// Actual client-go GET/LIST and original UID/spec checks; synthetic API objects
+// establish observer behavior only, not installed termination or SQL release.
+func TestProjectionEarlyTerminationRequiresExactBoundPositiveObjects(t *testing.T) {
+	for _, mode := range []string{"terminal", "unbound", "live", "replacement-job", "replacement-pod", "missing-job"} {
+		t.Run(mode, func(t *testing.T) {
+			old, _, _, _, _ := historicalWorkerFixture(t)
+			i := old.Acquisition().Intent
+			i.Parent = value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: i.ID}
+			now := time.Now().UTC().Truncate(time.Second)
+			i.CreatedAt, i.RunUntil = now.Add(-time.Second), now.Add(59*time.Second)
+			job := acquisitionJob(i)
+			job.UID = "original-query-job"
+			job.Status = batch.JobStatus{Succeeded: 1, Conditions: []batch.JobCondition{{Type: batch.JobComplete, Status: core.ConditionTrue}}}
+			jraw, _ := json.Marshal(job)
+			driver := &DownloadWorkerJobs{profile: i.Profile}
+			_, receipt, err := driver.checkedAcquisitionJob(i, jraw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			yes := true
+			pod := core.Pod{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Pod"}, ObjectMeta: meta.ObjectMeta{Name: "query-pod", Namespace: i.Profile.Namespace, UID: types.UID(i.ID), Labels: job.Spec.Template.Labels, OwnerReferences: []meta.OwnerReference{{APIVersion: "batch/v1", Kind: "Job", Name: job.Name, UID: job.UID, Controller: &yes}}}, Spec: *job.Spec.Template.Spec.DeepCopy()}
+			pod.Status = core.PodStatus{Phase: core.PodSucceeded, ContainerStatuses: []core.ContainerStatus{{Name: "acquisition", State: core.ContainerState{Terminated: &core.ContainerStateTerminated{ContainerID: "containerd://original", FinishedAt: meta.NewTime(now), Reason: "Completed"}}}}}
+			praw, _ := json.Marshal(pod)
+			_, digest, err := checkedAcquisitionPod(i, receipt, praw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			worker := value.AcquisitionWorker{Intent: i, Job: receipt, Binding: value.AcquisitionWorkerBinding{Parent: i.Parent, InstallationID: i.Profile.InstallationID, ClusterID: i.Profile.ClusterID, Namespace: i.Profile.Namespace, NamespaceUID: i.Profile.NamespaceUID, ServiceAccount: i.Profile.ServiceAccount, ServiceAccountUID: i.Profile.ServiceAccountUID, Job: job.Name, JobUID: string(job.UID), JobSpec: receipt.Spec, Pod: pod.Name, PodUID: string(pod.UID), PodSpec: digest}}
+			if !worker.Valid() {
+				t.Fatal("invalid bound early fixture")
+			}
+			gets, lists := 0, 0
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if r.Method != http.MethodGet {
+					t.Error("early termination attempted mutation")
+					w.WriteHeader(500)
+					return
+				}
+				switch {
+				case strings.Contains(r.URL.Path, "/jobs/"):
+					gets++
+					current := job.DeepCopy()
+					if mode == "missing-job" {
+						w.WriteHeader(404)
+						_ = json.NewEncoder(w).Encode(meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Reason: meta.StatusReasonNotFound, Code: 404})
+						return
+					}
+					if mode == "replacement-job" {
+						current.UID = "replacement"
+					}
+					_ = json.NewEncoder(w).Encode(current)
+				case strings.HasSuffix(r.URL.Path, "/pods"):
+					lists++
+					current := pod.DeepCopy()
+					if mode == "live" {
+						current.Status = core.PodStatus{Phase: core.PodRunning}
+					}
+					if mode == "replacement-pod" {
+						current.UID = "replacement"
+					}
+					_ = json.NewEncoder(w).Encode(core.PodList{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "PodList"}, ListMeta: meta.ListMeta{ResourceVersion: "1"}, Items: []core.Pod{*current}})
+				default:
+					t.Errorf("unexpected observer request %s", r.URL.Path)
+					w.WriteHeader(500)
+				}
+			}))
+			defer server.Close()
+			client, err := NewPermissionClient(&rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})}}, i.Profile.ClusterID, cfg.NamespaceRef{Name: i.Profile.Namespace, UID: i.Profile.NamespaceUID}, time.Now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			driver.client = client
+			if mode == "unbound" {
+				worker = value.AcquisitionWorker{}
+			}
+			proof, err := driver.ObserveExpiredProjectionWorker(t.Context(), i, receipt, worker)
+			if mode == "terminal" {
+				if err != nil || !proof.Valid(time.Now()) || proof.Worker != worker || gets != 1 || lists != 1 || !time.Now().Before(i.RunUntil) {
+					t.Fatal("exact positive early bound worker refused", err, gets, lists)
+				}
+			} else if err == nil {
+				t.Fatal("nonpositive early termination accepted", mode)
+			}
+			if mode == "unbound" && gets+lists != 0 {
+				t.Fatal("unbound worker triggered early discovery")
+			}
+		})
+	}
 }

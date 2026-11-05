@@ -128,6 +128,12 @@ func (l workerNativeLoop) Run(parent context.Context) error {
 		if err != nil || closeErr != nil || outcome.State != contracts.NativeJoined {
 			return workerNativeStep("conversation", err)
 		}
+		if outcome.ExhaustedProjection && l.target.Parent().Purpose == value.AcquisitionProjection {
+			if ctx.Err() != nil || !l.now().Before(l.target.RunUntil) {
+				return artifact.ErrDownloadExpired
+			}
+			return nil
+		}
 		if err := l.wait(ctx, contracts.NativeIdleRetry); err != nil {
 			return err
 		}
@@ -172,7 +178,13 @@ func runWorkerNativePair(ctx context.Context, ready <-chan value.KeyPeer, creden
 		<-workDone
 	case err = <-workDone:
 		cancel()
-		<-credentialDone
+		credentialErr := <-credentialDone
+		// The native loop returns nil only for a positively joined exhausted
+		// projection. Its original parent must still be live, and credentials
+		// must have joined cancellation rather than stopped successfully early.
+		if err == nil && errors.Is(credentialErr, context.Canceled) && ctx.Err() == nil {
+			return nil
+		}
 	case <-ctx.Done():
 		err = ctx.Err()
 		cancel()

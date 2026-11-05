@@ -102,8 +102,19 @@ func (s *ProjectionWorkers) ConfirmProjectionTermination(ctx context.Context, p 
 			return nil
 		}
 		now, err := tx.CurrentTime(ctx)
-		if err != nil || now.Time.Before(p.Worker.Intent.RunUntil) || !p.Valid(now.Time) || ctx.Err() != nil {
+		if err != nil || !p.Valid(now.Time) || ctx.Err() != nil {
 			return query.ErrUnavailable
+		}
+		if now.Time.Before(p.Worker.Intent.RunUntil) {
+			// The list is only a candidate. Recheck exact consumed scope/batch
+			// and binding under this worker lock, never adopt an unbound worker.
+			if !state.Worker.Valid() || state.Worker != p.Worker || state.Intent.Query.Scope.ReadBatches() != 1 {
+				return query.ErrUnavailable
+			}
+			exhausted, err := tx.QueryAcquisitionWorkerExhausted(ctx, custodydb.QueryAcquisitionWorkerExhaustedParams{RootID: row.RootID, ID: row.ID})
+			if err != nil || !exhausted || ctx.Err() != nil {
+				return query.ErrUnavailable
+			}
 		}
 		// An abandoned startup may never have published its Job/Pod binding.
 		// Persist only the now-terminated exact identity, never a live replacement.

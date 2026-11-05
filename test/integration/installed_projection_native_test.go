@@ -141,7 +141,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 					// deadline kill) before their demand cleanup; no fixture
 					// mutation releases its slot.
 					waitTerminal := func() {
-						if err := installedProjectionWaitTerminal(ctx, api, observed); err != nil {
+						if err := installedProjectionWaitTerminal(ctx, api, observed, intent.Query.Scope.ReadBatches() == 1); err != nil {
 							t.Fatal("approved query worker did not terminate", err)
 						}
 					}
@@ -159,7 +159,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						if err != nil || !retired {
 							t.Fatal("native preparation did not retain positive query-worker retirement", err)
 						}
-						t.Log("installed query worker: original lifetime ended, exact Job/Pod terminated, product demand cleanup retained positive retirement before Stop")
+						t.Log("installed query worker: exact original Job/Pod terminated, unchanged RunUntil retained; product demand cleanup recorded positive retirement before Stop")
 					}
 				}
 				if installedJourneyPause(limit, 100*time.Millisecond) != nil {
@@ -272,14 +272,19 @@ func installedApprovedProjection(t *testing.T, ctx context.Context, identity *in
 
 // This fixture wait observes exact admitted objects only. Product cleanup still
 // constructs and persists its own termination and deletion proofs afterward.
-func installedProjectionWaitTerminal(ctx context.Context, api kubernetes.Interface, w value.AcquisitionWorker) error {
+func installedProjectionWaitTerminal(ctx context.Context, api kubernetes.Interface, w value.AcquisitionWorker, exhaustedSingleBatch ...bool) error {
 	if ctx == nil || api == nil || !w.Valid() {
 		return errors.New("invalid approved worker observation")
 	}
 	wait, end := context.WithDeadline(ctx, w.Intent.RunUntil.Add(30*time.Second))
 	defer end()
-	if err := installedJourneyPause(wait, time.Until(w.Intent.RunUntil)); err != nil {
-		return err
+	early := len(exhaustedSingleBatch) == 1 && exhaustedSingleBatch[0]
+	// Only a known joined single-batch query can end naturally early. All
+	// other callers keep one original-lifetime wait and the existing API cost.
+	if !early {
+		if err := installedJourneyPause(wait, time.Until(w.Intent.RunUntil)); err != nil {
+			return err
+		}
 	}
 	for wait.Err() == nil {
 		job, err := api.BatchV1().Jobs(w.Binding.Namespace).Get(wait, w.Binding.Job, meta.GetOptions{})
@@ -304,7 +309,7 @@ func installedProjectionWaitTerminal(ctx context.Context, api kubernetes.Interfa
 		if jobGone && podGone {
 			return nil
 		}
-		if !jobGone && installedProjectionWorkerTerminal(w, job, pod, time.Now()) {
+		if !jobGone && installedProjectionWorkerTerminal(w, job, pod, time.Now(), early) {
 			return nil
 		}
 		if err := installedJourneyPause(wait, 250*time.Millisecond); err != nil {
@@ -314,11 +319,13 @@ func installedProjectionWaitTerminal(ctx context.Context, api kubernetes.Interfa
 	return wait.Err()
 }
 
+// An exhausted single-batch scope may finish before its original maximum.
 // A nil Pod means NotFound: the Job controller removed it (native90:
 // activeDeadlineSeconds). Only the exact Job's accounted terminal record, as
 // product termination requires, makes that absence terminal.
-func installedProjectionWorkerTerminal(w value.AcquisitionWorker, job *batch.Job, pod *core.Pod, now time.Time) bool {
-	if job == nil || now.Before(w.Intent.RunUntil) || job.Namespace != w.Binding.Namespace || job.Name != w.Binding.Job || string(job.UID) != w.Binding.JobUID {
+func installedProjectionWorkerTerminal(w value.AcquisitionWorker, job *batch.Job, pod *core.Pod, now time.Time, exhaustedSingleBatch ...bool) bool {
+	early := len(exhaustedSingleBatch) == 1 && exhaustedSingleBatch[0]
+	if job == nil || now.Before(w.Intent.RunUntil) && !early || job.Namespace != w.Binding.Namespace || job.Name != w.Binding.Job || string(job.UID) != w.Binding.JobUID {
 		return false
 	}
 	if pod == nil {

@@ -24,7 +24,11 @@ const (
 	NativeUncertain NativeConversationState = "Uncertain"
 )
 
+// NativeConversationResult stays inside the worker process; it is not a wire
+// command, receipt, or SQL proof. Only the local authenticated conversation may
+// mark a single-batch projection exhausted after its exact joined ACK.
 type NativeConversationResult struct {
-	State     NativeConversationState
-	Reference NativeReference
+	ExhaustedProjection bool `json:"-"`
+	State               NativeConversationState
+	Reference           NativeReference
 }

@@ -212,3 +212,17 @@ both bounds. Historical accepted 8 MiB transient profiles remain usable for olde
 tools but cannot admit this summary. The existing root/workload/principal caps,
 nonrefundable uncertainty, audit, key slots and original deadlines stay binding.
 Public registration remains absent until installed qualification.
+
+## Exhausted worker completion
+
+[ADR-307](../decisions/307-exhausted-projection-worker-completion.md) permits an
+exhausted single-batch projection worker to exit after its exact final joined
+acknowledgement and joined local shutdown. The private disposition is not wire
+or SQL authority. Original dates and charges remain; only independently observed
+exact termination and recorded retirement can release physical capacity. Existing
+SQL must first prove the sole generation-one batch closed/native-closed with
+exact query/worker/claim/reference association and no active/uncertain read. The
+bounded foreground selector and confirmation recheck reuse those facts; an early
+candidate still running remains charged. Unbound abandonment retains expiry.
+Multi-batch projections and native downloads retain their existing lifetime.
+Implementation and installed qualification are tracked in the progress ledger.

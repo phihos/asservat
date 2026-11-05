@@ -47,6 +47,9 @@ func publicRuntimeProjectionGrants(purpose string) []publicRuntimeGrant {
 		add("context_query_key_binding", "UPDATE", "used_roles")
 		return out
 	}
+	// Pure, immutable scope classification; no table or effect authority. The
+	// runtime uses the same one-batch predicate as the query admission guard.
+	function("context_query_read_batches(jsonb)")
 	for _, table := range []string{"context_query_principal", "context_query", "context_query_call", "context_query_batch", "context_query_worker", "context_query_key_binding"} {
 		add(table, "INSERT")
 	}

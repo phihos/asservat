@@ -10,13 +10,16 @@ import (
 	value "asservat.local/asservat/internal/domain/authorization"
 )
 
-// Query cleanup observes only expired admitted workers. It does not read evidence or
+// Query cleanup observes expired workers or exhausted bound single-batch work. It does not read evidence or
 // refund query history, and does not need the admitting human to return.
 type ProjectionCleanupCandidate struct {
 	State       ProjectionWorkerState
 	Termination value.AcquisitionWorkerTermination
 }
 type ProjectionCleanupLedger interface {
+	// Includes expired rows and exact bound single-batch rows whose native
+	// and public batch closures are recorded. Confirmation rechecks early
+	// eligibility under its worker lock; a candidate alone grants no release.
 	ExpiredProjectionWorkers(context.Context) ([]ProjectionCleanupCandidate, error)
 	AbandonUnclaimedProjectionWorker(context.Context, query.ContextProjectionWorkerIntent) error
 	ConfirmProjectionTermination(context.Context, value.AcquisitionWorkerTermination) (value.AcquisitionWorkerTermination, error)
@@ -44,7 +47,7 @@ type DownloadCleanupJobs interface {
 }
 
 // ProjectionWorkerCleanup retires both shared acquisition worker kinds: query
-// workers after RunUntil and native download workers once they have ended.
+// workers after exhaustion or RunUntil, and downloads once they have ended.
 type ProjectionWorkerCleanup struct {
 	Ledger       ProjectionCleanupLedger
 	Jobs         ProjectionCleanupJobs
@@ -94,7 +97,10 @@ func (s *ProjectionWorkerCleanup) CleanupProjectionWorkers(ctx context.Context) 
 	}
 	c := rows[k]
 	i := c.State.Intent.Worker
-	if !c.State.Intent.Valid() || s.Now().Before(i.RunUntil) {
+	if !c.State.Intent.Valid() {
+		return
+	}
+	if s.Now().Before(i.RunUntil) && (!c.State.Claimed || !c.State.Worker.Valid() || c.State.Intent.Query.Scope.ReadBatches() != 1) {
 		return
 	}
 	if !c.State.Claimed {

@@ -91,12 +91,13 @@ func checkedHistoricalAcquisitionPod(w value.AcquisitionWorker, raw []byte) (*co
 	return &p, nil
 }
 
-// ObserveExpiredProjectionWorker handles abandoned query work that never
-// reached human-driven binding. It can only prove termination of the exact
-// original deterministic Job and its sole real Pod; it grants no live binding.
+// ObserveExpiredProjectionWorker observes an already-bound worker at any time,
+// or discovers an abandoned unbound worker only after its original expiry.
+// Both require positive termination of the exact original Job/Pod; neither
+// logical query completion nor absence grants termination or a live binding.
 func (s *DownloadWorkerJobs) ObserveExpiredProjectionWorker(ctx context.Context, i value.AcquisitionWorkerIntent, receipt value.DownloadWorkerJob, worker value.AcquisitionWorker) (value.AcquisitionWorkerTermination, error) {
 	var out value.AcquisitionWorkerTermination
-	if s == nil || s.client == nil || ctx == nil || ctx.Err() != nil || !i.Valid() || i.Parent.Purpose != value.AcquisitionProjection || i.Profile != s.profile || s.client.now().Before(i.RunUntil) {
+	if s == nil || s.client == nil || ctx == nil || ctx.Err() != nil || !i.Valid() || i.Parent.Purpose != value.AcquisitionProjection || i.Profile != s.profile {
 		return out, artifact.ErrInvalid
 	}
 	if worker.Valid() {
@@ -104,6 +105,11 @@ func (s *DownloadWorkerJobs) ObserveExpiredProjectionWorker(ctx context.Context,
 			return out, artifact.ErrIntegrity
 		}
 		return s.ObserveAcquisitionWorkerTermination(ctx, worker)
+	}
+	// Only an already-bound exact worker may be observed early. Historical
+	// discovery and never-claimed abandonment keep their original expiry gate.
+	if s.client.now().Before(i.RunUntil) {
+		return out, artifact.ErrInvalid
 	}
 	call, stop := context.WithTimeout(ctx, 5*time.Second)
 	defer stop()

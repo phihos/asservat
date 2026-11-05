@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Exhausted-worker lifecycle correction reaches frozen local checkpoint (2026-11-05)
+
+ADR-307 adds natural completion only after the authenticated sole generation-one
+projection batch, final joined acknowledgement and joined local shutdown.
+Concurrent independent credential failure remains failure; original deadline
+expiry retains its classification. Multi-batch/download/uncertain behavior and
+all original limits remain. Lifecycle/realTLS and supervision RED/GREEN controls
+pass; independent review is clear.
+
+Early cleanup reuses exact public/native-closed query/worker/batch facts, fresh
+worker-locked confirmation and existing positive Kubernetes termination,
+UID-bound deletion/absence and persisted retirement before physical reuse.
+Logical spend is unchanged. No schema/table/role/timer/watch is added; the existing
+runtime role gains one pure batch-count helper EXECUTE. Existing foreground
+cleanup may perform additional early attempts, at most one rotating attempt per
+demand with the existing bounded object walk and caller limit.
+
+The real compiled-role baseline reproduces the missing early selection after
+joined closure (Go8.227s, unchanged sources, provider0, cleanup[]); before-join
+negatives pass. Frozen-source GREEN with actual successor admission and the
+multi-batch control remains pending. These local changes do not establish
+installed capacity savings, cleanup or a full20-minute syscall workflow pass.
+
 ## Syscall authoring gaps closed locally; observed cancellation scoped (2026-11-05)
 
 CI42044734677 passes all15 jobs on signed `dacedd43`. Native42044789919 is
