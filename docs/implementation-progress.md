@@ -1,5 +1,70 @@
 # Sustained implementation progress
 
+## Saved packet queries implemented; named local checks passed (2026-11-05)
+
+The private candidate at `360ba3f60d71c500dff6e5c6512ce38a71421f0d` implements
+[ADR-305](decisions/305-bounded-saved-packet-queries.md): bounded `pcap_query` over saved metadata and raw PCAPNG, with
+React/MCP parity, the existing libpcap compiler/Go VM and no new acquisition or
+stored derivative. Installed query qualification, eligible CI, PR publication
+and merge remain pending. This does not complete S-05 or authorize a release.
+
+Metadata queries use current ordinary/retained rights. Every raw original needs
+an exact query grant, including header-only selection; download-only approval
+and raw-summary authority do not cover it. Standalone and same-human combined
+review use one finite disclosure pool. Each actual raw batch reserves 24
+KiB/one operation atomically; query admission reserves four units for at most
+two batches. Same-key Begin returns only the original pending handle after
+current checks, without compiling, reading or charging again. The worker
+authenticates complete EOF even after a logical scan/output stop. Primitive
+zero/null fields, typed time/flags and raw saved-frame prefixes retain exact
+source classification.
+
+[Local evidence](../test/results/saved-packet-query-local/README.md) retains focused RED/GREEN checks, independent reviews and
+source-scoped repository checks. The full built React/Go TLS gate passed at
+`bb936966` in 107.539 seconds, including metadata ordinary access, raw
+zero/null/prefix fields and a limited nested reply; existing browser cases and
+28 journeys/27 accessibility scans passed. A real limited-page failure exposed
+runtime/browser schema disagreement: fixed inner narrowing hints and a null
+outer hint now pass both validators. The 4096-byte wrapper reserve keeps the
+measured maximal admitted primitive page at 20,424 B, direct reply 21,254 B and
+nested reply 21,955 B within 24 KiB.
+
+[Service evidence](../test/results/saved-packet-query-services-local/README.md) records separate pristine managed metadata (13.764 seconds,
+`5722a38e`) and raw (15.639 seconds, `b2759438`) lifecycle passes. Each matched
+all 4,194 reported Git hashes, kept sources unchanged and cleaned up. Actual
+compiled hub/key roles, encrypted audit, original query/key identity, two
+batches/six one-use key roles, current grant/pool checks, atomic rollback and
+retained-history downgrade refusal pass. Job/Pod/issuer/join and initial
+authority inputs remain synthetic. The corrected upgrade 139 campaign at
+`360ba3f6` passed 401 tests with all 4,194 Git hashes matched, unchanged source
+and empty cleanup. It restores exact 138 functions, schema, account guard,
+key-binding CHECK and trust; all four new helpers are absent after Down.
+Historical setup checks logical schema before rebinding the full snapshot; the
+actual 139 round trip still compares physical ordinals exactly.
+
+[Resource evidence](../test/results/saved-packet-query-resource-local/README.md) at `b2759438` passed four fresh consumers against 1,812 exact
+dependency hashes: two 8 MiB originals exercise 256-instruction GoVM filtering,
+long raw fields/prefix output and 233,011 tiny records with wire-length cache
+overflow. Complete peaks were 94,838,784 B and 134,688,768 B under the observed
+256 MiB memory maximum, with zero swap/OOM and three key roles per read.
+Cancellation/source-error cases return no rows and join; all containers were
+removed. The 500m quota is verified configuration only: short CPU/wall/period
+counters do not demonstrate enforced or sustained 500m throughput.
+Installed/all-maximum/sustained/second-cluster qualification remains open.
+
+Full `go-check` exited 0 (68 full packages and 691 Kubernetes tests in 18
+groups); its recorded source scope and subsequent migration/fixture changes
+remain separate. Pre-push at `b2759438` passed with 529 console tests. These
+are not represented as one unchanged final-source campaign. Retained failures
+include missing four-unit SQL admission, the old 16 KiB key-binding CHECK, role
+cleanup after premature admin-pool closure, and an upgrade snapshot taken
+before historical column re-creation. Fixes preserve quota/role checks and
+strict actual rollback comparison. Earlier setup, compiler/vet and browser
+failures remain in the linked originals rather than being replaced by later
+passes.
+
+
+
 ## Raw-source fixed packet summary merged and installed-qualified (2026-11-05)
 
 PR167 merged normally as `897fd783d6963073ce421cb6a211ffd59a1cdebf` at
