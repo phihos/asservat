@@ -628,12 +628,40 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 						summaryCheck = installedPacketSummarySQLCheckWithTerminal(t, ctx, admin, api, p.RootID, true, terminalSink)
 						packetQueryCheck = installedPacketQuerySQLCheck(t, ctx, admin, api, p.RootID, &packetQueryRetirements, terminalSink)
 					}
+					if installedJourneyFocus() == "manual-arguments" {
+						packetPipeline = &installedPacketTerminalPipeline{limit: 7}
+						defer packetPipeline.finish(t)
+						terminalSink := func(wait func()) { packetPipeline.add(t, wait) }
+						packetDrain = func() {
+							if len(packetPipeline.pending) == 2 {
+								packetPipeline.drain(t)
+							}
+						}
+						summaryCheck = installedProjectionSQLCheck(t, ctx, admin, api, p.RootID, terminalSink)
+						checks := []installedProjectionCheck{installedSyscallQuerySQLCheck(t, ctx, admin, api, p.RootID, nil, terminalSink, true), installedSyscallQuerySQLCheck(t, ctx, admin, api, p.RootID, nil, terminalSink, false)}
+						queryIndex := 0
+						packetQueryCheck = func(artifactID string) func(string, string) func() {
+							if queryIndex >= len(checks) {
+								t.Fatal("raw syscall query proof count exceeds original two")
+							}
+							check := checks[queryIndex]
+							queryIndex++
+							return check(artifactID)
+						}
+					}
 					qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) }, func(previewID string) { installedInitialStorageDiagnostics(t, ctx, admin, p.RootID, previewID) }, summaryCheck, packetQueryCheck, packetDrain, installedArgumentsSQLSource(t, ctx, admin, p.RootID), installedStoppedDownloadSQLCheck(t, ctx, admin, kc, p.RootID, original.Plan.ClusterID), profileChecks...)
 					for _, retired := range packetQueryRetirements {
 						retired()
 					}
-					if packetPipeline != nil && (packetPipeline.admitted != 4 || packetPipeline.joined != 4 || len(packetPipeline.pending) != 0) {
-						t.Fatal("four original raw-query workers were not positively joined")
+					if packetPipeline != nil {
+						packetPipeline.finish(t)
+						expected := 4
+						if installedJourneyFocus() == "manual-arguments" {
+							expected = 7
+						}
+						if packetPipeline.admitted != expected || packetPipeline.joined != expected || len(packetPipeline.pending) != 0 {
+							t.Fatal("all original funded query workers were not positively joined", packetPipeline.admitted, packetPipeline.joined, expected)
+						}
 					}
 					if installedJourneyFocus() == "manual-raw" && len(packetQueryRetirements) != 2 {
 						t.Fatal("both query workers lack retained positive retirement checks")
@@ -1058,9 +1086,13 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	}
 	// The saved-syscall journey performs five distinct paid queries, including
 	// the changed-filter cursor refusal. Retiring a worker never refunds a
-	// query unit; fund exactly five two-unit source reads in these two foci.
+	// query unit. Arguments additionally funds two four-unit raw queries; the
+	// metadata-only focus retains five two-unit source reads.
 	if installedJourneyFocus() == "manual-syscall" || installedJourneyFocus() == "manual-arguments" {
 		records = installedSyscallProjectionQueries * query.SyscallProjectionQueryUnits
+		if installedJourneyFocus() == "manual-arguments" {
+			records = installedArgumentQueryUnits
+		}
 	}
 	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: records, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 128), Resolution: lane(4, 8), Processing: lane(2, 16)},

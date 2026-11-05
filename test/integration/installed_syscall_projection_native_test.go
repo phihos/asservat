@@ -304,7 +304,7 @@ type installedSyscallPage struct {
 	Expires  time.Time `json:"query_expires_at"`
 }
 
-func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version, nativeType, pod string, native []byte, expires time.Time, marker string, check installedProjectionCheck, downloadRetirement func()) {
+func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, version, nativeType, pod string, native []byte, expires time.Time, marker string, check installedProjectionCheck, downloadRetirement func(), continuation ...installedSyscallQueryContinuation) {
 	t.Helper()
 	if check == nil || downloadRetirement == nil {
 		t.Fatal("syscall projections require independent SQL readback")
@@ -363,22 +363,54 @@ func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, ident
 	// one full worker lifetime after each already-joined response.
 	var proofs installedSyscallProofCohort
 	defer proofs.flush(t)
+	if len(continuation) > 1 {
+		t.Fatal("ambiguous raw syscall continuation")
+	}
+	rolling := len(continuation) == 1
+	if rolling && (continuation[0].BeforeQuery == nil || continuation[0].RawQueries == nil) {
+		t.Fatal("raw syscall continuation lacks owned pipeline")
+	}
+	var oldRetirements []func()
+	retiredOld := 0
+	retireNext := func() {
+		if retiredOld >= len(oldRetirements) {
+			t.Fatal("missing original fixed-view retirement")
+		}
+		oldRetirements[retiredOld]()
+		retiredOld++
+	}
 	run := func(tool string, args map[string]any, wantError string) (installedSyscallReply, installedSyscallPage) {
 		t.Helper()
-		if proofs.queries >= installedSyscallProjectionQueries {
+		if proofs.queries >= installedSyscallProjectionQueries || rolling && len(oldRetirements) >= installedSyscallProjectionQueries {
 			t.Fatal("syscall fixture has no prepaid query unit for another call")
+		}
+		if rolling {
+			continuation[0].BeforeQuery()
 		}
 		verify := check(artifactID)
 		out := call(tool, args)
 		operation, handle := out.RequestID, ""
 		// Queue as soon as the immutable operation is known, so a later poll or
 		// assertion failure still attempts this known worker's independent join.
-		proofs.add(t, func() func() { return verify(handle, operation) })
-		defer func() {
-			if len(proofs.pending) == 2 {
-				proofs.flush(t)
-			}
-		}()
+		if rolling {
+			defer func() {
+				retirement := verify(handle, operation)
+				if retirement == nil {
+					t.Fatal("fixed syscall result lacks live proof")
+				}
+				oldRetirements = append(oldRetirements, retirement)
+				if len(oldRetirements) > 2 {
+					retireNext()
+				}
+			}()
+		} else {
+			proofs.add(t, func() func() { return verify(handle, operation) })
+			defer func() {
+				if len(proofs.pending) == 2 {
+					proofs.flush(t)
+				}
+			}()
+		}
 		var observed, until time.Time
 		for poll := 0; out.Status == "pending"; poll++ {
 			var pending struct {
@@ -493,6 +525,17 @@ func qualifyInstalledSyscallProjections(t *testing.T, ctx context.Context, ident
 	args = base()
 	args["cursor"], args["syscall_names"], args["errors_only"] = first.Next, []string{name}, true
 	run("get_syscall_events", args, "InvalidCursor")
+	if rolling {
+		if len(oldRetirements) != installedSyscallProjectionQueries || retiredOld != 3 || continuation[0].RawQueries == nil {
+			t.Fatal("five fixed views did not retain immediate proof before raw queries")
+		}
+		continuation[0].RawQueries(retireNext)
+		if retiredOld != installedSyscallProjectionQueries {
+			t.Fatal("later raw admissions did not retire all original fixed views")
+		}
+		t.Log("five original fixed views retained all assertions and positive later retirement; two raw queries use the same native original with immediate live proofs and rolling two-slot terminal ownership")
+		return
+	}
 	proofs.flush(t)
 	if proofs.queries != installedSyscallProjectionQueries || proofs.joined != installedSyscallProjectionQueries || proofs.retired != installedSyscallProjectionQueries-1 {
 		t.Fatal("syscall fixture did not observe all five joins and first four product retirements", proofs.queries, proofs.joined, proofs.retired)

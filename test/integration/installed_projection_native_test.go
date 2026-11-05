@@ -110,18 +110,27 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						t.Log("installed profile summary: exact 384 MiB installed Pod limit and transient declaration, ten query units, one consumed three-key batch")
 					}
 					if intent.Query.Scope.NativeType == artifactvalue.SyscallRecordsArtifact || intent.Query.Scope.NativeType == artifactvalue.SyscallArgumentsArtifact {
-						if batches != 1 || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes || intent.Query.Plan.Profile.Worker.MemoryBytes != query.ProfileComparisonWorkerBytes {
+						rawQuery := intent.Query.Scope.NativeType == artifactvalue.SyscallArgumentsArtifact && intent.Query.Scope.DisplayVersion == query.SyscallQueryDisplayVersion
+						wantUnits := query.SyscallProjectionQueryUnits
+						wantBatches := int64(1)
+						if rawQuery {
+							wantUnits, wantBatches = query.SyscallQueryQueryUnits, 2
+							if intent.Query.Scope.Syscalls.View != query.SyscallQueryView || intent.Query.Scope.SourceFormat != artifactvalue.SyscallArgumentsFormat {
+								t.Fatal("raw syscall query lost exact native format/view")
+							}
+						}
+						if batches != 1 || intent.Query.Scope.ReadBatches() != wantBatches || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes || intent.Query.Plan.Profile.Worker.MemoryBytes != query.ProfileComparisonWorkerBytes {
 							t.Fatal("syscall view did not retain its one-batch installed resource reservation")
 						}
 						var units int
-						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != query.SyscallProjectionQueryUnits {
+						if err := admin.QueryRow(limit, "SELECT context_query_units(query->'Scope') FROM context_query WHERE root_id=$1 AND id=$2", root, id).Scan(&units); err != nil || units != wantUnits {
 							t.Fatal("syscall projection source charge", units, err)
 						}
 						pod, err := api.CoreV1().Pods(observed.Binding.Namespace).Get(limit, observed.Binding.Pod, meta.GetOptions{})
 						if err != nil || string(pod.UID) != observed.Binding.PodUID || len(pod.Spec.Containers) != 1 || pod.Spec.Containers[0].Resources.Limits.Memory().Value() != intent.Query.Plan.Profile.Worker.MemoryBytes {
 							t.Fatal("syscall projection actual worker memory limit", err)
 						}
-						t.Log("installed syscall view: exact 384 MiB installed Pod limit and transient declaration, two query units, one consumed three-key batch")
+						t.Logf("installed syscall view: exact 384 MiB installed Pod limit and transient declaration, %d query units/%d configured read batches, one consumed three-key batch", wantUnits, wantBatches)
 					}
 					observed.Intent = intent.Worker
 					if !observed.Valid() {

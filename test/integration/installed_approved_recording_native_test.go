@@ -442,6 +442,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		access["operations"] = []string{"download_artifact", "pcap_query"}
 		access["clientIDs"] = []string{"console", "mcp"}
 	}
+	if installedJourneyFocus() == "manual-arguments" {
+		access := original["result_access"].(map[string]any)
+		access["operations"] = []string{"download_artifact", "syscall_query"}
+		access["clientIDs"] = []string{"console", "mcp"}
+	}
 	pending, code := invoke("request_capture", original)
 	var refused struct {
 		URI string `json:"navigation_uri"`
@@ -1040,7 +1045,20 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if err != nil {
 			t.Fatal(err)
 		}
-		qualifyInstalledSyscallProjections(t, ctx, identity, transport, origin, progress.CaseID, evidence.Artifacts[0].ID, evidence.Artifacts[0].Digest, artifact.SyscallArgumentsArtifact, preview.Pods[0].UID, native, evidence.Artifacts[0].Expires, manualArgumentsMarker, summaryCheck, retirement)
+		if packetQueryCheck == nil || packetQueryDrain == nil {
+			t.Fatal("raw argument query proof pipeline missing")
+		}
+		row := evidence.Artifacts[0]
+		source := installedSyscallQueryBrowserSource{CaseID: progress.CaseID, ArtifactID: row.ID, Version: row.Digest, PodUID: preview.Pods[0].UID, GrantID: grantID, Expires: row.Expires}
+		qualifyInstalledSyscallProjections(t, ctx, identity, transport, origin, progress.CaseID, row.ID, row.Digest, artifact.SyscallArgumentsArtifact, preview.Pods[0].UID, native, row.Expires, manualArgumentsMarker, summaryCheck, retirement, installedSyscallQueryContinuation{BeforeQuery: packetQueryDrain, RawQueries: func(afterEach func()) {
+			packetQueryDrain()
+			mcp := queryInstalledRawSyscalls(t, ctx, identity, transport, origin, source, packetQueryCheck)
+			afterEach()
+			packetQueryDrain()
+			console := queryInstalledRawSyscallsBrowser(t, ctx, self, address, source, packetQueryCheck)
+			afterEach()
+			qualifyInstalledRawSyscallParity(t, native, source, mcp, console)
+		}})
 		qualifyManualRecorderRepeatPreview(t, receipt.CaptureID, preview, invoke, diagnose)
 		qualifyManualRecorderStop(t, ctx, "arguments", manualArgumentsCaptureInput(cluster, namespace, workload, true), read, invoke, func(grantID string) {
 			browser.approvedRecordingStepUp(t, ctx, reviewer, grantID)
