@@ -1,6 +1,6 @@
 # Sustained implementation progress
 
-## First installed packet-query attempt failed; SQL correction prepared (2026-11-05)
+## Packet-query SQL correction passes locally; installed retry pending (2026-11-05)
 
 PR169 candidate `329a48fc` passed all 15 eligible CI jobs. Its separate installed
 `continuation-manual-raw` run41986407470 failed (Go/harness 1, Go697.503s).
@@ -12,8 +12,15 @@ The earlier empty-program service fixtures bypassed this branch.
 The correction qualifies both digest-byte columns without changing validation.
 A direct PostgreSQL regression reproduces the old failure with a valid nonempty
 program; both managed lifecycle fixtures now also use nonempty programs.
-Focused race/generation checks and independent source review pass. Corrected
-managed-service, upgrade and installed results remain pending.
+Focused race/generation checks and independent source review pass. On signed
+`8fcd4963`, the corrected direct PostgreSQL campaign passed in 1.147s (27 tests),
+metadata lifecycle in 13.526s, raw lifecycle in 15.325s and separate upgrade139
+round trip in 6.492s (401 tests). All four campaigns matched their 4,194 reported
+Git hashes, kept sources unchanged and cleaned up. The regression uses a valid
+nonempty BPF instruction representation; it does not invoke libpcap itself.
+[Corrected service originals](../test/results/saved-packet-query-services-local/compiled-program/README.md)
+preserve the old failure and each new pass. SQL generation, spec/architecture
+checks and Go vet also pass. Corrected installed qualification remains pending.
 
 [Failed installed originals](../test/results/saved-packet-query-native-41986407470/README.md)
 preserve the terminal run, verified ZIP and exact 4,255 Git source hashes.

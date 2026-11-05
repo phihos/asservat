@@ -1674,6 +1674,46 @@
       "original_sha256": "fb9464048827b6ec93f18bbe1fc94b4b990d12d75021112fb717750fbd433e40",
       "gzip_bytes": 1121,
       "gzip_sha256": "5401ff300737b4b71d06eb683dd43b78d4557e3fc9a082d6d7936ab1acd69ad9"
+    },
+    {
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/nonempty-program-final-gates.log",
+      "member": "nonempty-program-final-gates.log.gz",
+      "original_bytes": 841,
+      "original_sha256": "b884e887912015ed697f2d6b32f6135e3d29ed574817f7502631a21e9162dfd9",
+      "gzip_bytes": 491,
+      "gzip_sha256": "f01d70c191a04ff9dca8a4d2ef599baa87dd3c6f7d0ea0d99b7ecbcec5ce7ed0"
+    },
+    {
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/nonempty-program-final-gates-readback.json",
+      "member": "nonempty-program-final-gates-readback.json.gz",
+      "original_bytes": 315,
+      "original_sha256": "5d82d716d57bdbfdb67b0cb2b1ec7cdda02ab9b7c646bf15ef140739ff362d81",
+      "gzip_bytes": 245,
+      "gzip_sha256": "59152f5b5d2da8c6231d2c58d876e94cea310f0055b27926099ceed607994370"
+    },
+    {
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/nonempty-program-independent-review.json",
+      "member": "nonempty-program-independent-review.json.gz",
+      "original_bytes": 1558,
+      "original_sha256": "b553e3b2fc6f7773fa7ee66b7629cc5bcd9883ab32478482f64a99586cac5650",
+      "gzip_bytes": 919,
+      "gzip_sha256": "62b7785dc1c109ad54169ba23a068df9cacc8519df656fbd9300c3f0b20410a0"
+    },
+    {
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/nonempty-program-evidence-doc-gates-final.log",
+      "member": "nonempty-program-evidence-doc-gates-final.log.gz",
+      "original_bytes": 605,
+      "original_sha256": "fac35c512f08bc18b922e2fff70464ad69c1a5f51891c00ee1c9befd26a54cb1",
+      "gzip_bytes": 393,
+      "gzip_sha256": "c290109c04f28470f6f86ccbab3111014f39b8221f0cf25009103c9b0cb0f94f"
+    },
+    {
+      "original_path": "/home/phil/.cache/asservat-build/saved-packet-query/compiled-program-archive-independent-review.json",
+      "member": "compiled-program-archive-independent-review.json.gz",
+      "original_bytes": 1064,
+      "original_sha256": "d0af0eedb43a9f9ed8134f57dc9ece8f92fe86314309a081a75ca9c9d6f842a1",
+      "gzip_bytes": 691,
+      "gzip_sha256": "c08034e7e6396fc7de3a4de47a20020e1e3bba778eb15f4458060e563e7d4c62"
     }
   ]
 }

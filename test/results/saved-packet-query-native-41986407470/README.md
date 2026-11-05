@@ -17,7 +17,8 @@ The retained PostgreSQL report identifies SQLSTATE `42702` in
 with the unqualified digest-byte column in the nonempty-program digest checks.
 Earlier managed-service fixtures used an empty program and bypassed this branch.
 Both compiler- and program-digest queries require qualified column references;
-the local regression and correction have separate evidence. No timeout or
+the [local regression and correction](../saved-packet-query-services-local/compiled-program/README.md)
+have separate evidence. No timeout or
 authorization change is justified by this failure.
 
 All 4,255 reported source hashes independently match the exact Git commit.
