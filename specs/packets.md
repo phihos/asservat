@@ -72,7 +72,7 @@ Given a header spans several packets and a body shares its last packet, when htt
 
 Each network artifact records profile/projection and engine/compiler digests, link/hook/CNI profile, target identity, authored filter digest, resolved peer generations and activation intervals, requested/achieved time range, wire/captured counts, loss/suppression reasons, ring/frozen/parser ceilings and actual truncation. Generation history is itself bounded (default 1,024 entries per artifact); close a segment/artifact within reserved output slots or stop with a visible limit instead of dropping provenance silently. Manifests reference a bounded encrypted network metadata record under the same lifetime.
 
-`get_pcap_summary` describes sanitized or raw packet metadata; `get_http_headers` returns bounded structured HTTP fields from an approved projection with provenance, cursor/output limits and no body parameter. It does not imply that raw capture is extract-safe: analyze raw packets in the offline sandbox and publish a reviewed extract first. `pcap_query` remains a separately granted raw operation. All external-agent disclosures retain existing client policy, audit, share and expiry checks. The UI calls the choices “Network headers”, “HTTP headers” and “Raw packets”, shows unsupported target capabilities early, and lets maintainers choose Kubernetes peers by workload/service rather than typing addresses.
+`get_pcap_summary` describes sanitized or raw packet metadata; `get_http_headers` returns bounded structured HTTP fields from an approved projection with provenance, cursor/output limits and no body parameter. A raw original remains raw. Its fixed numeric summary may use the qualified transient Go projection in [ADR-304](../docs/decisions/304-transient-raw-packet-summary.md), with dedicated ordinary aggregate authority and independent output validation. This creates no stored derivative or raw-content permission. `pcap_query` remains a separately granted raw operation; native/subprocess analysis retains the separate-Job encrypted-scratch boundary. All external-agent disclosures retain existing client policy, audit, share and expiry checks. The UI calls the choices “Network headers”, “HTTP headers” and “Raw packets”, shows unsupported target capabilities early, and lets maintainers choose Kubernetes peers by workload/service rather than typing addresses.
 
 EXP-02/03 must qualify filter compilation, continuous peer updates, CNI/dual-stack/NAT/hostNetwork/loopback behavior, rings under stalls and HTTP secrecy/resource bounds before capability advertisement. Unsupported environments return specific unavailable results; no blanket packet coverage claim.
 
@@ -84,11 +84,28 @@ mean records in the saved file rather than unique datagrams. `drops` is nullable
 `drop_reporting` labels finite capture exclusions, snapshot output-limit exclusions
 or unavailable statistics. These reported counters never establish measured
 network loss. Missing statistics remain unknown and repeated cumulative statistics
-are not summed. Raw sources still require the separate reviewed/sandbox path.
+are not summed.
+
+Raw originals use the distinct `approved-raw-pcap-summary/v1` definition in
+ADR-304. The authenticated source retains its actual raw prefix limits and
+class. `packets` counts all saved records; required `unclassified_packets`
+reports records without usable complete headers, including zero. Conversations
+cover classified records only, with the same deterministic top100 bound. No
+endpoint or protocol is guessed from a missing header. Metadata results omit
+this raw-only field. Raw-summary authority grants neither raw queries nor native
+download and uses no raw-source share fallback. Qualification of this source
+class remains separate from the earlier metadata workflow.
 
 ### SC-NET-005
 
 Given an HTTP-header artifact is shared with an external agent, when it queries the approved projection, then only authorized bounded fields and coverage gaps are returned. The tool cannot expose raw packets, unapproved headers or records from another peer generation/case through pagination.
+
+Given an authorized reader inspects a saved raw packet recording, when the fixed
+summary runs, then complete authenticated input precedes the approved numeric
+output, truncated prefixes remain visible as unclassified records and a unique
+payload marker appears only in separately authorized raw/native inspection.
+The original remains raw; another client, changed source or expired/revoked
+authority cannot reuse the summary's query or widen its output.
 
 ## REQ-NET-006 — Pod scope, zero-history captures and watch health
 

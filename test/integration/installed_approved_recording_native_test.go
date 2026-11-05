@@ -903,6 +903,17 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Log("installed heap snapshot: namespace profile, independent collection review selecting only console result access, original Pod, no forced GC; real installed React untouched inuse_space default, one summary before one authenticated browser attachment; exact signed native total/bytes and null duration, MCP fresh repeat verified")
 		return
 	}
+	var rawSummaries []analysis.PacketSummary
+	if installedJourneyFocus() == "manual-raw" {
+		row := evidence.Artifacts[0]
+		if row.Kind != "packetCapture" || row.NativeFormat != artifact.RawPCAPNGFormat || row.Target.PodUID != preview.Pods[0].UID || row.Target.ClusterID != cluster || row.Target.Namespace != namespace || row.Target.WorkloadName != workload {
+			t.Fatal("raw summary source changed original raw target")
+		}
+		source := installedPacketSummarySource{CaseID: progress.CaseID, ArtifactID: row.ID, Version: row.Digest, PodUID: preview.Pods[0].UID, Expires: row.Expires, CaptureMode: "rawPackets"}
+		rawSummaries = append(rawSummaries, queryInstalledPacketSummary(t, ctx, identity, transport, origin, source, summaryCheck))
+		rawSummaries = append(rawSummaries, queryInstalledPacketSummaryBrowser(t, ctx, self, address, source, summaryCheck))
+		t.Log("raw summary phase: independent read-only MCP and installed React fixed extracts completed before separately authorized original raw download")
+	}
 	if measurement != nil {
 		if err := finishRecording(); err != nil {
 			t.Fatal(err)
@@ -1101,6 +1112,16 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	if installedJourneyFocus() == "manual-raw" {
 		s := qualifyManualRawPCAP(t, ctx, native)
+		if len(rawSummaries) != 2 || !bytes.Contains(native, []byte("synthetic-approved-recording")) {
+			t.Fatal("raw original lacks both summaries or actual payload marker")
+		}
+		for _, summary := range rawSummaries {
+			encoded, _ := json.Marshal(summary)
+			if bytes.Contains(encoded, []byte("synthetic-approved-recording")) {
+				t.Fatal("raw payload marker escaped fixed summary")
+			}
+		}
+		installedPacketSummaryTshark(t, ctx, "../results/manual-raw.pcapng", native, rawSummaries...)
 		t.Logf("manual raw recording %s: %d packets on port 8080, %d kept payload beyond %d header bytes, largest %d (cap %d), %d bytes", receipt.CaptureID, s.Packets, s.Payload, artifact.RecordingSnaplen, s.MaxCaptured, manualRawTCPCap, len(native))
 		return
 	}

@@ -765,7 +765,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 			d.syscallSummary, projection.SyscallSummary = projection.SyscallSummary, nil
 			d.syscallEvents, projection.SyscallEvents = projection.SyscallEvents, nil
 		}
-	case scope.NativeType == artifact.PCAPNGArtifact:
+	case scope.NativeType == artifact.PCAPNGArtifact || scope.NativeType == artifact.RawPCAPNGArtifact:
 		if !boundedPacketSummary(projection.PacketSummary) {
 			err = value.ErrUnavailable
 		} else {

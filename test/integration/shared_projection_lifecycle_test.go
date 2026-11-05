@@ -117,10 +117,14 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 		scope.Profile = query.ProfileSummarySelection{SampleType: "cpu", TopN: 20}
 		scope.Comparison = query.ProfileComparisonWindow{Normalization: query.ProfileComparisonRaw, Baseline: query.ProfileComparisonBaseline{CaseID: scope.CaseID, ArtifactID: scope.ArtifactID, CaptureID: scope.CaptureID, ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID, Version: scope.Version}}
 	}
-	packet := expected.NativeType == artifact.PCAPNGArtifact
+	rawPacket := expected.NativeType == artifact.RawPCAPNGArtifact
+	packet := expected.NativeType == artifact.PCAPNGArtifact || rawPacket
 	if packet {
 		scope.NativeType, scope.SourceFormat, scope.DisplayVersion = artifact.PCAPNGArtifact, artifact.PCAPNGFormat, query.PacketSummaryDisplayVersion
 		scope.SourceProjectionDigest, scope.Selection = artifact.Digest{}, query.LineSelection{}
+		if rawPacket {
+			scope.NativeType, scope.SourceFormat, scope.DisplayVersion = artifact.RawPCAPNGArtifact, artifact.RawPCAPNGFormat, query.RawPacketSummaryDisplayVersion
+		}
 	}
 	policy := f.audit.Normal.Policy
 	journal, err := postgres.NewHealthyOperationJournal(ctx, compiled("hub-runtime"), policy, s.recovery.guard)
@@ -404,7 +408,9 @@ func qualifySharedProjectionLifecycleClient(t *testing.T, f *queryLedgerFixture,
 	if downloads != 0 || workersCount != 1 || certificates != 1 || keyRoles != int64(7*len(keyIDs)) || keyChildren != int64(len(keyIDs)) || queries != priorQueries+1 || allocated != (priorQueries+1)*scope.QueryUnits() || !nativeClosed || !closed || active || !audited || !claimed || !bound {
 		t.Fatalf("unexpected paid final state: downloads=%d workers=%d certificates=%d roles=%d children=%d queries=%d allocated=%d nativeClosed=%t closed=%t active=%t audited=%t claimed=%t bound=%t", downloads, workersCount, certificates, keyRoles, keyChildren, queries, allocated, nativeClosed, closed, active, audited, claimed, bound)
 	}
-	if packet {
+	if rawPacket {
+		refuseRetainedRawPacketSummaryDowngrade(t, f)
+	} else if packet {
 		refuseRetainedPacketSummaryDowngrade(t, f)
 	}
 	stored, err := ledger.LookupQuery(ctx, scope.Principal, q.ID)

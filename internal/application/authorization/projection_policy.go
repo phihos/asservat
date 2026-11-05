@@ -16,7 +16,8 @@ import (
 // bounded installed observation (DownloadPolicyObservations). It never consumes a
 // DownloadAuthority or evaluates download entitlement. ReadApproved remains a
 // separate ordinary permission check by ContextProjectionAuthority; raw pprof
-// input instead uses the distinct ReadProfileSummary aggregate operation.
+// input instead uses the distinct ReadProfileSummary aggregate operation;
+// raw PCAPNG uses ReadPacketSummary. Both disclose only the approved extract.
 type ContextProjectionPolicies struct {
 	source DownloadPolicyReader
 	now    func() time.Time

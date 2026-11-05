@@ -2864,7 +2864,7 @@
     },
     {
       "name": "get_pcap_summary",
-      "description": "Read a bounded summary of saved packet metadata. Counts describe saved records and explicitly labelled capture exclusions, not measured network loss; HTTP fields use get_http_headers. Raw packet analysis remains subject to its separate sandbox and review requirements.",
+      "description": "Read a bounded numeric summary of saved network-header or raw packet recordings. Raw originals stay raw; the fixed projection omits payload, names and comments. Saved records without usable headers are explicit; reported exclusions are not measured network loss. Raw queries and native downloads retain their separate authority.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -2992,6 +2992,12 @@
                         "type": "string",
                         "format": "date-time",
                         "description": "Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline."
+                      },
+                      "unclassified_packets": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000000,
+                        "description": "Saved raw packet records without usable complete headers. These records remain in packets but not conversations; this is not a drop or network-loss count. Required for rawPackets and omitted for networkHeaders."
                       }
                     },
                     "required": [
@@ -3004,6 +3010,32 @@
                       "conversations_truncated",
                       "query_observed_at",
                       "query_expires_at"
+                    ],
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "capture_mode": {
+                              "const": "rawPackets"
+                            }
+                          },
+                          "required": [
+                            "capture_mode"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "unclassified_packets"
+                          ]
+                        },
+                        "else": {
+                          "not": {
+                            "required": [
+                              "unclassified_packets"
+                            ]
+                          }
+                        }
+                      }
                     ]
                   }
                 },
@@ -10181,7 +10213,7 @@
     },
     {
       "name": "preview_capture",
-      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human\u2019s selected result inspection/download; never an issued grant.",
+      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human’s selected result inspection/download; never an issued grant.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -13541,7 +13573,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 512,
-            "description": "Optional 1\u2013512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
+            "description": "Optional 1–512 Unicode scalars, preserved verbatim. Omit when absent; an explicit empty string is invalid. Descriptive metadata is not restored on repeat."
           },
           "sharing": {
             "$ref": "https://asservat.io/spec/v1/sharing-request.schema.json#/$defs/capture"
@@ -14700,7 +14732,7 @@
     },
     {
       "name": "cancel_artifact_download",
-      "description": "Stop this caller and client\u2019s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
+      "description": "Stop this caller and client’s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,

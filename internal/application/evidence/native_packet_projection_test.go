@@ -23,9 +23,9 @@ func (r *packetApprovedReadFixture) ReadApprovedContext(_ context.Context, s Nat
 // This is the actual installed worker receiver constructor/entry point. Adapter-
 // only projection tests do not exercise its separate closed source gate.
 func TestPacketSummaryActualRegionalApprovedReceiver(t *testing.T) {
-	for _, mode := range []string{"metadata", "raw-source", "different-pod"} {
+	for _, mode := range []string{"metadata", "raw", "raw-source", "raw-wrong-source", "raw-wrong-display", "different-pod"} {
 		t.Run(mode, func(t *testing.T) {
-			source, scope, _ := packetReadFixture(t)
+			source, scope, _ := packetReadFixture(t, mode == "raw" || mode == "raw-wrong-display")
 			o := nativeLeaseFixture().Operation
 			now := time.Now()
 			o.Kind = value.NativeProjection
@@ -38,6 +38,16 @@ func TestPacketSummaryActualRegionalApprovedReceiver(t *testing.T) {
 			o.Processing.ObservedAt, o.Processing.ValidUntil = now, o.Until
 			o.Path.StoreID, o.Path.TargetClusterID = source.Expectation.Registration.StoreID, scope.ClusterID
 			reader := &packetApprovedReadFixture{result: query.ProjectionResult{PacketSummary: &query.PacketSummary{CaptureMode: "networkHeaders", DropReporting: "unavailable", Conversations: []query.PacketConversation{}}}}
+			if mode == "raw" || mode == "raw-wrong-display" {
+				reader.result.PacketSummary.CaptureMode = "rawPackets"
+				reader.result.PacketSummary.UnclassifiedPackets = new(int64)
+			}
+			if mode == "raw-wrong-source" {
+				scope.NativeType, scope.SourceFormat, scope.DisplayVersion = artifact.RawPCAPNGArtifact, artifact.RawPCAPNGFormat, query.RawPacketSummaryDisplayVersion
+			}
+			if mode == "raw-wrong-display" {
+				scope.DisplayVersion = query.PacketSummaryDisplayVersion
+			}
 			worker := value.WorkerCredentialTarget{InstallationID: scope.RootID, QueryID: scope.RootID, WorkerID: scope.RootID, PodUID: scope.RootID, CreatedAt: now, RunUntil: now.Add(time.Minute)}
 			ctx, cancel := context.WithDeadline(t.Context(), o.Until)
 			defer cancel()
@@ -63,14 +73,14 @@ func TestPacketSummaryActualRegionalApprovedReceiver(t *testing.T) {
 				scope.PodUID = "33333333-3333-4333-8333-333333333333"
 			}
 			result, err := r.ReadApproved(ctx, o, source, scope)
-			if mode != "metadata" {
+			if mode != "metadata" && mode != "raw" {
 				if err == nil || result.PacketSummary != nil || reader.calls != 0 {
 					t.Fatal("fresh receiver accepted mismatched source", mode, reader.calls, err)
 				}
 				return
 			}
 			if err != nil || !result.Valid(scope) || reader.calls != 1 {
-				t.Fatalf("actual receiver rejected metadata packet before installed reader: calls=%d err=%v", reader.calls, err)
+				t.Fatalf("actual receiver rejected exact packet source before installed reader: calls=%d err=%v", reader.calls, err)
 			}
 			if _, err = r.ReadApproved(ctx, o, source, scope); err == nil || reader.calls != 1 {
 				t.Fatal("same regional batch replayed reader")

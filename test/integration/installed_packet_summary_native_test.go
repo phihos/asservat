@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 
 type installedPacketSummarySource struct {
 	CaseID, ArtifactID, Version, PodUID string
+	CaptureMode                         string
 	Expires                             time.Time
 }
 
@@ -48,6 +50,9 @@ func queryInstalledPacketSummary(t *testing.T, ctx context.Context, identity *in
 			t.Fatal("packet summary outcome unavailable; no replay", name, err)
 		}
 		raw, err := json.Marshal(result.StructuredContent)
+		if source.CaptureMode == "rawPackets" && bytes.Contains(raw, []byte("synthetic-approved-recording")) {
+			t.Fatal("raw marker escaped public packet response")
+		}
 		var out installedComparisonReply
 		if err != nil || wire.ValidateOutput(name, raw) != nil || json.Unmarshal(raw, &out) != nil || result.IsError != (out.Status == "error") {
 			t.Fatal("canonical packet summary response", name)
@@ -121,6 +126,13 @@ func queryInstalledPacketSummaryWithCall(t *testing.T, ctx context.Context, sour
 	var summary query.PacketSummary
 	if json.Unmarshal(result.Data, &times) != nil || times.Observed.IsZero() || !times.Expires.After(times.Observed) || times.Expires.After(source.Expires) || !until.IsZero() && (!times.Expires.Equal(until) || !times.Observed.Equal(finalObserved)) || json.Unmarshal(result.Data, &summary) != nil || !summary.Valid() {
 		t.Fatal("packet summary lost canonical fields/original times")
+	}
+	expectedMode := source.CaptureMode
+	if expectedMode == "" {
+		expectedMode = "networkHeaders"
+	}
+	if summary.CaptureMode != expectedMode {
+		t.Fatal("packet summary changed source capture mode")
 	}
 	if verify(handle, operation) == nil {
 		t.Fatal("packet summary lacks exact SQL joined proof")

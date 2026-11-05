@@ -49,3 +49,11 @@ it('shows an empty saved file and a bounded top100 without claiming complete con
   value.data.packets = 0; value.data.conversations_total = 0; value.data.conversations = []; value.data.conversations_truncated = false; value.data.drops = null; value.data.drop_reporting = 'unavailable';
   fireEvent.click(screen.getByRole('button', { name: 'Inspect again' })); await screen.findByText('No packet records were retained in this saved file.'); scope.abort();
 });
+it('shows raw unclassified records without exposing or inventing packet headers', async () => {
+  const client = new SyntheticProjection(), value = packetSummary(); Object.assign(value.data, { capture_mode: 'rawPackets', packets: 5, unclassified_packets: 2 }); client.responder = () => value;
+  const controller = ContextProjection.packet(client), scope = new AbortController();
+  const { container } = render(<PacketSummaryView controller={controller} session={session} scope={scope.signal} caseID={id(2)} artifactID={id(3)} version={profileVersion} captureMode="rawPackets"/>);
+  fireEvent.click(screen.getByRole('button', { name: 'Inspect saved packets' })); await screen.findByRole('table');
+  expect(screen.getByText('Unclassified saved records')).toBeTruthy(); expect(screen.getByText(/too short or unsupported/)).toBeTruthy();
+  expect(container.textContent).not.toContain('synthetic-payload-must-not-display'); expect(client.calls).toHaveLength(1); scope.abort();
+});

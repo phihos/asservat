@@ -30,6 +30,12 @@ func TestConsolePacketSummaryWithBuiltPackage(t *testing.T) {
 	if os.Getenv("ASSERVAT_CONSOLE_BROWSER_TEST") != "1" {
 		t.Skip("set ASSERVAT_CONSOLE_BROWSER_TEST=1 after building web/dist")
 	}
+	for _, mode := range []string{"networkHeaders", "rawPackets"} {
+		t.Run(mode, func(t *testing.T) { consolePacketSummaryWithBuiltPackage(t, mode) })
+	}
+}
+
+func consolePacketSummaryWithBuiltPackage(t *testing.T, captureMode string) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +50,7 @@ func TestConsolePacketSummaryWithBuiltPackage(t *testing.T) {
 	expires := time.Now().Add(time.Hour)
 	sessions := &consoleSyntheticSessions{origin: origin, state: "ready", expiresAt: time.Now().Add(5 * time.Minute)}
 	sessionHandler := browser.SessionHandler{Origin: origin, Issuer: "https://identity.invalid", Sessions: sessions}
-	cases := &consoleSyntheticPacketCases{&consoleSyntheticCases{state: "ready", expiresAt: expires}}
+	cases := &consoleSyntheticPacketCases{consoleSyntheticCases: &consoleSyntheticCases{state: "ready", expiresAt: expires}, captureMode: captureMode}
 	caseOps, err := presentation.NewContextCaseOperations(presentation.ContextCaseOperationsConfig{PublicOrigin: origin, Now: time.Now, NewID: func() string { return consoleCaptureID(501) }}, cases)
 	if err != nil {
 		t.Fatal(err)
@@ -62,6 +68,11 @@ func TestConsolePacketSummaryWithBuiltPackage(t *testing.T) {
 		t.Fatal("synthetic packet example")
 	}
 	data := result["data"].(map[string]any)
+	expectedPackets := int64(12)
+	if captureMode == "rawPackets" {
+		expectedPackets = 14
+		data["capture_mode"], data["packets"], data["unclassified_packets"] = captureMode, expectedPackets, int64(2)
+	}
 	observed := time.Now().UTC()
 	data["query_observed_at"], data["query_expires_at"] = observed, observed.Add(time.Minute)
 	version := "09" + strings.Repeat("00", 31)
@@ -90,7 +101,7 @@ func TestConsolePacketSummaryWithBuiltPackage(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	snapshots, checks := 0, 0
-	summary := queryInstalledPacketSummaryBrowser(t, ctx, b, server.Listener.Addr().String(), installedPacketSummarySource{CaseID: consoleCaptureID(80), ArtifactID: consoleCaptureID(81), Version: version, PodUID: "synthetic-pod-uid", Expires: expires}, func(artifactID string) func(string, string) func() {
+	summary := queryInstalledPacketSummaryBrowser(t, ctx, b, server.Listener.Addr().String(), installedPacketSummarySource{CaseID: consoleCaptureID(80), ArtifactID: consoleCaptureID(81), Version: version, PodUID: "synthetic-pod-uid", Expires: expires, CaptureMode: captureMode}, func(artifactID string) func(string, string) func() {
 		if artifactID != consoleCaptureID(81) || packet.starts != 0 {
 			t.Fatal("synthetic snapshot before exact-source query")
 		}
@@ -107,12 +118,18 @@ func TestConsolePacketSummaryWithBuiltPackage(t *testing.T) {
 	defer packet.mu.Unlock()
 	cases.mu.Lock()
 	defer cases.mu.Unlock()
-	if summary.Packets != 12 || summary.Drops == nil || *summary.Drops != 2 || len(summary.Conversations) != 1 || snapshots != 1 || checks != 1 || packet.starts != 1 || packet.polls != 1 || cases.calls != 1 || !packet.readyObserved.After(observed) {
+	if summary.Packets != expectedPackets || summary.CaptureMode != captureMode || summary.Drops == nil || *summary.Drops != 2 || len(summary.Conversations) != 1 || snapshots != 1 || checks != 1 || packet.starts != 1 || packet.polls != 1 || cases.calls != 1 || !packet.readyObserved.After(observed) {
 		t.Fatal("actual rendered packet journey made extra calls or changed the result")
+	}
+	if captureMode == "rawPackets" && (summary.UnclassifiedPackets == nil || *summary.UnclassifiedPackets != 2) || captureMode == "networkHeaders" && summary.UnclassifiedPackets != nil {
+		t.Fatal("raw/metadata unclassified count crossed source modes")
 	}
 }
 
-type consoleSyntheticPacketCases struct{ *consoleSyntheticCases }
+type consoleSyntheticPacketCases struct {
+	*consoleSyntheticCases
+	captureMode string
+}
 
 func (s *consoleSyntheticPacketCases) GetContextCase(ctx context.Context, current identities.CurrentIdentity, id string) (catalog.ContextCase, error) {
 	view, err := s.consoleSyntheticCases.GetContextCase(ctx, current, id)
@@ -120,6 +137,9 @@ func (s *consoleSyntheticPacketCases) GetContextCase(ctx context.Context, curren
 		view.Artifacts[0].EvidenceType = "packetCapture"
 		view.Artifacts[0].NativeType = artifact.PCAPNGArtifact
 		view.Artifacts[0].DataClass = "metadata"
+		if s.captureMode == "rawPackets" {
+			view.Artifacts[0].NativeType, view.Artifacts[0].DataClass = artifact.RawPCAPNGArtifact, "raw"
+		}
 	}
 	return view, err
 }

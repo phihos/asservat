@@ -89,8 +89,8 @@ func (r ProjectionResult) Valid(s ContextProjectionScope) bool {
 		}
 		return r.SyscallSummary == nil && r.SyscallEvents != nil && r.SyscallEvents.ValidShape(selection, s.Version, s.PodUID)
 	}
-	if s.NativeType == artifact.PCAPNGArtifact {
-		return r.PodStatus == (PodStatusProjection{}) && r.Headers.empty() && r.Summary == nil && r.SyscallSummary == nil && r.SyscallEvents == nil && !r.InvalidCursor && !r.TooLarge && r.PacketSummary != nil && r.PacketSummary.Valid()
+	if s.NativeType == artifact.PCAPNGArtifact || s.NativeType == artifact.RawPCAPNGArtifact {
+		return r.PodStatus == (PodStatusProjection{}) && r.Headers.empty() && r.Summary == nil && r.SyscallSummary == nil && r.SyscallEvents == nil && !r.InvalidCursor && !r.TooLarge && r.PacketSummary != nil && r.PacketSummary.Valid() && (s.NativeType == artifact.RawPCAPNGArtifact) == (r.PacketSummary.CaptureMode == "rawPackets")
 	}
 	if r.PacketSummary != nil {
 		return false
@@ -149,7 +149,7 @@ func (p HTTPHeaderPage) empty() bool {
 
 // BeginTool is the public tool that admits a query of this scope.
 func (s ContextProjectionScope) BeginTool() string {
-	if s.NativeType == artifact.PCAPNGArtifact {
+	if s.NativeType == artifact.PCAPNGArtifact || s.NativeType == artifact.RawPCAPNGArtifact {
 		return "get_pcap_summary"
 	}
 	if s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
@@ -177,7 +177,7 @@ func (s ContextProjectionScope) BeginTool() string {
 // ReadBatches is the number of read batches a query of this scope may
 // start: one page read for an extract, the historical two for pod status.
 func (s ContextProjectionScope) ReadBatches() int64 {
-	if s.NativeType == artifact.PCAPNGArtifact || s.NativeType == artifact.HTTPHeadersArtifact || s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
+	if s.NativeType == artifact.PCAPNGArtifact || s.NativeType == artifact.RawPCAPNGArtifact || s.NativeType == artifact.HTTPHeadersArtifact || s.NativeType == artifact.PprofArtifact || s.NativeType == artifact.SyscallRecordsArtifact || s.NativeType == artifact.SyscallArgumentsArtifact {
 		return 1
 	}
 	return ContextMaxReadBatches

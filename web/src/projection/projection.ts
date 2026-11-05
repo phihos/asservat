@@ -6,6 +6,7 @@ export type State = { phase: 'idle' | 'loading' | 'pending' | 'result' | 'incomp
 export type ProfileSource = { caseID: string; artifactID: string; version: string };
 export type ComparisonSelection = { sample_type: string; normalization: 'none' | 'perSecond'; top_n: number };
 export type SyscallSelection = { view: 'summary' | 'events'; limit: number; names: string[]; errorsOnly: boolean };
+export type PacketCaptureMode = 'networkHeaders' | 'rawPackets';
 type Timing = { query_observed_at: string; query_expires_at: string };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 // Go's canonical UTF-8 ordering follows code points, whereas JavaScript's
@@ -28,6 +29,7 @@ export class ContextProjection {
   private scope?: AbortSignal;
   private target?: { case_id: string; artifact_id: string };
   private version?: string;
+  private packetCaptureMode: PacketCaptureMode = 'networkHeaders';
   private baseline?: ProfileSource;
   private comparisonSelection?: ComparisonSelection;
   private selection = { sample_type: 'cpu', top_n: 20 };
@@ -55,13 +57,14 @@ export class ContextProjection {
     this.publish({ phase });
   }
   close = () => this.clear('idle');
-  isAttachedTo(session: Session, scope: AbortSignal, caseID: string, artifactID: string, version?: string) {
+  isAttachedTo(session: Session, scope: AbortSignal, caseID: string, artifactID: string, version?: string, packetCaptureMode: PacketCaptureMode = 'networkHeaders') {
     return this.session === session && this.scope === scope && !scope.aborted &&
-      this.target?.case_id === caseID && this.target.artifact_id === artifactID && this.version === version;
+      this.target?.case_id === caseID && this.target.artifact_id === artifactID && this.version === version &&
+      (this.kind !== 'packet' || this.packetCaptureMode === packetCaptureMode);
   }
-  attach(session: Session, scope: AbortSignal, caseID: string, artifactID: string, version?: string) {
+  attach(session: Session, scope: AbortSignal, caseID: string, artifactID: string, version?: string, packetCaptureMode: PacketCaptureMode = 'networkHeaders') {
     this.detach?.(); this.close();
-    this.session = session; this.scope = scope; this.version = version; this.baseline = undefined;
+    this.session = session; this.scope = scope; this.version = version; this.baseline = undefined; this.packetCaptureMode = packetCaptureMode;
     this.target = uuid.test(caseID) && uuid.test(artifactID) ? { case_id: caseID, artifact_id: artifactID } : undefined;
     const abort = () => { this.session = undefined; this.target = undefined; this.version = undefined; this.baseline = undefined; this.close(); };
     const detach = () => {
@@ -212,20 +215,23 @@ export class ContextProjection {
     }
     if (!validOutput_get_pcap_summary(summary) || summary.status !== 'ok' || summary.data_class !== 'extract' || summary.truncated || summary.next_cursor !== null || summary.request_id !== response.request_id || summary.data.query_observed_at !== response.data.query_observed_at || summary.data.query_expires_at !== response.data.query_expires_at || summary.provenance.length !== 1 || summary.provenance[0].artifactID !== this.target?.artifact_id || summary.provenance[0].digest !== this.version) throw new Error('Packet summary association changed');
     const data = summary.data;
-    if (data.capture_mode !== 'networkHeaders' || !Number.isSafeInteger(data.packets) || !Number.isSafeInteger(data.conversations_total) || data.conversations_total > data.packets || data.conversations.length !== Math.min(data.conversations_total, 100) || data.conversations_truncated !== (data.conversations_total > data.conversations.length) || (data.drops === null) !== (data.drop_reporting === 'unavailable') || data.drops !== null && !Number.isSafeInteger(data.drops)) throw new Error('Inconsistent packet counters');
+    const unclassified = this.packetCaptureMode === 'rawPackets' ? data.unclassified_packets ?? NaN : 0;
+    if (data.capture_mode !== this.packetCaptureMode || !Number.isSafeInteger(unclassified) || unclassified < 0 || unclassified > data.packets || this.packetCaptureMode === 'networkHeaders' && data.unclassified_packets !== undefined) throw new Error('Packet source mode changed');
+    const classified = data.packets - unclassified;
+    if (!Number.isSafeInteger(data.packets) || !Number.isSafeInteger(data.conversations_total) || data.conversations_total > classified || data.conversations.length !== Math.min(data.conversations_total, 100) || data.conversations_truncated !== (data.conversations_total > data.conversations.length) || (data.drops === null) !== (data.drop_reporting === 'unavailable') || data.drops !== null && !Number.isSafeInteger(data.drops)) throw new Error('Inconsistent packet counters');
     let count = 0;
     const seen = new Set<string>();
     for (let i = 0; i < data.conversations.length; i++) {
       const row = data.conversations[i];
       const key = JSON.stringify([row.protocol, row.source, row.destination]);
-      if (!Number.isSafeInteger(row.packets) || row.packets > data.packets || !packetEndpoint(row.source, row.protocol) || !packetEndpoint(row.destination, row.protocol) || seen.has(key)) throw new Error('Invalid packet endpoints');
+      if (!Number.isSafeInteger(row.packets) || row.packets > classified || !packetEndpoint(row.source, row.protocol) || !packetEndpoint(row.destination, row.protocol) || seen.has(key)) throw new Error('Invalid packet endpoints');
       seen.add(key); count += row.packets;
       if (i > 0) {
         const previous = data.conversations[i - 1];
         if (previous.packets < row.packets || previous.packets === row.packets && (previous.protocol > row.protocol || previous.protocol === row.protocol && (previous.source > row.source || previous.source === row.source && previous.destination >= row.destination))) throw new Error('Packet ranking changed');
       }
     }
-    if (count > data.packets || !data.conversations_truncated && count !== data.packets) throw new Error('Packet total changed');
+    if (count > classified || !data.conversations_truncated && count !== classified) throw new Error('Packet total changed');
     this.publish({ phase: 'result', packetSummary: { ...data, conversations: data.conversations.map(row => ({ ...row })) }, warnings: [...summary.warnings] });
   }
 

@@ -1,5 +1,17 @@
 # Sustained implementation progress
 
+## Raw-source fixed packet summary candidate (2026-11-05)
+
+PR165's metadata workflow and PR166's evidence/status closure are merged.
+[ADR-304](decisions/304-transient-raw-packet-summary.md) is the next S-05 workflow:
+ordinary approved numeric inspection of an existing raw PCAPNG, using the
+accepted Go worker and separate raw display definition. The original stays raw;
+raw query/download grants remain independent. Tiny stored prefixes count as
+unclassified saved records rather than guessed endpoints. No derivative or
+additional human approval is introduced. Source/authority/SQL/worker/public
+composition and raw-input resource/browser/native qualification are in progress;
+no raw-summary installed pass or complete S-05 exit is claimed.
+
 ## Saved packet summaries merged and installed-qualified (2026-11-05)
 
 PR165 merged as `8bea063222b873283d210264e88d286efa0a2a86` after required

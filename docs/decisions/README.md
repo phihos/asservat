@@ -1,5 +1,14 @@
 # Decision records
 
+[ADR-304 — Fixed transient raw packet summaries](304-transient-raw-packet-summary.md)
+applies the accepted bounded Go mechanism to a dedicated ordinary aggregate of
+an unchanged raw original. Raw-only unclassified counts preserve truncated
+prefixes; source/authority/worker/resource and installed qualification are pending.
+
+[ADR-303 — Saved packet metadata summaries](303-saved-packet-summary.md)
+implements the bounded metadata-PCAPNG summary. The named MCP/React/native-file
+workflow passed and merged in PR165; raw sources are the separate ADR-304 candidate.
+
 [ADR-302 — Named profile endpoint authorization](302-named-profile-endpoint-authorization.md)
 adds public exact workload audiences and a separate fixed private file in the
 existing connector bundle, with transient authenticated poll delivery. Private

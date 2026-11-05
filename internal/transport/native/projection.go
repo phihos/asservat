@@ -73,7 +73,7 @@ func encodeProjectionResult(r query.ProjectionResult, scope query.ContextProject
 		}
 		return b, nil
 	}
-	if scope.NativeType == artifact.PCAPNGArtifact {
+	if scope.NativeType == artifact.PCAPNGArtifact || scope.NativeType == artifact.RawPCAPNGArtifact {
 		b, e := json.Marshal(r.PacketSummary)
 		if e != nil || len(b) > query.ContextResultBytes {
 			clear(b)
@@ -150,7 +150,7 @@ func decodeProjectionResult(b []byte, scope query.ContextProjectionScope) (query
 		if len(b) > query.ContextResultBytes || nativeDecode(b, &r.PodStatus) != nil {
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol
 		}
-	case artifact.PCAPNGArtifact:
+	case artifact.PCAPNGArtifact, artifact.RawPCAPNGArtifact:
 		var summary query.PacketSummary
 		if nativeDecodeBounded(b, &summary, query.ContextResultBytes) != nil {
 			return query.ProjectionResult{}, contracts.ErrNativeProtocol

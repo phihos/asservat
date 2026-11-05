@@ -18,12 +18,25 @@ import (
 // Keep the existing download/grant snapshot, exact worker/key/batch join and
 // original terminal wait. This read-only wrapper adds the new closed packet
 // scope/resource/charge proof BEFORE that wait, while its exact Pod is live.
-func installedPacketSummarySQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string) installedProjectionCheck {
+func installedPacketSummarySQLCheck(t *testing.T, ctx context.Context, admin *pgxpool.Pool, api kubernetes.Interface, root string, modes ...string) installedProjectionCheck {
+	rawSource := len(modes) == 1 && modes[0] == "rawPackets"
+	wantType, wantFormat, wantDisplay := artifact.PCAPNGArtifact, artifact.PCAPNGFormat, query.PacketSummaryDisplayVersion
+	if rawSource {
+		wantType, wantFormat, wantDisplay = artifact.RawPCAPNGArtifact, artifact.RawPCAPNGFormat, query.RawPacketSummaryDisplayVersion
+	}
 	shared := installedProjectionSQLCheck(t, ctx, admin, api, root)
 	return func(artifactID string) func(string, string) func() {
+		beforeCaptures := 0
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM context_capture WHERE root_id=$1", root).Scan(&beforeCaptures); err != nil {
+			t.Fatal("packet capture count snapshot", err)
+		}
 		verify := shared(artifactID)
 		return func(handle, operation string) func() {
 			t.Helper()
+			var afterCaptures int
+			if err := admin.QueryRow(ctx, "SELECT count(*) FROM context_capture WHERE root_id=$1", root).Scan(&afterCaptures); err != nil || afterCaptures != beforeCaptures {
+				t.Fatal("summary changed acquisition count", err)
+			}
 			var observed value.AcquisitionWorker
 			if operation != "" {
 				call, stop := context.WithTimeout(ctx, 5*time.Second)
@@ -39,7 +52,7 @@ WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`
 					t.Fatal("packet exact worker/query SQL readback", err)
 				}
 				scope := intent.Query.Scope
-				if scope.NativeType != artifact.PCAPNGArtifact || scope.SourceFormat != artifact.PCAPNGFormat || scope.DisplayVersion != query.PacketSummaryDisplayVersion || scope.Selection != (query.LineSelection{}) || scope.Headers != (query.HTTPHeaderWindow{}) || scope.Profile != (query.ProfileSummarySelection{}) || scope.Syscalls != (query.SyscallWindow{}) || scope.Comparison != (query.ProfileComparisonWindow{}) || scope.SourceProjectionDigest != (artifact.Digest{}) || scope.ArtifactID != artifactID || handle != "" && intent.Query.ID != handle || intent.Query.Plan.Profile.Worker.MemoryBytes != query.ProfileComparisonWorkerBytes || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes {
+				if scope.NativeType != wantType || scope.SourceFormat != wantFormat || scope.DisplayVersion != wantDisplay || scope.Selection != (query.LineSelection{}) || scope.Headers != (query.HTTPHeaderWindow{}) || scope.Profile != (query.ProfileSummarySelection{}) || scope.Syscalls != (query.SyscallWindow{}) || scope.Comparison != (query.ProfileComparisonWindow{}) || scope.SourceProjectionDigest != (artifact.Digest{}) || scope.ArtifactID != artifactID || handle != "" && intent.Query.ID != handle || intent.Query.Plan.Profile.Worker.MemoryBytes != query.ProfileComparisonWorkerBytes || intent.Query.Plan.Profile.Worker.WorkerTransientBytes != query.ProfileComparisonWorkerBytes {
 					stop()
 					t.Fatal("packet source/selection/paid resource reservation changed")
 				}
@@ -54,7 +67,7 @@ WHERE q.root_id=$1 AND q.operation_id=$2 AND q.query->'Scope'->>'ArtifactID'=$3`
 					t.Fatal("packet original worker actual384MiB/500m Pod", err)
 				}
 				stop()
-				t.Log("installed packet summary SQL: exact metadataPCAPNG scope/allselectionzero, two read units/one three-key child, original384MiB+500m Pod and transient declaration")
+				t.Log("installed packet summary SQL: exact packet source scope/allselectionzero, two read units/one three-key child, original384MiB+500m Pod and transient declaration")
 			}
 			retirement := verify(handle, operation)
 			if operation != "" {

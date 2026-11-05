@@ -8,6 +8,7 @@ import (
 	"asservat.local/asservat/migrations"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -30,9 +31,14 @@ import (
 // Managed profile admission uses the real original capacity root and current
 // permission/retention/grant adapters. Target and independent human identities
 // are synthetic; this fixture does not invoke a workload profiler.
-func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityapp.RootConfiguration, enrollment capacityapp.Enrollment) (captureAdmissionScenario, capture.Accepted, *postgres.APIContextExecutions) {
+func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacityapp.RootConfiguration, enrollment capacityapp.Enrollment, rawPacket ...bool) (captureAdmissionScenario, capture.Accepted, *postgres.APIContextExecutions) {
 	t.Helper()
 	ctx, admin, poolFor := f.ctx, f.admin, f.fixturePool
+	raw := len(rawPacket) > 0 && rawPacket[0]
+	evidenceType := "profile"
+	if raw {
+		evidenceType = "packetCapture"
+	}
 	s, publisher, _ := f.prepareManagedContext(t, root, enrollment, 60)
 	in := s.a.Plan.Input
 	in.Target.ExecutionClass, in.Capability.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
@@ -42,22 +48,39 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 		t.Fatal(err)
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	in.Retention, err = privacy.Resolve(policies, privacy.Input{Target: in.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "profile", AnchorAt: now}, now)
+	in.Retention, err = privacy.Resolve(policies, privacy.Input{Target: in.Target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: evidenceType, AnchorAt: now}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := planvalue.ProfileComposition{Components: []planvalue.ProfileComponent{{ID: "cpu", Profile: planvalue.ProfileRef{Catalog: "builtin", Name: "go-cpu", Version: "v1"}, Edits: []planvalue.ProfileEdit{{ActionID: "cpu", Field: "actionMaxBytes", Number: 1 << 20}}}}, MaxTotalBytes: 16 << 20, MaxDuration: "30s"}
 	input := planvalue.RecorderInput{CaptureID: in.CaptureID, Executor: in.Executor, Target: in.Target, Composition: c, Retention: in.Retention, Deadline: now.Add(time.Minute), NodeRecorder: true}
-	_, err = planning.CompileRecorder(input, nil, now)
-	var needed planning.EndpointResolutionNeeded
-	if !errors.As(err, &needed) {
-		t.Fatal("endpoint query", err)
+	var reviewed planvalue.RecorderPlan
+	if raw {
+		definition, e := manualRawProfileDefinition()
+		if e != nil {
+			t.Fatal(e)
+		}
+		document, e := json.Marshal(map[string]any{"name": manualRawProfileName, "version": manualRawProfileVersion, "definition": definition})
+		if e != nil {
+			t.Fatal(e)
+		}
+		ref := planvalue.ProfileRef{Catalog: "namespace", Name: manualRawProfileName, Version: manualRawProfileVersion}
+		c = planvalue.ProfileComposition{Components: []planvalue.ProfileComponent{{ID: "net", Profile: ref, Edits: []planvalue.ProfileEdit{{ActionID: "sample", Field: "packetFilter", Text: "tcp dst port 80"}, {ActionID: "sample", Field: "packetAfter", Text: "2s"}}}}, Resolved: []planvalue.CatalogProfile{{Ref: ref, SourceClusterID: in.Target.Request.ClusterID, SourceNamespaceUID: in.Target.Request.Namespace.UID, SourceUID: "synthetic-raw-profile", Document: document, Enabled: true}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
+		input.Composition = c
+		reviewed, err = planning.CompileRecorder(input, recordingCompiler{}, now)
+	} else {
+		_, err = planning.CompileRecorder(input, nil, now)
+		var needed planning.EndpointResolutionNeeded
+		if !errors.As(err, &needed) {
+			t.Fatal("endpoint query", err)
+		}
+		input.Endpoints = []targets.ProfileEndpointResolution{{Request: needed.Request, SourceKind: targets.ProfileEndpointTemplateBinding, SourceName: "go-pprof-loopback", AddressMode: "targetLoopback", Port: 6060, DeclaredPortName: "diagnostics", PathPolicy: "go-pprof/v1", DefinitionDigest: artifact.Digest{1}, EndpointDigest: artifact.Digest{2}, ResolvedAt: now}}
+		reviewed, err = planning.CompileRecorder(input, nil, now)
 	}
-	input.Endpoints = []targets.ProfileEndpointResolution{{Request: needed.Request, SourceKind: targets.ProfileEndpointTemplateBinding, SourceName: "go-pprof-loopback", AddressMode: "targetLoopback", Port: 6060, DeclaredPortName: "diagnostics", PathPolicy: "go-pprof/v1", DefinitionDigest: artifact.Digest{1}, EndpointDigest: artifact.Digest{2}, ResolvedAt: now}}
-	reviewed, err := planning.CompileRecorder(input, nil, now)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("reviewed source", err)
 	}
+
 	p := capture.ContextPreview{ID: custodyID(), AssessmentID: custodyID(), AssessmentRulesDigest: planning.RecorderAssessmentRulesDigest(), RootID: s.a.RootID, InstallationID: s.a.Recovery.InstallationID, IssuerEpoch: s.a.Recovery.IssuerEpoch, CaptureID: in.CaptureID, CaseID: s.a.CaseID, OccurrenceID: s.a.OccurrenceID, ArtifactID: s.a.Registration.Location.ArtifactID, AttemptID: s.a.Registration.Location.AttemptID, Actor: in.Executor, ExecutionClass: artifact.ContextAPIExecution,
 		Intent: capture.ContextIntent{Target: targets.WorkloadRequest{ClusterID: in.Target.Request.ClusterID, Namespace: in.Target.Request.Namespace.Name, Kind: in.Target.Request.Workload.Kind, Name: in.Target.Request.Workload.Name}, Composition: &c, RequestedSeconds: in.Retention.RequestedSeconds}, Target: in.Target.Request, Pin: in.Target.Pin,
 		Storage: capture.ContextStorageSelection{StoreID: s.a.Registration.StoreID, AllocationID: s.a.Registration.AllocationID, PoolRevision: s.a.Registration.PoolRevision, AllocationRevision: s.a.Registration.AllocationRevision, BindingRevision: s.a.Storage.Revision}, Retention: reviewOf(in.Retention), Audience: s.a.Eligibility.DefaultAudience, CanonicalScope: reviewed.CanonicalScope, ScopeDigest: reviewed.ScopeDigest, CreatedAt: now, Deadline: input.Deadline}
@@ -74,13 +97,20 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 		t.Fatal(err)
 	}
 	g := authorization.Grant{ID: custodyID(), RootID: p.RootID, Kind: authorization.GrantAdHocCapture, PreviewID: p.ID, CaptureID: p.CaptureID, Target: in.Target.Target(), Requester: p.Actor, ExecutionDigest: p.ScopeDigest, Scope: p.CanonicalScope, Review: []byte(`{}`), DataClass: "raw", Reasons: []authorization.SensitiveReason{{ActionID: reviewed.Actions[0].ID, Code: planvalue.ReasonLiveProfile}}, Lifetime: time.Hour, Revision: 1}
+	if raw {
+		g.Reasons = reviewed.Approval.Reasons
+	}
 	g.ReviewDigest = authapp.ReviewDigest(g, g.Review)
 	g, _, err = grants.RequestGrant(ctx, authapp.StoredGrantRequest{Grant: g, IdempotencyKey: "profile-review", RequestDigest: sha256.Sum256([]byte("synthetic-profile-review"))}, s.a.Recovery)
 	if err != nil {
 		t.Fatal("profile review", err)
 	}
 	in.Deadline = input.Deadline
-	in.Profile, err = planning.ProfileContextFromScope(c, in.Target.Request, reviewed.CanonicalScope)
+	if raw {
+		in.Recorder, err = planning.RecorderContextFromScope(c, reviewed.CanonicalScope)
+	} else {
+		in.Profile, err = planning.ProfileContextFromScope(c, in.Target.Request, reviewed.CanonicalScope)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,6 +121,9 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	s.a.SubmissionDigest = captureapp.ContextRequestDigest(p.ID)
 	r := &s.a.Registration
 	r.NativeLimit = 1 << 20
+	if raw {
+		r.NativeLimit = artifact.RecordingNativeLimit
+	}
 	r.AnchorAt = in.Retention.AnchorAt
 	r.WriteUntil = in.Deadline
 	r.ExpiresAt = in.Retention.ExpiresAt
@@ -115,7 +148,11 @@ func admitQueryLedgerProfile(t *testing.T, f *capacitySQLFixture, root capacitya
 	if err != nil {
 		t.Fatal("approved profile admission", err)
 	}
-	if accepted.Expectation.Profile == nil || accepted.Expectation.Recording != nil || accepted.Expectation.DataClass != "raw" || accepted.Expectation.NativeType != artifact.PprofArtifact {
+	if raw {
+		if accepted.Expectation.Recording == nil || accepted.Expectation.Recording.Profile != "rawPackets" || accepted.Expectation.NativeType != artifact.RawPCAPNGArtifact || accepted.Expectation.DataClass != "raw" {
+			t.Fatal("raw admitted with wrong shape")
+		}
+	} else if accepted.Expectation.Profile == nil || accepted.Expectation.Recording != nil || accepted.Expectation.DataClass != "raw" || accepted.Expectation.NativeType != artifact.PprofArtifact {
 		t.Fatal("profile admitted with wrong shape")
 	}
 

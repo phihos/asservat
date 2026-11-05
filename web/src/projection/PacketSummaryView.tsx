@@ -1,26 +1,27 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
-import type { ContextProjection } from './projection';
+import type { ContextProjection, PacketCaptureMode } from './projection';
 
-type Props = { controller: ContextProjection; session: Session; scope: AbortSignal; caseID: string; artifactID: string; version: string };
+type Props = { controller: ContextProjection; session: Session; scope: AbortSignal; caseID: string; artifactID: string; version: string; captureMode?: PacketCaptureMode };
 
 export function PacketSummaryView(props: Props) {
-  return <SavedPacketSummary key={JSON.stringify([props.caseID, props.artifactID, props.version])} {...props}/>;
+  return <SavedPacketSummary key={JSON.stringify([props.caseID, props.artifactID, props.version, props.captureMode])} {...props}/>;
 }
-function SavedPacketSummary({ controller, session, scope, caseID, artifactID, version }: Props) {
+function SavedPacketSummary({ controller, session, scope, caseID, artifactID, version, captureMode = 'networkHeaders' }: Props) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.snapshot);
-  const attached = controller.isAttachedTo(session, scope, caseID, artifactID, version);
+  const attached = controller.isAttachedTo(session, scope, caseID, artifactID, version, captureMode);
   const state = attached ? snapshot : { phase: 'idle' as const };
-  useEffect(() => controller.attach(session, scope, caseID, artifactID, version), [controller, session, scope, caseID, artifactID, version]);
+  useEffect(() => controller.attach(session, scope, caseID, artifactID, version, captureMode), [controller, session, scope, caseID, artifactID, version, captureMode]);
   const summary = state.packetSummary;
   return <section aria-label="Saved packet summary" aria-busy={state.phase === 'loading'}>
     <h3>Saved packet summary</h3>
-    <p>Inspect the saved network headers. Numeric endpoints may contain user data. This view excludes payload, names and comments.</p>
+    <p>{captureMode === 'rawPackets' ? 'Inspect fixed numeric metadata from the saved raw packets.' : 'Inspect the saved network headers.'} Numeric endpoints may contain user data. This view excludes payload, names and comments.</p>
     {state.phase === 'loading' && <p role="status">Checking access and preparing the saved packet summary…</p>}
     {state.phase === 'pending' && <><p role="status">The saved packet summary is being prepared.</p><Button className="button secondary" isDisabled={!state.canCheck} onPress={() => void controller.check()}>Check result</Button></>}
     {state.phase === 'result' && summary && <>
       <dl className="facts"><dt>Saved packet records</dt><dd>{summary.packets.toLocaleString()}</dd><dt>{summary.drop_reporting === 'snapshotOutputLimit' ? 'Snapshot output-limit exclusions' : 'Reported capture exclusions'}</dt><dd>{summary.drops === null ? 'Unknown' : summary.drops.toLocaleString()}</dd><dt>Directional conversations</dt><dd>{summary.conversations_total.toLocaleString()}</dd></dl>
+      {captureMode === 'rawPackets' && <><dl className="facts"><dt>Unclassified saved records</dt><dd>{summary.unclassified_packets?.toLocaleString()}</dd></dl><p>Records that are too short or unsupported for endpoint classification are counted as unclassified. Their headers are not guessed.</p></>}
       <p>Counts describe saved records, not unique network datagrams. Acquisition coverage is unknown; reported exclusions are not measured network loss.</p>
       {summary.drop_reporting === 'captureExclusions' && <p>Capture exclusions can include filtering, unsupported packets, output limits and source-reported loss.</p>}
       {summary.drop_reporting === 'snapshotOutputLimit' && <p>This counter reports records excluded by the snapshot output limit; it does not measure all capture loss.</p>}

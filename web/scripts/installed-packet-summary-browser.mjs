@@ -20,6 +20,9 @@ function event(value) {
 }
 const config = await command();
 assert.equal(config.mode, 'packet');
+const captureMode = config.packet_capture_mode ?? 'networkHeaders';
+assert(['networkHeaders', 'rawPackets'].includes(captureMode), 'closed expected source mode');
+const raw = captureMode === 'rawPackets';
 assert.equal(new URL(config.origin).protocol, 'https:');
 assert.equal(new URL(config.proxy).hostname, '127.0.0.1');
 assert.match(config.caseID, /^[0-9a-f-]{36}$/);
@@ -95,7 +98,7 @@ try {
         const data = read.reply?.data;
         const artifacts = Array.isArray(data?.artifacts) ? data.artifacts : [];
         const source = artifacts.find(a => a.artifact_id === config.artifactID);
-        caseDiagnostic = { http: read.http, body: read.body, pageConsumed, schema: validOutput_get_case(read.reply), ok: read.status === 'ok', caseMatch: data?.case?.case_id === config.caseID, ordinary: data?.case?.access === 'ordinary', sourceMatch: source?.kind === 'packetCapture' && source?.native_format === 'pcapng' && source?.data_class === 'metadata' && source?.digest === config.version && Date.parse(source?.expires_at) > Date.now() };
+        caseDiagnostic = { http: read.http, body: read.body, pageConsumed, schema: validOutput_get_case(read.reply), ok: read.status === 'ok', caseMatch: data?.case?.case_id === config.caseID, ordinary: data?.case?.access === 'ordinary', sourceMatch: source?.kind === 'packetCapture' && source?.native_format === (raw ? 'pcapng-raw' : 'pcapng') && source?.data_class === (raw ? 'raw' : 'metadata') && source?.digest === config.version && Date.parse(source?.expires_at) > Date.now() };
         process.stderr.write('installed packet case ' + JSON.stringify(caseDiagnostic) + '\n');
       }
       assert.equal(read.http, 200, 'operation HTTP status');
@@ -183,6 +186,13 @@ try {
       assert.deepEqual(result.provenance, [{ artifactID: config.artifactID, digest: config.version }]);
       stage = 'rendered';
       const summary = result.data;
+      assert.equal(summary.capture_mode, captureMode, 'result bound to attached source mode');
+      if (raw) assert(Number.isSafeInteger(summary.unclassified_packets) && summary.unclassified_packets >= 0 && summary.unclassified_packets <= summary.packets, 'explicit raw unclassified count');
+      else assert(!Object.hasOwn(summary, 'unclassified_packets'), 'legacy metadata result shape');
+      const classified = summary.packets - (raw ? summary.unclassified_packets : 0);
+      const classifiedRows = summary.conversations.reduce((total, row) => total + row.packets, 0);
+      assert(classifiedRows <= classified && (summary.conversations_truncated || classifiedRows === classified), 'classified packet counts');
+      assert(!JSON.stringify(result).includes('synthetic-approved-recording'), 'payload marker absent result');
       const table = panel.getByRole('table', { name: 'Saved packet conversations', exact: true });
       await expect(table).toBeVisible();
       await expect(table.getByRole('row')).toHaveCount(summary.conversations.length + 1);
@@ -192,7 +202,9 @@ try {
       await expect(panel.locator('dt:has-text("Saved packet records") + dd')).toHaveText(summary.packets.toLocaleString('en-US'));
       await expect(panel.locator('dt:has-text("Directional conversations") + dd')).toHaveText(summary.conversations_total.toLocaleString('en-US'));
       await expect(panel.locator('dt:has-text("exclusions") + dd')).toHaveText(summary.drops === null ? 'Unknown' : summary.drops.toLocaleString('en-US'));
-      process.stderr.write('installed packet rendered records/conversations/exclusions checked before SQL terminal join\n');
+      if (raw) await expect(panel.locator('dt:has-text("Unclassified saved records") + dd')).toHaveText(summary.unclassified_packets.toLocaleString('en-US'));
+      assert(!(await page.locator('body').textContent()).includes('synthetic-approved-recording'), 'payload marker absent DOM');
+      process.stderr.write('installed packet rendered records/conversations/exclusions/unclassified checked before SQL terminal join\n');
       terminal = true;
     }
   }

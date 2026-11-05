@@ -18,7 +18,7 @@ var _ authorizationapp.ContextProjectionCatalog = (*ContextPublications)(nil)
 
 // ContextProjectionEvidence returns the independently verified fixed context
 // profile, an httpHeaders extract (ADR-282), or retained raw pprof for the
-// closed summary (ADR-291), and its original publication
+// closed summary (ADR-291), or fixed raw packet summary (ADR-304), and original publication
 // identity. The SELECT-only facet provides
 // no native content or read permit. C-03 checks ordinary target eligibility
 // before calling it, then current audience, retention and query-purpose state.

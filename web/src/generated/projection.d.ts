@@ -187,7 +187,9 @@ export interface components {
                  * @description Original total query cutoff, irreversibly shortened by effective evidence access. A poll never extends it. Managed views clear by this cutoff or earlier on scope loss or closure; this cannot recall external copies. Distinct from the current request disclosure deadline.
                  */
                 query_expires_at: string;
-            };
+                /** @description Saved raw packet records without usable complete headers. These records remain in packets but not conversations; this is not a drop or network-loss count. Required for rawPackets and omitted for networkHeaders. */
+                unclassified_packets?: number;
+            } & unknown;
         } | {
             /** @constant */
             status: "pending";

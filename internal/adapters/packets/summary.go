@@ -30,16 +30,35 @@ type summaryScan struct {
 	interfaces     []summaryInterface
 	rows           map[[3]string]int64
 	packets, drops int64
+	unclassified   int64
 	unknown        bool
 }
 
-// SummarizePCAPNG reads only closed metadata PCAPNG. It uses the same maintained
-// header decoder as acquisition and never exports options, payload or names.
+// SummarizePCAPNG interprets fixed numeric metadata from saved metadata or raw
+// PCAPNG. Raw byte caps may cut inside a header: every record still counts,
+// while only completely decoded endpoint tuples enter conversations.
+// It never exports options, payload or names.
 // Authenticity belongs to the enclosing source reader and canonical checker.
 func SummarizePCAPNG(ctx context.Context, source io.Reader, e artifact.ContextExpectation, from, until time.Time) (query.PacketSummary, error) {
 	var zero query.PacketSummary
-	if ctx == nil || ctx.Err() != nil || source == nil || e.NativeType != artifact.PCAPNGArtifact || e.DataClass != "metadata" || e.Registration.NativeLimit < 1 || e.Registration.NativeLimit > artifact.RecordingNativeLimit || from.IsZero() || until.Before(from) {
+	if ctx == nil || ctx.Err() != nil || source == nil || (e.NativeType != artifact.PCAPNGArtifact || e.DataClass != "metadata") && (e.NativeType != artifact.RawPCAPNGArtifact || e.DataClass != "raw") || e.Registration.NativeLimit < 1 || e.Registration.NativeLimit > artifact.RecordingNativeLimit || from.IsZero() || until.Before(from) {
 		return zero, query.ErrUnavailable
+	}
+	raw := e.NativeType == artifact.RawPCAPNGArtifact
+	limit := Snaplen
+	var rawLimits RawLimits
+	if raw {
+		if e.Recording == nil || e.Recording.Profile != "rawPackets" {
+			return zero, query.ErrUnavailable
+		}
+		rawLimits.Snaplen = e.Recording.Snaplen
+		if caps := e.Recording.ProtocolSnaplen; caps != nil {
+			rawLimits.TCP, rawLimits.UDP, rawLimits.ICMP = caps.TCP, caps.UDP, caps.ICMP
+		}
+		if !rawLimits.valid() {
+			return zero, query.ErrUnavailable
+		}
+		limit = rawLimits.Max()
 	}
 	s := summaryScan{ctx: ctx, rows: make(map[[3]string]int64)}
 	limited := &io.LimitedReader{R: summaryContextReader{ctx, source}, N: e.Registration.NativeLimit + 1}
@@ -85,7 +104,7 @@ func SummarizePCAPNG(ctx context.Context, source io.Reader, e artifact.ContextEx
 			s.sections++
 			s.interfaces = nil
 		case 1:
-			if len(body) < 8 || s.order.Uint16(body) != 1 || s.order.Uint32(body[4:]) < 1 || s.order.Uint32(body[4:]) > Snaplen || len(s.interfaces) >= 4096 {
+			if len(body) < 8 || s.order.Uint16(body) != 1 || s.order.Uint32(body[4:]) < 1 || s.order.Uint32(body[4:]) > uint32(limit) || len(s.interfaces) >= 4096 {
 				return zero, query.ErrUnavailable
 			}
 			inf := summaryInterface{snap: s.order.Uint32(body[4:]), resolution: 6}
@@ -106,7 +125,7 @@ func SummarizePCAPNG(ctx context.Context, source io.Reader, e artifact.ContextEx
 				return zero, query.ErrUnavailable
 			}
 			index, captured, wire := s.order.Uint32(body), s.order.Uint32(body[12:]), s.order.Uint32(body[16:])
-			if index >= uint32(len(s.interfaces)) || captured > wire || captured > s.interfaces[index].snap || captured > Snaplen || int((captured+3)&^3) > len(body)-20 {
+			if index >= uint32(len(s.interfaces)) || captured > wire || captured > s.interfaces[index].snap || captured > uint32(limit) || int((captured+3)&^3) > len(body)-20 {
 				return zero, query.ErrUnavailable
 			}
 			inf := &s.interfaces[index]
@@ -126,8 +145,23 @@ func SummarizePCAPNG(ctx context.Context, source io.Reader, e artifact.ContextEx
 				return zero, query.ErrUnavailable
 			}
 			frame := body[20 : 20+captured]
+			if s.packets >= query.PacketSummaryMaxCount {
+				return zero, query.ErrUnavailable
+			}
+			s.packets++
+			inf.packets++
+			if raw {
+				cap, ok := rawFrameCap(frame, rawLimits)
+				if !ok || len(frame) > cap {
+					return zero, query.ErrUnavailable
+				}
+			}
 			count, drop := decoder.headerLength(frame)
-			if drop != DropNone || count != len(frame) {
+			if raw && drop != DropNone {
+				s.unclassified++
+				continue
+			}
+			if drop != DropNone || !raw && count != len(frame) {
 				return zero, query.ErrUnavailable
 			}
 			row, ok := summaryConversation(decoder)
@@ -138,12 +172,7 @@ func SummarizePCAPNG(ctx context.Context, source io.Reader, e artifact.ContextEx
 			if _, ok := s.rows[key]; !ok && len(s.rows) >= query.PacketSummaryMaxAggregates {
 				return zero, query.ErrUnavailable
 			}
-			if s.packets >= query.PacketSummaryMaxCount {
-				return zero, query.ErrUnavailable
-			}
 			s.rows[key]++
-			s.packets++
-			inf.packets++
 		case 5:
 			if len(body) < 12 || s.order.Uint32(body) >= uint32(len(s.interfaces)) {
 				return zero, query.ErrUnavailable
@@ -192,6 +221,10 @@ func SummarizePCAPNG(ctx context.Context, source io.Reader, e artifact.ContextEx
 		return zero, query.ErrUnavailable
 	}
 	out := query.PacketSummary{CaptureMode: "networkHeaders", Packets: s.packets, DropReporting: "unavailable", Conversations: make([]query.PacketConversation, 0, min(len(s.rows), query.PacketSummaryMaxConversations)), ConversationsTotal: len(s.rows)}
+	if raw {
+		out.CaptureMode = "rawPackets"
+		out.UnclassifiedPackets = &s.unclassified
+	}
 	if !s.unknown {
 		out.Drops = &s.drops
 		out.DropReporting = "captureExclusions"

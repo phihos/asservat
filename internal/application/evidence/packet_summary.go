@@ -11,7 +11,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 )
 
-// PacketSummarizer is a closed worker-only metadata interpreter, with no
+// PacketSummarizer is a closed worker-only fixed-metadata interpreter, with no
 // provider, key, query expression or external lookup capability.
 type PacketSummarizer func(context.Context, io.Reader, artifact.ContextExpectation, time.Time, time.Time) (query.PacketSummary, error)
 
@@ -31,7 +31,7 @@ func ReadPacketSummary(ctx context.Context, opened NativeArtifactSource, source 
 	}
 	defer closeSource()
 	window, ok := opened.(NativeCaptureWindow)
-	if !ok || ctx == nil || ctx.Err() != nil || summarize == nil || !scope.Valid() || scope.NativeType != artifact.PCAPNGArtifact || !source.Valid(scope.Version) || !projectionExpectation(source.Expectation, scope) {
+	if !ok || ctx == nil || ctx.Err() != nil || summarize == nil || !scope.Valid() || (scope.NativeType != artifact.PCAPNGArtifact && scope.NativeType != artifact.RawPCAPNGArtifact) || !source.Valid(scope.Version) || !projectionExpectation(source.Expectation, scope) {
 		return zero, query.ErrUnavailable
 	}
 	from, until := window.CaptureWindow()
@@ -56,7 +56,7 @@ func ReadPacketSummary(ctx context.Context, opened NativeArtifactSource, source 
 		clear(summary.Conversations)
 		return zero, query.ErrUnavailable
 	}
-	if err != nil || !summary.Valid() {
+	if err != nil || !summary.Valid() || (scope.NativeType == artifact.RawPCAPNGArtifact) != (summary.CaptureMode == "rawPackets") {
 		clear(summary.Conversations)
 		return zero, query.ErrUnavailable
 	}

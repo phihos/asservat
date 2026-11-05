@@ -35,6 +35,12 @@ func installedProfileComparisonBrowser(t *testing.T, ctx context.Context, browse
 // Heap mode uses the same installed React/session transport and one existing
 // query. Native bytes stay in a Go-owned private directory, never stdout.
 func installedProfileBrowser(t *testing.T, ctx context.Context, browser *installedBrowser, address string, source installedProfileComparisonSource, mode string, observed func(installedComparisonReply), restoreDuringNative ...bool) (func(string, any) installedComparisonReply, func() ([]byte, installedJourneyDownload), func()) {
+	return installedProfileBrowserSourceMode(t, ctx, browser, address, source, mode, observed, "", restoreDuringNative...)
+}
+
+// Only the packet owner supplies its trusted source mode. Other drivers keep
+// their original private input and function signature.
+func installedProfileBrowserSourceMode(t *testing.T, ctx context.Context, browser *installedBrowser, address string, source installedProfileComparisonSource, mode string, observed func(installedComparisonReply), packetCaptureMode string, restoreDuringNative ...bool) (func(string, any) installedComparisonReply, func() ([]byte, installedJourneyDownload), func()) {
 	t.Helper()
 	origin, err := url.Parse(browser.base)
 	if err != nil || browser.client.Jar == nil || observed == nil {
@@ -67,6 +73,13 @@ func installedProfileBrowser(t *testing.T, ctx context.Context, browser *install
 	input := map[string]any{"origin": browser.base, "proxy": proxy, "cookies": cookies, "caseID": source.CaseID, "artifactID": source.ArtifactID, "mode": mode, "nativeDestination": nativePath}
 	if mode == "packet" {
 		input["version"] = source.Version
+		if packetCaptureMode == "" {
+			packetCaptureMode = "networkHeaders"
+		}
+		if packetCaptureMode != "networkHeaders" && packetCaptureMode != "rawPackets" {
+			t.Fatal("invalid packet source mode")
+		}
+		input["packet_capture_mode"] = packetCaptureMode
 	}
 	if len(restoreDuringNative) == 1 && restoreDuringNative[0] {
 		input["restoreDuringNative"] = true

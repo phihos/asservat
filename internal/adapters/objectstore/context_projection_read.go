@@ -39,7 +39,7 @@ func NewContextProjectionReader(store *CustodyStore) (*ContextProjectionReader, 
 // ReadProjectionNative returns the scope's one result: the pod-status DTO, or
 // one rechecked httpHeaders page.
 func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, source evidence.NativeContextSource, scope value.ContextProjectionScope, keys evidence.KeyOpener, until time.Time) (value.ProjectionResult, error) {
-	if r != nil && scope.NativeType == artifact.PCAPNGArtifact {
+	if r != nil && (scope.NativeType == artifact.PCAPNGArtifact || scope.NativeType == artifact.RawPCAPNGArtifact) {
 		return r.readPacketSummary(ctx, source, scope, keys, until)
 	}
 	if r != nil && (scope.NativeType == artifact.SyscallRecordsArtifact || scope.NativeType == artifact.SyscallArgumentsArtifact) {

@@ -584,7 +584,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             report["goVersion"] = run(["go", "version"])
             report["installedHistoryBrowserQualification"] = collector_qualification and focus == "approved-recording"
             report["installedProfileComparisonBrowserQualification"] = collector_qualification and focus == "profile-comparison"
-            report["installedPacketSummaryBrowserQualification"] = collector_qualification and focus == "manual-mixed"
+            report["installedPacketSummaryBrowserQualification"] = collector_qualification and focus in ("manual-mixed", "manual-raw")
             report["installedHeapBrowserQualification"] = collector_qualification and focus == "manual-profile" and profile_variant == "heap"
             report["installedProfileAuth"] = profile_auth if collector_qualification and focus == "manual-profile" else None
             report["installedProfileTransport"] = profile_transport if collector_qualification and focus == "manual-profile" else None

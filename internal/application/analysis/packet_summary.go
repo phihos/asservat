@@ -31,16 +31,36 @@ type PacketSummaryReads struct {
 	Routes  ContextProjectionRouteReader
 }
 
+// ContextPacketProjectionRouteReader is an optional source discriminator from
+// the same private case-locator lookup. It grants no read authority; C-03 must
+// independently match the exact published source. Legacy routes remain
+// metadata-only and cannot enable raw aggregates.
+type ContextPacketProjectionRouteReader interface {
+	ResolvePacketProjectionRoute(context.Context, string, string, identity.Identity, artifact.RecoveryProof) (value.ContextProjectionCandidate, error)
+}
+
 func (s PacketSummaryReads) Begin(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, request value.PacketSummaryRequest) (*ContextProjectionDelivery, error) {
 	var d *ContextProjectionDelivery
 	err := queryStepped("configuration", value.ErrUnavailable)
 	if request.Valid() && s.Routes != nil {
 		d, err = s.Service.begin(ctx, current, invocation, "get_pcap_summary", ContextQueryInput{Packet: request}, func(ctx context.Context, caller identity.Identity, recovery artifact.RecoveryProof) (value.ContextProjectionCandidate, error) {
-			c, err := s.Routes.ResolveProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller, recovery)
-			if err != nil || !c.RouteValid() || c.CaseID != request.CaseID || c.ArtifactID != request.ArtifactID || c.NativeType != "" || c.Selection != (value.LineSelection{}) || c.Headers != (value.HTTPHeaderWindow{}) || c.Profile != (value.ProfileSummarySelection{}) || c.Syscalls != (value.SyscallWindow{}) || c.Comparison != (value.ProfileComparisonWindow{}) {
+			var c value.ContextProjectionCandidate
+			var err error
+			if routes, ok := s.Routes.(ContextPacketProjectionRouteReader); ok {
+				c, err = routes.ResolvePacketProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller, recovery)
+				if c.NativeType != artifact.PCAPNGArtifact && c.NativeType != artifact.RawPCAPNGArtifact {
+					return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)
+				}
+			} else {
+				c, err = s.Routes.ResolveProjectionRoute(ctx, request.CaseID, request.ArtifactID, caller, recovery)
+				if c.NativeType != "" {
+					return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)
+				}
+				c.NativeType = artifact.PCAPNGArtifact
+			}
+			if err != nil || !c.RouteValid() || c.CaseID != request.CaseID || c.ArtifactID != request.ArtifactID || c.Selection != (value.LineSelection{}) || c.Headers != (value.HTTPHeaderWindow{}) || c.Profile != (value.ProfileSummarySelection{}) || c.Syscalls != (value.SyscallWindow{}) || c.Comparison != (value.ProfileComparisonWindow{}) {
 				return value.ContextProjectionCandidate{}, errors.Join(value.ErrUnavailable, err)
 			}
-			c.NativeType = artifact.PCAPNGArtifact
 			return c, nil
 		})
 	}
@@ -48,7 +68,7 @@ func (s PacketSummaryReads) Begin(ctx context.Context, current identities.Curren
 	return d, err
 }
 func (d *ContextProjectionDelivery) PacketSummary() (value.PacketSummary, bool) {
-	if d == nil || d.owner == nil || d.pending || d.owner.query.Scope.NativeType != artifact.PCAPNGArtifact {
+	if d == nil || d.owner == nil || d.pending || d.owner.query.Scope.NativeType != artifact.PCAPNGArtifact && d.owner.query.Scope.NativeType != artifact.RawPCAPNGArtifact {
 		return value.PacketSummary{}, false
 	}
 	d.owner.mu.Lock()

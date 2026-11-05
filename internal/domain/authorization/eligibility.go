@@ -17,6 +17,9 @@ const (
 	ReadApproved   Operation = "readApproved"
 	// ReadProfileSummary authorizes only a closed pprof aggregate, never raw bytes.
 	ReadProfileSummary Operation = "readProfileSummary"
+	// ReadPacketSummary permits only fixed numeric aggregates of a raw PCAPNG.
+	// It never authorizes raw query expressions, payload or native downloads.
+	ReadPacketSummary Operation = "readPacketSummary"
 	// ReadSyscallProjection admits only fixed metadata views of stored arguments.
 	ReadSyscallProjection Operation = "readSyscallProjection"
 	DownloadApproved      Operation = "downloadApproved"
@@ -97,7 +100,7 @@ func (t Target) Valid() bool {
 	return UUID(t.ClusterID) && identity.Text(t.NamespaceUID, 64) && identity.Text(t.WorkloadUID, 64) && identity.Text(t.PodUID, 64)
 }
 func (op Operation) Valid() bool {
-	return op == CollectContext || op == ReadApproved || op == ReadProfileSummary || op == ReadSyscallProjection || op == DownloadApproved || op == ApproveAction
+	return op == CollectContext || op == ReadApproved || op == ReadProfileSummary || op == ReadPacketSummary || op == ReadSyscallProjection || op == DownloadApproved || op == ApproveAction
 }
 func validAudience(a artifact.AudienceAssignment) bool {
 	return (a.Kind == "User" || a.Kind == "Group" || a.Kind == "Workload") && identity.Text(a.Issuer, 2048) && identity.Text(a.SubjectID, 256) && validRole(a.Role) && (a.BasisKind == "AccessBinding" || a.BasisKind == "PermissionSource") && identity.Text(a.BasisUID, 64) && UUID(a.AssignmentID) && a.BasisDigest != (artifact.Digest{})
@@ -109,7 +112,7 @@ func permits(role string, op Operation) bool {
 	switch op {
 	case CollectContext:
 		return role == "workload-maintainer"
-	case ReadApproved, ReadProfileSummary, ReadSyscallProjection, DownloadApproved:
+	case ReadApproved, ReadProfileSummary, ReadPacketSummary, ReadSyscallProjection, DownloadApproved:
 		return role == "evidence-reader" || role == "workload-maintainer" || role == "evidence-owner"
 	case ApproveAction:
 		return role == "action-approver"
@@ -212,10 +215,13 @@ func evaluateDetailScope(i identity.Identity, p Projection, op Operation, t Targ
 	if e != nil && op == ReadProfileSummary && (e.DataClass != "raw" || e.NativeType != artifact.PprofArtifact) {
 		return deny("ProjectionSourceUnsupported")
 	}
+	if e != nil && op == ReadPacketSummary && (e.DataClass != "raw" || e.NativeType != artifact.RawPCAPNGArtifact) {
+		return deny("ProjectionSourceUnsupported")
+	}
 	if e != nil && op == ReadSyscallProjection && (e.DataClass != "raw" || e.NativeType != artifact.SyscallArgumentsArtifact) {
 		return deny("ProjectionSourceUnsupported")
 	}
-	if e != nil && op != ReadProfileSummary && op != ReadSyscallProjection && e.DataClass != "metadata" && e.DataClass != "extract" {
+	if e != nil && op != ReadProfileSummary && op != ReadPacketSummary && op != ReadSyscallProjection && e.DataClass != "metadata" && e.DataClass != "extract" {
 		return deny("RawAccessUnsupported")
 	}
 	until := identity.Earlier(i.ValidUntil, p.FreshUntil)

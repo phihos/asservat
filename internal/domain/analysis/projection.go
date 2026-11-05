@@ -60,6 +60,8 @@ func LookupProjectionSource(nativeType string) (ProjectionSource, bool) {
 	case artifact.PodStatusArtifact:
 		return ProjectionSource{NativeType: artifact.PodStatusArtifact, Format: artifact.ContextFormat, DataClass: "metadata", EvidenceType: "context",
 			DisplayVersion: ContextDisplayVersion, NativeLimit: artifact.MaxContextBytes, ProjectionDigest: ContextSourceProjectionDigest()}, true
+	case artifact.RawPCAPNGArtifact:
+		return ProjectionSource{NativeType: artifact.RawPCAPNGArtifact, Format: artifact.RawPCAPNGFormat, DataClass: "raw", EvidenceType: "packetCapture", DisplayVersion: RawPacketSummaryDisplayVersion, NativeLimit: artifact.RecordingNativeLimit}, true
 	case artifact.PCAPNGArtifact:
 		return ProjectionSource{NativeType: artifact.PCAPNGArtifact, Format: artifact.PCAPNGFormat, DataClass: "metadata", EvidenceType: "packetCapture", DisplayVersion: PacketSummaryDisplayVersion, NativeLimit: artifact.RecordingNativeLimit}, true
 	case artifact.PprofArtifact:
@@ -96,7 +98,7 @@ func LookupProjectionSourceFor(nativeType, displayVersion string) (ProjectionSou
 // Matches reports whether published facts are exactly this source.
 func (p ProjectionSource) Matches(nativeType, format, dataClass, evidenceType string, nativeLimit int64, digest artifact.Digest) bool {
 	return p.NativeType == nativeType && p.Format == format && p.DataClass == dataClass && p.EvidenceType == evidenceType &&
-		(p.NativeLimit == nativeLimit || (p.NativeType == artifact.PprofArtifact || p.NativeType == artifact.PCAPNGArtifact) && nativeLimit > 0 && nativeLimit <= p.NativeLimit) && p.ProjectionDigest == digest
+		(p.NativeLimit == nativeLimit || (p.NativeType == artifact.PprofArtifact || p.NativeType == artifact.PCAPNGArtifact || p.NativeType == artifact.RawPCAPNGArtifact) && nativeLimit > 0 && nativeLimit <= p.NativeLimit) && p.ProjectionDigest == digest
 }
 
 func ContextSourceProjectionDigest() artifact.Digest {
@@ -212,7 +214,7 @@ func (c ContextProjectionCandidate) selectionValid() bool {
 	switch c.NativeType {
 	case artifact.PodStatusArtifact:
 		return c.Selection.Valid() && c.Headers == HTTPHeaderWindow{} && c.Profile == (ProfileSummarySelection{})
-	case artifact.PCAPNGArtifact:
+	case artifact.PCAPNGArtifact, artifact.RawPCAPNGArtifact:
 		return c.Selection == (LineSelection{}) && c.Headers == (HTTPHeaderWindow{}) && c.Profile == (ProfileSummarySelection{})
 	case artifact.HTTPHeadersArtifact:
 		return c.Selection == LineSelection{} && c.Headers.Valid() && c.Profile == (ProfileSummarySelection{})

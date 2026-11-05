@@ -51,7 +51,7 @@ func TestProjectionSourcePinsAreExact(t *testing.T) {
 	}
 	for name, r := range map[string]app.ContextProjectionEvidence{
 		"mixed":          record("", artifact.HTTPHeadersFormat, "extract", "packetCapture", artifact.RecordingNativeLimit, artifact.Digest{}),
-		"raw":            record(artifact.RawPCAPNGArtifact, artifact.RawPCAPNGFormat, "raw", "packetCapture", artifact.RecordingNativeLimit, artifact.Digest{}),
+		"raw-class":      record(artifact.RawPCAPNGArtifact, artifact.RawPCAPNGFormat, "metadata", "packetCapture", artifact.RecordingNativeLimit, artifact.Digest{}),
 		"extract-digest": record(artifact.HTTPHeadersArtifact, artifact.HTTPHeadersFormat, "extract", "packetCapture", artifact.RecordingNativeLimit, analysis.ContextSourceProjectionDigest()),
 		"pod-evidence":   record("", artifact.ContextFormat, "metadata", "packetCapture", artifact.MaxContextBytes, analysis.ContextSourceProjectionDigest()),
 	} {
