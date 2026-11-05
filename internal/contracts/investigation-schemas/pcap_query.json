@@ -199,7 +199,16 @@
         "type": "null"
       },
       "narrowing_hint": {
-        "type": "null"
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "warnings": {
         "type": "array",
@@ -579,6 +588,27 @@
             ]
           }
         ]
+      },
+      {
+        "if": {
+          "properties": {
+            "truncated": {
+              "const": true
+            }
+          },
+          "required": [
+            "truncated"
+          ]
+        },
+        "then": {
+          "properties": {
+            "narrowing_hint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          }
+        }
       }
     ],
     "$defs": {

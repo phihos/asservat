@@ -10,6 +10,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
+	"os"
 	"strings"
 	"testing"
 )
@@ -270,7 +272,94 @@ func TestPacketQueryMaximumAdmittedPageFitsDirectAndNestedEnvelope(t *testing.T)
 			if len(reply.Body) > contracts.InvestigationOutputLimit || !bytes.Contains(reply.Body, []byte(`"output_limit_reached":true`)) {
 				t.Fatal("shape", len(reply.Body))
 			}
+
+			name := "pcap_query"
+			var envelope struct {
+				Truncated bool    `json:"truncated"`
+				Hint      *string `json:"narrowing_hint"`
+				Data      struct {
+					Result json.RawMessage `json:"result"`
+				} `json:"data"`
+			}
+			if json.Unmarshal(reply.Body, &envelope) != nil {
+				t.Fatal("envelope decode")
+			}
+			inner := reply.Body
+			if nested {
+				name = "get_query_result"
+				if envelope.Truncated || envelope.Hint != nil {
+					t.Fatal("outer query wrapper gained inner limit metadata")
+				}
+				inner = envelope.Data.Result
+			}
+			var limited struct {
+				Truncated bool    `json:"truncated"`
+				Hint      *string `json:"narrowing_hint"`
+			}
+			if json.Unmarshal(inner, &limited) != nil || !limited.Truncated || limited.Hint == nil || *limited.Hint == "" {
+				t.Fatal("limited page lost narrowing hint")
+			}
+			validatePacketQueryCanonicalOutput(t, name, reply.Body)
+			if nested {
+				validatePacketQueryCanonicalOutput(t, "pcap_query", inner)
+			}
 			t.Logf("rows=%d primitive=%d envelope=%d nested=%v", admittedRows, admittedBytes, len(reply.Body), nested)
 		})
+	}
+}
+
+// Validate the actual audited body against the canonical output used by the
+// browser generator as well as the embedded runtime validator used by Call.
+func validatePacketQueryCanonicalOutput(t *testing.T, name string, body []byte) {
+	t.Helper()
+	c := jsonschema.NewCompiler()
+	c.UseLoader(offlineLoader{})
+	c.AssertFormat()
+	for _, file := range []string{"common.schema.json", "mcp-result.schema.json"} {
+		b, e := os.ReadFile("../../../specs/contracts/" + file)
+		if e != nil {
+			t.Fatal(e)
+		}
+		var doc map[string]any
+		if json.Unmarshal(b, &doc) != nil || c.AddResource(doc["$id"].(string), doc) != nil {
+			t.Fatal("canonical base schema")
+		}
+	}
+	b, e := os.ReadFile("../../../specs/contracts/mcp-tools.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	var tools struct {
+		Tools []struct {
+			Name   string          `json:"name"`
+			Output json.RawMessage `json:"outputSchema"`
+		} `json:"tools"`
+	}
+	if json.Unmarshal(b, &tools) != nil {
+		t.Fatal("canonical tool catalog")
+	}
+	var schema *jsonschema.Schema
+	for _, tool := range tools.Tools {
+		if tool.Name == name {
+			doc, e := jsonschema.UnmarshalJSON(bytes.NewReader(tool.Output))
+			if e != nil || c.AddResource("urn:asservat:test-packet-query-output", doc) != nil {
+				t.Fatal("canonical output resource", e)
+			}
+			schema, e = c.Compile("urn:asservat:test-packet-query-output")
+			if e != nil {
+				t.Fatal(e)
+			}
+			break
+		}
+	}
+	if schema == nil {
+		t.Fatal("missing canonical tool", name)
+	}
+	doc, e := jsonschema.UnmarshalJSON(bytes.NewReader(body))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = schema.Validate(doc); e != nil {
+		t.Fatalf("actual %s body violates canonical/browser output: %v", name, e)
 	}
 }

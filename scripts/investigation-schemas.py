@@ -242,9 +242,14 @@ def main():
                 # pages are approved extracts. Limits live in the page, not a cursor.
                 output["properties"]["data_class"] = {"enum": ["metadata", "extract", "raw"]}
                 output["properties"]["truncated"] = {"type": "boolean"}
+                output["properties"]["narrowing_hint"] = copy.deepcopy(common["properties"]["narrowing_hint"])
                 output["properties"]["next_cursor"] = {"type": "null"}
                 branches[0]["properties"]["provenance"] = {"type": "array", "minItems": 1, "maxItems": 1}
             output["allOf"] = [{"oneOf": branches}]
+            if name == "pcap_query":
+                # A limited page needs the same useful hint as the canonical
+                # browser/MCP result; only its poll wrapper remains untruncated.
+                output["allOf"].extend(copy.deepcopy(common.get("allOf", [])))
             description["inputSchema"] = localize(description["inputSchema"])
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()

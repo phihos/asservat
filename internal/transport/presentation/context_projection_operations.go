@@ -342,7 +342,9 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 		envelope.Warnings = []string{packetQueryHandling}
 		envelope.Truncated = page.RowLimitReached || page.ScanLimitReached || page.OutputLimitReached
 		if envelope.Truncated {
-			envelope.Warnings = append(envelope.Warnings, "QueryLimit: Narrow the packet filter, time interval or selected fields to inspect another bounded result.")
+			hint := "Narrow the packet filter, time interval or selected fields to inspect another bounded result."
+			envelope.NarrowingHint = &hint
+			envelope.Warnings = append(envelope.Warnings, "QueryLimit: "+hint)
 		}
 		envelope.Data = struct {
 			contracts.PacketQueryPage
@@ -352,6 +354,7 @@ func (s *ContextProjectionOperations) serialize(requestID, name string, d *analy
 			envelope.Data = queryResult(d.Association().QueryID, d.Tool(), envelope, times)
 			envelope.Provenance = []any{}
 			envelope.Truncated = false
+			envelope.NarrowingHint = nil
 		}
 	case d.Tool() == "compare_profiles":
 		comparison, ok := d.ProfileComparison()

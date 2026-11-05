@@ -94,3 +94,46 @@ func TestPacketQueryCombinedReviewChoicesAndCurrentClientDefault(t *testing.T) {
 		t.Fatal("unimplemented query operation advertised")
 	}
 }
+
+func TestLimitedPacketQueryRequiresCanonicalNarrowingHint(t *testing.T) {
+	wire, err := NewInvestigationContracts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile("../../examples/mcp-packet-query-raw-result.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var page map[string]any
+	if err := json.Unmarshal(body, &page); err != nil {
+		t.Fatal(err)
+	}
+	page["truncated"], page["narrowing_hint"] = true, "Narrow the packet filter or time interval."
+	data := page["data"].(map[string]any)
+	data["row_limit_reached"] = true
+	encoded, _ := json.Marshal(page)
+	if err := wire.ValidateOutput("pcap_query", encoded); err != nil {
+		t.Fatal("canonical limited page rejected", err)
+	}
+	outer := make(map[string]any, len(page))
+	for k, v := range page {
+		outer[k] = v
+	}
+	outer["truncated"], outer["narrowing_hint"], outer["provenance"] = false, nil, []any{}
+	outer["data"] = map[string]any{"query_handle": "00000000-0000-4000-8000-000000000091", "tool_name": "pcap_query", "result": page, "query_observed_at": data["query_observed_at"], "query_expires_at": data["query_expires_at"]}
+	encoded, _ = json.Marshal(outer)
+	if err := wire.ValidateOutput("get_query_result", encoded); err != nil {
+		t.Fatal("nested canonical limited page rejected", err)
+	}
+	page["narrowing_hint"] = nil
+	for _, tool := range []string{"pcap_query", "get_query_result"} {
+		v := page
+		if tool == "get_query_result" {
+			v = outer
+		}
+		encoded, _ = json.Marshal(v)
+		if wire.ValidateOutput(tool, encoded) == nil {
+			t.Fatal("limited page without narrowing hint admitted", tool)
+		}
+	}
+}
