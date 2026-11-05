@@ -53,3 +53,13 @@ query authority returns closed Unavailable; PostgreSQL reports no error. Read-on
 review establishes no specific parent/child product defect. The fixture now
 retains the existing safe refusal stage and closed sentinel flags, without new
 reads or dependency/error-body strings. Further diagnosis remains required.
+
+Diagnostic mixed `f5410ffd` FAILS in9.889s at raw-grant with GrantScope=true;
+other closed principal/pool/expiry/revocation/deny/deadline/cancel flags are false.
+All4,300 inputs match and cleanup completes. Read-only review identifies the
+exported resolver mapping successful transaction nil through grantError(nil),
+which returns Unavailable and is mapped to GrantScope. Earlier direct private
+materialization controls bypassed that wrapper. The narrow success return fix
+leaves error mapping and all source/association rules unchanged; a new exported
+reader assertion also verifies that resolution does not spend disclosure.
+A successful mixed lifecycle remains pending.

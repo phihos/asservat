@@ -1,7 +1,7 @@
 {
   "format": "finite-saved-logs-local/v1",
   "scope": "Local component and bounded synthetic resource evidence. Individual failed/setup/skipped results remain original; no installed workflow qualification. Local500m CPU enforcement is unqualified.",
-  "base_commit": "6dd89c26fb392dedf57603402e5041db41277f55",
+  "base_commit": "f5410ffdfd1af41867f62f55ecbd1e923074813c",
   "files": [
     {
       "source": "finite-logs-acquiring-check-focused.log",
@@ -106,6 +106,14 @@
       "sha256": "7b2fc58083e900910ba1b5528d07d044f0b40fecc311b08f03e4d23eef22434c",
       "compressedBytes": 262,
       "compressedSHA256": "994149bc0ec2ed1596f07c1c98f50dc9b31da8490aee9bb4010e8807ac3a45ba"
+    },
+    {
+      "source": "finite-logs-authority-diagnostic-commit.log",
+      "archive": "finite-logs-authority-diagnostic-commit.log.gz",
+      "bytes": 1247,
+      "sha256": "b24cda1b37d4f583dd20921950dc1b6d72ab70997f906236dc4f36bcc38a7a33",
+      "compressedBytes": 331,
+      "compressedSHA256": "9778057c804d9adfbceadb92819e8e8e981abb96ee57f72fd6cee46fab35d30a"
     },
     {
       "source": "finite-logs-authority-green.log",
@@ -612,6 +620,22 @@
       "compressedSHA256": "246cbd0af0845b13a69bd0d4e1ac82fcf80971c6780da58e7bf2b6af37c33463"
     },
     {
+      "source": "finite-logs-db/group-resolver-success-fix-handoff.json",
+      "archive": "finite-logs-db__group-resolver-success-fix-handoff.json.gz",
+      "bytes": 3015,
+      "sha256": "a9c361a08a74635c71030e473dc8c129c80a73b700b4e4e8513e7a5453b0059a",
+      "compressedBytes": 1525,
+      "compressedSHA256": "c9c06c81cc81765e8109492d59f4018505d6aaafa2720e00b3a2f1e291f456af"
+    },
+    {
+      "source": "finite-logs-db/group-resolver-success-focused.log",
+      "archive": "finite-logs-db__group-resolver-success-focused.log.gz",
+      "bytes": 187,
+      "sha256": "48cb4c3a9ecc114c201ea01b4b4de377c7c3d45b37b1cbebe40cb887a6afd026",
+      "compressedBytes": 113,
+      "compressedSHA256": "22bb4f9c58a1cffe46db4312fbd02c9bc8bd3fe4d9db0548206c9fb23b390eda"
+    },
+    {
       "source": "finite-logs-db/handoff.json",
       "archive": "finite-logs-db__handoff.json.gz",
       "bytes": 22002,
@@ -666,6 +690,14 @@
       "sha256": "140000c80cb85e83e090df0541542f8ac9285efd1c4ec48f255b6bd900dab650",
       "compressedBytes": 1516,
       "compressedSHA256": "7875a967d5671b03a1aa9dd3f6195b54feaca235cd73d4d33ac6139cca5b79fb"
+    },
+    {
+      "source": "finite-logs-db/mixed-f5410ffd-campaign.log",
+      "archive": "finite-logs-db__mixed-f5410ffd-campaign.log.gz",
+      "bytes": 53,
+      "sha256": "331c7bd495f1b9807962904caf963c90220b887a9f4ddbf68e0fb701cbcde858",
+      "compressedBytes": 73,
+      "compressedSHA256": "f70a90ce027466b807ed9d050f0e5ac7bb5ee338ed1b0a45ecca1a8b4421a204"
     },
     {
       "source": "finite-logs-db/mixed-f8c8eb5c-campaign.log",
@@ -1484,6 +1516,14 @@
       "compressedSHA256": "2732f5a7b345511f617e725d6c67cf65cd1a390fbb37441ae5bef5a974c7da17"
     },
     {
+      "source": "finite-logs-public-resolver-pre-push.log",
+      "archive": "finite-logs-public-resolver-pre-push.log.gz",
+      "bytes": 11469,
+      "sha256": "a0f54d4896a9e79774b87d84f7f65da78dc54a0daa1cfbf6e7a2342af342f488",
+      "compressedBytes": 2589,
+      "compressedSHA256": "b58f006b4cf797c4d8a37adbc861af4bc674f54075992ec114144a9c64e501cc"
+    },
+    {
       "source": "finite-logs-public-typed-edits-handoff.json",
       "archive": "finite-logs-public-typed-edits-handoff.json.gz",
       "bytes": 5488,
@@ -1714,6 +1754,14 @@
       "sha256": "b2163b79209e05bc7b46b5ad0dcee9dde596f8ac4446adbb0f21763b08cc40bd",
       "compressedBytes": 1845,
       "compressedSHA256": "d695a0cea024162d18bb72a91ff8fee2e956d9c6b1c0984a29b742ea605b59a1"
+    },
+    {
+      "source": "finite-logs-source/mixed-public-resolver-fix-independent-review.json",
+      "archive": "finite-logs-source__mixed-public-resolver-fix-independent-review.json.gz",
+      "bytes": 1217,
+      "sha256": "3ec2df9819c43e05346465cf0db9e3dcfff83df2e552c77511947205870d6ff5",
+      "compressedBytes": 728,
+      "compressedSHA256": "d1fedce5e5c1d2f81a20ff3fa8c44772140b497adeacfadf8ee9d17c4c5e93b7"
     },
     {
       "source": "finite-logs-source/reader-wire-independent-review.json",

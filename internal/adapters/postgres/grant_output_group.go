@@ -23,7 +23,10 @@ func (s *AccessGrants) ResolveGrantedOutput(ctx context.Context, parent string, 
 		out, group, err = resolveGrantedGroupOutput(ctx, q, parent, scope, action)
 		return err
 	})
-	return out, group, grantError(err)
+	if err != nil {
+		return authorization.VerifiedOutput{}, nil, grantError(err)
+	}
+	return out, group, nil
 }
 func resolveGrantedGroupOutput(ctx context.Context, q *custodydb.Queries, parent string, scope artifact.DownloadScope, action string) (authorization.VerifiedOutput, *authorization.GrantOutputGroup, error) {
 	var out authorization.VerifiedOutput

@@ -87,6 +87,15 @@ defect is established. A fixture-only diagnostic now retains the existing
 closed refusal stage and sentinel categories without dependency strings or
 additional reads, so the next campaign can identify the actual boundary.
 
+The diagnostic `f5410ffd` mixed run isolates `raw-grant`/GrantScope (Go1/9.889s,
+unchanged4,300 Git inputs, cleanup[]). The exported group resolver incorrectly
+maps a successful transaction through `grantError(nil)`, unlike its private
+helper used by earlier materialization controls. The local correction returns
+exact output/group with nil on success, preserving existing error mapping and
+all association checks. An exported-reader assertion now precedes materialization
+and verifies unchanged disclosure spend. Focused races and independent review
+pass; the whole mixed-query lifecycle still requires its fresh result.
+
 Mixed real-service qualification and the installed logs/browser/native/history/
 Repeat journey remain pending, as does installed maximum-shape worker evidence.
 Full S-05 and the complete specification goal remain active.

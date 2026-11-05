@@ -343,6 +343,13 @@ func assertMixedLogGrantAssociation(t *testing.T, f *queryLedgerFixture, m logsM
 		return v
 	}
 	before := snapshot()
+	// C3 uses the exported metadata reader before materialization; direct
+	// materialization alone does not exercise that reader's success return.
+	downloadScope := artifact.DownloadScope{RootID: m.grant.RootID, CaptureID: output.CaptureID, ArtifactID: output.ArtifactID, Version: output.ArtifactDigest, ClusterID: output.Target.ClusterID, NamespaceUID: output.Target.NamespaceUID, WorkloadUID: output.Target.WorkloadUID, PodUID: output.Target.PodUID, Principal: m.grant.Requester}
+	resolved, association, err := m.grants.ResolveGrantedOutput(ctx, m.grant.ID, downloadScope, output.ActionID)
+	if err != nil || resolved != output || association == nil || *association != group || snapshot() != before {
+		t.Fatal("exported group source association failed or charged disclosure", err)
+	}
 	for _, kind := range []string{"unrelated-parent", "mutated-child-scope", "stale-parent-scope", "mutated-output-scope", "mutated-artifact-version", "wrong-ordinal", "standalone-output"} {
 		t.Run(kind, func(t *testing.T) {
 			g, o := group, output
