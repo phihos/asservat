@@ -1,5 +1,39 @@
 # Sustained implementation progress
 
+## Audit refusal diagnostics pass real SQL and exact rollback (2026-11-05)
+
+Signed `6297ff69` preserves the effective capacity-audit reader predicate and
+adds operator-only bounded rejection details from held rows, with no added
+reads, roles, state or success-path work. Independent comparison confirms that
+only DETAIL differs from effective65+74. The native failure hook now invokes
+existing diagnostics before its unchanged refusal. On that exact checkpoint,
+the real compiled-reader diagnostic campaign passed 5 tests in 35.743s and
+pristine upgrade139 passed 401 tests in 8.073s; harness/Go exits were 0/0.
+Each matched all 4,197 Git hashes, retained unchanged sources and cleaned up.
+Fresh controls and identical-state permission/source/trust expiry checks retain
+SQL23514/message, with 809–818 bytes of operator detail and a generic public
+adapter. [Originals and limits](../test/results/saved-packet-query-audit-diagnostics-local/README.md)
+also retain exact actual function restoration through 139→138→139.
+
+This is observability for the proven installed failure, not an availability
+fix. Its original failed predicate remains unknown until a later installed
+attempt supplies current timing/category. PR169 remains unmerged.
+
+## Installed packet queries pass; native download audit remains unresolved (2026-11-05)
+
+Candidate `17d72a84` passed all 15 CI jobs. Installed42011944382 passed both
+fixed summaries, MCP keyed replay/query delivery, actual React query delivery,
+covering-grant reuse, exact accounting/key checks and original worker joins.
+The later native GET failed at current audit-profile preflight (Go/harness 1,
+Go811.852s). The specific failing combined SQL guard term was not retained.
+[Original campaign and diagnoses](../test/results/saved-packet-query-native-42011944382/README.md)
+preserve 4,257 exact Git source hashes, unchanged inputs and clean teardown.
+
+No native download/hash/tshark parity or complete S-05 exit follows. The next
+change adds bounded operator-only diagnostics from already-held SQL rows,
+preserving the effective predicate, all cutoffs and the public refusal. It is
+diagnostic work, not an asserted availability fix. PR169 remains open.
+
 ## Same-key replay correction passes real-service composition (2026-11-05)
 
 Candidate `9bf84fcc` passed all 15 CI jobs. Its installed run41990901022
