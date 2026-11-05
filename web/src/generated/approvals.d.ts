@@ -394,7 +394,7 @@ export interface components {
                 actions: ({
                     action_id: string;
                     /** @enum {unknown} */
-                    kind: "packetCapture" | "syscallTrace" | "profile";
+                    kind: "packetCapture" | "syscallTrace" | "profile" | "logs";
                     /** @enum {unknown} */
                     execution_mode: "ongoing" | "onTrigger";
                     before?: string;
@@ -445,6 +445,12 @@ export interface components {
                 } | {
                     /** @enum {unknown} */
                     kind?: "packetCapture" | "syscallTrace";
+                } | {
+                    /** @constant */
+                    kind?: "logs";
+                    /** @constant */
+                    execution_mode?: "onTrigger";
+                    max_bytes?: number;
                 }))[];
                 result_access?: {
                     action_ids: string[];

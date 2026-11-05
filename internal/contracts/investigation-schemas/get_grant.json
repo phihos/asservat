@@ -434,7 +434,8 @@
                               "enum": [
                                 "packetCapture",
                                 "syscallTrace",
-                                "profile"
+                                "profile",
+                                "logs"
                               ]
                             },
                             "execution_mode": {
@@ -786,6 +787,59 @@
                               "not": {
                                 "required": [
                                   "profile"
+                                ]
+                              }
+                            },
+                            {
+                              "properties": {
+                                "kind": {
+                                  "const": "logs"
+                                },
+                                "execution_mode": {
+                                  "const": "onTrigger"
+                                },
+                                "max_bytes": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 67108864
+                                }
+                              },
+                              "required": [
+                                "before",
+                                "after"
+                              ],
+                              "not": {
+                                "anyOf": [
+                                  {
+                                    "required": [
+                                      "profile"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "ring_max_bytes"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "ring_max_age"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter_digest"
+                                    ]
+                                  },
+                                  {
+                                    "required": [
+                                      "filter_instructions"
+                                    ]
+                                  }
                                 ]
                               }
                             }
