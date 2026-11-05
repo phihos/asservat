@@ -87,7 +87,11 @@ func TestPacketSummaryRequiresPhysicalAndTransientBudget(t *testing.T) {
 
 func TestRawPacketSummaryRequiresBothResourceReservations(t *testing.T) {
 	a := testAuthority()
-	a.Scope.NativeType=artifact.PCAPNGArtifact; a.Scope.SourceFormat=artifact.PCAPNGFormat;a.Scope.DisplayVersion=PacketSummaryDisplayVersion;a.Scope.SourceProjectionDigest=artifact.Digest{};a.Scope.Selection=LineSelection{}
+	a.Scope.NativeType = artifact.PCAPNGArtifact
+	a.Scope.SourceFormat = artifact.PCAPNGFormat
+	a.Scope.DisplayVersion = PacketSummaryDisplayVersion
+	a.Scope.SourceProjectionDigest = artifact.Digest{}
+	a.Scope.Selection = LineSelection{}
 	a.Scope.NativeType = artifact.RawPCAPNGArtifact
 	a.Scope.SourceFormat = artifact.RawPCAPNGFormat
 	a.Scope.DisplayVersion = RawPacketSummaryDisplayVersion
