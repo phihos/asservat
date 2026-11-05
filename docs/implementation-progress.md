@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Repeat readiness scheduling correction passes local boundaries (2026-11-05)
+
+The shared response reserve is reduced from1s to750ms, giving readiness250ms
+more within the original request/source deadlines. No API, watch, role, state
+or configuration is added; the existing250ms cadence permits at most one extra
+storage read. The1s binding freshness margin, one joined hint/demand and final
+protected read remain. Current ADR-213/285 wording records this scheduling choice.
+
+The same five-second publication boundary fails under the former reserve and
+passes with750ms; original-source expiry and changed-selection controls refuse.
+Affected capture races pass25.794s. Existing C20 audit/schema/serialization races
+pass7.622s: a3,570-byte successful response takes3.130ms after injected preview
+completion, leaving743.154ms. Its providers are in-memory; this is not installed
+success-tail latency. The initial expired-assessment and test compile failures
+are retained with [local originals](../test/results/saved-syscall-query-readiness-local/README.md).
+Required `make pre-push` passes, including552 console tests.
+
+The separate history test correction and first failed native campaign are
+committed as signed `ab2198ae`. Independent review found no blockers; the corrected candidate's
+full CI/installed workflow remains required. No later Repeat or Stop pass follows.
+
 ## Installed raw syscall queries pass; Repeat preview remains failing (2026-11-05)
 
 Candidate `6fe419ad` completed all five fixed views and new raw MCP/actual React

@@ -431,7 +431,7 @@ resolved API-execution target matches its original
 workload and any explicit Pod pin, move the existing review and sole storage
 hint before catalog and recorder reads. Pass that same owner into ordinary
 facts consumption. Preserve the original five-second stage, observation
-deadlines, one-second response reserve, current eligibility and independent
+deadlines, the 750 ms response reserve, current eligibility and independent
 authoritative storage read. Every return cancels and joins the owner. A
 replacement target retains the ordinary eligibility check before its refusal
 and starts no early hint. Direct and multi-component previews retain their existing order.
@@ -475,3 +475,29 @@ outcome remains undetermined. Broader storage lifecycle/availability and maximum
 analyzer containment are not established. PR160 merged as `5b765322` after
 eligible `pull_request` CI41821140504 passed; the entire merge tree equals
 qualified `80593f93`.
+
+### Readiness response reserve adjustment (2026-11-05)
+
+The shared readiness response reserve is now 750 ms. The former one-second
+reserve was an engineering scheduling choice, not a maintainer authority
+requirement. Native run `42030863610` reached the readiness tail with an expired
+binding: the guarded observation succeeded 137.865 ms before preview refusal,
+but its durable capacity reconciliation completed 31.675 ms afterward. History
+reads had succeeded. This change adds 250 ms to readiness under the same original
+request and source cutoffs; it does not change the five-second ordinary preview,
+the eight-second profile-repeat path, or the one-second binding freshness margin.
+
+There are no new call sites, APIs, watches, roles, state, configuration or retry
+mechanisms. The existing 250 ms polling cadence can perform at most one additional
+storage read in the added quarter-second. The same single hint and demand are
+joined, and the final protected storage read and every post-blocking check remain.
+The response tail is still bounded and does not guarantee that an external audit
+provider finishes within it. Historical one-second measurements above retain
+their original source scope.
+
+The boundary regression fixes the original five-second caller and source facts,
+publishes a current binding 125 ms after the old readiness cutoff, and checks
+original-source expiry and selection changes. A separate C20 test measures its
+existing audit wrapper, public schema and response serialization after an injected
+preview completion with 750 ms left. Its in-memory audit and preview do not
+qualify external provider latency or an installed successful preview tail.

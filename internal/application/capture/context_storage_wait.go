@@ -11,8 +11,10 @@ import (
 )
 
 // Reserve scheduling time for audit completion, final identity and response delivery.
-// This is not a new authority interval or a guarantee those operations finish.
-const storageResponseReserve = time.Second
+// The 750 ms reserve is an engineering scheduling choice, not authority. It leaves
+// 250ms more readiness than the former1s reserve without changing any request or
+// source deadline, and does not guarantee external work finishes in that tail.
+const storageResponseReserve = 750 * time.Millisecond
 
 func storageReadinessUntil(ctx context.Context, until time.Time) time.Time {
 	if deadline, ok := ctx.Deadline(); ok && deadline.Add(-storageResponseReserve).Before(until) {
