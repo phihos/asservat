@@ -1,0 +1,7 @@
+# API-only logs reached the typed start contract
+
+The fresh signed `a03baf86e2332be440c636cf4a2aaef13f03d6af` campaign fails (Go/harness1,470.496s; manual logs13.22s). Its repaired output preparation succeeds; the actual original execution then refuses PrepareStart. Independent review verifies all4,365 Git inputs, sourceUnchangedDuringTest=true, providerLogExit0 and scratch removal. The original report deliberately retains cleanupComplete=false because the lab was retained. Later explicit cleanup exits0 and independently confirms no owned containers, networks, Kind clusters or kept manifest. No original uncertain capture was retried.
+
+A synthetic new reservation server dry-run against that original API reproduces nativeType logs being rejected: the installed CRD lists pprof/goTrace only. The installed CRD remains byte-identical and no synthetic object is persisted. Signed `94519f1b25db43bc599e189022d754656a61ef51` adds the exact existing API logs type with positive64MiB ceiling to the canonical schema, reviewed generator/CEL and CRD. The original five-second permit, executor binding, no-node-field rule and all other native branches are preserved. Root verifies all seven source hashes and exact canonical baseline subtraction. The corrected synthetic-name CRD compiles in server dry-run; spec golden/negative, architecture/start-CRD and existing local-start races pass.
+
+A fresh full installed campaign for94519f1b is running separately. Neither this failure nor the schema/local checks establish an installed logs success.

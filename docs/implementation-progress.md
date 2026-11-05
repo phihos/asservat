@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Finite logs typed start contract correction (2026-11-05)
+
+The repaired `a03baf86` constructor reaches output preparation in a fresh
+installed fixture, then fails at PrepareStart (Go/harness1,470.496s). Native
+server dry-run reproduces the installed CRD rejecting the exact `logs` type.
+All4,365 original sources match Git; retained original diagnostics and separate
+strict cleanup readback are [preserved](../test/results/finite-saved-logs-start-contract/README.md).
+Signed `94519f1b` adds only the existing API logs type and positive64MiB ceiling
+to the canonical start contract, reviewed CEL and CRD. Golden/negative gates,
+existing local-start races and synthetic CRD server compilation pass. Original
+roles, bindings and five-second deadlines remain. Fresh installed qualification
+is running; no installed success is claimed.
+
 ## API-only saved-logs start correction (2026-11-05)
 
 Signed `ed7ebe06` passes CI42112331527, but installed42112422885 fails
